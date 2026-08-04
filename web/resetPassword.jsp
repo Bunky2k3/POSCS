@@ -201,14 +201,12 @@
         <div class="card-body-custom">
 
             <div class="alert-info-custom mb-4">
-                <i class="fa-solid fa-clock me-1"></i>
-                Liên kết này còn hiệu lực trong <strong id="countdown">15:00</strong> phút.
+                <i class="fa-solid fa-circle-check me-1"></i>
+                Xác thực OTP thành công. Vui lòng đặt mật khẩu mới cho tài khoản của bạn.
             </div>
 
-            <form action="#" method="POST" id="resetPasswordForm" onsubmit="return validateForm();">
-
-                <%-- Token xác thực lấy từ đường link trong email, ví dụ: resetPassword.jsp?token=xxxxx --%>
-                <input type="hidden" name="token" id="token" value="">
+            <%-- Servlet cần kiểm tra session có otpVerified = true không trước khi hiển thị/xử lý trang này --%>
+            <form action="ResetPasswordServlet" method="POST" id="resetPasswordForm" onsubmit="return validateForm();">
 
                 <div class="mb-4">
                     <label for="newPassword" class="form-label">Mật khẩu mới</label>
@@ -261,13 +259,6 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        // Lấy token từ query string trên URL (?token=xxxxx) khi người dùng click link trong email
-        (function () {
-            var params = new URLSearchParams(window.location.search);
-            var token = params.get('token') || '';
-            document.getElementById('token').value = token;
-        })();
-
         // Toggle hiện / ẩn mật khẩu cho cả 2 ô
         document.querySelectorAll('.btn-toggle-pass').forEach(function (toggle) {
             toggle.addEventListener('click', function () {
@@ -326,23 +317,6 @@
             }
             return valid;
         }
-
-        // Đếm ngược thời gian hiệu lực của liên kết (demo giao diện, 15 phút)
-        (function () {
-            var totalSeconds = 15 * 60;
-            var el = document.getElementById('countdown');
-            var timer = setInterval(function () {
-                totalSeconds--;
-                if (totalSeconds <= 0) {
-                    clearInterval(timer);
-                    el.textContent = '00:00';
-                    return;
-                }
-                var m = Math.floor(totalSeconds / 60);
-                var s = totalSeconds % 60;
-                el.textContent = (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s;
-            }, 1000);
-        })();
     </script>
 </body>
 </html>
