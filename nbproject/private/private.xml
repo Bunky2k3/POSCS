@@ -3,7 +3,12 @@
     <editor-bookmarks xmlns="http://www.netbeans.org/ns/editor-bookmarks/2" lastBookmarkId="0"/>
     <open-files xmlns="http://www.netbeans.org/ns/projectui-open-files/2">
         <group>
-            <file>file:/C:/Users/admin/Documents/NetBeansProjects/POSCS/web/header.jsp</file>
+            <file>file:/C:/Users/Admin/Documents/GitHub/POSCS/web/login.jsp</file>
+            <file>file:/C:/Users/Admin/Documents/GitHub/POSCS/web/updateProfile.jsp</file>
+            <file>file:/C:/Users/Admin/Documents/GitHub/POSCS/web/dashboard.jsp</file>
+            <file>file:/C:/Users/Admin/Documents/GitHub/POSCS/web/header.jsp</file>
+            <file>file:/C:/Users/Admin/Documents/GitHub/POSCS/src/java/poscs/dao/DBContext.java</file>
+            <file>file:/C:/Users/Admin/Documents/GitHub/POSCS/src/java/poscs/controller/AuthenticationController.java</file>
         </group>
     </open-files>
 </project-private>
