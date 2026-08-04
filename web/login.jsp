@@ -12,6 +12,14 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
     <style>
+        :root {
+            --primary-dark: #003c6e;
+            --primary: #0568a6;
+            --primary-light: #0f9edb;
+            --primary-lighter: #6fd0ff;
+            --accent: #00c2ff;
+        }
+
         body {
             font-family: 'Inter', sans-serif;
             background: #f3f4f6;
@@ -24,7 +32,7 @@
         .login-wrapper {
             background: #ffffff;
             border-radius: 24px;
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.08);
+            box-shadow: 0 20px 40px rgba(0, 60, 110, 0.15);
             overflow: hidden;
             max-width: 1000px;
             width: 100%;
@@ -57,13 +65,32 @@
         }
 
         .brand-panel {
-            background: linear-gradient(rgba(79, 70, 229, 0.85), rgba(37, 99, 235, 0.85));
+            background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 60%, var(--primary-light) 100%);
             color: white;
             padding: 3rem;
             display: flex;
             flex-direction: column;
             justify-content: center;
             position: relative;
+            overflow: hidden;
+        }
+
+        /* Trang trí sóng nước phía sau, đồng bộ với changePassword.jsp */
+        .brand-panel::before, .brand-panel::after {
+            content: "";
+            position: absolute;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.08);
+            z-index: 0;
+        }
+        .brand-panel::before {
+            width: 260px; height: 260px;
+            top: -90px; left: -90px;
+        }
+        .brand-panel::after {
+            width: 220px; height: 220px;
+            bottom: -80px; right: -60px;
+            background: rgba(255,255,255,0.1);
         }
 
         .form-panel {
@@ -81,8 +108,8 @@
 
         .form-control:focus {
             background-color: #ffffff;
-            border-color: #4f46e5;
-            box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.1);
+            border-color: var(--primary-light);
+            box-shadow: 0 0 0 4px rgba(15, 158, 219, 0.15);
         }
 
         .input-group-text {
@@ -111,32 +138,49 @@
             margin-bottom: 0.5rem;
         }
 
+        .form-check-input {
+            accent-color: var(--primary);
+        }
+        .form-check-input:checked {
+            background-color: var(--primary);
+            border-color: var(--primary);
+        }
+        .form-check-input:focus {
+            box-shadow: 0 0 0 4px rgba(15, 158, 219, 0.15);
+            border-color: var(--primary-light);
+        }
+
         .btn-primary {
-            background: #4f46e5;
+            background: linear-gradient(120deg, var(--primary), var(--primary-light));
             border: none;
             border-radius: 12px;
             padding: 0.8rem;
             font-weight: 600;
             font-size: 1rem;
             transition: all 0.3s ease;
+            box-shadow: 0 8px 18px rgba(5, 104, 166, 0.3);
         }
 
         .btn-primary:hover {
-            background: #4338ca;
+            background: linear-gradient(120deg, var(--primary-dark), var(--primary));
             transform: translateY(-2px);
-            box-shadow: 0 8px 15px rgba(79, 70, 229, 0.3);
+            box-shadow: 0 10px 22px rgba(5, 104, 166, 0.4);
         }
 
         .custom-link {
-            color: #4f46e5;
+            color: var(--primary);
             font-weight: 500;
             text-decoration: none;
             transition: color 0.2s;
         }
 
         .custom-link:hover {
-            color: #3730a3;
+            color: var(--primary-dark);
             text-decoration: underline;
+        }
+
+        .text-primary {
+            color: var(--primary) !important;
         }
 
         @media (max-width: 768px) {
@@ -150,7 +194,7 @@
         <div class="row g-0">
             <!-- Cột trái: Branding (Ẩn trên Mobile) -->
             <div class="col-md-5 d-none d-md-flex brand-panel">
-                <div class="placeholder-box placeholder-light mb-4" style="position: absolute; top: 20px; right: 20px; padding: 5px 15px; font-size: 0.75rem;">
+                <div class="placeholder-box placeholder-light mb-4" style="position: absolute; top: 20px; right: 20px; padding: 5px 15px; font-size: 0.75rem; z-index: 1;">
                     [VỊ TRÍ 2]<br>Ảnh Nền Doanh Nghiệp
                 </div>
 
