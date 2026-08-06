@@ -65,6 +65,54 @@
             border: 2px solid var(--primary-light);
         }
 
+        /* ===== Dropdown chung (avatar + thông báo) ===== */
+        .dropdown-menu {
+            border: none; border-radius: 14px;
+            box-shadow: 0 14px 34px rgba(0, 40, 80, 0.18);
+            padding: 8px; margin-top: 12px !important;
+            min-width: 230px;
+        }
+        .dropdown-item {
+            border-radius: 8px; padding: 9px 12px;
+            font-size: 0.87rem; color: #374151;
+        }
+        .dropdown-item:hover, .dropdown-item:focus {
+            background: #f0f9ff; color: var(--primary-dark);
+        }
+        .dropdown-item.text-danger:hover {
+            background: #fdecef; color: var(--danger) !important;
+        }
+
+        .dd-user-header {
+            display: flex; align-items: center; gap: 10px;
+            padding: 8px 10px 12px;
+        }
+        .dd-user-header img {
+            width: 42px; height: 42px; border-radius: 50%; object-fit: cover;
+        }
+        .dd-user-header .dd-name { font-weight: 600; font-size: 0.9rem; color: #111827; }
+        .dd-user-header .dd-role { font-size: 0.75rem; color: #6b7280; }
+
+        /* ===== Dropdown thông báo ===== */
+        .notif-dropdown { min-width: 320px; max-height: 380px; overflow-y: auto; }
+        .notif-header {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 6px 10px 10px; font-weight: 700; font-size: 0.9rem; color: var(--primary-dark);
+        }
+        .notif-count {
+            background: var(--primary); color: #fff; font-size: 0.68rem;
+            padding: 2px 9px; border-radius: 10px; font-weight: 600;
+        }
+        .notif-item { display: flex; gap: 10px; align-items: flex-start; white-space: normal; }
+        .notif-icon {
+            width: 34px; height: 34px; border-radius: 50%;
+            background: #eef6fb; color: var(--primary);
+            display: flex; align-items: center; justify-content: center;
+            flex-shrink: 0; font-size: 0.85rem;
+        }
+        .notif-text { font-size: 0.85rem; color: #111827; font-weight: 500; line-height: 1.3; }
+        .notif-time { font-size: 0.72rem; color: #9ca3af; margin-top: 2px; }
+
         /* ===== Layout ===== */
         .page-container {
             max-width: 900px;
@@ -145,8 +193,65 @@
     <nav class="topbar">
         <div class="brand"><i class="fa-solid fa-tower-broadcast"></i> POSCS Portal</div>
         <div class="topbar-right">
-            <div class="bell-icon"><i class="fa-regular fa-bell"></i><span class="dot"></span></div>
-            <img src="https://ui-avatars.com/api/?name=Nguyen+An&background=0568a6&color=fff" class="avatar-mini" alt="avatar">
+
+            <!-- ===== Dropdown thông báo ===== -->
+            <div class="dropdown">
+                <div class="bell-icon" data-bs-toggle="dropdown" aria-expanded="false">
+                    <i class="fa-regular fa-bell"></i><span class="dot"></span>
+                </div>
+                <ul class="dropdown-menu dropdown-menu-end notif-dropdown">
+                    <li class="notif-header">Thông báo <span class="notif-count">3 mới</span></li>
+                    <li>
+                        <a class="dropdown-item notif-item" href="#">
+                            <span class="notif-icon"><i class="fa-solid fa-file-contract"></i></span>
+                            <div>
+                                <div class="notif-text">Hợp đồng #HD-0231 sắp hết hạn</div>
+                                <div class="notif-time">10 phút trước</div>
+                            </div>
+                        </a>
+                    </li>
+                    <li>
+                        <a class="dropdown-item notif-item" href="#">
+                            <span class="notif-icon"><i class="fa-solid fa-headset"></i></span>
+                            <div>
+                                <div class="notif-text">Phiếu hỗ trợ #TK-1042 vừa được giao cho bạn</div>
+                                <div class="notif-time">1 giờ trước</div>
+                            </div>
+                        </a>
+                    </li>
+                    <li>
+                        <a class="dropdown-item notif-item" href="#">
+                            <span class="notif-icon"><i class="fa-solid fa-user-plus"></i></span>
+                            <div>
+                                <div class="notif-text">Khách hàng mới được thêm: Viettel Bắc Ninh</div>
+                                <div class="notif-time">Hôm qua</div>
+                            </div>
+                        </a>
+                    </li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li><a class="dropdown-item text-center small" href="#">Xem tất cả thông báo</a></li>
+                </ul>
+            </div>
+
+            <!-- ===== Dropdown avatar ===== -->
+            <div class="dropdown">
+                <img src="https://ui-avatars.com/api/?name=Nguyen+An&background=0568a6&color=fff"
+                     class="avatar-mini" alt="avatar" data-bs-toggle="dropdown" aria-expanded="false">
+                <ul class="dropdown-menu dropdown-menu-end">
+                    <li class="dd-user-header">
+                        <img src="https://ui-avatars.com/api/?name=Nguyen+An&background=0568a6&color=fff" alt="avatar">
+                        <div>
+                            <div class="dd-name">Nguyễn Văn An</div>
+                            <div class="dd-role">Sales</div>
+                        </div>
+                    </li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li><a class="dropdown-item" href="viewProfile.jsp"><i class="fa-regular fa-id-card me-2"></i>Thông tin cá nhân</a></li>
+                    <li><a class="dropdown-item" href="changePassword.jsp"><i class="fa-solid fa-key me-2"></i>Đổi mật khẩu</a></li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li><a class="dropdown-item text-danger" href="login.jsp"><i class="fa-solid fa-arrow-right-from-bracket me-2"></i>Đăng xuất</a></li>
+                </ul>
+            </div>
         </div>
     </nav>
 

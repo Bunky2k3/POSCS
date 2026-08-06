@@ -4,7 +4,12 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Đổi Mật Khẩu</title>
+<title>Đổi Mật Khẩu - POSCS Portal</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
 <style>
     :root {
         --primary-dark: #003c6e;
@@ -21,30 +26,120 @@
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
+    html, body { height: 100%; }
+
     body {
         min-height: 100vh;
-        font-family: 'Segoe UI', Arial, sans-serif;
-        background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 45%, var(--primary-light) 100%);
+        font-family: 'Inter', sans-serif;
+        display: flex;
+        flex-direction: column;
+    }
+
+    /* ===== Topbar (đồng bộ với viewProfile.jsp / updateProfile.jsp) ===== */
+    .topbar {
+        background: #ffffff;
+        box-shadow: 0 2px 12px rgba(0, 60, 110, 0.08);
+        padding: 14px 28px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        position: sticky;
+        top: 0;
+        z-index: 50;
+    }
+    .topbar .brand {
+        font-weight: 700;
+        color: var(--primary-dark);
+        font-size: 1.05rem;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    .topbar .brand i { color: var(--primary); font-size: 1.2rem; }
+
+    .topbar-right { display: flex; align-items: center; gap: 18px; }
+    .bell-icon { color: #6b7280; font-size: 1.1rem; cursor: pointer; position: relative; }
+    .bell-icon .dot {
+        position: absolute; top: -3px; right: -4px;
+        width: 8px; height: 8px; border-radius: 50%;
+        background: var(--danger); border: 1.5px solid #fff;
+    }
+    .avatar-mini {
+        width: 38px; height: 38px; border-radius: 50%;
+        object-fit: cover; cursor: pointer;
+        border: 2px solid var(--primary-light);
+    }
+
+    /* ===== Dropdown chung (avatar + thông báo) ===== */
+    .dropdown-menu {
+        border: none; border-radius: 14px;
+        box-shadow: 0 14px 34px rgba(0, 40, 80, 0.18);
+        padding: 8px; margin-top: 12px !important;
+        min-width: 230px;
+    }
+    .dropdown-item {
+        border-radius: 8px; padding: 9px 12px;
+        font-size: 0.87rem; color: #374151;
+    }
+    .dropdown-item:hover, .dropdown-item:focus {
+        background: #f0f9ff; color: var(--primary-dark);
+    }
+    .dropdown-item.text-danger:hover {
+        background: #fdecef; color: var(--danger) !important;
+    }
+    .dd-user-header {
+        display: flex; align-items: center; gap: 10px;
+        padding: 8px 10px 12px;
+    }
+    .dd-user-header img {
+        width: 42px; height: 42px; border-radius: 50%; object-fit: cover;
+    }
+    .dd-user-header .dd-name { font-weight: 600; font-size: 0.9rem; color: #111827; }
+    .dd-user-header .dd-role { font-size: 0.75rem; color: #6b7280; }
+
+    .notif-dropdown { min-width: 320px; max-height: 380px; overflow-y: auto; }
+    .notif-header {
+        display: flex; justify-content: space-between; align-items: center;
+        padding: 6px 10px 10px; font-weight: 700; font-size: 0.9rem; color: var(--primary-dark);
+    }
+    .notif-count {
+        background: var(--primary); color: #fff; font-size: 0.68rem;
+        padding: 2px 9px; border-radius: 10px; font-weight: 600;
+    }
+    .notif-item { display: flex; gap: 10px; align-items: flex-start; white-space: normal; }
+    .notif-icon {
+        width: 34px; height: 34px; border-radius: 50%;
+        background: #eef6fb; color: var(--primary);
+        display: flex; align-items: center; justify-content: center;
+        flex-shrink: 0; font-size: 0.85rem;
+    }
+    .notif-text { font-size: 0.85rem; color: #111827; font-weight: 500; line-height: 1.3; }
+    .notif-time { font-size: 0.72rem; color: #9ca3af; margin-top: 2px; }
+
+    /* ===== Vùng nội dung đổi mật khẩu (nền gradient xanh) ===== */
+    .auth-content {
+        flex: 1;
         display: flex;
         align-items: center;
         justify-content: center;
         padding: 24px;
         position: relative;
         overflow: hidden;
+        background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 45%, var(--primary-light) 100%);
     }
 
     /* Trang trí sóng nước phía sau */
-    body::before, body::after {
+    .auth-content::before, .auth-content::after {
         content: "";
         position: absolute;
         border-radius: 50%;
         background: rgba(255,255,255,0.06);
     }
-    body::before {
+    .auth-content::before {
         width: 500px; height: 500px;
         top: -150px; left: -150px;
     }
-    body::after {
+    .auth-content::after {
         width: 400px; height: 400px;
         bottom: -120px; right: -100px;
         background: rgba(255,255,255,0.08);
@@ -166,6 +261,7 @@
         outline: none;
         transition: border-color 0.2s, box-shadow 0.2s;
         background: #f7fbfd;
+        font-family: 'Inter', sans-serif;
     }
 
     .input-wrap input:focus {
@@ -226,6 +322,7 @@
         letter-spacing: 0.3px;
         transition: transform 0.15s, box-shadow 0.15s, opacity 0.15s;
         box-shadow: 0 8px 18px rgba(5, 104, 166, 0.35);
+        font-family: 'Inter', sans-serif;
     }
     .btn-submit:hover { transform: translateY(-1px); box-shadow: 0 10px 22px rgba(5, 104, 166, 0.45); }
     .btn-submit:active { transform: translateY(0); }
@@ -257,130 +354,198 @@
 </head>
 <body>
 
-<div class="container">
-    <div class="header">
-        <div class="icon-circle">
-            <svg viewBox="0 0 24 24"><path d="M12 1a5 5 0 0 0-5 5v3H6a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-9a2 2 0 0 0-2-2h-1V6a5 5 0 0 0-5-5zm0 2a3 3 0 0 1 3 3v3H9V6a3 3 0 0 1 3-3zm0 10a2 2 0 0 1 1 3.73V19a1 1 0 1 1-2 0v-2.27A2 2 0 0 1 12 13z"/></svg>
+    <nav class="topbar">
+        <div class="brand"><i class="fa-solid fa-tower-broadcast"></i> POSCS Portal</div>
+        <div class="topbar-right">
+
+            <!-- ===== Dropdown thông báo ===== -->
+            <div class="dropdown">
+                <div class="bell-icon" data-bs-toggle="dropdown" aria-expanded="false">
+                    <i class="fa-regular fa-bell"></i><span class="dot"></span>
+                </div>
+                <ul class="dropdown-menu dropdown-menu-end notif-dropdown">
+                    <li class="notif-header">Thông báo <span class="notif-count">3 mới</span></li>
+                    <li>
+                        <a class="dropdown-item notif-item" href="#">
+                            <span class="notif-icon"><i class="fa-solid fa-file-contract"></i></span>
+                            <div>
+                                <div class="notif-text">Hợp đồng #HD-0231 sắp hết hạn</div>
+                                <div class="notif-time">10 phút trước</div>
+                            </div>
+                        </a>
+                    </li>
+                    <li>
+                        <a class="dropdown-item notif-item" href="#">
+                            <span class="notif-icon"><i class="fa-solid fa-headset"></i></span>
+                            <div>
+                                <div class="notif-text">Phiếu hỗ trợ #TK-1042 vừa được giao cho bạn</div>
+                                <div class="notif-time">1 giờ trước</div>
+                            </div>
+                        </a>
+                    </li>
+                    <li>
+                        <a class="dropdown-item notif-item" href="#">
+                            <span class="notif-icon"><i class="fa-solid fa-user-plus"></i></span>
+                            <div>
+                                <div class="notif-text">Khách hàng mới được thêm: Viettel Bắc Ninh</div>
+                                <div class="notif-time">Hôm qua</div>
+                            </div>
+                        </a>
+                    </li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li><a class="dropdown-item text-center small" href="#">Xem tất cả thông báo</a></li>
+                </ul>
+            </div>
+
+            <!-- ===== Dropdown avatar ===== -->
+            <div class="dropdown">
+                <img src="https://ui-avatars.com/api/?name=Nguyen+An&background=0568a6&color=fff"
+                     class="avatar-mini" alt="avatar" data-bs-toggle="dropdown" aria-expanded="false">
+                <ul class="dropdown-menu dropdown-menu-end">
+                    <li class="dd-user-header">
+                        <img src="https://ui-avatars.com/api/?name=Nguyen+An&background=0568a6&color=fff" alt="avatar">
+                        <div>
+                            <div class="dd-name">Nguyễn Văn An</div>
+                            <div class="dd-role">Sales</div>
+                        </div>
+                    </li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li><a class="dropdown-item" href="viewProfile.jsp"><i class="fa-regular fa-id-card me-2"></i>Thông tin cá nhân</a></li>
+                    <li><a class="dropdown-item" href="changePassword.jsp"><i class="fa-solid fa-key me-2"></i>Đổi mật khẩu</a></li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li><a class="dropdown-item text-danger" href="login.jsp"><i class="fa-solid fa-arrow-right-from-bracket me-2"></i>Đăng xuất</a></li>
+                </ul>
+            </div>
         </div>
-        <h1>Đổi Mật Khẩu</h1>
-        <p>Bảo mật tài khoản của bạn với mật khẩu mới</p>
+    </nav>
+
+    <div class="auth-content">
+        <div class="container">
+            <div class="header">
+                <div class="icon-circle">
+                    <svg viewBox="0 0 24 24"><path d="M12 1a5 5 0 0 0-5 5v3H6a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-9a2 2 0 0 0-2-2h-1V6a5 5 0 0 0-5-5zm0 2a3 3 0 0 1 3 3v3H9V6a3 3 0 0 1 3-3zm0 10a2 2 0 0 1 1 3.73V19a1 1 0 1 1-2 0v-2.27A2 2 0 0 1 12 13z"/></svg>
+                </div>
+                <h1>Đổi Mật Khẩu</h1>
+                <p>Bảo mật tài khoản của bạn với mật khẩu mới</p>
+            </div>
+
+            <div class="form-body">
+
+                <%-- Khu vực này dùng để hiển thị thông báo lỗi/thành công khi có xử lý backend sau này --%>
+
+                <form id="changePasswordForm" method="post" onsubmit="return validateForm();">
+
+                    <div class="form-group">
+                        <label for="oldPassword">Mật khẩu hiện tại</label>
+                        <div class="input-wrap">
+                            <svg class="icon-left" viewBox="0 0 24 24"><path d="M12 17a2 2 0 0 0 2-2 2 2 0 0 0-2-2 2 2 0 0 0-2 2 2 2 0 0 0 2 2zm6-9a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V10a2 2 0 0 1 2-2h1V6a5 5 0 0 1 10 0v2h1zM12 3a3 3 0 0 0-3 3v2h6V6a3 3 0 0 0-3-3z"/></svg>
+                            <input type="password" id="oldPassword" name="oldPassword" placeholder="Nhập mật khẩu hiện tại" required>
+                            <svg class="toggle-eye" data-target="oldPassword" viewBox="0 0 24 24">
+                                <path d="M12 5c-7 0-11 7-11 7s4 7 11 7 11-7 11-7-4-7-11-7zm0 12a5 5 0 1 1 0-10 5 5 0 0 1 0 10zm0-8a3 3 0 1 0 0 6 3 3 0 0 0 0-6z"/>
+                            </svg>
+                        </div>
+                        <span class="error-text" id="err-oldPassword">Vui lòng nhập mật khẩu hiện tại</span>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="newPassword">Mật khẩu mới</label>
+                        <div class="input-wrap">
+                            <svg class="icon-left" viewBox="0 0 24 24"><path d="M12 17a2 2 0 0 0 2-2 2 2 0 0 0-2-2 2 2 0 0 0-2 2 2 2 0 0 0 2 2zm6-9a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V10a2 2 0 0 1 2-2h1V6a5 5 0 0 1 10 0v2h1zM12 3a3 3 0 0 0-3 3v2h6V6a3 3 0 0 0-3-3z"/></svg>
+                            <input type="password" id="newPassword" name="newPassword" placeholder="Nhập mật khẩu mới" required oninput="checkStrength(this.value)">
+                            <svg class="toggle-eye" data-target="newPassword" viewBox="0 0 24 24">
+                                <path d="M12 5c-7 0-11 7-11 7s4 7 11 7 11-7 11-7-4-7-11-7zm0 12a5 5 0 1 1 0-10 5 5 0 0 1 0 10zm0-8a3 3 0 1 0 0 6 3 3 0 0 0 0-6z"/>
+                            </svg>
+                        </div>
+                        <div class="strength-meter"><div class="strength-meter-bar" id="strengthBar"></div></div>
+                        <span class="strength-label" id="strengthLabel">Độ mạnh mật khẩu</span>
+                        <span class="error-text" id="err-newPassword">Mật khẩu mới phải có ít nhất 8 ký tự</span>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="confirmPassword">Xác nhận mật khẩu mới</label>
+                        <div class="input-wrap">
+                            <svg class="icon-left" viewBox="0 0 24 24"><path d="M12 17a2 2 0 0 0 2-2 2 2 0 0 0-2-2 2 2 0 0 0-2 2 2 2 0 0 0 2 2zm6-9a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V10a2 2 0 0 1 2-2h1V6a5 5 0 0 1 10 0v2h1zM12 3a3 3 0 0 0-3 3v2h6V6a3 3 0 0 0-3-3z"/></svg>
+                            <input type="password" id="confirmPassword" name="confirmPassword" placeholder="Nhập lại mật khẩu mới" required>
+                            <svg class="toggle-eye" data-target="confirmPassword" viewBox="0 0 24 24">
+                                <path d="M12 5c-7 0-11 7-11 7s4 7 11 7 11-7 11-7-4-7-11-7zm0 12a5 5 0 1 1 0-10 5 5 0 0 1 0 10zm0-8a3 3 0 1 0 0 6 3 3 0 0 0 0-6z"/>
+                            </svg>
+                        </div>
+                        <span class="error-text" id="err-confirmPassword">Mật khẩu xác nhận không khớp</span>
+                    </div>
+
+                    <ul class="hint-list">
+                        <li>Tối thiểu 8 ký tự</li>
+                        <li>Nên có chữ hoa, chữ thường và số</li>
+                        <li>Không trùng với mật khẩu cũ</li>
+                    </ul>
+
+                    <button type="submit" class="btn-submit">Cập nhật mật khẩu</button>
+                </form>
+
+                <a href="viewProfile.jsp" class="back-link">← Quay lại trang cá nhân</a>
+            </div>
+        </div>
     </div>
 
-    <div class="form-body">
-
-        <%-- Khu vực này dùng để hiển thị thông báo lỗi/thành công khi có xử lý backend sau này --%>
-
-        <form id="changePasswordForm" method="post" onsubmit="return validateForm();">
-
-            <div class="form-group">
-                <label for="oldPassword">Mật khẩu hiện tại</label>
-                <div class="input-wrap">
-                    <svg class="icon-left" viewBox="0 0 24 24"><path d="M12 17a2 2 0 0 0 2-2 2 2 0 0 0-2-2 2 2 0 0 0-2 2 2 2 0 0 0 2 2zm6-9a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V10a2 2 0 0 1 2-2h1V6a5 5 0 0 1 10 0v2h1zM12 3a3 3 0 0 0-3 3v2h6V6a3 3 0 0 0-3-3z"/></svg>
-                    <input type="password" id="oldPassword" name="oldPassword" placeholder="Nhập mật khẩu hiện tại" required>
-                    <svg class="toggle-eye" data-target="oldPassword" viewBox="0 0 24 24">
-                        <path d="M12 5c-7 0-11 7-11 7s4 7 11 7 11-7 11-7-4-7-11-7zm0 12a5 5 0 1 1 0-10 5 5 0 0 1 0 10zm0-8a3 3 0 1 0 0 6 3 3 0 0 0 0-6z"/>
-                    </svg>
-                </div>
-                <span class="error-text" id="err-oldPassword">Vui lòng nhập mật khẩu hiện tại</span>
-            </div>
-
-            <div class="form-group">
-                <label for="newPassword">Mật khẩu mới</label>
-                <div class="input-wrap">
-                    <svg class="icon-left" viewBox="0 0 24 24"><path d="M12 17a2 2 0 0 0 2-2 2 2 0 0 0-2-2 2 2 0 0 0-2 2 2 2 0 0 0 2 2zm6-9a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V10a2 2 0 0 1 2-2h1V6a5 5 0 0 1 10 0v2h1zM12 3a3 3 0 0 0-3 3v2h6V6a3 3 0 0 0-3-3z"/></svg>
-                    <input type="password" id="newPassword" name="newPassword" placeholder="Nhập mật khẩu mới" required oninput="checkStrength(this.value)">
-                    <svg class="toggle-eye" data-target="newPassword" viewBox="0 0 24 24">
-                        <path d="M12 5c-7 0-11 7-11 7s4 7 11 7 11-7 11-7-4-7-11-7zm0 12a5 5 0 1 1 0-10 5 5 0 0 1 0 10zm0-8a3 3 0 1 0 0 6 3 3 0 0 0 0-6z"/>
-                    </svg>
-                </div>
-                <div class="strength-meter"><div class="strength-meter-bar" id="strengthBar"></div></div>
-                <span class="strength-label" id="strengthLabel">Độ mạnh mật khẩu</span>
-                <span class="error-text" id="err-newPassword">Mật khẩu mới phải có ít nhất 8 ký tự</span>
-            </div>
-
-            <div class="form-group">
-                <label for="confirmPassword">Xác nhận mật khẩu mới</label>
-                <div class="input-wrap">
-                    <svg class="icon-left" viewBox="0 0 24 24"><path d="M12 17a2 2 0 0 0 2-2 2 2 0 0 0-2-2 2 2 0 0 0-2 2 2 2 0 0 0 2 2zm6-9a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V10a2 2 0 0 1 2-2h1V6a5 5 0 0 1 10 0v2h1zM12 3a3 3 0 0 0-3 3v2h6V6a3 3 0 0 0-3-3z"/></svg>
-                    <input type="password" id="confirmPassword" name="confirmPassword" placeholder="Nhập lại mật khẩu mới" required>
-                    <svg class="toggle-eye" data-target="confirmPassword" viewBox="0 0 24 24">
-                        <path d="M12 5c-7 0-11 7-11 7s4 7 11 7 11-7 11-7-4-7-11-7zm0 12a5 5 0 1 1 0-10 5 5 0 0 1 0 10zm0-8a3 3 0 1 0 0 6 3 3 0 0 0 0-6z"/>
-                    </svg>
-                </div>
-                <span class="error-text" id="err-confirmPassword">Mật khẩu xác nhận không khớp</span>
-            </div>
-
-            <ul class="hint-list">
-                <li>Tối thiểu 8 ký tự</li>
-                <li>Nên có chữ hoa, chữ thường và số</li>
-                <li>Không trùng với mật khẩu cũ</li>
-            </ul>
-
-            <button type="submit" class="btn-submit">Cập nhật mật khẩu</button>
-        </form>
-
-        <a href="profile.jsp" class="back-link">← Quay lại trang cá nhân</a>
-    </div>
-</div>
-
-<script>
-    // Toggle hiện / ẩn mật khẩu
-    document.querySelectorAll('.toggle-eye').forEach(function (eye) {
-        eye.addEventListener('click', function () {
-            var input = document.getElementById(eye.getAttribute('data-target'));
-            input.type = (input.type === 'password') ? 'text' : 'password';
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Toggle hiện / ẩn mật khẩu
+        document.querySelectorAll('.toggle-eye').forEach(function (eye) {
+            eye.addEventListener('click', function () {
+                var input = document.getElementById(eye.getAttribute('data-target'));
+                input.type = (input.type === 'password') ? 'text' : 'password';
+            });
         });
-    });
 
-    // Đánh giá độ mạnh mật khẩu
-    function checkStrength(value) {
-        var bar = document.getElementById('strengthBar');
-        var label = document.getElementById('strengthLabel');
-        var score = 0;
+        // Đánh giá độ mạnh mật khẩu
+        function checkStrength(value) {
+            var bar = document.getElementById('strengthBar');
+            var label = document.getElementById('strengthLabel');
+            var score = 0;
 
-        if (value.length >= 8) score++;
-        if (/[A-Z]/.test(value)) score++;
-        if (/[0-9]/.test(value)) score++;
-        if (/[^A-Za-z0-9]/.test(value)) score++;
+            if (value.length >= 8) score++;
+            if (/[A-Z]/.test(value)) score++;
+            if (/[0-9]/.test(value)) score++;
+            if (/[^A-Za-z0-9]/.test(value)) score++;
 
-        var colors = ['#e2536b', '#e2536b', '#f5a623', '#2fbf8f', '#0568a6'];
-        var texts = ['Rất yếu', 'Yếu', 'Trung bình', 'Mạnh', 'Rất mạnh'];
-        var percents = [15, 30, 55, 80, 100];
+            var colors = ['#e2536b', '#e2536b', '#f5a623', '#2fbf8f', '#0568a6'];
+            var texts = ['Rất yếu', 'Yếu', 'Trung bình', 'Mạnh', 'Rất mạnh'];
+            var percents = [15, 30, 55, 80, 100];
 
-        if (value.length === 0) {
-            bar.style.width = '0%';
-            label.textContent = 'Độ mạnh mật khẩu';
-            return;
+            if (value.length === 0) {
+                bar.style.width = '0%';
+                label.textContent = 'Độ mạnh mật khẩu';
+                return;
+            }
+            bar.style.width = percents[score] + '%';
+            bar.style.background = colors[score];
+            label.textContent = texts[score];
         }
-        bar.style.width = percents[score] + '%';
-        bar.style.background = colors[score];
-        label.textContent = texts[score];
-    }
 
-    // Validate form phía client trước khi submit
-    function validateForm() {
-        var oldPass = document.getElementById('oldPassword');
-        var newPass = document.getElementById('newPassword');
-        var confirmPass = document.getElementById('confirmPassword');
-        var valid = true;
+        // Validate form phía client trước khi submit
+        function validateForm() {
+            var oldPass = document.getElementById('oldPassword');
+            var newPass = document.getElementById('newPassword');
+            var confirmPass = document.getElementById('confirmPassword');
+            var valid = true;
 
-        document.querySelectorAll('.error-text').forEach(function (el) { el.style.display = 'none'; });
+            document.querySelectorAll('.error-text').forEach(function (el) { el.style.display = 'none'; });
 
-        if (oldPass.value.trim() === '') {
-            document.getElementById('err-oldPassword').style.display = 'block';
-            valid = false;
+            if (oldPass.value.trim() === '') {
+                document.getElementById('err-oldPassword').style.display = 'block';
+                valid = false;
+            }
+            if (newPass.value.length < 8) {
+                document.getElementById('err-newPassword').style.display = 'block';
+                valid = false;
+            }
+            if (confirmPass.value !== newPass.value || confirmPass.value === '') {
+                document.getElementById('err-confirmPassword').style.display = 'block';
+                valid = false;
+            }
+            return valid;
         }
-        if (newPass.value.length < 8) {
-            document.getElementById('err-newPassword').style.display = 'block';
-            valid = false;
-        }
-        if (confirmPass.value !== newPass.value || confirmPass.value === '') {
-            document.getElementById('err-confirmPassword').style.display = 'block';
-            valid = false;
-        }
-        return valid;
-    }
-</script>
+    </script>
 
 </body>
 </html>
