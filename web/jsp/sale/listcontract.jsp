@@ -217,7 +217,7 @@
                 <h2>Danh sách hợp đồng</h2>
                 <p>Quản lý toàn bộ hợp đồng cung cấp và thi công thiết bị viễn thông</p>
             </div>
-            <a href="createContract.jsp" class="btn-add"><i class="fa-solid fa-plus"></i> Tạo hợp đồng</a>
+            <a href="addnewcontract.jsp" class="btn-add"><i class="fa-solid fa-plus"></i> Tạo hợp đồng</a>
         </div>
 
         <!-- ===== Dải trạng thái tổng quan ===== -->
@@ -271,7 +271,7 @@
                     <tbody id="contractTableBody">
                         <tr data-status="Sắp hết hạn" data-type="Cung cấp thiết bị">
                             <td class="contract-code">HD-0231</td>
-                            <td><a href="contractDetail.jsp?id=231" class="contract-title-link">Cung cấp cáp quang OM4 đợt 2</a></td>
+                            <td><a href="viewcontractdetail.jsp?id=231" class="contract-title-link">Cung cấp cáp quang OM4 đợt 2</a></td>
                             <td>VNPT Hà Nội</td>
                             <td><span class="type-badge">Cung cấp thiết bị</span></td>
                             <td class="money-value">1.250.000.000 đ</td>
@@ -280,15 +280,15 @@
                             <td><span class="status-pill status-soon"><span class="dot"></span>Sắp hết hạn</span></td>
                             <td>
                                 <div class="action-icons">
-                                    <button class="act-view" title="Xem chi tiết" onclick="location.href='contractDetail.jsp?id=231'"><i class="fa-regular fa-eye"></i></button>
-                                    <button class="act-edit" title="Sửa" onclick="location.href='updateContract.jsp?id=231'"><i class="fa-solid fa-pen"></i></button>
+                                    <button class="act-view" title="Xem chi tiết" onclick="location.href='viewcontractdetail.jsp?id=231'"><i class="fa-regular fa-eye"></i></button>
+                                    <button class="act-edit" title="Sửa" onclick="location.href='updatecontract.jsp?id=231'"><i class="fa-solid fa-pen"></i></button>
                                     <button class="act-delete" title="Chỉ được xóa hợp đồng ở trạng thái nháp/chưa hiệu lực" disabled><i class="fa-solid fa-trash"></i></button>
                                 </div>
                             </td>
                         </tr>
                         <tr data-status="Sắp hết hạn" data-type="Cung cấp thiết bị">
                             <td class="contract-code">HD-0214</td>
-                            <td><a href="contractDetail.jsp?id=214" class="contract-title-link">Cung cấp nguồn UPS trạm BTS Quý 3</a></td>
+                            <td><a href="viewcontractdetail.jsp?id=214" class="contract-title-link">Cung cấp nguồn UPS trạm BTS Quý 3</a></td>
                             <td>Viettel Bắc Ninh</td>
                             <td><span class="type-badge">Cung cấp thiết bị</span></td>
                             <td class="money-value">680.000.000 đ</td>
@@ -297,15 +297,15 @@
                             <td><span class="status-pill status-soon"><span class="dot"></span>Sắp hết hạn</span></td>
                             <td>
                                 <div class="action-icons">
-                                    <button class="act-view" title="Xem chi tiết" onclick="location.href='contractDetail.jsp?id=214'"><i class="fa-regular fa-eye"></i></button>
-                                    <button class="act-edit" title="Sửa" onclick="location.href='updateContract.jsp?id=214'"><i class="fa-solid fa-pen"></i></button>
+                                    <button class="act-view" title="Xem chi tiết" onclick="location.href='viewcontractdetail.jsp?id=214'"><i class="fa-regular fa-eye"></i></button>
+                                    <button class="act-edit" title="Sửa" onclick="location.href='updatecontract.jsp?id=214'"><i class="fa-solid fa-pen"></i></button>
                                     <button class="act-delete" title="Chỉ được xóa hợp đồng ở trạng thái nháp/chưa hiệu lực" disabled><i class="fa-solid fa-trash"></i></button>
                                 </div>
                             </td>
                         </tr>
                         <tr data-status="Sắp hết hạn" data-type="Cung cấp thiết bị">
                             <td class="contract-code">HD-0205</td>
-                            <td><a href="contractDetail.jsp?id=205" class="contract-title-link">Cung cấp thiết bị truyền dẫn quang</a></td>
+                            <td><a href="viewcontractdetail.jsp?id=205" class="contract-title-link">Cung cấp thiết bị truyền dẫn quang</a></td>
                             <td>FPT Telecom Đà Nẵng</td>
                             <td><span class="type-badge">Cung cấp thiết bị</span></td>
                             <td class="money-value">430.000.000 đ</td>
@@ -314,15 +314,15 @@
                             <td><span class="status-pill status-soon"><span class="dot"></span>Sắp hết hạn</span></td>
                             <td>
                                 <div class="action-icons">
-                                    <button class="act-view" title="Xem chi tiết" onclick="location.href='contractDetail.jsp?id=205'"><i class="fa-regular fa-eye"></i></button>
-                                    <button class="act-edit" title="Sửa" onclick="location.href='updateContract.jsp?id=205'"><i class="fa-solid fa-pen"></i></button>
+                                    <button class="act-view" title="Xem chi tiết" onclick="location.href='viewcontractdetail.jsp?id=205'"><i class="fa-regular fa-eye"></i></button>
+                                    <button class="act-edit" title="Sửa" onclick="location.href='updatecontract.jsp?id=205'"><i class="fa-solid fa-pen"></i></button>
                                     <button class="act-delete" title="Chỉ được xóa hợp đồng ở trạng thái nháp/chưa hiệu lực" disabled><i class="fa-solid fa-trash"></i></button>
                                 </div>
                             </td>
                         </tr>
                         <tr data-status="Đang hiệu lực" data-type="Bảo trì bảo dưỡng">
                             <td class="contract-code">HD-0250</td>
-                            <td><a href="contractDetail.jsp?id=250" class="contract-title-link">Bảo trì hệ thống nguồn UPS</a></td>
+                            <td><a href="viewcontractdetail.jsp?id=250" class="contract-title-link">Bảo trì hệ thống nguồn UPS</a></td>
                             <td>CMC Telecom</td>
                             <td><span class="type-badge">Bảo trì bảo dưỡng</span></td>
                             <td class="money-value">320.000.000 đ</td>
@@ -331,15 +331,15 @@
                             <td><span class="status-pill status-active"><span class="dot"></span>Đang hiệu lực</span></td>
                             <td>
                                 <div class="action-icons">
-                                    <button class="act-view" title="Xem chi tiết" onclick="location.href='contractDetail.jsp?id=250'"><i class="fa-regular fa-eye"></i></button>
-                                    <button class="act-edit" title="Sửa" onclick="location.href='updateContract.jsp?id=250'"><i class="fa-solid fa-pen"></i></button>
+                                    <button class="act-view" title="Xem chi tiết" onclick="location.href='viewcontractdetail.jsp?id=250'"><i class="fa-regular fa-eye"></i></button>
+                                    <button class="act-edit" title="Sửa" onclick="location.href='updatecontract.jsp?id=250'"><i class="fa-solid fa-pen"></i></button>
                                     <button class="act-delete" title="Chỉ được xóa hợp đồng ở trạng thái nháp/chưa hiệu lực" disabled><i class="fa-solid fa-trash"></i></button>
                                 </div>
                             </td>
                         </tr>
                         <tr data-status="Đang hiệu lực" data-type="Cung cấp thiết bị">
                             <td class="contract-code">HD-0248</td>
-                            <td><a href="contractDetail.jsp?id=248" class="contract-title-link">Phân phối thiết bị viễn thông Quý 3</a></td>
+                            <td><a href="viewcontractdetail.jsp?id=248" class="contract-title-link">Phân phối thiết bị viễn thông Quý 3</a></td>
                             <td>Đại lý Thiết bị Viễn thông Đông Á</td>
                             <td><span class="type-badge">Cung cấp thiết bị</span></td>
                             <td class="money-value">540.000.000 đ</td>
@@ -348,15 +348,15 @@
                             <td><span class="status-pill status-active"><span class="dot"></span>Đang hiệu lực</span></td>
                             <td>
                                 <div class="action-icons">
-                                    <button class="act-view" title="Xem chi tiết" onclick="location.href='contractDetail.jsp?id=248'"><i class="fa-regular fa-eye"></i></button>
-                                    <button class="act-edit" title="Sửa" onclick="location.href='updateContract.jsp?id=248'"><i class="fa-solid fa-pen"></i></button>
+                                    <button class="act-view" title="Xem chi tiết" onclick="location.href='viewcontractdetail.jsp?id=248'"><i class="fa-regular fa-eye"></i></button>
+                                    <button class="act-edit" title="Sửa" onclick="location.href='updatecontract.jsp?id=248'"><i class="fa-solid fa-pen"></i></button>
                                     <button class="act-delete" title="Chỉ được xóa hợp đồng ở trạng thái nháp/chưa hiệu lực" disabled><i class="fa-solid fa-trash"></i></button>
                                 </div>
                             </td>
                         </tr>
                         <tr data-status="Đang hiệu lực" data-type="Bảo trì bảo dưỡng">
                             <td class="contract-code">HD-0260</td>
-                            <td><a href="contractDetail.jsp?id=260" class="contract-title-link">Bảo trì định kỳ Quý 3</a></td>
+                            <td><a href="viewcontractdetail.jsp?id=260" class="contract-title-link">Bảo trì định kỳ Quý 3</a></td>
                             <td>Cty Xây dựng Hạ tầng Miền Trung</td>
                             <td><span class="type-badge">Bảo trì bảo dưỡng</span></td>
                             <td class="money-value">195.000.000 đ</td>
@@ -365,15 +365,15 @@
                             <td><span class="status-pill status-active"><span class="dot"></span>Đang hiệu lực</span></td>
                             <td>
                                 <div class="action-icons">
-                                    <button class="act-view" title="Xem chi tiết" onclick="location.href='contractDetail.jsp?id=260'"><i class="fa-regular fa-eye"></i></button>
-                                    <button class="act-edit" title="Sửa" onclick="location.href='updateContract.jsp?id=260'"><i class="fa-solid fa-pen"></i></button>
+                                    <button class="act-view" title="Xem chi tiết" onclick="location.href='viewcontractdetail.jsp?id=260'"><i class="fa-regular fa-eye"></i></button>
+                                    <button class="act-edit" title="Sửa" onclick="location.href='updatecontract.jsp?id=260'"><i class="fa-solid fa-pen"></i></button>
                                     <button class="act-delete" title="Chỉ được xóa hợp đồng ở trạng thái nháp/chưa hiệu lực" disabled><i class="fa-solid fa-trash"></i></button>
                                 </div>
                             </td>
                         </tr>
                         <tr data-status="Đã hết hạn" data-type="Thi công lắp đặt">
                             <td class="contract-code">HD-0198</td>
-                            <td><a href="contractDetail.jsp?id=198" class="contract-title-link">Lắp đặt tủ trạm Smart Shelter</a></td>
+                            <td><a href="viewcontractdetail.jsp?id=198" class="contract-title-link">Lắp đặt tủ trạm Smart Shelter</a></td>
                             <td>VNPT Hà Nội</td>
                             <td><span class="type-badge">Thi công lắp đặt</span></td>
                             <td class="money-value">860.000.000 đ</td>
@@ -382,15 +382,15 @@
                             <td><span class="status-pill status-expired"><span class="dot"></span>Đã hết hạn</span></td>
                             <td>
                                 <div class="action-icons">
-                                    <button class="act-view" title="Xem chi tiết" onclick="location.href='contractDetail.jsp?id=198'"><i class="fa-regular fa-eye"></i></button>
-                                    <button class="act-edit" title="Sửa" onclick="location.href='updateContract.jsp?id=198'"><i class="fa-solid fa-pen"></i></button>
+                                    <button class="act-view" title="Xem chi tiết" onclick="location.href='viewcontractdetail.jsp?id=198'"><i class="fa-regular fa-eye"></i></button>
+                                    <button class="act-edit" title="Sửa" onclick="location.href='updatecontract.jsp?id=198'"><i class="fa-solid fa-pen"></i></button>
                                     <button class="act-delete" title="Chỉ được xóa hợp đồng ở trạng thái nháp/chưa hiệu lực" disabled><i class="fa-solid fa-trash"></i></button>
                                 </div>
                             </td>
                         </tr>
                         <tr data-status="Đã hết hạn" data-type="Thi công lắp đặt">
                             <td class="contract-code">HD-0180</td>
-                            <td><a href="contractDetail.jsp?id=180" class="contract-title-link">Thi công lắp đặt trạm BTS</a></td>
+                            <td><a href="viewcontractdetail.jsp?id=180" class="contract-title-link">Thi công lắp đặt trạm BTS</a></td>
                             <td>Cty TNHH Xây lắp Điện Nam Hà</td>
                             <td><span class="type-badge">Thi công lắp đặt</span></td>
                             <td class="money-value">1.100.000.000 đ</td>
@@ -399,15 +399,15 @@
                             <td><span class="status-pill status-expired"><span class="dot"></span>Đã hết hạn</span></td>
                             <td>
                                 <div class="action-icons">
-                                    <button class="act-view" title="Xem chi tiết" onclick="location.href='contractDetail.jsp?id=180'"><i class="fa-regular fa-eye"></i></button>
-                                    <button class="act-edit" title="Sửa" onclick="location.href='updateContract.jsp?id=180'"><i class="fa-solid fa-pen"></i></button>
+                                    <button class="act-view" title="Xem chi tiết" onclick="location.href='viewcontractdetail.jsp?id=180'"><i class="fa-regular fa-eye"></i></button>
+                                    <button class="act-edit" title="Sửa" onclick="location.href='updatecontract.jsp?id=180'"><i class="fa-solid fa-pen"></i></button>
                                     <button class="act-delete" title="Chỉ được xóa hợp đồng ở trạng thái nháp/chưa hiệu lực" disabled><i class="fa-solid fa-trash"></i></button>
                                 </div>
                             </td>
                         </tr>
                         <tr data-status="Chưa hiệu lực" data-type="Cung cấp thiết bị">
                             <td class="contract-code">HD-0255</td>
-                            <td><a href="contractDetail.jsp?id=255" class="contract-title-link">Cung cấp nguồn điện DC trạm viễn thông</a></td>
+                            <td><a href="viewcontractdetail.jsp?id=255" class="contract-title-link">Cung cấp nguồn điện DC trạm viễn thông</a></td>
                             <td>MobiFone Hải Phòng</td>
                             <td><span class="type-badge">Cung cấp thiết bị</span></td>
                             <td class="money-value">275.000.000 đ</td>
@@ -416,8 +416,8 @@
                             <td><span class="status-pill status-draft"><span class="dot"></span>Chưa hiệu lực</span></td>
                             <td>
                                 <div class="action-icons">
-                                    <button class="act-view" title="Xem chi tiết" onclick="location.href='contractDetail.jsp?id=255'"><i class="fa-regular fa-eye"></i></button>
-                                    <button class="act-edit" title="Sửa" onclick="location.href='updateContract.jsp?id=255'"><i class="fa-solid fa-pen"></i></button>
+                                    <button class="act-view" title="Xem chi tiết" onclick="location.href='viewcontractdetail.jsp?id=255'"><i class="fa-regular fa-eye"></i></button>
+                                    <button class="act-edit" title="Sửa" onclick="location.href='updatecontract.jsp?id=255'"><i class="fa-solid fa-pen"></i></button>
                                     <button class="act-delete" title="Xóa" onclick="openDeleteModal(this)"><i class="fa-solid fa-trash"></i></button>
                                 </div>
                             </td>
