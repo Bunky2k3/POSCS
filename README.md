@@ -65,3 +65,6 @@ This project is set up as a NetBeans Ant-based web application:
    if unset).
 4. Deploy the resulting WAR to a Jakarta EE 11–compatible servlet
    container (e.g. Apache Tomcat).
+
+For deploying to a real server (staging/production), see
+[DEPLOY.md](DEPLOY.md).
