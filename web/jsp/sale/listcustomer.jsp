@@ -348,11 +348,12 @@
                 <h2>Danh sách khách hàng</h2>
                 <p>Quản lý thông tin khách hàng doanh nghiệp đối tác</p>
             </div>
-            <a href="addnewcustomer.jsp" class="btn-add"><i class="fa-solid fa-plus"></i> Thêm khách hàng</a>
+            <a href="${pageContext.request.contextPath}/customer?action=new" class="btn-add"><i class="fa-solid fa-plus"></i> Thêm khách hàng</a>
         </div>
 
         <!-- ===== Bộ lọc / tìm kiếm ===== -->
-        <form class="filter-bar card-box" method="GET" action="ListCustomerServlet" id="filterForm">
+        <form class="filter-bar card-box" method="GET" action="${pageContext.request.contextPath}/customer" id="filterForm">
+            <input type="hidden" name="action" value="list">
             <div class="search-input-wrap">
                 <i class="fa-solid fa-magnifying-glass"></i>
                 <input type="text" id="searchInput" name="keyword" value="${keyword}" placeholder="Tìm theo mã KH, tên, số điện thoại...">
@@ -391,7 +392,7 @@
                         <c:forEach var="customer" items="${customerList}">
                             <tr>
                                 <td class="customer-code">${customer.enterpriseCode}</td>
-                                <td><a href="viewcustomerdetail.jsp?id=${customer.enterpriseId}" class="customer-name-link">${customer.enterpriseName}</a></td>
+                                <td><a href="${pageContext.request.contextPath}/customer?action=view&id=${customer.enterpriseId}" class="customer-name-link">${customer.enterpriseName}</a></td>
                                 <td><span class="type-badge">${customer.customerType}</span></td>
                                 <td>${customer.email}</td>
                                 <td>${customer.phone}</td>
@@ -409,8 +410,8 @@
                                 </td>
                                 <td>
                                     <div class="action-icons">
-                                        <button class="act-view" title="Xem chi tiết" onclick="location.href='viewcustomerdetail.jsp?id=${customer.enterpriseId}'"><i class="fa-regular fa-eye"></i></button>
-                                        <button class="act-edit" title="Sửa" onclick="location.href='updatecustomer.jsp?id=${customer.enterpriseId}'"><i class="fa-solid fa-pen"></i></button>
+                                        <button class="act-view" title="Xem chi tiết" onclick="location.href='${pageContext.request.contextPath}/customer?action=view&id=${customer.enterpriseId}'"><i class="fa-regular fa-eye"></i></button>
+                                        <button class="act-edit" title="Sửa" onclick="location.href='${pageContext.request.contextPath}/customer?action=edit&id=${customer.enterpriseId}'"><i class="fa-solid fa-pen"></i></button>
                                         <button class="act-delete" title="Xóa" onclick="openDeleteModal(${customer.enterpriseId}, '${customer.enterpriseName}')"><i class="fa-solid fa-trash"></i></button>
                                     </div>
                                 </td>
@@ -431,11 +432,11 @@
                 <span class="pagination-info" id="paginationInfo">Hiển thị ${fn:length(customerList)} trong tổng số ${totalCount} khách hàng</span>
                 <nav>
                     <ul class="pagination pagination-sm mb-0">
-                        <li class="page-item ${currentPage <= 1 ? 'disabled' : ''}"><a class="page-link" href="ListCustomerServlet?page=${currentPage - 1}">Trước</a></li>
+                        <li class="page-item ${currentPage <= 1 ? 'disabled' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/customer?action=list&page=${currentPage - 1}&keyword=${keyword}&type=${typeFilter}&assigneeId=${assigneeFilter}">Trước</a></li>
                         <c:forEach begin="1" end="${totalPages}" var="p">
-                            <li class="page-item ${p == currentPage ? 'active' : ''}"><a class="page-link" href="ListCustomerServlet?page=${p}">${p}</a></li>
+                            <li class="page-item ${p == currentPage ? 'active' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/customer?action=list&page=${p}&keyword=${keyword}&type=${typeFilter}&assigneeId=${assigneeFilter}">${p}</a></li>
                         </c:forEach>
-                        <li class="page-item ${currentPage >= totalPages ? 'disabled' : ''}"><a class="page-link" href="ListCustomerServlet?page=${currentPage + 1}">Sau</a></li>
+                        <li class="page-item ${currentPage >= totalPages ? 'disabled' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/customer?action=list&page=${currentPage + 1}&keyword=${keyword}&type=${typeFilter}&assigneeId=${assigneeFilter}">Sau</a></li>
                     </ul>
                 </nav>
             </div>
@@ -461,10 +462,11 @@
         </div>
     </div>
 
-    <div class="toast-msg" id="toastMsg">
-        <i class="fa-solid fa-circle-check"></i>
-        <span id="toastMsgText">Xóa khách hàng thành công.</span>
-    </div>
+    <!-- Form ẩn để gửi yêu cầu xoá qua POST (không đổi state bằng GET) -->
+    <form id="deleteForm" method="POST" action="${pageContext.request.contextPath}/customer" style="display:none">
+        <input type="hidden" name="action" value="delete">
+        <input type="hidden" name="id" id="deleteFormId">
+    </form>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
@@ -479,8 +481,8 @@
 
         document.getElementById('confirmDeleteBtn').addEventListener('click', function () {
             if (customerIdToDelete) {
-                // TODO: gọi DeleteCustomerServlet?id=<customerIdToDelete>, kiểm tra ràng buộc hợp đồng còn hiệu lực (BR-41) trước khi xóa thật
-                window.location.href = 'DeleteCustomerServlet?id=' + customerIdToDelete;
+                document.getElementById('deleteFormId').value = customerIdToDelete;
+                document.getElementById('deleteForm').submit();
             }
             deleteModal.hide();
         });

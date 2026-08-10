@@ -158,7 +158,7 @@
     </nav>
 
     <div class="page-container">
-        <a href="listcustomer.jsp" class="back-link-top"><i class="fa-solid fa-arrow-left-long"></i> Quay lại danh sách</a>
+        <a href="${pageContext.request.contextPath}/customer" class="back-link-top"><i class="fa-solid fa-arrow-left-long"></i> Quay lại danh sách</a>
 
         <div class="page-header-row">
             <div>
@@ -168,7 +168,8 @@
         </div>
 
         <div class="card-box">
-            <form id="createCustomerForm" action="CreateCustomerServlet" method="POST" onsubmit="return validateForm();">
+            <form id="createCustomerForm" action="${pageContext.request.contextPath}/customer" method="POST" onsubmit="return validateForm();">
+                <input type="hidden" name="action" value="create">
 
                 <div class="section-header"><h5>Thông tin khách hàng</h5></div>
                 <div class="row">
@@ -176,6 +177,11 @@
                         <label>Tên khách hàng <span class="req">*</span></label>
                         <input type="text" class="form-control" id="customerName" name="customerName" placeholder="VD: VNPT Hà Nội">
                         <span class="error-text" id="err-customerName">Tên khách hàng không được để trống.</span>
+                    </div>
+                    <div class="col-md-6 field-row">
+                        <label>Mã số thuế <span class="req">*</span></label>
+                        <input type="text" class="form-control" id="taxCode" name="taxCode" placeholder="VD: 0100100026">
+                        <span class="error-text" id="err-taxCode">Mã số thuế không được để trống.</span>
                     </div>
                     <div class="col-md-6 field-row">
                         <label>Loại khách hàng <span class="req">*</span></label>
@@ -259,7 +265,7 @@
                 </div>
 
                 <div class="action-bar">
-                    <a href="listcustomer.jsp" class="btn-cancel">Hủy</a>
+                    <a href="${pageContext.request.contextPath}/customer" class="btn-cancel">Hủy</a>
                     <button type="submit" class="btn-primary"><i class="fa-solid fa-check me-1"></i> Tạo khách hàng</button>
                 </div>
             </form>
@@ -300,6 +306,9 @@
 
             var name = document.getElementById('customerName');
             if (!name.value.trim()) { document.getElementById('err-customerName').style.display = 'block'; valid = false; }
+
+            var taxCode = document.getElementById('taxCode');
+            if (!taxCode.value.trim()) { document.getElementById('err-taxCode').style.display = 'block'; valid = false; }
 
             var phone = document.getElementById('phone');
             if (!isValidPhone(phone.value)) { document.getElementById('err-phone').style.display = 'block'; valid = false; }

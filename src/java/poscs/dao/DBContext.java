@@ -21,6 +21,10 @@ public class DBContext {
     private static HikariDataSource buildDataSource() {
         HikariConfig config = new HikariConfig();
         config.setJdbcUrl(DB_URL);
+        // Bắt buộc khai báo rõ driver: chạy trong Tomcat mỗi webapp có
+        // classloader riêng, HikariCP không tự tìm thấy driver qua
+        // DriverManager service-loader như khi chạy "java -cp" trực tiếp.
+        config.setDriverClassName("com.mysql.cj.jdbc.Driver");
         config.setUsername(DB_USER_NAME);
         config.setPassword(DB_PASSWORD);
         config.setMaximumPoolSize(10);

@@ -159,17 +159,18 @@
     </nav>
 
     <div class="page-container">
-        <a href="viewcustomerdetail.jsp?id=${customer.enterpriseId}" class="back-link-top"><i class="fa-solid fa-arrow-left-long"></i> Quay lại chi tiết khách hàng</a>
+        <a href="${pageContext.request.contextPath}/customer?action=view&id=${customer.enterpriseId}" class="back-link-top"><i class="fa-solid fa-arrow-left-long"></i> Quay lại chi tiết khách hàng</a>
 
         <div class="page-header-row">
             <div>
                 <h2>Cập nhật thông tin khách hàng</h2>
-                <p>Mã khách hàng: <strong style="color:var(--primary-dark)">${customer.enterpriseCode}</strong></p>
+                <p>Mã khách hàng: <strong style="color:var(--primary-dark)">${customer.enterpriseCode}</strong> &middot; Mã số thuế: <strong style="color:var(--primary-dark)">${customer.taxCode}</strong></p>
             </div>
         </div>
 
         <div class="card-box">
-            <form id="createCustomerForm" action="UpdateCustomerServlet" method="POST" onsubmit="return validateForm();">
+            <form id="createCustomerForm" action="${pageContext.request.contextPath}/customer" method="POST" onsubmit="return validateForm();">
+                <input type="hidden" name="action" value="update">
                 <input type="hidden" name="customerId" value="${customer.enterpriseId}">
 
                 <div class="section-header"><h5>Thông tin khách hàng</h5></div>
@@ -263,7 +264,7 @@
                 </div>
 
                 <div class="action-bar">
-                    <a href="viewcustomerdetail.jsp?id=${customer.enterpriseId}" class="btn-cancel">Hủy</a>
+                    <a href="${pageContext.request.contextPath}/customer?action=view&id=${customer.enterpriseId}" class="btn-cancel">Hủy</a>
                     <button type="submit" class="btn-primary"><i class="fa-solid fa-check me-1"></i> Lưu thay đổi</button>
                 </div>
             </form>
