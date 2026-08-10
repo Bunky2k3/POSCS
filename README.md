@@ -29,19 +29,21 @@ build.xml       Ant build script
 
 ## Database Setup
 
-The database schema is not created automatically — run the SQL files in
-`db/migrations/` **in order** against a fresh MySQL database (`utf8mb4`):
+The database schema is not created automatically — run `db/schema.sql`
+once against a fresh MySQL database (`utf8mb4`):
 
 ```bash
 mysql -u root -p -e "CREATE DATABASE poscs_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
-mysql -u root -p poscs_db < db/migrations/000_baseline_schema.sql
-mysql -u root -p poscs_db < db/migrations/001_customer_evaluation_schema.sql
+mysql -u root -p poscs_db < db/schema.sql
 ```
 
-`000_baseline_schema.sql` creates the core tables (users, enterprises,
-contracts, products, technical support tickets, ...); later numbered files
-are incremental migrations layered on top. Always apply them in numeric
-order on a new database.
+`db/schema.sql` (re)creates every table the app expects, from scratch,
+in one shot — including the core tables (users, enterprises, contracts,
+products, technical support tickets, ...) and the customer evaluation
+tables (`contract_payments`, `customer_evaluation_rules`,
+`customer_lifecycle_events`). Re-running it drops and recreates all of
+these tables, so only run it on a fresh/dev database, not one with data
+you want to keep.
 
 ## Building and Running
 
