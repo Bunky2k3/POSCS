@@ -27,13 +27,32 @@ nbproject/      NetBeans/Ant project configuration
 build.xml       Ant build script
 ```
 
+## Database Setup
+
+The database schema is not created automatically — run the SQL files in
+`db/migrations/` **in order** against a fresh MySQL database (`utf8mb4`):
+
+```bash
+mysql -u root -p -e "CREATE DATABASE poscs_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+mysql -u root -p poscs_db < db/migrations/000_baseline_schema.sql
+mysql -u root -p poscs_db < db/migrations/001_customer_evaluation_schema.sql
+```
+
+`000_baseline_schema.sql` creates the core tables (users, enterprises,
+contracts, products, technical support tickets, ...); later numbered files
+are incremental migrations layered on top. Always apply them in numeric
+order on a new database.
+
 ## Building and Running
 
 This project is set up as a NetBeans Ant-based web application:
 
 1. Open the project folder in NetBeans (or run Ant directly with
    `ant build` / `ant run` from the repository root).
-2. Configure a MySQL database and update the connection settings used by
-   `poscs.dao.DBContext`.
-3. Deploy the resulting WAR to a Jakarta EE 11–compatible servlet
+2. Set up the database (see **Database Setup** above).
+3. Configure connection settings via the `DB_URL` / `DB_USER` /
+   `DB_PASSWORD` environment variables, read by `poscs.dao.DBContext`
+   (falls back to `jdbc:mysql://localhost:3306/poscs_db` / `root` / `1234`
+   if unset).
+4. Deploy the resulting WAR to a Jakarta EE 11–compatible servlet
    container (e.g. Apache Tomcat).
