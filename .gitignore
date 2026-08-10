@@ -24,3 +24,7 @@ hs_err_pid*
 replay_pid*
 /build/
 /dist/
+
+# NetBeans private project state (machine-specific: IDE server paths,
+# open editor tabs, etc.) - should never be shared between developers.
+/nbproject/private/
