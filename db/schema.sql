@@ -12,6 +12,23 @@ SET NAMES utf8mb4;
 SET FOREIGN_KEY_CHECKS = 0;
 
 -- =========================================================
+-- Migration tracking
+--
+-- Records which files under db/migrations/ have been applied to this
+-- database, so a migration is never accidentally run twice. A fresh
+-- database created from this file is already up to date with every
+-- migration that existed when this file was last synced -- see
+-- db/migrations/README.md for the workflow.
+-- =========================================================
+
+DROP TABLE IF EXISTS `schema_migrations`;
+CREATE TABLE `schema_migrations` (
+  `version`    varchar(150) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `applied_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`version`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- =========================================================
 -- Core tables
 -- =========================================================
 

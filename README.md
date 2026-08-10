@@ -45,6 +45,13 @@ tables (`contract_payments`, `customer_evaluation_rules`,
 these tables, so only run it on a fresh/dev database, not one with data
 you want to keep.
 
+### Changing the schema later
+
+Don't edit a live database by hand. Add a file under
+[`db/migrations/`](db/migrations/README.md) instead — that folder
+documents the naming convention and full workflow (including keeping
+`db/schema.sql` in sync so new setups stay up to date).
+
 ## Building and Running
 
 This project is set up as a NetBeans Ant-based web application:
