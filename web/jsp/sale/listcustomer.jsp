@@ -1,4 +1,14 @@
 <%@page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
+<%@taglib prefix="c" uri="jakarta.tags.core"%>
+<%@taglib prefix="fmt" uri="jakarta.tags.fmt"%>
+<%@taglib prefix="fn" uri="jakarta.tags.functions"%>
+<%--
+    Servlet cần đặt các request attribute sau trước khi forward tới trang này:
+      - customerList : List<poscs.model.Enterprise>  (mỗi Enterprise nên có sẵn .address.district.province và .accountOwner đã join)
+      - userList      : List<poscs.model.User>        (toàn bộ nhân viên, để đổ dropdown lọc "Người phụ trách")
+      - currentPage, totalPages, totalCount : thông tin phân trang (BR-12)
+      - keyword, typeFilter, assigneeFilter : giá trị filter hiện tại (để giữ lại lúc submit lại form tìm kiếm)
+--%>
 <!DOCTYPE html>
 <html lang="vi">
 <head>
@@ -342,27 +352,24 @@
         </div>
 
         <!-- ===== Bộ lọc / tìm kiếm ===== -->
-        <div class="filter-bar card-box">
+        <form class="filter-bar card-box" method="GET" action="ListCustomerServlet" id="filterForm">
             <div class="search-input-wrap">
                 <i class="fa-solid fa-magnifying-glass"></i>
-                <input type="text" id="searchInput" placeholder="Tìm theo mã KH, tên, số điện thoại...">
+                <input type="text" id="searchInput" name="keyword" value="${keyword}" placeholder="Tìm theo mã KH, tên, số điện thoại...">
             </div>
-            <select id="filterType">
+            <select id="filterType" name="type">
                 <option value="">Tất cả loại khách hàng</option>
-                <option value="Nhà mạng viễn thông">Nhà mạng viễn thông</option>
-                <option value="Nhà thầu thi công">Nhà thầu thi công</option>
-                <option value="Đại lý phân phối">Đại lý phân phối</option>
+                <option value="Nhà mạng viễn thông" ${typeFilter == 'Nhà mạng viễn thông' ? 'selected' : ''}>Nhà mạng viễn thông</option>
+                <option value="Nhà thầu thi công" ${typeFilter == 'Nhà thầu thi công' ? 'selected' : ''}>Nhà thầu thi công</option>
+                <option value="Đại lý phân phối" ${typeFilter == 'Đại lý phân phối' ? 'selected' : ''}>Đại lý phân phối</option>
             </select>
-            <select id="filterAssignee">
+            <select id="filterAssignee" name="assigneeId">
                 <option value="">Tất cả người phụ trách</option>
-                <option value="Nguyễn Văn An">Nguyễn Văn An</option>
-                <option value="Trần Thị Bình">Trần Thị Bình</option>
-                <option value="Lê Minh Châu">Lê Minh Châu</option>
-                <option value="Phạm Quốc Huy">Phạm Quốc Huy</option>
+                <c:forEach var="staff" items="${userList}">
+                    <option value="${staff.userId}" ${assigneeFilter == staff.userId ? 'selected' : ''}>${staff.fullName}</option>
+                </c:forEach>
             </select>
-        </div>
-
-        <%-- Servlet cần: truy vấn bảng enterprises (JOIN addresses, users làm người phụ trách), hỗ trợ phân trang (BR-12), tìm kiếm/lọc theo query param --%>
+        </form>
 
         <!-- ===== Bảng danh sách ===== -->
         <div class="table-card card-box">
@@ -381,152 +388,54 @@
                         </tr>
                     </thead>
                     <tbody id="customerTableBody">
-                        <tr data-type="Nhà mạng viễn thông" data-assignee="Nguyễn Văn An">
-                            <td class="customer-code">KH-0001</td>
-                            <td><a href="viewcustomerdetail.jsp?id=1" class="customer-name-link">VNPT Hà Nội</a></td>
-                            <td><span class="type-badge">Nhà mạng viễn thông</span></td>
-                            <td>contact@vnpt-hanoi.vn</td>
-                            <td>024 3822 1234</td>
-                            <td>Hà Nội</td>
-                            <td>Nguyễn Văn An</td>
-                            <td>
-                                <div class="action-icons">
-                                    <button class="act-view" title="Xem chi tiết" onclick="location.href='viewcustomerdetail.jsp?id=1'"><i class="fa-regular fa-eye"></i></button>
-                                    <button class="act-edit" title="Sửa" onclick="location.href='updatecustomer.jsp?id=1'"><i class="fa-solid fa-pen"></i></button>
-                                    <button class="act-delete" title="Xóa" onclick="openDeleteModal(this)"><i class="fa-solid fa-trash"></i></button>
-                                </div>
-                            </td>
-                        </tr>
-                        <tr data-type="Nhà mạng viễn thông" data-assignee="Trần Thị Bình">
-                            <td class="customer-code">KH-0002</td>
-                            <td><a href="viewcustomerdetail.jsp?id=2" class="customer-name-link">Viettel Bắc Ninh</a></td>
-                            <td><span class="type-badge">Nhà mạng viễn thông</span></td>
-                            <td>lienhe@viettel-bacninh.vn</td>
-                            <td>0222 384 5678</td>
-                            <td>Bắc Ninh</td>
-                            <td>Trần Thị Bình</td>
-                            <td>
-                                <div class="action-icons">
-                                    <button class="act-view" title="Xem chi tiết" onclick="location.href='viewcustomerdetail.jsp?id=2'"><i class="fa-regular fa-eye"></i></button>
-                                    <button class="act-edit" title="Sửa" onclick="location.href='updatecustomer.jsp?id=2'"><i class="fa-solid fa-pen"></i></button>
-                                    <button class="act-delete" title="Xóa" onclick="openDeleteModal(this)"><i class="fa-solid fa-trash"></i></button>
-                                </div>
-                            </td>
-                        </tr>
-                        <tr data-type="Nhà mạng viễn thông" data-assignee="Nguyễn Văn An">
-                            <td class="customer-code">KH-0003</td>
-                            <td><a href="viewcustomerdetail.jsp?id=3" class="customer-name-link">MobiFone Hải Phòng</a></td>
-                            <td><span class="type-badge">Nhà mạng viễn thông</span></td>
-                            <td>cskh@mobifone-hp.vn</td>
-                            <td>0225 385 9012</td>
-                            <td>Hải Phòng</td>
-                            <td>Nguyễn Văn An</td>
-                            <td>
-                                <div class="action-icons">
-                                    <button class="act-view" title="Xem chi tiết" onclick="location.href='viewcustomerdetail.jsp?id=3'"><i class="fa-regular fa-eye"></i></button>
-                                    <button class="act-edit" title="Sửa" onclick="location.href='updatecustomer.jsp?id=3'"><i class="fa-solid fa-pen"></i></button>
-                                    <button class="act-delete" title="Xóa" onclick="openDeleteModal(this)"><i class="fa-solid fa-trash"></i></button>
-                                </div>
-                            </td>
-                        </tr>
-                        <tr data-type="Nhà thầu thi công" data-assignee="Lê Minh Châu">
-                            <td class="customer-code">KH-0004</td>
-                            <td><a href="viewcustomerdetail.jsp?id=4" class="customer-name-link">Cty TNHH Xây lắp Điện Nam Hà</a></td>
-                            <td><span class="type-badge">Nhà thầu thi công</span></td>
-                            <td>info@namha-const.vn</td>
-                            <td>0228 123 4567</td>
-                            <td>Nam Định</td>
-                            <td>Lê Minh Châu</td>
-                            <td>
-                                <div class="action-icons">
-                                    <button class="act-view" title="Xem chi tiết" onclick="location.href='viewcustomerdetail.jsp?id=4'"><i class="fa-regular fa-eye"></i></button>
-                                    <button class="act-edit" title="Sửa" onclick="location.href='updatecustomer.jsp?id=4'"><i class="fa-solid fa-pen"></i></button>
-                                    <button class="act-delete" title="Xóa" onclick="openDeleteModal(this)"><i class="fa-solid fa-trash"></i></button>
-                                </div>
-                            </td>
-                        </tr>
-                        <tr data-type="Đại lý phân phối" data-assignee="Trần Thị Bình">
-                            <td class="customer-code">KH-0005</td>
-                            <td><a href="viewcustomerdetail.jsp?id=5" class="customer-name-link">Đại lý Thiết bị Viễn thông Đông Á</a></td>
-                            <td><span class="type-badge">Đại lý phân phối</span></td>
-                            <td>sales@dongatelecom.vn</td>
-                            <td>024 6655 7788</td>
-                            <td>Hà Nội</td>
-                            <td>Trần Thị Bình</td>
-                            <td>
-                                <div class="action-icons">
-                                    <button class="act-view" title="Xem chi tiết" onclick="location.href='viewcustomerdetail.jsp?id=5'"><i class="fa-regular fa-eye"></i></button>
-                                    <button class="act-edit" title="Sửa" onclick="location.href='updatecustomer.jsp?id=5'"><i class="fa-solid fa-pen"></i></button>
-                                    <button class="act-delete" title="Xóa" onclick="openDeleteModal(this)"><i class="fa-solid fa-trash"></i></button>
-                                </div>
-                            </td>
-                        </tr>
-                        <tr data-type="Nhà mạng viễn thông" data-assignee="Phạm Quốc Huy">
-                            <td class="customer-code">KH-0006</td>
-                            <td><a href="viewcustomerdetail.jsp?id=6" class="customer-name-link">FPT Telecom Đà Nẵng</a></td>
-                            <td><span class="type-badge">Nhà mạng viễn thông</span></td>
-                            <td>support@fpt-dn.vn</td>
-                            <td>0236 123 9988</td>
-                            <td>Đà Nẵng</td>
-                            <td>Phạm Quốc Huy</td>
-                            <td>
-                                <div class="action-icons">
-                                    <button class="act-view" title="Xem chi tiết" onclick="location.href='viewcustomerdetail.jsp?id=6'"><i class="fa-regular fa-eye"></i></button>
-                                    <button class="act-edit" title="Sửa" onclick="location.href='updatecustomer.jsp?id=6'"><i class="fa-solid fa-pen"></i></button>
-                                    <button class="act-delete" title="Xóa" onclick="openDeleteModal(this)"><i class="fa-solid fa-trash"></i></button>
-                                </div>
-                            </td>
-                        </tr>
-                        <tr data-type="Nhà mạng viễn thông" data-assignee="Lê Minh Châu">
-                            <td class="customer-code">KH-0007</td>
-                            <td><a href="viewcustomerdetail.jsp?id=7" class="customer-name-link">CMC Telecom</a></td>
-                            <td><span class="type-badge">Nhà mạng viễn thông</span></td>
-                            <td>contact@cmctelecom.vn</td>
-                            <td>024 7300 8899</td>
-                            <td>Hà Nội</td>
-                            <td>Lê Minh Châu</td>
-                            <td>
-                                <div class="action-icons">
-                                    <button class="act-view" title="Xem chi tiết" onclick="location.href='viewcustomerdetail.jsp?id=7'"><i class="fa-regular fa-eye"></i></button>
-                                    <button class="act-edit" title="Sửa" onclick="location.href='updatecustomer.jsp?id=7'"><i class="fa-solid fa-pen"></i></button>
-                                    <button class="act-delete" title="Xóa" onclick="openDeleteModal(this)"><i class="fa-solid fa-trash"></i></button>
-                                </div>
-                            </td>
-                        </tr>
-                        <tr data-type="Nhà thầu thi công" data-assignee="Phạm Quốc Huy">
-                            <td class="customer-code">KH-0008</td>
-                            <td><a href="viewcustomerdetail.jsp?id=8" class="customer-name-link">Cty Xây dựng Hạ tầng Miền Trung</a></td>
-                            <td><span class="type-badge">Nhà thầu thi công</span></td>
-                            <td>info@hatangmt.vn</td>
-                            <td>0234 987 6543</td>
-                            <td>Huế</td>
-                            <td>Phạm Quốc Huy</td>
-                            <td>
-                                <div class="action-icons">
-                                    <button class="act-view" title="Xem chi tiết" onclick="location.href='viewcustomerdetail.jsp?id=8'"><i class="fa-regular fa-eye"></i></button>
-                                    <button class="act-edit" title="Sửa" onclick="location.href='updatecustomer.jsp?id=8'"><i class="fa-solid fa-pen"></i></button>
-                                    <button class="act-delete" title="Xóa" onclick="openDeleteModal(this)"><i class="fa-solid fa-trash"></i></button>
-                                </div>
-                            </td>
-                        </tr>
+                        <c:forEach var="customer" items="${customerList}">
+                            <tr>
+                                <td class="customer-code">${customer.enterpriseCode}</td>
+                                <td><a href="viewcustomerdetail.jsp?id=${customer.enterpriseId}" class="customer-name-link">${customer.enterpriseName}</a></td>
+                                <td><span class="type-badge">${customer.customerType}</span></td>
+                                <td>${customer.email}</td>
+                                <td>${customer.phone}</td>
+                                <td>
+                                    <c:choose>
+                                        <c:when test="${customer.address != null}">${customer.address.fullAddress}</c:when>
+                                        <c:otherwise>&mdash;</c:otherwise>
+                                    </c:choose>
+                                </td>
+                                <td>
+                                    <c:choose>
+                                        <c:when test="${customer.accountOwner != null}">${customer.accountOwner.fullName}</c:when>
+                                        <c:otherwise>&mdash;</c:otherwise>
+                                    </c:choose>
+                                </td>
+                                <td>
+                                    <div class="action-icons">
+                                        <button class="act-view" title="Xem chi tiết" onclick="location.href='viewcustomerdetail.jsp?id=${customer.enterpriseId}'"><i class="fa-regular fa-eye"></i></button>
+                                        <button class="act-edit" title="Sửa" onclick="location.href='updatecustomer.jsp?id=${customer.enterpriseId}'"><i class="fa-solid fa-pen"></i></button>
+                                        <button class="act-delete" title="Xóa" onclick="openDeleteModal(${customer.enterpriseId}, '${customer.enterpriseName}')"><i class="fa-solid fa-trash"></i></button>
+                                    </div>
+                                </td>
+                            </tr>
+                        </c:forEach>
                     </tbody>
                 </table>
             </div>
 
             <!-- ===== Trạng thái rỗng (MSG-017) ===== -->
-            <div class="empty-state" id="emptyState" style="display:none">
+            <div class="empty-state" id="emptyState" style="${empty customerList ? 'display:block' : 'display:none'}">
                 <i class="fa-regular fa-folder-open"></i>
                 <p>Không có khách hàng để hiển thị.</p>
             </div>
 
             <!-- ===== Phân trang (BR-12) ===== -->
             <div class="pagination-bar">
-                <span class="pagination-info" id="paginationInfo">Hiển thị 1–8 trong tổng số 8 khách hàng</span>
+                <span class="pagination-info" id="paginationInfo">Hiển thị ${fn:length(customerList)} trong tổng số ${totalCount} khách hàng</span>
                 <nav>
                     <ul class="pagination pagination-sm mb-0">
-                        <li class="page-item disabled"><a class="page-link" href="#">Trước</a></li>
-                        <li class="page-item active"><a class="page-link" href="#">1</a></li>
-                        <li class="page-item disabled"><a class="page-link" href="#">Sau</a></li>
+                        <li class="page-item ${currentPage <= 1 ? 'disabled' : ''}"><a class="page-link" href="ListCustomerServlet?page=${currentPage - 1}">Trước</a></li>
+                        <c:forEach begin="1" end="${totalPages}" var="p">
+                            <li class="page-item ${p == currentPage ? 'active' : ''}"><a class="page-link" href="ListCustomerServlet?page=${p}">${p}</a></li>
+                        </c:forEach>
+                        <li class="page-item ${currentPage >= totalPages ? 'disabled' : ''}"><a class="page-link" href="ListCustomerServlet?page=${currentPage + 1}">Sau</a></li>
                     </ul>
                 </nav>
             </div>
@@ -542,7 +451,7 @@
                 </div>
                 <div class="modal-body">
                     <h5 class="mb-2" style="font-weight:700; color:#111827;">Xác nhận xóa khách hàng</h5>
-                    Bạn có chắc chắn muốn xóa khách hàng này? Hành động này không thể hoàn tác.
+                    Bạn có chắc chắn muốn xóa khách hàng <strong id="deleteCustomerName"></strong>? Hành động này không thể hoàn tác.
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn-modal-cancel" data-bs-dismiss="modal">Hủy</button>
@@ -560,68 +469,25 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         var deleteModal = new bootstrap.Modal(document.getElementById('deleteModal'));
-        var rowToDelete = null;
+        var customerIdToDelete = null;
 
-        function openDeleteModal(btn) {
-            rowToDelete = btn.closest('tr');
+        function openDeleteModal(customerId, customerName) {
+            customerIdToDelete = customerId;
+            document.getElementById('deleteCustomerName').textContent = customerName;
             deleteModal.show();
         }
 
         document.getElementById('confirmDeleteBtn').addEventListener('click', function () {
-            // TODO: gọi servlet DeleteCustomerServlet, kiểm tra ràng buộc hợp đồng còn hiệu lực (BR-41) trước khi xóa thật
-            if (rowToDelete) {
-                rowToDelete.remove();
-                rowToDelete = null;
-                updateRowCount();
-                showToast('Xóa khách hàng thành công.', false);
+            if (customerIdToDelete) {
+                // TODO: gọi DeleteCustomerServlet?id=<customerIdToDelete>, kiểm tra ràng buộc hợp đồng còn hiệu lực (BR-41) trước khi xóa thật
+                window.location.href = 'DeleteCustomerServlet?id=' + customerIdToDelete;
             }
             deleteModal.hide();
         });
 
-        function showToast(message, blocked) {
-            var toast = document.getElementById('toastMsg');
-            var toastText = document.getElementById('toastMsgText');
-            toastText.textContent = message;
-            toast.classList.toggle('blocked', !!blocked);
-            toast.querySelector('i').className = blocked ? 'fa-solid fa-circle-xmark' : 'fa-solid fa-circle-check';
-            toast.classList.add('show');
-            setTimeout(function () { toast.classList.remove('show'); }, 3000);
-        }
-
-        function updateRowCount() {
-            var rows = document.querySelectorAll('#customerTableBody tr:not([style*="display: none"])');
-            var total = rows.length;
-            document.getElementById('paginationInfo').textContent =
-                total > 0 ? 'Hiển thị 1–' + total + ' trong tổng số ' + total + ' khách hàng' : '';
-            document.getElementById('emptyState').style.display = total === 0 ? 'block' : 'none';
-        }
-
-        // ===== Tìm kiếm & lọc phía client (demo giao diện) =====
-        function applyFilters() {
-            var keyword = document.getElementById('searchInput').value.trim().toLowerCase();
-            var type = document.getElementById('filterType').value;
-            var assignee = document.getElementById('filterAssignee').value;
-            var rows = document.querySelectorAll('#customerTableBody tr');
-            var visibleCount = 0;
-
-            rows.forEach(function (row) {
-                var text = row.textContent.toLowerCase();
-                var matchesKeyword = !keyword || text.indexOf(keyword) !== -1;
-                var matchesType = !type || row.getAttribute('data-type') === type;
-                var matchesAssignee = !assignee || row.getAttribute('data-assignee') === assignee;
-                var visible = matchesKeyword && matchesType && matchesAssignee;
-                row.style.display = visible ? '' : 'none';
-                if (visible) visibleCount++;
-            });
-
-            document.getElementById('paginationInfo').textContent =
-                visibleCount > 0 ? 'Hiển thị 1–' + visibleCount + ' trong tổng số ' + visibleCount + ' khách hàng' : '';
-            document.getElementById('emptyState').style.display = visibleCount === 0 ? 'block' : 'none';
-        }
-
-        document.getElementById('searchInput').addEventListener('input', applyFilters);
-        document.getElementById('filterType').addEventListener('change', applyFilters);
-        document.getElementById('filterAssignee').addEventListener('change', applyFilters);
+        // Tự động submit lại form lọc khi đổi loại KH / người phụ trách
+        document.getElementById('filterType').addEventListener('change', function () { document.getElementById('filterForm').submit(); });
+        document.getElementById('filterAssignee').addEventListener('change', function () { document.getElementById('filterForm').submit(); });
     </script>
 </body>
 </html>

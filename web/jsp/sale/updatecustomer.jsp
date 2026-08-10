@@ -1,4 +1,17 @@
 <%@page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
+<%@taglib prefix="c" uri="jakarta.tags.core"%>
+<%@taglib prefix="fmt" uri="jakarta.tags.fmt"%>
+<%--
+    Servlet cần: lấy customer_id từ query param, truy vấn enterprises (JOIN address/district
+    để biết provinceId hiện tại) đổ vào request attribute "customer", xử lý POST cập nhật vào
+    bảng enterprises. Kiểm tra bản ghi tồn tại (MSG-021) trước khi hiển thị.
+
+    Request attribute cần có:
+      - customer      : poscs.model.Enterprise (đã join .address.district)
+      - userList      : List<poscs.model.User>
+      - provinceList  : List<poscs.model.Province>
+      - districtList  : List<poscs.model.District>
+--%>
 <!DOCTYPE html>
 <html lang="vi">
 <head>
@@ -146,34 +159,33 @@
     </nav>
 
     <div class="page-container">
-        <a href="viewcustomerdetail.jsp?id=1" class="back-link-top"><i class="fa-solid fa-arrow-left-long"></i> Quay lại chi tiết khách hàng</a>
+        <a href="viewcustomerdetail.jsp?id=${customer.enterpriseId}" class="back-link-top"><i class="fa-solid fa-arrow-left-long"></i> Quay lại chi tiết khách hàng</a>
 
         <div class="page-header-row">
             <div>
                 <h2>Cập nhật thông tin khách hàng</h2>
-                <p>Mã khách hàng: <strong style="color:var(--primary-dark)">KH-0001</strong></p>
+                <p>Mã khách hàng: <strong style="color:var(--primary-dark)">${customer.enterpriseCode}</strong></p>
             </div>
         </div>
 
-        <%-- Servlet cần: lấy customer_id từ query param, đổ dữ liệu hiện tại vào value="" các input bên dưới, xử lý POST cập nhật vào bảng enterprises. Kiểm tra bản ghi tồn tại (MSG-021) trước khi hiển thị --%>
         <div class="card-box">
             <form id="createCustomerForm" action="UpdateCustomerServlet" method="POST" onsubmit="return validateForm();">
-                <input type="hidden" name="customerId" value="1">
+                <input type="hidden" name="customerId" value="${customer.enterpriseId}">
 
                 <div class="section-header"><h5>Thông tin khách hàng</h5></div>
                 <div class="row">
                     <div class="col-md-6 field-row">
                         <label>Tên khách hàng <span class="req">*</span></label>
-                        <input type="text" class="form-control" id="customerName" name="customerName" value="VNPT Hà Nội">
+                        <input type="text" class="form-control" id="customerName" name="customerName" value="${customer.enterpriseName}">
                         <span class="error-text" id="err-customerName">Tên khách hàng không được để trống.</span>
                     </div>
                     <div class="col-md-6 field-row">
                         <label>Loại khách hàng <span class="req">*</span></label>
                         <select class="form-select" id="customerType" name="customerType">
                             <option value="">-- Chọn loại khách hàng --</option>
-                            <option value="Nhà mạng viễn thông" selected>Nhà mạng viễn thông</option>
-                            <option value="Nhà thầu thi công">Nhà thầu thi công</option>
-                            <option value="Đại lý phân phối">Đại lý phân phối</option>
+                            <option value="Nhà mạng viễn thông" ${customer.customerType == 'Nhà mạng viễn thông' ? 'selected' : ''}>Nhà mạng viễn thông</option>
+                            <option value="Nhà thầu thi công" ${customer.customerType == 'Nhà thầu thi công' ? 'selected' : ''}>Nhà thầu thi công</option>
+                            <option value="Đại lý phân phối" ${customer.customerType == 'Đại lý phân phối' ? 'selected' : ''}>Đại lý phân phối</option>
                         </select>
                         <span class="error-text" id="err-customerType">Vui lòng chọn loại khách hàng.</span>
                     </div>
@@ -182,43 +194,42 @@
                         <label>Nhóm khách hàng <span class="req">*</span></label>
                         <select class="form-select" id="customerGroup" name="customerGroup">
                             <option value="">-- Chọn nhóm khách hàng --</option>
-                            <option value="Khách hàng VIP" selected>Khách hàng VIP</option>
-                            <option value="Khách hàng thân thiết">Khách hàng thân thiết</option>
-                            <option value="Khách hàng tiềm năng">Khách hàng tiềm năng</option>
-                            <option value="Khách hàng thường">Khách hàng thường</option>
+                            <option value="Khách hàng VIP" ${customer.customerGroup == 'Khách hàng VIP' ? 'selected' : ''}>Khách hàng VIP</option>
+                            <option value="Khách hàng thân thiết" ${customer.customerGroup == 'Khách hàng thân thiết' ? 'selected' : ''}>Khách hàng thân thiết</option>
+                            <option value="Khách hàng tiềm năng" ${customer.customerGroup == 'Khách hàng tiềm năng' ? 'selected' : ''}>Khách hàng tiềm năng</option>
+                            <option value="Khách hàng thường" ${customer.customerGroup == 'Khách hàng thường' ? 'selected' : ''}>Khách hàng thường</option>
                         </select>
                         <span class="error-text" id="err-customerGroup">Vui lòng chọn nhóm khách hàng.</span>
                     </div>
                     <div class="col-md-6 field-row">
                         <label>Nhân viên phụ trách <span class="req">*</span></label>
-                        <select class="form-select" id="assignee" name="assignee">
+                        <select class="form-select" id="assignee" name="accountOwnerId">
                             <option value="">-- Chọn nhân viên --</option>
-                            <option value="Nguyễn Văn An" selected>Nguyễn Văn An</option>
-                            <option value="Trần Thị Bình">Trần Thị Bình</option>
-                            <option value="Lê Minh Châu">Lê Minh Châu</option>
-                            <option value="Phạm Quốc Huy">Phạm Quốc Huy</option>
+                            <c:forEach var="staff" items="${userList}">
+                                <option value="${staff.userId}" ${staff.userId == customer.accountOwnerId ? 'selected' : ''}>${staff.fullName}</option>
+                            </c:forEach>
                         </select>
                         <span class="error-text" id="err-assignee">Vui lòng chọn nhân viên phụ trách.</span>
                     </div>
 
                     <div class="col-md-6 field-row">
                         <label>Số điện thoại <span class="req">*</span></label>
-                        <input type="tel" class="form-control" id="phone" name="phone" value="024 3822 1234">
+                        <input type="tel" class="form-control" id="phone" name="phone" value="${customer.phone}">
                         <span class="error-text" id="err-phone">Số điện thoại không hợp lệ.</span>
                     </div>
                     <div class="col-md-6 field-row">
                         <label>Email</label>
-                        <input type="email" class="form-control" id="email" name="email" value="contact@vnpt-hanoi.vn">
+                        <input type="email" class="form-control" id="email" name="email" value="${customer.email}">
                         <span class="error-text" id="err-email">Địa chỉ email không hợp lệ.</span>
                     </div>
 
                     <div class="col-md-6 field-row">
                         <label>Website</label>
-                        <input type="text" class="form-control" id="website" name="website" value="https://vnpt-hanoi.vn">
+                        <input type="text" class="form-control" id="website" name="website" value="${customer.website}">
                     </div>
                     <div class="col-md-6 field-row">
                         <label>Ngày tham gia</label>
-                        <input type="date" class="form-control" id="joinDate" name="joinDate" value="2023-03-15">
+                        <input type="date" class="form-control" id="joinDate" name="joinDate" value="${customer.joinDate}">
                         <span class="error-text" id="err-joinDate">Ngày tham gia không được là ngày trong tương lai.</span>
                     </div>
                 </div>
@@ -227,31 +238,32 @@
                 <div class="row">
                     <div class="col-md-6 field-row">
                         <label>Tỉnh / Thành phố</label>
-                        <select class="form-select" id="province" name="province">
-                            <option selected>Thành phố Hà Nội</option>
-                            <option>Thành phố Hồ Chí Minh</option>
-                            <option>Tỉnh Bắc Ninh</option>
-                            <option>Thành phố Đà Nẵng</option>
-                            <option>Thành phố Hải Phòng</option>
+                        <select class="form-select" id="province" name="provinceId">
+                            <option value="">-- Chọn tỉnh / thành phố --</option>
+                            <c:forEach var="prov" items="${provinceList}">
+                                <option value="${prov.provinceId}" ${customer.address != null && customer.address.district != null && prov.provinceId == customer.address.district.provinceId ? 'selected' : ''}>${prov.provinceName}</option>
+                            </c:forEach>
                         </select>
                     </div>
                     <div class="col-md-6 field-row">
                         <label>Quận / Huyện</label>
-                        <select class="form-select" id="district" name="district">
-                            <option selected>Quận Cầu Giấy</option>
-                            <option>Quận Đống Đa</option>
-                            <option>Quận Hai Bà Trưng</option>
-                            <option>Quận Nam Từ Liêm</option>
+                        <select class="form-select" id="district" name="districtId">
+                            <option value="">-- Chọn quận / huyện --</option>
+                            <c:forEach var="dist" items="${districtList}">
+                                <option value="${dist.districtId}" data-province-id="${dist.provinceId}"
+                                        ${customer.address != null && dist.districtId == customer.address.districtId ? 'selected' : ''}>${dist.districtName}</option>
+                            </c:forEach>
                         </select>
                     </div>
                     <div class="col-12 field-row">
                         <label>Địa chỉ chi tiết</label>
-                        <input type="text" class="form-control" id="addressDetail" name="addressDetail" value="Số 57 Huỳnh Thúc Kháng">
+                        <input type="text" class="form-control" id="addressDetail" name="addressDetail"
+                               value="${customer.address != null ? customer.address.streetAndLocalName : ''}">
                     </div>
                 </div>
 
                 <div class="action-bar">
-                    <a href="viewcustomerdetail.jsp?id=1" class="btn-cancel">Hủy</a>
+                    <a href="viewcustomerdetail.jsp?id=${customer.enterpriseId}" class="btn-cancel">Hủy</a>
                     <button type="submit" class="btn-primary"><i class="fa-solid fa-check me-1"></i> Lưu thay đổi</button>
                 </div>
             </form>
@@ -260,12 +272,32 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+        // Chấp nhận cả số di động lẫn số bàn Việt Nam (VD: 024 3822 1234), không chỉ riêng đầu số di động
         function isValidPhone(value) {
-            return /^(0|\+84)(3|5|7|8|9)[0-9]{8}$/.test(value.replace(/\s/g, ''));
+            return /^(0|\+84)[0-9]{9,10}$/.test(value.replace(/[\s.-]/g, ''));
         }
         function isValidEmail(value) {
             return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
         }
+
+        // Lọc quận/huyện theo tỉnh/thành phố đã chọn, giữ nguyên lựa chọn hiện tại nếu còn khớp
+        var districtSelect = document.getElementById('district');
+        var allDistrictOptions = Array.prototype.slice.call(districtSelect.querySelectorAll('option[data-province-id]'));
+        var initialDistrictValue = districtSelect.value;
+
+        function filterDistricts(provinceId, keepValue) {
+            allDistrictOptions.forEach(function (opt) {
+                opt.style.display = (opt.getAttribute('data-province-id') === provinceId) ? '' : 'none';
+            });
+            districtSelect.value = keepValue || '';
+        }
+
+        document.getElementById('province').addEventListener('change', function () {
+            filterDistricts(this.value, null);
+        });
+
+        // Khởi tạo hiển thị đúng danh sách quận/huyện theo tỉnh đã chọn sẵn khi load trang
+        filterDistricts(document.getElementById('province').value, initialDistrictValue);
 
         function validateForm() {
             var valid = true;
