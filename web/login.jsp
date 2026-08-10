@@ -1,4 +1,5 @@
 <%@page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
+<%@taglib prefix="c" uri="jakarta.tags.core"%>
 <!DOCTYPE html>
 <html lang="vi">
 <head>
@@ -233,12 +234,21 @@
                     <p class="text-muted" style="font-size: 0.95rem;">Vui lòng nhập thông tin để truy cập hệ thống.</p>
                 </div>
 
-                <form action="#" method="POST" id="loginForm">
+                <form action="${pageContext.request.contextPath}/login" method="POST" id="loginForm">
+                    <c:if test="${not empty param.error}">
+                        <div class="alert alert-danger py-2 px-3 mb-4" style="font-size: 0.9rem; border-radius: 12px;">
+                            <c:choose>
+                                <c:when test="${param.error == 'invalid_credentials'}">Sai tên đăng nhập hoặc mật khẩu.</c:when>
+                                <c:when test="${param.error == 'missing_fields'}">Vui lòng nhập đầy đủ tên đăng nhập và mật khẩu.</c:when>
+                                <c:otherwise>Đăng nhập thất bại. Vui lòng thử lại.</c:otherwise>
+                            </c:choose>
+                        </div>
+                    </c:if>
                     <div class="mb-4">
                         <label for="username" class="form-label">Tên đăng nhập / Email</label>
                         <div class="input-group">
                             <span class="input-group-text"><i class="fa-regular fa-user"></i></span>
-                            <input type="text" class="form-control" id="username" name="username" 
+                            <input type="text" class="form-control" id="username" name="username"
                                    placeholder="Nhập email hoặc username..." required autofocus>
                         </div>
                     </div>

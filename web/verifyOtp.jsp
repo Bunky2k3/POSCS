@@ -1,4 +1,5 @@
 <%@page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
+<%@taglib prefix="c" uri="jakarta.tags.core"%>
 <!DOCTYPE html>
 <html lang="vi">
 <head>
@@ -200,6 +201,16 @@
         <div class="card-body-custom">
 
             <form action="VerifyOtpServlet" method="POST" id="verifyOtpForm" onsubmit="return validateForm();">
+
+                <c:if test="${not empty param.error}">
+                    <div class="alert alert-danger py-2 px-3 mb-3" style="font-size: 0.85rem; border-radius: 12px;">
+                        <c:choose>
+                            <c:when test="${param.error == 'expired'}">Mã OTP đã hết hạn, vui lòng quay lại và yêu cầu gửi mã mới.</c:when>
+                            <c:when test="${param.error == 'invalid_otp'}">Mã OTP không đúng, vui lòng thử lại.</c:when>
+                            <c:otherwise>Đã có lỗi xảy ra. Vui lòng thử lại.</c:otherwise>
+                        </c:choose>
+                    </div>
+                </c:if>
 
                 <%-- otpCode sẽ được ghép lại từ 6 ô input bên dưới trước khi submit --%>
                 <input type="hidden" name="otpCode" id="otpCode" value="">
