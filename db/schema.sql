@@ -66,6 +66,13 @@ CREATE TABLE `roles` (
   PRIMARY KEY (`role_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Xem PERMISSIONS.md ở gốc repo để biết ma trận quyền theo role x resource
+INSERT INTO `roles` (`role_name`) VALUES
+('Admin'),
+('Sales'),
+('Kỹ thuật'),
+('CSKH');
+
 DROP TABLE IF EXISTS `users`;
 CREATE TABLE `users` (
   `user_id` int NOT NULL AUTO_INCREMENT,
