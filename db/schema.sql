@@ -104,14 +104,19 @@ CREATE TABLE `enterprises` (
   `enterprise_id` int NOT NULL AUTO_INCREMENT,
   `enterprise_code` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
   `enterprise_name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `customer_type` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `customer_group` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
   `tax_code` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
   `email` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
   `phone` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `website` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `address_id` int DEFAULT NULL,
+  `account_owner_id` int NOT NULL,
   `legal_representative` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `logo_url` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `business_license_url` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `status` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'Active',
+  `join_date` date DEFAULT NULL,
   `current_relationship_rating` enum('Tốt','Cần theo dõi','Xấu','Có nguy cơ rời bỏ') COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -122,7 +127,9 @@ CREATE TABLE `enterprises` (
   UNIQUE KEY `email` (`email`),
   UNIQUE KEY `phone` (`phone`),
   KEY `address_id` (`address_id`),
-  CONSTRAINT `enterprises_ibfk_1` FOREIGN KEY (`address_id`) REFERENCES `addresses` (`address_id`) ON DELETE SET NULL
+  KEY `account_owner_id` (`account_owner_id`),
+  CONSTRAINT `enterprises_ibfk_1` FOREIGN KEY (`address_id`) REFERENCES `addresses` (`address_id`) ON DELETE SET NULL,
+  CONSTRAINT `fk_enterprises_account_owner` FOREIGN KEY (`account_owner_id`) REFERENCES `users` (`user_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 DROP TABLE IF EXISTS `enterprisecontacts`;
