@@ -188,6 +188,8 @@
         }
         .toast-msg.show { transform: translateX(0); }
         .toast-msg i { color: var(--success); font-size: 1.2rem; }
+        .toast-msg.blocked { border-left-color: var(--danger); }
+        .toast-msg.blocked i { color: var(--danger); }
 
         @media (max-width: 768px) {
             .info-card, .detail-header { padding: 20px; }
@@ -240,7 +242,7 @@
     </nav>
 
     <div class="page-container">
-        <a href="listcustomer.jsp" class="back-link-top"><i class="fa-solid fa-arrow-left-long"></i> Quay lại danh sách</a>
+        <a href="${pageContext.request.contextPath}/customer" class="back-link-top"><i class="fa-solid fa-arrow-left-long"></i> Quay lại danh sách</a>
 
         <!-- ===== Header ===== -->
         <div class="detail-header card-box">
@@ -266,7 +268,7 @@
                 </div>
             </div>
             <div class="header-actions">
-                <a href="updatecustomer.jsp?id=${customer.enterpriseId}" class="btn-edit-detail"><i class="fa-solid fa-pen"></i> Sửa thông tin</a>
+                <a href="${pageContext.request.contextPath}/customer?action=edit&id=${customer.enterpriseId}" class="btn-edit-detail"><i class="fa-solid fa-pen"></i> Sửa thông tin</a>
                 <button class="btn-delete-detail" onclick="openDeleteModal()"><i class="fa-solid fa-trash"></i> Xóa</button>
             </div>
         </div>
@@ -437,10 +439,19 @@
         </div>
     </div>
 
-    <div class="toast-msg" id="toastMsg">
-        <i class="fa-solid fa-circle-check"></i>
-        <span>Xóa khách hàng thành công.</span>
-    </div>
+    <!-- MSG-040: chặn xoá do BR-41 (còn hợp đồng đang hiệu lực) -->
+    <c:if test="${param.error == 'has_active_contracts'}">
+        <div class="toast-msg blocked show">
+            <i class="fa-solid fa-circle-xmark"></i>
+            <span>Không thể xoá: khách hàng còn hợp đồng đang hiệu lực.</span>
+        </div>
+    </c:if>
+
+    <!-- Form ẩn để gửi yêu cầu xoá qua POST (không đổi state bằng GET) -->
+    <form id="deleteForm" method="POST" action="${pageContext.request.contextPath}/customer" style="display:none">
+        <input type="hidden" name="action" value="delete">
+        <input type="hidden" name="id" value="${customer.enterpriseId}">
+    </form>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
@@ -451,13 +462,7 @@
         }
 
         document.getElementById('confirmDeleteBtn').addEventListener('click', function () {
-            // TODO: gọi servlet DeleteCustomerServlet, kiểm tra ràng buộc hợp đồng còn hiệu lực (BR-41, MSG-040) trước khi xóa thật
-            deleteModal.hide();
-            var toast = document.getElementById('toastMsg');
-            toast.classList.add('show');
-            setTimeout(function () {
-                window.location.href = 'listcustomer.jsp';
-            }, 1200);
+            document.getElementById('deleteForm').submit();
         });
     </script>
 </body>

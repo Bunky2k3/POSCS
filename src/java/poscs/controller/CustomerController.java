@@ -1,87 +1,284 @@
-/*
- * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
- * Click nbfs://nbhost/SystemFileSystem/Templates/JSP_Servlet/Servlet.java to edit this template
- */
 package poscs.controller;
 
 import java.io.IOException;
-import java.io.PrintWriter;
+import java.sql.Date;
+import java.util.List;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import poscs.dao.AddressDAO;
+import poscs.dao.ContractDAO;
+import poscs.dao.CustomerDAO;
+import poscs.dao.EmployeeDAO;
+import poscs.dao.TechnicalSupportTicketDAO;
+import poscs.model.Address;
+import poscs.model.Enterprise;
 
 /**
- *
- * @author Admin
+ * Controller cho toàn bộ chức năng khách hàng (enterprises). Điều hướng
+ * theo tham số "action" -- xem README ở PERMISSIONS.md để biết role nào
+ * được thao tác gì (chưa enforce ở đây vì AuthenticationController/
+ * session chưa được code).
  */
 @WebServlet(name = "CustomerController", urlPatterns = {"/customer"})
 public class CustomerController extends HttpServlet {
 
-    /**
-     * Processes requests for both HTTP <code>GET</code> and <code>POST</code>
-     * methods.
-     *
-     * @param request servlet request
-     * @param response servlet response
-     * @throws ServletException if a servlet-specific error occurs
-     * @throws IOException if an I/O error occurs
-     */
-    protected void processRequest(HttpServletRequest request, HttpServletResponse response)
-            throws ServletException, IOException {
-        response.setContentType("text/html;charset=UTF-8");
-        try (PrintWriter out = response.getWriter()) {
-            /* TODO output your page here. You may use following sample code. */
-            out.println("<!DOCTYPE html>");
-            out.println("<html>");
-            out.println("<head>");
-            out.println("<title>Servlet CustomerController</title>");
-            out.println("</head>");
-            out.println("<body>");
-            out.println("<h1>Servlet CustomerController at " + request.getContextPath() + "</h1>");
-            out.println("</body>");
-            out.println("</html>");
-        }
-    }
+    private static final int PAGE_SIZE = 10;
+    private static final String LIST_VIEW = "/jsp/sale/listcustomer.jsp";
+    private static final String DETAIL_VIEW = "/jsp/sale/viewcustomerdetail.jsp";
+    private static final String CREATE_VIEW = "/jsp/sale/addnewcustomer.jsp";
+    private static final String UPDATE_VIEW = "/jsp/sale/updatecustomer.jsp";
 
-    // <editor-fold defaultstate="collapsed" desc="HttpServlet methods. Click on the + sign on the left to edit the code.">
-    /**
-     * Handles the HTTP <code>GET</code> method.
-     *
-     * @param request servlet request
-     * @param response servlet response
-     * @throws ServletException if a servlet-specific error occurs
-     * @throws IOException if an I/O error occurs
-     */
+    private final CustomerDAO customerDAO = new CustomerDAO();
+    private final EmployeeDAO employeeDAO = new EmployeeDAO();
+    private final AddressDAO addressDAO = new AddressDAO();
+    private final ContractDAO contractDAO = new ContractDAO();
+    private final TechnicalSupportTicketDAO ticketDAO = new TechnicalSupportTicketDAO();
+
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
-        processRequest(request, response);
+        String action = request.getParameter("action");
+        if (action == null) {
+            action = "list";
+        }
+        switch (action) {
+            case "view":
+                showDetail(request, response);
+                break;
+            case "new":
+                showCreateForm(request, response);
+                break;
+            case "edit":
+                showEditForm(request, response);
+                break;
+            case "list":
+            default:
+                showList(request, response);
+                break;
+        }
     }
 
-    /**
-     * Handles the HTTP <code>POST</code> method.
-     *
-     * @param request servlet request
-     * @param response servlet response
-     * @throws ServletException if a servlet-specific error occurs
-     * @throws IOException if an I/O error occurs
-     */
     @Override
     protected void doPost(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
-        processRequest(request, response);
+        String action = request.getParameter("action");
+        if (action == null) {
+            action = "";
+        }
+        switch (action) {
+            case "create":
+                handleCreate(request, response);
+                break;
+            case "update":
+                handleUpdate(request, response);
+                break;
+            case "delete":
+                handleDelete(request, response);
+                break;
+            default:
+                response.sendRedirect(request.getContextPath() + "/customer");
+        }
     }
 
-    /**
-     * Returns a short description of the servlet.
-     *
-     * @return a String containing servlet description
-     */
-    @Override
-    public String getServletInfo() {
-        return "Short description";
-    }// </editor-fold>
+    // ------------------------------------------------------------------
+    // GET actions
+    // ------------------------------------------------------------------
 
+    private void showList(HttpServletRequest request, HttpServletResponse response)
+            throws ServletException, IOException {
+        int page = parseIntOrDefault(request.getParameter("page"), 1);
+        if (page < 1) {
+            page = 1;
+        }
+        String keyword = request.getParameter("keyword");
+        String typeFilter = request.getParameter("type");
+        Integer assigneeFilter = parseIntOrNull(request.getParameter("assigneeId"));
+
+        List<Enterprise> customerList = customerDAO.findAll(page, PAGE_SIZE, keyword, typeFilter, assigneeFilter);
+        int totalCount = customerDAO.countAll(keyword, typeFilter, assigneeFilter);
+        int totalPages = Math.max(1, (int) Math.ceil(totalCount / (double) PAGE_SIZE));
+
+        request.setAttribute("customerList", customerList);
+        request.setAttribute("userList", employeeDAO.findAllActive());
+        request.setAttribute("currentPage", page);
+        request.setAttribute("totalPages", totalPages);
+        request.setAttribute("totalCount", totalCount);
+        request.setAttribute("keyword", keyword);
+        request.setAttribute("typeFilter", typeFilter);
+        request.setAttribute("assigneeFilter", assigneeFilter);
+
+        request.getRequestDispatcher(LIST_VIEW).forward(request, response);
+    }
+
+    private void showDetail(HttpServletRequest request, HttpServletResponse response)
+            throws ServletException, IOException {
+        Integer id = parseIntOrNull(request.getParameter("id"));
+        Enterprise customer = id != null ? customerDAO.findById(id) : null;
+        if (customer == null) {
+            // MSG-021: khách hàng không tồn tại
+            response.sendRedirect(request.getContextPath() + "/customer?error=notfound");
+            return;
+        }
+
+        request.setAttribute("customer", customer);
+        request.setAttribute("contactList", customerDAO.findContactsByEnterpriseId(id));
+        request.setAttribute("contractList", contractDAO.findByEnterpriseId(id));
+        request.setAttribute("ticketList", ticketDAO.findByEnterpriseId(id));
+
+        request.getRequestDispatcher(DETAIL_VIEW).forward(request, response);
+    }
+
+    private void showCreateForm(HttpServletRequest request, HttpServletResponse response)
+            throws ServletException, IOException {
+        request.setAttribute("userList", employeeDAO.findAllActive());
+        request.setAttribute("provinceList", addressDAO.findAllProvinces());
+        request.setAttribute("districtList", addressDAO.findAllDistricts());
+        request.getRequestDispatcher(CREATE_VIEW).forward(request, response);
+    }
+
+    private void showEditForm(HttpServletRequest request, HttpServletResponse response)
+            throws ServletException, IOException {
+        Integer id = parseIntOrNull(request.getParameter("id"));
+        Enterprise customer = id != null ? customerDAO.findById(id) : null;
+        if (customer == null) {
+            response.sendRedirect(request.getContextPath() + "/customer?error=notfound");
+            return;
+        }
+
+        request.setAttribute("customer", customer);
+        request.setAttribute("userList", employeeDAO.findAllActive());
+        request.setAttribute("provinceList", addressDAO.findAllProvinces());
+        request.setAttribute("districtList", addressDAO.findAllDistricts());
+        request.getRequestDispatcher(UPDATE_VIEW).forward(request, response);
+    }
+
+    // ------------------------------------------------------------------
+    // POST actions
+    // ------------------------------------------------------------------
+
+    private void handleCreate(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        Enterprise e = new Enterprise();
+        e.setEnterpriseCode(customerDAO.generateNextEnterpriseCode());
+        e.setEnterpriseName(request.getParameter("customerName"));
+        e.setCustomerType(request.getParameter("customerType"));
+        e.setCustomerGroup(request.getParameter("customerGroup"));
+        e.setTaxCode(request.getParameter("taxCode"));
+        e.setPhone(request.getParameter("phone"));
+        e.setEmail(emptyToNull(request.getParameter("email")));
+        e.setWebsite(emptyToNull(request.getParameter("website")));
+        e.setStatus("Active");
+        e.setJoinDate(parseDateOrNull(request.getParameter("joinDate")));
+
+        Integer accountOwnerId = parseIntOrNull(request.getParameter("accountOwnerId"));
+        if (accountOwnerId != null) {
+            e.setAccountOwnerId(accountOwnerId);
+        }
+
+        setAddressFromRequest(e, request);
+
+        int newId = customerDAO.insert(e);
+        if (newId <= 0) {
+            response.sendRedirect(request.getContextPath() + "/customer?action=new&error=create_failed");
+            return;
+        }
+        response.sendRedirect(request.getContextPath() + "/customer?action=view&id=" + newId);
+    }
+
+    private void handleUpdate(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        Integer id = parseIntOrNull(request.getParameter("customerId"));
+        if (id == null) {
+            response.sendRedirect(request.getContextPath() + "/customer?error=notfound");
+            return;
+        }
+
+        Enterprise e = new Enterprise();
+        e.setEnterpriseId(id);
+        e.setEnterpriseName(request.getParameter("customerName"));
+        e.setCustomerType(request.getParameter("customerType"));
+        e.setCustomerGroup(request.getParameter("customerGroup"));
+        e.setPhone(request.getParameter("phone"));
+        e.setEmail(emptyToNull(request.getParameter("email")));
+        e.setWebsite(emptyToNull(request.getParameter("website")));
+        e.setJoinDate(parseDateOrNull(request.getParameter("joinDate")));
+
+        Integer accountOwnerId = parseIntOrNull(request.getParameter("accountOwnerId"));
+        if (accountOwnerId != null) {
+            e.setAccountOwnerId(accountOwnerId);
+        }
+
+        setAddressFromRequest(e, request);
+
+        boolean ok = customerDAO.update(e);
+        if (!ok) {
+            response.sendRedirect(request.getContextPath() + "/customer?action=edit&id=" + id + "&error=update_failed");
+            return;
+        }
+        response.sendRedirect(request.getContextPath() + "/customer?action=view&id=" + id);
+    }
+
+    private void handleDelete(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        Integer id = parseIntOrNull(request.getParameter("id"));
+        if (id == null) {
+            response.sendRedirect(request.getContextPath() + "/customer");
+            return;
+        }
+
+        // BR-41: không cho xoá khách hàng còn hợp đồng đang hiệu lực
+        if (customerDAO.hasActiveContracts(id)) {
+            response.sendRedirect(request.getContextPath() + "/customer?action=view&id=" + id + "&error=has_active_contracts");
+            return;
+        }
+
+        customerDAO.softDelete(id);
+        response.sendRedirect(request.getContextPath() + "/customer");
+    }
+
+    // ------------------------------------------------------------------
+    // Helpers
+    // ------------------------------------------------------------------
+
+    private void setAddressFromRequest(Enterprise e, HttpServletRequest request) {
+        Integer districtId = parseIntOrNull(request.getParameter("districtId"));
+        String addressDetail = emptyToNull(request.getParameter("addressDetail"));
+        if (districtId != null && addressDetail != null) {
+            Address address = new Address();
+            address.setStreetAndLocalName(addressDetail);
+            address.setDistrictId(districtId);
+            e.setAddress(address);
+        }
+    }
+
+    private Integer parseIntOrNull(String value) {
+        if (value == null || value.trim().isEmpty()) {
+            return null;
+        }
+        try {
+            return Integer.parseInt(value.trim());
+        } catch (NumberFormatException ex) {
+            return null;
+        }
+    }
+
+    private int parseIntOrDefault(String value, int defaultValue) {
+        Integer parsed = parseIntOrNull(value);
+        return parsed != null ? parsed : defaultValue;
+    }
+
+    private Date parseDateOrNull(String value) {
+        if (value == null || value.trim().isEmpty()) {
+            return null;
+        }
+        try {
+            return Date.valueOf(value.trim());
+        } catch (IllegalArgumentException ex) {
+            return null;
+        }
+    }
+
+    private String emptyToNull(String value) {
+        return (value == null || value.trim().isEmpty()) ? null : value.trim();
+    }
 }
