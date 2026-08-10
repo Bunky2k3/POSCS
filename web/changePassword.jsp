@@ -1,4 +1,5 @@
 <%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
+<%@taglib prefix="c" uri="jakarta.tags.core"%>
 <!DOCTYPE html>
 <html lang="vi">
 <head>
@@ -431,9 +432,26 @@
 
             <div class="form-body">
 
-                <%-- Khu vực này dùng để hiển thị thông báo lỗi/thành công khi có xử lý backend sau này --%>
+                <c:if test="${not empty param.error}">
+                    <div class="alert alert-error">
+                        <i class="fa-solid fa-circle-exclamation"></i>
+                        <c:choose>
+                            <c:when test="${param.error == 'wrong_old_password'}">Mật khẩu hiện tại không đúng.</c:when>
+                            <c:when test="${param.error == 'weak_password'}">Mật khẩu mới phải có ít nhất 8 ký tự.</c:when>
+                            <c:when test="${param.error == 'mismatch'}">Mật khẩu xác nhận không khớp.</c:when>
+                            <c:when test="${param.error == 'same_as_old'}">Mật khẩu mới không được trùng với mật khẩu cũ.</c:when>
+                            <c:otherwise>Đã có lỗi xảy ra. Vui lòng thử lại.</c:otherwise>
+                        </c:choose>
+                    </div>
+                </c:if>
+                <c:if test="${param.success == '1'}">
+                    <div class="alert alert-success">
+                        <i class="fa-solid fa-circle-check"></i>
+                        Đổi mật khẩu thành công.
+                    </div>
+                </c:if>
 
-                <form id="changePasswordForm" method="post" onsubmit="return validateForm();">
+                <form id="changePasswordForm" method="post" action="${pageContext.request.contextPath}/changePassword" onsubmit="return validateForm();">
 
                     <div class="form-group">
                         <label for="oldPassword">Mật khẩu hiện tại</label>
