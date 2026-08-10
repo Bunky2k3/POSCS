@@ -68,3 +68,10 @@ This project is set up as a NetBeans Ant-based web application:
 
 For deploying to a real server (staging/production), see
 [DEPLOY.md](DEPLOY.md).
+
+## Roles and permissions
+
+See [PERMISSIONS.md](PERMISSIONS.md) for the role-based access matrix
+(who can do what per feature). Login/session enforcement isn't wired
+up yet, but the roles are seeded in the database and every controller
+should be built against this matrix.

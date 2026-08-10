@@ -32,3 +32,6 @@ replay_pid*
 # NetBeans private project state (machine-specific: IDE server paths,
 # open editor tabs, etc.) - should never be shared between developers.
 /nbproject/private/
+
+# Backup files NetBeans/Ant leave behind when regenerating build-impl.xml
+*.xml~
