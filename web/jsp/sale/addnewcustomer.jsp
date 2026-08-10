@@ -1,4 +1,16 @@
 <%@page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
+<%@taglib prefix="c" uri="jakarta.tags.core"%>
+<%--
+    Servlet cần: validate BR-09 (SĐT), BR-10 (email), ngày tham gia không ở tương lai,
+    tự sinh Mã khách hàng duy nhất, tạo/chọn địa chỉ (INSERT vào addresses nếu cần) rồi
+    INSERT vào bảng enterprises.
+
+    Request attribute cần có trước khi forward tới trang này:
+      - userList     : List<poscs.model.User>     (để đổ dropdown "Nhân viên phụ trách")
+      - provinceList : List<poscs.model.Province>  (để đổ dropdown "Tỉnh / Thành phố")
+      - districtList : List<poscs.model.District>  (toàn bộ quận/huyện; JS lọc theo tỉnh đã chọn
+                        dựa vào data-province-id của mỗi <option>)
+--%>
 <!DOCTYPE html>
 <html lang="vi">
 <head>
@@ -155,7 +167,6 @@
             </div>
         </div>
 
-        <%-- Servlet cần: validate BR-09 (SĐT), BR-10 (email), ngày tham gia không ở tương lai, tự sinh Mã khách hàng duy nhất, INSERT vào bảng enterprises --%>
         <div class="card-box">
             <form id="createCustomerForm" action="CreateCustomerServlet" method="POST" onsubmit="return validateForm();">
 
@@ -190,12 +201,11 @@
                     </div>
                     <div class="col-md-6 field-row">
                         <label>Nhân viên phụ trách <span class="req">*</span></label>
-                        <select class="form-select" id="assignee" name="assignee">
+                        <select class="form-select" id="assignee" name="accountOwnerId">
                             <option value="">-- Chọn nhân viên --</option>
-                            <option value="Nguyễn Văn An">Nguyễn Văn An</option>
-                            <option value="Trần Thị Bình">Trần Thị Bình</option>
-                            <option value="Lê Minh Châu">Lê Minh Châu</option>
-                            <option value="Phạm Quốc Huy">Phạm Quốc Huy</option>
+                            <c:forEach var="staff" items="${userList}">
+                                <option value="${staff.userId}">${staff.fullName}</option>
+                            </c:forEach>
                         </select>
                         <span class="error-text" id="err-assignee">Vui lòng chọn nhân viên phụ trách.</span>
                     </div>
@@ -226,21 +236,20 @@
                 <div class="row">
                     <div class="col-md-6 field-row">
                         <label>Tỉnh / Thành phố</label>
-                        <select class="form-select" id="province" name="province">
-                            <option selected>Thành phố Hà Nội</option>
-                            <option>Thành phố Hồ Chí Minh</option>
-                            <option>Tỉnh Bắc Ninh</option>
-                            <option>Thành phố Đà Nẵng</option>
-                            <option>Thành phố Hải Phòng</option>
+                        <select class="form-select" id="province" name="provinceId">
+                            <option value="">-- Chọn tỉnh / thành phố --</option>
+                            <c:forEach var="prov" items="${provinceList}">
+                                <option value="${prov.provinceId}">${prov.provinceName}</option>
+                            </c:forEach>
                         </select>
                     </div>
                     <div class="col-md-6 field-row">
                         <label>Quận / Huyện</label>
-                        <select class="form-select" id="district" name="district">
-                            <option selected>Quận Cầu Giấy</option>
-                            <option>Quận Đống Đa</option>
-                            <option>Quận Hai Bà Trưng</option>
-                            <option>Quận Nam Từ Liêm</option>
+                        <select class="form-select" id="district" name="districtId">
+                            <option value="">-- Chọn quận / huyện --</option>
+                            <c:forEach var="dist" items="${districtList}">
+                                <option value="${dist.districtId}" data-province-id="${dist.provinceId}" style="display:none">${dist.districtName}</option>
+                            </c:forEach>
                         </select>
                     </div>
                     <div class="col-12 field-row">
@@ -259,12 +268,25 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+        // Chấp nhận cả số di động lẫn số bàn Việt Nam (VD: 024 3822 1234), không chỉ riêng đầu số di động
         function isValidPhone(value) {
-            return /^(0|\+84)(3|5|7|8|9)[0-9]{8}$/.test(value.replace(/\s/g, ''));
+            return /^(0|\+84)[0-9]{9,10}$/.test(value.replace(/[\s.-]/g, ''));
         }
         function isValidEmail(value) {
             return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
         }
+
+        // Lọc quận/huyện theo tỉnh/thành phố đã chọn
+        var districtSelect = document.getElementById('district');
+        var allDistrictOptions = Array.prototype.slice.call(districtSelect.querySelectorAll('option[data-province-id]'));
+
+        document.getElementById('province').addEventListener('change', function () {
+            var provinceId = this.value;
+            districtSelect.value = '';
+            allDistrictOptions.forEach(function (opt) {
+                opt.style.display = (opt.getAttribute('data-province-id') === provinceId) ? '' : 'none';
+            });
+        });
 
         function validateForm() {
             var valid = true;

@@ -1,4 +1,18 @@
 <%@page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
+<%@taglib prefix="c" uri="jakarta.tags.core"%>
+<%@taglib prefix="fmt" uri="jakarta.tags.fmt"%>
+<%--
+    Servlet cần lấy customer_id từ query param ?id=, truy vấn bảng enterprises
+    (JOIN addresses/districts/provinces, JOIN users làm account_owner) + enterprisecontacts
+    + contracts (JOIN users làm owner) + technicalrequests (JOIN users làm assigned_technician).
+    Nếu không tồn tại thì hiển thị MSG-021 (redirect hoặc forward sang trang lỗi).
+
+    Request attribute cần có:
+      - customer      : poscs.model.Enterprise (đã join .address.district.province, .accountOwner)
+      - contactList    : List<poscs.model.EnterpriseContact>
+      - contractList    : List<poscs.model.Contract> (đã join .owner nếu cần hiển thị thêm)
+      - ticketList      : List<poscs.model.TechnicalRequest>
+--%>
 <!DOCTYPE html>
 <html lang="vi">
 <head>
@@ -80,6 +94,13 @@
             font-size: 0.72rem; font-weight: 600; background: #eaf6ff; color: var(--primary-dark);
             margin-left: 8px;
         }
+        .rating-badge {
+            display: inline-block; padding: 3px 11px; border-radius: 20px;
+            font-size: 0.72rem; font-weight: 600; margin-left: 8px;
+        }
+        .rating-good { background: #e8faf3; color: var(--success); }
+        .rating-watch { background: #fff4e0; color: var(--warning); }
+        .rating-bad, .rating-risk { background: #fdecef; color: var(--danger); }
         .header-actions { display: flex; gap: 10px; }
         .btn-edit-detail {
             background: linear-gradient(120deg, var(--primary), var(--primary-light));
@@ -221,20 +242,31 @@
     <div class="page-container">
         <a href="listcustomer.jsp" class="back-link-top"><i class="fa-solid fa-arrow-left-long"></i> Quay lại danh sách</a>
 
-        <%-- Servlet cần: lấy customer_id từ query param ?id=, truy vấn bảng enterprises + enterprisecontacts + contracts + technicalrequests. Nếu không tồn tại thì hiển thị MSG-021 --%>
-
         <!-- ===== Header ===== -->
         <div class="detail-header card-box">
             <div class="company-info">
                 <div class="company-icon"><i class="fa-solid fa-building"></i></div>
                 <div>
-                    <span class="customer-code">KH-0001</span>
-                    <h2>VNPT Hà Nội <span class="type-badge">Nhà mạng viễn thông</span></h2>
-                    <div style="color:#6b7280; font-size:0.85rem;">Khách hàng VIP · Tham gia từ 15/03/2023</div>
+                    <span class="customer-code">${customer.enterpriseCode}</span>
+                    <h2>
+                        ${customer.enterpriseName}
+                        <span class="type-badge">${customer.customerType}</span>
+                        <c:if test="${customer.currentRelationshipRating != null}">
+                            <span class="rating-badge
+                                ${customer.currentRelationshipRating == 'GOOD' ? 'rating-good' : ''}
+                                ${customer.currentRelationshipRating == 'NEEDS_REVIEW' ? 'rating-watch' : ''}
+                                ${customer.currentRelationshipRating == 'BAD' ? 'rating-bad' : ''}
+                                ${customer.currentRelationshipRating == 'AT_RISK' ? 'rating-risk' : ''}">${customer.currentRelationshipRating}</span>
+                        </c:if>
+                    </h2>
+                    <div style="color:#6b7280; font-size:0.85rem;">
+                        ${customer.customerGroup}
+                        <c:if test="${customer.joinDate != null}"> &middot; Tham gia từ <fmt:formatDate value="${customer.joinDate}" pattern="dd/MM/yyyy"/></c:if>
+                    </div>
                 </div>
             </div>
             <div class="header-actions">
-                <a href="updatecustomer.jsp?id=1" class="btn-edit-detail"><i class="fa-solid fa-pen"></i> Sửa thông tin</a>
+                <a href="updatecustomer.jsp?id=${customer.enterpriseId}" class="btn-edit-detail"><i class="fa-solid fa-pen"></i> Sửa thông tin</a>
                 <button class="btn-delete-detail" onclick="openDeleteModal()"><i class="fa-solid fa-trash"></i> Xóa</button>
             </div>
         </div>
@@ -245,31 +277,51 @@
             <div class="row">
                 <div class="col-md-6 field-row">
                     <label>Nhóm khách hàng</label>
-                    <div class="view-value">Khách hàng VIP</div>
+                    <div class="view-value">${customer.customerGroup}</div>
                 </div>
                 <div class="col-md-6 field-row">
                     <label>Người phụ trách</label>
-                    <div class="view-value">Nguyễn Văn An</div>
+                    <div class="view-value">
+                        <c:choose>
+                            <c:when test="${customer.accountOwner != null}">${customer.accountOwner.fullName}</c:when>
+                            <c:otherwise>&mdash;</c:otherwise>
+                        </c:choose>
+                    </div>
                 </div>
                 <div class="col-md-6 field-row">
                     <label>Số điện thoại</label>
-                    <div class="view-value">024 3822 1234</div>
+                    <div class="view-value">${customer.phone}</div>
                 </div>
                 <div class="col-md-6 field-row">
                     <label>Email</label>
-                    <div class="view-value">contact@vnpt-hanoi.vn</div>
+                    <div class="view-value">${customer.email}</div>
                 </div>
                 <div class="col-md-6 field-row">
                     <label>Website</label>
-                    <div class="view-value">vnpt-hanoi.vn</div>
+                    <div class="view-value">
+                        <c:choose>
+                            <c:when test="${not empty customer.website}">${customer.website}</c:when>
+                            <c:otherwise>&mdash;</c:otherwise>
+                        </c:choose>
+                    </div>
                 </div>
                 <div class="col-md-6 field-row">
                     <label>Ngày tham gia</label>
-                    <div class="view-value">15/03/2023</div>
+                    <div class="view-value">
+                        <c:choose>
+                            <c:when test="${customer.joinDate != null}"><fmt:formatDate value="${customer.joinDate}" pattern="dd/MM/yyyy"/></c:when>
+                            <c:otherwise>&mdash;</c:otherwise>
+                        </c:choose>
+                    </div>
                 </div>
                 <div class="col-12 field-row">
                     <label>Địa chỉ</label>
-                    <div class="view-value">Số 57 Huỳnh Thúc Kháng, Quận Cầu Giấy, Thành phố Hà Nội</div>
+                    <div class="view-value">
+                        <c:choose>
+                            <c:when test="${customer.address != null}">${customer.address.fullAddress}</c:when>
+                            <c:otherwise>&mdash;</c:otherwise>
+                        </c:choose>
+                    </div>
                 </div>
             </div>
         </div>
@@ -278,28 +330,26 @@
         <div class="info-card card-box">
             <div class="section-header"><h5>Người liên hệ</h5></div>
 
-            <div class="contact-item">
-                <div class="contact-avatar"><i class="fa-solid fa-user-tie"></i></div>
-                <div>
-                    <div class="contact-role">Giám đốc kỹ thuật</div>
-                    <div class="contact-name">Phạm Thu Hường</div>
-                    <div class="contact-meta">
-                        <span><i class="fa-solid fa-phone me-1"></i>0983 112 233</span>
-                        <span><i class="fa-solid fa-envelope me-1"></i>huong.pt@vnpt-hanoi.vn</span>
-                    </div>
-                </div>
-            </div>
-            <div class="contact-item">
-                <div class="contact-avatar"><i class="fa-solid fa-user-tie"></i></div>
-                <div>
-                    <div class="contact-role">Trưởng phòng thu mua</div>
-                    <div class="contact-name">Đỗ Anh Quân</div>
-                    <div class="contact-meta">
-                        <span><i class="fa-solid fa-phone me-1"></i>0977 445 566</span>
-                        <span><i class="fa-solid fa-envelope me-1"></i>quan.da@vnpt-hanoi.vn</span>
-                    </div>
-                </div>
-            </div>
+            <c:choose>
+                <c:when test="${empty contactList}">
+                    <div class="empty-mini">Chưa có người liên hệ nào được ghi nhận.</div>
+                </c:when>
+                <c:otherwise>
+                    <c:forEach var="contact" items="${contactList}">
+                        <div class="contact-item">
+                            <div class="contact-avatar"><i class="fa-solid fa-user-tie"></i></div>
+                            <div>
+                                <div class="contact-role">${contact.position}</div>
+                                <div class="contact-name">${contact.fullName}</div>
+                                <div class="contact-meta">
+                                    <c:if test="${not empty contact.contactPhone}"><span><i class="fa-solid fa-phone me-1"></i>${contact.contactPhone}</span></c:if>
+                                    <c:if test="${not empty contact.contactEmail}"><span><i class="fa-solid fa-envelope me-1"></i>${contact.contactEmail}</span></c:if>
+                                </div>
+                            </div>
+                        </div>
+                    </c:forEach>
+                </c:otherwise>
+            </c:choose>
         </div>
 
         <!-- ===== Hoạt động gần đây ===== -->
@@ -317,48 +367,52 @@
 
             <div class="tab-content">
                 <div class="tab-pane fade show active" id="tab-contracts">
-                    <table class="mini-table">
-                        <thead>
-                            <tr><th>Mã hợp đồng</th><th>Tên hợp đồng</th><th>Giá trị</th><th>Trạng thái</th><th>Ngày ký</th></tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td><a href="contractDetail.jsp?id=231">HD-0231</a></td>
-                                <td>Cung cấp cáp quang OM4 đợt 2</td>
-                                <td>1.250.000.000 đ</td>
-                                <td><span class="status-pill status-active">Đang hiệu lực</span></td>
-                                <td>02/01/2026</td>
-                            </tr>
-                            <tr>
-                                <td><a href="contractDetail.jsp?id=198">HD-0198</a></td>
-                                <td>Lắp đặt tủ trạm Smart Shelter</td>
-                                <td>860.000.000 đ</td>
-                                <td><span class="status-pill status-closed">Đã hoàn tất</span></td>
-                                <td>18/09/2025</td>
-                            </tr>
-                        </tbody>
-                    </table>
+                    <c:choose>
+                        <c:when test="${empty contractList}">
+                            <div class="empty-mini">Khách hàng chưa có hợp đồng nào.</div>
+                        </c:when>
+                        <c:otherwise>
+                            <table class="mini-table">
+                                <thead>
+                                    <tr><th>Mã hợp đồng</th><th>Tên hợp đồng</th><th>Trạng thái</th><th>Ngày ký</th></tr>
+                                </thead>
+                                <tbody>
+                                    <c:forEach var="contract" items="${contractList}">
+                                        <tr>
+                                            <td><a href="contractDetail.jsp?id=${contract.contractId}">${contract.contractCode}</a></td>
+                                            <td>${contract.title}</td>
+                                            <td><span class="status-pill status-active">${contract.status}</span></td>
+                                            <td><fmt:formatDate value="${contract.signingDate}" pattern="dd/MM/yyyy"/></td>
+                                        </tr>
+                                    </c:forEach>
+                                </tbody>
+                            </table>
+                        </c:otherwise>
+                    </c:choose>
                 </div>
                 <div class="tab-pane fade" id="tab-tickets">
-                    <table class="mini-table">
-                        <thead>
-                            <tr><th>Mã phiếu</th><th>Tiêu đề</th><th>Trạng thái</th><th>Ngày tạo</th></tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td><a href="ticketDetail.jsp?id=1042">TK-1042</a></td>
-                                <td>Sự cố mất tín hiệu tại trạm Cầu Giấy</td>
-                                <td><span class="status-pill status-pending">Đang xử lý</span></td>
-                                <td>05/08/2026</td>
-                            </tr>
-                            <tr>
-                                <td><a href="ticketDetail.jsp?id=987">TK-0987</a></td>
-                                <td>Yêu cầu bảo trì định kỳ nguồn UPS</td>
-                                <td><span class="status-pill status-closed">Đã đóng</span></td>
-                                <td>20/06/2026</td>
-                            </tr>
-                        </tbody>
-                    </table>
+                    <c:choose>
+                        <c:when test="${empty ticketList}">
+                            <div class="empty-mini">Khách hàng chưa có phiếu hỗ trợ nào.</div>
+                        </c:when>
+                        <c:otherwise>
+                            <table class="mini-table">
+                                <thead>
+                                    <tr><th>Mã phiếu</th><th>Mô tả</th><th>Trạng thái</th><th>Ngày tạo</th></tr>
+                                </thead>
+                                <tbody>
+                                    <c:forEach var="ticket" items="${ticketList}">
+                                        <tr>
+                                            <td><a href="ticketDetail.jsp?id=${ticket.ticketId}">${ticket.ticketCode}</a></td>
+                                            <td>${ticket.description}</td>
+                                            <td><span class="status-pill status-pending">${ticket.status}</span></td>
+                                            <td><fmt:formatDate value="${ticket.createdDate}" pattern="dd/MM/yyyy"/></td>
+                                        </tr>
+                                    </c:forEach>
+                                </tbody>
+                            </table>
+                        </c:otherwise>
+                    </c:choose>
                 </div>
             </div>
         </div>
@@ -373,7 +427,7 @@
                 </div>
                 <div class="modal-body">
                     <h5 class="mb-2" style="font-weight:700; color:#111827;">Xác nhận xóa khách hàng</h5>
-                    Bạn có chắc chắn muốn xóa <strong>VNPT Hà Nội</strong>? Hành động này không thể hoàn tác.
+                    Bạn có chắc chắn muốn xóa <strong>${customer.enterpriseName}</strong>? Hành động này không thể hoàn tác.
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn-modal-cancel" data-bs-dismiss="modal">Hủy</button>

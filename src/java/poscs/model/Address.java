@@ -3,7 +3,10 @@ package poscs.model;
 public class Address {
     private int addressId;
     private String streetAndLocalName;
-    private int districtId; 
+    private int districtId;
+
+    // Thuộc tính Object để chứa dữ liệu join từ bảng districts
+    private District district;
 
     // Constructors
     public Address() {
@@ -24,4 +27,23 @@ public class Address {
 
     public int getDistrictId() { return districtId; }
     public void setDistrictId(int districtId) { this.districtId = districtId; }
+
+    public District getDistrict() { return district; }
+    public void setDistrict(District district) { this.district = district; }
+
+    // Hàm tiện ích: ghép địa chỉ đầy đủ nếu đã có dữ liệu join district/province
+    public String getFullAddress() {
+        StringBuilder sb = new StringBuilder();
+        if (streetAndLocalName != null) {
+            sb.append(streetAndLocalName);
+        }
+        if (district != null) {
+            if (sb.length() > 0) sb.append(", ");
+            sb.append(district.getDistrictName());
+            if (district.getProvince() != null) {
+                sb.append(", ").append(district.getProvince().getProvinceName());
+            }
+        }
+        return sb.toString();
+    }
 }
