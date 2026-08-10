@@ -1,0 +1,3 @@
+-- This is a sample file, not a real migration -- do not run it.
+-- Copy it, then rename your copy replacing the {placeholders} above
+-- with real values (see db/migrations/README.md for the full rule).
