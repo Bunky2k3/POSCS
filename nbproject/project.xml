@@ -23,6 +23,10 @@
                     <path-in-war>WEB-INF/lib</path-in-war>
                 </library>
                 <library dirs="200">
+                    <file>${file.reference.slf4j-simple-2.0.17.jar}</file>
+                    <path-in-war>WEB-INF/lib</path-in-war>
+                </library>
+                <library dirs="200">
                     <file>${file.reference.commons-dbutils-1.8.1.jar}</file>
                     <path-in-war>WEB-INF/lib</path-in-war>
                 </library>
