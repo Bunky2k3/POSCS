@@ -69,7 +69,7 @@ public class DBContext {
             System.err.println("Vui long kiem tra lai cac thong tin sau:");
             System.err.println("1. MySQL Server da duoc khoi dong chua?");
             // Đã cập nhật lại tên CSDL trong thông báo lỗi
-            System.err.println("2. Ten CSDL (database name) trong DB_URL co dung  khong?");
+            System.err.println("2. Ten CSDL (database name) trong DB_URL co dung khong?");
             System.err.println("3. Username va password co chinh xac khong?");
             System.err.println("4. Thu vien MySQL Connector/J da duoc them vao du an chua?");
         }
