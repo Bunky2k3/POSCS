@@ -233,7 +233,7 @@
             <input type="hidden" name="action" value="list">
             <div class="search-input-wrap">
                 <i class="fa-solid fa-magnifying-glass"></i>
-                <input type="text" id="searchInput" name="keyword" value="${keyword}" placeholder="Tìm theo mã HĐ, tiêu đề, khách hàng...">
+                <input type="text" id="searchInput" name="keyword" value="${fn:escapeXml(keyword)}" placeholder="Tìm theo mã HĐ, tiêu đề, khách hàng...">
             </div>
             <select id="filterStatus" name="status">
                 <option value="">Tất cả trạng thái</option>
@@ -269,15 +269,15 @@
                     <tbody id="contractTableBody">
                         <c:forEach var="contract" items="${contractList}">
                             <tr>
-                                <td class="contract-code">${contract.contractCode}</td>
-                                <td><a href="${pageContext.request.contextPath}/contract?action=view&id=${contract.contractId}" class="contract-title-link">${contract.title}</a></td>
+                                <td class="contract-code">${fn:escapeXml(contract.contractCode)}</td>
+                                <td><a href="${pageContext.request.contextPath}/contract?action=view&id=${contract.contractId}" class="contract-title-link">${fn:escapeXml(contract.title)}</a></td>
                                 <td>
                                     <c:choose>
-                                        <c:when test="${contract.enterprise != null}">${contract.enterprise.enterpriseName}</c:when>
+                                        <c:when test="${contract.enterprise != null}">${fn:escapeXml(contract.enterprise.enterpriseName)}</c:when>
                                         <c:otherwise>&mdash;</c:otherwise>
                                     </c:choose>
                                 </td>
-                                <td><span class="type-badge">${contract.contractType}</span></td>
+                                <td><span class="type-badge">${fn:escapeXml(contract.contractType)}</span></td>
                                 <td><fmt:formatDate value="${contract.signingDate}" pattern="dd/MM/yyyy"/></td>
                                 <td><fmt:formatDate value="${contract.endDate}" pattern="dd/MM/yyyy"/></td>
                                 <td>
@@ -294,7 +294,7 @@
                                         <button class="act-edit" title="Sửa" onclick="location.href='${pageContext.request.contextPath}/contract?action=edit&id=${contract.contractId}'"><i class="fa-solid fa-pen"></i></button>
                                         <c:choose>
                                             <c:when test="${contract.status == 'Chưa hiệu lực'}">
-                                                <button class="act-delete" title="Xóa" onclick="openDeleteModal(${contract.contractId}, '${contract.contractCode}')"><i class="fa-solid fa-trash"></i></button>
+                                                <button class="act-delete" title="Xóa" onclick="openDeleteModal(${contract.contractId}, '${fn:escapeXml(contract.contractCode)}')"><i class="fa-solid fa-trash"></i></button>
                                             </c:when>
                                             <c:otherwise>
                                                 <button class="act-delete" title="Chỉ được xóa hợp đồng ở trạng thái chưa hiệu lực" disabled><i class="fa-solid fa-trash"></i></button>
@@ -319,11 +319,11 @@
                 <span class="pagination-info">Hiển thị ${fn:length(contractList)} trong tổng số ${totalCount} hợp đồng</span>
                 <nav>
                     <ul class="pagination pagination-sm mb-0">
-                        <li class="page-item ${currentPage <= 1 ? 'disabled' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/contract?action=list&page=${currentPage - 1}&keyword=${keyword}&status=${statusFilter}&type=${typeFilter}">Trước</a></li>
+                        <li class="page-item ${currentPage <= 1 ? 'disabled' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/contract?action=list&page=${currentPage - 1}&keyword=${fn:escapeXml(keyword)}&status=${fn:escapeXml(statusFilter)}&type=${fn:escapeXml(typeFilter)}">Trước</a></li>
                         <c:forEach begin="1" end="${totalPages}" var="p">
-                            <li class="page-item ${p == currentPage ? 'active' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/contract?action=list&page=${p}&keyword=${keyword}&status=${statusFilter}&type=${typeFilter}">${p}</a></li>
+                            <li class="page-item ${p == currentPage ? 'active' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/contract?action=list&page=${p}&keyword=${fn:escapeXml(keyword)}&status=${fn:escapeXml(statusFilter)}&type=${fn:escapeXml(typeFilter)}">${p}</a></li>
                         </c:forEach>
-                        <li class="page-item ${currentPage >= totalPages ? 'disabled' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/contract?action=list&page=${currentPage + 1}&keyword=${keyword}&status=${statusFilter}&type=${typeFilter}">Sau</a></li>
+                        <li class="page-item ${currentPage >= totalPages ? 'disabled' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/contract?action=list&page=${currentPage + 1}&keyword=${fn:escapeXml(keyword)}&status=${fn:escapeXml(statusFilter)}&type=${fn:escapeXml(typeFilter)}">Sau</a></li>
                     </ul>
                 </nav>
             </div>

@@ -1,6 +1,7 @@
 <%@page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
 <%@taglib prefix="c" uri="jakarta.tags.core"%>
 <%@taglib prefix="fmt" uri="jakarta.tags.fmt"%>
+<%@taglib prefix="fn" uri="jakarta.tags.functions"%>
 <%--
     Servlet cần lấy customer_id từ query param ?id=, truy vấn bảng enterprises
     (JOIN addresses/districts/provinces, JOIN users làm account_owner) + enterprisecontacts
@@ -251,10 +252,10 @@
             <div class="company-info">
                 <div class="company-icon"><i class="fa-solid fa-building"></i></div>
                 <div>
-                    <span class="customer-code">${customer.enterpriseCode}</span>
+                    <span class="customer-code">${fn:escapeXml(customer.enterpriseCode)}</span>
                     <h2>
-                        ${customer.enterpriseName}
-                        <span class="type-badge">${customer.customerType}</span>
+                        ${fn:escapeXml(customer.enterpriseName)}
+                        <span class="type-badge">${fn:escapeXml(customer.customerType)}</span>
                         <c:if test="${customer.currentRelationshipRating != null}">
                             <span class="rating-badge
                                 ${customer.currentRelationshipRating == 'GOOD' ? 'rating-good' : ''}
@@ -264,7 +265,7 @@
                         </c:if>
                     </h2>
                     <div style="color:#6b7280; font-size:0.85rem;">
-                        ${customer.customerGroup}
+                        ${fn:escapeXml(customer.customerGroup)}
                         <c:if test="${customer.joinDate != null}"> &middot; Tham gia từ <fmt:formatDate value="${customer.joinDate}" pattern="dd/MM/yyyy"/></c:if>
                     </div>
                 </div>
@@ -281,30 +282,30 @@
             <div class="row">
                 <div class="col-md-6 field-row">
                     <label>Nhóm khách hàng</label>
-                    <div class="view-value">${customer.customerGroup}</div>
+                    <div class="view-value">${fn:escapeXml(customer.customerGroup)}</div>
                 </div>
                 <div class="col-md-6 field-row">
                     <label>Người phụ trách</label>
                     <div class="view-value">
                         <c:choose>
-                            <c:when test="${customer.accountOwner != null}">${customer.accountOwner.fullName}</c:when>
+                            <c:when test="${customer.accountOwner != null}">${fn:escapeXml(customer.accountOwner.fullName)}</c:when>
                             <c:otherwise>&mdash;</c:otherwise>
                         </c:choose>
                     </div>
                 </div>
                 <div class="col-md-6 field-row">
                     <label>Số điện thoại</label>
-                    <div class="view-value">${customer.phone}</div>
+                    <div class="view-value">${fn:escapeXml(customer.phone)}</div>
                 </div>
                 <div class="col-md-6 field-row">
                     <label>Email</label>
-                    <div class="view-value">${customer.email}</div>
+                    <div class="view-value">${fn:escapeXml(customer.email)}</div>
                 </div>
                 <div class="col-md-6 field-row">
                     <label>Website</label>
                     <div class="view-value">
                         <c:choose>
-                            <c:when test="${not empty customer.website}">${customer.website}</c:when>
+                            <c:when test="${not empty customer.website}">${fn:escapeXml(customer.website)}</c:when>
                             <c:otherwise>&mdash;</c:otherwise>
                         </c:choose>
                     </div>
@@ -322,7 +323,7 @@
                     <label>Địa chỉ</label>
                     <div class="view-value">
                         <c:choose>
-                            <c:when test="${customer.address != null}">${customer.address.fullAddress}</c:when>
+                            <c:when test="${customer.address != null}">${fn:escapeXml(customer.address.fullAddress)}</c:when>
                             <c:otherwise>&mdash;</c:otherwise>
                         </c:choose>
                     </div>
@@ -343,11 +344,11 @@
                         <div class="contact-item">
                             <div class="contact-avatar"><i class="fa-solid fa-user-tie"></i></div>
                             <div>
-                                <div class="contact-role">${contact.position}</div>
-                                <div class="contact-name">${contact.fullName}</div>
+                                <div class="contact-role">${fn:escapeXml(contact.position)}</div>
+                                <div class="contact-name">${fn:escapeXml(contact.fullName)}</div>
                                 <div class="contact-meta">
-                                    <c:if test="${not empty contact.contactPhone}"><span><i class="fa-solid fa-phone me-1"></i>${contact.contactPhone}</span></c:if>
-                                    <c:if test="${not empty contact.contactEmail}"><span><i class="fa-solid fa-envelope me-1"></i>${contact.contactEmail}</span></c:if>
+                                    <c:if test="${not empty contact.contactPhone}"><span><i class="fa-solid fa-phone me-1"></i>${fn:escapeXml(contact.contactPhone)}</span></c:if>
+                                    <c:if test="${not empty contact.contactEmail}"><span><i class="fa-solid fa-envelope me-1"></i>${fn:escapeXml(contact.contactEmail)}</span></c:if>
                                 </div>
                             </div>
                         </div>
@@ -383,8 +384,8 @@
                                 <tbody>
                                     <c:forEach var="contract" items="${contractList}">
                                         <tr>
-                                            <td><a href="${pageContext.request.contextPath}/contract?action=view&id=${contract.contractId}">${contract.contractCode}</a></td>
-                                            <td>${contract.title}</td>
+                                            <td><a href="${pageContext.request.contextPath}/contract?action=view&id=${contract.contractId}">${fn:escapeXml(contract.contractCode)}</a></td>
+                                            <td>${fn:escapeXml(contract.title)}</td>
                                             <td>
                                                 <c:choose>
                                                     <c:when test="${contract.status == 'Đang hiệu lực'}"><span class="status-pill status-active">${contract.status}</span></c:when>
@@ -413,9 +414,9 @@
                                 <tbody>
                                     <c:forEach var="ticket" items="${ticketList}">
                                         <tr>
-                                            <td><a href="ticketDetail.jsp?id=${ticket.ticketId}">${ticket.ticketCode}</a></td>
-                                            <td>${ticket.description}</td>
-                                            <td><span class="status-pill status-pending">${ticket.status}</span></td>
+                                            <td><a href="ticketDetail.jsp?id=${ticket.ticketId}">${fn:escapeXml(ticket.ticketCode)}</a></td>
+                                            <td>${fn:escapeXml(ticket.description)}</td>
+                                            <td><span class="status-pill status-pending">${fn:escapeXml(ticket.status)}</span></td>
                                             <td><fmt:formatDate value="${ticket.createdDate}" pattern="dd/MM/yyyy"/></td>
                                         </tr>
                                     </c:forEach>
@@ -437,7 +438,7 @@
                 </div>
                 <div class="modal-body">
                     <h5 class="mb-2" style="font-weight:700; color:#111827;">Xác nhận xóa khách hàng</h5>
-                    Bạn có chắc chắn muốn xóa <strong>${customer.enterpriseName}</strong>? Hành động này không thể hoàn tác.
+                    Bạn có chắc chắn muốn xóa <strong>${fn:escapeXml(customer.enterpriseName)}</strong>? Hành động này không thể hoàn tác.
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn-modal-cancel" data-bs-dismiss="modal">Hủy</button>
