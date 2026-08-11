@@ -9,8 +9,10 @@
     Request attribute cần có trước khi forward tới trang này:
       - userList     : List<poscs.model.User>     (để đổ dropdown "Nhân viên phụ trách")
       - provinceList : List<poscs.model.Province>  (để đổ dropdown "Tỉnh / Thành phố")
-      - districtList : List<poscs.model.District>  (toàn bộ xã/phường; JS lọc theo tỉnh đã chọn
-                        dựa vào data-province-id của mỗi <option>)
+
+    Dropdown "Xã / Phường" KHÔNG đổ sẵn từ server -- JS nạp qua AJAX
+    (GET /address/wards?provinceId=..., xem AddressController) ngay khi
+    chọn tỉnh, thay vì đổ sẵn toàn bộ ~3.321 xã/phường vào trang.
 --%>
 <!DOCTYPE html>
 <html lang="vi">
@@ -253,10 +255,7 @@
                     <div class="col-md-6 field-row">
                         <label>Xã / Phường</label>
                         <select class="form-select" id="district" name="districtId">
-                            <option value="">-- Chọn xã / phường --</option>
-                            <c:forEach var="dist" items="${districtList}">
-                                <option value="${dist.districtId}" data-province-id="${dist.provinceId}" style="display:none">${fn:escapeXml(dist.shortName)}</option>
-                            </c:forEach>
+                            <option value="">-- Chọn tỉnh / thành phố trước --</option>
                         </select>
                     </div>
                     <div class="col-12 field-row">
@@ -283,16 +282,40 @@
             return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
         }
 
-        // Lọc xã/phường theo tỉnh/thành phố đã chọn
+        // Nạp xã/phường theo tỉnh/thành phố đã chọn qua AJAX (thay vì đổ sẵn ~3.321
+        // xã/phường vào trang) -- xem AddressController.
+        var contextPath = '${pageContext.request.contextPath}';
         var districtSelect = document.getElementById('district');
-        var allDistrictOptions = Array.prototype.slice.call(districtSelect.querySelectorAll('option[data-province-id]'));
+
+        function loadWards(provinceId) {
+            districtSelect.innerHTML = '';
+            if (!provinceId) {
+                districtSelect.innerHTML = '<option value="">-- Chọn tỉnh / thành phố trước --</option>';
+                return;
+            }
+            districtSelect.innerHTML = '<option value="">Đang tải...</option>';
+            fetch(contextPath + '/address/wards?provinceId=' + encodeURIComponent(provinceId))
+                .then(function (res) { return res.json(); })
+                .then(function (wards) {
+                    var html = '<option value="">-- Chọn xã / phường --</option>';
+                    wards.forEach(function (w) {
+                        html += '<option value="' + w.id + '">' + escapeHtml(w.name) + '</option>';
+                    });
+                    districtSelect.innerHTML = html;
+                })
+                .catch(function () {
+                    districtSelect.innerHTML = '<option value="">Không tải được danh sách xã/phường</option>';
+                });
+        }
+
+        function escapeHtml(value) {
+            var div = document.createElement('div');
+            div.textContent = value;
+            return div.innerHTML;
+        }
 
         document.getElementById('province').addEventListener('change', function () {
-            var provinceId = this.value;
-            districtSelect.value = '';
-            allDistrictOptions.forEach(function (opt) {
-                opt.style.display = (opt.getAttribute('data-province-id') === provinceId) ? '' : 'none';
-            });
+            loadWards(this.value);
         });
 
         function validateForm() {
