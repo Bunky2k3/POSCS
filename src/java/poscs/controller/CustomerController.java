@@ -135,7 +135,7 @@ public class CustomerController extends HttpServlet {
             throws ServletException, IOException {
         request.setAttribute("userList", employeeDAO.findAllActive());
         request.setAttribute("provinceList", addressDAO.findAllProvinces());
-        request.setAttribute("districtList", addressDAO.findAllDistricts());
+        request.setAttribute("wardList", addressDAO.findAllWards());
         request.getRequestDispatcher(CREATE_VIEW).forward(request, response);
     }
 
@@ -151,7 +151,7 @@ public class CustomerController extends HttpServlet {
         request.setAttribute("customer", customer);
         request.setAttribute("userList", employeeDAO.findAllActive());
         request.setAttribute("provinceList", addressDAO.findAllProvinces());
-        request.setAttribute("districtList", addressDAO.findAllDistricts());
+        request.setAttribute("wardList", addressDAO.findAllWards());
         request.getRequestDispatcher(UPDATE_VIEW).forward(request, response);
     }
 
@@ -251,12 +251,12 @@ public class CustomerController extends HttpServlet {
     // ------------------------------------------------------------------
 
     private void setAddressFromRequest(Enterprise e, HttpServletRequest request) {
-        Integer districtId = parseIntOrNull(request.getParameter("districtId"));
+        Integer wardId = parseIntOrNull(request.getParameter("wardId"));
         String addressDetail = emptyToNull(request.getParameter("addressDetail"));
-        if (districtId != null && addressDetail != null) {
+        if (wardId != null && addressDetail != null) {
             Address address = new Address();
             address.setStreetAndLocalName(addressDetail);
-            address.setDistrictId(districtId);
+            address.setWardId(wardId);
             e.setAddress(address);
         }
     }

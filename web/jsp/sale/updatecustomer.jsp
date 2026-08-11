@@ -3,15 +3,15 @@
 <%@taglib prefix="fmt" uri="jakarta.tags.fmt"%>
 <%@taglib prefix="fn" uri="jakarta.tags.functions"%>
 <%--
-    Servlet cần: lấy customer_id từ query param, truy vấn enterprises (JOIN address/district
+    Servlet cần: lấy customer_id từ query param, truy vấn enterprises (JOIN address/ward
     để biết provinceId hiện tại) đổ vào request attribute "customer", xử lý POST cập nhật vào
     bảng enterprises. Kiểm tra bản ghi tồn tại (MSG-021) trước khi hiển thị.
 
     Request attribute cần có:
-      - customer      : poscs.model.Enterprise (đã join .address.district)
+      - customer      : poscs.model.Enterprise (đã join .address.ward)
       - userList      : List<poscs.model.User>
       - provinceList  : List<poscs.model.Province>
-      - districtList  : List<poscs.model.District>
+      - wardList      : List<poscs.model.Ward>  (chính quyền 2 cấp, không còn cấp Quận/Huyện)
 --%>
 <!DOCTYPE html>
 <html lang="vi">
@@ -243,17 +243,17 @@
                         <select class="form-select" id="province" name="provinceId">
                             <option value="">-- Chọn tỉnh / thành phố --</option>
                             <c:forEach var="prov" items="${provinceList}">
-                                <option value="${prov.provinceId}" ${customer.address != null && customer.address.district != null && prov.provinceId == customer.address.district.provinceId ? 'selected' : ''}>${fn:escapeXml(prov.provinceName)}</option>
+                                <option value="${prov.provinceId}" ${customer.address != null && customer.address.ward != null && prov.provinceId == customer.address.ward.provinceId ? 'selected' : ''}>${fn:escapeXml(prov.provinceName)}</option>
                             </c:forEach>
                         </select>
                     </div>
                     <div class="col-md-6 field-row">
-                        <label>Quận / Huyện</label>
-                        <select class="form-select" id="district" name="districtId">
-                            <option value="">-- Chọn quận / huyện --</option>
-                            <c:forEach var="dist" items="${districtList}">
-                                <option value="${dist.districtId}" data-province-id="${dist.provinceId}"
-                                        ${customer.address != null && dist.districtId == customer.address.districtId ? 'selected' : ''}>${fn:escapeXml(dist.districtName)}</option>
+                        <label>Xã / Phường</label>
+                        <select class="form-select" id="ward" name="wardId">
+                            <option value="">-- Chọn xã / phường --</option>
+                            <c:forEach var="w" items="${wardList}">
+                                <option value="${w.wardId}" data-province-id="${w.provinceId}"
+                                        ${customer.address != null && w.wardId == customer.address.wardId ? 'selected' : ''}>${fn:escapeXml(w.wardName)}</option>
                             </c:forEach>
                         </select>
                     </div>
@@ -282,24 +282,24 @@
             return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
         }
 
-        // Lọc quận/huyện theo tỉnh/thành phố đã chọn, giữ nguyên lựa chọn hiện tại nếu còn khớp
-        var districtSelect = document.getElementById('district');
-        var allDistrictOptions = Array.prototype.slice.call(districtSelect.querySelectorAll('option[data-province-id]'));
-        var initialDistrictValue = districtSelect.value;
+        // Lọc xã/phường theo tỉnh/thành phố đã chọn, giữ nguyên lựa chọn hiện tại nếu còn khớp
+        var wardSelect = document.getElementById('ward');
+        var allWardOptions = Array.prototype.slice.call(wardSelect.querySelectorAll('option[data-province-id]'));
+        var initialWardValue = wardSelect.value;
 
-        function filterDistricts(provinceId, keepValue) {
-            allDistrictOptions.forEach(function (opt) {
+        function filterWards(provinceId, keepValue) {
+            allWardOptions.forEach(function (opt) {
                 opt.style.display = (opt.getAttribute('data-province-id') === provinceId) ? '' : 'none';
             });
-            districtSelect.value = keepValue || '';
+            wardSelect.value = keepValue || '';
         }
 
         document.getElementById('province').addEventListener('change', function () {
-            filterDistricts(this.value, null);
+            filterWards(this.value, null);
         });
 
-        // Khởi tạo hiển thị đúng danh sách quận/huyện theo tỉnh đã chọn sẵn khi load trang
-        filterDistricts(document.getElementById('province').value, initialDistrictValue);
+        // Khởi tạo hiển thị đúng danh sách xã/phường theo tỉnh đã chọn sẵn khi load trang
+        filterWards(document.getElementById('province').value, initialWardValue);
 
         function validateForm() {
             var valid = true;

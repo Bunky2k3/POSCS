@@ -4,7 +4,7 @@
 <%@taglib prefix="fn" uri="jakarta.tags.functions"%>
 <%--
     Servlet cần đặt các request attribute sau trước khi forward tới trang này:
-      - customerList : List<poscs.model.Enterprise>  (mỗi Enterprise nên có sẵn .address.district.province và .accountOwner đã join)
+      - customerList : List<poscs.model.Enterprise>  (mỗi Enterprise nên có sẵn .address.ward.province và .accountOwner đã join)
       - userList      : List<poscs.model.User>        (toàn bộ nhân viên, để đổ dropdown lọc "Người phụ trách")
       - currentPage, totalPages, totalCount : thông tin phân trang (BR-12)
       - keyword, typeFilter, assigneeFilter : giá trị filter hiện tại (để giữ lại lúc submit lại form tìm kiếm)

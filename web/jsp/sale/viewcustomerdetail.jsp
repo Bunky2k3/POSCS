@@ -4,12 +4,12 @@
 <%@taglib prefix="fn" uri="jakarta.tags.functions"%>
 <%--
     Servlet cần lấy customer_id từ query param ?id=, truy vấn bảng enterprises
-    (JOIN addresses/districts/provinces, JOIN users làm account_owner) + enterprisecontacts
+    (JOIN addresses/wards/provinces, JOIN users làm account_owner) + enterprisecontacts
     + contracts (JOIN users làm owner) + technicalrequests (JOIN users làm assigned_technician).
     Nếu không tồn tại thì hiển thị MSG-021 (redirect hoặc forward sang trang lỗi).
 
     Request attribute cần có:
-      - customer      : poscs.model.Enterprise (đã join .address.district.province, .accountOwner)
+      - customer      : poscs.model.Enterprise (đã join .address.ward.province, .accountOwner)
       - contactList    : List<poscs.model.EnterpriseContact>
       - contractList    : List<poscs.model.Contract> (đã join .owner nếu cần hiển thị thêm)
       - ticketList      : List<poscs.model.TechnicalRequest>

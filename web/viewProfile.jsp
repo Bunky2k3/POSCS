@@ -268,7 +268,7 @@
 
             <div class="profile-body">
 
-                <%-- Servlet cần: lấy user_id từ session, truy vấn bảng users + addresses/provinces/districts để đổ dữ liệu vào các view-value bên dưới --%>
+                <%-- Servlet cần: lấy user_id từ session, truy vấn bảng users + addresses/provinces/wards để đổ dữ liệu vào các view-value bên dưới --%>
 
                 <!-- ===== Thông tin công việc (chỉ xem, do Admin quản lý) ===== -->
                 <div class="section-header"><h5>Thông tin công việc</h5></div>

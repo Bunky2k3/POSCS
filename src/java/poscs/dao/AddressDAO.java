@@ -6,10 +6,10 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
-import poscs.model.District;
 import poscs.model.Province;
+import poscs.model.Ward;
 
-/** DAO cho bảng provinces/districts, phục vụ các dropdown địa chỉ. */
+/** DAO cho bảng provinces/wards, phục vụ các dropdown địa chỉ (chính quyền 2 cấp: Tỉnh/Thành phố -> Xã/Phường). */
 public class AddressDAO {
 
     public List<Province> findAllProvinces() {
@@ -31,22 +31,22 @@ public class AddressDAO {
         return result;
     }
 
-    /** Lấy toàn bộ quận/huyện (mọi tỉnh) -- JS phía client tự lọc theo tỉnh đã chọn qua data-province-id. */
-    public List<District> findAllDistricts() {
-        List<District> result = new ArrayList<>();
-        String sql = "SELECT districts_id, districts_name, province_id FROM districts ORDER BY districts_name";
+    /** Lấy toàn bộ xã/phường (mọi tỉnh) -- JS phía client tự lọc theo tỉnh đã chọn qua data-province-id. */
+    public List<Ward> findAllWards() {
+        List<Ward> result = new ArrayList<>();
+        String sql = "SELECT ward_id, ward_name, province_id FROM wards ORDER BY ward_name";
         try (Connection conn = DBContext.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql);
              ResultSet rs = ps.executeQuery()) {
             while (rs.next()) {
-                District d = new District();
-                d.setDistrictId(rs.getInt("districts_id"));
-                d.setDistrictName(rs.getString("districts_name"));
-                d.setProvinceId(rs.getInt("province_id"));
-                result.add(d);
+                Ward w = new Ward();
+                w.setWardId(rs.getInt("ward_id"));
+                w.setWardName(rs.getString("ward_name"));
+                w.setProvinceId(rs.getInt("province_id"));
+                result.add(w);
             }
         } catch (SQLException ex) {
-            System.err.println("--- LOI TRUY VAN DANH SACH QUAN/HUYEN ---");
+            System.err.println("--- LOI TRUY VAN DANH SACH XA/PHUONG ---");
             ex.printStackTrace();
         }
         return result;

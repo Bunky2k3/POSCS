@@ -8,12 +8,12 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
 import poscs.model.Address;
-import poscs.model.District;
 import poscs.model.Enterprise;
 import poscs.model.EnterpriseContact;
 import poscs.model.Province;
 import poscs.model.RelationshipRating;
 import poscs.model.User;
+import poscs.model.Ward;
 
 /**
  * DAO cho khách hàng doanh nghiệp (bảng enterprises) và người liên hệ
@@ -27,14 +27,14 @@ public class CustomerDAO {
         "       e.tax_code, e.email AS ent_email, e.phone AS ent_phone, e.website, e.address_id, e.account_owner_id, " +
         "       e.legal_representative, e.logo_url, e.business_license_url, e.status, e.join_date, " +
         "       e.current_relationship_rating, e.created_at, e.updated_at, e.is_deleted, " +
-        "       a.street_and_local_name, a.districts_id AS addr_districts_id, " +
-        "       d.districts_name, d.province_id AS dist_province_id, " +
+        "       a.street_and_local_name, a.ward_id AS addr_ward_id, " +
+        "       w.ward_name, w.province_id AS ward_province_id, " +
         "       p.province_name, " +
         "       u.last_name AS owner_last_name, u.middle_name AS owner_middle_name, u.first_name AS owner_first_name " +
         "FROM enterprises e " +
         "LEFT JOIN addresses a ON e.address_id = a.address_id " +
-        "LEFT JOIN districts d ON a.districts_id = d.districts_id " +
-        "LEFT JOIN provinces p ON d.province_id = p.province_id " +
+        "LEFT JOIN wards w ON a.ward_id = w.ward_id " +
+        "LEFT JOIN provinces p ON w.province_id = p.province_id " +
         "LEFT JOIN users u ON e.account_owner_id = u.user_id ";
 
     /**
@@ -157,7 +157,7 @@ public class CustomerDAO {
     }
 
     /**
-     * Thêm khách hàng mới. Nếu enterprise.getAddress() có street/district thì tự tạo
+     * Thêm khách hàng mới. Nếu enterprise.getAddress() có street/ward thì tự tạo
      * dòng addresses trước rồi mới gán address_id. Trả về enterprise_id vừa tạo, hoặc -1 nếu lỗi.
      */
     public int insert(Enterprise enterprise) {
@@ -314,13 +314,13 @@ public class CustomerDAO {
 
     /** Tạo 1 dòng addresses mới từ Address chưa có addressId, trả về address_id vừa tạo. */
     private Integer insertAddress(Connection conn, Address address) throws SQLException {
-        if (address.getStreetAndLocalName() == null || address.getDistrictId() <= 0) {
+        if (address.getStreetAndLocalName() == null || address.getWardId() <= 0) {
             return null;
         }
-        String sql = "INSERT INTO addresses (street_and_local_name, districts_id) VALUES (?, ?)";
+        String sql = "INSERT INTO addresses (street_and_local_name, ward_id) VALUES (?, ?)";
         try (PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
             ps.setString(1, address.getStreetAndLocalName());
-            ps.setInt(2, address.getDistrictId());
+            ps.setInt(2, address.getWardId());
             ps.executeUpdate();
             try (ResultSet keys = ps.getGeneratedKeys()) {
                 return keys.next() ? keys.getInt(1) : null;
@@ -362,26 +362,26 @@ public class CustomerDAO {
             Address address = new Address();
             address.setAddressId(e.getAddressId() != null ? e.getAddressId() : 0);
             address.setStreetAndLocalName(street);
-            int districtId = rs.getInt("addr_districts_id");
+            int wardId = rs.getInt("addr_ward_id");
             if (!rs.wasNull()) {
-                address.setDistrictId(districtId);
-                String districtName = rs.getString("districts_name");
-                if (districtName != null) {
-                    District district = new District();
-                    district.setDistrictId(districtId);
-                    district.setDistrictName(districtName);
-                    int provinceId = rs.getInt("dist_province_id");
+                address.setWardId(wardId);
+                String wardName = rs.getString("ward_name");
+                if (wardName != null) {
+                    Ward ward = new Ward();
+                    ward.setWardId(wardId);
+                    ward.setWardName(wardName);
+                    int provinceId = rs.getInt("ward_province_id");
                     if (!rs.wasNull()) {
-                        district.setProvinceId(provinceId);
+                        ward.setProvinceId(provinceId);
                         String provinceName = rs.getString("province_name");
                         if (provinceName != null) {
                             Province province = new Province();
                             province.setProvinceId(provinceId);
                             province.setProvinceName(provinceName);
-                            district.setProvince(province);
+                            ward.setProvince(province);
                         }
                     }
-                    address.setDistrict(district);
+                    address.setWard(ward);
                 }
             }
             e.setAddress(address);

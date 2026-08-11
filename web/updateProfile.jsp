@@ -408,13 +408,13 @@
                             </select>
                         </div>
                         <div class="col-md-6 field-row">
-                            <label for="district">Quận / Huyện</label>
-                            <%-- Danh sách Quận/Huyện cần lấy từ bảng districts theo province đã chọn --%>
-                            <select class="form-select" id="district" name="district">
-                                <option selected>Quận Cầu Giấy</option>
-                                <option>Quận Đống Đa</option>
-                                <option>Quận Hai Bà Trưng</option>
-                                <option>Quận Nam Từ Liêm</option>
+                            <label for="ward">Xã / Phường</label>
+                            <%-- Danh sách Xã/Phường cần lấy từ bảng wards theo province đã chọn (chính quyền 2 cấp, không còn Quận/Huyện) --%>
+                            <select class="form-select" id="ward" name="ward">
+                                <option selected>Phường Cầu Giấy</option>
+                                <option>Phường Láng</option>
+                                <option>Phường Định Công</option>
+                                <option>Phường Xuân Đỉnh</option>
                             </select>
                         </div>
                         <div class="col-12 field-row">

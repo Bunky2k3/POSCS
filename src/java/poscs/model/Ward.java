@@ -1,8 +1,8 @@
 package poscs.model;
 
-public class District {
-    private int districtId;
-    private String districtName;
+public class Ward {
+    private int wardId;
+    private String wardName;
 
     // Thuộc tính lưu trữ ID khóa ngoại
     private int provinceId;
@@ -11,22 +11,22 @@ public class District {
     private Province province;
 
     // Constructor rỗng (Bắt buộc cho JavaBean)
-    public District() {
+    public Ward() {
     }
 
     // Constructor có tham số
-    public District(int districtId, String districtName, int provinceId) {
-        this.districtId = districtId;
-        this.districtName = districtName;
+    public Ward(int wardId, String wardName, int provinceId) {
+        this.wardId = wardId;
+        this.wardName = wardName;
         this.provinceId = provinceId;
     }
 
     // Các hàm Getters và Setters
-    public int getDistrictId() { return districtId; }
-    public void setDistrictId(int districtId) { this.districtId = districtId; }
+    public int getWardId() { return wardId; }
+    public void setWardId(int wardId) { this.wardId = wardId; }
 
-    public String getDistrictName() { return districtName; }
-    public void setDistrictName(String districtName) { this.districtName = districtName; }
+    public String getWardName() { return wardName; }
+    public void setWardName(String wardName) { this.wardName = wardName; }
 
     public int getProvinceId() { return provinceId; }
     public void setProvinceId(int provinceId) { this.provinceId = provinceId; }
@@ -36,6 +36,6 @@ public class District {
 
     @Override
     public String toString() {
-        return "District{" + "districtId=" + districtId + ", districtName='" + districtName + '\'' + '}';
+        return "Ward{" + "wardId=" + wardId + ", wardName='" + wardName + '\'' + '}';
     }
 }

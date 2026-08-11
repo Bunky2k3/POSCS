@@ -9,8 +9,9 @@
     Request attribute cần có trước khi forward tới trang này:
       - userList     : List<poscs.model.User>     (để đổ dropdown "Nhân viên phụ trách")
       - provinceList : List<poscs.model.Province>  (để đổ dropdown "Tỉnh / Thành phố")
-      - districtList : List<poscs.model.District>  (toàn bộ quận/huyện; JS lọc theo tỉnh đã chọn
-                        dựa vào data-province-id của mỗi <option>)
+      - wardList     : List<poscs.model.Ward>       (toàn bộ xã/phường; JS lọc theo tỉnh đã chọn
+                        dựa vào data-province-id của mỗi <option> -- chính quyền 2 cấp, không
+                        còn cấp Quận/Huyện sau sáp nhập tỉnh 2025)
 --%>
 <!DOCTYPE html>
 <html lang="vi">
@@ -251,11 +252,11 @@
                         </select>
                     </div>
                     <div class="col-md-6 field-row">
-                        <label>Quận / Huyện</label>
-                        <select class="form-select" id="district" name="districtId">
-                            <option value="">-- Chọn quận / huyện --</option>
-                            <c:forEach var="dist" items="${districtList}">
-                                <option value="${dist.districtId}" data-province-id="${dist.provinceId}" style="display:none">${fn:escapeXml(dist.districtName)}</option>
+                        <label>Xã / Phường</label>
+                        <select class="form-select" id="ward" name="wardId">
+                            <option value="">-- Chọn xã / phường --</option>
+                            <c:forEach var="w" items="${wardList}">
+                                <option value="${w.wardId}" data-province-id="${w.provinceId}" style="display:none">${fn:escapeXml(w.wardName)}</option>
                             </c:forEach>
                         </select>
                     </div>
@@ -283,14 +284,14 @@
             return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
         }
 
-        // Lọc quận/huyện theo tỉnh/thành phố đã chọn
-        var districtSelect = document.getElementById('district');
-        var allDistrictOptions = Array.prototype.slice.call(districtSelect.querySelectorAll('option[data-province-id]'));
+        // Lọc xã/phường theo tỉnh/thành phố đã chọn
+        var wardSelect = document.getElementById('ward');
+        var allWardOptions = Array.prototype.slice.call(wardSelect.querySelectorAll('option[data-province-id]'));
 
         document.getElementById('province').addEventListener('change', function () {
             var provinceId = this.value;
-            districtSelect.value = '';
-            allDistrictOptions.forEach(function (opt) {
+            wardSelect.value = '';
+            allWardOptions.forEach(function (opt) {
                 opt.style.display = (opt.getAttribute('data-province-id') === provinceId) ? '' : 'none';
             });
         });
