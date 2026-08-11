@@ -1,4 +1,15 @@
 <%@page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
+<%@taglib prefix="c" uri="jakarta.tags.core"%>
+<%@taglib prefix="fmt" uri="jakarta.tags.fmt"%>
+<%--
+    Request attribute do ContractController#showDetail thiết lập trước khi forward tới trang này:
+      - contract  : poscs.model.Contract (có sẵn .enterprise và .owner đã join, .status đã tính theo BR-17)
+      - canDelete : boolean -- true nếu hợp đồng đang ở trạng thái "Chưa hiệu lực" (BR-46)
+
+    Hạng mục sản phẩm/dịch vụ + điều khoản/ghi chú chưa hiển thị dữ liệu
+    thật -- bảng contractproducts chưa có cột đơn giá và contracts chưa có
+    cột lưu điều khoản, thuộc phạm vi khác.
+--%>
 <!DOCTYPE html>
 <html lang="vi">
 <head>
@@ -134,27 +145,44 @@
     </nav>
 
     <div class="page-container">
-        <a href="listcontract.jsp" class="back-link-top"><i class="fa-solid fa-arrow-left-long"></i> Quay lại danh sách</a>
-
-        <%-- Servlet cần: lấy contract_id từ query param ?id=, truy vấn bảng contracts + contract_items + enterprises. Trạng thái tự tính theo BR-17. Nếu không tồn tại hiển thị MSG-021 --%>
+        <a href="${pageContext.request.contextPath}/contract" class="back-link-top"><i class="fa-solid fa-arrow-left-long"></i> Quay lại danh sách</a>
 
         <!-- ===== Header ===== -->
         <div class="detail-header card-box">
             <div class="doc-info">
                 <div class="doc-icon"><i class="fa-solid fa-file-contract"></i></div>
                 <div>
-                    <span class="contract-code">HD-0231</span>
+                    <span class="contract-code">${contract.contractCode}</span>
                     <h2>
-                        Cung cấp cáp quang OM4 đợt 2
-                        <span class="type-badge">Cung cấp thiết bị</span>
-                        <span class="status-pill status-soon"><span class="dot"></span>Sắp hết hạn</span>
+                        ${contract.title}
+                        <span class="type-badge">${contract.contractType}</span>
+                        <c:choose>
+                            <c:when test="${contract.status == 'Đang hiệu lực'}"><span class="status-pill status-active"><span class="dot"></span>Đang hiệu lực</span></c:when>
+                            <c:when test="${contract.status == 'Sắp hết hạn'}"><span class="status-pill status-soon"><span class="dot"></span>Sắp hết hạn</span></c:when>
+                            <c:when test="${contract.status == 'Đã hết hạn'}"><span class="status-pill status-expired"><span class="dot"></span>Đã hết hạn</span></c:when>
+                            <c:otherwise><span class="status-pill status-draft"><span class="dot"></span>Chưa hiệu lực</span></c:otherwise>
+                        </c:choose>
                     </h2>
-                    <div style="color:#6b7280; font-size:0.85rem;">Khách hàng: <a href="viewcustomerdetail.jsp?id=1" style="color:var(--primary); font-weight:600; text-decoration:none;">VNPT Hà Nội</a></div>
+                    <div style="color:#6b7280; font-size:0.85rem;">Khách hàng:
+                        <a href="${pageContext.request.contextPath}/customer?action=view&id=${contract.enterpriseId}" style="color:var(--primary); font-weight:600; text-decoration:none;">
+                            <c:choose>
+                                <c:when test="${contract.enterprise != null}">${contract.enterprise.enterpriseName}</c:when>
+                                <c:otherwise>&mdash;</c:otherwise>
+                            </c:choose>
+                        </a>
+                    </div>
                 </div>
             </div>
             <div class="header-actions">
-                <a href="updatecontract.jsp?id=231" class="btn-edit-detail"><i class="fa-solid fa-pen"></i> Sửa thông tin</a>
-                <button class="btn-delete-detail" disabled title="Chỉ được xóa hợp đồng ở trạng thái nháp/chưa hiệu lực"><i class="fa-solid fa-trash"></i> Xóa</button>
+                <a href="${pageContext.request.contextPath}/contract?action=edit&id=${contract.contractId}" class="btn-edit-detail"><i class="fa-solid fa-pen"></i> Sửa thông tin</a>
+                <c:choose>
+                    <c:when test="${canDelete}">
+                        <button type="button" class="btn-delete-detail" style="cursor:pointer; color:var(--danger); border-color:var(--danger);" onclick="confirmDelete(${contract.contractId})"><i class="fa-solid fa-trash"></i> Xóa</button>
+                    </c:when>
+                    <c:otherwise>
+                        <button class="btn-delete-detail" disabled title="Chỉ được xóa hợp đồng ở trạng thái chưa hiệu lực"><i class="fa-solid fa-trash"></i> Xóa</button>
+                    </c:otherwise>
+                </c:choose>
             </div>
         </div>
 
@@ -164,23 +192,35 @@
             <div class="row">
                 <div class="col-md-6 field-row">
                     <label>Khách hàng</label>
-                    <div class="view-value"><a href="viewcustomerdetail.jsp?id=1">VNPT Hà Nội</a></div>
+                    <div class="view-value">
+                        <a href="${pageContext.request.contextPath}/customer?action=view&id=${contract.enterpriseId}">
+                            <c:choose>
+                                <c:when test="${contract.enterprise != null}">${contract.enterprise.enterpriseName}</c:when>
+                                <c:otherwise>&mdash;</c:otherwise>
+                            </c:choose>
+                        </a>
+                    </div>
                 </div>
                 <div class="col-md-6 field-row">
                     <label>Người phụ trách</label>
-                    <div class="view-value">Nguyễn Văn An</div>
+                    <div class="view-value">
+                        <c:choose>
+                            <c:when test="${contract.owner != null}">${contract.owner.fullName}</c:when>
+                            <c:otherwise>&mdash;</c:otherwise>
+                        </c:choose>
+                    </div>
                 </div>
                 <div class="col-md-4 field-row">
                     <label>Ngày ký</label>
-                    <div class="view-value">02/01/2026</div>
+                    <div class="view-value"><fmt:formatDate value="${contract.signingDate}" pattern="dd/MM/yyyy"/></div>
                 </div>
                 <div class="col-md-4 field-row">
                     <label>Ngày hiệu lực</label>
-                    <div class="view-value">05/01/2026</div>
+                    <div class="view-value"><fmt:formatDate value="${contract.effectiveDate}" pattern="dd/MM/yyyy"/></div>
                 </div>
                 <div class="col-md-4 field-row">
                     <label>Ngày kết thúc</label>
-                    <div class="view-value">09/08/2026</div>
+                    <div class="view-value"><fmt:formatDate value="${contract.endDate}" pattern="dd/MM/yyyy"/></div>
                 </div>
             </div>
         </div>
@@ -188,43 +228,30 @@
         <!-- ===== Hạng mục sản phẩm / dịch vụ ===== -->
         <div class="info-card card-box">
             <div class="section-header"><h5>Hạng mục sản phẩm / dịch vụ</h5></div>
-            <table class="item-table">
-                <thead>
-                    <tr><th>Tên sản phẩm/dịch vụ</th><th class="text-end">Số lượng</th><th class="text-end">Đơn giá</th><th class="text-end">Thành tiền</th></tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td>Cáp quang OM4 4FO</td>
-                        <td class="num">500</td>
-                        <td class="num">1.800.000 đ</td>
-                        <td class="num">900.000.000 đ</td>
-                    </tr>
-                    <tr>
-                        <td>Đầu nối quang SC/APC</td>
-                        <td class="num">1.000</td>
-                        <td class="num">35.000 đ</td>
-                        <td class="num">35.000.000 đ</td>
-                    </tr>
-                </tbody>
-            </table>
-
-            <div class="totals-box">
-                <div class="totals-row"><span>Tổng tiền hàng</span><span>935.000.000 đ</span></div>
-                <div class="totals-row"><span>Thuế GTGT (10%)</span><span>93.500.000 đ</span></div>
-                <div class="totals-row grand"><span>Tổng cộng</span><span>1.028.500.000 đ</span></div>
-            </div>
+            <div class="empty-mini" style="color:#9ca3af; font-size:0.87rem;">Chưa hỗ trợ trong phiên bản này.</div>
         </div>
 
         <!-- ===== Ghi chú / điều khoản ===== -->
         <div class="info-card card-box">
             <div class="section-header"><h5>Điều khoản & ghi chú</h5></div>
-            <div class="field-row" style="margin-bottom:0;">
-                <div class="view-value" style="min-height:80px; align-items:flex-start; padding-top:12px;">
-                    Bên B giao hàng thành 2 đợt tại kho Cầu Giấy, Hà Nội. Bảo hành thiết bị 24 tháng kể từ ngày nghiệm thu. Thanh toán 50% khi ký hợp đồng, 50% còn lại sau nghiệm thu.
-                </div>
-            </div>
+            <div class="empty-mini" style="color:#9ca3af; font-size:0.87rem;">Chưa hỗ trợ trong phiên bản này.</div>
         </div>
     </div>
+
+    <!-- Form ẩn để gửi yêu cầu xoá qua POST (không đổi state bằng GET) -->
+    <form id="deleteForm" method="POST" action="${pageContext.request.contextPath}/contract" style="display:none">
+        <input type="hidden" name="action" value="delete">
+        <input type="hidden" name="id" id="deleteFormId">
+    </form>
+
+    <script>
+        function confirmDelete(contractId) {
+            if (confirm('Bạn có chắc chắn muốn xóa hợp đồng này?')) {
+                document.getElementById('deleteFormId').value = contractId;
+                document.getElementById('deleteForm').submit();
+            }
+        }
+    </script>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>

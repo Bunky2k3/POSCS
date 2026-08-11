@@ -1,4 +1,14 @@
 <%@page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
+<%@taglib prefix="c" uri="jakarta.tags.core"%>
+<%--
+    Request attribute do ContractController#showCreateForm thiết lập trước khi forward tới trang này:
+      - customerList : List<poscs.model.Enterprise> (toàn bộ khách hàng, để đổ dropdown "Khách hàng")
+      - userList      : List<poscs.model.User>       (toàn bộ nhân viên, để đổ dropdown "Người phụ trách")
+
+    Hạng mục sản phẩm/dịch vụ bên dưới hiện chưa được lưu xuống DB -- bảng
+    contractproducts chưa có cột đơn giá nên chưa tính được thành tiền/VAT/
+    tổng cộng, thuộc phạm vi khác. Phần này chỉ demo giao diện.
+--%>
 <!DOCTYPE html>
 <html lang="vi">
 <head>
@@ -124,16 +134,16 @@
     </nav>
 
     <div class="page-container">
-        <a href="listcontract.jsp" class="back-link-top"><i class="fa-solid fa-arrow-left-long"></i> Quay lại danh sách</a>
+        <a href="${pageContext.request.contextPath}/contract" class="back-link-top"><i class="fa-solid fa-arrow-left-long"></i> Quay lại danh sách</a>
 
         <div class="page-header-row">
             <h2>Tạo hợp đồng</h2>
             <p>Khởi tạo hợp đồng mới với khách hàng doanh nghiệp</p>
         </div>
 
-        <%-- Servlet cần: validate BR-44 (Ngày ký ≤ Ngày hiệu lực ≤ Ngày kết thúc, MSG-045), trường bắt buộc, tự sinh Mã hợp đồng, INSERT contracts + contract_items --%>
         <div class="card-box">
-            <form id="createContractForm" action="CreateContractServlet" method="POST" onsubmit="return validateForm();">
+            <form id="createContractForm" action="${pageContext.request.contextPath}/contract" method="POST" onsubmit="return validateForm();">
+                <input type="hidden" name="action" value="create">
 
                 <div class="section-header"><h5>Thông tin chung</h5></div>
                 <div class="row">
@@ -144,14 +154,11 @@
                     </div>
                     <div class="col-md-6 field-row">
                         <label>Khách hàng <span class="req">*</span></label>
-                        <select class="form-select" id="customer" name="customer">
+                        <select class="form-select" id="customer" name="enterpriseId">
                             <option value="">-- Chọn khách hàng --</option>
-                            <option>VNPT Hà Nội</option>
-                            <option>Viettel Bắc Ninh</option>
-                            <option>MobiFone Hải Phòng</option>
-                            <option>FPT Telecom Đà Nẵng</option>
-                            <option>CMC Telecom</option>
-                            <option>Đại lý Thiết bị Viễn thông Đông Á</option>
+                            <c:forEach var="customer" items="${customerList}">
+                                <option value="${customer.enterpriseId}">${customer.enterpriseName}</option>
+                            </c:forEach>
                         </select>
                         <span class="error-text" id="err-customer">Vui lòng chọn khách hàng.</span>
                     </div>
@@ -182,12 +189,11 @@
 
                     <div class="col-md-6 field-row">
                         <label>Người phụ trách <span class="req">*</span></label>
-                        <select class="form-select" id="owner" name="owner">
+                        <select class="form-select" id="owner" name="ownerId">
                             <option value="">-- Chọn nhân viên --</option>
-                            <option>Nguyễn Văn An</option>
-                            <option>Trần Thị Bình</option>
-                            <option>Lê Minh Châu</option>
-                            <option>Phạm Quốc Huy</option>
+                            <c:forEach var="staff" items="${userList}">
+                                <option value="${staff.userId}">${staff.fullName}</option>
+                            </c:forEach>
                         </select>
                         <span class="error-text" id="err-owner">Vui lòng chọn người phụ trách.</span>
                     </div>
@@ -217,7 +223,7 @@
                 </div>
 
                 <div class="action-bar">
-                    <a href="listcontract.jsp" class="btn-cancel">Hủy</a>
+                    <a href="${pageContext.request.contextPath}/contract" class="btn-cancel">Hủy</a>
                     <button type="submit" class="btn-primary"><i class="fa-solid fa-check me-1"></i> Tạo hợp đồng</button>
                 </div>
             </form>
