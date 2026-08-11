@@ -242,7 +242,7 @@
                         <select class="form-select" id="province" name="provinceId">
                             <option value="">-- Chọn tỉnh / thành phố --</option>
                             <c:forEach var="prov" items="${provinceList}">
-                                <option value="${prov.provinceId}" ${customer.address != null && customer.address.district != null && prov.provinceId == customer.address.district.provinceId ? 'selected' : ''}>${prov.provinceName}</option>
+                                <option value="${prov.provinceId}" ${customer.address != null && customer.address.district != null && prov.provinceId == customer.address.district.provinceId ? 'selected' : ''}>${prov.shortName}</option>
                             </c:forEach>
                         </select>
                     </div>
@@ -252,7 +252,7 @@
                             <option value="">-- Chọn xã / phường --</option>
                             <c:forEach var="dist" items="${districtList}">
                                 <option value="${dist.districtId}" data-province-id="${dist.provinceId}"
-                                        ${customer.address != null && dist.districtId == customer.address.districtId ? 'selected' : ''}>${dist.districtName}</option>
+                                        ${customer.address != null && dist.districtId == customer.address.districtId ? 'selected' : ''}>${dist.shortName}</option>
                             </c:forEach>
                         </select>
                     </div>

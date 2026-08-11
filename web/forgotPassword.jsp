@@ -249,6 +249,7 @@
                         <div class="alert alert-danger py-2 px-3 mb-4" style="font-size: 0.9rem; border-radius: 12px;">
                             <c:choose>
                                 <c:when test="${param.error == 'missing_email'}">Vui lòng nhập email.</c:when>
+                                <c:when test="${param.error == 'invalid_email'}">Địa chỉ email không đúng định dạng.</c:when>
                                 <c:when test="${param.error == 'unauthorized'}">Vui lòng thực hiện lại từ bước nhập email.</c:when>
                                 <c:when test="${param.error == 'update_failed'}">Có lỗi xảy ra, vui lòng thử lại.</c:when>
                                 <c:when test="${param.error == 'session_expired'}">Phiên làm việc đã hết hạn, vui lòng thử lại.</c:when>

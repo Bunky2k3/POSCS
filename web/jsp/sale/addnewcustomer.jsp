@@ -245,7 +245,7 @@
                         <select class="form-select" id="province" name="provinceId">
                             <option value="">-- Chọn tỉnh / thành phố --</option>
                             <c:forEach var="prov" items="${provinceList}">
-                                <option value="${prov.provinceId}">${prov.provinceName}</option>
+                                <option value="${prov.provinceId}">${prov.shortName}</option>
                             </c:forEach>
                         </select>
                     </div>
@@ -254,7 +254,7 @@
                         <select class="form-select" id="district" name="districtId">
                             <option value="">-- Chọn xã / phường --</option>
                             <c:forEach var="dist" items="${districtList}">
-                                <option value="${dist.districtId}" data-province-id="${dist.provinceId}" style="display:none">${dist.districtName}</option>
+                                <option value="${dist.districtId}" data-province-id="${dist.provinceId}" style="display:none">${dist.shortName}</option>
                             </c:forEach>
                         </select>
                     </div>

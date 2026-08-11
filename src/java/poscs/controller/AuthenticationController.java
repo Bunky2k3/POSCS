@@ -172,6 +172,13 @@ public class AuthenticationController extends HttpServlet {
             response.sendRedirect(request.getContextPath() + "/updateProfile?error=invalid_email");
             return;
         }
+        // Bắt buộc chọn Xã/Phường (và do đó cả Tỉnh/Thành, vì mỗi xã/phường
+        // chỉ thuộc đúng 1 tỉnh) -- địa chỉ chi tiết thì không bắt buộc.
+        Integer districtId = parseIntOrNull(request.getParameter("districtId"));
+        if (districtId == null) {
+            response.sendRedirect(request.getContextPath() + "/updateProfile?error=missing_address");
+            return;
+        }
 
         // Tra 1 lần duy nhất để biết profile hiện có addressId hay chưa (dùng
         // cho setAddressFromRequest bên dưới) -- tránh tra lại DB thêm lần nữa.
@@ -187,7 +194,7 @@ public class AuthenticationController extends HttpServlet {
         user.setCitizenId(citizenId);
         user.setPhone(phone);
         user.setPersonalEmail(personalEmail);
-        setAddressFromRequest(user, currentProfile, request);
+        setAddressFromRequest(user, currentProfile, districtId, request);
 
         boolean ok = employeeDAO.updateProfile(user);
         if (!ok) {
@@ -197,19 +204,18 @@ public class AuthenticationController extends HttpServlet {
         response.sendRedirect(request.getContextPath() + "/viewProfile");
     }
 
-    private void setAddressFromRequest(User user, User currentProfile, HttpServletRequest request) {
-        Integer districtId = parseIntOrNull(request.getParameter("districtId"));
+    /** districtId đã được validate là bắt buộc trước khi gọi hàm này -- addressDetail thì không. */
+    private void setAddressFromRequest(User user, User currentProfile, int districtId, HttpServletRequest request) {
         String addressDetail = trimToNull(request.getParameter("addressDetail"));
-        if (districtId == null || addressDetail == null) {
-            return;
-        }
         Address address = new Address();
         // Nếu profile hiện tại đã có địa chỉ, giữ nguyên addressId để
         // EmployeeDAO.updateProfile() UPDATE đúng dòng đó thay vì tạo dòng mới.
         if (currentProfile != null && currentProfile.getAddress() != null) {
             address.setAddressId(currentProfile.getAddress().getAddressId());
         }
-        address.setStreetAndLocalName(addressDetail);
+        // street_and_local_name là NOT NULL trong DB -- dùng chuỗi rỗng thay vì
+        // null khi người dùng không nhập địa chỉ chi tiết.
+        address.setStreetAndLocalName(addressDetail != null ? addressDetail : "");
         address.setDistrictId(districtId);
         user.setAddress(address);
     }

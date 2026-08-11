@@ -325,6 +325,7 @@
                             <c:when test="${param.error == 'missing_fields'}">Vui lòng nhập đầy đủ Họ, Tên và Số CCCD/CMND.</c:when>
                             <c:when test="${param.error == 'invalid_phone'}">Số điện thoại không hợp lệ.</c:when>
                             <c:when test="${param.error == 'invalid_email'}">Địa chỉ email không hợp lệ.</c:when>
+                            <c:when test="${param.error == 'missing_address'}">Vui lòng chọn Tỉnh/Thành phố và Xã/Phường.</c:when>
                             <c:otherwise>Đã có lỗi xảy ra. Vui lòng thử lại.</c:otherwise>
                         </c:choose>
                     </div>
@@ -413,9 +414,10 @@
                             <select class="form-select" id="province" name="provinceId">
                                 <option value="">-- Chọn tỉnh / thành phố --</option>
                                 <c:forEach var="prov" items="${provinceList}">
-                                    <option value="${prov.provinceId}" ${profile.address != null && profile.address.district != null && prov.provinceId == profile.address.district.provinceId ? 'selected' : ''}>${prov.provinceName}</option>
+                                    <option value="${prov.provinceId}" ${profile.address != null && profile.address.district != null && prov.provinceId == profile.address.district.provinceId ? 'selected' : ''}>${prov.shortName}</option>
                                 </c:forEach>
                             </select>
+                            <span class="error-text" id="err-province">Vui lòng chọn tỉnh / thành phố.</span>
                         </div>
                         <div class="col-md-6 field-row">
                             <label for="district">Xã / Phường</label>
@@ -423,14 +425,14 @@
                                 <option value="">-- Chọn xã / phường --</option>
                                 <c:forEach var="dist" items="${districtList}">
                                     <option value="${dist.districtId}" data-province-id="${dist.provinceId}"
-                                            ${profile.address != null && dist.districtId == profile.address.districtId ? 'selected' : ''}>${dist.districtName}</option>
+                                            ${profile.address != null && dist.districtId == profile.address.districtId ? 'selected' : ''}>${dist.shortName}</option>
                                 </c:forEach>
                             </select>
+                            <span class="error-text" id="err-district">Vui lòng chọn xã / phường.</span>
                         </div>
                         <div class="col-12 field-row">
-                            <label for="addressDetail">Địa chỉ chi tiết</label>
+                            <label for="addressDetail">Địa chỉ chi tiết <span class="text-muted" style="text-transform: none; font-weight: 400;">(không bắt buộc)</span></label>
                             <input type="text" class="form-control" id="addressDetail" name="addressDetail" value="${profile.address != null ? profile.address.streetAndLocalName : ''}">
-                            <span class="error-text" id="err-addressDetail">Trường này không được để trống.</span>
                         </div>
                     </div>
 
@@ -490,7 +492,7 @@
             var valid = true;
             document.querySelectorAll('.error-text').forEach(function (el) { el.style.display = 'none'; });
 
-            var requiredIds = ['lastName', 'firstName', 'citizenId', 'addressDetail'];
+            var requiredIds = ['lastName', 'firstName', 'citizenId', 'province', 'district'];
             requiredIds.forEach(function (id) {
                 var el = document.getElementById(id);
                 if (!el.value.trim()) {

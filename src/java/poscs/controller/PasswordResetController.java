@@ -75,8 +75,12 @@ public class PasswordResetController extends HttpServlet {
 
     private void handleForgotPassword(HttpServletRequest request, HttpServletResponse response) throws IOException {
         String email = trimToNull(request.getParameter("email"));
-        if (email == null) {
-            response.sendRedirect(request.getContextPath() + "/forgotPassword.jsp?error=missing_email");
+        // Validate ĐỊNH DẠNG thôi (không phải "email này có tồn tại không") --
+        // an toàn để báo lỗi riêng cho trường hợp sai định dạng, vì nó không
+        // tiết lộ gì về việc email đó có tài khoản hay không (khác với việc
+        // báo "email không tồn tại", điều mà code bên dưới cố tình tránh).
+        if (email == null || !email.matches("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$")) {
+            response.sendRedirect(request.getContextPath() + "/forgotPassword.jsp?error=invalid_email");
             return;
         }
 

@@ -28,6 +28,28 @@ public class District {
     public String getDistrictName() { return districtName; }
     public void setDistrictName(String districtName) { this.districtName = districtName; }
 
+    /**
+     * Tên bỏ tiền tố "Phường "/"Xã "/"Đặc khu " -- lý do giống hệt
+     * {@link Province#getShortName()}: để gõ phím đầu nhảy nhanh trong
+     * dropdown thật sự hữu ích thay vì chỉ nhảy được giữa "Phường ..."
+     * với nhau hoặc "Xã ..." với nhau.
+     */
+    public String getShortName() {
+        if (districtName == null) {
+            return null;
+        }
+        if (districtName.startsWith("Phường ")) {
+            return districtName.substring("Phường ".length());
+        }
+        if (districtName.startsWith("Xã ")) {
+            return districtName.substring("Xã ".length());
+        }
+        if (districtName.startsWith("Đặc khu ")) {
+            return districtName.substring("Đặc khu ".length());
+        }
+        return districtName;
+    }
+
     public int getProvinceId() { return provinceId; }
     public void setProvinceId(int provinceId) { this.provinceId = provinceId; }
 
