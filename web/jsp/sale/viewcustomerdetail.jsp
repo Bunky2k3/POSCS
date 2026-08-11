@@ -165,6 +165,8 @@
 
         .status-pill { padding: 3px 10px; border-radius: 20px; font-size: 0.72rem; font-weight: 600; }
         .status-active { background: #e8faf3; color: var(--success); }
+        .status-soon { background: #fff4e0; color: var(--warning); }
+        .status-expired { background: #fdecef; color: var(--danger); }
         .status-pending { background: #fff4e0; color: var(--warning); }
         .status-closed { background: #f3f4f6; color: #6b7280; }
 
@@ -381,9 +383,15 @@
                                 <tbody>
                                     <c:forEach var="contract" items="${contractList}">
                                         <tr>
-                                            <td><a href="contractDetail.jsp?id=${contract.contractId}">${contract.contractCode}</a></td>
+                                            <td><a href="${pageContext.request.contextPath}/contract?action=view&id=${contract.contractId}">${contract.contractCode}</a></td>
                                             <td>${contract.title}</td>
-                                            <td><span class="status-pill status-active">${contract.status}</span></td>
+                                            <td>
+                                                <c:choose>
+                                                    <c:when test="${contract.status == 'Đang hiệu lực'}"><span class="status-pill status-active">${contract.status}</span></c:when>
+                                                    <c:when test="${contract.status == 'Sắp hết hạn'}"><span class="status-pill status-soon">${contract.status}</span></c:when>
+                                                    <c:otherwise><span class="status-pill status-expired">${contract.status}</span></c:otherwise>
+                                                </c:choose>
+                                            </td>
                                             <td><fmt:formatDate value="${contract.signingDate}" pattern="dd/MM/yyyy"/></td>
                                         </tr>
                                     </c:forEach>
