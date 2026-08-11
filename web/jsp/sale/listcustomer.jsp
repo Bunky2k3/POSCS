@@ -60,6 +60,12 @@
             gap: 10px;
         }
         .topbar .brand i { color: var(--primary); font-size: 1.2rem; }
+        .topbar-left { display: flex; align-items: center; gap: 32px; }
+        .topbar-nav { display: flex; align-items: center; gap: 4px; }
+        .topbar-nav-link { color: #6b7280; font-weight: 600; font-size: 0.87rem; text-decoration: none; padding: 8px 14px; border-radius: 8px; transition: background 0.15s, color 0.15s; }
+        .topbar-nav-link:hover { background: #f0f9ff; color: var(--primary-dark); }
+        .topbar-nav-link.active { background: #eaf6ff; color: var(--primary-dark); }
+        @media (max-width: 900px) { .topbar-nav { display: none; } }
 
         .topbar-right { display: flex; align-items: center; gap: 18px; }
         .bell-icon { color: #6b7280; font-size: 1.1rem; cursor: pointer; position: relative; }
@@ -277,7 +283,14 @@
 <body>
 
     <nav class="topbar">
-        <div class="brand"><i class="fa-solid fa-tower-broadcast"></i> POSCS Portal</div>
+        <div class="topbar-left">
+            <div class="brand"><i class="fa-solid fa-tower-broadcast"></i> POSCS Portal</div>
+            <div class="topbar-nav">
+                <a href="${pageContext.request.contextPath}/dashboard.jsp" class="topbar-nav-link">Trang chủ</a>
+                <a href="${pageContext.request.contextPath}/customer" class="topbar-nav-link active">Khách hàng</a>
+                <a href="${pageContext.request.contextPath}/contract" class="topbar-nav-link">Hợp đồng</a>
+            </div>
+        </div>
         <div class="topbar-right">
 
             <!-- ===== Dropdown thông báo ===== -->
@@ -321,19 +334,19 @@
 
             <!-- ===== Dropdown avatar ===== -->
             <div class="dropdown">
-                <img src="https://ui-avatars.com/api/?name=Nguyen+An&background=0568a6&color=fff"
+                <img src="https://ui-avatars.com/api/?name=${fn:escapeXml(sessionScope.currentUser.firstName)}&background=0568a6&color=fff"
                      class="avatar-mini" alt="avatar" data-bs-toggle="dropdown" aria-expanded="false">
                 <ul class="dropdown-menu dropdown-menu-end">
                     <li class="dd-user-header">
-                        <img src="https://ui-avatars.com/api/?name=Nguyen+An&background=0568a6&color=fff" alt="avatar">
+                        <img src="https://ui-avatars.com/api/?name=${fn:escapeXml(sessionScope.currentUser.firstName)}&background=0568a6&color=fff" alt="avatar">
                         <div>
-                            <div class="dd-name">Nguyễn Văn An</div>
-                            <div class="dd-role">Sales</div>
+                            <div class="dd-name"><c:out value="${sessionScope.currentUser.fullName}"/></div>
+                            <div class="dd-role"><c:out value="${sessionScope.currentUser.role.roleName}"/></div>
                         </div>
                     </li>
                     <li><hr class="dropdown-divider"></li>
                     <li><a class="dropdown-item" href="${pageContext.request.contextPath}/viewProfile"><i class="fa-regular fa-id-card me-2"></i>Thông tin cá nhân</a></li>
-                    <li><a class="dropdown-item" href="changePassword.jsp"><i class="fa-solid fa-key me-2"></i>Đổi mật khẩu</a></li>
+                    <li><a class="dropdown-item" href="${pageContext.request.contextPath}/changePassword.jsp"><i class="fa-solid fa-key me-2"></i>Đổi mật khẩu</a></li>
                     <li><hr class="dropdown-divider"></li>
                     <li><a class="dropdown-item text-danger" href="${pageContext.request.contextPath}/login?action=logout"><i class="fa-solid fa-arrow-right-from-bracket me-2"></i>Đăng xuất</a></li>
                 </ul>
