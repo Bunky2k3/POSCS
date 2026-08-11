@@ -1,5 +1,6 @@
 <%@page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
 <%@taglib prefix="c" uri="jakarta.tags.core"%>
+<%@taglib prefix="fn" uri="jakarta.tags.functions"%>
 <%--
     Servlet cần: validate BR-09 (SĐT), BR-10 (email), ngày tham gia không ở tương lai,
     tự sinh Mã khách hàng duy nhất, tạo/chọn địa chỉ (INSERT vào addresses nếu cần) rồi
@@ -210,7 +211,7 @@
                         <select class="form-select" id="assignee" name="accountOwnerId">
                             <option value="">-- Chọn nhân viên --</option>
                             <c:forEach var="staff" items="${userList}">
-                                <option value="${staff.userId}">${staff.fullName}</option>
+                                <option value="${staff.userId}">${fn:escapeXml(staff.fullName)}</option>
                             </c:forEach>
                         </select>
                         <span class="error-text" id="err-assignee">Vui lòng chọn nhân viên phụ trách.</span>
@@ -245,7 +246,7 @@
                         <select class="form-select" id="province" name="provinceId">
                             <option value="">-- Chọn tỉnh / thành phố --</option>
                             <c:forEach var="prov" items="${provinceList}">
-                                <option value="${prov.provinceId}">${prov.shortName}</option>
+                                <option value="${prov.provinceId}">${fn:escapeXml(prov.shortName)}</option>
                             </c:forEach>
                         </select>
                     </div>
@@ -254,7 +255,7 @@
                         <select class="form-select" id="district" name="districtId">
                             <option value="">-- Chọn xã / phường --</option>
                             <c:forEach var="dist" items="${districtList}">
-                                <option value="${dist.districtId}" data-province-id="${dist.provinceId}" style="display:none">${dist.shortName}</option>
+                                <option value="${dist.districtId}" data-province-id="${dist.provinceId}" style="display:none">${fn:escapeXml(dist.shortName)}</option>
                             </c:forEach>
                         </select>
                     </div>

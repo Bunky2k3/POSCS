@@ -356,7 +356,7 @@
             <input type="hidden" name="action" value="list">
             <div class="search-input-wrap">
                 <i class="fa-solid fa-magnifying-glass"></i>
-                <input type="text" id="searchInput" name="keyword" value="${keyword}" placeholder="Tìm theo mã KH, tên, số điện thoại...">
+                <input type="text" id="searchInput" name="keyword" value="${fn:escapeXml(keyword)}" placeholder="Tìm theo mã KH, tên, số điện thoại...">
             </div>
             <select id="filterType" name="type">
                 <option value="">Tất cả loại khách hàng</option>
@@ -367,7 +367,7 @@
             <select id="filterAssignee" name="assigneeId">
                 <option value="">Tất cả người phụ trách</option>
                 <c:forEach var="staff" items="${userList}">
-                    <option value="${staff.userId}" ${assigneeFilter == staff.userId ? 'selected' : ''}>${staff.fullName}</option>
+                    <option value="${staff.userId}" ${assigneeFilter == staff.userId ? 'selected' : ''}>${fn:escapeXml(staff.fullName)}</option>
                 </c:forEach>
             </select>
         </form>
@@ -391,20 +391,20 @@
                     <tbody id="customerTableBody">
                         <c:forEach var="customer" items="${customerList}">
                             <tr>
-                                <td class="customer-code">${customer.enterpriseCode}</td>
-                                <td><a href="${pageContext.request.contextPath}/customer?action=view&id=${customer.enterpriseId}" class="customer-name-link">${customer.enterpriseName}</a></td>
-                                <td><span class="type-badge">${customer.customerType}</span></td>
-                                <td>${customer.email}</td>
-                                <td>${customer.phone}</td>
+                                <td class="customer-code">${fn:escapeXml(customer.enterpriseCode)}</td>
+                                <td><a href="${pageContext.request.contextPath}/customer?action=view&id=${customer.enterpriseId}" class="customer-name-link">${fn:escapeXml(customer.enterpriseName)}</a></td>
+                                <td><span class="type-badge">${fn:escapeXml(customer.customerType)}</span></td>
+                                <td>${fn:escapeXml(customer.email)}</td>
+                                <td>${fn:escapeXml(customer.phone)}</td>
                                 <td>
                                     <c:choose>
-                                        <c:when test="${customer.address != null}">${customer.address.fullAddress}</c:when>
+                                        <c:when test="${customer.address != null}">${fn:escapeXml(customer.address.fullAddress)}</c:when>
                                         <c:otherwise>&mdash;</c:otherwise>
                                     </c:choose>
                                 </td>
                                 <td>
                                     <c:choose>
-                                        <c:when test="${customer.accountOwner != null}">${customer.accountOwner.fullName}</c:when>
+                                        <c:when test="${customer.accountOwner != null}">${fn:escapeXml(customer.accountOwner.fullName)}</c:when>
                                         <c:otherwise>&mdash;</c:otherwise>
                                     </c:choose>
                                 </td>
@@ -412,7 +412,7 @@
                                     <div class="action-icons">
                                         <button class="act-view" title="Xem chi tiết" onclick="location.href='${pageContext.request.contextPath}/customer?action=view&id=${customer.enterpriseId}'"><i class="fa-regular fa-eye"></i></button>
                                         <button class="act-edit" title="Sửa" onclick="location.href='${pageContext.request.contextPath}/customer?action=edit&id=${customer.enterpriseId}'"><i class="fa-solid fa-pen"></i></button>
-                                        <button class="act-delete" title="Xóa" onclick="openDeleteModal(${customer.enterpriseId}, '${customer.enterpriseName}')"><i class="fa-solid fa-trash"></i></button>
+                                        <button class="act-delete" title="Xóa" onclick="openDeleteModal(${customer.enterpriseId}, '${fn:escapeXml(customer.enterpriseName)}')"><i class="fa-solid fa-trash"></i></button>
                                     </div>
                                 </td>
                             </tr>
@@ -432,11 +432,11 @@
                 <span class="pagination-info" id="paginationInfo">Hiển thị ${fn:length(customerList)} trong tổng số ${totalCount} khách hàng</span>
                 <nav>
                     <ul class="pagination pagination-sm mb-0">
-                        <li class="page-item ${currentPage <= 1 ? 'disabled' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/customer?action=list&page=${currentPage - 1}&keyword=${keyword}&type=${typeFilter}&assigneeId=${assigneeFilter}">Trước</a></li>
+                        <li class="page-item ${currentPage <= 1 ? 'disabled' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/customer?action=list&page=${currentPage - 1}&keyword=${fn:escapeXml(keyword)}&type=${fn:escapeXml(typeFilter)}&assigneeId=${assigneeFilter}">Trước</a></li>
                         <c:forEach begin="1" end="${totalPages}" var="p">
-                            <li class="page-item ${p == currentPage ? 'active' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/customer?action=list&page=${p}&keyword=${keyword}&type=${typeFilter}&assigneeId=${assigneeFilter}">${p}</a></li>
+                            <li class="page-item ${p == currentPage ? 'active' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/customer?action=list&page=${p}&keyword=${fn:escapeXml(keyword)}&type=${fn:escapeXml(typeFilter)}&assigneeId=${assigneeFilter}">${p}</a></li>
                         </c:forEach>
-                        <li class="page-item ${currentPage >= totalPages ? 'disabled' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/customer?action=list&page=${currentPage + 1}&keyword=${keyword}&type=${typeFilter}&assigneeId=${assigneeFilter}">Sau</a></li>
+                        <li class="page-item ${currentPage >= totalPages ? 'disabled' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/customer?action=list&page=${currentPage + 1}&keyword=${fn:escapeXml(keyword)}&type=${fn:escapeXml(typeFilter)}&assigneeId=${assigneeFilter}">Sau</a></li>
                     </ul>
                 </nav>
             </div>

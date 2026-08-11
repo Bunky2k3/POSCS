@@ -1,4 +1,15 @@
 <%@page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
+<%@taglib prefix="c" uri="jakarta.tags.core"%>
+<%@taglib prefix="fmt" uri="jakarta.tags.fmt"%>
+<%@taglib prefix="fn" uri="jakarta.tags.functions"%>
+<%--
+    Request attribute do ContractController#showList thiết lập trước khi forward tới trang này:
+      - contractList  : List<poscs.model.Contract> (mỗi Contract có sẵn .enterprise và .owner đã join,
+                         .status đã được tính lại theo BR-17)
+      - statusSummary : Map<String,Integer> đếm số hợp đồng theo từng trạng thái, phục vụ dải KPI
+      - currentPage, totalPages, totalCount : thông tin phân trang
+      - keyword, statusFilter, typeFilter : giá trị filter hiện tại (để giữ lại lúc submit lại form)
+--%>
 <!DOCTYPE html>
 <html lang="vi">
 <head>
@@ -104,7 +115,6 @@
         .contract-code { font-weight: 700; color: var(--primary); font-size: 0.85rem; }
         .contract-title-link { color: #111827; font-weight: 600; text-decoration: none; }
         .contract-title-link:hover { color: var(--primary); text-decoration: underline; }
-        .money-value { font-weight: 600; color: #111827; }
 
         .type-badge { display: inline-block; padding: 3px 11px; border-radius: 20px; font-size: 0.72rem; font-weight: 600; background: #f3f4f6; color: #4b5563; }
 
@@ -140,16 +150,6 @@
         .page-link { color: var(--primary); border-color: #e5e7eb; font-size: 0.85rem; }
         .page-item.active .page-link { background: var(--primary); border-color: var(--primary); }
         .page-link:hover { background: #eaf6ff; color: var(--primary-dark); }
-
-        .toast-msg {
-            position: fixed; top: 24px; right: 24px; z-index: 999;
-            background: #fff; border-left: 4px solid var(--success);
-            border-radius: 12px; padding: 14px 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.15);
-            display: flex; align-items: center; gap: 12px; font-size: 0.88rem; color: #111827; font-weight: 500;
-            transform: translateX(130%); transition: transform 0.35s ease;
-        }
-        .toast-msg.show { transform: translateX(0); }
-        .toast-msg i { color: var(--success); font-size: 1.2rem; }
 
         .modal-content { border-radius: 16px; border: none; }
         .modal-header { border-bottom: none; padding: 24px 24px 0; }
@@ -217,39 +217,38 @@
                 <h2>Danh sách hợp đồng</h2>
                 <p>Quản lý toàn bộ hợp đồng cung cấp và thi công thiết bị viễn thông</p>
             </div>
-            <a href="addnewcontract.jsp" class="btn-add"><i class="fa-solid fa-plus"></i> Tạo hợp đồng</a>
+            <a href="${pageContext.request.contextPath}/contract?action=new" class="btn-add"><i class="fa-solid fa-plus"></i> Tạo hợp đồng</a>
         </div>
 
-        <!-- ===== Dải trạng thái tổng quan ===== -->
+        <!-- ===== Dải trạng thái tổng quan (BR-17) ===== -->
         <div class="status-strip">
-            <div class="card-box status-chip"><span class="dot" style="background:var(--success)"></span><div><div class="num">5</div><div class="lbl">Đang hiệu lực</div></div></div>
-            <div class="card-box status-chip"><span class="dot" style="background:var(--warning)"></span><div><div class="num">3</div><div class="lbl">Sắp hết hạn (≤30 ngày)</div></div></div>
-            <div class="card-box status-chip"><span class="dot" style="background:var(--danger)"></span><div><div class="num">2</div><div class="lbl">Đã hết hạn</div></div></div>
-            <div class="card-box status-chip"><span class="dot" style="background:#9ca3af"></span><div><div class="num">1</div><div class="lbl">Chưa hiệu lực</div></div></div>
+            <div class="card-box status-chip"><span class="dot" style="background:var(--success)"></span><div><div class="num">${statusSummary['Đang hiệu lực']}</div><div class="lbl">Đang hiệu lực</div></div></div>
+            <div class="card-box status-chip"><span class="dot" style="background:var(--warning)"></span><div><div class="num">${statusSummary['Sắp hết hạn']}</div><div class="lbl">Sắp hết hạn (≤30 ngày)</div></div></div>
+            <div class="card-box status-chip"><span class="dot" style="background:var(--danger)"></span><div><div class="num">${statusSummary['Đã hết hạn']}</div><div class="lbl">Đã hết hạn</div></div></div>
+            <div class="card-box status-chip"><span class="dot" style="background:#9ca3af"></span><div><div class="num">${statusSummary['Chưa hiệu lực']}</div><div class="lbl">Chưa hiệu lực</div></div></div>
         </div>
 
         <!-- ===== Bộ lọc / tìm kiếm ===== -->
-        <div class="filter-bar card-box">
+        <form class="filter-bar card-box" method="GET" action="${pageContext.request.contextPath}/contract" id="filterForm">
+            <input type="hidden" name="action" value="list">
             <div class="search-input-wrap">
                 <i class="fa-solid fa-magnifying-glass"></i>
-                <input type="text" id="searchInput" placeholder="Tìm theo mã HĐ, tiêu đề, khách hàng...">
+                <input type="text" id="searchInput" name="keyword" value="${fn:escapeXml(keyword)}" placeholder="Tìm theo mã HĐ, tiêu đề, khách hàng...">
             </div>
-            <select id="filterStatus">
+            <select id="filterStatus" name="status">
                 <option value="">Tất cả trạng thái</option>
-                <option value="Đang hiệu lực">Đang hiệu lực</option>
-                <option value="Sắp hết hạn">Sắp hết hạn</option>
-                <option value="Đã hết hạn">Đã hết hạn</option>
-                <option value="Chưa hiệu lực">Chưa hiệu lực</option>
+                <option value="Đang hiệu lực" ${statusFilter == 'Đang hiệu lực' ? 'selected' : ''}>Đang hiệu lực</option>
+                <option value="Sắp hết hạn" ${statusFilter == 'Sắp hết hạn' ? 'selected' : ''}>Sắp hết hạn</option>
+                <option value="Đã hết hạn" ${statusFilter == 'Đã hết hạn' ? 'selected' : ''}>Đã hết hạn</option>
+                <option value="Chưa hiệu lực" ${statusFilter == 'Chưa hiệu lực' ? 'selected' : ''}>Chưa hiệu lực</option>
             </select>
-            <select id="filterType">
+            <select id="filterType" name="type">
                 <option value="">Tất cả loại hợp đồng</option>
-                <option value="Cung cấp thiết bị">Cung cấp thiết bị</option>
-                <option value="Thi công lắp đặt">Thi công lắp đặt</option>
-                <option value="Bảo trì bảo dưỡng">Bảo trì bảo dưỡng</option>
+                <option value="Cung cấp thiết bị" ${typeFilter == 'Cung cấp thiết bị' ? 'selected' : ''}>Cung cấp thiết bị</option>
+                <option value="Thi công lắp đặt" ${typeFilter == 'Thi công lắp đặt' ? 'selected' : ''}>Thi công lắp đặt</option>
+                <option value="Bảo trì bảo dưỡng" ${typeFilter == 'Bảo trì bảo dưỡng' ? 'selected' : ''}>Bảo trì bảo dưỡng</option>
             </select>
-        </div>
-
-        <%-- Servlet cần: truy vấn bảng contracts (JOIN enterprises, users làm người phụ trách), tự tính Trạng thái theo ngày kết thúc (BR-17), định dạng tiền VND (BR-18), phân trang --%>
+        </form>
 
         <!-- ===== Bảng danh sách ===== -->
         <div class="table-card card-box">
@@ -261,7 +260,6 @@
                             <th>Tiêu đề</th>
                             <th>Khách hàng</th>
                             <th>Loại HĐ</th>
-                            <th>Giá trị</th>
                             <th>Ngày ký</th>
                             <th>Ngày kết thúc</th>
                             <th>Trạng thái</th>
@@ -269,177 +267,63 @@
                         </tr>
                     </thead>
                     <tbody id="contractTableBody">
-                        <tr data-status="Sắp hết hạn" data-type="Cung cấp thiết bị">
-                            <td class="contract-code">HD-0231</td>
-                            <td><a href="viewcontractdetail.jsp?id=231" class="contract-title-link">Cung cấp cáp quang OM4 đợt 2</a></td>
-                            <td>VNPT Hà Nội</td>
-                            <td><span class="type-badge">Cung cấp thiết bị</span></td>
-                            <td class="money-value">1.250.000.000 đ</td>
-                            <td>02/01/2026</td>
-                            <td>09/08/2026</td>
-                            <td><span class="status-pill status-soon"><span class="dot"></span>Sắp hết hạn</span></td>
-                            <td>
-                                <div class="action-icons">
-                                    <button class="act-view" title="Xem chi tiết" onclick="location.href='viewcontractdetail.jsp?id=231'"><i class="fa-regular fa-eye"></i></button>
-                                    <button class="act-edit" title="Sửa" onclick="location.href='updatecontract.jsp?id=231'"><i class="fa-solid fa-pen"></i></button>
-                                    <button class="act-delete" title="Chỉ được xóa hợp đồng ở trạng thái nháp/chưa hiệu lực" disabled><i class="fa-solid fa-trash"></i></button>
-                                </div>
-                            </td>
-                        </tr>
-                        <tr data-status="Sắp hết hạn" data-type="Cung cấp thiết bị">
-                            <td class="contract-code">HD-0214</td>
-                            <td><a href="viewcontractdetail.jsp?id=214" class="contract-title-link">Cung cấp nguồn UPS trạm BTS Quý 3</a></td>
-                            <td>Viettel Bắc Ninh</td>
-                            <td><span class="type-badge">Cung cấp thiết bị</span></td>
-                            <td class="money-value">680.000.000 đ</td>
-                            <td>10/02/2026</td>
-                            <td>15/08/2026</td>
-                            <td><span class="status-pill status-soon"><span class="dot"></span>Sắp hết hạn</span></td>
-                            <td>
-                                <div class="action-icons">
-                                    <button class="act-view" title="Xem chi tiết" onclick="location.href='viewcontractdetail.jsp?id=214'"><i class="fa-regular fa-eye"></i></button>
-                                    <button class="act-edit" title="Sửa" onclick="location.href='updatecontract.jsp?id=214'"><i class="fa-solid fa-pen"></i></button>
-                                    <button class="act-delete" title="Chỉ được xóa hợp đồng ở trạng thái nháp/chưa hiệu lực" disabled><i class="fa-solid fa-trash"></i></button>
-                                </div>
-                            </td>
-                        </tr>
-                        <tr data-status="Sắp hết hạn" data-type="Cung cấp thiết bị">
-                            <td class="contract-code">HD-0205</td>
-                            <td><a href="viewcontractdetail.jsp?id=205" class="contract-title-link">Cung cấp thiết bị truyền dẫn quang</a></td>
-                            <td>FPT Telecom Đà Nẵng</td>
-                            <td><span class="type-badge">Cung cấp thiết bị</span></td>
-                            <td class="money-value">430.000.000 đ</td>
-                            <td>18/02/2026</td>
-                            <td>20/08/2026</td>
-                            <td><span class="status-pill status-soon"><span class="dot"></span>Sắp hết hạn</span></td>
-                            <td>
-                                <div class="action-icons">
-                                    <button class="act-view" title="Xem chi tiết" onclick="location.href='viewcontractdetail.jsp?id=205'"><i class="fa-regular fa-eye"></i></button>
-                                    <button class="act-edit" title="Sửa" onclick="location.href='updatecontract.jsp?id=205'"><i class="fa-solid fa-pen"></i></button>
-                                    <button class="act-delete" title="Chỉ được xóa hợp đồng ở trạng thái nháp/chưa hiệu lực" disabled><i class="fa-solid fa-trash"></i></button>
-                                </div>
-                            </td>
-                        </tr>
-                        <tr data-status="Đang hiệu lực" data-type="Bảo trì bảo dưỡng">
-                            <td class="contract-code">HD-0250</td>
-                            <td><a href="viewcontractdetail.jsp?id=250" class="contract-title-link">Bảo trì hệ thống nguồn UPS</a></td>
-                            <td>CMC Telecom</td>
-                            <td><span class="type-badge">Bảo trì bảo dưỡng</span></td>
-                            <td class="money-value">320.000.000 đ</td>
-                            <td>15/07/2026</td>
-                            <td>20/07/2027</td>
-                            <td><span class="status-pill status-active"><span class="dot"></span>Đang hiệu lực</span></td>
-                            <td>
-                                <div class="action-icons">
-                                    <button class="act-view" title="Xem chi tiết" onclick="location.href='viewcontractdetail.jsp?id=250'"><i class="fa-regular fa-eye"></i></button>
-                                    <button class="act-edit" title="Sửa" onclick="location.href='updatecontract.jsp?id=250'"><i class="fa-solid fa-pen"></i></button>
-                                    <button class="act-delete" title="Chỉ được xóa hợp đồng ở trạng thái nháp/chưa hiệu lực" disabled><i class="fa-solid fa-trash"></i></button>
-                                </div>
-                            </td>
-                        </tr>
-                        <tr data-status="Đang hiệu lực" data-type="Cung cấp thiết bị">
-                            <td class="contract-code">HD-0248</td>
-                            <td><a href="viewcontractdetail.jsp?id=248" class="contract-title-link">Phân phối thiết bị viễn thông Quý 3</a></td>
-                            <td>Đại lý Thiết bị Viễn thông Đông Á</td>
-                            <td><span class="type-badge">Cung cấp thiết bị</span></td>
-                            <td class="money-value">540.000.000 đ</td>
-                            <td>10/07/2026</td>
-                            <td>10/01/2027</td>
-                            <td><span class="status-pill status-active"><span class="dot"></span>Đang hiệu lực</span></td>
-                            <td>
-                                <div class="action-icons">
-                                    <button class="act-view" title="Xem chi tiết" onclick="location.href='viewcontractdetail.jsp?id=248'"><i class="fa-regular fa-eye"></i></button>
-                                    <button class="act-edit" title="Sửa" onclick="location.href='updatecontract.jsp?id=248'"><i class="fa-solid fa-pen"></i></button>
-                                    <button class="act-delete" title="Chỉ được xóa hợp đồng ở trạng thái nháp/chưa hiệu lực" disabled><i class="fa-solid fa-trash"></i></button>
-                                </div>
-                            </td>
-                        </tr>
-                        <tr data-status="Đang hiệu lực" data-type="Bảo trì bảo dưỡng">
-                            <td class="contract-code">HD-0260</td>
-                            <td><a href="viewcontractdetail.jsp?id=260" class="contract-title-link">Bảo trì định kỳ Quý 3</a></td>
-                            <td>Cty Xây dựng Hạ tầng Miền Trung</td>
-                            <td><span class="type-badge">Bảo trì bảo dưỡng</span></td>
-                            <td class="money-value">195.000.000 đ</td>
-                            <td>03/08/2026</td>
-                            <td>03/08/2027</td>
-                            <td><span class="status-pill status-active"><span class="dot"></span>Đang hiệu lực</span></td>
-                            <td>
-                                <div class="action-icons">
-                                    <button class="act-view" title="Xem chi tiết" onclick="location.href='viewcontractdetail.jsp?id=260'"><i class="fa-regular fa-eye"></i></button>
-                                    <button class="act-edit" title="Sửa" onclick="location.href='updatecontract.jsp?id=260'"><i class="fa-solid fa-pen"></i></button>
-                                    <button class="act-delete" title="Chỉ được xóa hợp đồng ở trạng thái nháp/chưa hiệu lực" disabled><i class="fa-solid fa-trash"></i></button>
-                                </div>
-                            </td>
-                        </tr>
-                        <tr data-status="Đã hết hạn" data-type="Thi công lắp đặt">
-                            <td class="contract-code">HD-0198</td>
-                            <td><a href="viewcontractdetail.jsp?id=198" class="contract-title-link">Lắp đặt tủ trạm Smart Shelter</a></td>
-                            <td>VNPT Hà Nội</td>
-                            <td><span class="type-badge">Thi công lắp đặt</span></td>
-                            <td class="money-value">860.000.000 đ</td>
-                            <td>05/09/2025</td>
-                            <td>18/09/2025</td>
-                            <td><span class="status-pill status-expired"><span class="dot"></span>Đã hết hạn</span></td>
-                            <td>
-                                <div class="action-icons">
-                                    <button class="act-view" title="Xem chi tiết" onclick="location.href='viewcontractdetail.jsp?id=198'"><i class="fa-regular fa-eye"></i></button>
-                                    <button class="act-edit" title="Sửa" onclick="location.href='updatecontract.jsp?id=198'"><i class="fa-solid fa-pen"></i></button>
-                                    <button class="act-delete" title="Chỉ được xóa hợp đồng ở trạng thái nháp/chưa hiệu lực" disabled><i class="fa-solid fa-trash"></i></button>
-                                </div>
-                            </td>
-                        </tr>
-                        <tr data-status="Đã hết hạn" data-type="Thi công lắp đặt">
-                            <td class="contract-code">HD-0180</td>
-                            <td><a href="viewcontractdetail.jsp?id=180" class="contract-title-link">Thi công lắp đặt trạm BTS</a></td>
-                            <td>Cty TNHH Xây lắp Điện Nam Hà</td>
-                            <td><span class="type-badge">Thi công lắp đặt</span></td>
-                            <td class="money-value">1.100.000.000 đ</td>
-                            <td>20/02/2026</td>
-                            <td>05/03/2026</td>
-                            <td><span class="status-pill status-expired"><span class="dot"></span>Đã hết hạn</span></td>
-                            <td>
-                                <div class="action-icons">
-                                    <button class="act-view" title="Xem chi tiết" onclick="location.href='viewcontractdetail.jsp?id=180'"><i class="fa-regular fa-eye"></i></button>
-                                    <button class="act-edit" title="Sửa" onclick="location.href='updatecontract.jsp?id=180'"><i class="fa-solid fa-pen"></i></button>
-                                    <button class="act-delete" title="Chỉ được xóa hợp đồng ở trạng thái nháp/chưa hiệu lực" disabled><i class="fa-solid fa-trash"></i></button>
-                                </div>
-                            </td>
-                        </tr>
-                        <tr data-status="Chưa hiệu lực" data-type="Cung cấp thiết bị">
-                            <td class="contract-code">HD-0255</td>
-                            <td><a href="viewcontractdetail.jsp?id=255" class="contract-title-link">Cung cấp nguồn điện DC trạm viễn thông</a></td>
-                            <td>MobiFone Hải Phòng</td>
-                            <td><span class="type-badge">Cung cấp thiết bị</span></td>
-                            <td class="money-value">275.000.000 đ</td>
-                            <td>01/08/2026</td>
-                            <td>15/08/2027</td>
-                            <td><span class="status-pill status-draft"><span class="dot"></span>Chưa hiệu lực</span></td>
-                            <td>
-                                <div class="action-icons">
-                                    <button class="act-view" title="Xem chi tiết" onclick="location.href='viewcontractdetail.jsp?id=255'"><i class="fa-regular fa-eye"></i></button>
-                                    <button class="act-edit" title="Sửa" onclick="location.href='updatecontract.jsp?id=255'"><i class="fa-solid fa-pen"></i></button>
-                                    <button class="act-delete" title="Xóa" onclick="openDeleteModal(this)"><i class="fa-solid fa-trash"></i></button>
-                                </div>
-                            </td>
-                        </tr>
+                        <c:forEach var="contract" items="${contractList}">
+                            <tr>
+                                <td class="contract-code">${fn:escapeXml(contract.contractCode)}</td>
+                                <td><a href="${pageContext.request.contextPath}/contract?action=view&id=${contract.contractId}" class="contract-title-link">${fn:escapeXml(contract.title)}</a></td>
+                                <td>
+                                    <c:choose>
+                                        <c:when test="${contract.enterprise != null}">${fn:escapeXml(contract.enterprise.enterpriseName)}</c:when>
+                                        <c:otherwise>&mdash;</c:otherwise>
+                                    </c:choose>
+                                </td>
+                                <td><span class="type-badge">${fn:escapeXml(contract.contractType)}</span></td>
+                                <td><fmt:formatDate value="${contract.signingDate}" pattern="dd/MM/yyyy"/></td>
+                                <td><fmt:formatDate value="${contract.endDate}" pattern="dd/MM/yyyy"/></td>
+                                <td>
+                                    <c:choose>
+                                        <c:when test="${contract.status == 'Đang hiệu lực'}"><span class="status-pill status-active"><span class="dot"></span>Đang hiệu lực</span></c:when>
+                                        <c:when test="${contract.status == 'Sắp hết hạn'}"><span class="status-pill status-soon"><span class="dot"></span>Sắp hết hạn</span></c:when>
+                                        <c:when test="${contract.status == 'Đã hết hạn'}"><span class="status-pill status-expired"><span class="dot"></span>Đã hết hạn</span></c:when>
+                                        <c:otherwise><span class="status-pill status-draft"><span class="dot"></span>Chưa hiệu lực</span></c:otherwise>
+                                    </c:choose>
+                                </td>
+                                <td>
+                                    <div class="action-icons">
+                                        <button class="act-view" title="Xem chi tiết" onclick="location.href='${pageContext.request.contextPath}/contract?action=view&id=${contract.contractId}'"><i class="fa-regular fa-eye"></i></button>
+                                        <button class="act-edit" title="Sửa" onclick="location.href='${pageContext.request.contextPath}/contract?action=edit&id=${contract.contractId}'"><i class="fa-solid fa-pen"></i></button>
+                                        <c:choose>
+                                            <c:when test="${contract.status == 'Chưa hiệu lực'}">
+                                                <button class="act-delete" title="Xóa" onclick="openDeleteModal(${contract.contractId}, '${fn:escapeXml(contract.contractCode)}')"><i class="fa-solid fa-trash"></i></button>
+                                            </c:when>
+                                            <c:otherwise>
+                                                <button class="act-delete" title="Chỉ được xóa hợp đồng ở trạng thái chưa hiệu lực" disabled><i class="fa-solid fa-trash"></i></button>
+                                            </c:otherwise>
+                                        </c:choose>
+                                    </div>
+                                </td>
+                            </tr>
+                        </c:forEach>
                     </tbody>
                 </table>
             </div>
 
             <!-- ===== Trạng thái rỗng (MSG-020) ===== -->
-            <div class="empty-state" id="emptyState" style="display:none">
+            <div class="empty-state" id="emptyState" style="${empty contractList ? 'display:block' : 'display:none'}">
                 <i class="fa-regular fa-folder-open"></i>
                 <p>Không có hợp đồng để hiển thị.</p>
             </div>
 
             <!-- ===== Phân trang ===== -->
             <div class="pagination-bar">
-                <span class="pagination-info" id="paginationInfo">Hiển thị 1–9 trong tổng số 9 hợp đồng</span>
+                <span class="pagination-info">Hiển thị ${fn:length(contractList)} trong tổng số ${totalCount} hợp đồng</span>
                 <nav>
                     <ul class="pagination pagination-sm mb-0">
-                        <li class="page-item disabled"><a class="page-link" href="#">Trước</a></li>
-                        <li class="page-item active"><a class="page-link" href="#">1</a></li>
-                        <li class="page-item disabled"><a class="page-link" href="#">Sau</a></li>
+                        <li class="page-item ${currentPage <= 1 ? 'disabled' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/contract?action=list&page=${currentPage - 1}&keyword=${fn:escapeXml(keyword)}&status=${fn:escapeXml(statusFilter)}&type=${fn:escapeXml(typeFilter)}">Trước</a></li>
+                        <c:forEach begin="1" end="${totalPages}" var="p">
+                            <li class="page-item ${p == currentPage ? 'active' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/contract?action=list&page=${p}&keyword=${fn:escapeXml(keyword)}&status=${fn:escapeXml(statusFilter)}&type=${fn:escapeXml(typeFilter)}">${p}</a></li>
+                        </c:forEach>
+                        <li class="page-item ${currentPage >= totalPages ? 'disabled' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/contract?action=list&page=${currentPage + 1}&keyword=${fn:escapeXml(keyword)}&status=${fn:escapeXml(statusFilter)}&type=${fn:escapeXml(typeFilter)}">Sau</a></li>
                     </ul>
                 </nav>
             </div>
@@ -455,7 +339,7 @@
                 </div>
                 <div class="modal-body">
                     <h5 class="mb-2" style="font-weight:700; color:#111827;">Xác nhận xóa hợp đồng</h5>
-                    Bạn có chắc chắn muốn xóa hợp đồng này?
+                    Bạn có chắc chắn muốn xóa hợp đồng <strong id="deleteContractCode"></strong>?
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn-modal-cancel" data-bs-dismiss="modal">Hủy</button>
@@ -465,72 +349,34 @@
         </div>
     </div>
 
-    <div class="toast-msg" id="toastMsg">
-        <i class="fa-solid fa-circle-check"></i>
-        <span>Xóa hợp đồng thành công.</span>
-    </div>
+    <!-- Form ẩn để gửi yêu cầu xoá qua POST (không đổi state bằng GET) -->
+    <form id="deleteForm" method="POST" action="${pageContext.request.contextPath}/contract" style="display:none">
+        <input type="hidden" name="action" value="delete">
+        <input type="hidden" name="id" id="deleteFormId">
+    </form>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         var deleteModal = new bootstrap.Modal(document.getElementById('deleteModal'));
-        var rowToDelete = null;
+        var contractIdToDelete = null;
 
-        function openDeleteModal(btn) {
-            rowToDelete = btn.closest('tr');
+        function openDeleteModal(contractId, contractCode) {
+            contractIdToDelete = contractId;
+            document.getElementById('deleteContractCode').textContent = contractCode;
             deleteModal.show();
         }
 
         document.getElementById('confirmDeleteBtn').addEventListener('click', function () {
-            // TODO: gọi servlet DeleteContractServlet — chỉ cho phép xóa hợp đồng ở trạng thái nháp/chưa hiệu lực (BR-46)
-            if (rowToDelete) {
-                rowToDelete.remove();
-                rowToDelete = null;
-                updateRowCount();
-                showToast();
+            if (contractIdToDelete) {
+                document.getElementById('deleteFormId').value = contractIdToDelete;
+                document.getElementById('deleteForm').submit();
             }
             deleteModal.hide();
         });
 
-        function showToast() {
-            var toast = document.getElementById('toastMsg');
-            toast.classList.add('show');
-            setTimeout(function () { toast.classList.remove('show'); }, 3000);
-        }
-
-        function updateRowCount() {
-            var rows = document.querySelectorAll('#contractTableBody tr:not([style*="display: none"])');
-            var total = rows.length;
-            document.getElementById('paginationInfo').textContent =
-                total > 0 ? 'Hiển thị 1–' + total + ' trong tổng số ' + total + ' hợp đồng' : '';
-            document.getElementById('emptyState').style.display = total === 0 ? 'block' : 'none';
-        }
-
-        // ===== Tìm kiếm & lọc phía client (demo giao diện) =====
-        function applyFilters() {
-            var keyword = document.getElementById('searchInput').value.trim().toLowerCase();
-            var status = document.getElementById('filterStatus').value;
-            var type = document.getElementById('filterType').value;
-            var rows = document.querySelectorAll('#contractTableBody tr');
-            var visibleCount = 0;
-
-            rows.forEach(function (row) {
-                var text = row.textContent.toLowerCase();
-                var matchesKeyword = !keyword || text.indexOf(keyword) !== -1;
-                var matchesStatus = !status || row.getAttribute('data-status') === status;
-                var matchesType = !type || row.getAttribute('data-type') === type;
-                var visible = matchesKeyword && matchesStatus && matchesType;
-                row.style.display = visible ? '' : 'none';
-                if (visible) visibleCount++;
-            });
-
-            document.getElementById('paginationInfo').textContent =
-                visibleCount > 0 ? 'Hiển thị 1–' + visibleCount + ' trong tổng số ' + visibleCount + ' hợp đồng' : '';
-            document.getElementById('emptyState').style.display = visibleCount === 0 ? 'block' : 'none';
-        }
-
-        document.getElementById('searchInput').addEventListener('input', applyFilters);
-        document.getElementById('filterStatus').addEventListener('change', applyFilters);
-        document.getElementById('filterType').addEventListener('change', applyFilters);
+        // Tự động submit lại form lọc khi đổi trạng thái / loại hợp đồng
+        document.getElementById('filterStatus').addEventListener('change', function () { document.getElementById('filterForm').submit(); });
+        document.getElementById('filterType').addEventListener('change', function () { document.getElementById('filterForm').submit(); });
     </script>
 </body>
 </html>

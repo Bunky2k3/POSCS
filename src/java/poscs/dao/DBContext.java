@@ -32,21 +32,30 @@ public class DBContext {
         config.setConnectionTimeout(10_000);
         config.setIdleTimeout(600_000);
         config.setMaxLifetime(1_800_000);
+        // Tắt fail-fast lúc khởi tạo pool: mặc định HikariCP thử kết nối
+        // ngay khi tạo HikariDataSource và ném lỗi nếu không kết nối được.
+        // Vì DATA_SOURCE là static final, lỗi đó sẽ làm hỏng vĩnh viễn
+        // việc load class DBContext (ExceptionInInitializerError rồi
+        // NoClassDefFoundError ở mọi lần gọi sau) nếu CSDL chưa sẵn sàng
+        // đúng lúc Tomcat khởi động -- kể cả khi CSDL sống lại sau đó.
+        // -1 = không chờ/không fail lúc khởi tạo; lỗi kết nối chỉ ném ra
+        // ở getConnection(), nơi DAO đã có catch (SQLException) sẵn.
+        config.setInitializationFailTimeout(-1);
         return new HikariDataSource(config);
     }
 
     /**
      * Lấy một kết nối từ connection pool tới CSDL.
-     * @return Một đối tượng Connection, hoặc null nếu có lỗi.
+     * Ném SQLException khi không kết nối được thay vì trả về null --
+     * mọi lời gọi trong DAO đều nằm trong try-with-resources kèm
+     * catch (SQLException), nên để ngoại lệ thoát ra tự nhiên thay vì
+     * nuốt thành null (nuốt thành null từng gây NullPointerException ở
+     * chỗ gọi conn.prepareStatement() khi CSDL bị mất kết nối).
+     * @return Một đối tượng Connection.
+     * @throws SQLException nếu không lấy được kết nối từ pool.
      */
-    public static Connection getConnection() {
-        try {
-            return DATA_SOURCE.getConnection();
-        } catch (SQLException ex) {
-            System.err.println("--- LOI KET NOI CSDL ---");
-            ex.printStackTrace(); // In ra lỗi chi tiết để gỡ rối
-            return null;
-        }
+    public static Connection getConnection() throws SQLException {
+        return DATA_SOURCE.getConnection();
     }
 
     /**
@@ -58,15 +67,11 @@ public class DBContext {
 
         // Cố gắng lấy một kết nối
         try (Connection conn = DBContext.getConnection()) {
-            // Kiểm tra kết quả
-            if (conn != null) {
-                System.out.println("===> KET NOI THANH CONG! <===");
-                System.out.println("Thong tin ket noi: " + conn.toString());
-            } else {
-                printFailureHelp();
-            }
+            System.out.println("===> KET NOI THANH CONG! <===");
+            System.out.println("Thong tin ket noi: " + conn.toString());
         } catch (SQLException e) {
-            System.err.println("Loi khi dong ket noi: " + e.getMessage());
+            System.err.println("Loi khi ket noi: " + e.getMessage());
+            printFailureHelp();
         } finally {
             DATA_SOURCE.close();
         }

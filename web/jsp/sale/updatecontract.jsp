@@ -1,4 +1,16 @@
 <%@page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
+<%@taglib prefix="c" uri="jakarta.tags.core"%>
+<%@taglib prefix="fmt" uri="jakarta.tags.fmt"%>
+<%@taglib prefix="fn" uri="jakarta.tags.functions"%>
+<%--
+    Request attribute do ContractController#showEditForm thiết lập trước khi forward tới trang này:
+      - contract     : poscs.model.Contract (hợp đồng đang sửa)
+      - customerList : List<poscs.model.Enterprise>
+      - userList      : List<poscs.model.User>
+
+    Hạng mục sản phẩm/dịch vụ bên dưới hiện chưa được lưu xuống DB, xem ghi
+    chú ở addnewcontract.jsp -- phần này chỉ demo giao diện.
+--%>
 <!DOCTYPE html>
 <html lang="vi">
 <head>
@@ -124,35 +136,32 @@
     </nav>
 
     <div class="page-container">
-        <a href="viewcontractdetail.jsp?id=231" class="back-link-top"><i class="fa-solid fa-arrow-left-long"></i> Quay lại chi tiết hợp đồng</a>
+        <a href="${pageContext.request.contextPath}/contract?action=view&id=${contract.contractId}" class="back-link-top"><i class="fa-solid fa-arrow-left-long"></i> Quay lại chi tiết hợp đồng</a>
 
         <div class="page-header-row">
             <h2>Cập nhật hợp đồng</h2>
-            <p>Mã hợp đồng: <strong style="color:var(--primary-dark)">HD-0231</strong></p>
+            <p>Mã hợp đồng: <strong style="color:var(--primary-dark)">${fn:escapeXml(contract.contractCode)}</strong></p>
         </div>
 
-        <%-- Servlet cần: lấy contract_id từ query param, đổ dữ liệu hiện tại vào form, validate BR-44 (trình tự ngày), tính lại Thành tiền/Thuế GTGT/Tổng tiền, UPDATE contracts + contract_items --%>
         <div class="card-box">
-            <form id="createContractForm" action="UpdateContractServlet" method="POST" onsubmit="return validateForm();">
-                <input type="hidden" name="contractId" value="231">
+            <form id="createContractForm" action="${pageContext.request.contextPath}/contract" method="POST" onsubmit="return validateForm();">
+                <input type="hidden" name="action" value="update">
+                <input type="hidden" name="contractId" value="${contract.contractId}">
 
                 <div class="section-header"><h5>Thông tin chung</h5></div>
                 <div class="row">
                     <div class="col-12 field-row">
                         <label>Tiêu đề hợp đồng <span class="req">*</span></label>
-                        <input type="text" class="form-control" id="title" name="title" value="Cung cấp cáp quang OM4 đợt 2">
+                        <input type="text" class="form-control" id="title" name="title" value="${fn:escapeXml(contract.title)}">
                         <span class="error-text" id="err-title">Tiêu đề không được để trống.</span>
                     </div>
                     <div class="col-md-6 field-row">
                         <label>Khách hàng <span class="req">*</span></label>
-                        <select class="form-select" id="customer" name="customer">
+                        <select class="form-select" id="customer" name="enterpriseId">
                             <option value="">-- Chọn khách hàng --</option>
-                            <option selected>VNPT Hà Nội</option>
-                            <option>Viettel Bắc Ninh</option>
-                            <option>MobiFone Hải Phòng</option>
-                            <option>FPT Telecom Đà Nẵng</option>
-                            <option>CMC Telecom</option>
-                            <option>Đại lý Thiết bị Viễn thông Đông Á</option>
+                            <c:forEach var="customer" items="${customerList}">
+                                <option value="${customer.enterpriseId}" ${customer.enterpriseId == contract.enterpriseId ? 'selected' : ''}>${fn:escapeXml(customer.enterpriseName)}</option>
+                            </c:forEach>
                         </select>
                         <span class="error-text" id="err-customer">Vui lòng chọn khách hàng.</span>
                     </div>
@@ -160,35 +169,34 @@
                         <label>Loại hợp đồng <span class="req">*</span></label>
                         <select class="form-select" id="contractType" name="contractType">
                             <option value="">-- Chọn loại hợp đồng --</option>
-                            <option value="Cung cấp thiết bị" selected>Cung cấp thiết bị</option>
-                            <option value="Thi công lắp đặt">Thi công lắp đặt</option>
-                            <option value="Bảo trì bảo dưỡng">Bảo trì bảo dưỡng</option>
+                            <option value="Cung cấp thiết bị" ${contract.contractType == 'Cung cấp thiết bị' ? 'selected' : ''}>Cung cấp thiết bị</option>
+                            <option value="Thi công lắp đặt" ${contract.contractType == 'Thi công lắp đặt' ? 'selected' : ''}>Thi công lắp đặt</option>
+                            <option value="Bảo trì bảo dưỡng" ${contract.contractType == 'Bảo trì bảo dưỡng' ? 'selected' : ''}>Bảo trì bảo dưỡng</option>
                         </select>
                         <span class="error-text" id="err-contractType">Vui lòng chọn loại hợp đồng.</span>
                     </div>
 
                     <div class="col-md-4 field-row">
                         <label>Ngày ký <span class="req">*</span></label>
-                        <input type="date" class="form-control" id="signDate" name="signDate" value="2026-01-02">
+                        <input type="date" class="form-control" id="signDate" name="signDate" value="<fmt:formatDate value="${contract.signingDate}" pattern="yyyy-MM-dd"/>">
                         <span class="error-text" id="err-dates">Ngày ký, ngày hiệu lực, ngày hết hạn không hợp lệ.</span>
                     </div>
                     <div class="col-md-4 field-row">
                         <label>Ngày hiệu lực <span class="req">*</span></label>
-                        <input type="date" class="form-control" id="effectiveDate" name="effectiveDate" value="2026-01-05">
+                        <input type="date" class="form-control" id="effectiveDate" name="effectiveDate" value="<fmt:formatDate value="${contract.effectiveDate}" pattern="yyyy-MM-dd"/>">
                     </div>
                     <div class="col-md-4 field-row">
                         <label>Ngày kết thúc <span class="req">*</span></label>
-                        <input type="date" class="form-control" id="endDate" name="endDate" value="2026-08-09">
+                        <input type="date" class="form-control" id="endDate" name="endDate" value="<fmt:formatDate value="${contract.endDate}" pattern="yyyy-MM-dd"/>">
                     </div>
 
                     <div class="col-md-6 field-row">
                         <label>Người phụ trách <span class="req">*</span></label>
-                        <select class="form-select" id="owner" name="owner">
+                        <select class="form-select" id="owner" name="ownerId">
                             <option value="">-- Chọn nhân viên --</option>
-                            <option selected>Nguyễn Văn An</option>
-                            <option>Trần Thị Bình</option>
-                            <option>Lê Minh Châu</option>
-                            <option>Phạm Quốc Huy</option>
+                            <c:forEach var="staff" items="${userList}">
+                                <option value="${staff.userId}" ${staff.userId == contract.ownerId ? 'selected' : ''}>${fn:escapeXml(staff.fullName)}</option>
+                            </c:forEach>
                         </select>
                         <span class="error-text" id="err-owner">Vui lòng chọn người phụ trách.</span>
                     </div>
@@ -225,7 +233,7 @@
                 </div>
 
                 <div class="action-bar">
-                    <a href="viewcontractdetail.jsp?id=231" class="btn-cancel">Hủy</a>
+                    <a href="${pageContext.request.contextPath}/contract?action=view&id=${contract.contractId}" class="btn-cancel">Hủy</a>
                     <button type="submit" class="btn-primary"><i class="fa-solid fa-check me-1"></i> Lưu thay đổi</button>
                 </div>
             </form>
