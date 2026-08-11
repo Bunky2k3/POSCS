@@ -114,6 +114,12 @@
         .notif-text { font-size: 0.85rem; color: #111827; font-weight: 500; line-height: 1.3; }
         .notif-time { font-size: 0.72rem; color: #9ca3af; margin-top: 2px; }
 
+        .back-link-top {
+            color: var(--primary); font-size: 0.85rem; text-decoration: none; font-weight: 600;
+            display: inline-flex; align-items: center; gap: 6px; margin-bottom: 10px;
+        }
+        .back-link-top:hover { text-decoration: underline; }
+
         /* ===== Layout ===== */
         .page-container {
             max-width: 900px;
@@ -257,6 +263,8 @@
     </nav>
 
     <div class="page-container">
+        <a href="${pageContext.request.contextPath}/dashboard.jsp" class="back-link-top"><i class="fa-solid fa-arrow-left-long"></i> Về trang chủ</a>
+
         <div class="profile-card">
 
             <!-- ===== Banner ===== -->

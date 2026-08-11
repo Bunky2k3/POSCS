@@ -1,5 +1,6 @@
 <%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
 <%@taglib prefix="c" uri="jakarta.tags.core"%>
+<%@taglib prefix="fn" uri="jakarta.tags.functions"%>
 <!DOCTYPE html>
 <html lang="vi">
 <head>
@@ -400,14 +401,14 @@
 
             <!-- ===== Dropdown avatar ===== -->
             <div class="dropdown">
-                <img src="https://ui-avatars.com/api/?name=Nguyen+An&background=0568a6&color=fff"
+                <img src="https://ui-avatars.com/api/?name=${fn:escapeXml(sessionScope.currentUser.firstName)}&background=0568a6&color=fff"
                      class="avatar-mini" alt="avatar" data-bs-toggle="dropdown" aria-expanded="false">
                 <ul class="dropdown-menu dropdown-menu-end">
                     <li class="dd-user-header">
-                        <img src="https://ui-avatars.com/api/?name=Nguyen+An&background=0568a6&color=fff" alt="avatar">
+                        <img src="https://ui-avatars.com/api/?name=${fn:escapeXml(sessionScope.currentUser.firstName)}&background=0568a6&color=fff" alt="avatar">
                         <div>
-                            <div class="dd-name">Nguyễn Văn An</div>
-                            <div class="dd-role">Sales</div>
+                            <div class="dd-name"><c:out value="${sessionScope.currentUser.fullName}"/></div>
+                            <div class="dd-role"><c:out value="${sessionScope.currentUser.role.roleName}"/></div>
                         </div>
                     </li>
                     <li><hr class="dropdown-divider"></li>
