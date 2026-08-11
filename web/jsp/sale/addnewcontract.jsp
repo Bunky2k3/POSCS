@@ -1,5 +1,6 @@
 <%@page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
 <%@taglib prefix="c" uri="jakarta.tags.core"%>
+<%@taglib prefix="fn" uri="jakarta.tags.functions"%>
 <%--
     Request attribute do ContractController#showCreateForm thiết lập trước khi forward tới trang này:
       - customerList : List<poscs.model.Enterprise> (toàn bộ khách hàng, để đổ dropdown "Khách hàng")
@@ -157,7 +158,7 @@
                         <select class="form-select" id="customer" name="enterpriseId">
                             <option value="">-- Chọn khách hàng --</option>
                             <c:forEach var="customer" items="${customerList}">
-                                <option value="${customer.enterpriseId}">${customer.enterpriseName}</option>
+                                <option value="${customer.enterpriseId}">${fn:escapeXml(customer.enterpriseName)}</option>
                             </c:forEach>
                         </select>
                         <span class="error-text" id="err-customer">Vui lòng chọn khách hàng.</span>
@@ -192,7 +193,7 @@
                         <select class="form-select" id="owner" name="ownerId">
                             <option value="">-- Chọn nhân viên --</option>
                             <c:forEach var="staff" items="${userList}">
-                                <option value="${staff.userId}">${staff.fullName}</option>
+                                <option value="${staff.userId}">${fn:escapeXml(staff.fullName)}</option>
                             </c:forEach>
                         </select>
                         <span class="error-text" id="err-owner">Vui lòng chọn người phụ trách.</span>

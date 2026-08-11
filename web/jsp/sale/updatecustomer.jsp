@@ -1,6 +1,7 @@
 <%@page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
 <%@taglib prefix="c" uri="jakarta.tags.core"%>
 <%@taglib prefix="fmt" uri="jakarta.tags.fmt"%>
+<%@taglib prefix="fn" uri="jakarta.tags.functions"%>
 <%--
     Servlet cần: lấy customer_id từ query param, truy vấn enterprises (JOIN address/district
     để biết provinceId hiện tại) đổ vào request attribute "customer", xử lý POST cập nhật vào
@@ -164,7 +165,7 @@
         <div class="page-header-row">
             <div>
                 <h2>Cập nhật thông tin khách hàng</h2>
-                <p>Mã khách hàng: <strong style="color:var(--primary-dark)">${customer.enterpriseCode}</strong> &middot; Mã số thuế: <strong style="color:var(--primary-dark)">${customer.taxCode}</strong></p>
+                <p>Mã khách hàng: <strong style="color:var(--primary-dark)">${fn:escapeXml(customer.enterpriseCode)}</strong> &middot; Mã số thuế: <strong style="color:var(--primary-dark)">${fn:escapeXml(customer.taxCode)}</strong></p>
             </div>
         </div>
 
@@ -177,7 +178,7 @@
                 <div class="row">
                     <div class="col-md-6 field-row">
                         <label>Tên khách hàng <span class="req">*</span></label>
-                        <input type="text" class="form-control" id="customerName" name="customerName" value="${customer.enterpriseName}">
+                        <input type="text" class="form-control" id="customerName" name="customerName" value="${fn:escapeXml(customer.enterpriseName)}">
                         <span class="error-text" id="err-customerName">Tên khách hàng không được để trống.</span>
                     </div>
                     <div class="col-md-6 field-row">
@@ -207,7 +208,7 @@
                         <select class="form-select" id="assignee" name="accountOwnerId">
                             <option value="">-- Chọn nhân viên --</option>
                             <c:forEach var="staff" items="${userList}">
-                                <option value="${staff.userId}" ${staff.userId == customer.accountOwnerId ? 'selected' : ''}>${staff.fullName}</option>
+                                <option value="${staff.userId}" ${staff.userId == customer.accountOwnerId ? 'selected' : ''}>${fn:escapeXml(staff.fullName)}</option>
                             </c:forEach>
                         </select>
                         <span class="error-text" id="err-assignee">Vui lòng chọn nhân viên phụ trách.</span>
@@ -215,18 +216,18 @@
 
                     <div class="col-md-6 field-row">
                         <label>Số điện thoại <span class="req">*</span></label>
-                        <input type="tel" class="form-control" id="phone" name="phone" value="${customer.phone}">
+                        <input type="tel" class="form-control" id="phone" name="phone" value="${fn:escapeXml(customer.phone)}">
                         <span class="error-text" id="err-phone">Số điện thoại không hợp lệ.</span>
                     </div>
                     <div class="col-md-6 field-row">
                         <label>Email</label>
-                        <input type="email" class="form-control" id="email" name="email" value="${customer.email}">
+                        <input type="email" class="form-control" id="email" name="email" value="${fn:escapeXml(customer.email)}">
                         <span class="error-text" id="err-email">Địa chỉ email không hợp lệ.</span>
                     </div>
 
                     <div class="col-md-6 field-row">
                         <label>Website</label>
-                        <input type="text" class="form-control" id="website" name="website" value="${customer.website}">
+                        <input type="text" class="form-control" id="website" name="website" value="${fn:escapeXml(customer.website)}">
                     </div>
                     <div class="col-md-6 field-row">
                         <label>Ngày tham gia</label>
@@ -242,7 +243,7 @@
                         <select class="form-select" id="province" name="provinceId">
                             <option value="">-- Chọn tỉnh / thành phố --</option>
                             <c:forEach var="prov" items="${provinceList}">
-                                <option value="${prov.provinceId}" ${customer.address != null && customer.address.district != null && prov.provinceId == customer.address.district.provinceId ? 'selected' : ''}>${prov.provinceName}</option>
+                                <option value="${prov.provinceId}" ${customer.address != null && customer.address.district != null && prov.provinceId == customer.address.district.provinceId ? 'selected' : ''}>${fn:escapeXml(prov.provinceName)}</option>
                             </c:forEach>
                         </select>
                     </div>
@@ -252,14 +253,14 @@
                             <option value="">-- Chọn quận / huyện --</option>
                             <c:forEach var="dist" items="${districtList}">
                                 <option value="${dist.districtId}" data-province-id="${dist.provinceId}"
-                                        ${customer.address != null && dist.districtId == customer.address.districtId ? 'selected' : ''}>${dist.districtName}</option>
+                                        ${customer.address != null && dist.districtId == customer.address.districtId ? 'selected' : ''}>${fn:escapeXml(dist.districtName)}</option>
                             </c:forEach>
                         </select>
                     </div>
                     <div class="col-12 field-row">
                         <label>Địa chỉ chi tiết</label>
                         <input type="text" class="form-control" id="addressDetail" name="addressDetail"
-                               value="${customer.address != null ? customer.address.streetAndLocalName : ''}">
+                               value="${fn:escapeXml(customer.address != null ? customer.address.streetAndLocalName : '')}">
                     </div>
                 </div>
 

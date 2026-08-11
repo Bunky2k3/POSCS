@@ -1,6 +1,7 @@
 <%@page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
 <%@taglib prefix="c" uri="jakarta.tags.core"%>
 <%@taglib prefix="fmt" uri="jakarta.tags.fmt"%>
+<%@taglib prefix="fn" uri="jakarta.tags.functions"%>
 <%--
     Request attribute do ContractController#showDetail thiết lập trước khi forward tới trang này:
       - contract  : poscs.model.Contract (có sẵn .enterprise và .owner đã join, .status đã tính theo BR-17)
@@ -152,10 +153,10 @@
             <div class="doc-info">
                 <div class="doc-icon"><i class="fa-solid fa-file-contract"></i></div>
                 <div>
-                    <span class="contract-code">${contract.contractCode}</span>
+                    <span class="contract-code">${fn:escapeXml(contract.contractCode)}</span>
                     <h2>
-                        ${contract.title}
-                        <span class="type-badge">${contract.contractType}</span>
+                        ${fn:escapeXml(contract.title)}
+                        <span class="type-badge">${fn:escapeXml(contract.contractType)}</span>
                         <c:choose>
                             <c:when test="${contract.status == 'Đang hiệu lực'}"><span class="status-pill status-active"><span class="dot"></span>Đang hiệu lực</span></c:when>
                             <c:when test="${contract.status == 'Sắp hết hạn'}"><span class="status-pill status-soon"><span class="dot"></span>Sắp hết hạn</span></c:when>
@@ -166,7 +167,7 @@
                     <div style="color:#6b7280; font-size:0.85rem;">Khách hàng:
                         <a href="${pageContext.request.contextPath}/customer?action=view&id=${contract.enterpriseId}" style="color:var(--primary); font-weight:600; text-decoration:none;">
                             <c:choose>
-                                <c:when test="${contract.enterprise != null}">${contract.enterprise.enterpriseName}</c:when>
+                                <c:when test="${contract.enterprise != null}">${fn:escapeXml(contract.enterprise.enterpriseName)}</c:when>
                                 <c:otherwise>&mdash;</c:otherwise>
                             </c:choose>
                         </a>
@@ -195,7 +196,7 @@
                     <div class="view-value">
                         <a href="${pageContext.request.contextPath}/customer?action=view&id=${contract.enterpriseId}">
                             <c:choose>
-                                <c:when test="${contract.enterprise != null}">${contract.enterprise.enterpriseName}</c:when>
+                                <c:when test="${contract.enterprise != null}">${fn:escapeXml(contract.enterprise.enterpriseName)}</c:when>
                                 <c:otherwise>&mdash;</c:otherwise>
                             </c:choose>
                         </a>
@@ -205,7 +206,7 @@
                     <label>Người phụ trách</label>
                     <div class="view-value">
                         <c:choose>
-                            <c:when test="${contract.owner != null}">${contract.owner.fullName}</c:when>
+                            <c:when test="${contract.owner != null}">${fn:escapeXml(contract.owner.fullName)}</c:when>
                             <c:otherwise>&mdash;</c:otherwise>
                         </c:choose>
                     </div>
