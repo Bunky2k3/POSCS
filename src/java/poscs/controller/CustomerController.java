@@ -135,7 +135,6 @@ public class CustomerController extends HttpServlet {
             throws ServletException, IOException {
         request.setAttribute("userList", employeeDAO.findAllActive());
         request.setAttribute("provinceList", addressDAO.findAllProvinces());
-        request.setAttribute("districtList", addressDAO.findAllDistricts());
         request.getRequestDispatcher(CREATE_VIEW).forward(request, response);
     }
 
@@ -151,7 +150,6 @@ public class CustomerController extends HttpServlet {
         request.setAttribute("customer", customer);
         request.setAttribute("userList", employeeDAO.findAllActive());
         request.setAttribute("provinceList", addressDAO.findAllProvinces());
-        request.setAttribute("districtList", addressDAO.findAllDistricts());
         request.getRequestDispatcher(UPDATE_VIEW).forward(request, response);
     }
 

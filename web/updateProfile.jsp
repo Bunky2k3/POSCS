@@ -422,11 +422,14 @@
                         <div class="col-md-6 field-row">
                             <label for="district">Xã / Phường</label>
                             <select class="form-select" id="district" name="districtId">
-                                <option value="">-- Chọn xã / phường --</option>
-                                <c:forEach var="dist" items="${districtList}">
-                                    <option value="${dist.districtId}" data-province-id="${dist.provinceId}"
-                                            ${profile.address != null && dist.districtId == profile.address.districtId ? 'selected' : ''}>${dist.shortName}</option>
-                                </c:forEach>
+                                <c:choose>
+                                    <c:when test="${profile.address != null && profile.address.district != null}">
+                                        <option value="${profile.address.districtId}" selected>${profile.address.district.shortName}</option>
+                                    </c:when>
+                                    <c:otherwise>
+                                        <option value="">-- Chọn xã / phường --</option>
+                                    </c:otherwise>
+                                </c:choose>
                             </select>
                             <span class="error-text" id="err-district">Vui lòng chọn xã / phường.</span>
                         </div>
@@ -469,24 +472,45 @@
             return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
         }
 
-        // ===== Lọc xã/phường theo tỉnh/thành phố đã chọn =====
+        // ===== Nạp xã/phường theo tỉnh/thành phố đã chọn qua AJAX =====
+        // (thay vì đổ sẵn ~3.321 xã/phường vào trang -- xem AddressController)
+        var contextPath = '${pageContext.request.contextPath}';
         var districtSelect = document.getElementById('district');
-        var allDistrictOptions = Array.prototype.slice.call(districtSelect.querySelectorAll('option[data-province-id]'));
         var initialDistrictValue = districtSelect.value;
 
-        function filterDistricts(provinceId, keepValue) {
-            allDistrictOptions.forEach(function (opt) {
-                opt.style.display = (opt.getAttribute('data-province-id') === provinceId) ? '' : 'none';
-            });
-            districtSelect.value = keepValue || '';
+        function escapeHtml(value) {
+            var div = document.createElement('div');
+            div.textContent = value;
+            return div.innerHTML;
+        }
+
+        function loadWards(provinceId, keepValue) {
+            if (!provinceId) {
+                districtSelect.innerHTML = '<option value="">-- Chọn tỉnh / thành phố trước --</option>';
+                return;
+            }
+            districtSelect.innerHTML = '<option value="">Đang tải...</option>';
+            fetch(contextPath + '/address/wards?provinceId=' + encodeURIComponent(provinceId))
+                .then(function (res) { return res.json(); })
+                .then(function (wards) {
+                    var html = '<option value="">-- Chọn xã / phường --</option>';
+                    wards.forEach(function (w) {
+                        var selected = keepValue && String(w.id) === String(keepValue) ? ' selected' : '';
+                        html += '<option value="' + w.id + '"' + selected + '>' + escapeHtml(w.name) + '</option>';
+                    });
+                    districtSelect.innerHTML = html;
+                })
+                .catch(function () {
+                    districtSelect.innerHTML = '<option value="">Không tải được danh sách xã/phường</option>';
+                });
         }
 
         document.getElementById('province').addEventListener('change', function () {
-            filterDistricts(this.value, null);
+            loadWards(this.value, null);
         });
 
-        // Khởi tạo hiển thị đúng danh sách xã/phường theo tỉnh đã chọn sẵn khi load trang
-        filterDistricts(document.getElementById('province').value, initialDistrictValue);
+        // Khởi tạo đúng danh sách xã/phường theo tỉnh đã chọn sẵn khi load trang
+        loadWards(document.getElementById('province').value, initialDistrictValue);
 
         function validateForm() {
             var valid = true;

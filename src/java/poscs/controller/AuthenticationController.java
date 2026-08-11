@@ -132,11 +132,10 @@ public class AuthenticationController extends HttpServlet {
 
         request.setAttribute("profile", profile);
         request.setAttribute("hireDateText", formatDate(profile.getHireDate()));
-        // Danh sách đầy đủ để đổ vào 2 dropdown Tỉnh/Thành, Quận/Huyện -- JS
-        // phía client tự lọc quận/huyện theo tỉnh đã chọn (giống pattern đã
-        // dùng ở updatecustomer.jsp).
+        // Dropdown "Tỉnh/Thành phố" đổ sẵn (34 dòng, rẻ); dropdown "Xã/Phường"
+        // nạp qua AJAX theo tỉnh đã chọn (xem AddressController) thay vì đổ
+        // sẵn toàn bộ ~3.321 xã/phường vào trang.
         request.setAttribute("provinceList", addressDAO.findAllProvinces());
-        request.setAttribute("districtList", addressDAO.findAllDistricts());
         request.getRequestDispatcher("/updateProfile.jsp").forward(request, response);
     }
 

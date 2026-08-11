@@ -11,7 +11,10 @@
       - customer      : poscs.model.Enterprise (đã join .address.district)
       - userList      : List<poscs.model.User>
       - provinceList  : List<poscs.model.Province>
-      - districtList  : List<poscs.model.District>
+
+    Dropdown "Xã / Phường" KHÔNG đổ sẵn từ server -- JS nạp qua AJAX
+    (GET /address/wards?provinceId=..., xem AddressController), tự chọn sẵn
+    xã/phường hiện tại của khách hàng sau khi nạp xong.
 --%>
 <!DOCTYPE html>
 <html lang="vi">
@@ -250,11 +253,14 @@
                     <div class="col-md-6 field-row">
                         <label>Xã / Phường</label>
                         <select class="form-select" id="district" name="districtId">
-                            <option value="">-- Chọn xã / phường --</option>
-                            <c:forEach var="dist" items="${districtList}">
-                                <option value="${dist.districtId}" data-province-id="${dist.provinceId}"
-                                        ${customer.address != null && dist.districtId == customer.address.districtId ? 'selected' : ''}>${fn:escapeXml(dist.shortName)}</option>
-                            </c:forEach>
+                            <c:choose>
+                                <c:when test="${customer.address != null && customer.address.district != null}">
+                                    <option value="${customer.address.districtId}" selected>${fn:escapeXml(customer.address.district.shortName)}</option>
+                                </c:when>
+                                <c:otherwise>
+                                    <option value="">-- Chọn xã / phường --</option>
+                                </c:otherwise>
+                            </c:choose>
                         </select>
                     </div>
                     <div class="col-12 field-row">
@@ -282,24 +288,46 @@
             return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
         }
 
-        // Lọc xã/phường theo tỉnh/thành phố đã chọn, giữ nguyên lựa chọn hiện tại nếu còn khớp
+        // Nạp xã/phường theo tỉnh/thành phố đã chọn qua AJAX (thay vì đổ sẵn ~3.321
+        // xã/phường vào trang) -- xem AddressController. Giữ nguyên lựa chọn hiện
+        // tại nếu còn khớp sau khi nạp.
+        var contextPath = '${pageContext.request.contextPath}';
         var districtSelect = document.getElementById('district');
-        var allDistrictOptions = Array.prototype.slice.call(districtSelect.querySelectorAll('option[data-province-id]'));
         var initialDistrictValue = districtSelect.value;
 
-        function filterDistricts(provinceId, keepValue) {
-            allDistrictOptions.forEach(function (opt) {
-                opt.style.display = (opt.getAttribute('data-province-id') === provinceId) ? '' : 'none';
-            });
-            districtSelect.value = keepValue || '';
+        function escapeHtml(value) {
+            var div = document.createElement('div');
+            div.textContent = value;
+            return div.innerHTML;
+        }
+
+        function loadWards(provinceId, keepValue) {
+            if (!provinceId) {
+                districtSelect.innerHTML = '<option value="">-- Chọn tỉnh / thành phố trước --</option>';
+                return;
+            }
+            districtSelect.innerHTML = '<option value="">Đang tải...</option>';
+            fetch(contextPath + '/address/wards?provinceId=' + encodeURIComponent(provinceId))
+                .then(function (res) { return res.json(); })
+                .then(function (wards) {
+                    var html = '<option value="">-- Chọn xã / phường --</option>';
+                    wards.forEach(function (w) {
+                        var selected = keepValue && String(w.id) === String(keepValue) ? ' selected' : '';
+                        html += '<option value="' + w.id + '"' + selected + '>' + escapeHtml(w.name) + '</option>';
+                    });
+                    districtSelect.innerHTML = html;
+                })
+                .catch(function () {
+                    districtSelect.innerHTML = '<option value="">Không tải được danh sách xã/phường</option>';
+                });
         }
 
         document.getElementById('province').addEventListener('change', function () {
-            filterDistricts(this.value, null);
+            loadWards(this.value, null);
         });
 
-        // Khởi tạo hiển thị đúng danh sách xã/phường theo tỉnh đã chọn sẵn khi load trang
-        filterDistricts(document.getElementById('province').value, initialDistrictValue);
+        // Khởi tạo đúng danh sách xã/phường theo tỉnh đã chọn sẵn khi load trang
+        loadWards(document.getElementById('province').value, initialDistrictValue);
 
         function validateForm() {
             var valid = true;
