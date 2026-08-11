@@ -28,7 +28,7 @@ required on the server.
 
 ```bash
 mysql -u root -p -e "CREATE DATABASE poscs_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
-mysql -u root -p poscs_db < db/schema.sql
+mysql --default-character-set=utf8mb4 -u root -p poscs_db < db/schema.sql
 ```
 
 Then apply any files added later under `db/migrations/`, in order —

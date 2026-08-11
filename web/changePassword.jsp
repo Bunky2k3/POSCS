@@ -411,10 +411,10 @@
                         </div>
                     </li>
                     <li><hr class="dropdown-divider"></li>
-                    <li><a class="dropdown-item" href="viewProfile.jsp"><i class="fa-regular fa-id-card me-2"></i>Thông tin cá nhân</a></li>
+                    <li><a class="dropdown-item" href="${pageContext.request.contextPath}/viewProfile"><i class="fa-regular fa-id-card me-2"></i>Thông tin cá nhân</a></li>
                     <li><a class="dropdown-item" href="changePassword.jsp"><i class="fa-solid fa-key me-2"></i>Đổi mật khẩu</a></li>
                     <li><hr class="dropdown-divider"></li>
-                    <li><a class="dropdown-item text-danger" href="login.jsp"><i class="fa-solid fa-arrow-right-from-bracket me-2"></i>Đăng xuất</a></li>
+                    <li><a class="dropdown-item text-danger" href="${pageContext.request.contextPath}/login?action=logout"><i class="fa-solid fa-arrow-right-from-bracket me-2"></i>Đăng xuất</a></li>
                 </ul>
             </div>
         </div>
@@ -442,12 +442,6 @@
                             <c:when test="${param.error == 'same_as_old'}">Mật khẩu mới không được trùng với mật khẩu cũ.</c:when>
                             <c:otherwise>Đã có lỗi xảy ra. Vui lòng thử lại.</c:otherwise>
                         </c:choose>
-                    </div>
-                </c:if>
-                <c:if test="${param.success == '1'}">
-                    <div class="alert alert-success">
-                        <i class="fa-solid fa-circle-check"></i>
-                        Đổi mật khẩu thành công.
                     </div>
                 </c:if>
 
@@ -500,7 +494,7 @@
                     <button type="submit" class="btn-submit">Cập nhật mật khẩu</button>
                 </form>
 
-                <a href="viewProfile.jsp" class="back-link">← Quay lại trang cá nhân</a>
+                <a href="${pageContext.request.contextPath}/viewProfile" class="back-link">← Quay lại trang cá nhân</a>
             </div>
         </div>
     </div>

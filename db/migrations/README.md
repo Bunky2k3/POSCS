@@ -54,7 +54,15 @@ v1__add_total_value__ndat2003.sql   (lowercase v)
    SELECT * FROM schema_migrations WHERE version = 'V1__add_total_value_to_contracts__ndat2003';
    ```
    If that returns a row, skip — it's already applied on this database.
-5. Run the file against your local database.
+5. Run the file against your local database. If it contains any non-ASCII
+   text (Vietnamese, etc.), pass `--default-character-set=utf8mb4` to the
+   `mysql` client -- without it, some client setups silently mis-encode
+   the file on the way in and you end up with mojibake stored in the DB
+   (looks fine in some terminals, breaks everywhere else, including the
+   app itself):
+   ```bash
+   mysql --default-character-set=utf8mb4 -u root -p poscs_db < db/migrations/V3__....sql
+   ```
 6. **Also apply the same change to `db/schema.sql`** (edit the relevant
    `CREATE TABLE` directly) so a brand-new setup via `schema.sql` still
    ends up matching every applied migration. `schema.sql` and this

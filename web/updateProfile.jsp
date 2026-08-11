@@ -1,4 +1,5 @@
 <%@page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
+<%@taglib prefix="c" uri="jakarta.tags.core"%>
 <!DOCTYPE html>
 <html lang="vi">
 <head>
@@ -281,21 +282,21 @@
 
             <!-- ===== Dropdown avatar ===== -->
             <div class="dropdown">
-                <img src="https://ui-avatars.com/api/?name=Nguyen+An&background=0568a6&color=fff"
+                <img src="https://ui-avatars.com/api/?name=<c:out value="${profile.firstName}"/>&background=0568a6&color=fff"
                      class="avatar-mini" alt="avatar" data-bs-toggle="dropdown" aria-expanded="false">
                 <ul class="dropdown-menu dropdown-menu-end">
                     <li class="dd-user-header">
-                        <img src="https://ui-avatars.com/api/?name=Nguyen+An&background=0568a6&color=fff" alt="avatar">
+                        <img src="https://ui-avatars.com/api/?name=<c:out value="${profile.firstName}"/>&background=0568a6&color=fff" alt="avatar">
                         <div>
-                            <div class="dd-name">Nguyễn Văn An</div>
-                            <div class="dd-role">Sales</div>
+                            <div class="dd-name"><c:out value="${profile.fullName}"/></div>
+                            <div class="dd-role"><c:out value="${profile.role.roleName}"/></div>
                         </div>
                     </li>
                     <li><hr class="dropdown-divider"></li>
-                    <li><a class="dropdown-item" href="viewProfile.jsp"><i class="fa-regular fa-id-card me-2"></i>Thông tin cá nhân</a></li>
+                    <li><a class="dropdown-item" href="${pageContext.request.contextPath}/viewProfile"><i class="fa-regular fa-id-card me-2"></i>Thông tin cá nhân</a></li>
                     <li><a class="dropdown-item" href="changePassword.jsp"><i class="fa-solid fa-key me-2"></i>Đổi mật khẩu</a></li>
                     <li><hr class="dropdown-divider"></li>
-                    <li><a class="dropdown-item text-danger" href="login.jsp"><i class="fa-solid fa-arrow-right-from-bracket me-2"></i>Đăng xuất</a></li>
+                    <li><a class="dropdown-item text-danger" href="${pageContext.request.contextPath}/login?action=logout"><i class="fa-solid fa-arrow-right-from-bracket me-2"></i>Đăng xuất</a></li>
                 </ul>
             </div>
         </div>
@@ -308,17 +309,28 @@
             <div class="profile-banner">
                 <div class="avatar-wrap">
                     <img id="avatarPreview" class="avatar-img"
-                         src="https://ui-avatars.com/api/?name=Nguyen+An&background=ffffff&color=0568a6&size=128" alt="Avatar">
+                         src="https://ui-avatars.com/api/?name=<c:out value="${profile.firstName}"/>&background=ffffff&color=0568a6&size=128" alt="Avatar">
                     <label class="avatar-edit-btn" for="avatarInput"><i class="fa-solid fa-camera"></i></label>
                     <input type="file" name="avatar" id="avatarInput" accept="image/*" hidden>
                 </div>
                 <h3>Sửa thông tin cá nhân</h3>
-                <span class="role-badge">Nhân viên Kinh doanh (Sales)</span>
+                <span class="role-badge"><c:out value="${profile.role.roleName}"/></span>
             </div>
 
             <div class="profile-body">
 
-                <%-- Servlet cần: lấy user_id từ session, đổ dữ liệu hiện tại vào value="" các input bên dưới, xử lý POST cập nhật vào bảng users --%>
+                <c:if test="${not empty param.error}">
+                    <div class="alert alert-danger py-2 px-3 mb-4" style="font-size: 0.9rem; border-radius: 12px;">
+                        <c:choose>
+                            <c:when test="${param.error == 'missing_fields'}">Vui lòng nhập đầy đủ Họ, Tên và Số CCCD/CMND.</c:when>
+                            <c:when test="${param.error == 'invalid_phone'}">Số điện thoại không hợp lệ.</c:when>
+                            <c:when test="${param.error == 'invalid_email'}">Địa chỉ email không hợp lệ.</c:when>
+                            <c:otherwise>Đã có lỗi xảy ra. Vui lòng thử lại.</c:otherwise>
+                        </c:choose>
+                    </div>
+                </c:if>
+
+                <%-- Lưu ý: chưa xử lý lưu ảnh đại diện (avatar) -- chỉ mới xem trước ở trình duyệt (JS bên dưới). --%>
                 <form id="updateProfileForm" action="UpdateProfileServlet" method="POST" enctype="multipart/form-data" onsubmit="return validateForm();">
 
                     <!-- ===== Thông tin công việc (chỉ xem, do Admin quản lý) ===== -->
@@ -329,19 +341,19 @@
                     <div class="row">
                         <div class="col-md-6 field-row">
                             <label>Email đăng nhập</label>
-                            <div class="readonly-value">nguyenvana@company.com</div>
+                            <div class="readonly-value"><c:out value="${profile.email}"/></div>
                         </div>
                         <div class="col-md-6 field-row">
                             <label>Phòng ban</label>
-                            <div class="readonly-value">Phòng Kinh doanh</div>
+                            <div class="readonly-value"><c:out value="${profile.department}"/></div>
                         </div>
                         <div class="col-md-6 field-row">
                             <label>Vai trò</label>
-                            <div class="readonly-value">Sales</div>
+                            <div class="readonly-value"><c:out value="${profile.role.roleName}"/></div>
                         </div>
                         <div class="col-md-6 field-row">
                             <label>Ngày vào làm</label>
-                            <div class="readonly-value">15/03/2023</div>
+                            <div class="readonly-value"><c:out value="${hireDateText}" default="—"/></div>
                         </div>
                     </div>
 
@@ -350,45 +362,45 @@
                     <div class="row">
                         <div class="col-md-4 field-row">
                             <label for="lastName">Họ</label>
-                            <input type="text" class="form-control" id="lastName" name="lastName" value="Nguyễn">
+                            <input type="text" class="form-control" id="lastName" name="lastName" value="${profile.lastName}">
                             <span class="error-text" id="err-lastName">Trường này không được để trống.</span>
                         </div>
                         <div class="col-md-4 field-row">
                             <label for="middleName">Tên đệm</label>
-                            <input type="text" class="form-control" id="middleName" name="middleName" value="Văn">
+                            <input type="text" class="form-control" id="middleName" name="middleName" value="${profile.middleName}">
                         </div>
                         <div class="col-md-4 field-row">
                             <label for="firstName">Tên</label>
-                            <input type="text" class="form-control" id="firstName" name="firstName" value="An">
+                            <input type="text" class="form-control" id="firstName" name="firstName" value="${profile.firstName}">
                             <span class="error-text" id="err-firstName">Trường này không được để trống.</span>
                         </div>
 
                         <div class="col-md-4 field-row">
                             <label for="gender">Giới tính</label>
                             <select class="form-select" id="gender" name="gender">
-                                <option value="Nam" selected>Nam</option>
-                                <option value="Nữ">Nữ</option>
-                                <option value="Khác">Khác</option>
+                                <option value="Nam" ${profile.gender == 'Nam' ? 'selected' : ''}>Nam</option>
+                                <option value="Nữ" ${profile.gender == 'Nữ' ? 'selected' : ''}>Nữ</option>
+                                <option value="Khác" ${profile.gender == 'Khác' ? 'selected' : ''}>Khác</option>
                             </select>
                         </div>
                         <div class="col-md-4 field-row">
                             <label for="dob">Ngày sinh</label>
-                            <input type="date" class="form-control" id="dob" name="dob" value="1995-05-20">
+                            <input type="date" class="form-control" id="dob" name="dob" value="${profile.dateOfBirth}">
                         </div>
                         <div class="col-md-4 field-row">
                             <label for="citizenId">Số CCCD/CMND</label>
-                            <input type="text" class="form-control" id="citizenId" name="citizenId" value="038095006123">
+                            <input type="text" class="form-control" id="citizenId" name="citizenId" value="${profile.citizenId}">
                             <span class="error-text" id="err-citizenId">Trường này không được để trống.</span>
                         </div>
 
                         <div class="col-md-6 field-row">
                             <label for="phone">Số điện thoại</label>
-                            <input type="tel" class="form-control" id="phone" name="phone" value="0912345678">
+                            <input type="tel" class="form-control" id="phone" name="phone" value="${profile.phone}">
                             <span class="error-text" id="err-phone">Số điện thoại không hợp lệ.</span>
                         </div>
                         <div class="col-md-6 field-row">
                             <label for="personalEmail">Email cá nhân</label>
-                            <input type="email" class="form-control" id="personalEmail" name="personalEmail" value="nguyenvana.personal@gmail.com">
+                            <input type="email" class="form-control" id="personalEmail" name="personalEmail" value="${profile.personalEmail}">
                             <span class="error-text" id="err-email">Địa chỉ email không hợp lệ.</span>
                         </div>
                     </div>
@@ -398,35 +410,33 @@
                     <div class="row">
                         <div class="col-md-6 field-row">
                             <label for="province">Tỉnh / Thành phố</label>
-                            <%-- Danh sách Tỉnh/Thành cần lấy từ bảng provinces --%>
-                            <select class="form-select" id="province" name="province">
-                                <option selected>Thành phố Hà Nội</option>
-                                <option>Thành phố Hồ Chí Minh</option>
-                                <option>Tỉnh Bắc Ninh</option>
-                                <option>Thành phố Đà Nẵng</option>
-                                <option>Thành phố Hải Phòng</option>
+                            <select class="form-select" id="province" name="provinceId">
+                                <option value="">-- Chọn tỉnh / thành phố --</option>
+                                <c:forEach var="prov" items="${provinceList}">
+                                    <option value="${prov.provinceId}" ${profile.address != null && profile.address.district != null && prov.provinceId == profile.address.district.provinceId ? 'selected' : ''}>${prov.provinceName}</option>
+                                </c:forEach>
                             </select>
                         </div>
                         <div class="col-md-6 field-row">
-                            <label for="district">Quận / Huyện</label>
-                            <%-- Danh sách Quận/Huyện cần lấy từ bảng districts theo province đã chọn --%>
-                            <select class="form-select" id="district" name="district">
-                                <option selected>Quận Cầu Giấy</option>
-                                <option>Quận Đống Đa</option>
-                                <option>Quận Hai Bà Trưng</option>
-                                <option>Quận Nam Từ Liêm</option>
+                            <label for="district">Xã / Phường</label>
+                            <select class="form-select" id="district" name="districtId">
+                                <option value="">-- Chọn xã / phường --</option>
+                                <c:forEach var="dist" items="${districtList}">
+                                    <option value="${dist.districtId}" data-province-id="${dist.provinceId}"
+                                            ${profile.address != null && dist.districtId == profile.address.districtId ? 'selected' : ''}>${dist.districtName}</option>
+                                </c:forEach>
                             </select>
                         </div>
                         <div class="col-12 field-row">
                             <label for="addressDetail">Địa chỉ chi tiết</label>
-                            <input type="text" class="form-control" id="addressDetail" name="addressDetail" value="Số 12, ngõ 34, đường Xuân Thủy">
+                            <input type="text" class="form-control" id="addressDetail" name="addressDetail" value="${profile.address != null ? profile.address.streetAndLocalName : ''}">
                             <span class="error-text" id="err-addressDetail">Trường này không được để trống.</span>
                         </div>
                     </div>
 
                     <!-- ===== Action buttons ===== -->
                     <div class="action-bar">
-                        <a href="viewProfile.jsp" class="btn-cancel">Hủy</a>
+                        <a href="${pageContext.request.contextPath}/viewProfile" class="btn-cancel">Hủy</a>
                         <button type="submit" class="btn-primary">
                             <i class="fa-solid fa-check me-1"></i> Lưu thay đổi
                         </button>
@@ -456,6 +466,25 @@
         function isValidEmail(value) {
             return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
         }
+
+        // ===== Lọc xã/phường theo tỉnh/thành phố đã chọn =====
+        var districtSelect = document.getElementById('district');
+        var allDistrictOptions = Array.prototype.slice.call(districtSelect.querySelectorAll('option[data-province-id]'));
+        var initialDistrictValue = districtSelect.value;
+
+        function filterDistricts(provinceId, keepValue) {
+            allDistrictOptions.forEach(function (opt) {
+                opt.style.display = (opt.getAttribute('data-province-id') === provinceId) ? '' : 'none';
+            });
+            districtSelect.value = keepValue || '';
+        }
+
+        document.getElementById('province').addEventListener('change', function () {
+            filterDistricts(this.value, null);
+        });
+
+        // Khởi tạo hiển thị đúng danh sách xã/phường theo tỉnh đã chọn sẵn khi load trang
+        filterDistricts(document.getElementById('province').value, initialDistrictValue);
 
         function validateForm() {
             var valid = true;
