@@ -161,7 +161,6 @@ public class CustomerController extends HttpServlet {
 
     private void handleCreate(HttpServletRequest request, HttpServletResponse response) throws IOException {
         Enterprise e = new Enterprise();
-        e.setEnterpriseCode(customerDAO.generateNextEnterpriseCode());
         e.setEnterpriseName(request.getParameter("customerName"));
         e.setCustomerType(request.getParameter("customerType"));
         e.setCustomerGroup(request.getParameter("customerGroup"));
@@ -179,6 +178,12 @@ public class CustomerController extends HttpServlet {
 
         setAddressFromRequest(e, request);
 
+        if (!isValidCommonFields(e) || isBlank(e.getTaxCode())) {
+            response.sendRedirect(request.getContextPath() + "/customer?action=new&error=invalid");
+            return;
+        }
+
+        e.setEnterpriseCode(customerDAO.generateNextEnterpriseCode());
         int newId = customerDAO.insert(e);
         if (newId <= 0) {
             response.sendRedirect(request.getContextPath() + "/customer?action=new&error=create_failed");
@@ -210,6 +215,11 @@ public class CustomerController extends HttpServlet {
         }
 
         setAddressFromRequest(e, request);
+
+        if (!isValidCommonFields(e)) {
+            response.sendRedirect(request.getContextPath() + "/customer?action=edit&id=" + id + "&error=invalid");
+            return;
+        }
 
         boolean ok = customerDAO.update(e);
         if (!ok) {
@@ -249,6 +259,44 @@ public class CustomerController extends HttpServlet {
             address.setDistrictId(districtId);
             e.setAddress(address);
         }
+    }
+
+    /**
+     * Trường bắt buộc + BR-09 (định dạng SĐT) + BR-10 (định dạng email) + ngày tham gia
+     * không ở tương lai. Khớp với validate phía client ở addnewcustomer.jsp/updatecustomer.jsp
+     * -- trước đây chỉ có ở client nên có thể bị bypass bằng cách POST thẳng.
+     */
+    private boolean isValidCommonFields(Enterprise e) {
+        if (isBlank(e.getEnterpriseName()) || isBlank(e.getCustomerType()) || isBlank(e.getCustomerGroup())) {
+            return false;
+        }
+        if (e.getAccountOwnerId() <= 0) {
+            return false;
+        }
+        if (!isValidPhone(e.getPhone())) {
+            return false;
+        }
+        if (e.getEmail() != null && !isValidEmail(e.getEmail())) {
+            return false;
+        }
+        return e.getJoinDate() == null || !e.getJoinDate().toLocalDate().isAfter(java.time.LocalDate.now());
+    }
+
+    private boolean isBlank(String value) {
+        return value == null || value.trim().isEmpty();
+    }
+
+    /** BR-09: chấp nhận cả số di động lẫn số bàn Việt Nam (VD: 024 3822 1234). */
+    private boolean isValidPhone(String phone) {
+        if (phone == null) {
+            return false;
+        }
+        return phone.replaceAll("[\\s.-]", "").matches("^(0|\\+84)[0-9]{9,10}$");
+    }
+
+    /** BR-10 */
+    private boolean isValidEmail(String email) {
+        return email.matches("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$");
     }
 
     private Integer parseIntOrNull(String value) {
