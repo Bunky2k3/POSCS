@@ -1,4 +1,5 @@
 <%@page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
+<%@taglib prefix="c" uri="jakarta.tags.core"%>
 <!DOCTYPE html>
 <html lang="vi">
 <head>
@@ -235,21 +236,21 @@
 
             <!-- ===== Dropdown avatar ===== -->
             <div class="dropdown">
-                <img src="https://ui-avatars.com/api/?name=Nguyen+An&background=0568a6&color=fff"
+                <img src="https://ui-avatars.com/api/?name=<c:out value="${profile.firstName}"/>&background=0568a6&color=fff"
                      class="avatar-mini" alt="avatar" data-bs-toggle="dropdown" aria-expanded="false">
                 <ul class="dropdown-menu dropdown-menu-end">
                     <li class="dd-user-header">
-                        <img src="https://ui-avatars.com/api/?name=Nguyen+An&background=0568a6&color=fff" alt="avatar">
+                        <img src="https://ui-avatars.com/api/?name=<c:out value="${profile.firstName}"/>&background=0568a6&color=fff" alt="avatar">
                         <div>
-                            <div class="dd-name">Nguyễn Văn An</div>
-                            <div class="dd-role">Sales</div>
+                            <div class="dd-name"><c:out value="${profile.fullName}"/></div>
+                            <div class="dd-role"><c:out value="${profile.role.roleName}"/></div>
                         </div>
                     </li>
                     <li><hr class="dropdown-divider"></li>
-                    <li><a class="dropdown-item" href="viewProfile.jsp"><i class="fa-regular fa-id-card me-2"></i>Thông tin cá nhân</a></li>
+                    <li><a class="dropdown-item" href="${pageContext.request.contextPath}/viewProfile"><i class="fa-regular fa-id-card me-2"></i>Thông tin cá nhân</a></li>
                     <li><a class="dropdown-item" href="changePassword.jsp"><i class="fa-solid fa-key me-2"></i>Đổi mật khẩu</a></li>
                     <li><hr class="dropdown-divider"></li>
-                    <li><a class="dropdown-item text-danger" href="login.jsp"><i class="fa-solid fa-arrow-right-from-bracket me-2"></i>Đăng xuất</a></li>
+                    <li><a class="dropdown-item text-danger" href="${pageContext.request.contextPath}/login?action=logout"><i class="fa-solid fa-arrow-right-from-bracket me-2"></i>Đăng xuất</a></li>
                 </ul>
             </div>
         </div>
@@ -261,96 +262,101 @@
             <!-- ===== Banner ===== -->
             <div class="profile-banner">
                 <img class="avatar-img"
-                     src="https://ui-avatars.com/api/?name=Nguyen+An&background=ffffff&color=0568a6&size=128" alt="Avatar">
-                <h3>Nguyễn Văn An</h3>
-                <span class="role-badge">Nhân viên Kinh doanh (Sales)</span>
+                     src="https://ui-avatars.com/api/?name=<c:out value="${profile.firstName}"/>&background=ffffff&color=0568a6&size=128" alt="Avatar">
+                <h3><c:out value="${profile.fullName}"/></h3>
+                <span class="role-badge"><c:out value="${profile.role.roleName}"/></span>
             </div>
 
             <div class="profile-body">
-
-                <%-- Servlet cần: lấy user_id từ session, truy vấn bảng users + addresses/provinces/districts để đổ dữ liệu vào các view-value bên dưới --%>
 
                 <!-- ===== Thông tin công việc (chỉ xem, do Admin quản lý) ===== -->
                 <div class="section-header"><h5>Thông tin công việc</h5></div>
                 <div class="row">
                     <div class="col-md-6 field-row">
                         <label>Email đăng nhập</label>
-                        <div class="view-value">nguyenvana@company.com</div>
+                        <div class="view-value"><c:out value="${profile.email}"/></div>
                     </div>
                     <div class="col-md-6 field-row">
                         <label>Phòng ban</label>
-                        <div class="view-value">Phòng Kinh doanh</div>
+                        <div class="view-value"><c:out value="${profile.department}"/></div>
                     </div>
                     <div class="col-md-6 field-row">
                         <label>Vai trò</label>
-                        <div class="view-value">Sales</div>
+                        <div class="view-value"><c:out value="${profile.role.roleName}"/></div>
                     </div>
                     <div class="col-md-6 field-row">
                         <label>Ngày vào làm</label>
-                        <div class="view-value">15/03/2023</div>
+                        <div class="view-value"><c:out value="${hireDateText}" default="—"/></div>
                     </div>
                 </div>
 
                 <!-- ===== Thông tin cá nhân ===== -->
                 <div class="section-header">
                     <h5>Thông tin cá nhân</h5>
-                    <a href="updateProfile.jsp" class="btn-outline-edit">
+                    <a href="${pageContext.request.contextPath}/updateProfile" class="btn-outline-edit">
                         <i class="fa-solid fa-pen me-1"></i> Sửa thông tin
                     </a>
                 </div>
                 <div class="row">
                     <div class="col-md-4 field-row">
                         <label>Họ</label>
-                        <div class="view-value">Nguyễn</div>
+                        <div class="view-value"><c:out value="${profile.lastName}"/></div>
                     </div>
                     <div class="col-md-4 field-row">
                         <label>Tên đệm</label>
-                        <div class="view-value">Văn</div>
+                        <div class="view-value"><c:out value="${profile.middleName}" default="—"/></div>
                     </div>
                     <div class="col-md-4 field-row">
                         <label>Tên</label>
-                        <div class="view-value">An</div>
+                        <div class="view-value"><c:out value="${profile.firstName}"/></div>
                     </div>
 
                     <div class="col-md-4 field-row">
                         <label>Giới tính</label>
-                        <div class="view-value">Nam</div>
+                        <div class="view-value"><c:out value="${profile.gender}"/></div>
                     </div>
                     <div class="col-md-4 field-row">
                         <label>Ngày sinh</label>
-                        <div class="view-value">20/05/1995</div>
+                        <div class="view-value"><c:out value="${dateOfBirthText}" default="—"/></div>
                     </div>
                     <div class="col-md-4 field-row">
                         <label>Số CCCD/CMND</label>
-                        <div class="view-value">038095006xxx</div>
+                        <div class="view-value"><c:out value="${profile.citizenId}"/></div>
                     </div>
 
                     <div class="col-md-6 field-row">
                         <label>Số điện thoại</label>
-                        <div class="view-value">0912 345 678</div>
+                        <div class="view-value"><c:out value="${profile.phone}"/></div>
                     </div>
                     <div class="col-md-6 field-row">
                         <label>Email cá nhân</label>
-                        <div class="view-value">nguyenvana.personal@gmail.com</div>
+                        <div class="view-value"><c:out value="${profile.personalEmail}" default="—"/></div>
                     </div>
                 </div>
 
                 <!-- ===== Địa chỉ ===== -->
                 <div class="section-header"><h5>Địa chỉ</h5></div>
-                <div class="row">
-                    <div class="col-md-6 field-row">
-                        <label>Tỉnh / Thành phố</label>
-                        <div class="view-value">Thành phố Hà Nội</div>
-                    </div>
-                    <div class="col-md-6 field-row">
-                        <label>Quận / Huyện</label>
-                        <div class="view-value">Quận Cầu Giấy</div>
-                    </div>
-                    <div class="col-12 field-row">
-                        <label>Địa chỉ chi tiết</label>
-                        <div class="view-value">Số 12, ngõ 34, đường Xuân Thủy</div>
-                    </div>
-                </div>
+                <c:choose>
+                    <c:when test="${not empty profile.address}">
+                        <div class="row">
+                            <div class="col-md-6 field-row">
+                                <label>Tỉnh / Thành phố</label>
+                                <div class="view-value"><c:out value="${profile.address.district.province.provinceName}"/></div>
+                            </div>
+                            <div class="col-md-6 field-row">
+                                <label>Xã / Phường</label>
+                                <div class="view-value"><c:out value="${profile.address.district.districtName}"/></div>
+                            </div>
+                            <div class="col-12 field-row">
+                                <label>Địa chỉ chi tiết</label>
+                                <div class="view-value"><c:out value="${profile.address.streetAndLocalName}"/></div>
+                            </div>
+                        </div>
+                    </c:when>
+                    <c:otherwise>
+                        <div class="view-value">Chưa cập nhật địa chỉ</div>
+                    </c:otherwise>
+                </c:choose>
 
             </div>
         </div>

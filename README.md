@@ -34,7 +34,7 @@ once against a fresh MySQL database (`utf8mb4`):
 
 ```bash
 mysql -u root -p -e "CREATE DATABASE poscs_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
-mysql -u root -p poscs_db < db/schema.sql
+mysql --default-character-set=utf8mb4 -u root -p poscs_db < db/schema.sql
 ```
 
 `db/schema.sql` (re)creates every table the app expects, from scratch,

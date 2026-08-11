@@ -150,10 +150,10 @@
                         <div><div class="dd-name">Nguyễn Văn An</div><div class="dd-role">Sales</div></div>
                     </li>
                     <li><hr class="dropdown-divider"></li>
-                    <li><a class="dropdown-item" href="viewProfile.jsp"><i class="fa-regular fa-id-card me-2"></i>Thông tin cá nhân</a></li>
+                    <li><a class="dropdown-item" href="${pageContext.request.contextPath}/viewProfile"><i class="fa-regular fa-id-card me-2"></i>Thông tin cá nhân</a></li>
                     <li><a class="dropdown-item" href="changePassword.jsp"><i class="fa-solid fa-key me-2"></i>Đổi mật khẩu</a></li>
                     <li><hr class="dropdown-divider"></li>
-                    <li><a class="dropdown-item text-danger" href="login.jsp"><i class="fa-solid fa-arrow-right-from-bracket me-2"></i>Đăng xuất</a></li>
+                    <li><a class="dropdown-item text-danger" href="${pageContext.request.contextPath}/login?action=logout"><i class="fa-solid fa-arrow-right-from-bracket me-2"></i>Đăng xuất</a></li>
                 </ul>
             </div>
         </div>
@@ -243,17 +243,17 @@
                         <select class="form-select" id="province" name="provinceId">
                             <option value="">-- Chọn tỉnh / thành phố --</option>
                             <c:forEach var="prov" items="${provinceList}">
-                                <option value="${prov.provinceId}" ${customer.address != null && customer.address.district != null && prov.provinceId == customer.address.district.provinceId ? 'selected' : ''}>${fn:escapeXml(prov.provinceName)}</option>
+                                <option value="${prov.provinceId}" ${customer.address != null && customer.address.district != null && prov.provinceId == customer.address.district.provinceId ? 'selected' : ''}>${fn:escapeXml(prov.shortName)}</option>
                             </c:forEach>
                         </select>
                     </div>
                     <div class="col-md-6 field-row">
-                        <label>Quận / Huyện</label>
+                        <label>Xã / Phường</label>
                         <select class="form-select" id="district" name="districtId">
-                            <option value="">-- Chọn quận / huyện --</option>
+                            <option value="">-- Chọn xã / phường --</option>
                             <c:forEach var="dist" items="${districtList}">
                                 <option value="${dist.districtId}" data-province-id="${dist.provinceId}"
-                                        ${customer.address != null && dist.districtId == customer.address.districtId ? 'selected' : ''}>${fn:escapeXml(dist.districtName)}</option>
+                                        ${customer.address != null && dist.districtId == customer.address.districtId ? 'selected' : ''}>${fn:escapeXml(dist.shortName)}</option>
                             </c:forEach>
                         </select>
                     </div>
@@ -282,7 +282,7 @@
             return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
         }
 
-        // Lọc quận/huyện theo tỉnh/thành phố đã chọn, giữ nguyên lựa chọn hiện tại nếu còn khớp
+        // Lọc xã/phường theo tỉnh/thành phố đã chọn, giữ nguyên lựa chọn hiện tại nếu còn khớp
         var districtSelect = document.getElementById('district');
         var allDistrictOptions = Array.prototype.slice.call(districtSelect.querySelectorAll('option[data-province-id]'));
         var initialDistrictValue = districtSelect.value;
@@ -298,7 +298,7 @@
             filterDistricts(this.value, null);
         });
 
-        // Khởi tạo hiển thị đúng danh sách quận/huyện theo tỉnh đã chọn sẵn khi load trang
+        // Khởi tạo hiển thị đúng danh sách xã/phường theo tỉnh đã chọn sẵn khi load trang
         filterDistricts(document.getElementById('province').value, initialDistrictValue);
 
         function validateForm() {

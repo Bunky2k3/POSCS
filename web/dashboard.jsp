@@ -162,10 +162,10 @@
                         <div><div class="dd-name">Nguyễn Văn An</div><div class="dd-role">Sales</div></div>
                     </li>
                     <li><hr class="dropdown-divider"></li>
-                    <li><a class="dropdown-item" href="viewProfile.jsp"><i class="fa-regular fa-id-card me-2"></i>Thông tin cá nhân</a></li>
+                    <li><a class="dropdown-item" href="${pageContext.request.contextPath}/viewProfile"><i class="fa-regular fa-id-card me-2"></i>Thông tin cá nhân</a></li>
                     <li><a class="dropdown-item" href="changePassword.jsp"><i class="fa-solid fa-key me-2"></i>Đổi mật khẩu</a></li>
                     <li><hr class="dropdown-divider"></li>
-                    <li><a class="dropdown-item text-danger" href="login.jsp"><i class="fa-solid fa-arrow-right-from-bracket me-2"></i>Đăng xuất</a></li>
+                    <li><a class="dropdown-item text-danger" href="${pageContext.request.contextPath}/login?action=logout"><i class="fa-solid fa-arrow-right-from-bracket me-2"></i>Đăng xuất</a></li>
                 </ul>
             </div>
         </div>
@@ -373,6 +373,18 @@
                 responsive: true,
                 cutout: '68%',
                 plugins: { legend: { display: false } }
+            }
+        });
+
+        // Một số trình duyệt (đặc biệt Chrome bản cũ) vẫn phục hồi trang từ
+        // bfcache khi bấm Back dù đã có header Cache-Control: no-store --
+        // event.persisted = true nghĩa là trang này KHÔNG được tải lại từ
+        // server mà chỉ là ảnh chụp cũ trong bộ nhớ trình duyệt. Ép reload
+        // thật để trang phải đi qua AuthenticationFilter lần nữa: nếu session
+        // đã bị huỷ (vd. do vừa đăng xuất) thì filter sẽ tự đá về login.jsp.
+        window.addEventListener('pageshow', function (event) {
+            if (event.persisted) {
+                window.location.reload();
             }
         });
     </script>

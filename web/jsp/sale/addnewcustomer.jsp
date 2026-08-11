@@ -9,7 +9,7 @@
     Request attribute cần có trước khi forward tới trang này:
       - userList     : List<poscs.model.User>     (để đổ dropdown "Nhân viên phụ trách")
       - provinceList : List<poscs.model.Province>  (để đổ dropdown "Tỉnh / Thành phố")
-      - districtList : List<poscs.model.District>  (toàn bộ quận/huyện; JS lọc theo tỉnh đã chọn
+      - districtList : List<poscs.model.District>  (toàn bộ xã/phường; JS lọc theo tỉnh đã chọn
                         dựa vào data-province-id của mỗi <option>)
 --%>
 <!DOCTYPE html>
@@ -149,10 +149,10 @@
                         <div><div class="dd-name">Nguyễn Văn An</div><div class="dd-role">Sales</div></div>
                     </li>
                     <li><hr class="dropdown-divider"></li>
-                    <li><a class="dropdown-item" href="viewProfile.jsp"><i class="fa-regular fa-id-card me-2"></i>Thông tin cá nhân</a></li>
+                    <li><a class="dropdown-item" href="${pageContext.request.contextPath}/viewProfile"><i class="fa-regular fa-id-card me-2"></i>Thông tin cá nhân</a></li>
                     <li><a class="dropdown-item" href="changePassword.jsp"><i class="fa-solid fa-key me-2"></i>Đổi mật khẩu</a></li>
                     <li><hr class="dropdown-divider"></li>
-                    <li><a class="dropdown-item text-danger" href="login.jsp"><i class="fa-solid fa-arrow-right-from-bracket me-2"></i>Đăng xuất</a></li>
+                    <li><a class="dropdown-item text-danger" href="${pageContext.request.contextPath}/login?action=logout"><i class="fa-solid fa-arrow-right-from-bracket me-2"></i>Đăng xuất</a></li>
                 </ul>
             </div>
         </div>
@@ -246,16 +246,16 @@
                         <select class="form-select" id="province" name="provinceId">
                             <option value="">-- Chọn tỉnh / thành phố --</option>
                             <c:forEach var="prov" items="${provinceList}">
-                                <option value="${prov.provinceId}">${fn:escapeXml(prov.provinceName)}</option>
+                                <option value="${prov.provinceId}">${fn:escapeXml(prov.shortName)}</option>
                             </c:forEach>
                         </select>
                     </div>
                     <div class="col-md-6 field-row">
-                        <label>Quận / Huyện</label>
+                        <label>Xã / Phường</label>
                         <select class="form-select" id="district" name="districtId">
-                            <option value="">-- Chọn quận / huyện --</option>
+                            <option value="">-- Chọn xã / phường --</option>
                             <c:forEach var="dist" items="${districtList}">
-                                <option value="${dist.districtId}" data-province-id="${dist.provinceId}" style="display:none">${fn:escapeXml(dist.districtName)}</option>
+                                <option value="${dist.districtId}" data-province-id="${dist.provinceId}" style="display:none">${fn:escapeXml(dist.shortName)}</option>
                             </c:forEach>
                         </select>
                     </div>
@@ -283,7 +283,7 @@
             return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
         }
 
-        // Lọc quận/huyện theo tỉnh/thành phố đã chọn
+        // Lọc xã/phường theo tỉnh/thành phố đã chọn
         var districtSelect = document.getElementById('district');
         var allDistrictOptions = Array.prototype.slice.call(districtSelect.querySelectorAll('option[data-province-id]'));
 

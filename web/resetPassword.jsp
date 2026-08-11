@@ -1,4 +1,5 @@
 <%@page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
+<%@taglib prefix="c" uri="jakarta.tags.core"%>
 <!DOCTYPE html>
 <html lang="vi">
 <head>
@@ -205,8 +206,18 @@
                 Xác thực OTP thành công. Vui lòng đặt mật khẩu mới cho tài khoản của bạn.
             </div>
 
-            <%-- Servlet cần kiểm tra session có otpVerified = true không trước khi hiển thị/xử lý trang này --%>
+            <%-- PasswordResetController#handleResetPassword kiểm tra session có otpVerified = true không trước khi cho đặt mật khẩu mới --%>
             <form action="ResetPasswordServlet" method="POST" id="resetPasswordForm" onsubmit="return validateForm();">
+
+                <c:if test="${not empty param.error}">
+                    <div class="alert alert-danger py-2 px-3 mb-4" style="font-size: 0.85rem; border-radius: 12px;">
+                        <c:choose>
+                            <c:when test="${param.error == 'weak_password'}">Mật khẩu mới phải có ít nhất 8 ký tự.</c:when>
+                            <c:when test="${param.error == 'mismatch'}">Mật khẩu xác nhận không khớp.</c:when>
+                            <c:otherwise>Đã có lỗi xảy ra. Vui lòng thử lại.</c:otherwise>
+                        </c:choose>
+                    </div>
+                </c:if>
 
                 <div class="mb-4">
                     <label for="newPassword" class="form-label">Mật khẩu mới</label>
