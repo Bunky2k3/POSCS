@@ -128,11 +128,11 @@
     .auth-content {
         flex: 1;
         display: flex;
-        align-items: center;
         justify-content: center;
         padding: 24px;
         position: relative;
-        overflow: hidden;
+        overflow-y: auto;
+        overflow-x: hidden;
         background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 45%, var(--primary-light) 100%);
     }
 
@@ -156,6 +156,7 @@
     .container {
         width: 100%;
         max-width: 440px;
+        margin: auto 0;
         background: var(--bg-card);
         border-radius: 18px;
         box-shadow: 0 20px 50px rgba(0, 40, 80, 0.35);
