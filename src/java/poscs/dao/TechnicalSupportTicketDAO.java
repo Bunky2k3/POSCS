@@ -167,6 +167,48 @@ public class TechnicalSupportTicketDAO {
         return summary;
     }
 
+    /** Lấy top N phiếu chưa đóng cần chú ý, ưu tiên khẩn cấp trước rồi tới phiếu tạo lâu nhất -- phục vụ dashboard. */
+    public List<TechnicalRequest> findNeedingAttention(int limit) {
+        List<TechnicalRequest> result = new ArrayList<>();
+        String sql = SELECT_BASE +
+            "WHERE t.is_deleted = 0 AND t.status <> ? " +
+            "ORDER BY FIELD(t.priority, 'Khẩn cấp', 'Cao', 'Bình thường', 'Thấp'), t.created_date ASC LIMIT ?";
+        try (Connection conn = DBContext.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, STATUS_CLOSED);
+            ps.setInt(2, limit);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    result.add(mapRow(rs));
+                }
+            }
+        } catch (SQLException ex) {
+            System.err.println("--- LOI TRUY VAN PHIEU CAN CHU Y ---");
+            ex.printStackTrace();
+        }
+        return result;
+    }
+
+    /** Đếm số phiếu chưa đóng có SLA đã quá hạn hoặc còn dưới 24h -- phục vụ dashboard. */
+    public int countOverdueOrDueSoon() {
+        String sql = "SELECT COUNT(*) FROM technicalrequests " +
+                     "WHERE is_deleted = 0 AND status <> ? " +
+                     "AND sla_deadline IS NOT NULL AND sla_deadline <= DATE_ADD(NOW(), INTERVAL 24 HOUR)";
+        try (Connection conn = DBContext.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, STATUS_CLOSED);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt(1);
+                }
+            }
+        } catch (SQLException ex) {
+            System.err.println("--- LOI DEM PHIEU SAP TRE HAN ---");
+            ex.printStackTrace();
+        }
+        return 0;
+    }
+
     /** Lấy chi tiết 1 phiếu hỗ trợ theo ID, đã join khách hàng/hợp đồng/kỹ thuật viên/người tạo. Trả về null nếu không tồn tại. */
     public TechnicalRequest findById(int ticketId) {
         String sql = SELECT_BASE + "WHERE t.ticket_id = ? AND t.is_deleted = 0";

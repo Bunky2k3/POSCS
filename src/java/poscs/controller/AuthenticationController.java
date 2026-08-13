@@ -291,7 +291,7 @@ public class AuthenticationController extends HttpServlet {
         // để biết ai đang đăng nhập và role của họ là gì (theo PERMISSIONS.md).
         HttpSession session = request.getSession(true);
         session.setAttribute("currentUser", user);
-        response.sendRedirect(request.getContextPath() + "/dashboard.jsp");
+        response.sendRedirect(request.getContextPath() + "/dashboard");
     }
 
     // ------------------------------------------------------------------
