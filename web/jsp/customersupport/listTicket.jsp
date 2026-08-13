@@ -42,6 +42,42 @@
         .notif-text { font-size: 0.85rem; color: #111827; font-weight: 500; line-height: 1.3; }
         .notif-time { font-size: 0.72rem; color: #9ca3af; margin-top: 2px; }
 
+        .app-shell { display: flex; align-items: flex-start; }
+        .sidebar {
+            width: 240px; flex-shrink: 0;
+            background: #fff; border-right: 1px solid #eef2f6;
+            padding: 20px 12px; position: sticky; top: 66px;
+            height: calc(100vh - 66px); overflow-y: auto;
+            display: flex; flex-direction: column;
+            transition: width 0.15s ease;
+        }
+        .sidebar-link {
+            display: flex; align-items: center; gap: 12px;
+            padding: 11px 14px; margin-bottom: 2px; border-radius: 10px;
+            color: #6b7280; font-weight: 600; font-size: 0.88rem; text-decoration: none;
+        }
+        .sidebar-link i { width: 18px; text-align: center; color: #9ca3af; flex-shrink: 0; }
+        .sidebar-link:hover { background: #f0f9ff; color: var(--primary-dark); }
+        .sidebar-link.active { background: linear-gradient(120deg, var(--primary), var(--primary-light)); color: #fff; }
+        .sidebar-link.active i { color: #fff; }
+        .sidebar-toggle {
+            display: flex; align-items: center; justify-content: center; width: 32px; height: 32px;
+            margin: 0 0 12px; padding: 0; border: none; border-radius: 8px;
+            background: none; color: #9ca3af; cursor: pointer;
+        }
+        .sidebar-toggle i { transition: transform 0.15s ease; }
+        .sidebar-toggle:hover { background: #f0f9ff; color: var(--primary-dark); }
+        .sidebar.collapsed { width: 68px; }
+        .sidebar.collapsed .sidebar-link { justify-content: center; }
+        .sidebar.collapsed .sidebar-link span { display: none; }
+        .sidebar.collapsed .sidebar-toggle i { transform: rotate(180deg); }
+        .sidebar.collapsed:hover { width: 240px; }
+        .sidebar.collapsed:hover .sidebar-link { justify-content: flex-start; }
+        .sidebar.collapsed:hover .sidebar-link span { display: inline; }
+        .sidebar.collapsed:hover .sidebar-toggle i { transform: rotate(0deg); }
+        .main-content { flex: 1; min-width: 0; }
+        @media (max-width: 900px) { .sidebar { display: none; } /* TODO: drawer thu gọn thay vì ẩn hẳn */ }
+
         .page-container { max-width: 1280px; margin: 28px auto; padding: 0 24px 60px; }
         .page-header-row { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 22px; flex-wrap: wrap; gap: 14px; }
         .page-header-row h2 { font-weight: 700; color: var(--primary-dark); font-size: 1.4rem; margin-bottom: 4px; }
@@ -170,6 +206,18 @@
             </div>
         </div>
     </nav>
+
+    <div class="app-shell">
+        <aside class="sidebar" id="sidebar">
+            <button type="button" class="sidebar-toggle" id="sidebarToggle" aria-label="Thu gọn menu">
+                <i class="fa-solid fa-angles-left"></i>
+            </button>
+            <a href="${pageContext.request.contextPath}/dashboard.jsp" class="sidebar-link"><i class="fa-solid fa-house"></i><span>Trang chủ</span></a>
+            <a href="${pageContext.request.contextPath}/customer" class="sidebar-link"><i class="fa-solid fa-users"></i><span>Khách hàng</span></a>
+            <a href="${pageContext.request.contextPath}/contract" class="sidebar-link"><i class="fa-solid fa-file-contract"></i><span>Hợp đồng</span></a>
+            <a href="${pageContext.request.contextPath}/ticket" class="sidebar-link active"><i class="fa-solid fa-headset"></i><span>Phiếu hỗ trợ</span></a>
+        </aside>
+        <div class="main-content">
 
     <div class="page-container">
 
@@ -407,6 +455,9 @@
         </div>
     </div>
 
+        </div>
+    </div>
+
     <!-- ===== Modal xác nhận xóa ===== -->
     <div class="modal fade" id="deleteModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
@@ -490,6 +541,22 @@
         document.getElementById('searchInput').addEventListener('input', applyFilters);
         document.getElementById('filterStatus').addEventListener('change', applyFilters);
         document.getElementById('filterPriority').addEventListener('change', applyFilters);
+    </script>
+
+    <script>
+        // ===== Thu gọn / mở rộng sidebar =====
+        (function () {
+            var sidebar = document.getElementById('sidebar');
+            var toggle = document.getElementById('sidebarToggle');
+            var STORAGE_KEY = 'poscsSidebarCollapsed';
+            if (localStorage.getItem(STORAGE_KEY) === '1') {
+                sidebar.classList.add('collapsed');
+            }
+            toggle.addEventListener('click', function () {
+                var collapsed = sidebar.classList.toggle('collapsed');
+                localStorage.setItem(STORAGE_KEY, collapsed ? '1' : '0');
+            });
+        })();
     </script>
 </body>
 </html>
