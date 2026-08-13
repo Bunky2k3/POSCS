@@ -1,4 +1,15 @@
 <%@page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
+<%@taglib prefix="c" uri="jakarta.tags.core"%>
+<%@taglib prefix="fmt" uri="jakarta.tags.fmt"%>
+<%@taglib prefix="fn" uri="jakarta.tags.functions"%>
+<%--
+    Request attribute do TechnicalSupportTicketController#showList thiết
+    lập trước khi forward tới trang này:
+      - ticketList    : List<poscs.model.TechnicalRequest> (đã join enterprise/contract/assignedTechnician)
+      - statusSummary : Map<String, Integer> (đếm theo từng trạng thái + số phiếu khẩn cấp, cho dải KPI đầu trang)
+      - currentPage, totalPages, totalCount : thông tin phân trang
+      - keyword, statusFilter, priorityFilter : giá trị filter hiện tại (để giữ lại lúc submit lại form tìm kiếm)
+--%>
 <!DOCTYPE html>
 <html lang="vi">
 <head>
@@ -194,12 +205,12 @@
                 </ul>
             </div>
             <div class="dropdown">
-                <img src="https://ui-avatars.com/api/?name=Nguyen+An&background=0568a6&color=fff" class="avatar-mini" alt="avatar" data-bs-toggle="dropdown" aria-expanded="false">
+                <img src="https://ui-avatars.com/api/?name=${fn:escapeXml(sessionScope.currentUser.firstName)}&background=0568a6&color=fff" class="avatar-mini" alt="avatar" data-bs-toggle="dropdown" aria-expanded="false">
                 <ul class="dropdown-menu dropdown-menu-end">
-                    <li class="dd-user-header"><img src="https://ui-avatars.com/api/?name=Nguyen+An&background=0568a6&color=fff" alt="avatar"><div><div class="dd-name">Nguyễn Văn An</div><div class="dd-role">Sales</div></div></li>
+                    <li class="dd-user-header"><img src="https://ui-avatars.com/api/?name=${fn:escapeXml(sessionScope.currentUser.firstName)}&background=0568a6&color=fff" alt="avatar"><div><div class="dd-name"><c:out value="${sessionScope.currentUser.fullName}"/></div><div class="dd-role"><c:out value="${sessionScope.currentUser.role.roleName}"/></div></div></li>
                     <li><hr class="dropdown-divider"></li>
                     <li><a class="dropdown-item" href="${pageContext.request.contextPath}/viewProfile"><i class="fa-regular fa-id-card me-2"></i>Thông tin cá nhân</a></li>
-                    <li><a class="dropdown-item" href="changePassword.jsp"><i class="fa-solid fa-key me-2"></i>Đổi mật khẩu</a></li>
+                    <li><a class="dropdown-item" href="${pageContext.request.contextPath}/changePassword.jsp"><i class="fa-solid fa-key me-2"></i>Đổi mật khẩu</a></li>
                     <li><hr class="dropdown-divider"></li>
                     <li><a class="dropdown-item text-danger" href="${pageContext.request.contextPath}/login?action=logout"><i class="fa-solid fa-arrow-right-from-bracket me-2"></i>Đăng xuất</a></li>
                 </ul>
@@ -226,39 +237,38 @@
                 <h2>Danh sách phiếu hỗ trợ kỹ thuật</h2>
                 <p>Theo dõi và xử lý các yêu cầu hỗ trợ kỹ thuật từ khách hàng</p>
             </div>
-            <a href="createTicket.jsp" class="btn-add"><i class="fa-solid fa-plus"></i> Tạo phiếu hỗ trợ</a>
+            <a href="${pageContext.request.contextPath}/ticket?action=new" class="btn-add"><i class="fa-solid fa-plus"></i> Tạo phiếu hỗ trợ</a>
         </div>
 
         <!-- ===== Dải trạng thái tổng quan ===== -->
         <div class="status-strip">
-            <div class="card-box status-chip"><span class="dot" style="background:var(--primary)"></span><div><div class="num">2</div><div class="lbl">Mới</div></div></div>
-            <div class="card-box status-chip"><span class="dot" style="background:var(--warning)"></span><div><div class="num">4</div><div class="lbl">Đang xử lý</div></div></div>
-            <div class="card-box status-chip"><span class="dot" style="background:var(--success)"></span><div><div class="num">3</div><div class="lbl">Đã đóng</div></div></div>
-            <div class="card-box status-chip"><span class="dot" style="background:var(--danger)"></span><div><div class="num">2</div><div class="lbl">Mức Khẩn cấp</div></div></div>
+            <div class="card-box status-chip"><span class="dot" style="background:var(--primary)"></span><div><div class="num">${statusSummary['Mới tiếp nhận']}</div><div class="lbl">Mới tiếp nhận</div></div></div>
+            <div class="card-box status-chip"><span class="dot" style="background:var(--warning)"></span><div><div class="num">${statusSummary['Đang xử lý']}</div><div class="lbl">Đang xử lý</div></div></div>
+            <div class="card-box status-chip"><span class="dot" style="background:var(--success)"></span><div><div class="num">${statusSummary['Đã đóng']}</div><div class="lbl">Đã đóng</div></div></div>
+            <div class="card-box status-chip"><span class="dot" style="background:var(--danger)"></span><div><div class="num">${statusSummary['Khẩn cấp']}</div><div class="lbl">Mức Khẩn cấp</div></div></div>
         </div>
 
         <!-- ===== Bộ lọc / tìm kiếm ===== -->
-        <div class="filter-bar card-box">
+        <form class="filter-bar card-box" method="GET" action="${pageContext.request.contextPath}/ticket" id="filterForm">
+            <input type="hidden" name="action" value="list">
             <div class="search-input-wrap">
                 <i class="fa-solid fa-magnifying-glass"></i>
-                <input type="text" id="searchInput" placeholder="Tìm theo mã phiếu, tiêu đề, khách hàng...">
+                <input type="text" id="searchInput" name="keyword" value="${fn:escapeXml(keyword)}" placeholder="Tìm theo mã phiếu, mô tả, khách hàng...">
             </div>
-            <select id="filterStatus">
+            <select id="filterStatus" name="status">
                 <option value="">Tất cả trạng thái</option>
-                <option value="Mới">Mới</option>
-                <option value="Đang xử lý">Đang xử lý</option>
-                <option value="Đã đóng">Đã đóng</option>
+                <option value="Mới tiếp nhận" ${statusFilter == 'Mới tiếp nhận' ? 'selected' : ''}>Mới tiếp nhận</option>
+                <option value="Đang xử lý" ${statusFilter == 'Đang xử lý' ? 'selected' : ''}>Đang xử lý</option>
+                <option value="Đã đóng" ${statusFilter == 'Đã đóng' ? 'selected' : ''}>Đã đóng</option>
             </select>
-            <select id="filterPriority">
+            <select id="filterPriority" name="priority">
                 <option value="">Tất cả mức ưu tiên</option>
-                <option value="Khẩn cấp">Khẩn cấp</option>
-                <option value="Cao">Cao</option>
-                <option value="Bình thường">Bình thường</option>
-                <option value="Thấp">Thấp</option>
+                <option value="Khẩn cấp" ${priorityFilter == 'Khẩn cấp' ? 'selected' : ''}>Khẩn cấp</option>
+                <option value="Cao" ${priorityFilter == 'Cao' ? 'selected' : ''}>Cao</option>
+                <option value="Bình thường" ${priorityFilter == 'Bình thường' ? 'selected' : ''}>Bình thường</option>
+                <option value="Thấp" ${priorityFilter == 'Thấp' ? 'selected' : ''}>Thấp</option>
             </select>
-        </div>
-
-        <%-- Servlet cần: truy vấn bảng technicalrequests (JOIN enterprises, contracts, users làm người xử lý), phân trang theo BR-12/BR-16, empty-state theo BR-14 --%>
+        </form>
 
         <!-- ===== Bảng danh sách ===== -->
         <div class="table-card card-box">
@@ -267,7 +277,7 @@
                     <thead>
                         <tr>
                             <th>Mã phiếu</th>
-                            <th>Tiêu đề</th>
+                            <th>Loại phiếu</th>
                             <th>Khách hàng</th>
                             <th>Hợp đồng liên quan</th>
                             <th>Ưu tiên</th>
@@ -278,177 +288,73 @@
                         </tr>
                     </thead>
                     <tbody id="ticketTableBody">
-                        <tr data-status="Đang xử lý" data-priority="Khẩn cấp">
-                            <td class="ticket-code">TK-1042</td>
-                            <td><a href="ticketDetail.jsp?id=1042" class="ticket-title-link">Sự cố mất tín hiệu tại trạm Cầu Giấy</a></td>
-                            <td>VNPT Hà Nội</td>
-                            <td><a href="contractDetail.jsp?id=231" class="contract-link">HD-0231</a></td>
-                            <td><span class="pill priority-urgent"><span class="dot"></span>Khẩn cấp</span></td>
-                            <td><span class="pill status-progress"><span class="dot"></span>Đang xử lý</span></td>
-                            <td>Nguyễn Văn An</td>
-                            <td>05/08/2026</td>
-                            <td>
-                                <div class="action-icons">
-                                    <button class="act-view" title="Xem chi tiết" onclick="location.href='ticketDetail.jsp?id=1042'"><i class="fa-regular fa-eye"></i></button>
-                                    <button class="act-edit" title="Sửa" onclick="location.href='updateTicket.jsp?id=1042'"><i class="fa-solid fa-pen"></i></button>
-                                    <button class="act-delete" title="Xóa" onclick="openDeleteModal(this)"><i class="fa-solid fa-trash"></i></button>
-                                </div>
-                            </td>
-                        </tr>
-                        <tr data-status="Mới" data-priority="Cao">
-                            <td class="ticket-code">TK-1039</td>
-                            <td><a href="ticketDetail.jsp?id=1039" class="ticket-title-link">Lỗi kết nối nguồn UPS sau bảo trì</a></td>
-                            <td>CMC Telecom</td>
-                            <td><a href="contractDetail.jsp?id=250" class="contract-link">HD-0250</a></td>
-                            <td><span class="pill priority-high"><span class="dot"></span>Cao</span></td>
-                            <td><span class="pill status-new"><span class="dot"></span>Mới</span></td>
-                            <td>Trần Thị Bình</td>
-                            <td>05/08/2026</td>
-                            <td>
-                                <div class="action-icons">
-                                    <button class="act-view" title="Xem chi tiết" onclick="location.href='ticketDetail.jsp?id=1039'"><i class="fa-regular fa-eye"></i></button>
-                                    <button class="act-edit" title="Sửa" onclick="location.href='updateTicket.jsp?id=1039'"><i class="fa-solid fa-pen"></i></button>
-                                    <button class="act-delete" title="Xóa" onclick="openDeleteModal(this)"><i class="fa-solid fa-trash"></i></button>
-                                </div>
-                            </td>
-                        </tr>
-                        <tr data-status="Đang xử lý" data-priority="Bình thường">
-                            <td class="ticket-code">TK-1035</td>
-                            <td><a href="ticketDetail.jsp?id=1035" class="ticket-title-link">Yêu cầu kiểm tra tín hiệu cáp quang</a></td>
-                            <td>MobiFone Hải Phòng</td>
-                            <td><span class="no-contract">Không có</span></td>
-                            <td><span class="pill priority-normal"><span class="dot"></span>Bình thường</span></td>
-                            <td><span class="pill status-progress"><span class="dot"></span>Đang xử lý</span></td>
-                            <td>Lê Minh Châu</td>
-                            <td>04/08/2026</td>
-                            <td>
-                                <div class="action-icons">
-                                    <button class="act-view" title="Xem chi tiết" onclick="location.href='ticketDetail.jsp?id=1035'"><i class="fa-regular fa-eye"></i></button>
-                                    <button class="act-edit" title="Sửa" onclick="location.href='updateTicket.jsp?id=1035'"><i class="fa-solid fa-pen"></i></button>
-                                    <button class="act-delete" title="Xóa" onclick="openDeleteModal(this)"><i class="fa-solid fa-trash"></i></button>
-                                </div>
-                            </td>
-                        </tr>
-                        <tr data-status="Đang xử lý" data-priority="Cao">
-                            <td class="ticket-code">TK-1028</td>
-                            <td><a href="ticketDetail.jsp?id=1028" class="ticket-title-link">Thiết bị truyền dẫn phát tiếng ồn bất thường</a></td>
-                            <td>Viettel Bắc Ninh</td>
-                            <td><a href="contractDetail.jsp?id=214" class="contract-link">HD-0214</a></td>
-                            <td><span class="pill priority-high"><span class="dot"></span>Cao</span></td>
-                            <td><span class="pill status-progress"><span class="dot"></span>Đang xử lý</span></td>
-                            <td>Phạm Quốc Huy</td>
-                            <td>02/08/2026</td>
-                            <td>
-                                <div class="action-icons">
-                                    <button class="act-view" title="Xem chi tiết" onclick="location.href='ticketDetail.jsp?id=1028'"><i class="fa-regular fa-eye"></i></button>
-                                    <button class="act-edit" title="Sửa" onclick="location.href='updateTicket.jsp?id=1028'"><i class="fa-solid fa-pen"></i></button>
-                                    <button class="act-delete" title="Xóa" onclick="openDeleteModal(this)"><i class="fa-solid fa-trash"></i></button>
-                                </div>
-                            </td>
-                        </tr>
-                        <tr data-status="Mới" data-priority="Thấp">
-                            <td class="ticket-code">TK-1015</td>
-                            <td><a href="ticketDetail.jsp?id=1015" class="ticket-title-link">Yêu cầu tư vấn lắp đặt thiết bị mới</a></td>
-                            <td>Đại lý Thiết bị Viễn thông Đông Á</td>
-                            <td><span class="no-contract">Không có</span></td>
-                            <td><span class="pill priority-low"><span class="dot"></span>Thấp</span></td>
-                            <td><span class="pill status-new"><span class="dot"></span>Mới</span></td>
-                            <td>Nguyễn Văn An</td>
-                            <td>30/07/2026</td>
-                            <td>
-                                <div class="action-icons">
-                                    <button class="act-view" title="Xem chi tiết" onclick="location.href='ticketDetail.jsp?id=1015'"><i class="fa-regular fa-eye"></i></button>
-                                    <button class="act-edit" title="Sửa" onclick="location.href='updateTicket.jsp?id=1015'"><i class="fa-solid fa-pen"></i></button>
-                                    <button class="act-delete" title="Xóa" onclick="openDeleteModal(this)"><i class="fa-solid fa-trash"></i></button>
-                                </div>
-                            </td>
-                        </tr>
-                        <tr data-status="Đã đóng" data-priority="Bình thường">
-                            <td class="ticket-code">TK-0998</td>
-                            <td><a href="ticketDetail.jsp?id=998" class="ticket-title-link">Kiểm tra định kỳ hệ thống nguồn DC</a></td>
-                            <td>FPT Telecom Đà Nẵng</td>
-                            <td><a href="contractDetail.jsp?id=205" class="contract-link">HD-0205</a></td>
-                            <td><span class="pill priority-normal"><span class="dot"></span>Bình thường</span></td>
-                            <td><span class="pill status-closed"><span class="dot"></span>Đã đóng</span></td>
-                            <td>Trần Thị Bình</td>
-                            <td>25/07/2026</td>
-                            <td>
-                                <div class="action-icons">
-                                    <button class="act-view" title="Xem chi tiết" onclick="location.href='ticketDetail.jsp?id=998'"><i class="fa-regular fa-eye"></i></button>
-                                    <button class="act-edit" title="Sửa" onclick="location.href='updateTicket.jsp?id=998'"><i class="fa-solid fa-pen"></i></button>
-                                    <button class="act-delete" title="Xóa" onclick="openDeleteModal(this)"><i class="fa-solid fa-trash"></i></button>
-                                </div>
-                            </td>
-                        </tr>
-                        <tr data-status="Đã đóng" data-priority="Bình thường">
-                            <td class="ticket-code">TK-0987</td>
-                            <td><a href="ticketDetail.jsp?id=987" class="ticket-title-link">Yêu cầu bảo trì định kỳ nguồn UPS</a></td>
-                            <td>VNPT Hà Nội</td>
-                            <td><a href="contractDetail.jsp?id=198" class="contract-link">HD-0198</a></td>
-                            <td><span class="pill priority-normal"><span class="dot"></span>Bình thường</span></td>
-                            <td><span class="pill status-closed"><span class="dot"></span>Đã đóng</span></td>
-                            <td>Lê Minh Châu</td>
-                            <td>20/06/2026</td>
-                            <td>
-                                <div class="action-icons">
-                                    <button class="act-view" title="Xem chi tiết" onclick="location.href='ticketDetail.jsp?id=987'"><i class="fa-regular fa-eye"></i></button>
-                                    <button class="act-edit" title="Sửa" onclick="location.href='updateTicket.jsp?id=987'"><i class="fa-solid fa-pen"></i></button>
-                                    <button class="act-delete" title="Xóa" onclick="openDeleteModal(this)"><i class="fa-solid fa-trash"></i></button>
-                                </div>
-                            </td>
-                        </tr>
-                        <tr data-status="Đang xử lý" data-priority="Khẩn cấp">
-                            <td class="ticket-code">TK-0950</td>
-                            <td><a href="ticketDetail.jsp?id=950" class="ticket-title-link">Khiếu nại chất lượng vật tư bảo trì</a></td>
-                            <td>Cty Xây dựng Hạ tầng Miền Trung</td>
-                            <td><a href="contractDetail.jsp?id=260" class="contract-link">HD-0260</a></td>
-                            <td><span class="pill priority-urgent"><span class="dot"></span>Khẩn cấp</span></td>
-                            <td><span class="pill status-progress"><span class="dot"></span>Đang xử lý</span></td>
-                            <td>Nguyễn Văn An</td>
-                            <td>05/06/2026</td>
-                            <td>
-                                <div class="action-icons">
-                                    <button class="act-view" title="Xem chi tiết" onclick="location.href='ticketDetail.jsp?id=950'"><i class="fa-regular fa-eye"></i></button>
-                                    <button class="act-edit" title="Sửa" onclick="location.href='updateTicket.jsp?id=950'"><i class="fa-solid fa-pen"></i></button>
-                                    <button class="act-delete" title="Xóa" onclick="openDeleteModal(this)"><i class="fa-solid fa-trash"></i></button>
-                                </div>
-                            </td>
-                        </tr>
-                        <tr data-status="Đã đóng" data-priority="Cao">
-                            <td class="ticket-code">TK-0965</td>
-                            <td><a href="ticketDetail.jsp?id=965" class="ticket-title-link">Sự cố thi công trạm BTS chậm tiến độ</a></td>
-                            <td>Cty TNHH Xây lắp Điện Nam Hà</td>
-                            <td><a href="contractDetail.jsp?id=180" class="contract-link">HD-0180</a></td>
-                            <td><span class="pill priority-high"><span class="dot"></span>Cao</span></td>
-                            <td><span class="pill status-closed"><span class="dot"></span>Đã đóng</span></td>
-                            <td>Phạm Quốc Huy</td>
-                            <td>10/06/2026</td>
-                            <td>
-                                <div class="action-icons">
-                                    <button class="act-view" title="Xem chi tiết" onclick="location.href='ticketDetail.jsp?id=965'"><i class="fa-regular fa-eye"></i></button>
-                                    <button class="act-edit" title="Sửa" onclick="location.href='updateTicket.jsp?id=965'"><i class="fa-solid fa-pen"></i></button>
-                                    <button class="act-delete" title="Xóa" onclick="openDeleteModal(this)"><i class="fa-solid fa-trash"></i></button>
-                                </div>
-                            </td>
-                        </tr>
+                        <c:forEach var="ticket" items="${ticketList}">
+                            <tr>
+                                <td class="ticket-code">${fn:escapeXml(ticket.ticketCode)}</td>
+                                <td><a href="${pageContext.request.contextPath}/ticket?action=view&id=${ticket.ticketId}" class="ticket-title-link">${fn:escapeXml(ticket.ticketType)}</a></td>
+                                <td>
+                                    <c:choose>
+                                        <c:when test="${ticket.enterprise != null}">${fn:escapeXml(ticket.enterprise.enterpriseName)}</c:when>
+                                        <c:otherwise>&mdash;</c:otherwise>
+                                    </c:choose>
+                                </td>
+                                <td>
+                                    <c:choose>
+                                        <c:when test="${ticket.contract != null}"><a href="${pageContext.request.contextPath}/contract?action=view&id=${ticket.contractId}" class="contract-link">${fn:escapeXml(ticket.contract.contractCode)}</a></c:when>
+                                        <c:otherwise><span class="no-contract">Không có</span></c:otherwise>
+                                    </c:choose>
+                                </td>
+                                <td>
+                                    <c:choose>
+                                        <c:when test="${ticket.priority == 'Khẩn cấp'}"><span class="pill priority-urgent"><span class="dot"></span>Khẩn cấp</span></c:when>
+                                        <c:when test="${ticket.priority == 'Cao'}"><span class="pill priority-high"><span class="dot"></span>Cao</span></c:when>
+                                        <c:when test="${ticket.priority == 'Thấp'}"><span class="pill priority-low"><span class="dot"></span>Thấp</span></c:when>
+                                        <c:otherwise><span class="pill priority-normal"><span class="dot"></span>Bình thường</span></c:otherwise>
+                                    </c:choose>
+                                </td>
+                                <td>
+                                    <c:choose>
+                                        <c:when test="${ticket.status == 'Đang xử lý'}"><span class="pill status-progress"><span class="dot"></span>Đang xử lý</span></c:when>
+                                        <c:when test="${ticket.status == 'Đã đóng'}"><span class="pill status-closed"><span class="dot"></span>Đã đóng</span></c:when>
+                                        <c:otherwise><span class="pill status-new"><span class="dot"></span>Mới tiếp nhận</span></c:otherwise>
+                                    </c:choose>
+                                </td>
+                                <td>
+                                    <c:choose>
+                                        <c:when test="${ticket.assignedTechnician != null}">${fn:escapeXml(ticket.assignedTechnician.fullName)}</c:when>
+                                        <c:otherwise>&mdash;</c:otherwise>
+                                    </c:choose>
+                                </td>
+                                <td><fmt:formatDate value="${ticket.createdDate}" pattern="dd/MM/yyyy"/></td>
+                                <td>
+                                    <div class="action-icons">
+                                        <button class="act-view" title="Xem chi tiết" onclick="location.href='${pageContext.request.contextPath}/ticket?action=view&id=${ticket.ticketId}'"><i class="fa-regular fa-eye"></i></button>
+                                        <button class="act-edit" title="Sửa" onclick="location.href='${pageContext.request.contextPath}/ticket?action=edit&id=${ticket.ticketId}'"><i class="fa-solid fa-pen"></i></button>
+                                        <button class="act-delete" title="Xóa" onclick="openDeleteModal(${ticket.ticketId}, '${fn:escapeXml(ticket.ticketCode)}')"><i class="fa-solid fa-trash"></i></button>
+                                    </div>
+                                </td>
+                            </tr>
+                        </c:forEach>
                     </tbody>
                 </table>
             </div>
 
             <!-- ===== Trạng thái rỗng (BR-14) ===== -->
-            <div class="empty-state" id="emptyState" style="display:none">
+            <div class="empty-state" id="emptyState" style="${empty ticketList ? 'display:block' : 'display:none'}">
                 <i class="fa-regular fa-folder-open"></i>
                 <p>Không có phiếu hỗ trợ để hiển thị.</p>
             </div>
 
             <!-- ===== Phân trang ===== -->
             <div class="pagination-bar">
-                <span class="pagination-info" id="paginationInfo">Hiển thị 1–9 trong tổng số 9 phiếu hỗ trợ</span>
+                <span class="pagination-info" id="paginationInfo">Hiển thị ${fn:length(ticketList)} trong tổng số ${totalCount} phiếu hỗ trợ</span>
                 <nav>
                     <ul class="pagination pagination-sm mb-0">
-                        <li class="page-item disabled"><a class="page-link" href="#">Trước</a></li>
-                        <li class="page-item active"><a class="page-link" href="#">1</a></li>
-                        <li class="page-item disabled"><a class="page-link" href="#">Sau</a></li>
+                        <li class="page-item ${currentPage <= 1 ? 'disabled' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/ticket?action=list&page=${currentPage - 1}&keyword=${fn:escapeXml(keyword)}&status=${fn:escapeXml(statusFilter)}&priority=${fn:escapeXml(priorityFilter)}">Trước</a></li>
+                        <c:forEach begin="1" end="${totalPages}" var="p">
+                            <li class="page-item ${p == currentPage ? 'active' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/ticket?action=list&page=${p}&keyword=${fn:escapeXml(keyword)}&status=${fn:escapeXml(statusFilter)}&priority=${fn:escapeXml(priorityFilter)}">${p}</a></li>
+                        </c:forEach>
+                        <li class="page-item ${currentPage >= totalPages ? 'disabled' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/ticket?action=list&page=${currentPage + 1}&keyword=${fn:escapeXml(keyword)}&status=${fn:escapeXml(statusFilter)}&priority=${fn:escapeXml(priorityFilter)}">Sau</a></li>
                     </ul>
                 </nav>
             </div>
@@ -465,7 +371,7 @@
                 <div class="modal-header"><div class="modal-icon-warn"><i class="fa-solid fa-triangle-exclamation"></i></div></div>
                 <div class="modal-body">
                     <h5 class="mb-2" style="font-weight:700; color:#111827;">Xác nhận xóa phiếu hỗ trợ</h5>
-                    Bạn có chắc chắn muốn xóa phiếu hỗ trợ này? Hành động này không thể hoàn tác.
+                    Bạn có chắc chắn muốn xóa phiếu hỗ trợ <strong id="deleteTicketCode"></strong>? Hành động này không thể hoàn tác.
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn-modal-cancel" data-bs-dismiss="modal">Hủy</button>
@@ -475,72 +381,34 @@
         </div>
     </div>
 
-    <div class="toast-msg" id="toastMsg">
-        <i class="fa-solid fa-circle-check"></i>
-        <span>Xóa phiếu hỗ trợ thành công.</span>
-    </div>
+    <!-- Form ẩn để gửi yêu cầu xoá qua POST (không đổi state bằng GET) -->
+    <form id="deleteForm" method="POST" action="${pageContext.request.contextPath}/ticket" style="display:none">
+        <input type="hidden" name="action" value="delete">
+        <input type="hidden" name="id" id="deleteFormId">
+    </form>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         var deleteModal = new bootstrap.Modal(document.getElementById('deleteModal'));
-        var rowToDelete = null;
+        var ticketIdToDelete = null;
 
-        function openDeleteModal(btn) {
-            rowToDelete = btn.closest('tr');
+        function openDeleteModal(ticketId, ticketCode) {
+            ticketIdToDelete = ticketId;
+            document.getElementById('deleteTicketCode').textContent = ticketCode;
             deleteModal.show();
         }
 
         document.getElementById('confirmDeleteBtn').addEventListener('click', function () {
-            // TODO: gọi servlet DeleteTicketServlet, hiển thị hộp thoại xác nhận theo BR liên quan trước khi xóa thật
-            if (rowToDelete) {
-                rowToDelete.remove();
-                rowToDelete = null;
-                updateRowCount();
-                showToast();
+            if (ticketIdToDelete) {
+                document.getElementById('deleteFormId').value = ticketIdToDelete;
+                document.getElementById('deleteForm').submit();
             }
             deleteModal.hide();
         });
 
-        function showToast() {
-            var toast = document.getElementById('toastMsg');
-            toast.classList.add('show');
-            setTimeout(function () { toast.classList.remove('show'); }, 3000);
-        }
-
-        function updateRowCount() {
-            var rows = document.querySelectorAll('#ticketTableBody tr:not([style*="display: none"])');
-            var total = rows.length;
-            document.getElementById('paginationInfo').textContent =
-                total > 0 ? 'Hiển thị 1–' + total + ' trong tổng số ' + total + ' phiếu hỗ trợ' : '';
-            document.getElementById('emptyState').style.display = total === 0 ? 'block' : 'none';
-        }
-
-        // ===== Tìm kiếm & lọc phía client (demo giao diện) =====
-        function applyFilters() {
-            var keyword = document.getElementById('searchInput').value.trim().toLowerCase();
-            var status = document.getElementById('filterStatus').value;
-            var priority = document.getElementById('filterPriority').value;
-            var rows = document.querySelectorAll('#ticketTableBody tr');
-            var visibleCount = 0;
-
-            rows.forEach(function (row) {
-                var text = row.textContent.toLowerCase();
-                var matchesKeyword = !keyword || text.indexOf(keyword) !== -1;
-                var matchesStatus = !status || row.getAttribute('data-status') === status;
-                var matchesPriority = !priority || row.getAttribute('data-priority') === priority;
-                var visible = matchesKeyword && matchesStatus && matchesPriority;
-                row.style.display = visible ? '' : 'none';
-                if (visible) visibleCount++;
-            });
-
-            document.getElementById('paginationInfo').textContent =
-                visibleCount > 0 ? 'Hiển thị 1–' + visibleCount + ' trong tổng số ' + visibleCount + ' phiếu hỗ trợ' : '';
-            document.getElementById('emptyState').style.display = visibleCount === 0 ? 'block' : 'none';
-        }
-
-        document.getElementById('searchInput').addEventListener('input', applyFilters);
-        document.getElementById('filterStatus').addEventListener('change', applyFilters);
-        document.getElementById('filterPriority').addEventListener('change', applyFilters);
+        // Tự động submit lại form lọc khi đổi trạng thái / mức ưu tiên
+        document.getElementById('filterStatus').addEventListener('change', function () { document.getElementById('filterForm').submit(); });
+        document.getElementById('filterPriority').addEventListener('change', function () { document.getElementById('filterForm').submit(); });
     </script>
 
     <script>
