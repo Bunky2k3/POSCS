@@ -217,7 +217,7 @@
             <button type="button" class="sidebar-toggle" id="sidebarToggle" aria-label="Thu gọn menu">
                 <i class="fa-solid fa-angles-left"></i>
             </button>
-            <a href="${pageContext.request.contextPath}/dashboard.jsp" class="sidebar-link active"><i class="fa-solid fa-house"></i><span>Trang chủ</span></a>
+            <a href="${pageContext.request.contextPath}/dashboard" class="sidebar-link active"><i class="fa-solid fa-house"></i><span>Trang chủ</span></a>
             <a href="${pageContext.request.contextPath}/customer" class="sidebar-link"><i class="fa-solid fa-users"></i><span>Khách hàng</span></a>
             <a href="${pageContext.request.contextPath}/contract" class="sidebar-link"><i class="fa-solid fa-file-contract"></i><span>Hợp đồng</span></a>
             <a href="${pageContext.request.contextPath}/ticket" class="sidebar-link"><i class="fa-solid fa-headset"></i><span>Phiếu hỗ trợ</span></a>
@@ -231,10 +231,8 @@
                 <h2>Chào mừng trở lại, <c:out value="${sessionScope.currentUser.fullName}"/> 👋</h2>
                 <p>Đây là tổng quan hoạt động kinh doanh và hỗ trợ kỹ thuật của bạn</p>
             </div>
-            <div class="today-badge"><i class="fa-regular fa-calendar"></i>Thứ Năm, 06/08/2026</div>
+            <div class="today-badge"><i class="fa-regular fa-calendar"></i>${todayLabel}</div>
         </div>
-
-        <%-- Servlet cần: tổng hợp số liệu từ bảng enterprises, contracts, technicalrequests theo phạm vi phân quyền của người dùng đang đăng nhập --%>
 
         <!-- ===== KPI cards ===== -->
         <div class="row g-4 mb-4">
@@ -243,11 +241,11 @@
                     <div class="kpi-top">
                         <div>
                             <div class="kpi-label">Tổng khách hàng</div>
-                            <div class="kpi-value">128</div>
+                            <div class="kpi-value">${totalCustomers}</div>
                         </div>
                         <div class="kpi-icon bg-blue"><i class="fa-solid fa-building"></i></div>
                     </div>
-                    <span class="kpi-trend up"><i class="fa-solid fa-arrow-trend-up"></i> +8 khách hàng mới tháng này</span>
+                    <span class="kpi-trend up"><i class="fa-solid fa-arrow-trend-up"></i> +${newCustomersThisMonth} khách hàng mới tháng này</span>
                 </div>
             </div>
             <div class="col-6 col-lg-3">
@@ -255,23 +253,30 @@
                     <div class="kpi-top">
                         <div>
                             <div class="kpi-label">Hợp đồng đang hiệu lực</div>
-                            <div class="kpi-value">47</div>
+                            <div class="kpi-value">${contractStatusSummary['Đang hiệu lực']}</div>
                         </div>
                         <div class="kpi-icon bg-amber"><i class="fa-solid fa-file-contract"></i></div>
                     </div>
-                    <span class="kpi-trend warn"><i class="fa-solid fa-triangle-exclamation"></i> 3 hợp đồng sắp hết hạn</span>
+                    <span class="kpi-trend warn"><i class="fa-solid fa-triangle-exclamation"></i> ${contractStatusSummary['Sắp hết hạn']} hợp đồng sắp hết hạn</span>
                 </div>
             </div>
             <div class="col-6 col-lg-3">
                 <div class="card-box kpi-card">
                     <div class="kpi-top">
                         <div>
-                            <div class="kpi-label">Doanh thu hợp đồng (tháng 8)</div>
-                            <div class="kpi-value">4,2 tỷ đ</div>
+                            <div class="kpi-label">Doanh thu hợp đồng (tháng ${currentMonthNumber})</div>
+                            <div class="kpi-value" id="revenueKpiValue" data-vnd="${revenueThisMonth}">&mdash;</div>
                         </div>
                         <div class="kpi-icon bg-green"><i class="fa-solid fa-sack-dollar"></i></div>
                     </div>
-                    <span class="kpi-trend up"><i class="fa-solid fa-arrow-trend-up"></i> +15% so với tháng trước</span>
+                    <c:choose>
+                        <c:when test="${not empty revenueTrendPercent}">
+                            <span class="kpi-trend ${revenueTrendPercent >= 0 ? 'up' : 'down'}"><i class="fa-solid fa-arrow-trend-${revenueTrendPercent >= 0 ? 'up' : 'down'}"></i> ${revenueTrendPercent >= 0 ? '+' : ''}${revenueTrendPercent}% so với tháng trước</span>
+                        </c:when>
+                        <c:otherwise>
+                            <span class="kpi-trend"><i class="fa-regular fa-circle-question"></i> Chưa đủ dữ liệu tháng trước để so sánh</span>
+                        </c:otherwise>
+                    </c:choose>
                 </div>
             </div>
             <div class="col-6 col-lg-3">
@@ -279,11 +284,18 @@
                     <div class="kpi-top">
                         <div>
                             <div class="kpi-label">Phiếu hỗ trợ đang xử lý</div>
-                            <div class="kpi-value">9</div>
+                            <div class="kpi-value">${ticketStatusSummary['Đang xử lý']}</div>
                         </div>
                         <div class="kpi-icon bg-red"><i class="fa-solid fa-headset"></i></div>
                     </div>
-                    <span class="kpi-trend down"><i class="fa-solid fa-clock"></i> 2 phiếu sắp trễ hạn xử lý</span>
+                    <c:choose>
+                        <c:when test="${overdueOrDueSoonCount > 0}">
+                            <span class="kpi-trend down"><i class="fa-solid fa-clock"></i> ${overdueOrDueSoonCount} phiếu sắp trễ hạn xử lý</span>
+                        </c:when>
+                        <c:otherwise>
+                            <span class="kpi-trend up"><i class="fa-solid fa-check"></i> Không có phiếu nào sắp trễ hạn</span>
+                        </c:otherwise>
+                    </c:choose>
                 </div>
             </div>
         </div>
@@ -300,12 +312,12 @@
             <div class="col-lg-4">
                 <div class="card-box chart-card">
                     <div class="section-title">Phiếu hỗ trợ theo trạng thái</div>
-                    <div class="section-sub">Tổng số 46 phiếu trong tháng</div>
+                    <div class="section-sub">Tổng số ${ticketStatusSummary['Mới tiếp nhận'] + ticketStatusSummary['Đang xử lý'] + ticketStatusSummary['Đã đóng']} phiếu hiện có</div>
                     <canvas id="ticketChart" height="200"></canvas>
                     <div class="legend-row">
-                        <div class="legend-item"><span class="legend-dot" style="background:var(--primary-light)"></span>Mới (5)</div>
-                        <div class="legend-item"><span class="legend-dot" style="background:var(--warning)"></span>Đang xử lý (9)</div>
-                        <div class="legend-item"><span class="legend-dot" style="background:var(--success)"></span>Đã đóng (32)</div>
+                        <div class="legend-item"><span class="legend-dot" style="background:var(--primary-light)"></span>Mới tiếp nhận (${ticketStatusSummary['Mới tiếp nhận']})</div>
+                        <div class="legend-item"><span class="legend-dot" style="background:var(--warning)"></span>Đang xử lý (${ticketStatusSummary['Đang xử lý']})</div>
+                        <div class="legend-item"><span class="legend-dot" style="background:var(--success)"></span>Đã đóng (${ticketStatusSummary['Đã đóng']})</div>
                     </div>
                 </div>
             </div>
@@ -317,29 +329,32 @@
                 <div class="card-box table-section">
                     <div class="table-section-header">
                         <h6>Hợp đồng sắp hết hạn</h6>
-                        <a href="contractList.jsp">Xem tất cả</a>
+                        <a href="${pageContext.request.contextPath}/contract">Xem tất cả</a>
                     </div>
                     <table class="mini-table">
                         <thead><tr><th>Mã HĐ</th><th>Khách hàng</th><th>Giá trị</th><th>Còn lại</th></tr></thead>
                         <tbody>
-                            <tr>
-                                <td><a href="contractDetail.jsp?id=231" class="link">HD-0231</a></td>
-                                <td>VNPT Hà Nội</td>
-                                <td>1,25 tỷ đ</td>
-                                <td><span class="status-pill status-danger">3 ngày</span></td>
-                            </tr>
-                            <tr>
-                                <td><a href="contractDetail.jsp?id=214" class="link">HD-0214</a></td>
-                                <td>Viettel Bắc Ninh</td>
-                                <td>680 triệu đ</td>
-                                <td><span class="status-pill status-warn">9 ngày</span></td>
-                            </tr>
-                            <tr>
-                                <td><a href="contractDetail.jsp?id=205" class="link">HD-0205</a></td>
-                                <td>FPT Telecom Đà Nẵng</td>
-                                <td>430 triệu đ</td>
-                                <td><span class="status-pill status-warn">14 ngày</span></td>
-                            </tr>
+                            <c:choose>
+                                <c:when test="${empty expiringContracts}">
+                                    <tr><td colspan="4" style="text-align:center; color:#9ca3af; padding:20px 8px;">Không có hợp đồng nào sắp hết hạn.</td></tr>
+                                </c:when>
+                                <c:otherwise>
+                                    <c:forEach var="ct" items="${expiringContracts}">
+                                        <c:set var="daysLeft" value="${daysRemaining[ct.contractId]}"/>
+                                        <tr>
+                                            <td><a href="${pageContext.request.contextPath}/contract?action=view&id=${ct.contractId}" class="link">${fn:escapeXml(ct.contractCode)}</a></td>
+                                            <td>
+                                                <c:choose>
+                                                    <c:when test="${ct.enterprise != null}">${fn:escapeXml(ct.enterprise.enterpriseName)}</c:when>
+                                                    <c:otherwise>&mdash;</c:otherwise>
+                                                </c:choose>
+                                            </td>
+                                            <td><span class="contract-value" data-vnd="${contractValues[ct.contractId]}">&mdash;</span></td>
+                                            <td><span class="status-pill ${daysLeft <= 7 ? 'status-danger' : 'status-warn'}">${daysLeft} ngày</span></td>
+                                        </tr>
+                                    </c:forEach>
+                                </c:otherwise>
+                            </c:choose>
                         </tbody>
                     </table>
                 </div>
@@ -349,29 +364,44 @@
                 <div class="card-box table-section">
                     <div class="table-section-header">
                         <h6>Phiếu hỗ trợ cần xử lý</h6>
-                        <a href="ticketList.jsp">Xem tất cả</a>
+                        <a href="${pageContext.request.contextPath}/ticket">Xem tất cả</a>
                     </div>
                     <table class="mini-table">
                         <thead><tr><th>Mã phiếu</th><th>Khách hàng</th><th>Ưu tiên</th><th>Trạng thái</th></tr></thead>
                         <tbody>
-                            <tr>
-                                <td><a href="ticketDetail.jsp?id=1042" class="link">TK-1042</a></td>
-                                <td>VNPT Hà Nội</td>
-                                <td><span class="status-pill status-danger">Khẩn cấp</span></td>
-                                <td><span class="status-pill status-warn">Đang xử lý</span></td>
-                            </tr>
-                            <tr>
-                                <td><a href="ticketDetail.jsp?id=1039" class="link">TK-1039</a></td>
-                                <td>CMC Telecom</td>
-                                <td><span class="status-pill status-warn">Cao</span></td>
-                                <td><span class="status-pill status-info">Mới</span></td>
-                            </tr>
-                            <tr>
-                                <td><a href="ticketDetail.jsp?id=1035" class="link">TK-1035</a></td>
-                                <td>MobiFone Hải Phòng</td>
-                                <td><span class="status-pill status-gray">Bình thường</span></td>
-                                <td><span class="status-pill status-warn">Đang xử lý</span></td>
-                            </tr>
+                            <c:choose>
+                                <c:when test="${empty attentionTickets}">
+                                    <tr><td colspan="4" style="text-align:center; color:#9ca3af; padding:20px 8px;">Không có phiếu nào cần xử lý.</td></tr>
+                                </c:when>
+                                <c:otherwise>
+                                    <c:forEach var="tk" items="${attentionTickets}">
+                                        <tr>
+                                            <td><a href="${pageContext.request.contextPath}/ticket?action=view&id=${tk.ticketId}" class="link">${fn:escapeXml(tk.ticketCode)}</a></td>
+                                            <td>
+                                                <c:choose>
+                                                    <c:when test="${tk.enterprise != null}">${fn:escapeXml(tk.enterprise.enterpriseName)}</c:when>
+                                                    <c:otherwise>&mdash;</c:otherwise>
+                                                </c:choose>
+                                            </td>
+                                            <td>
+                                                <c:choose>
+                                                    <c:when test="${tk.priority == 'Khẩn cấp'}"><span class="status-pill status-danger">Khẩn cấp</span></c:when>
+                                                    <c:when test="${tk.priority == 'Cao'}"><span class="status-pill status-warn">Cao</span></c:when>
+                                                    <c:when test="${tk.priority == 'Thấp'}"><span class="status-pill status-gray">Thấp</span></c:when>
+                                                    <c:otherwise><span class="status-pill status-info">Bình thường</span></c:otherwise>
+                                                </c:choose>
+                                            </td>
+                                            <td>
+                                                <c:choose>
+                                                    <c:when test="${tk.status == 'Đang xử lý'}"><span class="status-pill status-warn">Đang xử lý</span></c:when>
+                                                    <c:when test="${tk.status == 'Đã đóng'}"><span class="status-pill status-success">Đã đóng</span></c:when>
+                                                    <c:otherwise><span class="status-pill status-info">Mới tiếp nhận</span></c:otherwise>
+                                                </c:choose>
+                                            </td>
+                                        </tr>
+                                    </c:forEach>
+                                </c:otherwise>
+                            </c:choose>
                         </tbody>
                     </table>
                 </div>
@@ -385,6 +415,21 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script>
+        // ===== Định dạng tiền tệ rút gọn (tỷ / triệu đ) =====
+        function formatCompactVND(n) {
+            if (isNaN(n)) return '0 đ';
+            if (Math.abs(n) >= 1e9) return (n / 1e9).toLocaleString('vi-VN', { maximumFractionDigits: 2 }) + ' tỷ đ';
+            if (Math.abs(n) >= 1e6) return (n / 1e6).toLocaleString('vi-VN', { maximumFractionDigits: 0 }) + ' triệu đ';
+            return n.toLocaleString('vi-VN') + ' đ';
+        }
+
+        document.getElementById('revenueKpiValue').textContent =
+            formatCompactVND(Number(document.getElementById('revenueKpiValue').dataset.vnd));
+
+        document.querySelectorAll('.contract-value').forEach(function (el) {
+            el.textContent = formatCompactVND(Number(el.dataset.vnd));
+        });
+
         // ===== Biểu đồ doanh thu hợp đồng theo tháng =====
         var revenueCtx = document.getElementById('revenueChart').getContext('2d');
         var revenueGradient = revenueCtx.createLinearGradient(0, 0, 0, 260);
@@ -394,10 +439,10 @@
         new Chart(revenueCtx, {
             type: 'bar',
             data: {
-                labels: ['Th.3', 'Th.4', 'Th.5', 'Th.6', 'Th.7', 'Th.8'],
+                labels: [<c:forEach var="m" items="${chartMonthLabels}" varStatus="st">'${m}'${!st.last ? ',' : ''}</c:forEach>],
                 datasets: [{
                     label: 'Doanh thu (tỷ đồng)',
-                    data: [2.8, 3.1, 2.5, 3.6, 3.9, 4.2],
+                    data: [<c:forEach var="v" items="${chartRevenueValues}" varStatus="st">${v}${!st.last ? ',' : ''}</c:forEach>],
                     backgroundColor: revenueGradient,
                     borderRadius: 8,
                     maxBarThickness: 42
@@ -418,9 +463,9 @@
         new Chart(ticketCtx, {
             type: 'doughnut',
             data: {
-                labels: ['Mới', 'Đang xử lý', 'Đã đóng'],
+                labels: ['Mới tiếp nhận', 'Đang xử lý', 'Đã đóng'],
                 datasets: [{
-                    data: [5, 9, 32],
+                    data: [${ticketStatusSummary['Mới tiếp nhận']}, ${ticketStatusSummary['Đang xử lý']}, ${ticketStatusSummary['Đã đóng']}],
                     backgroundColor: ['#0f9edb', '#f5a623', '#2fbf8f'],
                     borderWidth: 0
                 }]

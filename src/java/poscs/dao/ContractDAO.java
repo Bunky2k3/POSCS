@@ -171,6 +171,28 @@ public class ContractDAO {
         return summary;
     }
 
+    /** Lấy top N hợp đồng "Sắp hết hạn" (BR-17), sắp theo ngày hết hạn gần nhất trước -- phục vụ dashboard. */
+    public List<Contract> findExpiringSoon(int limit) {
+        List<Contract> result = new ArrayList<>();
+        String sql = SELECT_BASE +
+            "WHERE c.is_deleted = 0 AND CURDATE() BETWEEN c.effective_date AND c.end_date " +
+            "AND DATEDIFF(c.end_date, CURDATE()) <= " + SOON_THRESHOLD_DAYS + " " +
+            "ORDER BY c.end_date ASC LIMIT ?";
+        try (Connection conn = DBContext.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, limit);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    result.add(mapRow(rs));
+                }
+            }
+        } catch (SQLException ex) {
+            System.err.println("--- LOI TRUY VAN HOP DONG SAP HET HAN ---");
+            ex.printStackTrace();
+        }
+        return result;
+    }
+
     /** Lấy chi tiết 1 hợp đồng theo ID, đã join khách hàng + người phụ trách. Trả về null nếu không tồn tại. */
     public Contract findById(int contractId) {
         String sql = SELECT_BASE + "WHERE c.contract_id = ? AND c.is_deleted = 0";

@@ -86,6 +86,23 @@ public class CustomerDAO {
         return 0;
     }
 
+    /** Đếm số khách hàng có ngày tham gia (join_date) rơi vào tháng hiện tại, phục vụ KPI dashboard. */
+    public int countNewThisMonth() {
+        String sql = "SELECT COUNT(*) FROM enterprises WHERE is_deleted = 0 " +
+                     "AND YEAR(join_date) = YEAR(CURDATE()) AND MONTH(join_date) = MONTH(CURDATE())";
+        try (Connection conn = DBContext.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+            if (rs.next()) {
+                return rs.getInt(1);
+            }
+        } catch (SQLException ex) {
+            System.err.println("--- LOI DEM KHACH HANG MOI TRONG THANG ---");
+            ex.printStackTrace();
+        }
+        return 0;
+    }
+
     /** Lấy chi tiết 1 khách hàng theo ID, đã join địa chỉ + người phụ trách. Trả về null nếu không tồn tại. */
     public Enterprise findById(int enterpriseId) {
         String sql = SELECT_ENTERPRISE_BASE + "WHERE e.enterprise_id = ? AND e.is_deleted = 0";

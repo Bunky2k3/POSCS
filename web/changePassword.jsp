@@ -367,7 +367,7 @@
         <div class="topbar-left">
             <div class="brand"><i class="fa-solid fa-tower-broadcast"></i> POSCS Portal</div>
             <div class="topbar-nav">
-                <a href="${pageContext.request.contextPath}/dashboard.jsp" class="topbar-nav-link">Trang chủ</a>
+                <a href="${pageContext.request.contextPath}/dashboard" class="topbar-nav-link">Trang chủ</a>
                 <a href="${pageContext.request.contextPath}/customer" class="topbar-nav-link">Khách hàng</a>
                 <a href="${pageContext.request.contextPath}/contract" class="topbar-nav-link">Hợp đồng</a>
             </div>

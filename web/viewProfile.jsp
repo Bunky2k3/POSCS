@@ -305,7 +305,7 @@
             <button type="button" class="sidebar-toggle" id="sidebarToggle" aria-label="Thu gọn menu">
                 <i class="fa-solid fa-angles-left"></i>
             </button>
-            <a href="${pageContext.request.contextPath}/dashboard.jsp" class="sidebar-link"><i class="fa-solid fa-house"></i><span>Trang chủ</span></a>
+            <a href="${pageContext.request.contextPath}/dashboard" class="sidebar-link"><i class="fa-solid fa-house"></i><span>Trang chủ</span></a>
             <a href="${pageContext.request.contextPath}/customer" class="sidebar-link"><i class="fa-solid fa-users"></i><span>Khách hàng</span></a>
             <a href="${pageContext.request.contextPath}/contract" class="sidebar-link"><i class="fa-solid fa-file-contract"></i><span>Hợp đồng</span></a>
             <a href="${pageContext.request.contextPath}/ticket" class="sidebar-link"><i class="fa-solid fa-headset"></i><span>Phiếu hỗ trợ</span></a>
@@ -314,7 +314,7 @@
 
 
     <div class="page-container">
-        <a href="${pageContext.request.contextPath}/dashboard.jsp" class="back-link-top"><i class="fa-solid fa-arrow-left-long"></i> Về trang chủ</a>
+        <a href="${pageContext.request.contextPath}/dashboard" class="back-link-top"><i class="fa-solid fa-arrow-left-long"></i> Về trang chủ</a>
 
         <div class="profile-card">
 
