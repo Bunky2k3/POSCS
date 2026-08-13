@@ -45,10 +45,6 @@
         .topbar .brand { font-weight: 700; color: var(--primary-dark); font-size: 1.05rem; display: flex; align-items: center; gap: 10px; }
         .topbar .brand i { color: var(--primary); font-size: 1.2rem; }
         .topbar-left { display: flex; align-items: center; gap: 32px; }
-        .topbar-nav { display: flex; align-items: center; gap: 4px; }
-        .topbar-nav-link { color: #6b7280; font-weight: 600; font-size: 0.87rem; text-decoration: none; padding: 8px 14px; border-radius: 8px; transition: background 0.15s, color 0.15s; }
-        .topbar-nav-link:hover { background: #f0f9ff; color: var(--primary-dark); }
-        .topbar-nav-link.active { background: #eaf6ff; color: var(--primary-dark); }
         .topbar-right { display: flex; align-items: center; gap: 18px; }
         .bell-icon { color: #6b7280; font-size: 1.1rem; cursor: pointer; position: relative; }
         .bell-icon .dot { position: absolute; top: -3px; right: -4px; width: 8px; height: 8px; border-radius: 50%; background: var(--danger); border: 1.5px solid #fff; }
@@ -71,6 +67,42 @@
         .notif-time { font-size: 0.72rem; color: #9ca3af; margin-top: 2px; }
 
         /* ===== Layout ===== */
+        .app-shell { display: flex; align-items: flex-start; }
+        .sidebar {
+            width: 240px; flex-shrink: 0;
+            background: #fff; border-right: 1px solid #eef2f6;
+            padding: 20px 12px; position: sticky; top: 66px;
+            height: calc(100vh - 66px); overflow-y: auto;
+            display: flex; flex-direction: column;
+            transition: width 0.15s ease;
+        }
+        .sidebar-link {
+            display: flex; align-items: center; gap: 12px;
+            padding: 11px 14px; margin-bottom: 2px; border-radius: 10px;
+            color: #6b7280; font-weight: 600; font-size: 0.88rem; text-decoration: none;
+        }
+        .sidebar-link i { width: 18px; text-align: center; color: #9ca3af; flex-shrink: 0; }
+        .sidebar-link:hover { background: #f0f9ff; color: var(--primary-dark); }
+        .sidebar-link.active { background: linear-gradient(120deg, var(--primary), var(--primary-light)); color: #fff; }
+        .sidebar-link.active i { color: #fff; }
+        .sidebar-toggle {
+            display: flex; align-items: center; justify-content: center; width: 32px; height: 32px;
+            margin: 0 0 12px; padding: 0; border: none; border-radius: 8px;
+            background: none; color: #9ca3af; cursor: pointer;
+        }
+        .sidebar-toggle i { transition: transform 0.15s ease; }
+        .sidebar-toggle:hover { background: #f0f9ff; color: var(--primary-dark); }
+        .sidebar.collapsed { width: 68px; }
+        .sidebar.collapsed .sidebar-link { justify-content: center; }
+        .sidebar.collapsed .sidebar-link span { display: none; }
+        .sidebar.collapsed .sidebar-toggle i { transform: rotate(180deg); }
+        .sidebar.collapsed:hover { width: 240px; }
+        .sidebar.collapsed:hover .sidebar-link { justify-content: flex-start; }
+        .sidebar.collapsed:hover .sidebar-link span { display: inline; }
+        .sidebar.collapsed:hover .sidebar-toggle i { transform: rotate(0deg); }
+        .main-content { flex: 1; min-width: 0; }
+        @media (max-width: 900px) { .sidebar { display: none; } /* TODO: drawer thu gọn thay vì ẩn hẳn */ }
+
         .page-container { max-width: 1280px; margin: 28px auto; padding: 0 24px 60px; }
 
         .page-header-row { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 22px; flex-wrap: wrap; gap: 14px; }
@@ -164,9 +196,6 @@
         .btn-modal-danger { background: var(--danger); border: none; color: #fff; border-radius: 10px; padding: 8px 18px; font-weight: 600; font-size: 0.88rem; }
         .modal-icon-warn { width: 52px; height: 52px; border-radius: 50%; background: #fdecef; color: var(--danger); display: flex; align-items: center; justify-content: center; font-size: 1.3rem; margin-bottom: 4px; }
 
-        @media (max-width: 900px) {
-            .topbar-nav { display: none; }
-        }
         @media (max-width: 768px) {
             .page-container { padding: 0 14px 60px; }
             .custom-table { font-size: 0.8rem; }
@@ -178,11 +207,6 @@
     <nav class="topbar">
         <div class="topbar-left">
             <div class="brand"><i class="fa-solid fa-tower-broadcast"></i> POSCS Portal</div>
-            <div class="topbar-nav">
-                <a href="${pageContext.request.contextPath}/dashboard.jsp" class="topbar-nav-link">Trang chủ</a>
-                <a href="${pageContext.request.contextPath}/customer" class="topbar-nav-link">Khách hàng</a>
-                <a href="${pageContext.request.contextPath}/contract" class="topbar-nav-link active">Hợp đồng</a>
-            </div>
         </div>
         <div class="topbar-right">
             <div class="dropdown">
@@ -224,6 +248,17 @@
             </div>
         </div>
     </nav>
+    <div class="app-shell">
+        <aside class="sidebar" id="sidebar">
+            <button type="button" class="sidebar-toggle" id="sidebarToggle" aria-label="Thu gọn menu">
+                <i class="fa-solid fa-angles-left"></i>
+            </button>
+            <a href="${pageContext.request.contextPath}/dashboard.jsp" class="sidebar-link"><i class="fa-solid fa-house"></i><span>Trang chủ</span></a>
+            <a href="${pageContext.request.contextPath}/customer" class="sidebar-link"><i class="fa-solid fa-users"></i><span>Khách hàng</span></a>
+            <a href="${pageContext.request.contextPath}/contract" class="sidebar-link active"><i class="fa-solid fa-file-contract"></i><span>Hợp đồng</span></a>
+        </aside>
+        <div class="main-content">
+
 
     <div class="page-container">
 
@@ -345,6 +380,9 @@
         </div>
     </div>
 
+        </div>
+    </div>
+
     <!-- ===== Modal xác nhận xóa (MSG-043) ===== -->
     <div class="modal fade" id="deleteModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
@@ -392,6 +430,22 @@
         // Tự động submit lại form lọc khi đổi trạng thái / loại hợp đồng
         document.getElementById('filterStatus').addEventListener('change', function () { document.getElementById('filterForm').submit(); });
         document.getElementById('filterType').addEventListener('change', function () { document.getElementById('filterForm').submit(); });
+    </script>
+
+    <script>
+        // ===== Thu gọn / mở rộng sidebar =====
+        (function () {
+            var sidebar = document.getElementById('sidebar');
+            var toggle = document.getElementById('sidebarToggle');
+            var STORAGE_KEY = 'poscsSidebarCollapsed';
+            if (localStorage.getItem(STORAGE_KEY) === '1') {
+                sidebar.classList.add('collapsed');
+            }
+            toggle.addEventListener('click', function () {
+                var collapsed = sidebar.classList.toggle('collapsed');
+                localStorage.setItem(STORAGE_KEY, collapsed ? '1' : '0');
+            });
+        })();
     </script>
 </body>
 </html>
