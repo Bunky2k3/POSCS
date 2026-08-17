@@ -177,6 +177,9 @@ public class CustomerDAO {
      * Thêm khách hàng mới. Nếu enterprise.getAddress() có street/district thì tự tạo
      * dòng addresses trước rồi mới gán address_id. Trả về enterprise_id vừa tạo, hoặc -1 nếu lỗi.
      */
+    /** Thử lại tối đa bao nhiêu lần khi enterprise_code sinh ra bị trùng (xem insert()). */
+    private static final int MAX_CODE_GEN_ATTEMPTS = 5;
+
     public int insert(Enterprise enterprise) {
         String sql = "INSERT INTO enterprises " +
                 "(enterprise_code, enterprise_name, customer_type, customer_group, tax_code, email, phone, " +
@@ -184,13 +187,29 @@ public class CustomerDAO {
                 " status, join_date) " +
                 "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
+        // Tạo address (nếu có) trước vòng lặp, KHÔNG bên trong -- addressId sau khi
+        // tạo được giữ nguyên qua các lần thử lại, tránh insertAddress() chạy lại
+        // mỗi lần retry và để lại nhiều dòng addresses mồ côi cho cùng 1 request.
+        Integer addressId = enterprise.getAddressId();
         try (Connection conn = DBContext.getConnection()) {
-            Integer addressId = enterprise.getAddressId();
             if (addressId == null && enterprise.getAddress() != null) {
                 addressId = insertAddress(conn, enterprise.getAddress());
             }
+        } catch (SQLException ex) {
+            System.err.println("--- LOI THEM KHACH HANG (DIA CHI) ---");
+            ex.printStackTrace();
+            return -1;
+        }
 
-            try (PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+        // enterprise_code sinh từ generateNextEnterpriseCode() (đọc mã lớn nhất
+        // hiện có rồi +1) có thể trùng nếu 2 request tạo khách hàng gần như đồng
+        // thời cùng đọc được "mã lớn nhất" giống nhau -- cột enterprise_code có
+        // UNIQUE KEY (xem db/schema.sql) nên lần INSERT bị trùng sẽ bị DB từ chối
+        // thay vì âm thầm ghi đè; thử sinh mã mới và INSERT lại vài lần thay vì báo
+        // lỗi ngay, để người dùng không phải tự bấm lưu lại.
+        for (int attempt = 1; attempt <= MAX_CODE_GEN_ATTEMPTS; attempt++) {
+            try (Connection conn = DBContext.getConnection();
+                 PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
                 ps.setString(1, enterprise.getEnterpriseCode());
                 ps.setString(2, enterprise.getEnterpriseName());
                 ps.setString(3, enterprise.getCustomerType());
@@ -216,10 +235,15 @@ public class CustomerDAO {
                         return keys.getInt(1);
                     }
                 }
+            } catch (SQLException ex) {
+                if (isDuplicateKeyError(ex, "enterprise_code") && attempt < MAX_CODE_GEN_ATTEMPTS) {
+                    enterprise.setEnterpriseCode(generateNextEnterpriseCode());
+                    continue;
+                }
+                System.err.println("--- LOI THEM KHACH HANG ---");
+                ex.printStackTrace();
+                return -1;
             }
-        } catch (SQLException ex) {
-            System.err.println("--- LOI THEM KHACH HANG ---");
-            ex.printStackTrace();
         }
         return -1;
     }
@@ -327,6 +351,11 @@ public class CustomerDAO {
         } else {
             ps.setInt(index, value);
         }
+    }
+
+    /** true nếu ex là lỗi trùng UNIQUE KEY của MySQL (error 1062) trên đúng cột keyColumn. */
+    private boolean isDuplicateKeyError(SQLException ex, String keyColumn) {
+        return ex.getErrorCode() == 1062 && ex.getMessage() != null && ex.getMessage().contains(keyColumn);
     }
 
     /** Tạo 1 dòng addresses mới từ Address chưa có addressId, trả về address_id vừa tạo. */

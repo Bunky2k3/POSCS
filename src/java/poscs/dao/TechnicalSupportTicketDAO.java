@@ -249,6 +249,9 @@ public class TechnicalSupportTicketDAO {
         }
     }
 
+    /** Thử lại tối đa bao nhiêu lần khi ticket_code sinh ra bị trùng (xem insert()). */
+    private static final int MAX_CODE_GEN_ATTEMPTS = 5;
+
     /** Thêm phiếu hỗ trợ mới. Trả về ticket_id vừa tạo, hoặc -1 nếu lỗi. */
     public int insert(TechnicalRequest t) {
         String sql = "INSERT INTO technicalrequests " +
@@ -256,33 +259,46 @@ public class TechnicalSupportTicketDAO {
                 " assigned_technician_id, created_by, created_date, description, is_warranty, status) " +
                 "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
-        try (Connection conn = DBContext.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
-            ps.setString(1, t.getTicketCode());
-            ps.setInt(2, t.getEnterpriseId());
-            setNullableInt(ps, 3, t.getContractId());
-            ps.setString(4, t.getTicketType());
-            ps.setString(5, t.getPriority());
-            ps.setString(6, t.getReceptionChannel());
-            ps.setInt(7, t.getAssignedTechnicianId());
-            ps.setInt(8, t.getCreatedBy());
-            ps.setDate(9, t.getCreatedDate());
-            ps.setString(10, t.getDescription());
-            ps.setBoolean(11, t.isWarranty());
-            ps.setString(12, t.getStatus());
+        // ticket_code sinh từ generateNextTicketCode() (đọc mã lớn nhất hiện có rồi
+        // +1) có thể trùng nếu 2 request tạo phiếu gần như đồng thời cùng đọc được
+        // "mã lớn nhất" giống nhau -- cột ticket_code có UNIQUE KEY (xem
+        // db/schema.sql) nên lần INSERT bị trùng sẽ bị DB từ chối thay vì âm thầm
+        // ghi đè; thử sinh mã mới và INSERT lại vài lần thay vì báo lỗi ngay, để
+        // người dùng không phải tự bấm lưu lại.
+        for (int attempt = 1; attempt <= MAX_CODE_GEN_ATTEMPTS; attempt++) {
+            try (Connection conn = DBContext.getConnection();
+                 PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+                ps.setString(1, t.getTicketCode());
+                ps.setInt(2, t.getEnterpriseId());
+                setNullableInt(ps, 3, t.getContractId());
+                ps.setString(4, t.getTicketType());
+                ps.setString(5, t.getPriority());
+                ps.setString(6, t.getReceptionChannel());
+                ps.setInt(7, t.getAssignedTechnicianId());
+                ps.setInt(8, t.getCreatedBy());
+                ps.setDate(9, t.getCreatedDate());
+                ps.setString(10, t.getDescription());
+                ps.setBoolean(11, t.isWarranty());
+                ps.setString(12, t.getStatus());
 
-            int affected = ps.executeUpdate();
-            if (affected == 0) {
+                int affected = ps.executeUpdate();
+                if (affected == 0) {
+                    return -1;
+                }
+                try (ResultSet keys = ps.getGeneratedKeys()) {
+                    if (keys.next()) {
+                        return keys.getInt(1);
+                    }
+                }
+            } catch (SQLException ex) {
+                if (isDuplicateKeyError(ex, "ticket_code") && attempt < MAX_CODE_GEN_ATTEMPTS) {
+                    t.setTicketCode(generateNextTicketCode());
+                    continue;
+                }
+                System.err.println("--- LOI THEM PHIEU HO TRO ---");
+                ex.printStackTrace();
                 return -1;
             }
-            try (ResultSet keys = ps.getGeneratedKeys()) {
-                if (keys.next()) {
-                    return keys.getInt(1);
-                }
-            }
-        } catch (SQLException ex) {
-            System.err.println("--- LOI THEM PHIEU HO TRO ---");
-            ex.printStackTrace();
         }
         return -1;
     }
@@ -392,6 +408,11 @@ public class TechnicalSupportTicketDAO {
         } else {
             ps.setNull(index, Types.INTEGER);
         }
+    }
+
+    /** true nếu ex là lỗi trùng UNIQUE KEY của MySQL (error 1062) trên đúng cột keyColumn. */
+    private boolean isDuplicateKeyError(SQLException ex, String keyColumn) {
+        return ex.getErrorCode() == 1062 && ex.getMessage() != null && ex.getMessage().contains(keyColumn);
     }
 
     private TechnicalRequest mapRow(ResultSet rs) throws SQLException {
