@@ -4,11 +4,17 @@ POSCS uses role-based access control. This document is the source of
 truth for who can do what — refer to it whenever implementing or
 reviewing a controller's access checks.
 
-**Status: design only.** The `roles` table is seeded (see
+**Status: enforced for Customer/Contract/Ticket.** The `roles` table is
+seeded (see
 [`db/migrations/V2__seed_default_roles__ndat2003.sql`](db/migrations/V2__seed_default_roles__ndat2003.sql)),
-but `AuthenticationController` and session-based authorization are not
-implemented yet. This document exists so the matrix is settled and
-ready to enforce once login/session code lands.
+login/session is implemented in `AuthenticationController`, and
+`CustomerController`/`ContractController`/`TechnicalSupportTicketController`
+enforce this matrix server-side via
+`poscs.common.AccessControl.requireFullAccess(...)` at the top of every
+create/update/delete handler. `Product` and `Employee` have no real
+controller logic yet (`ProductController`/`EmployeeController` are still
+NetBeans stubs), so enforcement for those two rows is still pending —
+wire it up the same way once those features are built.
 
 ## Roles
 
