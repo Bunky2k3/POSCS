@@ -185,37 +185,54 @@ public class CustomerDAO {
                 "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
         try (Connection conn = DBContext.getConnection()) {
-            Integer addressId = enterprise.getAddressId();
-            if (addressId == null && enterprise.getAddress() != null) {
-                addressId = insertAddress(conn, enterprise.getAddress());
-            }
-
-            try (PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
-                ps.setString(1, enterprise.getEnterpriseCode());
-                ps.setString(2, enterprise.getEnterpriseName());
-                ps.setString(3, enterprise.getCustomerType());
-                ps.setString(4, enterprise.getCustomerGroup());
-                ps.setString(5, enterprise.getTaxCode());
-                ps.setString(6, enterprise.getEmail());
-                ps.setString(7, enterprise.getPhone());
-                ps.setString(8, enterprise.getWebsite());
-                setNullableInt(ps, 9, addressId);
-                ps.setInt(10, enterprise.getAccountOwnerId());
-                ps.setString(11, enterprise.getLegalRepresentative());
-                ps.setString(12, enterprise.getLogoUrl());
-                ps.setString(13, enterprise.getBusinessLicenseUrl());
-                ps.setString(14, enterprise.getStatus() != null ? enterprise.getStatus() : "Active");
-                ps.setDate(15, enterprise.getJoinDate());
-
-                int affected = ps.executeUpdate();
-                if (affected == 0) {
-                    return -1;
+            // insertAddress() (nếu có) và INSERT enterprises phải cùng thành công
+            // hoặc cùng rollback -- tắt autocommit để gộp thành 1 transaction,
+            // tránh để lại dòng addresses mồ côi khi bước INSERT enterprises sau
+            // đó lỗi (ví dụ vi phạm ràng buộc, mất kết nối giữa chừng).
+            conn.setAutoCommit(false);
+            try {
+                Integer addressId = enterprise.getAddressId();
+                if (addressId == null && enterprise.getAddress() != null) {
+                    addressId = insertAddress(conn, enterprise.getAddress());
                 }
-                try (ResultSet keys = ps.getGeneratedKeys()) {
-                    if (keys.next()) {
-                        return keys.getInt(1);
+
+                try (PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+                    ps.setString(1, enterprise.getEnterpriseCode());
+                    ps.setString(2, enterprise.getEnterpriseName());
+                    ps.setString(3, enterprise.getCustomerType());
+                    ps.setString(4, enterprise.getCustomerGroup());
+                    ps.setString(5, enterprise.getTaxCode());
+                    ps.setString(6, enterprise.getEmail());
+                    ps.setString(7, enterprise.getPhone());
+                    ps.setString(8, enterprise.getWebsite());
+                    setNullableInt(ps, 9, addressId);
+                    ps.setInt(10, enterprise.getAccountOwnerId());
+                    ps.setString(11, enterprise.getLegalRepresentative());
+                    ps.setString(12, enterprise.getLogoUrl());
+                    ps.setString(13, enterprise.getBusinessLicenseUrl());
+                    ps.setString(14, enterprise.getStatus() != null ? enterprise.getStatus() : "Active");
+                    ps.setDate(15, enterprise.getJoinDate());
+
+                    int affected = ps.executeUpdate();
+                    if (affected == 0) {
+                        conn.rollback();
+                        return -1;
+                    }
+                    try (ResultSet keys = ps.getGeneratedKeys()) {
+                        if (!keys.next()) {
+                            conn.rollback();
+                            return -1;
+                        }
+                        int newId = keys.getInt(1);
+                        conn.commit();
+                        return newId;
                     }
                 }
+            } catch (SQLException ex) {
+                conn.rollback();
+                throw ex;
+            } finally {
+                conn.setAutoCommit(true);
             }
         } catch (SQLException ex) {
             System.err.println("--- LOI THEM KHACH HANG ---");
@@ -232,23 +249,39 @@ public class CustomerDAO {
                 "WHERE enterprise_id = ? AND is_deleted = 0";
 
         try (Connection conn = DBContext.getConnection()) {
-            Integer addressId = enterprise.getAddressId();
-            if (addressId == null && enterprise.getAddress() != null) {
-                addressId = insertAddress(conn, enterprise.getAddress());
-            }
+            // Cùng lý do như insert(): gộp insertAddress() + UPDATE enterprises
+            // vào 1 transaction để không để lại dòng addresses mồ côi khi bước sau lỗi.
+            conn.setAutoCommit(false);
+            try {
+                Integer addressId = enterprise.getAddressId();
+                if (addressId == null && enterprise.getAddress() != null) {
+                    addressId = insertAddress(conn, enterprise.getAddress());
+                }
 
-            try (PreparedStatement ps = conn.prepareStatement(sql)) {
-                ps.setString(1, enterprise.getEnterpriseName());
-                ps.setString(2, enterprise.getCustomerType());
-                ps.setString(3, enterprise.getCustomerGroup());
-                ps.setString(4, enterprise.getEmail());
-                ps.setString(5, enterprise.getPhone());
-                ps.setString(6, enterprise.getWebsite());
-                setNullableInt(ps, 7, addressId);
-                ps.setInt(8, enterprise.getAccountOwnerId());
-                ps.setDate(9, enterprise.getJoinDate());
-                ps.setInt(10, enterprise.getEnterpriseId());
-                return ps.executeUpdate() > 0;
+                try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                    ps.setString(1, enterprise.getEnterpriseName());
+                    ps.setString(2, enterprise.getCustomerType());
+                    ps.setString(3, enterprise.getCustomerGroup());
+                    ps.setString(4, enterprise.getEmail());
+                    ps.setString(5, enterprise.getPhone());
+                    ps.setString(6, enterprise.getWebsite());
+                    setNullableInt(ps, 7, addressId);
+                    ps.setInt(8, enterprise.getAccountOwnerId());
+                    ps.setDate(9, enterprise.getJoinDate());
+                    ps.setInt(10, enterprise.getEnterpriseId());
+                    boolean ok = ps.executeUpdate() > 0;
+                    if (ok) {
+                        conn.commit();
+                    } else {
+                        conn.rollback();
+                    }
+                    return ok;
+                }
+            } catch (SQLException ex) {
+                conn.rollback();
+                throw ex;
+            } finally {
+                conn.setAutoCommit(true);
             }
         } catch (SQLException ex) {
             System.err.println("--- LOI CAP NHAT KHACH HANG ---");

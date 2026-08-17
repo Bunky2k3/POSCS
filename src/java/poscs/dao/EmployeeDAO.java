@@ -141,24 +141,42 @@ public class EmployeeDAO {
                      "date_of_birth = ?, citizen_id = ?, phone = ?, personal_email = ?, address_id = ? " +
                      "WHERE user_id = ? AND is_deleted = 0";
         try (Connection conn = DBContext.getConnection()) {
-            Integer addressId = resolveAddressId(conn, user.getAddress());
+            // resolveAddressId() (insert/update dòng addresses) và UPDATE users
+            // phải cùng thành công hoặc cùng rollback -- tắt autocommit để gộp
+            // thành 1 transaction, tránh để địa chỉ đã đổi mà các trường khác
+            // của hồ sơ lại không được lưu (hoặc ngược lại) khi 1 trong 2 bước lỗi.
+            conn.setAutoCommit(false);
+            try {
+                Integer addressId = resolveAddressId(conn, user.getAddress());
 
-            try (PreparedStatement ps = conn.prepareStatement(sql)) {
-                ps.setString(1, user.getLastName());
-                ps.setString(2, user.getMiddleName());
-                ps.setString(3, user.getFirstName());
-                ps.setString(4, user.getGender());
-                ps.setDate(5, user.getDateOfBirth());
-                ps.setString(6, user.getCitizenId());
-                ps.setString(7, user.getPhone());
-                ps.setString(8, user.getPersonalEmail());
-                if (addressId != null) {
-                    ps.setInt(9, addressId);
-                } else {
-                    ps.setNull(9, Types.INTEGER);
+                try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                    ps.setString(1, user.getLastName());
+                    ps.setString(2, user.getMiddleName());
+                    ps.setString(3, user.getFirstName());
+                    ps.setString(4, user.getGender());
+                    ps.setDate(5, user.getDateOfBirth());
+                    ps.setString(6, user.getCitizenId());
+                    ps.setString(7, user.getPhone());
+                    ps.setString(8, user.getPersonalEmail());
+                    if (addressId != null) {
+                        ps.setInt(9, addressId);
+                    } else {
+                        ps.setNull(9, Types.INTEGER);
+                    }
+                    ps.setInt(10, user.getUserId());
+                    boolean ok = ps.executeUpdate() > 0;
+                    if (ok) {
+                        conn.commit();
+                    } else {
+                        conn.rollback();
+                    }
+                    return ok;
                 }
-                ps.setInt(10, user.getUserId());
-                return ps.executeUpdate() > 0;
+            } catch (SQLException ex) {
+                conn.rollback();
+                throw ex;
+            } finally {
+                conn.setAutoCommit(true);
             }
         } catch (SQLException ex) {
             System.err.println("--- LOI CAP NHAT HO SO CA NHAN ---");
