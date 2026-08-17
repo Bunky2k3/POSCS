@@ -181,12 +181,34 @@ public class TechnicalSupportTicketController extends HttpServlet {
             return;
         }
 
+        // Cần đọc lại phiếu hiện có trong DB để: (1) giữ nguyên contractId khi form
+        // không gửi lên (dropdown "Hợp đồng" ở updateTicket.jsp mặc định disabled,
+        // chỉ enable sau khi AJAX loadContracts() chạy xong -- nếu chậm/lỗi/JS tắt
+        // thì trường này không được submit); và (2) không ghi đè lại resolved_at
+        // nếu phiếu đã đóng từ trước, xem bên dưới.
+        TechnicalRequest existing = ticketDAO.findById(id);
+        if (existing == null) {
+            response.sendRedirect(request.getContextPath() + "/ticket?error=notfound");
+            return;
+        }
+
         TechnicalRequest t = buildTicketFromRequest(request, new TechnicalRequest());
         t.setTicketId(id);
+        if (t.getContractId() == null) {
+            t.setContractId(existing.getContractId());
+        }
         t.setStatus(emptyToNull(request.getParameter("status")));
         t.setResolutionSummary(emptyToNull(request.getParameter("resolutionSummary")));
-        t.setResolvedAt(TechnicalSupportTicketDAO.STATUS_CLOSED.equals(t.getStatus())
-                ? new Timestamp(System.currentTimeMillis()) : null);
+        if (TechnicalSupportTicketDAO.STATUS_CLOSED.equals(t.getStatus())) {
+            // Chỉ stamp resolved_at = bây giờ ở lần đầu tiên chuyển sang "Đã đóng"
+            // -- nếu phiếu đã đóng từ trước (sửa lại resolutionSummary chẳng hạn),
+            // giữ nguyên thời điểm đóng gốc thay vì ghi đè lại mỗi lần lưu.
+            t.setResolvedAt(TechnicalSupportTicketDAO.STATUS_CLOSED.equals(existing.getStatus())
+                    ? existing.getResolvedAt()
+                    : new Timestamp(System.currentTimeMillis()));
+        } else {
+            t.setResolvedAt(null);
+        }
 
         if (!isValid(t) || t.getStatus() == null) {
             response.sendRedirect(request.getContextPath() + "/ticket?action=edit&id=" + id + "&error=invalid");
