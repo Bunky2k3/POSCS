@@ -286,9 +286,16 @@ public class AuthenticationController extends HttpServlet {
             return;
         }
 
-        // Đăng nhập thành công: tạo session mới (true = tạo nếu chưa có) và lưu
-        // user vào đó. Các servlet khác sau này sẽ đọc session.getAttribute("currentUser")
-        // để biết ai đang đăng nhập và role của họ là gì (theo PERMISSIONS.md).
+        // Đăng nhập thành công: huỷ session cũ (nếu có) trước khi tạo session mới,
+        // thay vì tái sử dụng session hiện tại -- nếu không, 1 session ID được kẻ
+        // tấn công cài sẵn từ trước (session fixation, vd qua URL dạng
+        // ;jsessionid=..., hoặc set cookie từ 1 origin liên quan) sẽ được gắn thẳng
+        // với currentUser vừa đăng nhập, cho phép kẻ tấn công dùng session ID đó
+        // để mạo danh nạn nhân ngay sau khi họ đăng nhập thành công.
+        HttpSession oldSession = request.getSession(false);
+        if (oldSession != null) {
+            oldSession.invalidate();
+        }
         HttpSession session = request.getSession(true);
         session.setAttribute("currentUser", user);
         response.sendRedirect(request.getContextPath() + "/dashboard");
