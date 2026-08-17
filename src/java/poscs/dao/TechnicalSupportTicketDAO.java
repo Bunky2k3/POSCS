@@ -252,9 +252,9 @@ public class TechnicalSupportTicketDAO {
     /** Thêm phiếu hỗ trợ mới. Trả về ticket_id vừa tạo, hoặc -1 nếu lỗi. */
     public int insert(TechnicalRequest t) {
         String sql = "INSERT INTO technicalrequests " +
-                "(ticket_code, enterprise_id, contract_id, ticket_type, priority, reception_channel, " +
+                "(ticket_code, enterprise_id, contract_id, ticket_type, priority, reception_channel, sla_deadline, " +
                 " assigned_technician_id, created_by, created_date, description, is_warranty, status) " +
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
         try (Connection conn = DBContext.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
@@ -264,12 +264,13 @@ public class TechnicalSupportTicketDAO {
             ps.setString(4, t.getTicketType());
             ps.setString(5, t.getPriority());
             ps.setString(6, t.getReceptionChannel());
-            ps.setInt(7, t.getAssignedTechnicianId());
-            ps.setInt(8, t.getCreatedBy());
-            ps.setDate(9, t.getCreatedDate());
-            ps.setString(10, t.getDescription());
-            ps.setBoolean(11, t.isWarranty());
-            ps.setString(12, t.getStatus());
+            setNullableTimestamp(ps, 7, t.getSlaDeadline());
+            ps.setInt(8, t.getAssignedTechnicianId());
+            ps.setInt(9, t.getCreatedBy());
+            ps.setDate(10, t.getCreatedDate());
+            ps.setString(11, t.getDescription());
+            ps.setBoolean(12, t.isWarranty());
+            ps.setString(13, t.getStatus());
 
             int affected = ps.executeUpdate();
             if (affected == 0) {
@@ -290,7 +291,7 @@ public class TechnicalSupportTicketDAO {
     /** Cập nhật phiếu hỗ trợ đang có (gồm cả đổi trạng thái xử lý). Trả về true nếu cập nhật thành công. */
     public boolean update(TechnicalRequest t) {
         String sql = "UPDATE technicalrequests SET " +
-                "enterprise_id = ?, contract_id = ?, ticket_type = ?, priority = ?, reception_channel = ?, " +
+                "enterprise_id = ?, contract_id = ?, ticket_type = ?, priority = ?, reception_channel = ?, sla_deadline = ?, " +
                 "assigned_technician_id = ?, description = ?, is_warranty = ?, status = ?, " +
                 "resolution_summary = ?, resolved_at = ? " +
                 "WHERE ticket_id = ? AND is_deleted = 0";
@@ -302,17 +303,14 @@ public class TechnicalSupportTicketDAO {
             ps.setString(3, t.getTicketType());
             ps.setString(4, t.getPriority());
             ps.setString(5, t.getReceptionChannel());
-            ps.setInt(6, t.getAssignedTechnicianId());
-            ps.setString(7, t.getDescription());
-            ps.setBoolean(8, t.isWarranty());
-            ps.setString(9, t.getStatus());
-            ps.setString(10, t.getResolutionSummary());
-            if (t.getResolvedAt() != null) {
-                ps.setTimestamp(11, t.getResolvedAt());
-            } else {
-                ps.setNull(11, Types.TIMESTAMP);
-            }
-            ps.setInt(12, t.getTicketId());
+            setNullableTimestamp(ps, 6, t.getSlaDeadline());
+            ps.setInt(7, t.getAssignedTechnicianId());
+            ps.setString(8, t.getDescription());
+            ps.setBoolean(9, t.isWarranty());
+            ps.setString(10, t.getStatus());
+            ps.setString(11, t.getResolutionSummary());
+            setNullableTimestamp(ps, 12, t.getResolvedAt());
+            ps.setInt(13, t.getTicketId());
             return ps.executeUpdate() > 0;
         } catch (SQLException ex) {
             System.err.println("--- LOI CAP NHAT PHIEU HO TRO ---");
@@ -391,6 +389,14 @@ public class TechnicalSupportTicketDAO {
             ps.setInt(index, value);
         } else {
             ps.setNull(index, Types.INTEGER);
+        }
+    }
+
+    private void setNullableTimestamp(PreparedStatement ps, int index, Timestamp value) throws SQLException {
+        if (value != null) {
+            ps.setTimestamp(index, value);
+        } else {
+            ps.setNull(index, Types.TIMESTAMP);
         }
     }
 
