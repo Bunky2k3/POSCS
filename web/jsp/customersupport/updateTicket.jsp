@@ -175,6 +175,7 @@
 
         <div class="card-box">
             <form id="updateTicketForm" action="${pageContext.request.contextPath}/ticket" method="POST" onsubmit="return validateForm();">
+                <input type="hidden" name="csrfToken" value="${csrfToken}">
                 <input type="hidden" name="action" value="update">
                 <input type="hidden" name="ticketId" value="${ticket.ticketId}">
 

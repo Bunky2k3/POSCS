@@ -225,6 +225,7 @@
 
         <div class="card-box">
             <form id="createCustomerForm" action="${pageContext.request.contextPath}/customer" method="POST" onsubmit="return validateForm();">
+                <input type="hidden" name="csrfToken" value="${csrfToken}">
                 <input type="hidden" name="action" value="update">
                 <input type="hidden" name="customerId" value="${customer.enterpriseId}">
 

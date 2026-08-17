@@ -235,6 +235,7 @@
                 </div>
 
                 <form action="${pageContext.request.contextPath}/login" method="POST" id="loginForm">
+                    <input type="hidden" name="csrfToken" value="${csrfToken}">
                     <c:if test="${not empty param.error}">
                         <div class="alert alert-danger py-2 px-3 mb-4" style="font-size: 0.9rem; border-radius: 12px;">
                             <c:choose>

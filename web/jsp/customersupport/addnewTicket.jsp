@@ -175,6 +175,7 @@
 
         <div class="card-box">
             <form id="createTicketForm" action="${pageContext.request.contextPath}/ticket" method="POST" onsubmit="return validateForm();">
+                <input type="hidden" name="csrfToken" value="${csrfToken}">
                 <input type="hidden" name="action" value="create">
 
                 <div class="section-header"><h5>Thông tin chung</h5></div>

@@ -461,6 +461,7 @@
                 </c:if>
 
                 <form id="changePasswordForm" method="post" action="${pageContext.request.contextPath}/changePassword" onsubmit="return validateForm();">
+                    <input type="hidden" name="csrfToken" value="${csrfToken}">
 
                     <div class="form-group">
                         <label for="oldPassword">Mật khẩu hiện tại</label>

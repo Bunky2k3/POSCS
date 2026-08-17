@@ -518,6 +518,7 @@
 
     <!-- Form ẩn để gửi yêu cầu xoá qua POST (không đổi state bằng GET) -->
     <form id="deleteForm" method="POST" action="${pageContext.request.contextPath}/customer" style="display:none">
+        <input type="hidden" name="csrfToken" value="${csrfToken}">
         <input type="hidden" name="action" value="delete">
         <input type="hidden" name="id" id="deleteFormId">
     </form>
