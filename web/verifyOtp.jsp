@@ -207,6 +207,7 @@
                         <c:choose>
                             <c:when test="${param.error == 'expired'}">Mã OTP đã hết hạn, vui lòng quay lại và yêu cầu gửi mã mới.</c:when>
                             <c:when test="${param.error == 'invalid_otp'}">Mã OTP không đúng, vui lòng thử lại.</c:when>
+                            <c:when test="${param.error == 'too_many_attempts'}">Bạn đã nhập sai quá nhiều lần, vui lòng quay lại và yêu cầu gửi mã mới.</c:when>
                             <c:otherwise>Đã có lỗi xảy ra. Vui lòng thử lại.</c:otherwise>
                         </c:choose>
                     </div>
