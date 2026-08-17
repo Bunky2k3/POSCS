@@ -8,6 +8,7 @@ import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import poscs.common.AccessControl;
 import poscs.dao.AddressDAO;
 import poscs.dao.ContractDAO;
 import poscs.dao.CustomerDAO;
@@ -18,9 +19,9 @@ import poscs.model.Enterprise;
 
 /**
  * Controller cho toàn bộ chức năng khách hàng (enterprises). Điều hướng
- * theo tham số "action" -- xem README ở PERMISSIONS.md để biết role nào
- * được thao tác gì (chưa enforce ở đây vì AuthenticationController/
- * session chưa được code).
+ * theo tham số "action" -- role nào được thao tác gì xem PERMISSIONS.md,
+ * enforce bằng AccessControl.requireFullAccess ở đầu mỗi hàm handleCreate/
+ * handleUpdate/handleDelete (Kỹ thuật/CSKH chỉ View only trên Customer).
  */
 @WebServlet(name = "CustomerController", urlPatterns = {"/customer"})
 public class CustomerController extends HttpServlet {
@@ -158,6 +159,9 @@ public class CustomerController extends HttpServlet {
     // ------------------------------------------------------------------
 
     private void handleCreate(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        if (!AccessControl.requireFullAccess(request, response, AccessControl.Resource.CUSTOMER)) {
+            return;
+        }
         Enterprise e = new Enterprise();
         e.setEnterpriseName(request.getParameter("customerName"));
         e.setCustomerType(request.getParameter("customerType"));
@@ -191,6 +195,9 @@ public class CustomerController extends HttpServlet {
     }
 
     private void handleUpdate(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        if (!AccessControl.requireFullAccess(request, response, AccessControl.Resource.CUSTOMER)) {
+            return;
+        }
         Integer id = parseIntOrNull(request.getParameter("customerId"));
         if (id == null) {
             response.sendRedirect(request.getContextPath() + "/customer?error=notfound");
@@ -228,6 +235,9 @@ public class CustomerController extends HttpServlet {
     }
 
     private void handleDelete(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        if (!AccessControl.requireFullAccess(request, response, AccessControl.Resource.CUSTOMER)) {
+            return;
+        }
         Integer id = parseIntOrNull(request.getParameter("id"));
         if (id == null) {
             response.sendRedirect(request.getContextPath() + "/customer");

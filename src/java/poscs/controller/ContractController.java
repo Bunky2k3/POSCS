@@ -9,6 +9,7 @@ import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import poscs.common.AccessControl;
 import poscs.dao.ContractDAO;
 import poscs.dao.CustomerDAO;
 import poscs.dao.EmployeeDAO;
@@ -19,8 +20,9 @@ import poscs.model.Contract;
  * Hạng mục sản phẩm/dịch vụ (contractproducts) chưa được xử lý ở đây --
  * bảng đó chưa có cột lưu đơn giá nên chưa thể tính thành tiền/VAT/tổng
  * cộng như mockup UI, thuộc phạm vi khác. Điều hướng theo tham số
- * "action" -- session/quyền hạn chưa enforce ở đây vì
- * AuthenticationController chưa được code.
+ * "action" -- quyền hạn theo PERMISSIONS.md enforce bằng
+ * AccessControl.requireFullAccess ở đầu mỗi hàm handleCreate/handleUpdate/
+ * handleDelete (Kỹ thuật/CSKH chỉ View only trên Contract).
  */
 @WebServlet(name = "ContractController", urlPatterns = {"/contract"})
 public class ContractController extends HttpServlet {
@@ -153,6 +155,9 @@ public class ContractController extends HttpServlet {
     // ------------------------------------------------------------------
 
     private void handleCreate(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        if (!AccessControl.requireFullAccess(request, response, AccessControl.Resource.CONTRACT)) {
+            return;
+        }
         Contract c = buildContractFromRequest(request, new Contract());
         if (!isValid(c)) {
             response.sendRedirect(request.getContextPath() + "/contract?action=new&error=invalid");
@@ -169,6 +174,9 @@ public class ContractController extends HttpServlet {
     }
 
     private void handleUpdate(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        if (!AccessControl.requireFullAccess(request, response, AccessControl.Resource.CONTRACT)) {
+            return;
+        }
         Integer id = parseIntOrNull(request.getParameter("contractId"));
         if (id == null) {
             response.sendRedirect(request.getContextPath() + "/contract?error=notfound");
@@ -191,6 +199,9 @@ public class ContractController extends HttpServlet {
     }
 
     private void handleDelete(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        if (!AccessControl.requireFullAccess(request, response, AccessControl.Resource.CONTRACT)) {
+            return;
+        }
         Integer id = parseIntOrNull(request.getParameter("id"));
         if (id == null) {
             response.sendRedirect(request.getContextPath() + "/contract");

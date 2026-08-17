@@ -10,6 +10,7 @@ import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
+import poscs.common.AccessControl;
 import poscs.dao.CustomerDAO;
 import poscs.dao.EmployeeDAO;
 import poscs.dao.TechnicalSupportTicketDAO;
@@ -19,9 +20,10 @@ import poscs.model.User;
 /**
  * Controller CRUD cho phiếu hỗ trợ kỹ thuật (bảng technicalrequests). Điều
  * hướng theo tham số "action", theo đúng khuôn mẫu của CustomerController/
- * ContractController -- session/quyền hạn theo PERMISSIONS.md (CSKH và
- * Admin có toàn quyền, Sales/Kỹ thuật chỉ xem) chưa enforce ở đây vì
- * AuthenticationController/session chưa được code.
+ * ContractController -- quyền hạn theo PERMISSIONS.md (CSKH và Admin có
+ * toàn quyền, Sales/Kỹ thuật chỉ xem) enforce bằng
+ * AccessControl.requireFullAccess ở đầu mỗi hàm handleCreate/handleUpdate/
+ * handleDelete.
  *
  * technicalrequestdevices (thiết bị lỗi) và technicalrequesthistory (lịch
  * sử đổi trạng thái) chưa được xử lý -- thuộc phạm vi khác.
@@ -155,6 +157,9 @@ public class TechnicalSupportTicketController extends HttpServlet {
     // ------------------------------------------------------------------
 
     private void handleCreate(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        if (!AccessControl.requireFullAccess(request, response, AccessControl.Resource.TICKET)) {
+            return;
+        }
         TechnicalRequest t = buildTicketFromRequest(request, new TechnicalRequest());
         t.setCreatedDate(new Date(System.currentTimeMillis()));
         t.setStatus(TechnicalSupportTicketDAO.STATUS_NEW);
@@ -175,6 +180,9 @@ public class TechnicalSupportTicketController extends HttpServlet {
     }
 
     private void handleUpdate(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        if (!AccessControl.requireFullAccess(request, response, AccessControl.Resource.TICKET)) {
+            return;
+        }
         Integer id = parseIntOrNull(request.getParameter("ticketId"));
         if (id == null) {
             response.sendRedirect(request.getContextPath() + "/ticket?error=notfound");
@@ -202,6 +210,9 @@ public class TechnicalSupportTicketController extends HttpServlet {
     }
 
     private void handleDelete(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        if (!AccessControl.requireFullAccess(request, response, AccessControl.Resource.TICKET)) {
+            return;
+        }
         Integer id = parseIntOrNull(request.getParameter("id"));
         if (id == null) {
             response.sendRedirect(request.getContextPath() + "/ticket");
