@@ -72,6 +72,21 @@ For deploying to a real server (staging/production), see
 ## Roles and permissions
 
 See [PERMISSIONS.md](PERMISSIONS.md) for the role-based access matrix
-(who can do what per feature). Login/session enforcement isn't wired
-up yet, but the roles are seeded in the database and every controller
-should be built against this matrix.
+(who can do what per feature). Login/session enforcement is wired up
+in `AuthenticationController`/`AuthenticationFilter`, and the matrix
+is enforced server-side for Customer/Contract/Ticket via
+`poscs.common.AccessControl` — see PERMISSIONS.md for what's still
+pending (Product/Employee).
+
+## Security
+
+- **CSRF protection:** every state-changing `POST` (including login)
+  must carry a valid per-session token, checked in
+  `AuthenticationFilter` before the request reaches a servlet — see
+  `poscs.common.CsrfUtil`.
+- **Session fixation:** login regenerates the session instead of
+  reusing whatever session ID the request arrived with (see
+  `AuthenticationController#handleLogin`).
+- **OTP rate limiting:** the forgot-password flow locks out a code
+  after 5 failed verification attempts (`PasswordResetController`).
+- **Role-based access control:** see [PERMISSIONS.md](PERMISSIONS.md).
