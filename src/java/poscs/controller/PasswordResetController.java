@@ -38,10 +38,16 @@ public class PasswordResetController extends HttpServlet {
     private static final int OTP_LENGTH = 6;
     // 5 phút -- khớp với UI (verifyOtp.jsp đếm ngược 05:00 bằng JS phía client).
     private static final long OTP_VALID_MILLIS = 5 * 60 * 1000;
+    // Số lần nhập sai tối đa trước khi bắt yêu cầu gửi mã OTP mới -- không có
+    // giới hạn này thì 1 kẻ tấn công (đã tự kích hoạt luồng quên mật khẩu cho
+    // email nạn nhân) có thể dò toàn bộ 10^OTP_LENGTH khả năng trong đúng 1
+    // cửa sổ hiệu lực OTP_VALID_MILLIS bằng cách gửi liên tục không giới hạn.
+    private static final int MAX_OTP_ATTEMPTS = 5;
 
     private static final String SESSION_RESET_EMAIL = "resetEmail";
     private static final String SESSION_RESET_OTP = "resetOtp";
     private static final String SESSION_RESET_OTP_EXPIRY = "resetOtpExpiry";
+    private static final String SESSION_RESET_OTP_ATTEMPTS = "resetOtpAttempts";
     private static final String SESSION_OTP_VERIFIED = "otpVerified";
 
     private final EmployeeDAO employeeDAO = new EmployeeDAO();
@@ -98,6 +104,7 @@ public class PasswordResetController extends HttpServlet {
             session.setAttribute(SESSION_RESET_EMAIL, email);
             session.setAttribute(SESSION_RESET_OTP, otp);
             session.setAttribute(SESSION_RESET_OTP_EXPIRY, System.currentTimeMillis() + OTP_VALID_MILLIS);
+            session.removeAttribute(SESSION_RESET_OTP_ATTEMPTS); // reset bộ đếm số lần nhập sai cho mã OTP mới này
             session.removeAttribute(SESSION_OTP_VERIFIED); // reset nếu trước đó đã từng verify 1 lần khác
 
             EmailUtil.sendOtpEmail(email, otp);
@@ -127,8 +134,25 @@ public class PasswordResetController extends HttpServlet {
             return;
         }
 
+        // Giới hạn số lần nhập sai (MAX_OTP_ATTEMPTS) trong đúng 1 mã OTP -- nếu
+        // không, mã 6 số vẫn còn hiệu lực trong OTP_VALID_MILLIS có thể bị dò
+        // toàn bộ bằng cách gửi liên tục không giới hạn. Vượt quá số lần cho
+        // phép thì coi như mã này "cháy", xoá luôn để bắt yêu cầu gửi mã mới.
+        Integer attempts = (Integer) session.getAttribute(SESSION_RESET_OTP_ATTEMPTS);
+        if (attempts == null) {
+            attempts = 0;
+        }
+        if (attempts >= MAX_OTP_ATTEMPTS) {
+            session.removeAttribute(SESSION_RESET_OTP);
+            session.removeAttribute(SESSION_RESET_OTP_EXPIRY);
+            session.removeAttribute(SESSION_RESET_OTP_ATTEMPTS);
+            response.sendRedirect(request.getContextPath() + "/verifyOtp.jsp?error=too_many_attempts");
+            return;
+        }
+
         String inputOtp = trimToNull(request.getParameter("otpCode"));
         if (inputOtp == null || !inputOtp.equals(expectedOtp)) {
+            session.setAttribute(SESSION_RESET_OTP_ATTEMPTS, attempts + 1);
             response.sendRedirect(request.getContextPath() + "/verifyOtp.jsp?error=invalid_otp");
             return;
         }
@@ -137,6 +161,7 @@ public class PasswordResetController extends HttpServlet {
         // chạy. Xoá resetOtp ngay để chặn dùng lại đúng mã đó lần 2.
         session.setAttribute(SESSION_OTP_VERIFIED, Boolean.TRUE);
         session.removeAttribute(SESSION_RESET_OTP);
+        session.removeAttribute(SESSION_RESET_OTP_ATTEMPTS);
         response.sendRedirect(request.getContextPath() + "/resetPassword.jsp");
     }
 
@@ -176,6 +201,7 @@ public class PasswordResetController extends HttpServlet {
         session.removeAttribute(SESSION_RESET_EMAIL);
         session.removeAttribute(SESSION_RESET_OTP);
         session.removeAttribute(SESSION_RESET_OTP_EXPIRY);
+        session.removeAttribute(SESSION_RESET_OTP_ATTEMPTS);
         session.removeAttribute(SESSION_OTP_VERIFIED);
 
         if (!ok) {
