@@ -273,6 +273,11 @@ public class CustomerController extends HttpServlet {
      * Trường bắt buộc + BR-09 (định dạng SĐT) + BR-10 (định dạng email) + ngày tham gia
      * không ở tương lai. Khớp với validate phía client ở addnewcustomer.jsp/updatecustomer.jsp
      * -- trước đây chỉ có ở client nên có thể bị bypass bằng cách POST thẳng.
+     *
+     * Email bắt buộc phải nhập (không chỉ đúng định dạng khi có) vì cột
+     * enterprises.email trong DB là NOT NULL + UNIQUE (xem db/schema.sql) --
+     * để trống sẽ làm INSERT/UPDATE thất bại ở tầng DB thay vì báo lỗi rõ
+     * ràng "invalid" ngay tại đây.
      */
     private boolean isValidCommonFields(Enterprise e) {
         if (isBlank(e.getEnterpriseName()) || isBlank(e.getCustomerType()) || isBlank(e.getCustomerGroup())) {
@@ -284,7 +289,7 @@ public class CustomerController extends HttpServlet {
         if (!isValidPhone(e.getPhone())) {
             return false;
         }
-        if (e.getEmail() != null && !isValidEmail(e.getEmail())) {
+        if (isBlank(e.getEmail()) || !isValidEmail(e.getEmail())) {
             return false;
         }
         return e.getJoinDate() == null || !e.getJoinDate().toLocalDate().isAfter(java.time.LocalDate.now());
