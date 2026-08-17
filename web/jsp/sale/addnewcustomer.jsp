@@ -277,9 +277,9 @@
                         <span class="error-text" id="err-phone">Số điện thoại không hợp lệ.</span>
                     </div>
                     <div class="col-md-6 field-row">
-                        <label>Email</label>
+                        <label>Email <span class="req">*</span></label>
                         <input type="email" class="form-control" id="email" name="email" placeholder="contact@company.vn">
-                        <span class="error-text" id="err-email">Địa chỉ email không hợp lệ.</span>
+                        <span class="error-text" id="err-email">Vui lòng nhập địa chỉ email hợp lệ.</span>
                     </div>
 
                     <div class="col-md-6 field-row">
@@ -393,7 +393,7 @@
             if (!isValidPhone(phone.value)) { document.getElementById('err-phone').style.display = 'block'; valid = false; }
 
             var email = document.getElementById('email');
-            if (email.value && !isValidEmail(email.value)) { document.getElementById('err-email').style.display = 'block'; valid = false; }
+            if (!isValidEmail(email.value)) { document.getElementById('err-email').style.display = 'block'; valid = false; }
 
             var joinDate = document.getElementById('joinDate');
             if (joinDate.value) {
