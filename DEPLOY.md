@@ -91,7 +91,13 @@ a target server is configured in the Ant/NetBeans project.
 
 ## Current status
 
-Most controllers (`AuthenticationController`, `CustomerController`,
-`ContractController`, ...) and DAOs are still scaffolding without real
-business logic. Deploying today gets you a working skeleton — real
-user-facing functionality depends on that work landing first.
+`CustomerController`, `ContractController`, and
+`TechnicalSupportTicketController` implement full CRUD with
+server-side role-based access control (see
+[PERMISSIONS.md](PERMISSIONS.md)) and CSRF protection.
+`AuthenticationController` handles login/logout/change-password/
+profile, with session-fixation protection on login and a
+rate-limited forgot-password/OTP flow. `ProductController` and
+`EmployeeController` are still NetBeans scaffolding with no real
+business logic — deploying today gets you working Customer/Contract/
+Ticket management and auth, not Product/Employee management yet.
