@@ -208,6 +208,7 @@
 
             <%-- PasswordResetController#handleResetPassword kiểm tra session có otpVerified = true không trước khi cho đặt mật khẩu mới --%>
             <form action="ResetPasswordServlet" method="POST" id="resetPasswordForm" onsubmit="return validateForm();">
+                <input type="hidden" name="csrfToken" value="${csrfToken}">
 
                 <c:if test="${not empty param.error}">
                     <div class="alert alert-danger py-2 px-3 mb-4" style="font-size: 0.85rem; border-radius: 12px;">

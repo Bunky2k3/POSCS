@@ -384,6 +384,7 @@
 
                 <%-- Lưu ý: chưa xử lý lưu ảnh đại diện (avatar) -- chỉ mới xem trước ở trình duyệt (JS bên dưới). --%>
                 <form id="updateProfileForm" action="UpdateProfileServlet" method="POST" enctype="multipart/form-data" onsubmit="return validateForm();">
+                    <input type="hidden" name="csrfToken" value="${csrfToken}">
 
                     <!-- ===== Thông tin công việc (chỉ xem, do Admin quản lý) ===== -->
                     <div class="section-header">

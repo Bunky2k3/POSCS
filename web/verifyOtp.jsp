@@ -201,6 +201,7 @@
         <div class="card-body-custom">
 
             <form action="VerifyOtpServlet" method="POST" id="verifyOtpForm" onsubmit="return validateForm();">
+                <input type="hidden" name="csrfToken" value="${csrfToken}">
 
                 <c:if test="${not empty param.error}">
                     <div class="alert alert-danger py-2 px-3 mb-3" style="font-size: 0.85rem; border-radius: 12px;">

@@ -245,6 +245,7 @@
 
                 <%-- PasswordResetController#handleForgotPassword: kiểm tra email tồn tại, sinh mã OTP, lưu vào session, gửi OTP qua email, rồi redirect sang verifyOtp.jsp --%>
                 <form action="ForgotPasswordServlet" method="POST" id="forgotPasswordForm">
+                    <input type="hidden" name="csrfToken" value="${csrfToken}">
                     <c:if test="${not empty param.error}">
                         <div class="alert alert-danger py-2 px-3 mb-4" style="font-size: 0.9rem; border-radius: 12px;">
                             <c:choose>
