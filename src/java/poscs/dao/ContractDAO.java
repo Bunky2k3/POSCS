@@ -233,6 +233,9 @@ public class ContractDAO {
         }
     }
 
+    /** Thử lại tối đa bao nhiêu lần khi contract_code sinh ra bị trùng (xem insert()). */
+    private static final int MAX_CODE_GEN_ATTEMPTS = 5;
+
     /** Thêm hợp đồng mới. Trả về contract_id vừa tạo, hoặc -1 nếu lỗi. */
     public int insert(Contract contract) {
         String sql = "INSERT INTO contracts " +
@@ -240,31 +243,44 @@ public class ContractDAO {
                 " enterprise_id, owner_id, attachment_url, status) " +
                 "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
-        try (Connection conn = DBContext.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
-            ps.setString(1, contract.getContractCode());
-            ps.setString(2, contract.getTitle());
-            ps.setString(3, contract.getContractType());
-            ps.setDate(4, contract.getSigningDate());
-            ps.setDate(5, contract.getEffectiveDate());
-            ps.setDate(6, contract.getEndDate());
-            ps.setInt(7, contract.getEnterpriseId());
-            ps.setInt(8, contract.getOwnerId());
-            ps.setString(9, contract.getAttachmentUrl());
-            ps.setString(10, computeStatus(contract.getEffectiveDate(), contract.getEndDate()));
+        // contract_code sinh từ generateNextContractCode() (đọc mã lớn nhất hiện có
+        // rồi +1) có thể trùng nếu 2 request tạo hợp đồng gần như đồng thời cùng
+        // đọc được "mã lớn nhất" giống nhau -- cột contract_code có UNIQUE KEY
+        // (xem db/schema.sql) nên lần INSERT bị trùng sẽ bị DB từ chối thay vì âm
+        // thầm ghi đè; thử sinh mã mới và INSERT lại vài lần thay vì báo lỗi ngay,
+        // để người dùng không phải tự bấm lưu lại.
+        for (int attempt = 1; attempt <= MAX_CODE_GEN_ATTEMPTS; attempt++) {
+            try (Connection conn = DBContext.getConnection();
+                 PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+                ps.setString(1, contract.getContractCode());
+                ps.setString(2, contract.getTitle());
+                ps.setString(3, contract.getContractType());
+                ps.setDate(4, contract.getSigningDate());
+                ps.setDate(5, contract.getEffectiveDate());
+                ps.setDate(6, contract.getEndDate());
+                ps.setInt(7, contract.getEnterpriseId());
+                ps.setInt(8, contract.getOwnerId());
+                ps.setString(9, contract.getAttachmentUrl());
+                ps.setString(10, computeStatus(contract.getEffectiveDate(), contract.getEndDate()));
 
-            int affected = ps.executeUpdate();
-            if (affected == 0) {
+                int affected = ps.executeUpdate();
+                if (affected == 0) {
+                    return -1;
+                }
+                try (ResultSet keys = ps.getGeneratedKeys()) {
+                    if (keys.next()) {
+                        return keys.getInt(1);
+                    }
+                }
+            } catch (SQLException ex) {
+                if (isDuplicateKeyError(ex, "contract_code") && attempt < MAX_CODE_GEN_ATTEMPTS) {
+                    contract.setContractCode(generateNextContractCode());
+                    continue;
+                }
+                System.err.println("--- LOI THEM HOP DONG ---");
+                ex.printStackTrace();
                 return -1;
             }
-            try (ResultSet keys = ps.getGeneratedKeys()) {
-                if (keys.next()) {
-                    return keys.getInt(1);
-                }
-            }
-        } catch (SQLException ex) {
-            System.err.println("--- LOI THEM HOP DONG ---");
-            ex.printStackTrace();
         }
         return -1;
     }
@@ -359,6 +375,11 @@ public class ContractDAO {
         for (int i = 0; i < params.size(); i++) {
             ps.setObject(i + 1, params.get(i));
         }
+    }
+
+    /** true nếu ex là lỗi trùng UNIQUE KEY của MySQL (error 1062) trên đúng cột keyColumn. */
+    private boolean isDuplicateKeyError(SQLException ex, String keyColumn) {
+        return ex.getErrorCode() == 1062 && ex.getMessage() != null && ex.getMessage().contains(keyColumn);
     }
 
     /** BR-17: tính trạng thái hiển thị theo ngày hiện tại so với effective_date/end_date. */

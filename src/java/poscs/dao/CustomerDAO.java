@@ -177,6 +177,9 @@ public class CustomerDAO {
      * Thêm khách hàng mới. Nếu enterprise.getAddress() có street/district thì tự tạo
      * dòng addresses trước rồi mới gán address_id. Trả về enterprise_id vừa tạo, hoặc -1 nếu lỗi.
      */
+    /** Thử lại tối đa bao nhiêu lần khi enterprise_code sinh ra bị trùng (xem insert()). */
+    private static final int MAX_CODE_GEN_ATTEMPTS = 5;
+
     public int insert(Enterprise enterprise) {
         String sql = "INSERT INTO enterprises " +
                 "(enterprise_code, enterprise_name, customer_type, customer_group, tax_code, email, phone, " +
@@ -184,59 +187,77 @@ public class CustomerDAO {
                 " status, join_date) " +
                 "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
-        try (Connection conn = DBContext.getConnection()) {
-            // insertAddress() (nếu có) và INSERT enterprises phải cùng thành công
-            // hoặc cùng rollback -- tắt autocommit để gộp thành 1 transaction,
-            // tránh để lại dòng addresses mồ côi khi bước INSERT enterprises sau
-            // đó lỗi (ví dụ vi phạm ràng buộc, mất kết nối giữa chừng).
-            conn.setAutoCommit(false);
-            try {
-                Integer addressId = enterprise.getAddressId();
-                if (addressId == null && enterprise.getAddress() != null) {
-                    addressId = insertAddress(conn, enterprise.getAddress());
-                }
-
-                try (PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
-                    ps.setString(1, enterprise.getEnterpriseCode());
-                    ps.setString(2, enterprise.getEnterpriseName());
-                    ps.setString(3, enterprise.getCustomerType());
-                    ps.setString(4, enterprise.getCustomerGroup());
-                    ps.setString(5, enterprise.getTaxCode());
-                    ps.setString(6, enterprise.getEmail());
-                    ps.setString(7, enterprise.getPhone());
-                    ps.setString(8, enterprise.getWebsite());
-                    setNullableInt(ps, 9, addressId);
-                    ps.setInt(10, enterprise.getAccountOwnerId());
-                    ps.setString(11, enterprise.getLegalRepresentative());
-                    ps.setString(12, enterprise.getLogoUrl());
-                    ps.setString(13, enterprise.getBusinessLicenseUrl());
-                    ps.setString(14, enterprise.getStatus() != null ? enterprise.getStatus() : "Active");
-                    ps.setDate(15, enterprise.getJoinDate());
-
-                    int affected = ps.executeUpdate();
-                    if (affected == 0) {
-                        conn.rollback();
-                        return -1;
+        // enterprise_code sinh từ generateNextEnterpriseCode() (đọc mã lớn nhất
+        // hiện có rồi +1) có thể trùng nếu 2 request tạo khách hàng gần như đồng
+        // thời cùng đọc được "mã lớn nhất" giống nhau -- cột enterprise_code có
+        // UNIQUE KEY (xem db/schema.sql) nên lần INSERT bị trùng sẽ bị DB từ chối
+        // thay vì âm thầm ghi đè; thử sinh mã mới và INSERT lại vài lần thay vì báo
+        // lỗi ngay, để người dùng không phải tự bấm lưu lại. Mỗi lần thử là 1
+        // transaction riêng (setAutoCommit(false) bên dưới) gồm cả insertAddress()
+        // lẫn INSERT enterprises -- nên nếu 1 lần thử thất bại (vì trùng mã hay bất
+        // kỳ lý do gì khác) và bị rollback, dòng addresses vừa tạo trong lần thử đó
+        // cũng bị rollback theo, không để lại bản ghi mồ côi qua các lần retry.
+        for (int attempt = 1; attempt <= MAX_CODE_GEN_ATTEMPTS; attempt++) {
+            try (Connection conn = DBContext.getConnection()) {
+                // insertAddress() (nếu có) và INSERT enterprises phải cùng thành công
+                // hoặc cùng rollback -- tắt autocommit để gộp thành 1 transaction,
+                // tránh để lại dòng addresses mồ côi khi bước INSERT enterprises sau
+                // đó lỗi (ví dụ vi phạm ràng buộc, mất kết nối giữa chừng, hoặc
+                // enterprise_code bị trùng ở lần thử này).
+                conn.setAutoCommit(false);
+                try {
+                    Integer addressId = enterprise.getAddressId();
+                    if (addressId == null && enterprise.getAddress() != null) {
+                        addressId = insertAddress(conn, enterprise.getAddress());
                     }
-                    try (ResultSet keys = ps.getGeneratedKeys()) {
-                        if (!keys.next()) {
+
+                    try (PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+                        ps.setString(1, enterprise.getEnterpriseCode());
+                        ps.setString(2, enterprise.getEnterpriseName());
+                        ps.setString(3, enterprise.getCustomerType());
+                        ps.setString(4, enterprise.getCustomerGroup());
+                        ps.setString(5, enterprise.getTaxCode());
+                        ps.setString(6, enterprise.getEmail());
+                        ps.setString(7, enterprise.getPhone());
+                        ps.setString(8, enterprise.getWebsite());
+                        setNullableInt(ps, 9, addressId);
+                        ps.setInt(10, enterprise.getAccountOwnerId());
+                        ps.setString(11, enterprise.getLegalRepresentative());
+                        ps.setString(12, enterprise.getLogoUrl());
+                        ps.setString(13, enterprise.getBusinessLicenseUrl());
+                        ps.setString(14, enterprise.getStatus() != null ? enterprise.getStatus() : "Active");
+                        ps.setDate(15, enterprise.getJoinDate());
+
+                        int affected = ps.executeUpdate();
+                        if (affected == 0) {
                             conn.rollback();
                             return -1;
                         }
-                        int newId = keys.getInt(1);
-                        conn.commit();
-                        return newId;
+                        try (ResultSet keys = ps.getGeneratedKeys()) {
+                            if (!keys.next()) {
+                                conn.rollback();
+                                return -1;
+                            }
+                            int newId = keys.getInt(1);
+                            conn.commit();
+                            return newId;
+                        }
                     }
+                } catch (SQLException ex) {
+                    conn.rollback();
+                    if (isDuplicateKeyError(ex, "enterprise_code") && attempt < MAX_CODE_GEN_ATTEMPTS) {
+                        enterprise.setEnterpriseCode(generateNextEnterpriseCode());
+                        continue;
+                    }
+                    throw ex;
+                } finally {
+                    conn.setAutoCommit(true);
                 }
             } catch (SQLException ex) {
-                conn.rollback();
-                throw ex;
-            } finally {
-                conn.setAutoCommit(true);
+                System.err.println("--- LOI THEM KHACH HANG ---");
+                ex.printStackTrace();
+                return -1;
             }
-        } catch (SQLException ex) {
-            System.err.println("--- LOI THEM KHACH HANG ---");
-            ex.printStackTrace();
         }
         return -1;
     }
@@ -360,6 +381,11 @@ public class CustomerDAO {
         } else {
             ps.setInt(index, value);
         }
+    }
+
+    /** true nếu ex là lỗi trùng UNIQUE KEY của MySQL (error 1062) trên đúng cột keyColumn. */
+    private boolean isDuplicateKeyError(SQLException ex, String keyColumn) {
+        return ex.getErrorCode() == 1062 && ex.getMessage() != null && ex.getMessage().contains(keyColumn);
     }
 
     /** Tạo 1 dòng addresses mới từ Address chưa có addressId, trả về address_id vừa tạo. */
