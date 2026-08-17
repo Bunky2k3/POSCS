@@ -271,10 +271,19 @@ public class CustomerDAO {
         }
     }
 
-    /** BR-41: kiểm tra khách hàng còn hợp đồng đang hiệu lực hay không trước khi cho xoá. */
+    /**
+     * BR-41: kiểm tra khách hàng còn hợp đồng đang hiệu lực hay không trước khi
+     * cho xoá. Tính trực tiếp theo effective_date/end_date (BR-17) thay vì đọc
+     * cột contracts.status đã lưu -- cột đó chỉ được ghi lúc insert/update
+     * (xem ContractDAO), nên 1 hợp đồng "Chưa hiệu lực" đã tự chuyển sang hiệu
+     * lực (hoặc 1 hợp đồng đã hết hạn) mà chưa có UPDATE nào khác từ lúc đó sẽ
+     * làm hàm này trả về sai nếu đọc thẳng status. "Sắp hết hạn" cũng tính là
+     * còn hiệu lực vì vẫn nằm trong khoảng effective_date..end_date.
+     */
     public boolean hasActiveContracts(int enterpriseId) {
         String sql = "SELECT COUNT(*) FROM contracts " +
-                     "WHERE enterprise_id = ? AND is_deleted = 0 AND status = 'Đang hiệu lực'";
+                     "WHERE enterprise_id = ? AND is_deleted = 0 " +
+                     "AND CURDATE() BETWEEN effective_date AND end_date";
         try (Connection conn = DBContext.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, enterpriseId);
