@@ -6,7 +6,9 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import poscs.model.Contract;
 import poscs.model.Enterprise;
 import poscs.model.Product;
@@ -103,6 +105,27 @@ public class ProductDAO {
             }
         } catch (SQLException ex) {
             System.err.println("--- LOI TRUY VAN DANH MUC SAN PHAM ---");
+            ex.printStackTrace();
+        }
+        return result;
+    }
+
+    /**
+     * Đếm số sản phẩm còn hiệu lực theo từng danh mục, phục vụ panel "Danh mục
+     * sản phẩm" ở listProduct.jsp (mỗi danh mục hiển thị kèm số lượng, theo
+     * đúng phong cách trang postef.com.vn/san-pham/).
+     */
+    public Map<Integer, Integer> countByCategory() {
+        Map<Integer, Integer> result = new HashMap<>();
+        String sql = "SELECT category_id, COUNT(*) AS cnt FROM products WHERE is_deleted = 0 GROUP BY category_id";
+        try (Connection conn = DBContext.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+                result.put(rs.getInt("category_id"), rs.getInt("cnt"));
+            }
+        } catch (SQLException ex) {
+            System.err.println("--- LOI DEM SAN PHAM THEO DANH MUC ---");
             ex.printStackTrace();
         }
         return result;

@@ -3,9 +3,15 @@
 <%@taglib prefix="fmt" uri="jakarta.tags.fmt"%>
 <%@taglib prefix="fn" uri="jakarta.tags.functions"%>
 <%--
+    Bố cục lấy cảm hứng từ trang danh mục sản phẩm postef.com.vn/san-pham/:
+    panel "Danh mục sản phẩm" bên trái (kèm số lượng, bấm để lọc) + lưới thẻ
+    sản phẩm bên phải, thay cho bảng liệt kê thông thường.
+
     Servlet cần đặt các request attribute sau trước khi forward tới trang này:
-      - productList  : List<poscs.model.Product>          (mỗi Product nên có sẵn .category đã join)
-      - categoryList : List<poscs.model.ProductCategory>   (toàn bộ danh mục, để đổ dropdown lọc "Danh mục")
+      - productList    : List<poscs.model.Product>          (mỗi Product nên có sẵn .category đã join)
+      - categoryList   : List<poscs.model.ProductCategory>   (toàn bộ danh mục, để đổ panel bên trái)
+      - categoryCounts : Map<Integer, Integer>                (category_id -> số sản phẩm còn hiệu lực)
+      - grandTotal     : int                                  (tổng số sản phẩm, không lọc, cho mục "Tất cả")
       - currentPage, totalPages, totalCount : thông tin phân trang (BR-12)
       - keyword, categoryFilter : giá trị filter hiện tại (để giữ lại lúc submit lại form tìm kiếm)
       - csrfToken : cho form xoá (POST)
@@ -157,7 +163,7 @@
         @media (max-width: 900px) { .sidebar { display: none; } /* TODO: drawer thu gọn thay vì ẩn hẳn */ }
 
         .page-container {
-            max-width: 1240px;
+            max-width: 1320px;
             margin: 28px auto;
             padding: 0 24px 60px;
         }
@@ -184,14 +190,31 @@
             box-shadow: 0 10px 30px rgba(0, 40, 80, 0.08);
         }
 
-        /* ===== Filter bar ===== */
-        .filter-bar {
-            padding: 18px 20px; margin-bottom: 20px;
-            display: flex; flex-wrap: wrap; gap: 14px; align-items: center;
+        /* ===== Bố cục: panel danh mục + nội dung ===== */
+        .catalog-layout { display: flex; align-items: flex-start; gap: 22px; }
+
+        /* ===== Panel "Danh mục sản phẩm" (kiểu postef.com.vn/san-pham/) ===== */
+        .category-panel { width: 260px; flex-shrink: 0; padding: 20px 18px; position: sticky; top: 90px; }
+        .category-panel-title {
+            font-weight: 700; color: var(--primary-dark); font-size: 0.82rem;
+            text-transform: uppercase; letter-spacing: .4px; margin-bottom: 14px;
         }
-        .search-input-wrap {
-            position: relative; flex: 1 1 280px; min-width: 220px;
+        .category-list { list-style: none; margin: 0; padding: 0; }
+        .category-list li { margin-bottom: 2px; }
+        .category-list a {
+            display: flex; justify-content: space-between; align-items: center; gap: 8px;
+            padding: 9px 12px; border-radius: 10px;
+            color: #374151; font-weight: 600; font-size: 0.87rem; text-decoration: none;
         }
+        .category-list a:hover { background: #f0f9ff; color: var(--primary-dark); }
+        .category-list a.active { background: linear-gradient(120deg, var(--primary), var(--primary-light)); color: #fff; }
+        .category-list a.active .category-count { color: #fff; opacity: 0.85; }
+        .category-count { font-size: 0.76rem; color: #9ca3af; font-weight: 600; }
+        .category-list-divider { border: none; border-top: 1px solid #eef2f6; margin: 10px 0; }
+
+        /* ===== Ô tìm kiếm ===== */
+        .search-bar { padding: 16px 18px; margin-bottom: 20px; }
+        .search-input-wrap { position: relative; }
         .search-input-wrap i {
             position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
             color: #9ca3af; font-size: 0.9rem;
@@ -205,62 +228,54 @@
             outline: none; background: #fff; border-color: var(--primary-light);
             box-shadow: 0 0 0 4px rgba(15, 158, 219, 0.15);
         }
-        .filter-bar select {
-            padding: 10px 14px; border-radius: 10px; border: 1px solid #e5e7eb;
-            background: #f9fafb; font-size: 0.88rem; min-width: 180px;
+        .active-filter-chip {
+            display: inline-flex; align-items: center; gap: 8px;
+            background: #eaf6ff; color: var(--primary-dark); font-weight: 600; font-size: 0.82rem;
+            border-radius: 20px; padding: 6px 12px; margin-top: 12px;
         }
-        .filter-bar select:focus { outline: none; border-color: var(--primary-light); }
+        .active-filter-chip a { color: var(--primary-dark); text-decoration: none; }
+        .active-filter-chip a:hover { color: var(--danger); }
 
-        /* ===== Table ===== */
-        .table-card { overflow: hidden; }
-        .custom-table { margin-bottom: 0; }
-        .custom-table thead th {
-            background: #f8fafc; color: #6b7280; font-size: 0.74rem;
-            text-transform: uppercase; letter-spacing: .3px; font-weight: 700;
-            padding: 14px 18px; border-bottom: 1.5px solid #eef2f6; white-space: nowrap;
+        /* ===== Lưới thẻ sản phẩm ===== */
+        .product-grid {
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+            gap: 20px;
         }
-        .custom-table tbody td {
-            padding: 14px 18px; font-size: 0.87rem; color: #111827;
-            vertical-align: middle; border-bottom: 1px solid #f3f4f6;
+        .product-card {
+            display: flex; flex-direction: column; overflow: hidden;
+            transition: box-shadow 0.15s ease, transform 0.15s ease;
         }
-        .custom-table tbody tr:last-child td { border-bottom: none; }
-        .custom-table tbody tr:hover { background: #f9fdff; }
-
-        .product-thumb {
-            width: 44px; height: 44px; border-radius: 10px; object-fit: cover;
-            background: #f3f4f6; border: 1px solid #eef2f6;
+        .product-card:hover { box-shadow: 0 16px 36px rgba(0, 40, 80, 0.14); transform: translateY(-2px); }
+        .product-card-media {
+            position: relative; width: 100%; height: 150px;
+            background: #eef6fb; display: flex; align-items: center; justify-content: center;
+            color: var(--primary-light); font-size: 2rem; overflow: hidden;
         }
-        .product-thumb-placeholder {
-            width: 44px; height: 44px; border-radius: 10px;
-            background: #eef6fb; color: var(--primary-light);
-            display: flex; align-items: center; justify-content: center; font-size: 1.1rem;
+        .product-card-media img { width: 100%; height: 100%; object-fit: cover; }
+        .product-card-category {
+            position: absolute; top: 10px; left: 10px;
+            background: rgba(255,255,255,0.92); color: var(--primary-dark);
+            font-size: 0.68rem; font-weight: 700; padding: 3px 10px; border-radius: 20px;
         }
-
-        .product-code {
-            font-weight: 700; color: var(--primary); font-size: 0.85rem;
+        .product-card-body { padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 6px; flex: 1; }
+        .product-card-code { font-size: 0.72rem; font-weight: 700; color: var(--primary); }
+        .product-card-name {
+            color: #111827; font-weight: 600; font-size: 0.92rem; text-decoration: none;
+            display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+            min-height: 2.5em; line-height: 1.25;
         }
-        .product-name-link {
-            color: #111827; font-weight: 600; text-decoration: none;
+        .product-card-name:hover { color: var(--primary); }
+        .product-card-footer {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-top: auto; padding-top: 10px; border-top: 1px solid #f3f4f6;
         }
-        .product-name-link:hover { color: var(--primary); text-decoration: underline; }
-
-        .category-badge {
-            display: inline-block; padding: 3px 11px; border-radius: 20px;
-            font-size: 0.72rem; font-weight: 600;
-            background: #eaf6ff; color: var(--primary-dark);
-        }
-
-        .desc-cell {
-            max-width: 280px; overflow: hidden; text-overflow: ellipsis;
-            white-space: nowrap; color: #6b7280;
-        }
-
-        .action-icons { display: flex; gap: 6px; justify-content: flex-end; }
+        .product-card-updated { font-size: 0.72rem; color: #9ca3af; }
+        .action-icons { display: flex; gap: 6px; }
         .action-icons button {
-            width: 32px; height: 32px; border-radius: 8px; border: none;
+            width: 30px; height: 30px; border-radius: 8px; border: none;
             background: #f3f4f6; color: #6b7280; cursor: pointer;
             display: flex; align-items: center; justify-content: center;
-            font-size: 0.82rem; transition: all 0.15s;
+            font-size: 0.78rem; transition: all 0.15s;
         }
         .action-icons .act-view:hover { background: #eaf6ff; color: var(--primary); }
         .action-icons .act-edit:hover { background: #fff4e0; color: var(--warning); }
@@ -275,7 +290,7 @@
         /* ===== Pagination bar ===== */
         .pagination-bar {
             display: flex; justify-content: space-between; align-items: center;
-            padding: 16px 20px; border-top: 1px solid #f3f4f6; flex-wrap: wrap; gap: 10px;
+            padding: 18px 4px 0; flex-wrap: wrap; gap: 10px;
         }
         .pagination-info { font-size: 0.83rem; color: #6b7280; }
         .pagination { margin: 0; }
@@ -306,9 +321,12 @@
             font-size: 1.3rem; margin-bottom: 4px;
         }
 
+        @media (max-width: 900px) {
+            .catalog-layout { flex-direction: column; }
+            .category-panel { width: 100%; position: static; }
+        }
         @media (max-width: 768px) {
             .page-container { padding: 0 14px 60px; }
-            .custom-table { font-size: 0.8rem; }
         }
     </style>
 </head>
@@ -404,95 +422,106 @@
             <a href="${pageContext.request.contextPath}/product?action=new" class="btn-add"><i class="fa-solid fa-plus"></i> Thêm sản phẩm</a>
         </div>
 
-        <!-- ===== Bộ lọc / tìm kiếm ===== -->
-        <form class="filter-bar card-box" method="GET" action="${pageContext.request.contextPath}/product" id="filterForm">
-            <input type="hidden" name="action" value="list">
-            <div class="search-input-wrap">
-                <i class="fa-solid fa-magnifying-glass"></i>
-                <input type="text" id="searchInput" name="keyword" value="${fn:escapeXml(keyword)}" placeholder="Tìm theo mã SP, tên sản phẩm...">
-            </div>
-            <select id="filterCategory" name="categoryId">
-                <option value="">Tất cả danh mục</option>
-                <c:forEach var="cat" items="${categoryList}">
-                    <option value="${cat.categoryId}" ${categoryFilter == cat.categoryId ? 'selected' : ''}>${fn:escapeXml(cat.categoryName)}</option>
-                </c:forEach>
-            </select>
-        </form>
+        <div class="catalog-layout">
+            <!-- ===== Panel "Danh mục sản phẩm" ===== -->
+            <aside class="category-panel card-box">
+                <div class="category-panel-title">Danh mục sản phẩm</div>
+                <ul class="category-list">
+                    <li>
+                        <a href="${pageContext.request.contextPath}/product?action=list&keyword=${fn:escapeXml(keyword)}"
+                           class="${empty categoryFilter ? 'active' : ''}">
+                            <span>Tất cả sản phẩm</span>
+                            <span class="category-count">(${grandTotal})</span>
+                        </a>
+                    </li>
+                    <li><hr class="category-list-divider"></li>
+                    <c:forEach var="cat" items="${categoryList}">
+                        <li>
+                            <a href="${pageContext.request.contextPath}/product?action=list&categoryId=${cat.categoryId}&keyword=${fn:escapeXml(keyword)}"
+                               class="${categoryFilter == cat.categoryId ? 'active' : ''}">
+                                <span>${fn:escapeXml(cat.categoryName)}</span>
+                                <span class="category-count">(${empty categoryCounts[cat.categoryId] ? 0 : categoryCounts[cat.categoryId]})</span>
+                            </a>
+                        </li>
+                    </c:forEach>
+                </ul>
+            </aside>
 
-        <!-- ===== Bảng danh sách ===== -->
-        <div class="table-card card-box">
-            <div class="table-responsive">
-                <table class="table custom-table" id="productTable">
-                    <thead>
-                        <tr>
-                            <th></th>
-                            <th>Mã SP</th>
-                            <th>Tên sản phẩm</th>
-                            <th>Danh mục</th>
-                            <th>Mô tả</th>
-                            <th>Cập nhật lần cuối</th>
-                            <th class="text-end">Thao tác</th>
-                        </tr>
-                    </thead>
-                    <tbody id="productTableBody">
-                        <c:forEach var="product" items="${productList}">
-                            <tr>
-                                <td>
-                                    <c:choose>
-                                        <c:when test="${not empty product.imageUrl}">
-                                            <img src="${fn:escapeXml(product.imageUrl)}" class="product-thumb" alt="${fn:escapeXml(product.productName)}">
-                                        </c:when>
-                                        <c:otherwise>
-                                            <div class="product-thumb-placeholder"><i class="fa-solid fa-box"></i></div>
-                                        </c:otherwise>
-                                    </c:choose>
-                                </td>
-                                <td class="product-code">${fn:escapeXml(product.productCode)}</td>
-                                <td><a href="${pageContext.request.contextPath}/product?action=view&id=${product.productId}" class="product-name-link">${fn:escapeXml(product.productName)}</a></td>
-                                <td>
-                                    <c:choose>
-                                        <c:when test="${product.category != null}"><span class="category-badge">${fn:escapeXml(product.category.categoryName)}</span></c:when>
-                                        <c:otherwise>&mdash;</c:otherwise>
-                                    </c:choose>
-                                </td>
-                                <td class="desc-cell" title="${fn:escapeXml(product.description)}">
-                                    <c:choose>
-                                        <c:when test="${not empty product.description}">${fn:escapeXml(product.description)}</c:when>
-                                        <c:otherwise>&mdash;</c:otherwise>
-                                    </c:choose>
-                                </td>
-                                <td><fmt:formatDate value="${product.updatedAt}" pattern="dd/MM/yyyy"/></td>
-                                <td>
-                                    <div class="action-icons">
-                                        <button class="act-view" title="Xem chi tiết" onclick="location.href='${pageContext.request.contextPath}/product?action=view&id=${product.productId}'"><i class="fa-regular fa-eye"></i></button>
-                                        <button class="act-edit" title="Sửa" onclick="location.href='${pageContext.request.contextPath}/product?action=edit&id=${product.productId}'"><i class="fa-solid fa-pen"></i></button>
-                                        <button class="act-delete" title="Xóa" onclick="openDeleteModal(${product.productId}, '${fn:escapeXml(product.productName)}')"><i class="fa-solid fa-trash"></i></button>
+            <div style="flex:1; min-width:0;">
+                <!-- ===== Ô tìm kiếm ===== -->
+                <form class="search-bar card-box" method="GET" action="${pageContext.request.contextPath}/product" id="filterForm">
+                    <input type="hidden" name="action" value="list">
+                    <input type="hidden" name="categoryId" id="categoryIdInput" value="${categoryFilter}">
+                    <div class="search-input-wrap">
+                        <i class="fa-solid fa-magnifying-glass"></i>
+                        <input type="text" id="searchInput" name="keyword" value="${fn:escapeXml(keyword)}" placeholder="Tìm theo mã SP, tên sản phẩm...">
+                    </div>
+                    <c:if test="${not empty categoryFilter}">
+                        <span class="active-filter-chip">
+                            <i class="fa-solid fa-filter"></i> Đang lọc theo danh mục
+                            <a href="${pageContext.request.contextPath}/product?action=list&keyword=${fn:escapeXml(keyword)}" title="Bỏ lọc"><i class="fa-solid fa-xmark"></i></a>
+                        </span>
+                    </c:if>
+                </form>
+
+                <!-- ===== Lưới thẻ sản phẩm ===== -->
+                <c:choose>
+                    <c:when test="${empty productList}">
+                        <div class="empty-state card-box">
+                            <i class="fa-regular fa-folder-open"></i>
+                            <p>Không có sản phẩm để hiển thị.</p>
+                        </div>
+                    </c:when>
+                    <c:otherwise>
+                        <div class="product-grid">
+                            <c:forEach var="product" items="${productList}">
+                                <div class="product-card card-box">
+                                    <div class="product-card-media">
+                                        <c:choose>
+                                            <c:when test="${not empty product.imageUrl}">
+                                                <img src="${fn:escapeXml(product.imageUrl)}" alt="${fn:escapeXml(product.productName)}">
+                                            </c:when>
+                                            <c:otherwise>
+                                                <i class="fa-solid fa-box"></i>
+                                            </c:otherwise>
+                                        </c:choose>
+                                        <c:if test="${product.category != null}">
+                                            <span class="product-card-category">${fn:escapeXml(product.category.categoryName)}</span>
+                                        </c:if>
                                     </div>
-                                </td>
-                            </tr>
-                        </c:forEach>
-                    </tbody>
-                </table>
-            </div>
+                                    <div class="product-card-body">
+                                        <span class="product-card-code">${fn:escapeXml(product.productCode)}</span>
+                                        <a href="${pageContext.request.contextPath}/product?action=view&id=${product.productId}" class="product-card-name">${fn:escapeXml(product.productName)}</a>
+                                        <div class="product-card-footer">
+                                            <span class="product-card-updated">
+                                                <c:if test="${product.updatedAt != null}"><fmt:formatDate value="${product.updatedAt}" pattern="dd/MM/yyyy"/></c:if>
+                                            </span>
+                                            <div class="action-icons">
+                                                <button class="act-view" title="Xem chi tiết" onclick="location.href='${pageContext.request.contextPath}/product?action=view&id=${product.productId}'"><i class="fa-regular fa-eye"></i></button>
+                                                <button class="act-edit" title="Sửa" onclick="location.href='${pageContext.request.contextPath}/product?action=edit&id=${product.productId}'"><i class="fa-solid fa-pen"></i></button>
+                                                <button class="act-delete" title="Xóa" onclick="openDeleteModal(${product.productId}, '${fn:escapeXml(product.productName)}')"><i class="fa-solid fa-trash"></i></button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </c:forEach>
+                        </div>
 
-            <!-- ===== Trạng thái rỗng ===== -->
-            <div class="empty-state" id="emptyState" style="${empty productList ? 'display:block' : 'display:none'}">
-                <i class="fa-regular fa-folder-open"></i>
-                <p>Không có sản phẩm để hiển thị.</p>
-            </div>
-
-            <!-- ===== Phân trang (BR-12) ===== -->
-            <div class="pagination-bar">
-                <span class="pagination-info" id="paginationInfo">Hiển thị ${fn:length(productList)} trong tổng số ${totalCount} sản phẩm</span>
-                <nav>
-                    <ul class="pagination pagination-sm mb-0">
-                        <li class="page-item ${currentPage <= 1 ? 'disabled' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/product?action=list&page=${currentPage - 1}&keyword=${fn:escapeXml(keyword)}&categoryId=${categoryFilter}">Trước</a></li>
-                        <c:forEach begin="1" end="${totalPages}" var="p">
-                            <li class="page-item ${p == currentPage ? 'active' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/product?action=list&page=${p}&keyword=${fn:escapeXml(keyword)}&categoryId=${categoryFilter}">${p}</a></li>
-                        </c:forEach>
-                        <li class="page-item ${currentPage >= totalPages ? 'disabled' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/product?action=list&page=${currentPage + 1}&keyword=${fn:escapeXml(keyword)}&categoryId=${categoryFilter}">Sau</a></li>
-                    </ul>
-                </nav>
+                        <!-- ===== Phân trang (BR-12) ===== -->
+                        <div class="pagination-bar">
+                            <span class="pagination-info">Hiển thị ${fn:length(productList)} trong tổng số ${totalCount} sản phẩm</span>
+                            <nav>
+                                <ul class="pagination pagination-sm mb-0">
+                                    <li class="page-item ${currentPage <= 1 ? 'disabled' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/product?action=list&page=${currentPage - 1}&keyword=${fn:escapeXml(keyword)}&categoryId=${categoryFilter}">Trước</a></li>
+                                    <c:forEach begin="1" end="${totalPages}" var="p">
+                                        <li class="page-item ${p == currentPage ? 'active' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/product?action=list&page=${p}&keyword=${fn:escapeXml(keyword)}&categoryId=${categoryFilter}">${p}</a></li>
+                                    </c:forEach>
+                                    <li class="page-item ${currentPage >= totalPages ? 'disabled' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/product?action=list&page=${currentPage + 1}&keyword=${fn:escapeXml(keyword)}&categoryId=${categoryFilter}">Sau</a></li>
+                                </ul>
+                            </nav>
+                        </div>
+                    </c:otherwise>
+                </c:choose>
             </div>
         </div>
     </div>
@@ -544,9 +573,6 @@
             }
             deleteModal.hide();
         });
-
-        // Tự động submit lại form lọc khi đổi danh mục
-        document.getElementById('filterCategory').addEventListener('change', function () { document.getElementById('filterForm').submit(); });
     </script>
 
     <script>

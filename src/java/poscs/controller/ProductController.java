@@ -93,6 +93,8 @@ public class ProductController extends HttpServlet {
 
         request.setAttribute("productList", productList);
         request.setAttribute("categoryList", productDAO.findAllCategories());
+        request.setAttribute("categoryCounts", productDAO.countByCategory());
+        request.setAttribute("grandTotal", productDAO.countAll(null, null));
         request.setAttribute("currentPage", page);
         request.setAttribute("totalPages", totalPages);
         request.setAttribute("totalCount", totalCount);
