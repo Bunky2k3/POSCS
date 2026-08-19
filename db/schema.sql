@@ -3543,6 +3543,13 @@ CREATE TABLE `productcategories` (
   CONSTRAINT `productcategories_ibfk_1` FOREIGN KEY (`parent_category_id`) REFERENCES `productcategories` (`category_id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+INSERT INTO `productcategories` (`category_name`, `parent_category_id`, `display_order`) VALUES
+('Máy POS', NULL, 1),
+('Máy in hóa đơn', NULL, 2),
+('Đầu đọc thẻ', NULL, 3),
+('Phụ kiện POS', NULL, 4),
+('Phần mềm POS', NULL, 5);
+
 DROP TABLE IF EXISTS `products`;
 CREATE TABLE `products` (
   `product_id` int NOT NULL AUTO_INCREMENT,
