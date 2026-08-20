@@ -91,13 +91,14 @@ a target server is configured in the Ant/NetBeans project.
 
 ## Current status
 
-`CustomerController`, `ContractController`, and
-`TechnicalSupportTicketController` implement full CRUD with
-server-side role-based access control (see
+`CustomerController`, `ContractController`, `ProductController`,
+`TechnicalSupportTicketController`, and `EmployeeController` all
+implement full CRUD with server-side role-based access control (see
 [PERMISSIONS.md](PERMISSIONS.md)) and CSRF protection.
 `AuthenticationController` handles login/logout/change-password/
 profile, with session-fixation protection on login and a
-rate-limited forgot-password/OTP flow. `ProductController` and
-`EmployeeController` are still NetBeans scaffolding with no real
-business logic — deploying today gets you working Customer/Contract/
-Ticket management and auth, not Product/Employee management yet.
+rate-limited forgot-password/OTP flow. Creating an employee
+(`EmployeeController`) generates a username + temporary password and
+emails them to the employee via `EmailUtil` — falls back to printing
+to the server console in dev mode if `MAIL_USERNAME`/`MAIL_PASSWORD`
+aren't set (see below).
