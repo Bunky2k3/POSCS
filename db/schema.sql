@@ -3543,14 +3543,52 @@ CREATE TABLE `productcategories` (
   CONSTRAINT `productcategories_ibfk_1` FOREIGN KEY (`parent_category_id`) REFERENCES `productcategories` (`category_id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Cây danh mục thật lấy từ https://postef.com.vn/san-pham/ (3 trong số các
+-- danh mục lớn nhất của họ) -- xem chi tiết nguồn gốc ở
+-- db/migrations/V5__seed_postef_product_catalog__Bunky2k3.sql. Tra theo tên
+-- qua subquery thay vì ghi cứng ID vì category_id là AUTO_INCREMENT.
+INSERT INTO `productcategories` (`category_name`, `parent_category_id`, `display_order`) VALUES
+('Năng lượng tái tạo', NULL, 10),
+('Cáp quang & Phụ kiện', NULL, 20),
+('Hạ tầng viễn thông', NULL, 30);
+
+INSERT INTO `productcategories` (`category_name`, `parent_category_id`, `display_order`)
+SELECT 'Ắc quy', category_id, 1 FROM `productcategories` WHERE category_name = 'Năng lượng tái tạo';
+INSERT INTO `productcategories` (`category_name`, `parent_category_id`, `display_order`)
+SELECT 'Hệ thống nguồn AC/DC, UPS', category_id, 2 FROM `productcategories` WHERE category_name = 'Năng lượng tái tạo';
+INSERT INTO `productcategories` (`category_name`, `parent_category_id`, `display_order`)
+SELECT 'Hệ thống điện mặt trời', category_id, 3 FROM `productcategories` WHERE category_name = 'Năng lượng tái tạo';
+
+INSERT INTO `productcategories` (`category_name`, `parent_category_id`, `display_order`)
+SELECT 'Sợi quang và cáp quang các loại', category_id, 1 FROM `productcategories` WHERE category_name = 'Cáp quang & Phụ kiện';
+INSERT INTO `productcategories` (`category_name`, `parent_category_id`, `display_order`)
+SELECT 'Hộp đấu nối quang, tủ phân phối quang', category_id, 2 FROM `productcategories` WHERE category_name = 'Cáp quang & Phụ kiện';
+INSERT INTO `productcategories` (`category_name`, `parent_category_id`, `display_order`)
+SELECT 'Phụ kiện kết nối quang', category_id, 3 FROM `productcategories` WHERE category_name = 'Cáp quang & Phụ kiện';
+
+INSERT INTO `productcategories` (`category_name`, `parent_category_id`, `display_order`)
+SELECT 'Thiết bị vô tuyến', category_id, 1 FROM `productcategories` WHERE category_name = 'Hạ tầng viễn thông';
+INSERT INTO `productcategories` (`category_name`, `parent_category_id`, `display_order`)
+SELECT 'Tủ outdoor, nguồn indoor cho trạm BTS', category_id, 2 FROM `productcategories` WHERE category_name = 'Hạ tầng viễn thông';
+INSERT INTO `productcategories` (`category_name`, `parent_category_id`, `display_order`)
+SELECT 'Thiết bị cắt lọc sét', category_id, 3 FROM `productcategories` WHERE category_name = 'Hạ tầng viễn thông';
+
+INSERT INTO `productcategories` (`category_name`, `parent_category_id`, `display_order`)
+SELECT 'Ăng ten cho trạm BTS', category_id, 1 FROM `productcategories` WHERE category_name = 'Thiết bị vô tuyến';
+INSERT INTO `productcategories` (`category_name`, `parent_category_id`, `display_order`)
+SELECT 'Hệ Thống Kích Sóng Điện Thoại Di Động Tòa Nhà', category_id, 2 FROM `productcategories` WHERE category_name = 'Thiết bị vô tuyến';
+
+INSERT INTO `productcategories` (`category_name`, `parent_category_id`, `display_order`)
+SELECT 'Tủ nguồn Outdoor', category_id, 1 FROM `productcategories` WHERE category_name = 'Tủ outdoor, nguồn indoor cho trạm BTS';
+INSERT INTO `productcategories` (`category_name`, `parent_category_id`, `display_order`)
+SELECT 'Tủ nguồn Indoor', category_id, 2 FROM `productcategories` WHERE category_name = 'Tủ outdoor, nguồn indoor cho trạm BTS';
+
 DROP TABLE IF EXISTS `products`;
 CREATE TABLE `products` (
   `product_id` int NOT NULL AUTO_INCREMENT,
   `product_code` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
   `product_name` varchar(150) COLLATE utf8mb4_unicode_ci NOT NULL,
   `description` longtext COLLATE utf8mb4_unicode_ci,
-  `image_url` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `catalogue_url` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `category_id` int NOT NULL,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -3560,6 +3598,130 @@ CREATE TABLE `products` (
   KEY `category_id` (`category_id`),
   CONSTRAINT `products_ibfk_1` FOREIGN KEY (`category_id`) REFERENCES `productcategories` (`category_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Một sản phẩm có thể có nhiều ảnh / nhiều file catalogue (tải lên từ máy),
+-- thay cho 2 cột image_url/catalogue_url đơn lẻ trước đây trên products --
+-- xem db/migrations/V6__product_multi_image_catalogue__Bunky2k3.sql.
+DROP TABLE IF EXISTS `productimages`;
+CREATE TABLE `productimages` (
+  `image_id` int NOT NULL AUTO_INCREMENT,
+  `product_id` int NOT NULL,
+  `image_url` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `display_order` int NOT NULL DEFAULT '0',
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`image_id`),
+  KEY `product_id` (`product_id`),
+  CONSTRAINT `productimages_ibfk_1` FOREIGN KEY (`product_id`) REFERENCES `products` (`product_id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+DROP TABLE IF EXISTS `productcatalogues`;
+CREATE TABLE `productcatalogues` (
+  `catalogue_id` int NOT NULL AUTO_INCREMENT,
+  `product_id` int NOT NULL,
+  `catalogue_url` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `file_name` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `display_order` int NOT NULL DEFAULT '0',
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`catalogue_id`),
+  KEY `product_id` (`product_id`),
+  CONSTRAINT `productcatalogues_ibfk_1` FOREIGN KEY (`product_id`) REFERENCES `products` (`product_id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Sản phẩm thật lấy từ https://postef.com.vn/san-pham/, xem chi tiết ở
+-- db/migrations/V5__seed_postef_product_catalog__Bunky2k3.sql.
+INSERT INTO `products` (`product_code`, `product_name`, `category_id`) VALUES
+('SP-0001', 'Ắc quy lưu động POSLI02/48100', (SELECT category_id FROM `productcategories` WHERE category_name = 'Ắc quy')),
+('SP-0002', 'Ắc quy Gel', (SELECT category_id FROM `productcategories` WHERE category_name = 'Ắc quy')),
+('SP-0003', 'Ắc quy acid chì kín', (SELECT category_id FROM `productcategories` WHERE category_name = 'Ắc quy')),
+('SP-0004', 'Ắc quy lithium', (SELECT category_id FROM `productcategories` WHERE category_name = 'Ắc quy')),
+('SP-0005', 'Ắc quy BAE', (SELECT category_id FROM `productcategories` WHERE category_name = 'Ắc quy')),
+('SP-0006', 'Nguồn UNIPOWER', (SELECT category_id FROM `productcategories` WHERE category_name = 'Hệ thống nguồn AC/DC, UPS')),
+('SP-0007', 'Nguồn POSTEF', (SELECT category_id FROM `productcategories` WHERE category_name = 'Hệ thống nguồn AC/DC, UPS')),
+('SP-0008', 'UPS EATON', (SELECT category_id FROM `productcategories` WHERE category_name = 'Hệ thống nguồn AC/DC, UPS')),
+('SP-0009', 'Pin mặt trời', (SELECT category_id FROM `productcategories` WHERE category_name = 'Hệ thống điện mặt trời')),
+('SP-0010', 'Cáp ADSS', (SELECT category_id FROM `productcategories` WHERE category_name = 'Sợi quang và cáp quang các loại')),
+('SP-0011', 'Cáp quang kéo cống', (SELECT category_id FROM `productcategories` WHERE category_name = 'Sợi quang và cáp quang các loại')),
+('SP-0012', 'Cáp quang treo kim loại - phi kim loại', (SELECT category_id FROM `productcategories` WHERE category_name = 'Sợi quang và cáp quang các loại')),
+('SP-0013', 'Cáp quang bọc chặt', (SELECT category_id FROM `productcategories` WHERE category_name = 'Sợi quang và cáp quang các loại')),
+('SP-0014', 'Dây thuê bao quang đệm lỏng', (SELECT category_id FROM `productcategories` WHERE category_name = 'Sợi quang và cáp quang các loại')),
+('SP-0015', 'Sợi quang G657A1', (SELECT category_id FROM `productcategories` WHERE category_name = 'Sợi quang và cáp quang các loại')),
+('SP-0016', 'Dây thuê bao đệm chặt', (SELECT category_id FROM `productcategories` WHERE category_name = 'Sợi quang và cáp quang các loại')),
+('SP-0017', 'Tủ phân phối quang OCC-SPLxxxFO', (SELECT category_id FROM `productcategories` WHERE category_name = 'Hộp đấu nối quang, tủ phân phối quang')),
+('SP-0018', 'Tủ quang-đồng', (SELECT category_id FROM `productcategories` WHERE category_name = 'Hộp đấu nối quang, tủ phân phối quang')),
+('SP-0019', 'Tủ đấu nối quang 192FO đặt bệ', (SELECT category_id FROM `productcategories` WHERE category_name = 'Hộp đấu nối quang, tủ phân phối quang')),
+('SP-0020', 'Hộp đấu nối POS-HOS-R và POS-SPL-R', (SELECT category_id FROM `productcategories` WHERE category_name = 'Hộp đấu nối quang, tủ phân phối quang')),
+('SP-0021', 'Hộp đấu nối nhựa', (SELECT category_id FROM `productcategories` WHERE category_name = 'Hộp đấu nối quang, tủ phân phối quang')),
+('SP-0022', 'Phụ kiện quang: Splitter, adapter, Connector, Pigtail...', (SELECT category_id FROM `productcategories` WHERE category_name = 'Phụ kiện kết nối quang')),
+('SP-0023', 'ODF gắn Rack 19 inch', (SELECT category_id FROM `productcategories` WHERE category_name = 'Phụ kiện kết nối quang')),
+('SP-0024', 'Khung - nắp hầm cáp', (SELECT category_id FROM `productcategories` WHERE category_name = 'Phụ kiện kết nối quang')),
+('SP-0025', 'Ống nhựa PVC-U dùng cho tuyến cáp ngầm', (SELECT category_id FROM `productcategories` WHERE category_name = 'Phụ kiện kết nối quang')),
+('SP-0026', 'Măng xông quang', (SELECT category_id FROM `productcategories` WHERE category_name = 'Phụ kiện kết nối quang')),
+('SP-0027', 'Thiết bị cảnh báo BTS', (SELECT category_id FROM `productcategories` WHERE category_name = 'Cáp quang & Phụ kiện')),
+('SP-0028', 'Tải điện tử', (SELECT category_id FROM `productcategories` WHERE category_name = 'Cáp quang & Phụ kiện')),
+('SP-0029', 'Máy phát điện KOHLER', (SELECT category_id FROM `productcategories` WHERE category_name = 'Cáp quang & Phụ kiện')),
+('SP-0030', 'Máy phát điện YANMAR', (SELECT category_id FROM `productcategories` WHERE category_name = 'Cáp quang & Phụ kiện')),
+('SP-0031', 'Máy phát điện ASKA', (SELECT category_id FROM `productcategories` WHERE category_name = 'Cáp quang & Phụ kiện')),
+('SP-0032', 'Giải pháp ăng ten ACE', (SELECT category_id FROM `productcategories` WHERE category_name = 'Ăng ten cho trạm BTS')),
+('SP-0033', 'Giải pháp ăng ten POSTEF', (SELECT category_id FROM `productcategories` WHERE category_name = 'Ăng ten cho trạm BTS')),
+('SP-0034', 'Helix Digital Headend Unit', (SELECT category_id FROM `productcategories` WHERE category_name = 'Hệ Thống Kích Sóng Điện Thoại Di Động Tòa Nhà')),
+('SP-0035', 'Stratus High Power Digital DAS Remotes', (SELECT category_id FROM `productcategories` WHERE category_name = 'Hệ Thống Kích Sóng Điện Thoại Di Động Tòa Nhà')),
+('SP-0036', 'Nimbus Low Power Active DAS Remotes', (SELECT category_id FROM `productcategories` WHERE category_name = 'Hệ Thống Kích Sóng Điện Thoại Di Động Tòa Nhà')),
+('SP-0037', 'Thiết bị Cắt lọc sét POSTEF', (SELECT category_id FROM `productcategories` WHERE category_name = 'Thiết bị cắt lọc sét')),
+('SP-0038', 'Tủ nguồn công suất cao ZXDU98T601', (SELECT category_id FROM `productcategories` WHERE category_name = 'Tủ nguồn Indoor')),
+('SP-0039', 'Tủ phân phối điện DB1', (SELECT category_id FROM `productcategories` WHERE category_name = 'Tủ nguồn Indoor')),
+('SP-0040', 'Tủ phân phối nguồn AC/DC', (SELECT category_id FROM `productcategories` WHERE category_name = 'Tủ nguồn Indoor')),
+('SP-0041', 'Tủ nguồn PODS VN-M02', (SELECT category_id FROM `productcategories` WHERE category_name = 'Tủ nguồn Outdoor')),
+('SP-0042', 'Bộ chuyển đổi nguồn AC-DC Cran', (SELECT category_id FROM `productcategories` WHERE category_name = 'Tủ nguồn Outdoor')),
+('SP-0043', 'Tủ nguồn PS 60/15', (SELECT category_id FROM `productcategories` WHERE category_name = 'Tủ nguồn Outdoor')),
+('SP-0044', 'Tủ nguồn PP/RU', (SELECT category_id FROM `productcategories` WHERE category_name = 'Tủ nguồn Outdoor')),
+('SP-0045', 'Tủ nguồn Outdoor', (SELECT category_id FROM `productcategories` WHERE category_name = 'Tủ nguồn Outdoor'));
+
+INSERT INTO `productimages` (`product_id`, `image_url`, `display_order`) VALUES
+((SELECT product_id FROM `products` WHERE product_code = 'SP-0001'), 'https://postef.com.vn/wp-content/uploads/2026/08/screenshot_1786350000.png', 0),
+((SELECT product_id FROM `products` WHERE product_code = 'SP-0002'), 'https://postef.com.vn/wp-content/uploads/2019/11/pngb.png', 0),
+((SELECT product_id FROM `products` WHERE product_code = 'SP-0003'), 'https://postef.com.vn/wp-content/uploads/2019/11/pnb.png', 0),
+((SELECT product_id FROM `products` WHERE product_code = 'SP-0004'), 'https://postef.com.vn/wp-content/uploads/2019/11/ac-quy-lithium-4850.png', 0),
+((SELECT product_id FROM `products` WHERE product_code = 'SP-0005'), 'https://postef.com.vn/wp-content/uploads/2019/11/bae.png', 0),
+((SELECT product_id FROM `products` WHERE product_code = 'SP-0006'), 'https://postef.com.vn/wp-content/uploads/2024/04/uni.png', 0),
+((SELECT product_id FROM `products` WHERE product_code = 'SP-0007'), 'https://postef.com.vn/wp-content/uploads/2019/11/Chua-co-ten-300-x-300-px-600-x-600-px.png', 0),
+((SELECT product_id FROM `products` WHERE product_code = 'SP-0008'), 'https://postef.com.vn/wp-content/uploads/2019/11/12113_Eaton-9395-a.jpg', 0),
+((SELECT product_id FROM `products` WHERE product_code = 'SP-0009'), 'https://postef.com.vn/wp-content/uploads/2019/11/Small-no-fold-poly-with-wp-reg.jpg', 0),
+((SELECT product_id FROM `products` WHERE product_code = 'SP-0010'), 'https://postef.com.vn/wp-content/uploads/2024/05/Capture.jpg', 0),
+((SELECT product_id FROM `products` WHERE product_code = 'SP-0011'), 'https://postef.com.vn/wp-content/uploads/2024/04/Cap-quang-keo-cong.png', 0),
+((SELECT product_id FROM `products` WHERE product_code = 'SP-0012'), 'https://postef.com.vn/wp-content/uploads/2024/04/treo-kl-pkl.png', 0),
+((SELECT product_id FROM `products` WHERE product_code = 'SP-0013'), 'https://postef.com.vn/wp-content/uploads/2024/04/boc-chat.png', 0),
+((SELECT product_id FROM `products` WHERE product_code = 'SP-0014'), 'https://postef.com.vn/wp-content/uploads/2024/04/DTB-dem-long.jpg', 0),
+((SELECT product_id FROM `products` WHERE product_code = 'SP-0015'), 'https://postef.com.vn/wp-content/uploads/2024/04/soi-quang-g657a1.png', 0),
+((SELECT product_id FROM `products` WHERE product_code = 'SP-0016'), 'https://postef.com.vn/wp-content/uploads/2024/04/dtb.jpg', 0),
+((SELECT product_id FROM `products` WHERE product_code = 'SP-0017'), 'https://postef.com.vn/wp-content/uploads/2024/04/Tu-phan-phoi-quang-OCC-SPLxxxFO.jpg', 0),
+((SELECT product_id FROM `products` WHERE product_code = 'SP-0018'), 'https://postef.com.vn/wp-content/uploads/2024/04/tu-quang-dong.jpg', 0),
+((SELECT product_id FROM `products` WHERE product_code = 'SP-0019'), 'https://postef.com.vn/wp-content/uploads/2024/04/tu-dau-noi-1920fo-dang-be.jpg', 0),
+((SELECT product_id FROM `products` WHERE product_code = 'SP-0020'), 'https://postef.com.vn/wp-content/uploads/2024/04/Hop-dau-noi-POS-HOS-R-va-POS-SPL-R.jpg', 0),
+((SELECT product_id FROM `products` WHERE product_code = 'SP-0021'), 'https://postef.com.vn/wp-content/uploads/2024/04/Hop-dau-noi-nhua.jpg', 0),
+((SELECT product_id FROM `products` WHERE product_code = 'SP-0022'), 'https://postef.com.vn/wp-content/uploads/2024/04/phu-kien-quang.png', 0),
+((SELECT product_id FROM `products` WHERE product_code = 'SP-0023'), 'https://postef.com.vn/wp-content/uploads/2024/04/ODF-GAN-RACK-19-INCH.png', 0),
+((SELECT product_id FROM `products` WHERE product_code = 'SP-0024'), 'https://postef.com.vn/wp-content/uploads/2024/04/Khung-–-nap-ham-cap.jpg', 0),
+((SELECT product_id FROM `products` WHERE product_code = 'SP-0025'), 'https://postef.com.vn/wp-content/uploads/2024/04/Ong-nhua-PVC-U-dung-cho-tuyen-cap-ngam.jpg', 0),
+((SELECT product_id FROM `products` WHERE product_code = 'SP-0026'), 'https://postef.com.vn/wp-content/uploads/2024/04/MX96-1.jpg', 0),
+((SELECT product_id FROM `products` WHERE product_code = 'SP-0027'), 'https://postef.com.vn/wp-content/uploads/2019/11/bts-01.jpg', 0),
+((SELECT product_id FROM `products` WHERE product_code = 'SP-0028'), 'https://postef.com.vn/wp-content/uploads/2019/11/tai-dien.jpg', 0),
+((SELECT product_id FROM `products` WHERE product_code = 'SP-0029'), 'https://postef.com.vn/wp-content/uploads/2019/11/kohler.png', 0),
+((SELECT product_id FROM `products` WHERE product_code = 'SP-0030'), 'https://postef.com.vn/wp-content/uploads/2019/11/yanmar.png', 0),
+((SELECT product_id FROM `products` WHERE product_code = 'SP-0031'), 'https://postef.com.vn/wp-content/uploads/2019/11/aska.png', 0),
+((SELECT product_id FROM `products` WHERE product_code = 'SP-0032'), 'https://postef.com.vn/wp-content/uploads/2024/04/ACE.jpg', 0),
+((SELECT product_id FROM `products` WHERE product_code = 'SP-0033'), 'https://postef.com.vn/wp-content/uploads/2019/11/atenna.jpg', 0),
+((SELECT product_id FROM `products` WHERE product_code = 'SP-0034'), 'https://postef.com.vn/wp-content/uploads/2024/04/helix2.png', 0),
+((SELECT product_id FROM `products` WHERE product_code = 'SP-0035'), 'https://postef.com.vn/wp-content/uploads/2024/04/stratus.png', 0),
+((SELECT product_id FROM `products` WHERE product_code = 'SP-0036'), 'https://postef.com.vn/wp-content/uploads/2024/04/New-Nimbus1.png', 0),
+((SELECT product_id FROM `products` WHERE product_code = 'SP-0037'), 'https://postef.com.vn/wp-content/uploads/2024/04/cls-400x231-1.png', 0),
+((SELECT product_id FROM `products` WHERE product_code = 'SP-0038'), 'https://postef.com.vn/wp-content/uploads/2026/05/T601.png', 0),
+((SELECT product_id FROM `products` WHERE product_code = 'SP-0039'), 'https://postef.com.vn/wp-content/uploads/2024/04/Asset-1.png', 0),
+((SELECT product_id FROM `products` WHERE product_code = 'SP-0040'), 'https://postef.com.vn/wp-content/uploads/2024/04/tn-400x332-1.jpg', 0),
+((SELECT product_id FROM `products` WHERE product_code = 'SP-0041'), 'https://postef.com.vn/wp-content/uploads/2024/11/z6008762354576_67aebe04e7825601a98aad4a06b469a6.jpg', 0),
+((SELECT product_id FROM `products` WHERE product_code = 'SP-0042'), 'https://postef.com.vn/wp-content/uploads/2024/09/mb02.png', 0),
+((SELECT product_id FROM `products` WHERE product_code = 'SP-0043'), 'https://postef.com.vn/wp-content/uploads/2019/11/60-ps.png', 0),
+((SELECT product_id FROM `products` WHERE product_code = 'SP-0044'), 'https://postef.com.vn/wp-content/uploads/2024/04/Tu-PP.png', 0),
+((SELECT product_id FROM `products` WHERE product_code = 'SP-0045'), 'https://postef.com.vn/wp-content/uploads/2019/11/tu-outdoor_300x300.png', 0);
 
 DROP TABLE IF EXISTS `contracts`;
 CREATE TABLE `contracts` (
