@@ -478,8 +478,12 @@
                                 <div class="product-card card-box">
                                     <div class="product-card-media">
                                         <c:choose>
-                                            <c:when test="${not empty product.imageUrl}">
-                                                <img src="${fn:escapeXml(product.imageUrl)}" alt="${fn:escapeXml(product.productName)}">
+                                            <c:when test="${not empty product.primaryImageUrl}">
+                                                <c:choose>
+                                                    <c:when test="${fn:startsWith(product.primaryImageUrl, 'http')}"><c:set var="cardImgSrc" value="${product.primaryImageUrl}"/></c:when>
+                                                    <c:otherwise><c:set var="cardImgSrc" value="${pageContext.request.contextPath}${product.primaryImageUrl}"/></c:otherwise>
+                                                </c:choose>
+                                                <img src="${fn:escapeXml(cardImgSrc)}" alt="${fn:escapeXml(product.productName)}">
                                             </c:when>
                                             <c:otherwise>
                                                 <i class="fa-solid fa-box"></i>

@@ -9,7 +9,7 @@
     (redirect hoặc forward sang trang lỗi).
 
     Request attribute cần có:
-      - product      : poscs.model.Product (đã join .category)
+      - product      : poscs.model.Product (đã join .category, .images, .catalogues)
       - contractList : List<poscs.model.Contract> (hợp đồng có dùng sản phẩm này, qua contractproducts)
       - csrfToken
 --%>
@@ -174,6 +174,23 @@
         }
         .product-image-box img { width: 100%; height: 100%; object-fit: cover; }
 
+        /* ===== Thư viện ảnh / catalogue ===== */
+        .image-gallery { display: flex; flex-wrap: wrap; gap: 14px; }
+        .image-gallery a {
+            display: block; width: 140px; height: 140px; border-radius: 12px;
+            overflow: hidden; border: 1px solid #eef2f6; background: #f9fafb;
+        }
+        .image-gallery img { width: 100%; height: 100%; object-fit: cover; }
+
+        .file-chip-list { display: flex; flex-direction: column; gap: 8px; }
+        .file-chip {
+            display: flex; align-items: center; gap: 10px;
+            border: 1px solid #eef2f6; border-radius: 10px; padding: 10px 14px; background: #f9fafb;
+        }
+        .file-chip i.fa-file-pdf { color: var(--danger); font-size: 1.1rem; }
+        .file-chip-link { font-size: 0.87rem; color: var(--primary); font-weight: 600; text-decoration: none; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .file-chip-link:hover { text-decoration: underline; }
+
         /* ===== Bảng hợp đồng sử dụng ===== */
         .mini-table { width: 100%; margin-top: 4px; }
         .mini-table th {
@@ -285,8 +302,12 @@
         <div class="detail-header card-box">
             <div class="product-info">
                 <c:choose>
-                    <c:when test="${not empty product.imageUrl}">
-                        <img src="${fn:escapeXml(product.imageUrl)}" class="product-thumb" alt="${fn:escapeXml(product.productName)}">
+                    <c:when test="${not empty product.primaryImageUrl}">
+                        <c:choose>
+                            <c:when test="${fn:startsWith(product.primaryImageUrl, 'http')}"><c:set var="headerImgSrc" value="${product.primaryImageUrl}"/></c:when>
+                            <c:otherwise><c:set var="headerImgSrc" value="${pageContext.request.contextPath}${product.primaryImageUrl}"/></c:otherwise>
+                        </c:choose>
+                        <img src="${fn:escapeXml(headerImgSrc)}" class="product-thumb" alt="${fn:escapeXml(product.productName)}">
                     </c:when>
                     <c:otherwise>
                         <div class="product-thumb-placeholder"><i class="fa-solid fa-box"></i></div>
@@ -346,24 +367,51 @@
                         </c:choose>
                     </div>
                 </div>
-                <div class="col-md-6 field-row">
-                    <label>URL catalogue</label>
-                    <div class="view-value">
-                        <c:choose>
-                            <c:when test="${not empty product.catalogueUrl}"><a href="${fn:escapeXml(product.catalogueUrl)}" target="_blank" rel="noopener"><i class="fa-solid fa-file-pdf me-1"></i>${fn:escapeXml(product.catalogueUrl)}</a></c:when>
-                            <c:otherwise>&mdash;</c:otherwise>
-                        </c:choose>
-                    </div>
-                </div>
-                <c:if test="${not empty product.imageUrl}">
-                    <div class="col-12 field-row">
-                        <label>Hình ảnh</label>
-                        <div class="product-image-box">
-                            <img src="${fn:escapeXml(product.imageUrl)}" alt="${fn:escapeXml(product.productName)}" onerror="this.parentElement.innerHTML='&lt;i class=&quot;fa-solid fa-triangle-exclamation&quot;&gt;&lt;/i&gt;'">
-                        </div>
-                    </div>
-                </c:if>
             </div>
+        </div>
+
+        <!-- ===== Hình ảnh & tài liệu ===== -->
+        <div class="info-card card-box">
+            <div class="section-header"><h5>Hình ảnh</h5></div>
+            <c:choose>
+                <c:when test="${empty product.images}">
+                    <div class="empty-mini">Chưa có ảnh nào.</div>
+                </c:when>
+                <c:otherwise>
+                    <div class="image-gallery">
+                        <c:forEach var="img" items="${product.images}">
+                            <c:choose>
+                                <c:when test="${fn:startsWith(img.imageUrl, 'http')}"><c:set var="galleryImgSrc" value="${img.imageUrl}"/></c:when>
+                                <c:otherwise><c:set var="galleryImgSrc" value="${pageContext.request.contextPath}${img.imageUrl}"/></c:otherwise>
+                            </c:choose>
+                            <a href="${fn:escapeXml(galleryImgSrc)}" target="_blank" rel="noopener">
+                                <img src="${fn:escapeXml(galleryImgSrc)}" alt="${fn:escapeXml(product.productName)}">
+                            </a>
+                        </c:forEach>
+                    </div>
+                </c:otherwise>
+            </c:choose>
+
+            <div class="section-header" style="margin-top:26px;"><h5>Catalogue</h5></div>
+            <c:choose>
+                <c:when test="${empty product.catalogues}">
+                    <div class="empty-mini">Chưa có file catalogue nào.</div>
+                </c:when>
+                <c:otherwise>
+                    <div class="file-chip-list">
+                        <c:forEach var="cat" items="${product.catalogues}">
+                            <c:choose>
+                                <c:when test="${fn:startsWith(cat.catalogueUrl, 'http')}"><c:set var="catalogueSrc" value="${cat.catalogueUrl}"/></c:when>
+                                <c:otherwise><c:set var="catalogueSrc" value="${pageContext.request.contextPath}${cat.catalogueUrl}"/></c:otherwise>
+                            </c:choose>
+                            <div class="file-chip">
+                                <i class="fa-solid fa-file-pdf"></i>
+                                <a class="file-chip-link" href="${fn:escapeXml(catalogueSrc)}" target="_blank" rel="noopener">${fn:escapeXml(not empty cat.fileName ? cat.fileName : cat.catalogueUrl)}</a>
+                            </div>
+                        </c:forEach>
+                    </div>
+                </c:otherwise>
+            </c:choose>
         </div>
 
         <!-- ===== Hợp đồng sử dụng sản phẩm này ===== -->

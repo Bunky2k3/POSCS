@@ -2,13 +2,16 @@
 <%@taglib prefix="c" uri="jakarta.tags.core"%>
 <%@taglib prefix="fn" uri="jakarta.tags.functions"%>
 <%--
-    Servlet cần lấy product_id từ query param ?id=, load bản ghi hiện tại rồi
-    forward sang trang này để đổ sẵn giá trị vào form; khi submit thì validate
-    giống addNewProduct.jsp rồi UPDATE bảng products (product_code giữ nguyên,
-    không cho sửa).
+    Servlet cần lấy product_id từ query param ?id=, load bản ghi hiện tại (kèm
+    product.images/product.catalogues) rồi forward sang trang này để đổ sẵn
+    giá trị vào form; khi submit thì validate giống addNewProduct.jsp rồi
+    UPDATE bảng products (product_code giữ nguyên, không cho sửa), xoá các
+    ảnh/catalogue có id nằm trong removedImageIds/removedCatalogueIds (CSV),
+    rồi lưu thêm mọi file mới chọn ở "images"/"catalogues" -- xem
+    ProductController + poscs.common.FileStorage.
 
     Request attribute cần có trước khi forward tới trang này:
-      - product      : poscs.model.Product (đã join .category nếu cần hiển thị)
+      - product      : poscs.model.Product (đã join .category, .images, .catalogues)
       - categoryList : List<poscs.model.ProductCategory>  (để đổ dropdown "Danh mục")
       - csrfToken
 --%>
@@ -135,13 +138,51 @@
 
         .error-text { color: var(--danger); font-size: 12px; margin-top: 5px; display: none; }
 
-        .image-preview {
-            width: 100%; max-width: 220px; height: 140px; border-radius: 12px;
-            border: 1.5px dashed #e5e7eb; background: #f9fafb;
-            display: flex; align-items: center; justify-content: center;
-            color: #9ca3af; font-size: 1.6rem; overflow: hidden; margin-top: 10px;
+        /* ===== Chọn file từ máy (ảnh / catalogue), nhiều file ===== */
+        .upload-dropzone {
+            border: 1.5px dashed #d7dde5; border-radius: 12px; background: #f9fafb;
+            padding: 18px; text-align: center;
         }
-        .image-preview img { width: 100%; height: 100%; object-fit: cover; }
+        .upload-btn {
+            display: inline-flex; align-items: center; gap: 8px; cursor: pointer;
+            background: #fff; border: 1.5px solid #e5e7eb; color: var(--primary-dark);
+            border-radius: 10px; padding: 9px 18px; font-weight: 600; font-size: 0.87rem;
+        }
+        .upload-btn:hover { border-color: var(--primary-light); background: #f0f9ff; }
+        .upload-hint { font-size: 0.76rem; color: #9ca3af; margin-top: 8px; }
+
+        .file-preview-grid {
+            display: flex; flex-wrap: wrap; gap: 12px; margin-top: 14px;
+        }
+        .file-thumb {
+            position: relative; width: 92px; height: 92px; border-radius: 10px;
+            overflow: hidden; background: #eef6fb; border: 1px solid #eef2f6;
+        }
+        .file-thumb img { width: 100%; height: 100%; object-fit: cover; }
+        .file-thumb-remove {
+            position: absolute; top: 4px; right: 4px; width: 22px; height: 22px; border-radius: 50%;
+            background: rgba(17, 24, 39, 0.65); color: #fff; border: none;
+            display: flex; align-items: center; justify-content: center; font-size: 0.7rem; cursor: pointer;
+        }
+        .file-thumb-remove:hover { background: var(--danger); }
+
+        .field-row .sub-label { font-size: 0.76rem; color: #9ca3af; font-weight: 600; margin: 14px 0 6px; text-transform: none; letter-spacing: 0; }
+
+        .file-chip-list { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
+        .file-chip {
+            display: flex; align-items: center; gap: 10px;
+            border: 1px solid #eef2f6; border-radius: 10px; padding: 9px 12px; background: #f9fafb;
+        }
+        .file-chip i.fa-file-pdf { color: var(--danger); font-size: 1.05rem; }
+        .file-chip-name { font-size: 0.85rem; color: #111827; font-weight: 500; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .file-chip-size { font-size: 0.76rem; color: #9ca3af; flex-shrink: 0; }
+        .file-chip-link { font-size: 0.85rem; color: var(--primary); font-weight: 500; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-decoration: none; }
+        .file-chip-link:hover { text-decoration: underline; }
+        .file-chip-remove {
+            width: 26px; height: 26px; border-radius: 8px; border: none; background: #f3f4f6; color: #6b7280;
+            display: flex; align-items: center; justify-content: center; font-size: 0.75rem; cursor: pointer; flex-shrink: 0;
+        }
+        .file-chip-remove:hover { background: #fdecef; color: var(--danger); }
 
         .action-bar { display: flex; gap: 12px; margin-top: 28px; justify-content: flex-end; border-top: 1.5px solid #eef2f6; padding-top: 22px; }
         .btn-primary {
@@ -231,10 +272,12 @@
         </div>
 
         <div class="card-box">
-            <form id="updateProductForm" action="${pageContext.request.contextPath}/product" method="POST" onsubmit="return validateForm();">
+            <form id="updateProductForm" action="${pageContext.request.contextPath}/product" method="POST" enctype="multipart/form-data" onsubmit="return validateForm();">
                 <input type="hidden" name="csrfToken" value="${csrfToken}">
                 <input type="hidden" name="action" value="update">
                 <input type="hidden" name="productId" value="${product.productId}">
+                <input type="hidden" name="removedImageIds" id="removedImageIdsInput" value="">
+                <input type="hidden" name="removedCatalogueIds" id="removedCatalogueIdsInput" value="">
 
                 <div class="section-header"><h5>Thông tin sản phẩm</h5></div>
                 <div class="row">
@@ -265,20 +308,50 @@
 
                 <div class="section-header"><h5>Hình ảnh &amp; tài liệu</h5></div>
                 <div class="row">
-                    <div class="col-md-6 field-row">
-                        <label>URL hình ảnh</label>
-                        <input type="text" class="form-control" id="imageUrl" name="imageUrl" value="${fn:escapeXml(product.imageUrl)}" placeholder="https://.../product.jpg">
-                        <div class="image-preview" id="imagePreview">
-                            <c:choose>
-                                <c:when test="${not empty product.imageUrl}"><img src="${fn:escapeXml(product.imageUrl)}" alt="Xem trước" onerror="this.parentElement.innerHTML='&lt;i class=&quot;fa-solid fa-triangle-exclamation&quot;&gt;&lt;/i&gt;'"></c:when>
-                                <c:otherwise><i class="fa-solid fa-image"></i></c:otherwise>
-                            </c:choose>
+                    <div class="col-12 field-row">
+                        <label>Hình ảnh sản phẩm</label>
+                        <div class="file-preview-grid" id="existingImageGrid">
+                            <c:forEach var="img" items="${product.images}">
+                                <c:choose>
+                                    <c:when test="${fn:startsWith(img.imageUrl, 'http')}"><c:set var="imgSrc" value="${img.imageUrl}"/></c:when>
+                                    <c:otherwise><c:set var="imgSrc" value="${pageContext.request.contextPath}${img.imageUrl}"/></c:otherwise>
+                                </c:choose>
+                                <div class="file-thumb" id="existing-image-${img.imageId}">
+                                    <img src="${fn:escapeXml(imgSrc)}" alt="Ảnh sản phẩm">
+                                    <button type="button" class="file-thumb-remove" onclick="removeExistingImage(${img.imageId})"><i class="fa-solid fa-xmark"></i></button>
+                                </div>
+                            </c:forEach>
                         </div>
+                        <div class="sub-label">Thêm ảnh mới</div>
+                        <div class="upload-dropzone">
+                            <label for="imagesInput" class="upload-btn"><i class="fa-solid fa-images"></i> Chọn ảnh từ máy</label>
+                            <input type="file" name="images" id="imagesInput" accept="image/*" multiple hidden>
+                            <div class="upload-hint">Có thể chọn nhiều ảnh cùng lúc (JPG, PNG, WEBP...).</div>
+                        </div>
+                        <div class="file-preview-grid" id="imagePreviewGrid"></div>
                     </div>
-                    <div class="col-md-6 field-row">
-                        <label>URL catalogue</label>
-                        <input type="text" class="form-control" id="catalogueUrl" name="catalogueUrl" value="${fn:escapeXml(product.catalogueUrl)}" placeholder="https://.../catalogue.pdf">
-                        <div class="hint">Đường dẫn tới tài liệu / catalogue kỹ thuật (PDF) của sản phẩm.</div>
+                    <div class="col-12 field-row">
+                        <label>File catalogue</label>
+                        <div class="file-chip-list" id="existingCatalogueList">
+                            <c:forEach var="cat" items="${product.catalogues}">
+                                <c:choose>
+                                    <c:when test="${fn:startsWith(cat.catalogueUrl, 'http')}"><c:set var="catSrc" value="${cat.catalogueUrl}"/></c:when>
+                                    <c:otherwise><c:set var="catSrc" value="${pageContext.request.contextPath}${cat.catalogueUrl}"/></c:otherwise>
+                                </c:choose>
+                                <div class="file-chip" id="existing-catalogue-${cat.catalogueId}">
+                                    <i class="fa-solid fa-file-pdf"></i>
+                                    <a class="file-chip-link" href="${fn:escapeXml(catSrc)}" target="_blank" rel="noopener">${fn:escapeXml(not empty cat.fileName ? cat.fileName : cat.catalogueUrl)}</a>
+                                    <button type="button" class="file-chip-remove" onclick="removeExistingCatalogue(${cat.catalogueId})"><i class="fa-solid fa-xmark"></i></button>
+                                </div>
+                            </c:forEach>
+                        </div>
+                        <div class="sub-label">Thêm file catalogue mới</div>
+                        <div class="upload-dropzone">
+                            <label for="cataloguesInput" class="upload-btn"><i class="fa-solid fa-file-pdf"></i> Chọn file catalogue</label>
+                            <input type="file" name="catalogues" id="cataloguesInput" accept="application/pdf" multiple hidden>
+                            <div class="upload-hint">Có thể chọn nhiều file catalogue (PDF) cùng lúc.</div>
+                        </div>
+                        <div class="file-chip-list" id="catalogueChipList"></div>
                     </div>
                 </div>
 
@@ -295,16 +368,103 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        var imageUrlInput = document.getElementById('imageUrl');
-        var imagePreview = document.getElementById('imagePreview');
+        // ===== Gỡ ảnh/catalogue đã có sẵn -- chỉ gộp id vào 1 hidden input dạng
+        // CSV, KHÔNG xoá ngay trên server; việc xoá chỉ thật sự có hiệu lực khi
+        // bấm "Lưu thay đổi" (bấm "Hủy" thì các lựa chọn xoá này không có tác dụng).
+        var removedImageIds = [];
+        var removedCatalogueIds = [];
 
-        imageUrlInput.addEventListener('input', function () {
-            var url = this.value.trim();
-            if (url) {
-                imagePreview.innerHTML = '<img src="' + url.replace(/"/g, '&quot;') + '" alt="Xem trước" onerror="this.parentElement.innerHTML=\'<i class=\\\'fa-solid fa-triangle-exclamation\\\'></i>\'">';
-            } else {
-                imagePreview.innerHTML = '<i class="fa-solid fa-image"></i>';
+        function removeExistingImage(imageId) {
+            removedImageIds.push(imageId);
+            document.getElementById('removedImageIdsInput').value = removedImageIds.join(',');
+            var el = document.getElementById('existing-image-' + imageId);
+            if (el) { el.remove(); }
+        }
+
+        function removeExistingCatalogue(catalogueId) {
+            removedCatalogueIds.push(catalogueId);
+            document.getElementById('removedCatalogueIdsInput').value = removedCatalogueIds.join(',');
+            var el = document.getElementById('existing-catalogue-' + catalogueId);
+            if (el) { el.remove(); }
+        }
+
+        // ===== Chọn nhiều file (ảnh / catalogue) kèm xem trước + gỡ bớt trước khi
+        // submit -- input[type=file][multiple] không cho xoá bớt 1 file trực tiếp
+        // nên giữ danh sách File trong JS rồi dựng lại input.files bằng DataTransfer
+        // mỗi khi thêm/gỡ, đảm bảo input luôn khớp với những gì đang hiển thị.
+        function setupMultiFileField(inputId, previewContainerId, renderItem) {
+            var input = document.getElementById(inputId);
+            var container = document.getElementById(previewContainerId);
+            var files = [];
+
+            function sync() {
+                var dt = new DataTransfer();
+                files.forEach(function (f) { dt.items.add(f); });
+                input.files = dt.files;
             }
+            function render() {
+                container.innerHTML = '';
+                files.forEach(function (f, idx) {
+                    container.appendChild(renderItem(f, idx, remove));
+                });
+            }
+            function remove(idx) {
+                files.splice(idx, 1);
+                sync();
+                render();
+            }
+            input.addEventListener('change', function (e) {
+                Array.from(e.target.files).forEach(function (f) { files.push(f); });
+                sync();
+                render();
+            });
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes < 1024) { return bytes + ' B'; }
+            if (bytes < 1024 * 1024) { return (bytes / 1024).toFixed(1) + ' KB'; }
+            return (bytes / 1024 / 1024).toFixed(1) + ' MB';
+        }
+
+        setupMultiFileField('imagesInput', 'imagePreviewGrid', function (file, idx, removeFn) {
+            var wrap = document.createElement('div');
+            wrap.className = 'file-thumb';
+            var img = document.createElement('img');
+            img.alt = file.name;
+            var reader = new FileReader();
+            reader.onload = function (evt) { img.src = evt.target.result; };
+            reader.readAsDataURL(file);
+            var btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'file-thumb-remove';
+            btn.innerHTML = '<i class="fa-solid fa-xmark"></i>';
+            btn.addEventListener('click', function () { removeFn(idx); });
+            wrap.appendChild(img);
+            wrap.appendChild(btn);
+            return wrap;
+        });
+
+        setupMultiFileField('cataloguesInput', 'catalogueChipList', function (file, idx, removeFn) {
+            var chip = document.createElement('div');
+            chip.className = 'file-chip';
+            var icon = document.createElement('i');
+            icon.className = 'fa-solid fa-file-pdf';
+            var name = document.createElement('span');
+            name.className = 'file-chip-name';
+            name.textContent = file.name;
+            var size = document.createElement('span');
+            size.className = 'file-chip-size';
+            size.textContent = formatFileSize(file.size);
+            var btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'file-chip-remove';
+            btn.innerHTML = '<i class="fa-solid fa-xmark"></i>';
+            btn.addEventListener('click', function () { removeFn(idx); });
+            chip.appendChild(icon);
+            chip.appendChild(name);
+            chip.appendChild(size);
+            chip.appendChild(btn);
+            return chip;
         });
 
         function validateForm() {

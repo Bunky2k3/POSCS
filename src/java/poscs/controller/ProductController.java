@@ -1,13 +1,17 @@
 package poscs.controller;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import jakarta.servlet.ServletException;
+import jakarta.servlet.annotation.MultipartConfig;
 import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.Part;
 import poscs.common.AccessControl;
+import poscs.common.FileStorage;
 import poscs.dao.ProductDAO;
 import poscs.model.Product;
 
@@ -16,8 +20,17 @@ import poscs.model.Product;
  * tham số "action" -- role nào được thao tác gì xem PERMISSIONS.md, enforce
  * bằng AccessControl.requireFullAccess ở đầu mỗi hàm handleCreate/
  * handleUpdate/handleDelete (Sales/CSKH chỉ View only trên Product).
+ *
+ * addNewProduct.jsp/updateProduct.jsp gửi lên dạng multipart/form-data (ảnh +
+ * catalogue tải từ máy, có thể chọn nhiều file) -- @MultipartConfig là bắt
+ * buộc, nếu không request.getParameter(...) sẽ trả về null cho MỌI trường
+ * (kể cả text), không chỉ riêng các trường file (xem AuthenticationController
+ * cho tiền lệ). Giới hạn kích thước rộng rãi cho catalogue PDF nhưng vẫn có
+ * giới hạn -- không để trống như AuthenticationController vì ở đó file chưa
+ * thực sự được lưu, còn ở đây thì có.
  */
 @WebServlet(name = "ProductController", urlPatterns = {"/product"})
+@MultipartConfig(maxFileSize = 20 * 1024 * 1024, maxRequestSize = 100 * 1024 * 1024, fileSizeThreshold = 1024 * 1024)
 public class ProductController extends HttpServlet {
 
     private static final int PAGE_SIZE = 10;
@@ -25,6 +38,9 @@ public class ProductController extends HttpServlet {
     private static final String DETAIL_VIEW = "/jsp/technical/viewdetailProduct.jsp";
     private static final String CREATE_VIEW = "/jsp/technical/addNewProduct.jsp";
     private static final String UPDATE_VIEW = "/jsp/technical/updateProduct.jsp";
+
+    private static final String IMAGE_SUBFOLDER = "products/images";
+    private static final String CATALOGUE_SUBFOLDER = "products/catalogues";
 
     private final ProductDAO productDAO = new ProductDAO();
 
@@ -143,15 +159,14 @@ public class ProductController extends HttpServlet {
     // POST actions
     // ------------------------------------------------------------------
 
-    private void handleCreate(HttpServletRequest request, HttpServletResponse response) throws IOException {
+    private void handleCreate(HttpServletRequest request, HttpServletResponse response)
+            throws ServletException, IOException {
         if (!AccessControl.requireFullAccess(request, response, AccessControl.Resource.PRODUCT)) {
             return;
         }
         Product p = new Product();
         p.setProductName(emptyToNull(request.getParameter("productName")));
         p.setDescription(emptyToNull(request.getParameter("description")));
-        p.setImageUrl(emptyToNull(request.getParameter("imageUrl")));
-        p.setCatalogueUrl(emptyToNull(request.getParameter("catalogueUrl")));
 
         Integer categoryId = parseIntOrNull(request.getParameter("categoryId"));
         if (categoryId != null) {
@@ -169,10 +184,15 @@ public class ProductController extends HttpServlet {
             response.sendRedirect(request.getContextPath() + "/product?action=new&error=create_failed");
             return;
         }
+
+        saveNewImages(request, newId);
+        saveNewCatalogues(request, newId);
+
         response.sendRedirect(request.getContextPath() + "/product?action=view&id=" + newId);
     }
 
-    private void handleUpdate(HttpServletRequest request, HttpServletResponse response) throws IOException {
+    private void handleUpdate(HttpServletRequest request, HttpServletResponse response)
+            throws ServletException, IOException {
         if (!AccessControl.requireFullAccess(request, response, AccessControl.Resource.PRODUCT)) {
             return;
         }
@@ -186,8 +206,6 @@ public class ProductController extends HttpServlet {
         p.setProductId(id);
         p.setProductName(emptyToNull(request.getParameter("productName")));
         p.setDescription(emptyToNull(request.getParameter("description")));
-        p.setImageUrl(emptyToNull(request.getParameter("imageUrl")));
-        p.setCatalogueUrl(emptyToNull(request.getParameter("catalogueUrl")));
 
         Integer categoryId = parseIntOrNull(request.getParameter("categoryId"));
         if (categoryId != null) {
@@ -204,6 +222,12 @@ public class ProductController extends HttpServlet {
             response.sendRedirect(request.getContextPath() + "/product?action=edit&id=" + id + "&error=update_failed");
             return;
         }
+
+        removeMarkedFiles(request, "removedImageIds", id, true);
+        removeMarkedFiles(request, "removedCatalogueIds", id, false);
+        saveNewImages(request, id);
+        saveNewCatalogues(request, id);
+
         response.sendRedirect(request.getContextPath() + "/product?action=view&id=" + id);
     }
 
@@ -227,6 +251,65 @@ public class ProductController extends HttpServlet {
 
         productDAO.softDelete(id);
         response.sendRedirect(request.getContextPath() + "/product");
+    }
+
+    // ------------------------------------------------------------------
+    // Helpers: upload
+    // ------------------------------------------------------------------
+
+    /** Lưu mọi file được chọn ở input "images" (name lặp lại vì có "multiple") vào productimages. */
+    private void saveNewImages(HttpServletRequest request, int productId) throws ServletException, IOException {
+        for (Part part : filePartsNamed(request, "images")) {
+            String url = FileStorage.save(part, IMAGE_SUBFOLDER);
+            if (url != null) {
+                productDAO.addImage(productId, url);
+            }
+        }
+    }
+
+    /** Lưu mọi file được chọn ở input "catalogues" (name lặp lại vì có "multiple") vào productcatalogues. */
+    private void saveNewCatalogues(HttpServletRequest request, int productId) throws ServletException, IOException {
+        for (Part part : filePartsNamed(request, "catalogues")) {
+            String url = FileStorage.save(part, CATALOGUE_SUBFOLDER);
+            if (url != null) {
+                productDAO.addCatalogue(productId, url, part.getSubmittedFileName());
+            }
+        }
+    }
+
+    /** request.getParts() lọc theo tên field + bỏ qua part rỗng (input file để trống vẫn gửi lên 1 part size=0). */
+    private List<Part> filePartsNamed(HttpServletRequest request, String name) throws ServletException, IOException {
+        List<Part> result = new ArrayList<>();
+        for (Part part : request.getParts()) {
+            if (name.equals(part.getName()) && part.getSize() > 0) {
+                result.add(part);
+            }
+        }
+        return result;
+    }
+
+    /**
+     * Xoá các ảnh/catalogue mà người dùng bấm "x" ở form sửa -- JS gộp id vào
+     * 1 hidden input dạng CSV (vd "3,7,12") thay vì tự submit xoá ngay, để
+     * việc xoá chỉ thật sự có hiệu lực khi bấm "Lưu thay đổi" (khớp với thao
+     * tác "Hủy" ở form vẫn bỏ được các lựa chọn xoá đó).
+     */
+    private void removeMarkedFiles(HttpServletRequest request, String paramName, int productId, boolean isImage) {
+        String raw = request.getParameter(paramName);
+        if (raw == null || raw.trim().isEmpty()) {
+            return;
+        }
+        for (String token : raw.split(",")) {
+            Integer fileId = parseIntOrNull(token);
+            if (fileId == null) {
+                continue;
+            }
+            if (isImage) {
+                productDAO.deleteImage(fileId, productId);
+            } else {
+                productDAO.deleteCatalogue(fileId, productId);
+            }
+        }
     }
 
     // ------------------------------------------------------------------
