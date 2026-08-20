@@ -13,8 +13,8 @@ import poscs.model.User;
 
 /**
  * DAO cho bảng customer_lifecycle_events -- lịch sử các lần đánh giá/thay
- * đổi xếp hạng quan hệ của khách hàng, cả tự động (CustomerEvaluator) lẫn
- * ghi nhận thủ công sau này.
+ * đổi xếp hạng quan hệ của khách hàng, do người dùng chọn thủ công ở
+ * viewcustomerdetail.jsp (xem CustomerController#handleEvaluate).
  */
 public class CustomerLifecycleEventDAO {
 

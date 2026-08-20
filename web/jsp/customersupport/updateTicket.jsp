@@ -112,6 +112,30 @@
         .error-text { color: var(--danger); font-size: 12px; margin-top: 5px; display: none; }
         .form-check-label { font-size: 0.88rem; color: #374151; }
 
+        /* ===== Box chọn khách hàng / hợp đồng (thay cho dropdown) ===== */
+        .picker-field {
+            display: flex; align-items: center; justify-content: space-between; cursor: pointer;
+            padding: 0.6rem 0.9rem; border-radius: 10px; border: 1px solid #e5e7eb;
+            background-color: #f9fafb; font-size: 0.9rem; color: #111827;
+        }
+        .picker-field:hover { border-color: var(--primary-light); }
+        .picker-field.disabled { cursor: not-allowed; color: #9ca3af; background-color: #f3f4f6; }
+        .picker-field i { color: #9ca3af; font-size: 0.85rem; flex-shrink: 0; margin-left: 10px; }
+        .picker-placeholder { color: #9ca3af; }
+
+        .modal-content { border-radius: 16px; border: none; }
+        .modal-header { border-bottom: none; padding: 22px 24px 6px; display: flex; justify-content: space-between; align-items: center; }
+        .modal-title { font-weight: 700; color: var(--primary-dark); font-size: 1.02rem; }
+        .modal-body { padding: 10px 24px 24px; }
+        .picker-search { margin-bottom: 12px; }
+        .picker-list { max-height: 320px; overflow-y: auto; border: 1px solid #eef2f6; border-radius: 10px; }
+        .picker-item { padding: 10px 14px; cursor: pointer; border-bottom: 1px solid #f3f4f6; }
+        .picker-item:last-child { border-bottom: none; }
+        .picker-item:hover { background: #f0f9ff; }
+        .picker-item-title { font-weight: 600; font-size: 0.88rem; color: #111827; }
+        .picker-item-sub { font-size: 0.76rem; color: #9ca3af; margin-top: 2px; }
+        .picker-empty { padding: 24px; text-align: center; color: #9ca3af; font-size: 0.85rem; }
+
         .action-bar { display: flex; gap: 12px; margin-top: 28px; justify-content: flex-end; border-top: 1.5px solid #eef2f6; padding-top: 22px; }
         .btn-primary { background: linear-gradient(120deg, var(--primary), var(--primary-light)); border: none; border-radius: 10px; padding: 0.6rem 1.4rem; font-weight: 600; font-size: 0.9rem; box-shadow: 0 6px 16px rgba(5, 104, 166, 0.3); }
         .btn-primary:hover { background: linear-gradient(120deg, var(--primary-dark), var(--primary)); }
@@ -183,19 +207,20 @@
                 <div class="row">
                     <div class="col-md-6 field-row">
                         <label>Khách hàng <span class="req">*</span></label>
-                        <select class="form-select" id="customer" name="enterpriseId">
-                            <option value="">-- Chọn khách hàng --</option>
-                            <c:forEach var="customer" items="${customerList}">
-                                <option value="${customer.enterpriseId}" ${customer.enterpriseId == ticket.enterpriseId ? 'selected' : ''}>${fn:escapeXml(customer.enterpriseName)}</option>
-                            </c:forEach>
-                        </select>
+                        <div class="picker-field" id="customerPickerField" onclick="openCustomerPicker()">
+                            <span id="customerPickerText" class="picker-placeholder">-- Chọn khách hàng --</span>
+                            <i class="fa-solid fa-magnifying-glass"></i>
+                        </div>
+                        <input type="hidden" id="customer" name="enterpriseId" value="">
                         <span class="error-text" id="err-customer">Vui lòng chọn khách hàng.</span>
                     </div>
                     <div class="col-md-6 field-row">
                         <label>Hợp đồng liên quan</label>
-                        <select class="form-select" id="contract" name="contractId" disabled>
-                            <option value="">Đang tải...</option>
-                        </select>
+                        <div class="picker-field disabled" id="contractPickerField" onclick="openContractPicker()">
+                            <span id="contractPickerText" class="picker-placeholder">Đang tải...</span>
+                            <i class="fa-solid fa-magnifying-glass"></i>
+                        </div>
+                        <input type="hidden" id="contract" name="contractId" value="">
                     </div>
 
                     <div class="col-md-4 field-row">
@@ -281,46 +306,207 @@
         </div>
     </div>
 
+    <!-- ===== Box chọn khách hàng ===== -->
+    <div class="modal fade" id="customerPickerModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <span class="modal-title">Chọn khách hàng</span>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="text" class="form-control picker-search" id="customerSearchInput" placeholder="Tìm theo tên, mã khách hàng hoặc người phụ trách...">
+                    <div class="picker-list" id="customerPickerList">
+                        <c:forEach var="customer" items="${customerList}">
+                            <div class="picker-item"
+                                 data-id="${customer.enterpriseId}"
+                                 data-name="${fn:escapeXml(customer.enterpriseName)}"
+                                 data-search="${fn:toLowerCase(fn:escapeXml(customer.enterpriseName))} ${fn:toLowerCase(fn:escapeXml(customer.enterpriseCode))} ${fn:toLowerCase(fn:escapeXml(customer.accountOwner.fullName))}">
+                                <div class="picker-item-title">${fn:escapeXml(customer.enterpriseName)}</div>
+                                <div class="picker-item-sub">
+                                    ${fn:escapeXml(customer.enterpriseCode)}
+                                    <c:if test="${customer.accountOwner != null}"> &middot; Phụ trách: ${fn:escapeXml(customer.accountOwner.fullName)}</c:if>
+                                </div>
+                            </div>
+                        </c:forEach>
+                        <div class="picker-empty" id="customerPickerEmpty" style="display:none;">Không tìm thấy khách hàng phù hợp.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== Box chọn hợp đồng liên quan (nạp theo khách hàng đã chọn) ===== -->
+    <div class="modal fade" id="contractPickerModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <span class="modal-title">Chọn hợp đồng liên quan</span>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="text" class="form-control picker-search" id="contractSearchInput" placeholder="Tìm theo mã hoặc tên hợp đồng...">
+                    <div class="picker-list" id="contractPickerList">
+                        <div class="picker-empty" id="contractPickerEmpty">Chọn khách hàng trước.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         var contextPath = '${pageContext.request.contextPath}';
         var currentEnterpriseId = '${ticket.enterpriseId}';
         var currentContractId = '${ticket.contractId}';
-        var customerSelect = document.getElementById('customer');
-        var contractSelect = document.getElementById('contract');
+        var customerHiddenInput = document.getElementById('customer');
+        var customerPickerText = document.getElementById('customerPickerText');
+        var contractHiddenInput = document.getElementById('contract');
+        var contractPickerField = document.getElementById('contractPickerField');
+        var contractPickerText = document.getElementById('contractPickerText');
+        var contractPickerList = document.getElementById('contractPickerList');
 
-        function escapeHtml(text) {
-            var div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
+        var customerPickerModal = new bootstrap.Modal(document.getElementById('customerPickerModal'));
+        var contractPickerModal = new bootstrap.Modal(document.getElementById('contractPickerModal'));
+
+        function openCustomerPicker() {
+            document.getElementById('customerSearchInput').value = '';
+            filterPickerList('customerPickerList', 'customerPickerEmpty', '');
+            customerPickerModal.show();
+        }
+
+        function openContractPicker() {
+            if (contractPickerField.classList.contains('disabled')) {
+                return;
+            }
+            document.getElementById('contractSearchInput').value = '';
+            filterPickerList('contractPickerList', 'contractPickerEmpty', '');
+            contractPickerModal.show();
+        }
+
+        function filterPickerList(listId, emptyId, query) {
+            var list = document.getElementById(listId);
+            var items = list.querySelectorAll('.picker-item');
+            var q = query.trim().toLowerCase();
+            var visibleCount = 0;
+            items.forEach(function (item) {
+                var match = !q || item.dataset.search.indexOf(q) !== -1;
+                item.style.display = match ? '' : 'none';
+                if (match) { visibleCount++; }
+            });
+            document.getElementById(emptyId).style.display = (visibleCount === 0 && items.length > 0) ? 'block' : 'none';
+        }
+
+        document.getElementById('customerSearchInput').addEventListener('input', function () {
+            filterPickerList('customerPickerList', 'customerPickerEmpty', this.value);
+        });
+        document.getElementById('contractSearchInput').addEventListener('input', function () {
+            filterPickerList('contractPickerList', 'contractPickerEmpty', this.value);
+        });
+
+        document.getElementById('customerPickerList').addEventListener('click', function (e) {
+            var item = e.target.closest('.picker-item');
+            if (!item) { return; }
+            selectCustomer(item.dataset.id, item.dataset.name);
+            customerPickerModal.hide();
+        });
+
+        contractPickerList.addEventListener('click', function (e) {
+            var item = e.target.closest('.picker-item');
+            if (!item) { return; }
+            selectContract(item.dataset.id, item.dataset.name);
+            contractPickerModal.hide();
+        });
+
+        function selectCustomer(id, name) {
+            customerHiddenInput.value = id;
+            customerPickerText.textContent = name;
+            customerPickerText.classList.remove('picker-placeholder');
+            resetContractPicker();
+            loadContracts(id, null);
+        }
+
+        function resetContractPicker() {
+            contractHiddenInput.value = '';
+            contractPickerText.textContent = '-- Chọn khách hàng trước --';
+            contractPickerText.classList.add('picker-placeholder');
+            contractPickerField.classList.add('disabled');
+        }
+
+        function selectContract(id, code) {
+            contractHiddenInput.value = id;
+            contractPickerText.textContent = code;
+            contractPickerText.classList.remove('picker-placeholder');
         }
 
         function loadContracts(enterpriseId, selectedContractId) {
-            if (!enterpriseId) {
-                contractSelect.innerHTML = '<option value="">-- Chọn khách hàng trước --</option>';
-                contractSelect.disabled = true;
-                return;
-            }
-            contractSelect.disabled = true;
-            contractSelect.innerHTML = '<option value="">Đang tải...</option>';
+            contractPickerField.classList.add('disabled');
+            contractPickerText.textContent = 'Đang tải...';
+            contractPickerText.classList.add('picker-placeholder');
+            contractPickerList.innerHTML = '';
             fetch(contextPath + '/contract/byEnterprise?enterpriseId=' + encodeURIComponent(enterpriseId))
                 .then(function (res) { return res.json(); })
                 .then(function (contracts) {
-                    var html = '<option value="">-- Không có hợp đồng liên quan --</option>';
+                    contractPickerList.innerHTML = '';
                     contracts.forEach(function (c) {
-                        var selected = selectedContractId && String(c.id) === String(selectedContractId) ? ' selected' : '';
-                        html += '<option value="' + c.id + '"' + selected + '>' + escapeHtml(c.code) + '</option>';
+                        var item = document.createElement('div');
+                        item.className = 'picker-item';
+                        item.dataset.id = c.id;
+                        item.dataset.name = c.code;
+                        item.dataset.search = (c.code + ' ' + (c.title || '')).toLowerCase();
+
+                        var title = document.createElement('div');
+                        title.className = 'picker-item-title';
+                        title.textContent = c.code;
+                        item.appendChild(title);
+
+                        if (c.title) {
+                            var sub = document.createElement('div');
+                            sub.className = 'picker-item-sub';
+                            sub.textContent = c.title;
+                            item.appendChild(sub);
+                        }
+                        contractPickerList.appendChild(item);
                     });
-                    contractSelect.innerHTML = html;
-                    contractSelect.disabled = false;
+
+                    var empty = document.createElement('div');
+                    empty.className = 'picker-empty';
+                    empty.id = 'contractPickerEmpty';
+                    empty.style.display = contracts.length === 0 ? 'block' : 'none';
+                    empty.textContent = 'Khách hàng này chưa có hợp đồng nào.';
+                    contractPickerList.appendChild(empty);
+
+                    contractPickerText.textContent = contracts.length === 0
+                        ? '-- Không có hợp đồng liên quan --'
+                        : '-- Chọn hợp đồng --';
+                    contractPickerField.classList.remove('disabled');
+
+                    if (selectedContractId) {
+                        var match = contractPickerList.querySelector('.picker-item[data-id="' + selectedContractId + '"]');
+                        if (match) {
+                            selectContract(match.dataset.id, match.dataset.name);
+                        }
+                    }
                 })
                 .catch(function () {
-                    contractSelect.innerHTML = '<option value="">Không tải được danh sách hợp đồng</option>';
+                    contractPickerText.textContent = 'Không tải được danh sách hợp đồng';
+                    contractPickerField.classList.add('disabled');
                 });
         }
 
-        customerSelect.addEventListener('change', function () { loadContracts(this.value, null); });
-        loadContracts(currentEnterpriseId, currentContractId);
+        // ===== Khởi tạo lựa chọn hiện có của phiếu (đang sửa, không phải tạo mới) =====
+        // Không gọi selectCustomer() ở đây vì nó tự gọi loadContracts() không kèm
+        // currentContractId -- gọi loadContracts() riêng bên dưới, kèm đúng
+        // contractId hiện tại để pre-select đúng hợp đồng, tránh nạp trùng 2 lần.
+        if (currentEnterpriseId) {
+            var currentCustomerItem = document.querySelector('#customerPickerList .picker-item[data-id="' + currentEnterpriseId + '"]');
+            if (currentCustomerItem) {
+                customerHiddenInput.value = currentCustomerItem.dataset.id;
+                customerPickerText.textContent = currentCustomerItem.dataset.name;
+                customerPickerText.classList.remove('picker-placeholder');
+            }
+            loadContracts(currentEnterpriseId, currentContractId);
+        }
 
         function validateForm() {
             var valid = true;
