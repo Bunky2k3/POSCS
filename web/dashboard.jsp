@@ -133,6 +133,7 @@
         .chart-card .section-sub { font-size: 0.8rem; color: #9ca3af; margin-bottom: 16px; }
 
         .legend-row { display: flex; gap: 18px; justify-content: center; margin-top: 14px; flex-wrap: wrap; }
+        .doughnut-wrap { max-width: 260px; margin: 0 auto; }
         .legend-item { display: flex; align-items: center; gap: 7px; font-size: 0.8rem; color: #6b7280; }
         .legend-dot { width: 9px; height: 9px; border-radius: 50%; }
 
@@ -301,20 +302,13 @@
             </div>
         </div>
 
-        <!-- ===== Biểu đồ ===== -->
+        <!-- ===== Biểu đồ + bảng hành động ===== -->
         <div class="row g-4 mb-4">
-            <div class="col-lg-8">
-                <div class="card-box chart-card">
-                    <div class="section-title">Doanh thu hợp đồng theo tháng</div>
-                    <div class="section-sub">6 tháng gần nhất (đơn vị: tỷ đồng)</div>
-                    <canvas id="revenueChart" height="110"></canvas>
-                </div>
-            </div>
             <div class="col-lg-4">
                 <div class="card-box chart-card">
                     <div class="section-title">Phiếu hỗ trợ theo trạng thái</div>
                     <div class="section-sub">Tổng số ${ticketStatusSummary['Mới tiếp nhận'] + ticketStatusSummary['Đang xử lý'] + ticketStatusSummary['Đã đóng']} phiếu hiện có</div>
-                    <canvas id="ticketChart" height="200"></canvas>
+                    <div class="doughnut-wrap"><canvas id="ticketChart" height="200"></canvas></div>
                     <div class="legend-row">
                         <div class="legend-item"><span class="legend-dot" style="background:var(--primary-light)"></span>Mới tiếp nhận (${ticketStatusSummary['Mới tiếp nhận']})</div>
                         <div class="legend-item"><span class="legend-dot" style="background:var(--warning)"></span>Đang xử lý (${ticketStatusSummary['Đang xử lý']})</div>
@@ -322,11 +316,8 @@
                     </div>
                 </div>
             </div>
-        </div>
 
-        <!-- ===== Bảng hành động ===== -->
-        <div class="row g-4">
-            <div class="col-lg-6">
+            <div class="col-lg-8">
                 <div class="card-box table-section">
                     <div class="table-section-header">
                         <h6>Hợp đồng sắp hết hạn</h6>
@@ -360,8 +351,11 @@
                     </table>
                 </div>
             </div>
+        </div>
 
-            <div class="col-lg-6">
+        <!-- ===== Bảng phiếu hỗ trợ ===== -->
+        <div class="row g-4">
+            <div class="col-lg-12">
                 <div class="card-box table-section">
                     <div class="table-section-header">
                         <h6>Phiếu hỗ trợ cần xử lý</h6>
@@ -429,34 +423,6 @@
 
         document.querySelectorAll('.contract-value').forEach(function (el) {
             el.textContent = formatCompactVND(Number(el.dataset.vnd));
-        });
-
-        // ===== Biểu đồ doanh thu hợp đồng theo tháng =====
-        var revenueCtx = document.getElementById('revenueChart').getContext('2d');
-        var revenueGradient = revenueCtx.createLinearGradient(0, 0, 0, 260);
-        revenueGradient.addColorStop(0, 'rgba(5, 104, 166, 0.85)');
-        revenueGradient.addColorStop(1, 'rgba(15, 158, 219, 0.55)');
-
-        new Chart(revenueCtx, {
-            type: 'bar',
-            data: {
-                labels: [<c:forEach var="m" items="${chartMonthLabels}" varStatus="st">'${m}'${!st.last ? ',' : ''}</c:forEach>],
-                datasets: [{
-                    label: 'Doanh thu (tỷ đồng)',
-                    data: [<c:forEach var="v" items="${chartRevenueValues}" varStatus="st">${v}${!st.last ? ',' : ''}</c:forEach>],
-                    backgroundColor: revenueGradient,
-                    borderRadius: 8,
-                    maxBarThickness: 42
-                }]
-            },
-            options: {
-                responsive: true,
-                plugins: { legend: { display: false } },
-                scales: {
-                    y: { beginAtZero: true, grid: { color: '#f0f2f5' }, ticks: { color: '#9ca3af', font: { size: 11 } } },
-                    x: { grid: { display: false }, ticks: { color: '#6b7280', font: { size: 11 } } }
-                }
-            }
         });
 
         // ===== Biểu đồ phiếu hỗ trợ theo trạng thái =====

@@ -4,7 +4,6 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
-import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.HashMap;
 import java.util.List;
@@ -33,7 +32,6 @@ public class DashboardController extends HttpServlet {
 
     private static final int EXPIRING_CONTRACTS_LIMIT = 5;
     private static final int ATTENTION_TICKETS_LIMIT = 5;
-    private static final int REVENUE_CHART_MONTHS = 6;
     private static final String[] WEEKDAY_VI = {
         "Chủ Nhật", "Thứ Hai", "Thứ Ba", "Thứ Tư", "Thứ Năm", "Thứ Sáu", "Thứ Bảy"
     };
@@ -80,20 +78,6 @@ public class DashboardController extends HttpServlet {
         String weekday = WEEKDAY_VI[cal.get(Calendar.DAY_OF_WEEK) - 1];
         request.setAttribute("todayLabel", weekday + ", " + String.format("%02d/%02d/%04d",
                 today.getDayOfMonth(), today.getMonthValue(), today.getYear()));
-
-        // ===== Biểu đồ doanh thu N tháng gần nhất =====
-        Map<String, BigDecimal> revenueByMonth = paymentDAO.sumInvoiceAmountLastNMonths(REVENUE_CHART_MONTHS);
-        List<String> chartMonthLabels = new ArrayList<>();
-        List<Double> chartRevenueValues = new ArrayList<>();
-        for (Map.Entry<String, BigDecimal> entry : revenueByMonth.entrySet()) {
-            String[] parts = entry.getKey().split("-");
-            chartMonthLabels.add("Th." + Integer.parseInt(parts[1]));
-            // Đổi sang đơn vị tỷ đồng, làm tròn 1 chữ số thập phân, khớp nhãn "đơn vị: tỷ đồng" trên biểu đồ.
-            double billions = entry.getValue().divide(new BigDecimal("1000000000"), 4, java.math.RoundingMode.HALF_UP).doubleValue();
-            chartRevenueValues.add(Math.round(billions * 10) / 10.0);
-        }
-        request.setAttribute("chartMonthLabels", chartMonthLabels);
-        request.setAttribute("chartRevenueValues", chartRevenueValues);
 
         // ===== Bảng hợp đồng sắp hết hạn =====
         List<Contract> expiringContracts = contractDAO.findExpiringSoon(EXPIRING_CONTRACTS_LIMIT);

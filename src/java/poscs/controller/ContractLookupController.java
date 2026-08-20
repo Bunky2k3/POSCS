@@ -51,7 +51,8 @@ public class ContractLookupController extends HttpServlet {
                 sb.append(',');
             }
             sb.append("{\"id\":").append(c.getContractId())
-              .append(",\"code\":\"").append(escapeJson(c.getContractCode())).append("\"}");
+              .append(",\"code\":\"").append(escapeJson(c.getContractCode())).append("\"")
+              .append(",\"title\":\"").append(escapeJson(c.getTitle())).append("\"}");
         }
         return sb.append(']').toString();
     }
