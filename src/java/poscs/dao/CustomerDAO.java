@@ -311,6 +311,21 @@ public class CustomerDAO {
         }
     }
 
+    /** Ghi kết quả CustomerEvaluator vào enterprises.current_relationship_rating. */
+    public boolean updateRelationshipRating(int enterpriseId, RelationshipRating rating) {
+        String sql = "UPDATE enterprises SET current_relationship_rating = ? WHERE enterprise_id = ?";
+        try (Connection conn = DBContext.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, rating.getDbValue());
+            ps.setInt(2, enterpriseId);
+            return ps.executeUpdate() > 0;
+        } catch (SQLException ex) {
+            System.err.println("--- LOI CAP NHAT XEP HANG KHACH HANG ---");
+            ex.printStackTrace();
+            return false;
+        }
+    }
+
     /** Xoá mềm khách hàng (is_deleted = 1). Gọi hasActiveContracts() trước để áp BR-41. */
     public boolean softDelete(int enterpriseId) {
         String sql = "UPDATE enterprises SET is_deleted = 1 WHERE enterprise_id = ?";
