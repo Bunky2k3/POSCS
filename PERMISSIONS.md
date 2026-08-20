@@ -4,17 +4,16 @@ POSCS uses role-based access control. This document is the source of
 truth for who can do what — refer to it whenever implementing or
 reviewing a controller's access checks.
 
-**Status: enforced for Customer/Contract/Product/Ticket.** The `roles`
-table is seeded (see
+**Status: enforced for Customer/Contract/Product/Ticket/Employee.** The
+`roles` table is seeded (see
 [`db/migrations/V2__seed_default_roles__ndat2003.sql`](db/migrations/V2__seed_default_roles__ndat2003.sql)),
 login/session is implemented in `AuthenticationController`, and
 `CustomerController`/`ContractController`/`ProductController`/
-`TechnicalSupportTicketController` enforce this matrix server-side via
-`poscs.common.AccessControl.requireFullAccess(...)` at the top of every
-create/update/delete handler. `Employee` has no real controller logic
-yet (`EmployeeController` is still a NetBeans stub), so enforcement for
-that row is still pending — wire it up the same way once that feature
-is built.
+`TechnicalSupportTicketController`/`EmployeeController` enforce this
+matrix server-side via `poscs.common.AccessControl.requireFullAccess(...)`.
+`EmployeeController` gates once at the top of `doGet`/`doPost` instead of
+per-handler like the others, since Employee has no "View only" tier for
+any role — every single action (including list/view) requires Admin.
 
 ## Roles
 

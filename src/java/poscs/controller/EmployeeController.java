@@ -1,87 +1,388 @@
-/*
- * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
- * Click nbfs://nbhost/SystemFileSystem/Templates/JSP_Servlet/Servlet.java to edit this template
- */
 package poscs.controller;
 
 import java.io.IOException;
-import java.io.PrintWriter;
+import java.security.SecureRandom;
+import java.sql.Date;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.util.List;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.mindrot.jbcrypt.BCrypt;
+import poscs.common.AccessControl;
+import poscs.common.EmailUtil;
+import poscs.dao.AddressDAO;
+import poscs.dao.EmployeeDAO;
+import poscs.model.Address;
+import poscs.model.User;
 
 /**
- *
- * @author Admin
+ * Controller quản lý nhân viên (FE-02 / UC-24 -> UC-29, bảng users). Khác
+ * với Customer/Contract/Product/Ticket -- PERMISSIONS.md không có tier
+ * "View only" nào cho Employee, chỉ Admin mới được đụng vào (kể cả xem danh
+ * sách/chi tiết) -- nên gate quyền 1 lần duy nhất ở đầu doGet/doPost thay vì
+ * lặp lại AccessControl.requireFullAccess() ở từng handler như các
+ * controller khác.
  */
 @WebServlet(name = "EmployeeController", urlPatterns = {"/employee"})
 public class EmployeeController extends HttpServlet {
 
-    /**
-     * Processes requests for both HTTP <code>GET</code> and <code>POST</code>
-     * methods.
-     *
-     * @param request servlet request
-     * @param response servlet response
-     * @throws ServletException if a servlet-specific error occurs
-     * @throws IOException if an I/O error occurs
-     */
-    protected void processRequest(HttpServletRequest request, HttpServletResponse response)
-            throws ServletException, IOException {
-        response.setContentType("text/html;charset=UTF-8");
-        try (PrintWriter out = response.getWriter()) {
-            /* TODO output your page here. You may use following sample code. */
-            out.println("<!DOCTYPE html>");
-            out.println("<html>");
-            out.println("<head>");
-            out.println("<title>Servlet EmployeeController</title>");
-            out.println("</head>");
-            out.println("<body>");
-            out.println("<h1>Servlet EmployeeController at " + request.getContextPath() + "</h1>");
-            out.println("</body>");
-            out.println("</html>");
-        }
-    }
+    private static final int PAGE_SIZE = 10;
+    private static final String LIST_VIEW = "/jsp/admin/listEmployee.jsp";
+    private static final String DETAIL_VIEW = "/jsp/admin/viewdetailEmployee.jsp";
+    private static final String CREATE_VIEW = "/jsp/admin/addEmployee.jsp";
+    private static final String UPDATE_VIEW = "/jsp/admin/updateEmployee.jsp";
 
-    // <editor-fold defaultstate="collapsed" desc="HttpServlet methods. Click on the + sign on the left to edit the code.">
-    /**
-     * Handles the HTTP <code>GET</code> method.
-     *
-     * @param request servlet request
-     * @param response servlet response
-     * @throws ServletException if a servlet-specific error occurs
-     * @throws IOException if an I/O error occurs
-     */
+    private static final SecureRandom RANDOM = new SecureRandom();
+    private static final String TEMP_PASSWORD_CHARS =
+            "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
+
+    private final EmployeeDAO employeeDAO = new EmployeeDAO();
+    private final AddressDAO addressDAO = new AddressDAO();
+
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
-        processRequest(request, response);
+        if (!AccessControl.requireFullAccess(request, response, AccessControl.Resource.EMPLOYEE)) {
+            return;
+        }
+        String action = request.getParameter("action");
+        if (action == null) {
+            action = "list";
+        }
+        switch (action) {
+            case "view":
+                showDetail(request, response);
+                break;
+            case "new":
+                showCreateForm(request, response);
+                break;
+            case "edit":
+                showEditForm(request, response);
+                break;
+            case "list":
+            default:
+                showList(request, response);
+                break;
+        }
     }
 
-    /**
-     * Handles the HTTP <code>POST</code> method.
-     *
-     * @param request servlet request
-     * @param response servlet response
-     * @throws ServletException if a servlet-specific error occurs
-     * @throws IOException if an I/O error occurs
-     */
     @Override
     protected void doPost(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
-        processRequest(request, response);
+        if (!AccessControl.requireFullAccess(request, response, AccessControl.Resource.EMPLOYEE)) {
+            return;
+        }
+        String action = request.getParameter("action");
+        if (action == null) {
+            action = "";
+        }
+        switch (action) {
+            case "create":
+                handleCreate(request, response);
+                break;
+            case "update":
+                handleUpdate(request, response);
+                break;
+            case "toggleStatus":
+                handleToggleStatus(request, response);
+                break;
+            default:
+                response.sendRedirect(request.getContextPath() + "/employee");
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // GET actions
+    // ------------------------------------------------------------------
+
+    private void showList(HttpServletRequest request, HttpServletResponse response)
+            throws ServletException, IOException {
+        int page = parseIntOrDefault(request.getParameter("page"), 1);
+        if (page < 1) {
+            page = 1;
+        }
+        String keyword = request.getParameter("keyword");
+        String statusFilter = request.getParameter("status");
+        Integer roleFilter = parseIntOrNull(request.getParameter("roleId"));
+
+        List<User> employeeList = employeeDAO.findAll(page, PAGE_SIZE, keyword, statusFilter, roleFilter);
+        int totalCount = employeeDAO.countAll(keyword, statusFilter, roleFilter);
+        int totalPages = Math.max(1, (int) Math.ceil(totalCount / (double) PAGE_SIZE));
+
+        request.setAttribute("employeeList", employeeList);
+        request.setAttribute("roleList", employeeDAO.findAllRoles());
+        request.setAttribute("currentPage", page);
+        request.setAttribute("totalPages", totalPages);
+        request.setAttribute("totalCount", totalCount);
+        request.setAttribute("keyword", keyword);
+        request.setAttribute("statusFilter", statusFilter);
+        request.setAttribute("roleFilter", roleFilter);
+
+        request.getRequestDispatcher(LIST_VIEW).forward(request, response);
+    }
+
+    private void showDetail(HttpServletRequest request, HttpServletResponse response)
+            throws ServletException, IOException {
+        Integer id = parseIntOrNull(request.getParameter("id"));
+        User employee = id != null ? employeeDAO.findById(id) : null;
+        if (employee == null) {
+            response.sendRedirect(request.getContextPath() + "/employee?error=notfound");
+            return;
+        }
+        request.setAttribute("employee", employee);
+        // Format sẵn thành chuỗi dd/MM/yyyy ở đây thay vì dùng <fmt:formatDate>
+        // trong JSP -- cùng lý do đã ghi ở AuthenticationController.formatDate:
+        // JSTL format sai với java.sql.Date (luôn ra "yyyy-MM-dd" bất kể pattern).
+        request.setAttribute("dateOfBirthText", formatDate(employee.getDateOfBirth()));
+        request.setAttribute("hireDateText", formatDate(employee.getHireDate()));
+        request.getRequestDispatcher(DETAIL_VIEW).forward(request, response);
+    }
+
+    private static final DateTimeFormatter DATE_DISPLAY_FORMAT = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+
+    private String formatDate(Date date) {
+        return date != null ? date.toLocalDate().format(DATE_DISPLAY_FORMAT) : null;
+    }
+
+    private void showCreateForm(HttpServletRequest request, HttpServletResponse response)
+            throws ServletException, IOException {
+        request.setAttribute("roleList", employeeDAO.findAllRoles());
+        request.setAttribute("provinceList", addressDAO.findAllProvinces());
+        request.getRequestDispatcher(CREATE_VIEW).forward(request, response);
+    }
+
+    private void showEditForm(HttpServletRequest request, HttpServletResponse response)
+            throws ServletException, IOException {
+        Integer id = parseIntOrNull(request.getParameter("id"));
+        User employee = id != null ? employeeDAO.findById(id) : null;
+        if (employee == null) {
+            response.sendRedirect(request.getContextPath() + "/employee?error=notfound");
+            return;
+        }
+        request.setAttribute("employee", employee);
+        request.setAttribute("roleList", employeeDAO.findAllRoles());
+        request.setAttribute("provinceList", addressDAO.findAllProvinces());
+        request.getRequestDispatcher(UPDATE_VIEW).forward(request, response);
+    }
+
+    // ------------------------------------------------------------------
+    // POST actions
+    // ------------------------------------------------------------------
+
+    /**
+     * UC-26 Create Employee: tạo tài khoản + sinh username/mật khẩu tạm rồi
+     * gửi qua email công ty của nhân viên -- đây là lý do controller này
+     * cần EmailUtil, khác các controller CRUD khác. Nếu gửi mail thất bại
+     * (SMTP lỗi) tài khoản vẫn đã được tạo (đằng nào Admin cũng có thể tra
+     * lại thông tin và báo tay cho nhân viên) -- chỉ báo warning qua query
+     * param thay vì rollback cả việc tạo tài khoản.
+     */
+    private void handleCreate(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        User u = buildUserFromRequest(request, new User());
+
+        if (!isValidCommonFields(u) || isBlank(u.getEmail()) || !isValidEmail(u.getEmail())) {
+            response.sendRedirect(request.getContextPath() + "/employee?action=new&error=invalid");
+            return;
+        }
+        if (employeeDAO.existsByEmail(u.getEmail(), null)) {
+            response.sendRedirect(request.getContextPath() + "/employee?action=new&error=duplicate_email");
+            return;
+        }
+        if (employeeDAO.existsByPhone(u.getPhone(), null)) {
+            response.sendRedirect(request.getContextPath() + "/employee?action=new&error=duplicate_phone");
+            return;
+        }
+        if (employeeDAO.existsByCitizenId(u.getCitizenId(), null)) {
+            response.sendRedirect(request.getContextPath() + "/employee?action=new&error=duplicate_citizen");
+            return;
+        }
+
+        String username = employeeDAO.generateUniqueUsername(u.getLastName(), u.getMiddleName(), u.getFirstName());
+        String tempPassword = generateTempPassword();
+        u.setUsername(username);
+        u.setPasswordHash(BCrypt.hashpw(tempPassword, BCrypt.gensalt()));
+
+        int newId = employeeDAO.insert(u);
+        if (newId <= 0) {
+            response.sendRedirect(request.getContextPath() + "/employee?action=new&error=create_failed");
+            return;
+        }
+
+        boolean mailSent = EmailUtil.sendNewAccountEmail(u.getEmail(), u.getFullName(), username, tempPassword);
+        String suffix = mailSent ? "" : "&warning=mail_failed";
+        response.sendRedirect(request.getContextPath() + "/employee?action=view&id=" + newId + suffix);
+    }
+
+    private void handleUpdate(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        Integer id = parseIntOrNull(request.getParameter("userId"));
+        if (id == null || employeeDAO.findById(id) == null) {
+            response.sendRedirect(request.getContextPath() + "/employee?error=notfound");
+            return;
+        }
+
+        User u = buildUserFromRequest(request, new User());
+        u.setUserId(id);
+
+        if (!isValidCommonFields(u) || isBlank(u.getEmail()) || !isValidEmail(u.getEmail())) {
+            response.sendRedirect(request.getContextPath() + "/employee?action=edit&id=" + id + "&error=invalid");
+            return;
+        }
+        if (employeeDAO.existsByEmail(u.getEmail(), id)) {
+            response.sendRedirect(request.getContextPath() + "/employee?action=edit&id=" + id + "&error=duplicate_email");
+            return;
+        }
+        if (employeeDAO.existsByPhone(u.getPhone(), id)) {
+            response.sendRedirect(request.getContextPath() + "/employee?action=edit&id=" + id + "&error=duplicate_phone");
+            return;
+        }
+        if (employeeDAO.existsByCitizenId(u.getCitizenId(), id)) {
+            response.sendRedirect(request.getContextPath() + "/employee?action=edit&id=" + id + "&error=duplicate_citizen");
+            return;
+        }
+
+        boolean ok = employeeDAO.update(u);
+        if (!ok) {
+            response.sendRedirect(request.getContextPath() + "/employee?action=edit&id=" + id + "&error=update_failed");
+            return;
+        }
+        response.sendRedirect(request.getContextPath() + "/employee?action=view&id=" + id);
+    }
+
+    /** UC-29 Ban/Unban Employee (BR-25/BR-26) -- không cho tự khóa chính tài khoản Admin đang đăng nhập. */
+    private void handleToggleStatus(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        Integer id = parseIntOrNull(request.getParameter("id"));
+        User target = id != null ? employeeDAO.findById(id) : null;
+        if (target == null) {
+            response.sendRedirect(request.getContextPath() + "/employee?error=notfound");
+            return;
+        }
+
+        User currentUser = AccessControl.currentUser(request);
+        if (currentUser != null && currentUser.getUserId() == target.getUserId()) {
+            response.sendRedirect(request.getContextPath() + "/employee?action=view&id=" + id + "&error=cannot_self_ban");
+            return;
+        }
+
+        boolean makeActive = target.isDeleted(); // đang Inactive -> Mở khóa; đang Active -> Khóa
+        employeeDAO.setActive(id, makeActive);
+        response.sendRedirect(request.getContextPath() + "/employee?action=view&id=" + id);
+    }
+
+    // ------------------------------------------------------------------
+    // Helpers
+    // ------------------------------------------------------------------
+
+    /** 10 ký tự ngẫu nhiên từ bộ ký tự đã loại bỏ các ký tự dễ nhầm (0/O, 1/l/I). */
+    private String generateTempPassword() {
+        StringBuilder sb = new StringBuilder(10);
+        for (int i = 0; i < 10; i++) {
+            sb.append(TEMP_PASSWORD_CHARS.charAt(RANDOM.nextInt(TEMP_PASSWORD_CHARS.length())));
+        }
+        return sb.toString();
+    }
+
+    private User buildUserFromRequest(HttpServletRequest request, User u) {
+        u.setEmail(emptyToNull(request.getParameter("email")));
+        u.setLastName(emptyToNull(request.getParameter("lastName")));
+        u.setMiddleName(emptyToNull(request.getParameter("middleName")));
+        u.setFirstName(emptyToNull(request.getParameter("firstName")));
+        u.setGender(request.getParameter("gender"));
+        u.setDateOfBirth(parseDateOrNull(request.getParameter("dateOfBirth")));
+        u.setCitizenId(emptyToNull(request.getParameter("citizenId")));
+        u.setPhone(emptyToNull(request.getParameter("phone")));
+        u.setPersonalEmail(emptyToNull(request.getParameter("personalEmail")));
+        u.setDepartment(emptyToNull(request.getParameter("department")));
+        u.setHireDate(parseDateOrNull(request.getParameter("hireDate")));
+
+        Integer roleId = parseIntOrNull(request.getParameter("roleId"));
+        if (roleId != null) {
+            u.setRoleId(roleId);
+        }
+
+        Integer districtId = parseIntOrNull(request.getParameter("districtId"));
+        String addressDetail = emptyToNull(request.getParameter("addressDetail"));
+        if (districtId != null) {
+            Address address = new Address();
+            address.setStreetAndLocalName(addressDetail != null ? addressDetail : "");
+            address.setDistrictId(districtId);
+            u.setAddress(address);
+        }
+        return u;
     }
 
     /**
-     * Returns a short description of the servlet.
-     *
-     * @return a String containing servlet description
+     * BR-28 (Phòng ban + Vai trò bắt buộc), BR-29 (ngày sinh hợp lệ trong
+     * quá khứ), BR-30 (giới tính hợp lệ), BR-09 (định dạng SĐT). Các trường
+     * bắt buộc khác của users (họ, tên, CCCD, ngày sinh, ngày vào làm) đều
+     * NOT NULL trong DB nên phải chặn ở đây trước khi tới tầng DAO.
      */
-    @Override
-    public String getServletInfo() {
-        return "Short description";
-    }// </editor-fold>
+    private boolean isValidCommonFields(User u) {
+        if (isBlank(u.getLastName()) || isBlank(u.getFirstName()) || isBlank(u.getCitizenId())) {
+            return false;
+        }
+        if (u.getRoleId() <= 0 || isBlank(u.getDepartment())) {
+            return false;
+        }
+        if (!"Nam".equals(u.getGender()) && !"Nữ".equals(u.getGender()) && !"Khác".equals(u.getGender())) {
+            return false;
+        }
+        if (u.getDateOfBirth() == null || !u.getDateOfBirth().toLocalDate().isBefore(LocalDate.now())) {
+            return false;
+        }
+        if (u.getHireDate() == null) {
+            return false;
+        }
+        return isValidPhone(u.getPhone());
+    }
 
+    private boolean isBlank(String value) {
+        return value == null || value.trim().isEmpty();
+    }
+
+    /** BR-09: chấp nhận cả số di động lẫn số bàn Việt Nam. */
+    private boolean isValidPhone(String phone) {
+        if (phone == null) {
+            return false;
+        }
+        return phone.replaceAll("[\\s.-]", "").matches("^(0|\\+84)[0-9]{9,10}$");
+    }
+
+    private boolean isValidEmail(String email) {
+        return email.matches("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$");
+    }
+
+    private Integer parseIntOrNull(String value) {
+        if (value == null || value.trim().isEmpty()) {
+            return null;
+        }
+        try {
+            return Integer.parseInt(value.trim());
+        } catch (NumberFormatException ex) {
+            return null;
+        }
+    }
+
+    private int parseIntOrDefault(String value, int defaultValue) {
+        Integer parsed = parseIntOrNull(value);
+        return parsed != null ? parsed : defaultValue;
+    }
+
+    private Date parseDateOrNull(String value) {
+        if (value == null || value.trim().isEmpty()) {
+            return null;
+        }
+        try {
+            return Date.valueOf(value.trim());
+        } catch (IllegalArgumentException ex) {
+            return null;
+        }
+    }
+
+    private String emptyToNull(String value) {
+        return (value == null || value.trim().isEmpty()) ? null : value.trim();
+    }
 }
