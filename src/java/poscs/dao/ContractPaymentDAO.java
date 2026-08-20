@@ -6,8 +6,11 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.YearMonth;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
+import poscs.model.ContractPayment;
 
 /**
  * DAO cho bảng contract_payments -- phục vụ tính doanh thu (dựa trên
@@ -88,5 +91,37 @@ public class ContractPaymentDAO {
             ex.printStackTrace();
         }
         return BigDecimal.ZERO;
+    }
+
+    /**
+     * Toàn bộ khoản thu (đã thu lẫn chưa thu) của tất cả hợp đồng thuộc 1
+     * khách hàng -- phục vụ CustomerEvaluator chấm điểm/xếp hạng quan hệ.
+     */
+    public List<ContractPayment> findByEnterpriseId(int enterpriseId) {
+        List<ContractPayment> result = new ArrayList<>();
+        String sql = "SELECT cp.payment_id, cp.contract_id, cp.invoice_amount, cp.due_date, cp.paid_date, cp.created_at " +
+                     "FROM contract_payments cp " +
+                     "JOIN contracts c ON c.contract_id = cp.contract_id " +
+                     "WHERE c.enterprise_id = ?";
+        try (Connection conn = DBContext.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, enterpriseId);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    ContractPayment p = new ContractPayment();
+                    p.setPaymentId(rs.getInt("payment_id"));
+                    p.setContractId(rs.getInt("contract_id"));
+                    p.setInvoiceAmount(rs.getBigDecimal("invoice_amount"));
+                    p.setDueDate(rs.getDate("due_date"));
+                    p.setPaidDate(rs.getDate("paid_date"));
+                    p.setCreatedAt(rs.getTimestamp("created_at"));
+                    result.add(p);
+                }
+            }
+        } catch (SQLException ex) {
+            System.err.println("--- LOI LAY LICH SU THANH TOAN THEO KHACH HANG ---");
+            ex.printStackTrace();
+        }
+        return result;
     }
 }
