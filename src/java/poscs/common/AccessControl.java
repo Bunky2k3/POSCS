@@ -6,6 +6,7 @@ import java.util.Set;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
+import poscs.model.TechnicalRequest;
 import poscs.model.User;
 
 /**
@@ -66,5 +67,22 @@ public final class AccessControl {
         response.sendError(HttpServletResponse.SC_FORBIDDEN,
                 "Bạn không có quyền thực hiện thao tác này.");
         return false;
+    }
+
+    /**
+     * Ngoại lệ riêng cho TICKET: role "Kỹ thuật" chỉ View only trên toàn bộ
+     * ticket (không có trong FULL_ACCESS_ROLES), nhưng vẫn cần tự cập nhật
+     * tiến độ/trạng thái của đúng phiếu đang được giao cho mình -- theo yêu
+     * cầu nghiệp vụ (vai trò Technical: "Handling assigned technical
+     * requests, updating progress and status"). Không cấp Full access vì họ
+     * không được đổi khách hàng/hợp đồng/độ ưu tiên/người xử lý của ticket.
+     */
+    public static boolean canUpdateAssignedTicket(HttpServletRequest request, TechnicalRequest ticket) {
+        User user = currentUser(request);
+        if (user == null || user.getRole() == null || ticket == null) {
+            return false;
+        }
+        return "Kỹ thuật".equals(user.getRole().getRoleName())
+                && ticket.getAssignedTechnicianId() == user.getUserId();
     }
 }

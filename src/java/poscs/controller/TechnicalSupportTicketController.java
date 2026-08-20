@@ -22,8 +22,10 @@ import poscs.model.User;
  * hướng theo tham số "action", theo đúng khuôn mẫu của CustomerController/
  * ContractController -- quyền hạn theo PERMISSIONS.md (CSKH và Admin có
  * toàn quyền, Sales/Kỹ thuật chỉ xem) enforce bằng
- * AccessControl.requireFullAccess ở đầu mỗi hàm handleCreate/handleUpdate/
- * handleDelete.
+ * AccessControl.requireFullAccess ở đầu mỗi hàm handleCreate/handleDelete.
+ * Riêng handleUpdate có thêm ngoại lệ: Kỹ thuật được tự đổi trạng thái/ghi
+ * chú xử lý của đúng phiếu đang giao cho mình, xem
+ * AccessControl.canUpdateAssignedTicket.
  *
  * technicalrequestdevices (thiết bị lỗi) và technicalrequesthistory (lịch
  * sử đổi trạng thái) chưa được xử lý -- thuộc phạm vi khác.
@@ -180,9 +182,6 @@ public class TechnicalSupportTicketController extends HttpServlet {
     }
 
     private void handleUpdate(HttpServletRequest request, HttpServletResponse response) throws IOException {
-        if (!AccessControl.requireFullAccess(request, response, AccessControl.Resource.TICKET)) {
-            return;
-        }
         Integer id = parseIntOrNull(request.getParameter("ticketId"));
         if (id == null) {
             response.sendRedirect(request.getContextPath() + "/ticket?error=notfound");
@@ -200,7 +199,17 @@ public class TechnicalSupportTicketController extends HttpServlet {
             return;
         }
 
-        TechnicalRequest t = buildTicketFromRequest(request, new TechnicalRequest());
+        boolean fullAccess = AccessControl.hasFullAccess(request, AccessControl.Resource.TICKET);
+        boolean assignedTechnicianUpdate = !fullAccess && AccessControl.canUpdateAssignedTicket(request, existing);
+        if (!fullAccess && !assignedTechnicianUpdate) {
+            response.sendError(HttpServletResponse.SC_FORBIDDEN, "Bạn không có quyền thực hiện thao tác này.");
+            return;
+        }
+
+        // Kỹ thuật viên được giao chỉ được đổi trạng thái/ghi chú xử lý của đúng
+        // phiếu của mình -- không được sửa khách hàng/hợp đồng/độ ưu tiên/người
+        // xử lý, nên bỏ qua toàn bộ các trường khác dù form có gửi lên hay không.
+        TechnicalRequest t = fullAccess ? buildTicketFromRequest(request, new TechnicalRequest()) : existing;
         t.setTicketId(id);
         if (t.getContractId() == null) {
             t.setContractId(existing.getContractId());
