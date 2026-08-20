@@ -34,8 +34,18 @@ is built.
 | Customer (`enterprises`) | Full | Full | View only | View only |
 | Contract (`contracts`) | Full | Full | View only | View only |
 | Product (`products`) | Full | View only | Full | View only |
-| Ticket (`technicalrequests`) | Full | View only | View only | Full |
+| Ticket (`technicalrequests`) | Full | View only | View only* | Full |
 | Employee (`users`) | Full | No access | No access | No access |
+
+\* **Exception:** `Kỹ thuật` may update the `status` and `resolutionSummary`
+of a ticket currently assigned to them (`assigned_technician_id` matches
+their own user id) — everything else about Ticket stays View only for that
+role (can't create, delete, reassign, or touch any other field, including on
+tickets assigned to someone else). This reflects the Technical role's real
+responsibility ("handling assigned technical requests, updating progress and
+status") without giving them Full CRUD. Enforced in
+`TechnicalSupportTicketController.handleUpdate` via
+`AccessControl.canUpdateAssignedTicket(...)`.
 
 ## Notes for implementation
 
