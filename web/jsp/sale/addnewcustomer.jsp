@@ -135,6 +135,23 @@
 
         .error-text { color: var(--danger); font-size: 12px; margin-top: 5px; display: none; }
 
+        /* ===== Logo doanh nghiệp ===== */
+        .logo-upload-wrap { display: flex; flex-direction: column; align-items: center; margin-bottom: 24px; }
+        .logo-avatar-wrap { position: relative; width: 92px; height: 92px; }
+        .logo-avatar-preview {
+            width: 92px; height: 92px; border-radius: 50%; overflow: hidden;
+            background: #eaf6ff; color: var(--primary);
+            display: flex; align-items: center; justify-content: center; font-size: 2rem;
+            border: 3px solid #eef2f6;
+        }
+        .logo-avatar-preview img { width: 100%; height: 100%; object-fit: cover; }
+        .logo-edit-btn {
+            position: absolute; bottom: 0; right: 0; width: 30px; height: 30px; border-radius: 50%;
+            background: #fff; color: var(--primary); display: flex; align-items: center; justify-content: center;
+            cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.18); border: 2px solid var(--primary-light);
+        }
+        .logo-upload-hint { font-size: 0.78rem; color: #9ca3af; margin-top: 10px; }
+
         .action-bar { display: flex; gap: 12px; margin-top: 28px; justify-content: flex-end; border-top: 1.5px solid #eef2f6; padding-top: 22px; }
         .btn-primary {
             background: linear-gradient(120deg, var(--primary), var(--primary-light));
@@ -224,11 +241,21 @@
         </div>
 
         <div class="card-box">
-            <form id="createCustomerForm" action="${pageContext.request.contextPath}/customer" method="POST" onsubmit="return validateForm();">
+            <form id="createCustomerForm" action="${pageContext.request.contextPath}/customer" method="POST" enctype="multipart/form-data" onsubmit="return validateForm();">
                 <input type="hidden" name="csrfToken" value="${csrfToken}">
                 <input type="hidden" name="action" value="create">
 
                 <div class="section-header"><h5>Thông tin khách hàng</h5></div>
+
+                <div class="logo-upload-wrap">
+                    <div class="logo-avatar-wrap">
+                        <div class="logo-avatar-preview" id="logoPreview"><i class="fa-solid fa-building"></i></div>
+                        <label class="logo-edit-btn" for="logoInput"><i class="fa-solid fa-camera"></i></label>
+                        <input type="file" name="logo" id="logoInput" accept="image/*" hidden onchange="previewLogo(this)">
+                    </div>
+                    <div class="logo-upload-hint">Logo doanh nghiệp (không bắt buộc)</div>
+                </div>
+
                 <div class="row">
                     <div class="col-md-6 field-row">
                         <label>Tên khách hàng <span class="req">*</span></label>
@@ -369,6 +396,17 @@
             var div = document.createElement('div');
             div.textContent = value;
             return div.innerHTML;
+        }
+
+        function previewLogo(input) {
+            if (!input.files || !input.files[0]) {
+                return;
+            }
+            var reader = new FileReader();
+            reader.onload = function (e) {
+                document.getElementById('logoPreview').innerHTML = '<img src="' + e.target.result + '" alt="Logo">';
+            };
+            reader.readAsDataURL(input.files[0]);
         }
 
         document.getElementById('province').addEventListener('change', function () {

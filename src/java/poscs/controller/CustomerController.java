@@ -5,11 +5,14 @@ import java.sql.Date;
 import java.time.LocalDate;
 import java.util.List;
 import jakarta.servlet.ServletException;
+import jakarta.servlet.annotation.MultipartConfig;
 import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.Part;
 import poscs.common.AccessControl;
+import poscs.common.FileStorage;
 import poscs.dao.AddressDAO;
 import poscs.dao.ContractDAO;
 import poscs.dao.CustomerDAO;
@@ -29,7 +32,10 @@ import poscs.model.User;
  * handleUpdate/handleDelete (Kỹ thuật/CSKH chỉ View only trên Customer).
  */
 @WebServlet(name = "CustomerController", urlPatterns = {"/customer"})
+@MultipartConfig(maxFileSize = 5 * 1024 * 1024, maxRequestSize = 10 * 1024 * 1024, fileSizeThreshold = 1024 * 1024)
 public class CustomerController extends HttpServlet {
+
+    private static final String LOGO_SUBFOLDER = "enterprise_logos";
 
     private static final int PAGE_SIZE = 10;
     private static final String LIST_VIEW = "/jsp/sale/listcustomer.jsp";
@@ -168,7 +174,8 @@ public class CustomerController extends HttpServlet {
     // POST actions
     // ------------------------------------------------------------------
 
-    private void handleCreate(HttpServletRequest request, HttpServletResponse response) throws IOException {
+    private void handleCreate(HttpServletRequest request, HttpServletResponse response)
+            throws ServletException, IOException {
         if (!AccessControl.requireFullAccess(request, response, AccessControl.Resource.CUSTOMER)) {
             return;
         }
@@ -182,6 +189,7 @@ public class CustomerController extends HttpServlet {
         e.setWebsite(emptyToNull(request.getParameter("website")));
         e.setStatus("Active");
         e.setJoinDate(parseDateOrNull(request.getParameter("joinDate")));
+        e.setLogoUrl(FileStorage.save(request.getPart("logo"), LOGO_SUBFOLDER));
 
         Integer accountOwnerId = parseIntOrNull(request.getParameter("accountOwnerId"));
         if (accountOwnerId != null) {
@@ -204,12 +212,14 @@ public class CustomerController extends HttpServlet {
         response.sendRedirect(request.getContextPath() + "/customer?action=view&id=" + newId);
     }
 
-    private void handleUpdate(HttpServletRequest request, HttpServletResponse response) throws IOException {
+    private void handleUpdate(HttpServletRequest request, HttpServletResponse response)
+            throws ServletException, IOException {
         if (!AccessControl.requireFullAccess(request, response, AccessControl.Resource.CUSTOMER)) {
             return;
         }
         Integer id = parseIntOrNull(request.getParameter("customerId"));
-        if (id == null) {
+        Enterprise existing = id != null ? customerDAO.findById(id) : null;
+        if (existing == null) {
             response.sendRedirect(request.getContextPath() + "/customer?error=notfound");
             return;
         }
@@ -223,6 +233,12 @@ public class CustomerController extends HttpServlet {
         e.setEmail(emptyToNull(request.getParameter("email")));
         e.setWebsite(emptyToNull(request.getParameter("website")));
         e.setJoinDate(parseDateOrNull(request.getParameter("joinDate")));
+
+        // Chỉ ghi đè logo khi người dùng thực sự chọn ảnh mới -- input file để
+        // trống vẫn gửi lên 1 Part rỗng (size=0), FileStorage.save trả về null
+        // trong trường hợp đó, nên giữ nguyên logo cũ thay vì xoá mất.
+        String newLogoUrl = FileStorage.save(request.getPart("logo"), LOGO_SUBFOLDER);
+        e.setLogoUrl(newLogoUrl != null ? newLogoUrl : existing.getLogoUrl());
 
         Integer accountOwnerId = parseIntOrNull(request.getParameter("accountOwnerId"));
         if (accountOwnerId != null) {
