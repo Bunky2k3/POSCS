@@ -170,10 +170,12 @@
 
         /* ===== Người liên hệ ===== */
         .contact-item {
-            display: flex; align-items: center; gap: 14px;
+            display: flex; align-items: center; gap: 14px; cursor: pointer;
             padding: 14px 16px; border: 1px solid #eef2f6; border-radius: 12px; margin-bottom: 12px;
+            transition: border-color 0.12s ease, background 0.12s ease;
         }
         .contact-item:last-child { margin-bottom: 0; }
+        .contact-item:hover, .contact-item:focus-visible { border-color: var(--primary-light); background: #f7fcff; outline: none; }
         .contact-avatar {
             width: 44px; height: 44px; border-radius: 50%;
             background: #eaf6ff; color: var(--primary);
@@ -182,6 +184,24 @@
         .contact-name { font-weight: 600; color: #111827; font-size: 0.9rem; }
         .contact-role { font-size: 0.78rem; color: var(--primary); font-weight: 500; margin-bottom: 2px; }
         .contact-meta { font-size: 0.8rem; color: #6b7280; display: flex; gap: 16px; flex-wrap: wrap; margin-top: 2px; }
+        .contact-item-chevron { margin-left: auto; color: #d1d5db; flex-shrink: 0; }
+
+        /* ===== Modal chi tiết người liên hệ ===== */
+        .contact-modal-avatar {
+            width: 64px; height: 64px; border-radius: 50%; margin: 0 auto 14px;
+            background: #eaf6ff; color: var(--primary);
+            display: flex; align-items: center; justify-content: center; font-size: 1.6rem;
+        }
+        .contact-modal-name { text-align: center; font-weight: 700; color: #111827; font-size: 1.05rem; }
+        .contact-modal-role { text-align: center; color: var(--primary); font-weight: 500; font-size: 0.85rem; margin-bottom: 18px; }
+        .contact-modal-field {
+            display: flex; align-items: center; gap: 12px;
+            padding: 11px 14px; border: 1px solid #eef2f6; border-radius: 10px; margin-bottom: 10px;
+        }
+        .contact-modal-field:last-child { margin-bottom: 0; }
+        .contact-modal-field i { color: var(--primary); width: 18px; text-align: center; flex-shrink: 0; }
+        .contact-modal-field a { color: #111827; font-weight: 500; text-decoration: none; }
+        .contact-modal-field a:hover { color: var(--primary); text-decoration: underline; }
 
         /* ===== Tabs hoạt động gần đây ===== */
         .nav-tabs { border-bottom: 1.5px solid #eef2f6; }
@@ -406,7 +426,13 @@
                 </c:when>
                 <c:otherwise>
                     <c:forEach var="contact" items="${contactList}">
-                        <div class="contact-item">
+                        <div class="contact-item" role="button" tabindex="0"
+                             data-name="${fn:escapeXml(contact.fullName)}"
+                             data-position="${fn:escapeXml(contact.position)}"
+                             data-phone="${fn:escapeXml(contact.contactPhone)}"
+                             data-email="${fn:escapeXml(contact.contactEmail)}"
+                             onclick="openContactModal(this)"
+                             onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openContactModal(this);}">
                             <div class="contact-avatar"><i class="fa-solid fa-user-tie"></i></div>
                             <div>
                                 <div class="contact-role">${fn:escapeXml(contact.position)}</div>
@@ -416,6 +442,7 @@
                                     <c:if test="${not empty contact.contactEmail}"><span><i class="fa-solid fa-envelope me-1"></i>${fn:escapeXml(contact.contactEmail)}</span></c:if>
                                 </div>
                             </div>
+                            <i class="fa-solid fa-chevron-right contact-item-chevron"></i>
                         </div>
                     </c:forEach>
                 </c:otherwise>
@@ -590,6 +617,34 @@
         </div>
     </div>
 
+    <!-- ===== Modal chi tiết người liên hệ ===== -->
+    <div class="modal fade" id="contactModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <span class="modal-title">Thông tin người liên hệ</span>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="contact-modal-avatar"><i class="fa-solid fa-user-tie"></i></div>
+                    <div class="contact-modal-name" id="contactModalName"></div>
+                    <div class="contact-modal-role" id="contactModalRole"></div>
+                    <div class="contact-modal-field" id="contactModalPhoneRow">
+                        <i class="fa-solid fa-phone"></i>
+                        <a id="contactModalPhone" href="#"></a>
+                    </div>
+                    <div class="contact-modal-field" id="contactModalEmailRow">
+                        <i class="fa-solid fa-envelope"></i>
+                        <a id="contactModalEmail" href="#"></a>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn-modal-cancel" data-bs-dismiss="modal">Đóng</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- MSG-040: chặn xoá do BR-41 (còn hợp đồng đang hiệu lực) -->
     <c:if test="${param.error == 'has_active_contracts'}">
         <div class="toast-msg blocked show">
@@ -625,6 +680,7 @@
     <script>
         var deleteModal = new bootstrap.Modal(document.getElementById('deleteModal'));
         var evaluateModal = new bootstrap.Modal(document.getElementById('evaluateModal'));
+        var contactModal = new bootstrap.Modal(document.getElementById('contactModal'));
 
         function openDeleteModal() {
             deleteModal.show();
@@ -632,6 +688,38 @@
 
         function openEvaluateModal() {
             evaluateModal.show();
+        }
+
+        // Điền dữ liệu người liên hệ (đọc từ data-* của .contact-item được bấm)
+        // vào modal chi tiết -- ẩn hẳn dòng SĐT/email nếu người đó không có
+        // thông tin đó, thay vì hiện dòng trống.
+        function openContactModal(el) {
+            document.getElementById('contactModalName').textContent = el.dataset.name || '';
+            document.getElementById('contactModalRole').textContent = el.dataset.position || 'Chưa cập nhật chức vụ';
+
+            var phone = el.dataset.phone;
+            var phoneRow = document.getElementById('contactModalPhoneRow');
+            if (phone) {
+                var phoneLink = document.getElementById('contactModalPhone');
+                phoneLink.textContent = phone;
+                phoneLink.href = 'tel:' + phone;
+                phoneRow.style.display = '';
+            } else {
+                phoneRow.style.display = 'none';
+            }
+
+            var email = el.dataset.email;
+            var emailRow = document.getElementById('contactModalEmailRow');
+            if (email) {
+                var emailLink = document.getElementById('contactModalEmail');
+                emailLink.textContent = email;
+                emailLink.href = 'mailto:' + email;
+                emailRow.style.display = '';
+            } else {
+                emailRow.style.display = 'none';
+            }
+
+            contactModal.show();
         }
 
         document.getElementById('confirmDeleteBtn').addEventListener('click', function () {
