@@ -91,13 +91,13 @@
         .main-content { flex: 1; min-width: 0; }
         @media (max-width: 900px) { .sidebar { display: none; } /* TODO: drawer thu gọn thay vì ẩn hẳn */ }
 
-        .page-container { max-width: 1080px; margin: 28px auto; padding: 0 20px 60px; }
+        .page-container { max-width: 1080px; margin: 28px auto; padding: 0 20px 32px; }
         .back-link-top { color: var(--primary); font-size: 0.85rem; text-decoration: none; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; margin-bottom: 16px; }
         .back-link-top:hover { text-decoration: underline; }
 
         .card-box { background: #fff; border-radius: 16px; box-shadow: 0 10px 30px rgba(0, 40, 80, 0.08); }
 
-        .detail-header { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 16px; padding: 26px 30px; margin-bottom: 20px; }
+        .detail-header { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 16px; padding: 22px 26px; margin-bottom: 20px; }
         .detail-header .doc-icon {
             width: 56px; height: 56px; border-radius: 14px;
             background: linear-gradient(120deg, var(--primary-dark), var(--primary-light));
@@ -126,8 +126,8 @@
             display: inline-flex; align-items: center; gap: 8px; cursor: not-allowed;
         }
 
-        .info-card { padding: 26px 30px 30px; margin-bottom: 20px; }
-        .section-header { display: flex; justify-content: space-between; align-items: center; margin: 0 0 18px; padding-bottom: 10px; border-bottom: 1.5px solid #eef2f6; }
+        .info-card { padding: 22px 26px 26px; margin-bottom: 20px; }
+        .section-header { display: flex; justify-content: space-between; align-items: center; margin: 0 0 16px; padding-bottom: 10px; border-bottom: 1.5px solid #eef2f6; }
         .section-header h5 { font-weight: 700; color: var(--primary-dark); font-size: 0.98rem; margin: 0; }
 
         .field-row { margin-bottom: 18px; }
@@ -141,7 +141,7 @@
 
         .item-table { width: 100%; }
         .item-table th { font-size: 0.72rem; text-transform: uppercase; color: #9ca3af; font-weight: 700; padding: 8px 10px; border-bottom: 1.5px solid #eef2f6; text-align: left; }
-        .item-table td { padding: 12px 10px; font-size: 0.87rem; color: #111827; border-bottom: 1px solid #f3f4f6; }
+        .item-table td { padding: 10px 10px; font-size: 0.87rem; color: #111827; border-bottom: 1px solid #f3f4f6; }
         .item-table tr:last-child td { border-bottom: none; }
         .item-table td.num { text-align: right; }
 

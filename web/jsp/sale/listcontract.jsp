@@ -103,7 +103,7 @@
         .main-content { flex: 1; min-width: 0; }
         @media (max-width: 900px) { .sidebar { display: none; } /* TODO: drawer thu gọn thay vì ẩn hẳn */ }
 
-        .page-container { max-width: 1280px; margin: 28px auto; padding: 0 24px 60px; }
+        .page-container { max-width: 1280px; margin: 28px auto; padding: 0 24px 32px; }
 
         .page-header-row { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 22px; flex-wrap: wrap; gap: 14px; }
         .page-header-row h2 { font-weight: 700; color: var(--primary-dark); font-size: 1.4rem; margin-bottom: 4px; }
@@ -123,7 +123,7 @@
         /* ===== KPI mini strip ===== */
         .status-strip { display: flex; gap: 14px; margin-bottom: 20px; flex-wrap: wrap; }
         .status-chip {
-            flex: 1 1 200px; padding: 14px 18px; display: flex; align-items: center; gap: 12px;
+            flex: 1 1 200px; padding: 12px 15px; display: flex; align-items: center; gap: 12px;
         }
         .status-chip .dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
         .status-chip .num { font-weight: 700; font-size: 1.15rem; color: #111827; }
@@ -143,9 +143,9 @@
         .custom-table { margin-bottom: 0; }
         .custom-table thead th {
             background: #f8fafc; color: #6b7280; font-size: 0.74rem; text-transform: uppercase; letter-spacing: .3px;
-            font-weight: 700; padding: 14px 16px; border-bottom: 1.5px solid #eef2f6; white-space: nowrap;
+            font-weight: 700; padding: 12px 16px; border-bottom: 1.5px solid #eef2f6; white-space: nowrap;
         }
-        .custom-table tbody td { padding: 14px 16px; font-size: 0.86rem; color: #111827; vertical-align: middle; border-bottom: 1px solid #f3f4f6; }
+        .custom-table tbody td { padding: 12px 16px; font-size: 0.86rem; color: #111827; vertical-align: middle; border-bottom: 1px solid #f3f4f6; }
         .custom-table tbody tr:last-child td { border-bottom: none; }
         .custom-table tbody tr:hover { background: #f9fdff; }
 
@@ -197,7 +197,7 @@
         .modal-icon-warn { width: 52px; height: 52px; border-radius: 50%; background: #fdecef; color: var(--danger); display: flex; align-items: center; justify-content: center; font-size: 1.3rem; margin-bottom: 4px; }
 
         @media (max-width: 768px) {
-            .page-container { padding: 0 14px 60px; }
+            .page-container { padding: 0 14px 32px; }
             .custom-table { font-size: 0.8rem; }
         }
     </style>

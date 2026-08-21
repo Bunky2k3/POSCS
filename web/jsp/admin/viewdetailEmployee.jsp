@@ -60,7 +60,7 @@
         .main-content { flex: 1; min-width: 0; }
         @media (max-width: 900px) { .sidebar { display: none; } }
 
-        .page-container { max-width: 900px; margin: 32px auto; padding: 0 20px 60px; }
+        .page-container { max-width: 900px; margin: 32px auto; padding: 0 20px 32px; }
 
         .back-link { display: inline-flex; align-items: center; gap: 6px; color: #6b7280; font-size: 0.87rem; font-weight: 600; text-decoration: none; margin-bottom: 16px; }
         .back-link:hover { color: var(--primary-dark); }
@@ -75,8 +75,8 @@
         .status-active { background: rgba(47,191,143,0.22); border: 1px solid rgba(47,191,143,0.5); }
         .status-inactive { background: rgba(226,83,107,0.22); border: 1px solid rgba(226,83,107,0.5); }
 
-        .profile-body { padding: 30px 34px 34px; }
-        .section-header { display: flex; justify-content: space-between; align-items: center; margin: 30px 0 18px; padding-bottom: 10px; border-bottom: 1.5px solid #eef2f6; }
+        .profile-body { padding: 24px 28px 28px; }
+        .section-header { display: flex; justify-content: space-between; align-items: center; margin: 24px 0 16px; padding-bottom: 10px; border-bottom: 1.5px solid #eef2f6; }
         .section-header:first-child { margin-top: 0; }
         .section-header h5 { font-weight: 700; color: var(--primary-dark); font-size: 0.98rem; margin: 0; }
 
@@ -103,7 +103,7 @@
         .btn-modal-danger { background: var(--danger); border: none; color: #fff; border-radius: 10px; padding: 8px 18px; font-weight: 600; font-size: 0.88rem; }
         .modal-icon-warn { width: 52px; height: 52px; border-radius: 50%; background: #fdecef; color: var(--danger); display: flex; align-items: center; justify-content: center; font-size: 1.3rem; margin-bottom: 4px; }
 
-        @media (max-width: 768px) { .profile-body { padding: 24px 20px 28px; } }
+        @media (max-width: 768px) { .profile-body { padding: 20px 18px 22px; } }
     </style>
 </head>
 <body>

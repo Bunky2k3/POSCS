@@ -105,16 +105,16 @@
         .main-content { flex: 1; min-width: 0; }
         @media (max-width: 900px) { .sidebar { display: none; } /* TODO: drawer thu gọn thay vì ẩn hẳn */ }
 
-        .page-container { max-width: 900px; margin: 28px auto; padding: 0 20px 60px; }
+        .page-container { max-width: 900px; margin: 28px auto; padding: 0 20px 32px; }
         .page-header-row { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 22px; flex-wrap: wrap; gap: 14px; }
         .page-header-row h2 { font-weight: 700; color: var(--primary-dark); font-size: 1.4rem; margin-bottom: 4px; }
         .page-header-row p { color: #6b7280; font-size: 0.9rem; }
         .back-link-top { color: var(--primary); font-size: 0.85rem; text-decoration: none; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; margin-bottom: 10px; }
         .back-link-top:hover { text-decoration: underline; }
 
-        .card-box { background: #fff; border-radius: 16px; box-shadow: 0 10px 30px rgba(0, 40, 80, 0.08); padding: 30px 34px 34px; }
+        .card-box { background: #fff; border-radius: 16px; box-shadow: 0 10px 30px rgba(0, 40, 80, 0.08); padding: 24px 28px 28px; }
 
-        .section-header { display: flex; justify-content: space-between; align-items: center; margin: 30px 0 18px; padding-bottom: 10px; border-bottom: 1.5px solid #eef2f6; }
+        .section-header { display: flex; justify-content: space-between; align-items: center; margin: 24px 0 16px; padding-bottom: 10px; border-bottom: 1.5px solid #eef2f6; }
         .section-header:first-child { margin-top: 0; }
         .section-header h5 { font-weight: 700; color: var(--primary-dark); font-size: 0.98rem; margin: 0; }
 
@@ -192,7 +192,7 @@
         }
         .btn-cancel:hover { background: #f3f4f6; color: #6b7280; }
 
-        @media (max-width: 768px) { .card-box { padding: 24px 20px 28px; } }
+        @media (max-width: 768px) { .card-box { padding: 20px 18px 22px; } }
     </style>
 </head>
 <body>

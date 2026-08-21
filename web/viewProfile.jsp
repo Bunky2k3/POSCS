@@ -161,7 +161,7 @@
         .page-container {
             max-width: 900px;
             margin: 32px auto;
-            padding: 0 20px 60px;
+            padding: 0 20px 32px;
         }
 
         .profile-card {
@@ -193,11 +193,11 @@
             font-size: 0.8rem;
         }
 
-        .profile-body { padding: 30px 34px 34px; }
+        .profile-body { padding: 24px 28px 28px; }
 
         .section-header {
             display: flex; justify-content: space-between; align-items: center;
-            margin: 30px 0 18px; padding-bottom: 10px;
+            margin: 24px 0 16px; padding-bottom: 10px;
             border-bottom: 1.5px solid #eef2f6;
         }
         .section-header:first-child { margin-top: 0; }
@@ -228,7 +228,7 @@
         }
 
         @media (max-width: 768px) {
-            .profile-body { padding: 24px 20px 28px; }
+            .profile-body { padding: 20px 18px 22px; }
         }
     </style>
 </head>

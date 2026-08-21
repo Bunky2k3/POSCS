@@ -158,7 +158,7 @@
         .page-container {
             max-width: 1240px;
             margin: 28px auto;
-            padding: 0 24px 60px;
+            padding: 0 24px 32px;
         }
 
         .page-header-row {
@@ -216,10 +216,10 @@
         .custom-table thead th {
             background: #f8fafc; color: #6b7280; font-size: 0.74rem;
             text-transform: uppercase; letter-spacing: .3px; font-weight: 700;
-            padding: 14px 18px; border-bottom: 1.5px solid #eef2f6; white-space: nowrap;
+            padding: 12px 16px; border-bottom: 1.5px solid #eef2f6; white-space: nowrap;
         }
         .custom-table tbody td {
-            padding: 14px 18px; font-size: 0.87rem; color: #111827;
+            padding: 12px 16px; font-size: 0.87rem; color: #111827;
             vertical-align: middle; border-bottom: 1px solid #f3f4f6;
         }
         .custom-table tbody tr:last-child td { border-bottom: none; }
@@ -313,7 +313,7 @@
         }
 
         @media (max-width: 768px) {
-            .page-container { padding: 0 14px 60px; }
+            .page-container { padding: 0 14px 32px; }
             .custom-table { font-size: 0.8rem; }
         }
     </style>
