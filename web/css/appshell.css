@@ -63,6 +63,9 @@ body { font-family: 'Inter', sans-serif; background: #f3f4f6; min-height: 100vh;
 .notif-icon { width: 34px; height: 34px; border-radius: 50%; background: #eef6fb; color: var(--primary); display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 0.85rem; }
 .notif-text { font-size: 0.85rem; color: #111827; font-weight: 500; line-height: 1.3; }
 .notif-time { font-size: 0.72rem; color: #9ca3af; margin-top: 2px; }
+.notif-item:not(.unread) .notif-text { font-weight: 400; color: #6b7280; }
+.notif-item:not(.unread) .notif-icon { background: #f3f4f6; color: #9ca3af; }
+.notif-empty { padding: 22px 10px; text-align: center; color: #9ca3af; font-size: 0.85rem; }
 
 /* ===== Layout ===== */
 .app-shell { display: flex; align-items: flex-start; }
