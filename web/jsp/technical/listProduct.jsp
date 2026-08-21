@@ -165,7 +165,7 @@
         .page-container {
             max-width: 1320px;
             margin: 28px auto;
-            padding: 0 24px 60px;
+            padding: 0 24px 32px;
         }
 
         .page-header-row {
@@ -326,7 +326,7 @@
             .category-panel { width: 100%; position: static; }
         }
         @media (max-width: 768px) {
-            .page-container { padding: 0 14px 60px; }
+            .page-container { padding: 0 14px 32px; }
         }
     </style>
 </head>

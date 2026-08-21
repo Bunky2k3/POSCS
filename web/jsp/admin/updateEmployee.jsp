@@ -62,14 +62,14 @@
         .main-content { flex: 1; min-width: 0; }
         @media (max-width: 900px) { .sidebar { display: none; } }
 
-        .page-container { max-width: 900px; margin: 32px auto; padding: 0 20px 60px; }
+        .page-container { max-width: 900px; margin: 32px auto; padding: 0 20px 32px; }
         .form-card { background: #fff; border-radius: 20px; overflow: hidden; box-shadow: 0 15px 40px rgba(0,40,80,0.12); }
         .form-banner { background: linear-gradient(120deg, var(--primary-dark), var(--primary), var(--primary-light)); padding: 30px 34px 24px; color: #fff; }
         .form-banner h3 { font-weight: 700; margin: 0 0 4px; }
         .form-banner p { margin: 0; opacity: 0.85; font-size: 0.88rem; }
-        .form-body { padding: 30px 34px 34px; }
+        .form-body { padding: 24px 28px 28px; }
 
-        .section-header { display: flex; justify-content: space-between; align-items: center; margin: 30px 0 18px; padding-bottom: 10px; border-bottom: 1.5px solid #eef2f6; }
+        .section-header { display: flex; justify-content: space-between; align-items: center; margin: 24px 0 16px; padding-bottom: 10px; border-bottom: 1.5px solid #eef2f6; }
         .section-header:first-of-type { margin-top: 0; }
         .section-header h5 { font-weight: 700; color: var(--primary-dark); font-size: 0.98rem; margin: 0; }
 
@@ -85,7 +85,7 @@
         .btn-cancel { background: #fff; border: 1.5px solid #e5e7eb; color: #6b7280; border-radius: 10px; padding: 0.6rem 1.4rem; font-weight: 600; font-size: 0.9rem; text-decoration: none; display: inline-flex; align-items: center; }
         .btn-cancel:hover { background: #f3f4f6; color: #6b7280; }
 
-        @media (max-width: 768px) { .form-body { padding: 24px 20px 28px; } }
+        @media (max-width: 768px) { .form-body { padding: 20px 18px 22px; } }
     </style>
 </head>
 <body>

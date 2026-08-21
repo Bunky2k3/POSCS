@@ -63,7 +63,7 @@
         .main-content { flex: 1; min-width: 0; }
         @media (max-width: 900px) { .sidebar { display: none; } }
 
-        .page-container { max-width: 1240px; margin: 28px auto; padding: 0 24px 60px; }
+        .page-container { max-width: 1240px; margin: 28px auto; padding: 0 24px 32px; }
         .page-header-row { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 22px; flex-wrap: wrap; gap: 14px; }
         .page-header-row h2 { font-weight: 700; color: var(--primary-dark); font-size: 1.4rem; margin-bottom: 4px; }
         .page-header-row p { color: #6b7280; font-size: 0.9rem; }
@@ -106,7 +106,7 @@
         .page-item.active .page-link { background: var(--primary); border-color: var(--primary); }
         .page-link:hover { background: #eaf6ff; color: var(--primary-dark); }
 
-        @media (max-width: 768px) { .page-container { padding: 0 14px 60px; } }
+        @media (max-width: 768px) { .page-container { padding: 0 14px 32px; } }
     </style>
 </head>
 <body>
