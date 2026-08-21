@@ -56,7 +56,9 @@
         display: flex;
         align-items: center;
         gap: 10px;
+        text-decoration: none;
     }
+    .topbar .brand:hover { color: var(--primary-dark); }
     .topbar .brand i { color: var(--primary); font-size: 1.2rem; }
     .topbar-left { display: flex; align-items: center; gap: 32px; }
     .topbar-nav { display: flex; align-items: center; gap: 4px; }
@@ -365,7 +367,7 @@
 
     <nav class="topbar">
         <div class="topbar-left">
-            <div class="brand"><i class="fa-solid fa-tower-broadcast"></i> POSCS Portal</div>
+            <a href="${pageContext.request.contextPath}/dashboard" class="brand"><i class="fa-solid fa-tower-broadcast"></i> POSCS Portal</a>
             <div class="topbar-nav">
                 <a href="${pageContext.request.contextPath}/dashboard" class="topbar-nav-link">Trang chủ</a>
                 <a href="${pageContext.request.contextPath}/customer" class="topbar-nav-link">Khách hàng</a>
