@@ -29,7 +29,8 @@
         body { font-family: 'Inter', sans-serif; background: #f3f4f6; min-height: 100vh; }
 
         .topbar { background: #fff; box-shadow: 0 2px 12px rgba(0,60,110,0.08); padding: 14px 28px; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 50; }
-        .topbar .brand { font-weight: 700; color: var(--primary-dark); font-size: 1.05rem; display: flex; align-items: center; gap: 10px; }
+        .topbar .brand { font-weight: 700; color: var(--primary-dark); font-size: 1.05rem; display: flex; align-items: center; gap: 10px; text-decoration: none; }
+        .topbar .brand:hover { color: var(--primary-dark); }
         .topbar .brand i { color: var(--primary); font-size: 1.2rem; }
         .topbar-right { display: flex; align-items: center; gap: 18px; }
         .avatar-mini { width: 38px; height: 38px; border-radius: 50%; object-fit: cover; cursor: pointer; border: 2px solid var(--primary-light); }
@@ -43,13 +44,15 @@
         .dd-user-header .dd-role { font-size: 0.75rem; color: #6b7280; }
 
         .app-shell { display: flex; align-items: flex-start; }
-        .sidebar { width: 240px; flex-shrink: 0; background: #fff; border-right: 1px solid #eef2f6; padding: 20px 12px; position: sticky; top: 66px; height: calc(100vh - 66px); overflow-y: auto; display: flex; flex-direction: column; transition: width 0.15s ease; }
-        .sidebar-link { display: flex; align-items: center; gap: 12px; padding: 11px 14px; margin-bottom: 2px; border-radius: 10px; color: #6b7280; font-weight: 600; font-size: 0.88rem; text-decoration: none; }
+        .sidebar { width: 240px; flex-shrink: 0; background: #fff; border-right: 1px solid #eef2f6; padding: 14px 10px; position: sticky; top: 66px; height: calc(100vh - 66px); overflow-y: auto; display: flex; flex-direction: column; transition: width 0.15s ease; }
+        .sidebar-link { display: flex; align-items: center; gap: 12px; padding: 9px 12px; margin-bottom: 1px; border-radius: 10px; color: #6b7280; font-weight: 600; font-size: 0.88rem; text-decoration: none; }
         .sidebar-link i { width: 18px; text-align: center; color: #9ca3af; flex-shrink: 0; }
         .sidebar-link:hover { background: #f0f9ff; color: var(--primary-dark); }
         .sidebar-link.active { background: linear-gradient(120deg, var(--primary), var(--primary-light)); color: #fff; }
         .sidebar-link.active i { color: #fff; }
         .sidebar-toggle { display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; margin: 0 0 12px; padding: 0; border: none; border-radius: 8px; background: none; color: #9ca3af; cursor: pointer; }
+        .sidebar-toggle { align-self: flex-end; }
+        .sidebar.collapsed .sidebar-toggle { align-self: center; }
         .sidebar-toggle i { transition: transform 0.15s ease; }
         .sidebar-toggle:hover { background: #f0f9ff; color: var(--primary-dark); }
         .sidebar.collapsed { width: 68px; }
@@ -112,7 +115,7 @@
 <body>
 
     <nav class="topbar">
-        <div class="topbar-left"><div class="brand"><i class="fa-solid fa-tower-broadcast"></i> POSCS Portal</div></div>
+        <div class="topbar-left"><a href="${pageContext.request.contextPath}/dashboard" class="brand"><i class="fa-solid fa-tower-broadcast"></i> POSCS Portal</a></div>
         <div class="topbar-right">
             <div class="dropdown">
                 <img src="https://ui-avatars.com/api/?name=${fn:escapeXml(sessionScope.currentUser.firstName)}&background=0568a6&color=fff" class="avatar-mini" alt="avatar" data-bs-toggle="dropdown" aria-expanded="false">

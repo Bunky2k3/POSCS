@@ -48,7 +48,8 @@
             padding: 14px 28px; display: flex; justify-content: space-between; align-items: center;
             position: sticky; top: 0; z-index: 50;
         }
-        .topbar .brand { font-weight: 700; color: var(--primary-dark); font-size: 1.05rem; display: flex; align-items: center; gap: 10px; }
+        .topbar .brand { font-weight: 700; color: var(--primary-dark); font-size: 1.05rem; display: flex; align-items: center; gap: 10px; text-decoration: none; }
+        .topbar .brand:hover { color: var(--primary-dark); }
         .topbar .brand i { color: var(--primary); font-size: 1.2rem; }
         .topbar-left { display: flex; align-items: center; gap: 32px; }
         .topbar-right { display: flex; align-items: center; gap: 18px; }
@@ -77,14 +78,14 @@
         .sidebar {
             width: 240px; flex-shrink: 0;
             background: #fff; border-right: 1px solid #eef2f6;
-            padding: 20px 12px; position: sticky; top: 66px;
+            padding: 14px 10px; position: sticky; top: 66px;
             height: calc(100vh - 66px); overflow-y: auto;
             display: flex; flex-direction: column;
             transition: width 0.15s ease;
         }
         .sidebar-link {
             display: flex; align-items: center; gap: 12px;
-            padding: 11px 14px; margin-bottom: 2px; border-radius: 10px;
+            padding: 9px 12px; margin-bottom: 1px; border-radius: 10px;
             color: #6b7280; font-weight: 600; font-size: 0.88rem; text-decoration: none;
         }
         .sidebar-link i { width: 18px; text-align: center; color: #9ca3af; flex-shrink: 0; }
@@ -96,6 +97,8 @@
             margin: 0 0 12px; padding: 0; border: none; border-radius: 8px;
             background: none; color: #9ca3af; cursor: pointer;
         }
+        .sidebar-toggle { align-self: flex-end; }
+        .sidebar.collapsed .sidebar-toggle { align-self: center; }
         .sidebar-toggle i { transition: transform 0.15s ease; }
         .sidebar-toggle:hover { background: #f0f9ff; color: var(--primary-dark); }
         .sidebar.collapsed { width: 68px; }
@@ -175,7 +178,7 @@
 
     <nav class="topbar">
         <div class="topbar-left">
-            <div class="brand"><i class="fa-solid fa-tower-broadcast"></i> POSCS Portal</div>
+            <a href="${pageContext.request.contextPath}/dashboard" class="brand"><i class="fa-solid fa-tower-broadcast"></i> POSCS Portal</a>
         </div>
         <div class="topbar-right">
             <div class="dropdown">
