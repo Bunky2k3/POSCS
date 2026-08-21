@@ -228,6 +228,13 @@
         .customer-code {
             font-weight: 700; color: var(--primary); font-size: 0.85rem;
         }
+        .customer-name-cell { display: flex; align-items: center; gap: 10px; }
+        .customer-logo {
+            width: 32px; height: 32px; border-radius: 8px; overflow: hidden; flex-shrink: 0;
+            background: linear-gradient(120deg, var(--primary-dark), var(--primary-light));
+            color: #fff; display: flex; align-items: center; justify-content: center; font-size: 0.85rem;
+        }
+        .customer-logo img { width: 100%; height: 100%; object-fit: cover; }
         .customer-name-link {
             color: #111827; font-weight: 600; text-decoration: none;
         }
@@ -445,7 +452,17 @@
                         <c:forEach var="customer" items="${customerList}">
                             <tr>
                                 <td class="customer-code">${fn:escapeXml(customer.enterpriseCode)}</td>
-                                <td><a href="${pageContext.request.contextPath}/customer?action=view&id=${customer.enterpriseId}" class="customer-name-link">${fn:escapeXml(customer.enterpriseName)}</a></td>
+                                <td>
+                                    <div class="customer-name-cell">
+                                        <div class="customer-logo">
+                                            <c:choose>
+                                                <c:when test="${not empty customer.logoUrl}"><img src="${pageContext.request.contextPath}${fn:escapeXml(customer.logoUrl)}" alt="Logo"></c:when>
+                                                <c:otherwise><i class="fa-solid fa-building"></i></c:otherwise>
+                                            </c:choose>
+                                        </div>
+                                        <a href="${pageContext.request.contextPath}/customer?action=view&id=${customer.enterpriseId}" class="customer-name-link">${fn:escapeXml(customer.enterpriseName)}</a>
+                                    </div>
+                                </td>
                                 <td><span class="type-badge">${fn:escapeXml(customer.customerType)}</span></td>
                                 <td>${fn:escapeXml(customer.email)}</td>
                                 <td>${fn:escapeXml(customer.phone)}</td>

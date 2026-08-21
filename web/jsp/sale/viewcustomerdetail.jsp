@@ -119,11 +119,12 @@
             flex-wrap: wrap; gap: 16px; padding: 26px 30px; margin-bottom: 20px;
         }
         .detail-header .company-icon {
-            width: 56px; height: 56px; border-radius: 14px;
+            width: 56px; height: 56px; border-radius: 14px; overflow: hidden;
             background: linear-gradient(120deg, var(--primary-dark), var(--primary-light));
             color: #fff; display: flex; align-items: center; justify-content: center;
             font-size: 1.4rem; flex-shrink: 0;
         }
+        .detail-header .company-icon img { width: 100%; height: 100%; object-fit: cover; }
         .detail-header .company-info { display: flex; gap: 16px; align-items: center; }
         .detail-header h2 { font-weight: 700; color: #111827; font-size: 1.25rem; margin-bottom: 4px; }
         .detail-header .customer-code { color: var(--primary); font-weight: 700; font-size: 0.82rem; }
@@ -334,7 +335,12 @@
         <!-- ===== Header ===== -->
         <div class="detail-header card-box">
             <div class="company-info">
-                <div class="company-icon"><i class="fa-solid fa-building"></i></div>
+                <div class="company-icon">
+                    <c:choose>
+                        <c:when test="${not empty customer.logoUrl}"><img src="${pageContext.request.contextPath}${fn:escapeXml(customer.logoUrl)}" alt="Logo"></c:when>
+                        <c:otherwise><i class="fa-solid fa-building"></i></c:otherwise>
+                    </c:choose>
+                </div>
                 <div>
                     <span class="customer-code">${fn:escapeXml(customer.enterpriseCode)}</span>
                     <h2>

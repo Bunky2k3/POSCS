@@ -266,7 +266,7 @@ public class CustomerDAO {
     public boolean update(Enterprise enterprise) {
         String sql = "UPDATE enterprises SET " +
                 "enterprise_name = ?, customer_type = ?, customer_group = ?, email = ?, phone = ?, " +
-                "website = ?, address_id = ?, account_owner_id = ?, join_date = ? " +
+                "website = ?, address_id = ?, account_owner_id = ?, join_date = ?, logo_url = ? " +
                 "WHERE enterprise_id = ? AND is_deleted = 0";
 
         try (Connection conn = DBContext.getConnection()) {
@@ -289,7 +289,8 @@ public class CustomerDAO {
                     setNullableInt(ps, 7, addressId);
                     ps.setInt(8, enterprise.getAccountOwnerId());
                     ps.setDate(9, enterprise.getJoinDate());
-                    ps.setInt(10, enterprise.getEnterpriseId());
+                    ps.setString(10, enterprise.getLogoUrl());
+                    ps.setInt(11, enterprise.getEnterpriseId());
                     boolean ok = ps.executeUpdate() > 0;
                     if (ok) {
                         conn.commit();
