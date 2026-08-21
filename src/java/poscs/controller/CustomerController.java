@@ -196,7 +196,7 @@ public class CustomerController extends HttpServlet {
             e.setAccountOwnerId(accountOwnerId);
         }
 
-        setAddressFromRequest(e, request);
+        setAddressFromRequest(e, request, null);
 
         if (!isValidCommonFields(e) || isBlank(e.getTaxCode())) {
             response.sendRedirect(request.getContextPath() + "/customer?action=new&error=invalid");
@@ -245,7 +245,7 @@ public class CustomerController extends HttpServlet {
             e.setAccountOwnerId(accountOwnerId);
         }
 
-        setAddressFromRequest(e, request);
+        setAddressFromRequest(e, request, existing.getAddressId());
 
         if (!isValidCommonFields(e)) {
             response.sendRedirect(request.getContextPath() + "/customer?action=edit&id=" + id + "&error=invalid");
@@ -338,7 +338,13 @@ public class CustomerController extends HttpServlet {
     // Helpers
     // ------------------------------------------------------------------
 
-    private void setAddressFromRequest(Enterprise e, HttpServletRequest request) {
+    /**
+     * @param existingAddressId address_id khách hàng đã có sẵn (null nếu tạo mới hoặc
+     *                          chưa từng có địa chỉ) -- truyền xuống để CustomerDAO cập
+     *                          nhật ngay dòng addresses cũ thay vì tạo dòng mới mỗi lần
+     *                          lưu (trước đây luôn INSERT mới, để lại rác không giới hạn).
+     */
+    private void setAddressFromRequest(Enterprise e, HttpServletRequest request, Integer existingAddressId) {
         Integer districtId = parseIntOrNull(request.getParameter("districtId"));
         String addressDetail = emptyToNull(request.getParameter("addressDetail"));
         if (districtId != null && addressDetail != null) {
@@ -347,6 +353,10 @@ public class CustomerController extends HttpServlet {
             address.setDistrictId(districtId);
             e.setAddress(address);
         }
+        // Luôn gán lại addressId hiện có (kể cả khi request này không gửi lên
+        // districtId/addressDetail) -- nếu không, CustomerDAO sẽ coi enterprise
+        // này chưa từng có địa chỉ và ghi đè address_id thành NULL.
+        e.setAddressId(existingAddressId);
     }
 
     /**

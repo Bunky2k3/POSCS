@@ -270,12 +270,18 @@ public class CustomerDAO {
                 "WHERE enterprise_id = ? AND is_deleted = 0";
 
         try (Connection conn = DBContext.getConnection()) {
-            // Cùng lý do như insert(): gộp insertAddress() + UPDATE enterprises
-            // vào 1 transaction để không để lại dòng addresses mồ côi khi bước sau lỗi.
+            // Cùng lý do như insert(): gộp insertAddress()/updateAddress() + UPDATE
+            // enterprises vào 1 transaction để không để lại dòng addresses mồ côi
+            // khi bước sau lỗi.
             conn.setAutoCommit(false);
             try {
                 Integer addressId = enterprise.getAddressId();
-                if (addressId == null && enterprise.getAddress() != null) {
+                if (addressId != null && enterprise.getAddress() != null) {
+                    // Khách hàng đã có address_id từ trước và form gửi lên địa chỉ mới
+                    // -- ghi đè nội dung ngay dòng addresses cũ thay vì tạo dòng mới,
+                    // tránh để lại dòng mồ côi mỗi lần bấm lưu.
+                    updateAddress(conn, addressId, enterprise.getAddress());
+                } else if (addressId == null && enterprise.getAddress() != null) {
                     addressId = insertAddress(conn, enterprise.getAddress());
                 }
 
@@ -426,6 +432,20 @@ public class CustomerDAO {
             try (ResultSet keys = ps.getGeneratedKeys()) {
                 return keys.next() ? keys.getInt(1) : null;
             }
+        }
+    }
+
+    /** Ghi đè nội dung 1 dòng addresses đã tồn tại (dùng khi khách hàng sửa địa chỉ của address_id đã gán từ trước). */
+    private void updateAddress(Connection conn, int addressId, Address address) throws SQLException {
+        if (address.getStreetAndLocalName() == null || address.getDistrictId() <= 0) {
+            return;
+        }
+        String sql = "UPDATE addresses SET street_and_local_name = ?, districts_id = ? WHERE address_id = ?";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, address.getStreetAndLocalName());
+            ps.setInt(2, address.getDistrictId());
+            ps.setInt(3, addressId);
+            ps.executeUpdate();
         }
     }
 
