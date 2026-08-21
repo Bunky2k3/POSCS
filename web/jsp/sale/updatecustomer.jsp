@@ -285,10 +285,10 @@
                         <label>Nhóm khách hàng <span class="req">*</span></label>
                         <select class="form-select" id="customerGroup" name="customerGroup">
                             <option value="">-- Chọn nhóm khách hàng --</option>
-                            <option value="Khách hàng VIP" ${customer.customerGroup == 'Khách hàng VIP' ? 'selected' : ''}>Khách hàng VIP</option>
-                            <option value="Khách hàng thân thiết" ${customer.customerGroup == 'Khách hàng thân thiết' ? 'selected' : ''}>Khách hàng thân thiết</option>
-                            <option value="Khách hàng tiềm năng" ${customer.customerGroup == 'Khách hàng tiềm năng' ? 'selected' : ''}>Khách hàng tiềm năng</option>
-                            <option value="Khách hàng thường" ${customer.customerGroup == 'Khách hàng thường' ? 'selected' : ''}>Khách hàng thường</option>
+                            <option value="VIP" ${customer.customerGroup == 'VIP' ? 'selected' : ''}>Khách hàng VIP</option>
+                            <option value="Thân thiết" ${customer.customerGroup == 'Thân thiết' ? 'selected' : ''}>Khách hàng thân thiết</option>
+                            <option value="Tiềm năng" ${customer.customerGroup == 'Tiềm năng' ? 'selected' : ''}>Khách hàng tiềm năng</option>
+                            <option value="Thường" ${customer.customerGroup == 'Thường' ? 'selected' : ''}>Khách hàng thường</option>
                         </select>
                         <span class="error-text" id="err-customerGroup">Vui lòng chọn nhóm khách hàng.</span>
                     </div>
