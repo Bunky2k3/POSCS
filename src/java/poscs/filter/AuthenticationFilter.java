@@ -12,6 +12,8 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 import poscs.common.CsrfUtil;
+import poscs.dao.NotificationDAO;
+import poscs.model.User;
 
 /**
  * Chặn TOÀN BỘ request khi chưa đăng nhập (session không có "currentUser"),
@@ -49,6 +51,13 @@ public class AuthenticationFilter implements Filter {
             "/VerifyOtpServlet",
             "/ResetPasswordServlet"
     );
+
+    // Số thông báo gần nhất bơm sẵn cho dropdown chuông ở topbar.jsp (trang
+    // "Xem tất cả" tự tra lại đầy đủ qua NotificationController, không dùng
+    // request attribute này).
+    private static final int RECENT_NOTIFICATIONS_LIMIT = 5;
+
+    private final NotificationDAO notificationDAO = new NotificationDAO();
 
     @Override
     public void doFilter(ServletRequest req, ServletResponse res, FilterChain chain)
@@ -100,6 +109,22 @@ public class AuthenticationFilter implements Filter {
             return;
         }
 
+        // Bơm sẵn dữ liệu chuông thông báo cho topbar.jsp -- topbar được
+        // include ở MỌI trang sau đăng nhập mà không qua controller riêng,
+        // nên nơi duy nhất chạy trước tất cả các trang đó là filter này.
+        // Bỏ qua request tới /css, /js (topbar không được render ở đó) để
+        // khỏi tốn 2 lượt query CSDL thừa cho mỗi lần tải trang.
+        if (!isStaticAssetPath(request.getServletPath())) {
+            User currentUser = (User) session.getAttribute("currentUser");
+            request.setAttribute("unreadNotifCount", notificationDAO.countUnread(currentUser.getUserId()));
+            request.setAttribute("recentNotifications",
+                    notificationDAO.findRecentByUser(currentUser.getUserId(), RECENT_NOTIFICATIONS_LIMIT));
+        }
+
         chain.doFilter(request, response);
+    }
+
+    private static boolean isStaticAssetPath(String servletPath) {
+        return servletPath.startsWith("/css/") || servletPath.startsWith("/js/");
     }
 }

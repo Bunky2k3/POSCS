@@ -5,8 +5,10 @@
     "c" và "fn", đồng thời link web/css/appshell.css và
     web/js/appshell.js trong <head>).
 
-    Không cần request attribute nào -- toàn bộ dữ liệu (tên/vai trò người
-    dùng) lấy thẳng từ sessionScope.currentUser.
+    Không cần request attribute nào cho phần tên/vai trò người dùng -- lấy
+    thẳng từ sessionScope.currentUser. Riêng chuông thông báo (unreadNotifCount,
+    recentNotifications) do AuthenticationFilter bơm sẵn vào request cho MỌI
+    trang sau đăng nhập, xem AuthenticationFilter#isStaticAssetPath.
 --%>
 <nav class="topbar">
     <div class="topbar-left">
@@ -18,24 +20,28 @@
     <div class="topbar-right">
         <div class="dropdown">
             <div class="bell-icon" data-bs-toggle="dropdown" aria-expanded="false">
-                <i class="fa-regular fa-bell"></i><span class="dot"></span>
+                <i class="fa-regular fa-bell"></i><c:if test="${requestScope.unreadNotifCount > 0}"><span class="dot"></span></c:if>
             </div>
             <ul class="dropdown-menu dropdown-menu-end notif-dropdown">
-                <li class="notif-header">Thông báo <span class="notif-count">3 mới</span></li>
-                <li><a class="dropdown-item notif-item" href="#">
-                    <span class="notif-icon"><i class="fa-solid fa-file-contract"></i></span>
-                    <div><div class="notif-text">Hợp đồng #HD-0231 sắp hết hạn</div><div class="notif-time">10 phút trước</div></div>
-                </a></li>
-                <li><a class="dropdown-item notif-item" href="#">
-                    <span class="notif-icon"><i class="fa-solid fa-headset"></i></span>
-                    <div><div class="notif-text">Phiếu hỗ trợ #TK-1042 vừa được giao cho bạn</div><div class="notif-time">1 giờ trước</div></div>
-                </a></li>
-                <li><a class="dropdown-item notif-item" href="#">
-                    <span class="notif-icon"><i class="fa-solid fa-user-plus"></i></span>
-                    <div><div class="notif-text">Khách hàng mới được thêm: Viettel Bắc Ninh</div><div class="notif-time">Hôm qua</div></div>
-                </a></li>
+                <li class="notif-header">Thông báo
+                    <c:if test="${requestScope.unreadNotifCount > 0}"><span class="notif-count">${requestScope.unreadNotifCount} mới</span></c:if>
+                </li>
+                <c:choose>
+                    <c:when test="${empty requestScope.recentNotifications}">
+                        <li class="notif-empty">Chưa có thông báo nào</li>
+                    </c:when>
+                    <c:otherwise>
+                        <c:forEach var="notif" items="${requestScope.recentNotifications}">
+                            <li><a class="dropdown-item notif-item ${notif.read ? '' : 'unread'}"
+                                   href="${pageContext.request.contextPath}/notifications?action=read&id=${notif.notificationId}">
+                                <span class="notif-icon"><i class="fa-regular fa-bell"></i></span>
+                                <div><div class="notif-text"><c:out value="${notif.title}"/></div><div class="notif-time">${notif.relativeTime}</div></div>
+                            </a></li>
+                        </c:forEach>
+                    </c:otherwise>
+                </c:choose>
                 <li><hr class="dropdown-divider"></li>
-                <li><a class="dropdown-item text-center small" href="#">Xem tất cả thông báo</a></li>
+                <li><a class="dropdown-item text-center small" href="${pageContext.request.contextPath}/notifications">Xem tất cả thông báo</a></li>
             </ul>
         </div>
         <div class="dropdown">
