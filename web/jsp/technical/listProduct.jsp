@@ -64,16 +64,34 @@
         }
         .category-list { list-style: none; margin: 0; padding: 0; }
         .category-list li { margin-bottom: 2px; }
-        .category-list a {
-            display: flex; justify-content: space-between; align-items: center; gap: 8px;
+        .category-count { font-size: 0.76rem; color: #9ca3af; font-weight: 600; }
+        .category-list-divider { border: none; border-top: 1px solid #eef2f6; margin: 10px 0; }
+
+        /* ===== Cây danh mục 3 cấp dạng accordion (thả xuống) ===== */
+        .cat-row { display: flex; align-items: center; gap: 2px; }
+        .cat-link {
+            flex: 1; min-width: 0; display: flex; justify-content: space-between; align-items: center; gap: 8px;
             padding: 9px 12px; border-radius: 10px;
             color: #374151; font-weight: 600; font-size: 0.87rem; text-decoration: none;
         }
-        .category-list a:hover { background: #f0f9ff; color: var(--primary-dark); }
-        .category-list a.active { background: linear-gradient(120deg, var(--primary), var(--primary-light)); color: #fff; }
-        .category-list a.active .category-count { color: #fff; opacity: 0.85; }
-        .category-count { font-size: 0.76rem; color: #9ca3af; font-weight: 600; }
-        .category-list-divider { border: none; border-top: 1px solid #eef2f6; margin: 10px 0; }
+        .cat-link:hover { background: #f0f9ff; color: var(--primary-dark); }
+        .cat-link.active { background: linear-gradient(120deg, var(--primary), var(--primary-light)); color: #fff; }
+        .cat-link.active .category-count { color: #fff; opacity: 0.85; }
+        .cat-toggle {
+            flex-shrink: 0; width: 26px; height: 26px; border: none; background: transparent;
+            color: #9ca3af; border-radius: 8px; cursor: pointer;
+            display: flex; align-items: center; justify-content: center; font-size: 0.7rem;
+        }
+        .cat-toggle:hover { background: #f0f9ff; color: var(--primary); }
+        .cat-toggle i { transition: transform 0.2s ease; }
+        .cat-toggle.collapsed i { transform: rotate(-90deg); }
+        .category-sublist {
+            list-style: none; margin: 2px 0 6px 12px; padding: 0 0 0 12px;
+            border-left: 1px dashed #e5e7eb;
+        }
+        .category-sublist .cat-link { font-size: 0.83rem; font-weight: 500; padding: 7px 10px; }
+        .category-sublist .category-sublist { margin-left: 8px; }
+        .category-sublist .category-sublist .cat-link { font-size: 0.8rem; color: #4b5563; }
 
         /* ===== Ô tìm kiếm ===== */
         .search-bar { padding: 16px 18px; margin-bottom: 20px; }
@@ -219,19 +237,68 @@
                 <ul class="category-list">
                     <li>
                         <a href="${pageContext.request.contextPath}/product?action=list&keyword=${fn:escapeXml(keyword)}"
-                           class="${empty categoryFilter ? 'active' : ''}">
+                           class="cat-link ${empty categoryFilter ? 'active' : ''}">
                             <span>Tất cả sản phẩm</span>
                             <span class="category-count">(${grandTotal})</span>
                         </a>
                     </li>
                     <li><hr class="category-list-divider"></li>
-                    <c:forEach var="cat" items="${categoryList}">
-                        <li>
-                            <a href="${pageContext.request.contextPath}/product?action=list&categoryId=${cat.categoryId}&keyword=${fn:escapeXml(keyword)}"
-                               class="${categoryFilter == cat.categoryId ? 'active' : ''}">
-                                <span>${fn:escapeXml(cat.categoryName)}</span>
-                                <span class="category-count">(${empty categoryCounts[cat.categoryId] ? 0 : categoryCounts[cat.categoryId]})</span>
-                            </a>
+
+                    <c:forEach var="l1" items="${rootCategories}">
+                        <li class="cat-node">
+                            <div class="cat-row">
+                                <a href="${pageContext.request.contextPath}/product?action=list&categoryId=${l1.categoryId}&keyword=${fn:escapeXml(keyword)}"
+                                   class="cat-link ${categoryFilter == l1.categoryId ? 'active' : ''}">
+                                    <span>${fn:escapeXml(l1.categoryName)}</span>
+                                    <span class="category-count">(${empty categoryCounts[l1.categoryId] ? 0 : categoryCounts[l1.categoryId]})</span>
+                                </a>
+                                <c:if test="${not empty childrenByParent[l1.categoryId]}">
+                                    <button type="button" class="cat-toggle ${expandedCategoryIds.contains(l1.categoryId) ? '' : 'collapsed'}"
+                                            data-bs-toggle="collapse" data-bs-target="#catkids-${l1.categoryId}"
+                                            aria-expanded="${expandedCategoryIds.contains(l1.categoryId)}" aria-label="Mở/thu danh mục con">
+                                        <i class="fa-solid fa-chevron-down"></i>
+                                    </button>
+                                </c:if>
+                            </div>
+                            <c:if test="${not empty childrenByParent[l1.categoryId]}">
+                                <div class="collapse ${expandedCategoryIds.contains(l1.categoryId) ? 'show' : ''}" id="catkids-${l1.categoryId}">
+                                    <ul class="category-sublist">
+                                        <c:forEach var="l2" items="${childrenByParent[l1.categoryId]}">
+                                            <li class="cat-node">
+                                                <div class="cat-row">
+                                                    <a href="${pageContext.request.contextPath}/product?action=list&categoryId=${l2.categoryId}&keyword=${fn:escapeXml(keyword)}"
+                                                       class="cat-link ${categoryFilter == l2.categoryId ? 'active' : ''}">
+                                                        <span>${fn:escapeXml(l2.categoryName)}</span>
+                                                        <span class="category-count">(${empty categoryCounts[l2.categoryId] ? 0 : categoryCounts[l2.categoryId]})</span>
+                                                    </a>
+                                                    <c:if test="${not empty childrenByParent[l2.categoryId]}">
+                                                        <button type="button" class="cat-toggle ${expandedCategoryIds.contains(l2.categoryId) ? '' : 'collapsed'}"
+                                                                data-bs-toggle="collapse" data-bs-target="#catkids-${l2.categoryId}"
+                                                                aria-expanded="${expandedCategoryIds.contains(l2.categoryId)}" aria-label="Mở/thu danh mục con">
+                                                            <i class="fa-solid fa-chevron-down"></i>
+                                                        </button>
+                                                    </c:if>
+                                                </div>
+                                                <c:if test="${not empty childrenByParent[l2.categoryId]}">
+                                                    <div class="collapse ${expandedCategoryIds.contains(l2.categoryId) ? 'show' : ''}" id="catkids-${l2.categoryId}">
+                                                        <ul class="category-sublist">
+                                                            <c:forEach var="l3" items="${childrenByParent[l2.categoryId]}">
+                                                                <li>
+                                                                    <a href="${pageContext.request.contextPath}/product?action=list&categoryId=${l3.categoryId}&keyword=${fn:escapeXml(keyword)}"
+                                                                       class="cat-link ${categoryFilter == l3.categoryId ? 'active' : ''}">
+                                                                        <span>${fn:escapeXml(l3.categoryName)}</span>
+                                                                        <span class="category-count">(${empty categoryCounts[l3.categoryId] ? 0 : categoryCounts[l3.categoryId]})</span>
+                                                                    </a>
+                                                                </li>
+                                                            </c:forEach>
+                                                        </ul>
+                                                    </div>
+                                                </c:if>
+                                            </li>
+                                        </c:forEach>
+                                    </ul>
+                                </div>
+                            </c:if>
                         </li>
                     </c:forEach>
                 </ul>

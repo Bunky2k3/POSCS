@@ -2,7 +2,12 @@ package poscs.controller;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.MultipartConfig;
 import jakarta.servlet.annotation.WebServlet;
@@ -14,6 +19,7 @@ import poscs.common.AccessControl;
 import poscs.common.FileStorage;
 import poscs.dao.ProductDAO;
 import poscs.model.Product;
+import poscs.model.ProductCategory;
 
 /**
  * Controller cho toàn bộ chức năng sản phẩm (products). Điều hướng theo
@@ -107,9 +113,16 @@ public class ProductController extends HttpServlet {
         int totalCount = productDAO.countAll(keyword, categoryFilter);
         int totalPages = Math.max(1, (int) Math.ceil(totalCount / (double) PAGE_SIZE));
 
+        List<ProductCategory> categoryList = productDAO.findAllCategories();
+        Map<Integer, List<ProductCategory>> childrenByParent = childrenByParent(categoryList);
+
         request.setAttribute("productList", productList);
-        request.setAttribute("categoryList", productDAO.findAllCategories());
-        request.setAttribute("categoryCounts", productDAO.countByCategory());
+        request.setAttribute("categoryList", categoryList);
+        request.setAttribute("rootCategories", rootCategories(categoryList));
+        request.setAttribute("childrenByParent", childrenByParent);
+        request.setAttribute("expandedCategoryIds", expandedCategoryIds(categoryList, categoryFilter));
+        request.setAttribute("categoryCounts",
+                subtreeCategoryCounts(categoryList, childrenByParent, productDAO.countByCategory()));
         request.setAttribute("grandTotal", productDAO.countAll(null, null));
         request.setAttribute("currentPage", page);
         request.setAttribute("totalPages", totalPages);
@@ -118,6 +131,84 @@ public class ProductController extends HttpServlet {
         request.setAttribute("categoryFilter", categoryFilter);
 
         request.getRequestDispatcher(LIST_VIEW).forward(request, response);
+    }
+
+    // ------------------------------------------------------------------
+    // Helpers: cây danh mục 3 cấp cho panel "Danh mục sản phẩm" (accordion)
+    // ------------------------------------------------------------------
+
+    /** Danh mục cấp 1 (không có cha), theo đúng thứ tự trả về từ findAllCategories(). */
+    private List<ProductCategory> rootCategories(List<ProductCategory> categoryList) {
+        List<ProductCategory> result = new ArrayList<>();
+        for (ProductCategory c : categoryList) {
+            if (c.getParentCategoryId() == null) {
+                result.add(c);
+            }
+        }
+        return result;
+    }
+
+    /** category_id cha -> danh sách danh mục con trực tiếp, dùng để đổ từng nhánh accordion (cấp 2, cấp 3). */
+    private Map<Integer, List<ProductCategory>> childrenByParent(List<ProductCategory> categoryList) {
+        Map<Integer, List<ProductCategory>> result = new LinkedHashMap<>();
+        for (ProductCategory c : categoryList) {
+            if (c.getParentCategoryId() != null) {
+                result.computeIfAbsent(c.getParentCategoryId(), k -> new ArrayList<>()).add(c);
+            }
+        }
+        return result;
+    }
+
+    /**
+     * Số sản phẩm hiển thị cạnh mỗi danh mục trong panel = tổng số sản phẩm của
+     * chính danh mục đó CỘNG DỒN toàn bộ danh mục con/cháu (không chỉ số sản
+     * phẩm gắn trực tiếp). Danh mục cha/giữa cây (Năng lượng tái tạo, Hạ tầng
+     * viễn thông, Thiết bị vô tuyến...) không có sản phẩm nào gắn trực tiếp --
+     * mọi sản phẩm đều nằm ở danh mục lá -- nên nếu không cộng dồn, các danh
+     * mục cha sẽ luôn hiện (0) dù bên trong có hàng chục sản phẩm.
+     */
+    private Map<Integer, Integer> subtreeCategoryCounts(List<ProductCategory> categoryList,
+            Map<Integer, List<ProductCategory>> childrenByParent, Map<Integer, Integer> directCounts) {
+        Map<Integer, Integer> result = new HashMap<>();
+        for (ProductCategory c : categoryList) {
+            result.put(c.getCategoryId(), subtreeCount(c.getCategoryId(), childrenByParent, directCounts));
+        }
+        return result;
+    }
+
+    /** Tổng số sản phẩm của 1 danh mục + toàn bộ hậu duệ (đệ quy theo childrenByParent). */
+    private int subtreeCount(int categoryId, Map<Integer, List<ProductCategory>> childrenByParent,
+            Map<Integer, Integer> directCounts) {
+        int total = directCounts.getOrDefault(categoryId, 0);
+        List<ProductCategory> children = childrenByParent.get(categoryId);
+        if (children != null) {
+            for (ProductCategory child : children) {
+                total += subtreeCount(child.getCategoryId(), childrenByParent, directCounts);
+            }
+        }
+        return total;
+    }
+
+    /**
+     * category_id của danh mục đang được lọc (nếu có) cùng toàn bộ tổ tiên của nó,
+     * để JSP biết nhánh accordion nào cần mở sẵn (show) thay vì để người dùng phải
+     * tự bấm mở từng cấp mới thấy được mục đang chọn.
+     */
+    private Set<Integer> expandedCategoryIds(List<ProductCategory> categoryList, Integer categoryFilter) {
+        Set<Integer> result = new HashSet<>();
+        if (categoryFilter == null) {
+            return result;
+        }
+        Map<Integer, ProductCategory> byId = new HashMap<>();
+        for (ProductCategory c : categoryList) {
+            byId.put(c.getCategoryId(), c);
+        }
+        Integer current = categoryFilter;
+        while (current != null && result.add(current)) {
+            ProductCategory c = byId.get(current);
+            current = (c != null) ? c.getParentCategoryId() : null;
+        }
+        return result;
     }
 
     private void showDetail(HttpServletRequest request, HttpServletResponse response)
