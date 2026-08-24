@@ -13,6 +13,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import poscs.model.Contract;
+import poscs.model.ContractProduct;
 import poscs.model.Enterprise;
 import poscs.model.User;
 
@@ -24,8 +25,10 @@ import poscs.model.User;
  * insert/update để các truy vấn khác (vd CustomerDAO.hasActiveContracts)
  * có giá trị tương đối đúng tại thời điểm đó.
  *
- * Chưa xử lý contractproducts (hạng mục sản phẩm/dịch vụ + đơn giá) --
- * bảng đó chưa có cột lưu giá, thuộc phạm vi khác.
+ * findProductsByContractId() đọc hạng mục sản phẩm/dịch vụ (contractproducts)
+ * cho mục đích hiển thị (sản phẩm/số lượng/đơn vị/ghi chú) -- vẫn CHƯA có
+ * đơn giá/thành tiền/VAT vì contractproducts chưa có cột lưu giá, và form
+ * thêm/sửa hợp đồng chưa có UI để gắn/gỡ sản phẩm (chỉ đọc, chưa ghi).
  */
 public class ContractDAO {
 
@@ -209,6 +212,43 @@ public class ContractDAO {
             ex.printStackTrace();
         }
         return null;
+    }
+
+    /**
+     * Hạng mục sản phẩm/dịch vụ của 1 hợp đồng (contractproducts JOIN products),
+     * theo thứ tự thêm vào -- phục vụ mục "Hạng mục sản phẩm / dịch vụ" ở
+     * viewcontractdetail.jsp. Không có đơn giá/thành tiền vì contractproducts
+     * chưa có cột lưu giá (xem javadoc đầu file) -- chỉ hiển thị sản phẩm,
+     * số lượng, đơn vị, ghi chú.
+     */
+    public List<ContractProduct> findProductsByContractId(int contractId) {
+        List<ContractProduct> result = new ArrayList<>();
+        String sql = "SELECT cp.contract_product_id, cp.contract_id, cp.product_id, cp.quantity, cp.unit, cp.notes, " +
+                     "       p.product_code, p.product_name " +
+                     "FROM contractproducts cp JOIN products p ON cp.product_id = p.product_id " +
+                     "WHERE cp.contract_id = ? ORDER BY cp.contract_product_id";
+        try (Connection conn = DBContext.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, contractId);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    ContractProduct cp = new ContractProduct();
+                    cp.setContractProductId(rs.getInt("contract_product_id"));
+                    cp.setContractId(rs.getInt("contract_id"));
+                    cp.setProductId(rs.getInt("product_id"));
+                    cp.setProductCode(rs.getString("product_code"));
+                    cp.setProductName(rs.getString("product_name"));
+                    cp.setQuantity(rs.getInt("quantity"));
+                    cp.setUnit(rs.getString("unit"));
+                    cp.setNotes(rs.getString("notes"));
+                    result.add(cp);
+                }
+            }
+        } catch (SQLException ex) {
+            System.err.println("--- LOI TRUY VAN SAN PHAM HOP DONG ---");
+            ex.printStackTrace();
+        }
+        return result;
     }
 
     /** Sinh mã hợp đồng tiếp theo dạng HD-0001, HD-0002, ... */

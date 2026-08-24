@@ -17,12 +17,13 @@ import poscs.model.Contract;
 
 /**
  * Controller cho phần "Thông tin chung" của hợp đồng (bảng contracts).
- * Hạng mục sản phẩm/dịch vụ (contractproducts) chưa được xử lý ở đây --
- * bảng đó chưa có cột lưu đơn giá nên chưa thể tính thành tiền/VAT/tổng
- * cộng như mockup UI, thuộc phạm vi khác. Điều hướng theo tham số
- * "action" -- quyền hạn theo PERMISSIONS.md enforce bằng
- * AccessControl.requireFullAccess ở đầu mỗi hàm handleCreate/handleUpdate/
- * handleDelete (Kỹ thuật/CSKH chỉ View only trên Contract).
+ * Trang chi tiết (showDetail) cũng hiển thị hạng mục sản phẩm/dịch vụ
+ * (contractproducts) ở dạng CHỈ ĐỌC -- bảng đó chưa có cột lưu đơn giá nên
+ * chưa thể tính thành tiền/VAT/tổng cộng như mockup UI, và form thêm/sửa
+ * hợp đồng ở đây chưa có UI để gắn/gỡ sản phẩm, thuộc phạm vi khác. Điều
+ * hướng theo tham số "action" -- quyền hạn theo PERMISSIONS.md enforce
+ * bằng AccessControl.requireFullAccess ở đầu mỗi hàm handleCreate/
+ * handleUpdate/handleDelete (Kỹ thuật/CSKH chỉ View only trên Contract).
  */
 @WebServlet(name = "ContractController", urlPatterns = {"/contract"})
 public class ContractController extends HttpServlet {
@@ -126,6 +127,7 @@ public class ContractController extends HttpServlet {
 
         request.setAttribute("contract", contract);
         request.setAttribute("canDelete", contractDAO.canDelete(id));
+        request.setAttribute("contractProducts", contractDAO.findProductsByContractId(id));
 
         request.getRequestDispatcher(DETAIL_VIEW).forward(request, response);
     }

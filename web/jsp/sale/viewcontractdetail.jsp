@@ -4,12 +4,15 @@
 <%@taglib prefix="fn" uri="jakarta.tags.functions"%>
 <%--
     Request attribute do ContractController#showDetail thiết lập trước khi forward tới trang này:
-      - contract  : poscs.model.Contract (có sẵn .enterprise và .owner đã join, .status đã tính theo BR-17)
-      - canDelete : boolean -- true nếu hợp đồng đang ở trạng thái "Chưa hiệu lực" (BR-46)
+      - contract         : poscs.model.Contract (có sẵn .enterprise và .owner đã join, .status đã tính theo BR-17)
+      - canDelete        : boolean -- true nếu hợp đồng đang ở trạng thái "Chưa hiệu lực" (BR-46)
+      - contractProducts : List<poscs.model.ContractProduct> -- hạng mục sản phẩm/dịch vụ (chỉ đọc)
 
-    Hạng mục sản phẩm/dịch vụ + điều khoản/ghi chú chưa hiển thị dữ liệu
-    thật -- bảng contractproducts chưa có cột đơn giá và contracts chưa có
-    cột lưu điều khoản, thuộc phạm vi khác.
+    Hạng mục sản phẩm/dịch vụ hiển thị sản phẩm/số lượng/đơn vị/ghi chú thật
+    từ contractproducts -- KHÔNG có đơn giá/thành tiền/VAT vì bảng đó chưa có
+    cột lưu giá, và chưa có form để gắn/gỡ sản phẩm (chỉ đọc). Điều khoản/ghi
+    chú vẫn chưa hiển thị dữ liệu thật -- contracts chưa có cột lưu điều
+    khoản, thuộc phạm vi khác.
 --%>
 <!DOCTYPE html>
 <html lang="vi">
@@ -177,7 +180,40 @@
         <!-- ===== Hạng mục sản phẩm / dịch vụ ===== -->
         <div class="info-card card-box">
             <div class="section-header"><h5>Hạng mục sản phẩm / dịch vụ</h5></div>
-            <div class="empty-mini" style="color:#9ca3af; font-size:0.87rem;">Chưa hỗ trợ trong phiên bản này.</div>
+            <c:choose>
+                <c:when test="${empty contractProducts}">
+                    <div class="empty-mini" style="color:#9ca3af; font-size:0.87rem;">Chưa có sản phẩm nào được gắn vào hợp đồng này.</div>
+                </c:when>
+                <c:otherwise>
+                    <table class="item-table">
+                        <thead>
+                            <tr>
+                                <th style="width:36px;">#</th>
+                                <th>Sản phẩm</th>
+                                <th class="num" style="width:90px;">Số lượng</th>
+                                <th style="width:110px;">Đơn vị</th>
+                                <th>Ghi chú</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <c:forEach var="cp" items="${contractProducts}" varStatus="st">
+                                <tr>
+                                    <td>${st.index + 1}</td>
+                                    <td>
+                                        <a href="${pageContext.request.contextPath}/product?action=view&id=${cp.productId}" style="color:var(--primary); font-weight:600; text-decoration:none;">
+                                            ${fn:escapeXml(cp.productName)}
+                                        </a>
+                                        <div style="color:#9ca3af; font-size:0.78rem;">${fn:escapeXml(cp.productCode)}</div>
+                                    </td>
+                                    <td class="num">${cp.quantity}</td>
+                                    <td>${fn:escapeXml(cp.unit)}</td>
+                                    <td>${not empty cp.notes ? fn:escapeXml(cp.notes) : '—'}</td>
+                                </tr>
+                            </c:forEach>
+                        </tbody>
+                    </table>
+                </c:otherwise>
+            </c:choose>
         </div>
 
         <!-- ===== Ghi chú / điều khoản ===== -->
