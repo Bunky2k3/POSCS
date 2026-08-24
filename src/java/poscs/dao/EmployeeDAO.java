@@ -237,10 +237,15 @@ public class EmployeeDAO {
         }
     }
 
-    /** Lấy toàn bộ nhân viên đang hoạt động (is_deleted=0), phục vụ các dropdown "Nhân viên phụ trách". */
+    /**
+     * Lấy toàn bộ nhân viên đang hoạt động (is_deleted=0), phục vụ các dropdown
+     * "Nhân viên phụ trách" (chỉ cần tên) và việc so khớp username lúc nhập
+     * Excel hàng loạt (CustomerController -- cần username nên SELECT cả cột
+     * đó dù dropdown không hiển thị).
+     */
     public List<User> findAllActive() {
         List<User> result = new ArrayList<>();
-        String sql = "SELECT user_id, last_name, middle_name, first_name, department " +
+        String sql = "SELECT user_id, username, last_name, middle_name, first_name, department " +
                      "FROM users WHERE is_deleted = 0 ORDER BY last_name, first_name";
         try (Connection conn = DBContext.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql);
@@ -248,6 +253,7 @@ public class EmployeeDAO {
             while (rs.next()) {
                 User u = new User();
                 u.setUserId(rs.getInt("user_id"));
+                u.setUsername(rs.getString("username"));
                 u.setLastName(rs.getString("last_name"));
                 u.setMiddleName(rs.getString("middle_name"));
                 u.setFirstName(rs.getString("first_name"));
