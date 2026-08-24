@@ -14,8 +14,8 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.PDPageContentStream;
-import org.apache.pdfbox.pdmodel.common.PDRectangle;
 import org.apache.pdfbox.pdmodel.font.PDFont;
+import org.apache.pdfbox.pdmodel.interactive.form.PDAcroForm;
 import poscs.common.AccessControl;
 import poscs.common.ExcelUtil;
 import poscs.common.PdfUtil;
@@ -181,6 +181,12 @@ public class ContractController extends HttpServlet {
      * customerDAO.findById() lấy Enterprise đầy đủ (địa chỉ/MST/người đại
      * diện) để in vào PDF. Không có đơn giá/thành tiền (xem javadoc đầu file).
      */
+    /** Toạ độ y (tính từ đáy trang) nơi vùng bảng sản phẩm bắt đầu trên trang 2 của
+     * hopdong_template.pdf -- phải khớp với TABLE_TOP_Y trong script đã dùng để dựng
+     * file mẫu đó (xem GenerateContractTemplate, không thuộc source repo). */
+    private static final float TABLE_TOP_Y = 732f;
+    private static final int TABLE_PAGE_INDEX = 1;
+
     private void exportPdf(HttpServletRequest request, HttpServletResponse response) throws IOException {
         Integer id = parseIntOrNull(request.getParameter("id"));
         Contract contract = id != null ? contractDAO.findById(id) : null;
@@ -191,77 +197,46 @@ public class ContractController extends HttpServlet {
         List<ContractProduct> items = contractDAO.findProductsByContractId(id);
         Enterprise enterprise = customerDAO.findById(contract.getEnterpriseId());
 
-        try (PDDocument document = new PDDocument()) {
-            PDPage page = new PDPage(PDRectangle.A4);
-            document.addPage(page);
+        try (PDDocument document = PdfUtil.loadTemplate(getServletContext(), "/WEB-INF/templates/hopdong_template.pdf")) {
+            PDAcroForm acroForm = document.getDocumentCatalog().getAcroForm();
+
+            PdfUtil.fillField(acroForm, "contractCode", safe(contract.getContractCode()));
+            PdfUtil.fillField(acroForm, "signDate", formatDate(contract.getSigningDate()));
+            PdfUtil.fillField(acroForm, "effectiveDate", formatDate(contract.getEffectiveDate()));
+            PdfUtil.fillField(acroForm, "endDate", formatDate(contract.getEndDate()));
+            PdfUtil.fillField(acroForm, "sellerRepName", contract.getOwner() != null ? safe(contract.getOwner().getFullName()) : "");
+            if (enterprise != null) {
+                String address = enterprise.getAddress() != null ? enterprise.getAddress().getFullAddress() : "";
+                PdfUtil.fillField(acroForm, "buyerName", safe(enterprise.getEnterpriseName()));
+                PdfUtil.fillField(acroForm, "buyerTax", safe(enterprise.getTaxCode()));
+                PdfUtil.fillField(acroForm, "buyerAddress", address);
+                PdfUtil.fillField(acroForm, "buyerRep", safe(enterprise.getLegalRepresentative()));
+                PdfUtil.fillField(acroForm, "buyerPhone", safe(enterprise.getPhone()));
+                PdfUtil.fillField(acroForm, "buyerEmail", safe(enterprise.getEmail()));
+            }
+            acroForm.flatten();
+
+            PDPage tablePage = document.getPage(TABLE_PAGE_INDEX);
             PDFont font = PdfUtil.loadVietnameseFont(document, getServletContext());
-            PDFont boldFont = font; // Noto Sans chỉ nhúng bản Regular -- phân biệt tiêu đề bằng cỡ chữ thay vì in đậm
-
             float margin = 50f;
-            float width = page.getMediaBox().getWidth() - margin * 2;
-            float y = page.getMediaBox().getHeight() - margin;
+            float width = tablePage.getMediaBox().getWidth() - margin * 2;
 
-            try (PDPageContentStream cs = new PDPageContentStream(document, page)) {
-                PdfUtil.drawText(cs, boldFont, 16, margin, y, "HỢP ĐỒNG " + safe(contract.getContractCode()));
-                y -= 26;
-                y = PdfUtil.drawWrapped(cs, font, 11, margin, y, width, 15, safe(contract.getTitle()));
-                y -= 12;
-
-                PdfUtil.drawText(cs, boldFont, 11, margin, y, "BÊN A (Bên cung cấp)");
-                y -= 16;
-                y = PdfUtil.drawWrapped(cs, font, 10, margin, y, width, 14,
-                        "Công ty Cổ phần Thiết bị Bưu điện (POSTEF)");
-                if (contract.getOwner() != null) {
-                    y = PdfUtil.drawWrapped(cs, font, 10, margin, y, width, 14,
-                            "Người phụ trách: " + safe(contract.getOwner().getFullName()));
-                }
-                y -= 8;
-
-                PdfUtil.drawText(cs, boldFont, 11, margin, y, "BÊN B (Khách hàng)");
-                y -= 16;
-                if (enterprise != null) {
-                    y = PdfUtil.drawWrapped(cs, font, 10, margin, y, width, 14, "Tên: " + safe(enterprise.getEnterpriseName()));
-                    y = PdfUtil.drawWrapped(cs, font, 10, margin, y, width, 14, "Mã số thuế: " + safe(enterprise.getTaxCode()));
-                    String address = enterprise.getAddress() != null ? enterprise.getAddress().getFullAddress() : "";
-                    y = PdfUtil.drawWrapped(cs, font, 10, margin, y, width, 14, "Địa chỉ: " + safe(address));
-                    y = PdfUtil.drawWrapped(cs, font, 10, margin, y, width, 14,
-                            "Người đại diện: " + safe(enterprise.getLegalRepresentative()));
-                    y = PdfUtil.drawWrapped(cs, font, 10, margin, y, width, 14,
-                            "Điện thoại: " + safe(enterprise.getPhone()) + "     Email: " + safe(enterprise.getEmail()));
-                }
-                y -= 8;
-
-                PdfUtil.drawText(cs, font, 10, margin, y,
-                        "Ngày ký: " + formatDate(contract.getSigningDate())
-                        + "     Hiệu lực từ: " + formatDate(contract.getEffectiveDate())
-                        + "     đến: " + formatDate(contract.getEndDate()));
-                y -= 26;
-
-                PdfUtil.drawText(cs, boldFont, 11, margin, y, "Hạng mục sản phẩm / dịch vụ");
-                y -= 18;
-
-                float[] colWidths = {30, width - 30 - 60 - 70 - 140, 60, 70, 140};
-                String[] tableHeaders = {"#", "Sản phẩm", "SL", "Đơn vị", "Ghi chú"};
-                List<String[]> tableRows = new ArrayList<>();
-                int stt = 1;
-                for (ContractProduct item : items) {
-                    tableRows.add(new String[]{
-                        String.valueOf(stt++),
-                        item.getProductName() + " (" + item.getProductCode() + ")",
-                        String.valueOf(item.getQuantity()),
-                        safe(item.getUnit()),
-                        safe(item.getNotes())
-                    });
-                }
-                y = PdfUtil.drawTable(cs, font, boldFont, 9, margin, y, colWidths, tableHeaders, tableRows);
-                y -= 44;
-
-                float halfWidth = width / 2;
-                PdfUtil.drawText(cs, boldFont, 10, margin, y, "ĐẠI DIỆN BÊN A");
-                PdfUtil.drawText(cs, boldFont, 10, margin + halfWidth, y, "ĐẠI DIỆN BÊN B");
-                y -= 14;
-                PdfUtil.drawText(cs, font, 9, margin, y, "(Ký, ghi rõ họ tên)");
-                PdfUtil.drawText(cs, font, 9, margin + halfWidth, y, "(Ký, ghi rõ họ tên)");
+            float[] colWidths = {30, width - 30 - 60 - 70 - 140, 60, 70, 140};
+            String[] tableHeaders = {"#", "Sản phẩm", "SL", "Đơn vị", "Ghi chú"};
+            List<String[]> tableRows = new ArrayList<>();
+            int stt = 1;
+            for (ContractProduct item : items) {
+                tableRows.add(new String[]{
+                    String.valueOf(stt++),
+                    item.getProductName() + " (" + item.getProductCode() + ")",
+                    String.valueOf(item.getQuantity()),
+                    safe(item.getUnit()),
+                    safe(item.getNotes())
+                });
+            }
+            try (PDPageContentStream cs = new PDPageContentStream(document, tablePage,
+                    PDPageContentStream.AppendMode.APPEND, true, true)) {
+                PdfUtil.drawTable(cs, font, font, 9, margin, TABLE_TOP_Y, colWidths, tableHeaders, tableRows);
             }
 
             response.setContentType("application/pdf");
