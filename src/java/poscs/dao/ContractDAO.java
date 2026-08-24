@@ -325,6 +325,31 @@ public class ContractDAO {
         return -1;
     }
 
+    /** Thêm hàng loạt hạng mục sản phẩm/dịch vụ cho 1 hợp đồng (phục vụ nhập PDF hợp đồng). */
+    public boolean insertProducts(int contractId, List<ContractProduct> items) {
+        if (items.isEmpty()) {
+            return true;
+        }
+        String sql = "INSERT INTO contractproducts (contract_id, product_id, quantity, unit, notes) VALUES (?, ?, ?, ?, ?)";
+        try (Connection conn = DBContext.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            for (ContractProduct item : items) {
+                ps.setInt(1, contractId);
+                ps.setInt(2, item.getProductId());
+                ps.setInt(3, item.getQuantity());
+                ps.setString(4, item.getUnit());
+                ps.setString(5, item.getNotes());
+                ps.addBatch();
+            }
+            ps.executeBatch();
+            return true;
+        } catch (SQLException ex) {
+            System.err.println("--- LOI THEM HANG MUC SAN PHAM HOP DONG ---");
+            ex.printStackTrace();
+            return false;
+        }
+    }
+
     /** Cập nhật thông tin chung của hợp đồng đang có. Trả về true nếu cập nhật thành công. */
     public boolean update(Contract contract) {
         String sql = "UPDATE contracts SET " +

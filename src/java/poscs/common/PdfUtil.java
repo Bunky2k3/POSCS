@@ -60,6 +60,31 @@ public final class PdfUtil {
         }
     }
 
+    /**
+     * Đọc giá trị 1 field AcroForm theo tên, đã trim; trả về "" nếu field không
+     * tồn tại/rỗng/null. Với field kiểu combo (PDComboBox), getValueAsString()
+     * của PDFBox trả về dạng "[Giá trị]" (bọc ngoặc vuông như mảng) thay vì
+     * chuỗi thuần -- bóc lớp ngoặc đó ra nếu có.
+     */
+    public static String readField(PDAcroForm acroForm, String name) {
+        if (acroForm == null) {
+            return "";
+        }
+        PDField field = acroForm.getField(name);
+        if (field == null) {
+            return "";
+        }
+        String value = field.getValueAsString();
+        if (value == null) {
+            return "";
+        }
+        value = value.trim();
+        if (value.length() >= 2 && value.charAt(0) == '[' && value.charAt(value.length() - 1) == ']') {
+            value = value.substring(1, value.length() - 1).trim();
+        }
+        return value;
+    }
+
     private static byte[] fontBytes(ServletContext servletContext) throws IOException {
         byte[] cached = vietnameseFontBytes;
         if (cached != null) {
