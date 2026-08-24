@@ -39,6 +39,14 @@
         }
         .btn-add:hover { background: linear-gradient(120deg, var(--primary-dark), var(--primary)); color: #fff; }
 
+        .header-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+        .btn-outline-action {
+            background: #fff; color: var(--primary); border: 1.5px solid #e5e7eb; border-radius: 10px;
+            padding: 9px 18px; font-weight: 600; font-size: 0.87rem; text-decoration: none;
+            display: inline-flex; align-items: center; gap: 8px; white-space: nowrap;
+        }
+        .btn-outline-action:hover { background: #eaf6ff; color: var(--primary-dark); border-color: var(--primary-light); }
+
         /* ===== KPI mini strip ===== */
         .status-strip { display: flex; gap: 14px; margin-bottom: 20px; flex-wrap: wrap; }
         .status-chip {
@@ -137,7 +145,10 @@
                 <h2>Danh sách hợp đồng</h2>
                 <p>Quản lý toàn bộ hợp đồng cung cấp và thi công thiết bị viễn thông</p>
             </div>
-            <a href="${pageContext.request.contextPath}/contract?action=new" class="btn-add"><i class="fa-solid fa-plus"></i> Tạo hợp đồng</a>
+            <div class="header-actions">
+                <a href="${pageContext.request.contextPath}/contract?action=exportExcel&keyword=${fn:escapeXml(keyword)}&status=${fn:escapeXml(statusFilter)}&type=${fn:escapeXml(typeFilter)}" class="btn-outline-action"><i class="fa-solid fa-file-excel"></i> Xuất Excel</a>
+                <a href="${pageContext.request.contextPath}/contract?action=new" class="btn-add"><i class="fa-solid fa-plus"></i> Tạo hợp đồng</a>
+            </div>
         </div>
 
         <!-- ===== Dải trạng thái tổng quan (BR-17) ===== -->

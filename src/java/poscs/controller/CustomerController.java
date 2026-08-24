@@ -3,7 +3,12 @@ package poscs.controller;
 import java.io.IOException;
 import java.sql.Date;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import org.apache.poi.ss.usermodel.Row;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.MultipartConfig;
 import jakarta.servlet.annotation.WebServlet;
@@ -12,6 +17,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.Part;
 import poscs.common.AccessControl;
+import poscs.common.ExcelUtil;
 import poscs.common.FileStorage;
 import poscs.dao.AddressDAO;
 import poscs.dao.ContractDAO;
@@ -21,7 +27,9 @@ import poscs.dao.EmployeeDAO;
 import poscs.dao.TechnicalSupportTicketDAO;
 import poscs.model.Address;
 import poscs.model.CustomerLifecycleEvent;
+import poscs.model.District;
 import poscs.model.Enterprise;
+import poscs.model.Province;
 import poscs.model.RelationshipRating;
 import poscs.model.User;
 
@@ -42,6 +50,16 @@ public class CustomerController extends HttpServlet {
     private static final String DETAIL_VIEW = "/jsp/sale/viewcustomerdetail.jsp";
     private static final String CREATE_VIEW = "/jsp/sale/addnewcustomer.jsp";
     private static final String UPDATE_VIEW = "/jsp/sale/updatecustomer.jsp";
+    private static final String IMPORT_VIEW = "/jsp/sale/importcustomer.jsp";
+
+    // Cột trong file mẫu nhập Excel (xem downloadImportTemplate/handleImportExcel).
+    private static final String[] IMPORT_HEADERS = {
+        "Tên doanh nghiệp*", "Loại KH*", "Nhóm KH*", "Mã số thuế*", "Email*", "Số điện thoại*",
+        "Website", "Tỉnh/Thành*", "Xã/Phường*", "Địa chỉ chi tiết*", "Người phụ trách (username)"
+    };
+    private static final int COL_NAME = 0, COL_TYPE = 1, COL_GROUP = 2, COL_TAX = 3, COL_EMAIL = 4,
+            COL_PHONE = 5, COL_WEBSITE = 6, COL_PROVINCE = 7, COL_WARD = 8, COL_ADDRESS_DETAIL = 9,
+            COL_OWNER_USERNAME = 10;
 
     private final CustomerDAO customerDAO = new CustomerDAO();
     private final EmployeeDAO employeeDAO = new EmployeeDAO();
@@ -66,6 +84,15 @@ public class CustomerController extends HttpServlet {
                 break;
             case "edit":
                 showEditForm(request, response);
+                break;
+            case "exportExcel":
+                exportExcel(request, response);
+                break;
+            case "importForm":
+                showImportForm(request, response);
+                break;
+            case "downloadTemplate":
+                downloadImportTemplate(request, response);
                 break;
             case "list":
             default:
@@ -93,6 +120,9 @@ public class CustomerController extends HttpServlet {
                 break;
             case "evaluate":
                 handleEvaluate(request, response);
+                break;
+            case "importExcel":
+                handleImportExcel(request, response);
                 break;
             default:
                 response.sendRedirect(request.getContextPath() + "/customer");
@@ -168,6 +198,203 @@ public class CustomerController extends HttpServlet {
         request.setAttribute("userList", employeeDAO.findAllActive());
         request.setAttribute("provinceList", addressDAO.findAllProvinces());
         request.getRequestDispatcher(UPDATE_VIEW).forward(request, response);
+    }
+
+    /** Xuất Excel toàn bộ khách hàng khớp filter hiện tại (không phân trang) -- nút "Xuất Excel" ở listcustomer.jsp. */
+    private void exportExcel(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        String keyword = request.getParameter("keyword");
+        String typeFilter = request.getParameter("type");
+        Integer assigneeFilter = parseIntOrNull(request.getParameter("assigneeId"));
+
+        List<Enterprise> all = customerDAO.findAll(1, Integer.MAX_VALUE, keyword, typeFilter, assigneeFilter);
+        String[] headers = {"Mã KH", "Tên doanh nghiệp", "Loại KH", "Nhóm KH", "MST", "Email", "SĐT", "Website",
+            "Địa chỉ", "Người phụ trách", "Ngày tham gia", "Xếp hạng quan hệ"};
+        List<Object[]> rows = new ArrayList<>();
+        for (Enterprise e : all) {
+            rows.add(new Object[]{
+                e.getEnterpriseCode(),
+                e.getEnterpriseName(),
+                e.getCustomerType(),
+                e.getCustomerGroup(),
+                e.getTaxCode(),
+                e.getEmail(),
+                e.getPhone(),
+                e.getWebsite(),
+                e.getAddress() != null ? e.getAddress().getFullAddress() : "",
+                e.getAccountOwner() != null ? e.getAccountOwner().getFullName() : "",
+                e.getJoinDate() != null ? e.getJoinDate().toString() : "",
+                e.getCurrentRelationshipRating() != null ? e.getCurrentRelationshipRating().toString() : ""
+            });
+        }
+        ExcelUtil.writeWorkbook(response, "khach_hang", headers, rows);
+    }
+
+    /** Hiển thị form nhập Excel hàng loạt (chưa xử lý gì) -- nút "Nhập Excel" ở listcustomer.jsp. */
+    private void showImportForm(HttpServletRequest request, HttpServletResponse response)
+            throws ServletException, IOException {
+        request.getRequestDispatcher(IMPORT_VIEW).forward(request, response);
+    }
+
+    /** Sinh file mẫu .xlsx cho nhập khách hàng, có dropdown Loại KH/Nhóm KH/Tỉnh-Thành để hạn chế gõ sai. */
+    private void downloadImportTemplate(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        Map<Integer, List<String>> dropdowns = new HashMap<>();
+        dropdowns.put(COL_TYPE, Arrays.asList("Nhà mạng viễn thông", "Nhà thầu thi công", "Đại lý phân phối"));
+        dropdowns.put(COL_GROUP, Arrays.asList("VIP", "Thân thiết", "Tiềm năng", "Thường"));
+        List<String> provinceNames = new ArrayList<>();
+        for (Province p : addressDAO.findAllProvinces()) {
+            provinceNames.add(p.getShortName());
+        }
+        dropdowns.put(COL_PROVINCE, provinceNames);
+        ExcelUtil.writeTemplate(response, "mau_nhap_khach_hang", IMPORT_HEADERS, dropdowns, 200);
+    }
+
+    /**
+     * Nhập hàng loạt khách hàng từ file .xlsx theo mẫu downloadImportTemplate().
+     * Mỗi dòng độc lập -- 1 dòng lỗi không chặn các dòng còn lại. Tỉnh/Thành
+     * và Xã/Phường trong file là TÊN (không phải ID) nên phải so khớp lại với
+     * addressDAO.findAllProvinces()/findWardsByProvinceId() -- không có sẵn
+     * hàm tra theo tên nào trong AddressDAO nên so khớp thủ công ở đây
+     * (rút gọn theo getShortName(), bỏ dấu cách/hoa-thường).
+     */
+    private void handleImportExcel(HttpServletRequest request, HttpServletResponse response)
+            throws ServletException, IOException {
+        if (!AccessControl.requireFullAccess(request, response, AccessControl.Resource.CUSTOMER)) {
+            return;
+        }
+
+        Part filePart = request.getPart("file");
+        if (filePart == null || filePart.getSize() <= 0) {
+            request.setAttribute("importError", "Vui lòng chọn file .xlsx để nhập.");
+            request.getRequestDispatcher(IMPORT_VIEW).forward(request, response);
+            return;
+        }
+
+        List<Province> provinces = addressDAO.findAllProvinces();
+        List<User> staff = employeeDAO.findAllActive();
+        User currentUser = AccessControl.currentUser(request);
+
+        List<String> errors = new ArrayList<>();
+        int successCount = 0;
+
+        List<Row> rows;
+        try (java.io.InputStream in = filePart.getInputStream()) {
+            rows = ExcelUtil.readRows(in, 0);
+        } catch (Exception ex) {
+            request.setAttribute("importError", "Không đọc được file -- hãy chắc chắn đây là file .xlsx đúng mẫu.");
+            request.getRequestDispatcher(IMPORT_VIEW).forward(request, response);
+            return;
+        }
+
+        int rowNumber = 1; // dòng 1 là header trong file gốc
+        for (Row row : rows) {
+            rowNumber++;
+            String rowError = importOneCustomerRow(row, rowNumber, provinces, staff, currentUser);
+            if (rowError == null) {
+                successCount++;
+            } else {
+                errors.add(rowError);
+            }
+        }
+
+        request.setAttribute("importSuccessCount", successCount);
+        request.setAttribute("importErrorCount", errors.size());
+        request.setAttribute("importErrors", errors);
+        request.getRequestDispatcher(IMPORT_VIEW).forward(request, response);
+    }
+
+    /** @return null nếu insert thành công, ngược lại là mô tả lỗi kèm số dòng để hiển thị cho người dùng. */
+    private String importOneCustomerRow(Row row, int rowNumber, List<Province> provinces, List<User> staff, User currentUser) {
+        String name = ExcelUtil.cellString(row, COL_NAME);
+        String type = ExcelUtil.cellString(row, COL_TYPE);
+        String group = ExcelUtil.cellString(row, COL_GROUP);
+        String tax = ExcelUtil.cellString(row, COL_TAX);
+        String email = ExcelUtil.cellString(row, COL_EMAIL);
+        String phone = ExcelUtil.cellString(row, COL_PHONE);
+        String website = ExcelUtil.cellString(row, COL_WEBSITE);
+        String provinceName = ExcelUtil.cellString(row, COL_PROVINCE);
+        String wardName = ExcelUtil.cellString(row, COL_WARD);
+        String addressDetail = ExcelUtil.cellString(row, COL_ADDRESS_DETAIL);
+        String ownerUsername = ExcelUtil.cellString(row, COL_OWNER_USERNAME);
+
+        if (isBlank(name) || isBlank(type) || isBlank(group) || isBlank(tax) || isBlank(email)
+                || isBlank(phone) || isBlank(provinceName) || isBlank(wardName) || isBlank(addressDetail)) {
+            return "Dòng " + rowNumber + ": thiếu trường bắt buộc (đánh dấu *).";
+        }
+        if (!isValidPhone(phone)) {
+            return "Dòng " + rowNumber + ": số điện thoại không đúng định dạng.";
+        }
+        if (!isValidEmail(email)) {
+            return "Dòng " + rowNumber + ": email không đúng định dạng.";
+        }
+
+        Province province = findProvinceByName(provinces, provinceName);
+        if (province == null) {
+            return "Dòng " + rowNumber + ": không tìm thấy tỉnh/thành \"" + provinceName + "\".";
+        }
+        District ward = findWardByName(addressDAO.findWardsByProvinceId(province.getProvinceId()), wardName);
+        if (ward == null) {
+            return "Dòng " + rowNumber + ": không tìm thấy xã/phường \"" + wardName + "\" thuộc \"" + provinceName + "\".";
+        }
+
+        Enterprise e = new Enterprise();
+        e.setEnterpriseName(name);
+        e.setCustomerType(type);
+        e.setCustomerGroup(group);
+        e.setTaxCode(tax);
+        e.setEmail(email);
+        e.setPhone(phone);
+        e.setWebsite(emptyToNull(website));
+        e.setStatus("Active");
+
+        Address address = new Address();
+        address.setStreetAndLocalName(addressDetail);
+        address.setDistrictId(ward.getDistrictId());
+        e.setAddress(address);
+
+        User owner = isBlank(ownerUsername) ? null : findUserByUsername(staff, ownerUsername);
+        e.setAccountOwnerId(owner != null ? owner.getUserId() : currentUser.getUserId());
+
+        if (!isValidCommonFields(e)) {
+            return "Dòng " + rowNumber + ": dữ liệu không hợp lệ (kiểm tra lại định dạng các trường).";
+        }
+
+        e.setEnterpriseCode(customerDAO.generateNextEnterpriseCode());
+        int newId = customerDAO.insert(e);
+        return newId > 0 ? null : "Dòng " + rowNumber + ": lưu vào CSDL thất bại (có thể MST/email/SĐT đã tồn tại).";
+    }
+
+    private Province findProvinceByName(List<Province> provinces, String name) {
+        String normalized = normalize(name);
+        for (Province p : provinces) {
+            if (normalize(p.getShortName()).equals(normalized) || normalize(p.getProvinceName()).equals(normalized)) {
+                return p;
+            }
+        }
+        return null;
+    }
+
+    private District findWardByName(List<District> wards, String name) {
+        String normalized = normalize(name);
+        for (District d : wards) {
+            if (normalize(d.getShortName()).equals(normalized) || normalize(d.getDistrictName()).equals(normalized)) {
+                return d;
+            }
+        }
+        return null;
+    }
+
+    private User findUserByUsername(List<User> staff, String username) {
+        String normalized = username.trim().toLowerCase();
+        for (User u : staff) {
+            if (u.getUsername() != null && u.getUsername().trim().toLowerCase().equals(normalized)) {
+                return u;
+            }
+        }
+        return null;
+    }
+
+    private String normalize(String value) {
+        return value == null ? "" : value.trim().toLowerCase();
     }
 
     // ------------------------------------------------------------------

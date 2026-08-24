@@ -46,6 +46,14 @@
         }
         .btn-add:hover { background: linear-gradient(120deg, var(--primary-dark), var(--primary)); color: #fff; }
 
+        .header-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+        .btn-outline-action {
+            background: #fff; color: var(--primary); border: 1.5px solid #e5e7eb; border-radius: 10px;
+            padding: 9px 18px; font-weight: 600; font-size: 0.87rem; text-decoration: none;
+            display: inline-flex; align-items: center; gap: 8px; white-space: nowrap;
+        }
+        .btn-outline-action:hover { background: #eaf6ff; color: var(--primary-dark); border-color: var(--primary-light); }
+
         /* ===== Filter bar ===== */
         .filter-bar {
             padding: 18px 20px; margin-bottom: 20px;
@@ -197,7 +205,11 @@
                 <h2>Danh sách khách hàng</h2>
                 <p>Quản lý thông tin khách hàng doanh nghiệp đối tác</p>
             </div>
-            <a href="${pageContext.request.contextPath}/customer?action=new" class="btn-add"><i class="fa-solid fa-plus"></i> Thêm khách hàng</a>
+            <div class="header-actions">
+                <a href="${pageContext.request.contextPath}/customer?action=exportExcel&keyword=${fn:escapeXml(keyword)}&type=${fn:escapeXml(typeFilter)}&assigneeId=${assigneeFilter}" class="btn-outline-action"><i class="fa-solid fa-file-excel"></i> Xuất Excel</a>
+                <a href="${pageContext.request.contextPath}/customer?action=importForm" class="btn-outline-action"><i class="fa-solid fa-file-import"></i> Nhập Excel</a>
+                <a href="${pageContext.request.contextPath}/customer?action=new" class="btn-add"><i class="fa-solid fa-plus"></i> Thêm khách hàng</a>
+            </div>
         </div>
 
         <!-- ===== Bộ lọc / tìm kiếm ===== -->
