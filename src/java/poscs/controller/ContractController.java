@@ -225,6 +225,9 @@ public class ContractController extends HttpServlet {
 
         try (PDDocument document = PdfUtil.loadTemplate(getServletContext(), "/WEB-INF/templates/hopdong_template.pdf")) {
             PDAcroForm acroForm = document.getDocumentCatalog().getAcroForm();
+            if (acroForm == null) {
+                throw new IOException("File mẫu hopdong_template.pdf không có AcroForm để điền.");
+            }
 
             PdfUtil.fillField(acroForm, "contractCode", safe(contract.getContractCode()));
             PdfUtil.fillField(acroForm, "signDate", formatDate(contract.getSigningDate()));
@@ -262,7 +265,8 @@ public class ContractController extends HttpServlet {
             }
             try (PDPageContentStream cs = new PDPageContentStream(document, tablePage,
                     PDPageContentStream.AppendMode.APPEND, true, true)) {
-                PdfUtil.drawTable(cs, font, font, 9, margin, TABLE_TOP_Y, colWidths, tableHeaders, tableRows);
+                float minY = tablePage.getMediaBox().getLowerLeftY() + margin;
+                PdfUtil.drawTable(cs, font, font, 9, margin, TABLE_TOP_Y, minY, colWidths, tableHeaders, tableRows);
             }
 
             response.setContentType("application/pdf");
@@ -439,7 +443,7 @@ public class ContractController extends HttpServlet {
                     continue;
                 }
                 String qtyText = PdfUtil.readField(acroForm, "product" + row + "Qty");
-                Integer qty = parseIntOrNull(qtyText);
+                Integer qty = parseQuantityOrNull(qtyText);
                 if (qty == null || qty <= 0) {
                     errors.add("Dòng sản phẩm " + row + ": số lượng không hợp lệ.");
                     continue;
@@ -461,8 +465,9 @@ public class ContractController extends HttpServlet {
                 return;
             }
 
+            boolean createdNewEnterprise = matchedEnterprise == null;
             int enterpriseId;
-            if (matchedEnterprise != null) {
+            if (!createdNewEnterprise) {
                 enterpriseId = matchedEnterprise.getEnterpriseId();
             } else {
                 newEnterprise.setEnterpriseCode(customerDAO.generateNextEnterpriseCode());
@@ -486,16 +491,34 @@ public class ContractController extends HttpServlet {
 
             int contractId = contractDAO.insert(contract);
             if (contractId <= 0) {
+                // tránh để lại khách hàng mồ côi (không có hợp đồng nào) nếu vừa tạo
+                // enterprise mới ở bước trên nhưng insert hợp đồng lại thất bại
+                if (createdNewEnterprise) {
+                    customerDAO.softDelete(enterpriseId);
+                }
                 request.setAttribute("importErrors", List.of("Lưu hợp đồng thất bại (có thể mã hợp đồng đã tồn tại)."));
                 request.getRequestDispatcher(IMPORT_VIEW).forward(request, response);
                 return;
             }
-            contractDAO.insertProducts(contractId, items);
+            if (!contractDAO.insertProducts(contractId, items)) {
+                // giữ đúng cam kết "không ghi gì nếu có lỗi" ở javadoc đầu hàm: hợp
+                // đồng vừa tạo (và khách hàng mới nếu có) không được để lại mồ côi
+                // với 0 dòng sản phẩm trong khi vẫn báo import thành công
+                contractDAO.softDelete(contractId);
+                if (createdNewEnterprise) {
+                    customerDAO.softDelete(enterpriseId);
+                }
+                request.setAttribute("importErrors", List.of("Lưu hạng mục sản phẩm thất bại -- chưa có gì được ghi vào CSDL, hãy thử lại."));
+                request.getRequestDispatcher(IMPORT_VIEW).forward(request, response);
+                return;
+            }
 
             request.setAttribute("importSuccessCode", contract.getContractCode());
             request.setAttribute("importSuccessId", contractId);
             request.getRequestDispatcher(IMPORT_VIEW).forward(request, response);
         } catch (Exception ex) {
+            System.err.println("--- LOI NHAP HOP DONG TU PDF ---");
+            ex.printStackTrace();
             request.setAttribute("importError", "Không đọc được file -- hãy chắc chắn đây là file .pdf đúng mẫu.");
             request.getRequestDispatcher(IMPORT_VIEW).forward(request, response);
         }
@@ -707,6 +730,19 @@ public class ContractController extends HttpServlet {
         } catch (NumberFormatException ex) {
             return null;
         }
+    }
+
+    /**
+     * Như parseIntOrNull, nhưng dùng riêng cho số lượng người dùng tự gõ vào
+     * field PDF -- bỏ dấu "." phân tách hàng nghìn kiểu Việt Nam trước khi
+     * parse (vd "1.000" -> 1000), tránh bị Integer.parseInt từ chối số lượng
+     * hợp lệ chỉ vì người dùng gõ theo thói quen.
+     */
+    private Integer parseQuantityOrNull(String value) {
+        if (value == null || value.trim().isEmpty()) {
+            return null;
+        }
+        return parseIntOrNull(value.trim().replace(".", ""));
     }
 
     private int parseIntOrDefault(String value, int defaultValue) {
