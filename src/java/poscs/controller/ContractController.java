@@ -263,10 +263,19 @@ public class ContractController extends HttpServlet {
                     safe(item.getNotes())
                 });
             }
+            int rowsDrawn;
             try (PDPageContentStream cs = new PDPageContentStream(document, tablePage,
                     PDPageContentStream.AppendMode.APPEND, true, true)) {
                 float minY = tablePage.getMediaBox().getLowerLeftY() + margin;
-                PdfUtil.drawTable(cs, font, font, 9, margin, TABLE_TOP_Y, minY, colWidths, tableHeaders, tableRows);
+                rowsDrawn = PdfUtil.drawTable(cs, font, font, 9, margin, TABLE_TOP_Y, minY, colWidths, tableHeaders, tableRows);
+            }
+            if (rowsDrawn < tableRows.size()) {
+                // Bảng sản phẩm dài hơn chỗ trống còn lại của trang mẫu -- không
+                // gửi 1 file PDF hợp đồng bị thiếu dữ liệu cho người dùng mà
+                // không báo gì (xem javadoc drawTable).
+                response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
+                        "Hợp đồng có quá nhiều dòng sản phẩm để xuất vừa 1 trang PDF -- vui lòng liên hệ quản trị viên.");
+                return;
             }
 
             response.setContentType("application/pdf");
@@ -736,13 +745,20 @@ public class ContractController extends HttpServlet {
      * Như parseIntOrNull, nhưng dùng riêng cho số lượng người dùng tự gõ vào
      * field PDF -- bỏ dấu "." phân tách hàng nghìn kiểu Việt Nam trước khi
      * parse (vd "1.000" -> 1000), tránh bị Integer.parseInt từ chối số lượng
-     * hợp lệ chỉ vì người dùng gõ theo thói quen.
+     * hợp lệ chỉ vì người dùng gõ theo thói quen. Chỉ chấp nhận dấu "." khi
+     * đúng vị trí ngăn cách hàng nghìn (mỗi nhóm sau dấu "." có đúng 3 chữ
+     * số) -- một số thập phân thật như "2.5" phải bị từ chối chứ không được
+     * âm thầm hiểu nhầm thành "25".
      */
     private Integer parseQuantityOrNull(String value) {
         if (value == null || value.trim().isEmpty()) {
             return null;
         }
-        return parseIntOrNull(value.trim().replace(".", ""));
+        String trimmed = value.trim();
+        if (!trimmed.matches("\\d+(\\.\\d{3})*")) {
+            return null;
+        }
+        return parseIntOrNull(trimmed.replace(".", ""));
     }
 
     private int parseIntOrDefault(String value, int defaultValue) {

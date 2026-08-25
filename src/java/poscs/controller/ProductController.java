@@ -201,13 +201,20 @@ public class ProductController extends HttpServlet {
             return;
         }
 
+        String seedCode = productDAO.generateNextProductCode();
+        if (seedCode == null) {
+            request.setAttribute("importError", "Không sinh được mã sản phẩm -- có thể mất kết nối CSDL, hãy thử lại.");
+            request.getRequestDispatcher(IMPORT_VIEW).forward(request, response);
+            return;
+        }
+
         List<String> errors = new ArrayList<>();
         int successCount = 0;
         int rowNumber = 1; // dòng 1 là header trong file gốc
         // Sinh mã SP-xxxx 1 lần rồi tăng dần trong vòng lặp thay vì gọi lại
         // generateNextProductCode() (1 SELECT MAX riêng) cho từng dòng --
         // với vài trăm dòng, tránh vài trăm round-trip DB không cần thiết.
-        String[] nextCode = {productDAO.generateNextProductCode()};
+        String[] nextCode = {seedCode};
         for (Row row : rows) {
             rowNumber++;
             String rowError = importOneProductRow(row, rowNumber, categoryIdByName, nextCode);
@@ -265,8 +272,14 @@ public class ProductController extends HttpServlet {
             return null;
         }
         // Lưu thất bại hẳn (hết số lần thử lại, hoặc lỗi khác) -- đọc lại mã mới
-        // nhất từ CSDL để đồng bộ lại trước khi tiếp tục các dòng sau.
-        nextCode[0] = productDAO.generateNextProductCode();
+        // nhất từ CSDL để đồng bộ lại trước khi tiếp tục các dòng sau; nếu chính
+        // lần đọc lại này cũng lỗi (null), giữ nguyên nextCode[0] cũ thay vì để
+        // null lọt sang dòng kế tiếp -- insert() ở dòng sau vẫn tự thử lại mã
+        // khác nếu bị trùng.
+        String resynced = productDAO.generateNextProductCode();
+        if (resynced != null) {
+            nextCode[0] = resynced;
+        }
         return "Dòng " + rowNumber + ": lưu vào CSDL thất bại.";
     }
 
