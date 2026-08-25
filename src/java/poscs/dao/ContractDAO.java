@@ -325,24 +325,40 @@ public class ContractDAO {
         return -1;
     }
 
-    /** Thêm hàng loạt hạng mục sản phẩm/dịch vụ cho 1 hợp đồng (phục vụ nhập PDF hợp đồng). */
+    /**
+     * Thêm hàng loạt hạng mục sản phẩm/dịch vụ cho 1 hợp đồng (phục vụ nhập PDF
+     * hợp đồng). Tắt autocommit và tự commit/rollback quanh cả batch -- mặc định
+     * autocommit=true của connection thì 1 statement lỗi giữa batch vẫn để lại
+     * các statement trước đó đã thi hành thành công, trong khi hàm này cần trả
+     * về true/false đúng nghĩa "tất cả hoặc không gì cả" để bên gọi (xem
+     * ContractController.handleImportPdf) có thể tin tưởng báo "chưa ghi gì vào
+     * CSDL" khi trả về false.
+     */
     public boolean insertProducts(int contractId, List<ContractProduct> items) {
         if (items.isEmpty()) {
             return true;
         }
         String sql = "INSERT INTO contractproducts (contract_id, product_id, quantity, unit, notes) VALUES (?, ?, ?, ?, ?)";
-        try (Connection conn = DBContext.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            for (ContractProduct item : items) {
-                ps.setInt(1, contractId);
-                ps.setInt(2, item.getProductId());
-                ps.setInt(3, item.getQuantity());
-                ps.setString(4, item.getUnit());
-                ps.setString(5, item.getNotes());
-                ps.addBatch();
+        try (Connection conn = DBContext.getConnection()) {
+            conn.setAutoCommit(false);
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                for (ContractProduct item : items) {
+                    ps.setInt(1, contractId);
+                    ps.setInt(2, item.getProductId());
+                    ps.setInt(3, item.getQuantity());
+                    ps.setString(4, item.getUnit());
+                    ps.setString(5, item.getNotes());
+                    ps.addBatch();
+                }
+                ps.executeBatch();
+                conn.commit();
+                return true;
+            } catch (SQLException ex) {
+                conn.rollback();
+                throw ex;
+            } finally {
+                conn.setAutoCommit(true);
             }
-            ps.executeBatch();
-            return true;
         } catch (SQLException ex) {
             System.err.println("--- LOI THEM HANG MUC SAN PHAM HOP DONG ---");
             ex.printStackTrace();
