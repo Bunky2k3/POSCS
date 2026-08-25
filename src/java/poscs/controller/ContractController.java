@@ -1,30 +1,40 @@
 package poscs.controller;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.sql.Date;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import jakarta.servlet.ServletException;
+import jakarta.servlet.annotation.MultipartConfig;
 import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.Part;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.PDPageContentStream;
-import org.apache.pdfbox.pdmodel.common.PDRectangle;
 import org.apache.pdfbox.pdmodel.font.PDFont;
+import org.apache.pdfbox.pdmodel.interactive.form.PDAcroForm;
 import poscs.common.AccessControl;
 import poscs.common.ExcelUtil;
 import poscs.common.PdfUtil;
+import poscs.dao.AddressDAO;
 import poscs.dao.ContractDAO;
 import poscs.dao.CustomerDAO;
 import poscs.dao.EmployeeDAO;
+import poscs.dao.ProductDAO;
+import poscs.model.Address;
 import poscs.model.Contract;
 import poscs.model.ContractProduct;
+import poscs.model.District;
 import poscs.model.Enterprise;
+import poscs.model.Product;
+import poscs.model.Province;
+import poscs.model.User;
 
 /**
  * Controller cho phần "Thông tin chung" của hợp đồng (bảng contracts).
@@ -37,6 +47,7 @@ import poscs.model.Enterprise;
  * handleUpdate/handleDelete (Kỹ thuật/CSKH chỉ View only trên Contract).
  */
 @WebServlet(name = "ContractController", urlPatterns = {"/contract"})
+@MultipartConfig(maxFileSize = 5 * 1024 * 1024, maxRequestSize = 10 * 1024 * 1024, fileSizeThreshold = 1024 * 1024)
 public class ContractController extends HttpServlet {
 
     private static final int PAGE_SIZE = 10;
@@ -44,10 +55,16 @@ public class ContractController extends HttpServlet {
     private static final String DETAIL_VIEW = "/jsp/sale/viewcontractdetail.jsp";
     private static final String CREATE_VIEW = "/jsp/sale/addnewcontract.jsp";
     private static final String UPDATE_VIEW = "/jsp/sale/updatecontract.jsp";
+    private static final String IMPORT_VIEW = "/jsp/sale/importcontract.jsp";
+
+    /** Số dòng sản phẩm tối đa trong hopdong_import_template.pdf (field product1..product15). */
+    private static final int IMPORT_MAX_PRODUCT_ROWS = 15;
 
     private final ContractDAO contractDAO = new ContractDAO();
     private final CustomerDAO customerDAO = new CustomerDAO();
     private final EmployeeDAO employeeDAO = new EmployeeDAO();
+    private final AddressDAO addressDAO = new AddressDAO();
+    private final ProductDAO productDAO = new ProductDAO();
 
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
@@ -72,6 +89,12 @@ public class ContractController extends HttpServlet {
             case "exportPdf":
                 exportPdf(request, response);
                 break;
+            case "importForm":
+                showImportForm(request, response);
+                break;
+            case "downloadImportTemplate":
+                downloadImportTemplate(request, response);
+                break;
             case "list":
             default:
                 showList(request, response);
@@ -95,6 +118,9 @@ public class ContractController extends HttpServlet {
                 break;
             case "delete":
                 handleDelete(request, response);
+                break;
+            case "importPdf":
+                handleImportPdf(request, response);
                 break;
             default:
                 response.sendRedirect(request.getContextPath() + "/contract");
@@ -181,6 +207,12 @@ public class ContractController extends HttpServlet {
      * customerDAO.findById() lấy Enterprise đầy đủ (địa chỉ/MST/người đại
      * diện) để in vào PDF. Không có đơn giá/thành tiền (xem javadoc đầu file).
      */
+    /** Toạ độ y (tính từ đáy trang) nơi vùng bảng sản phẩm bắt đầu trên trang 2 của
+     * hopdong_template.pdf -- phải khớp với TABLE_TOP_Y trong script đã dùng để dựng
+     * file mẫu đó (xem GenerateContractTemplate, không thuộc source repo). */
+    private static final float TABLE_TOP_Y = 732f;
+    private static final int TABLE_PAGE_INDEX = 1;
+
     private void exportPdf(HttpServletRequest request, HttpServletResponse response) throws IOException {
         Integer id = parseIntOrNull(request.getParameter("id"));
         Contract contract = id != null ? contractDAO.findById(id) : null;
@@ -191,77 +223,46 @@ public class ContractController extends HttpServlet {
         List<ContractProduct> items = contractDAO.findProductsByContractId(id);
         Enterprise enterprise = customerDAO.findById(contract.getEnterpriseId());
 
-        try (PDDocument document = new PDDocument()) {
-            PDPage page = new PDPage(PDRectangle.A4);
-            document.addPage(page);
+        try (PDDocument document = PdfUtil.loadTemplate(getServletContext(), "/WEB-INF/templates/hopdong_template.pdf")) {
+            PDAcroForm acroForm = document.getDocumentCatalog().getAcroForm();
+
+            PdfUtil.fillField(acroForm, "contractCode", safe(contract.getContractCode()));
+            PdfUtil.fillField(acroForm, "signDate", formatDate(contract.getSigningDate()));
+            PdfUtil.fillField(acroForm, "effectiveDate", formatDate(contract.getEffectiveDate()));
+            PdfUtil.fillField(acroForm, "endDate", formatDate(contract.getEndDate()));
+            PdfUtil.fillField(acroForm, "sellerRepName", contract.getOwner() != null ? safe(contract.getOwner().getFullName()) : "");
+            if (enterprise != null) {
+                String address = enterprise.getAddress() != null ? enterprise.getAddress().getFullAddress() : "";
+                PdfUtil.fillField(acroForm, "buyerName", safe(enterprise.getEnterpriseName()));
+                PdfUtil.fillField(acroForm, "buyerTax", safe(enterprise.getTaxCode()));
+                PdfUtil.fillField(acroForm, "buyerAddress", address);
+                PdfUtil.fillField(acroForm, "buyerRep", safe(enterprise.getLegalRepresentative()));
+                PdfUtil.fillField(acroForm, "buyerPhone", safe(enterprise.getPhone()));
+                PdfUtil.fillField(acroForm, "buyerEmail", safe(enterprise.getEmail()));
+            }
+            acroForm.flatten();
+
+            PDPage tablePage = document.getPage(TABLE_PAGE_INDEX);
             PDFont font = PdfUtil.loadVietnameseFont(document, getServletContext());
-            PDFont boldFont = font; // Noto Sans chỉ nhúng bản Regular -- phân biệt tiêu đề bằng cỡ chữ thay vì in đậm
-
             float margin = 50f;
-            float width = page.getMediaBox().getWidth() - margin * 2;
-            float y = page.getMediaBox().getHeight() - margin;
+            float width = tablePage.getMediaBox().getWidth() - margin * 2;
 
-            try (PDPageContentStream cs = new PDPageContentStream(document, page)) {
-                PdfUtil.drawText(cs, boldFont, 16, margin, y, "HỢP ĐỒNG " + safe(contract.getContractCode()));
-                y -= 26;
-                y = PdfUtil.drawWrapped(cs, font, 11, margin, y, width, 15, safe(contract.getTitle()));
-                y -= 12;
-
-                PdfUtil.drawText(cs, boldFont, 11, margin, y, "BÊN A (Bên cung cấp)");
-                y -= 16;
-                y = PdfUtil.drawWrapped(cs, font, 10, margin, y, width, 14,
-                        "Công ty Cổ phần Thiết bị Bưu điện (POSTEF)");
-                if (contract.getOwner() != null) {
-                    y = PdfUtil.drawWrapped(cs, font, 10, margin, y, width, 14,
-                            "Người phụ trách: " + safe(contract.getOwner().getFullName()));
-                }
-                y -= 8;
-
-                PdfUtil.drawText(cs, boldFont, 11, margin, y, "BÊN B (Khách hàng)");
-                y -= 16;
-                if (enterprise != null) {
-                    y = PdfUtil.drawWrapped(cs, font, 10, margin, y, width, 14, "Tên: " + safe(enterprise.getEnterpriseName()));
-                    y = PdfUtil.drawWrapped(cs, font, 10, margin, y, width, 14, "Mã số thuế: " + safe(enterprise.getTaxCode()));
-                    String address = enterprise.getAddress() != null ? enterprise.getAddress().getFullAddress() : "";
-                    y = PdfUtil.drawWrapped(cs, font, 10, margin, y, width, 14, "Địa chỉ: " + safe(address));
-                    y = PdfUtil.drawWrapped(cs, font, 10, margin, y, width, 14,
-                            "Người đại diện: " + safe(enterprise.getLegalRepresentative()));
-                    y = PdfUtil.drawWrapped(cs, font, 10, margin, y, width, 14,
-                            "Điện thoại: " + safe(enterprise.getPhone()) + "     Email: " + safe(enterprise.getEmail()));
-                }
-                y -= 8;
-
-                PdfUtil.drawText(cs, font, 10, margin, y,
-                        "Ngày ký: " + formatDate(contract.getSigningDate())
-                        + "     Hiệu lực từ: " + formatDate(contract.getEffectiveDate())
-                        + "     đến: " + formatDate(contract.getEndDate()));
-                y -= 26;
-
-                PdfUtil.drawText(cs, boldFont, 11, margin, y, "Hạng mục sản phẩm / dịch vụ");
-                y -= 18;
-
-                float[] colWidths = {30, width - 30 - 60 - 70 - 140, 60, 70, 140};
-                String[] tableHeaders = {"#", "Sản phẩm", "SL", "Đơn vị", "Ghi chú"};
-                List<String[]> tableRows = new ArrayList<>();
-                int stt = 1;
-                for (ContractProduct item : items) {
-                    tableRows.add(new String[]{
-                        String.valueOf(stt++),
-                        item.getProductName() + " (" + item.getProductCode() + ")",
-                        String.valueOf(item.getQuantity()),
-                        safe(item.getUnit()),
-                        safe(item.getNotes())
-                    });
-                }
-                y = PdfUtil.drawTable(cs, font, boldFont, 9, margin, y, colWidths, tableHeaders, tableRows);
-                y -= 44;
-
-                float halfWidth = width / 2;
-                PdfUtil.drawText(cs, boldFont, 10, margin, y, "ĐẠI DIỆN BÊN A");
-                PdfUtil.drawText(cs, boldFont, 10, margin + halfWidth, y, "ĐẠI DIỆN BÊN B");
-                y -= 14;
-                PdfUtil.drawText(cs, font, 9, margin, y, "(Ký, ghi rõ họ tên)");
-                PdfUtil.drawText(cs, font, 9, margin + halfWidth, y, "(Ký, ghi rõ họ tên)");
+            float[] colWidths = {30, width - 30 - 60 - 70 - 140, 60, 70, 140};
+            String[] tableHeaders = {"#", "Sản phẩm", "SL", "Đơn vị", "Ghi chú"};
+            List<String[]> tableRows = new ArrayList<>();
+            int stt = 1;
+            for (ContractProduct item : items) {
+                tableRows.add(new String[]{
+                    String.valueOf(stt++),
+                    item.getProductName() + " (" + item.getProductCode() + ")",
+                    String.valueOf(item.getQuantity()),
+                    safe(item.getUnit()),
+                    safe(item.getNotes())
+                });
+            }
+            try (PDPageContentStream cs = new PDPageContentStream(document, tablePage,
+                    PDPageContentStream.AppendMode.APPEND, true, true)) {
+                PdfUtil.drawTable(cs, font, font, 9, margin, TABLE_TOP_Y, colWidths, tableHeaders, tableRows);
             }
 
             response.setContentType("application/pdf");
@@ -269,6 +270,298 @@ public class ContractController extends HttpServlet {
             response.setHeader("Content-Disposition", "attachment; filename=\"" + fileName + "\"");
             document.save(response.getOutputStream());
         }
+    }
+
+    private void showImportForm(HttpServletRequest request, HttpServletResponse response)
+            throws ServletException, IOException {
+        request.getRequestDispatcher(IMPORT_VIEW).forward(request, response);
+    }
+
+    private void downloadImportTemplate(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        try (PDDocument document = PdfUtil.loadTemplate(getServletContext(), "/WEB-INF/templates/hopdong_import_template.pdf")) {
+            response.setContentType("application/pdf");
+            response.setHeader("Content-Disposition", "attachment; filename=\"mau_nhap_hopdong.pdf\"");
+            document.save(response.getOutputStream());
+        }
+    }
+
+    /**
+     * Nhập 1 hợp đồng mới từ file PDF điền theo mẫu downloadImportTemplate()
+     * (khác nhập Excel: mỗi file PDF chỉ chứa đúng 1 hợp đồng). Vì vậy nếu có
+     * bất kỳ lỗi nào (dù chỉ 1 dòng sản phẩm sai) thì KHÔNG ghi gì vào CSDL cả
+     * -- validate hết 1 lượt rồi mới insert, tránh để lại khách hàng/hợp đồng
+     * mồ côi nếu insert giữa chừng thất bại.
+     */
+    private void handleImportPdf(HttpServletRequest request, HttpServletResponse response)
+            throws ServletException, IOException {
+        if (!AccessControl.requireFullAccess(request, response, AccessControl.Resource.CONTRACT)) {
+            return;
+        }
+
+        Part filePart = request.getPart("file");
+        if (filePart == null || filePart.getSize() <= 0) {
+            request.setAttribute("importError", "Vui lòng chọn file .pdf để nhập.");
+            request.getRequestDispatcher(IMPORT_VIEW).forward(request, response);
+            return;
+        }
+
+        PDAcroForm acroForm;
+        try (PDDocument uploaded = org.apache.pdfbox.Loader.loadPDF(filePart.getInputStream().readAllBytes())) {
+            acroForm = uploaded.getDocumentCatalog().getAcroForm();
+            if (acroForm == null) {
+                request.setAttribute("importError", "File không đúng mẫu (không có field để đọc) -- hãy tải lại file mẫu và điền trên chính file đó.");
+                request.getRequestDispatcher(IMPORT_VIEW).forward(request, response);
+                return;
+            }
+
+            List<String> errors = new ArrayList<>();
+
+            String contractCode = PdfUtil.readField(acroForm, "contractCode");
+            String title = PdfUtil.readField(acroForm, "title");
+            String contractType = PdfUtil.readField(acroForm, "contractType");
+            Date signDate = parsePdfDate(PdfUtil.readField(acroForm, "signDate"));
+            Date effectiveDate = parsePdfDate(PdfUtil.readField(acroForm, "effectiveDate"));
+            Date endDate = parsePdfDate(PdfUtil.readField(acroForm, "endDate"));
+            String ownerUsername = PdfUtil.readField(acroForm, "ownerUsername");
+
+            String buyerTax = PdfUtil.readField(acroForm, "buyerTax");
+            String buyerName = PdfUtil.readField(acroForm, "buyerName");
+            String buyerType = PdfUtil.readField(acroForm, "buyerType");
+            String buyerGroup = PdfUtil.readField(acroForm, "buyerGroup");
+            String buyerEmail = PdfUtil.readField(acroForm, "buyerEmail");
+            String buyerPhone = PdfUtil.readField(acroForm, "buyerPhone");
+            String buyerWebsite = PdfUtil.readField(acroForm, "buyerWebsite");
+            String buyerProvince = PdfUtil.readField(acroForm, "buyerProvince");
+            String buyerWard = PdfUtil.readField(acroForm, "buyerWard");
+            String buyerAddressDetail = PdfUtil.readField(acroForm, "buyerAddressDetail");
+            String buyerRep = PdfUtil.readField(acroForm, "buyerRep");
+
+            if (isBlank(title)) {
+                errors.add("Thiếu \"Tiêu đề hợp đồng\".");
+            }
+            List<String> validTypes = java.util.Arrays.asList("Cung cấp thiết bị", "Thi công lắp đặt", "Bảo trì bảo dưỡng");
+            if (isBlank(contractType) || !validTypes.contains(contractType.trim())) {
+                errors.add("\"Loại hợp đồng\" không hợp lệ -- chỉ nhận: " + String.join(", ", validTypes) + ".");
+            }
+            if (signDate == null || effectiveDate == null || endDate == null) {
+                errors.add("Ngày ký/Hiệu lực từ/Đến ngày thiếu hoặc sai định dạng (phải là dd/MM/yyyy).");
+            } else if (signDate.after(effectiveDate) || effectiveDate.after(endDate)) {
+                errors.add("Ngày ký phải ≤ Hiệu lực từ phải ≤ Đến ngày.");
+            }
+            if (!isBlank(contractCode)) {
+                boolean exists = contractDAO.findAll(1, Integer.MAX_VALUE, contractCode.trim(), null, null).stream()
+                        .anyMatch(c -> c.getContractCode() != null && c.getContractCode().equalsIgnoreCase(contractCode.trim()));
+                if (exists) {
+                    errors.add("Mã hợp đồng \"" + contractCode.trim() + "\" đã tồn tại.");
+                }
+            }
+
+            if (isBlank(buyerTax)) {
+                errors.add("Thiếu \"Mã số thuế\" khách hàng.");
+            }
+            if (isBlank(buyerName)) {
+                errors.add("Thiếu \"Tên doanh nghiệp\" khách hàng.");
+            }
+            if (isBlank(buyerEmail) || !isValidEmail(buyerEmail)) {
+                errors.add("\"Email\" khách hàng thiếu hoặc không đúng định dạng.");
+            }
+            if (isBlank(buyerPhone) || !isValidPhone(buyerPhone)) {
+                errors.add("\"Điện thoại\" khách hàng thiếu hoặc không đúng định dạng.");
+            }
+
+            User currentUser = AccessControl.currentUser(request);
+            List<User> staff = employeeDAO.findAllActive();
+            User owner = isBlank(ownerUsername) ? null : findUserByUsername(staff, ownerUsername);
+            int ownerId = owner != null ? owner.getUserId() : currentUser.getUserId();
+
+            List<Enterprise> allEnterprises = customerDAO.findAll(1, Integer.MAX_VALUE, null, null, null);
+            Enterprise matchedEnterprise = null;
+            if (!isBlank(buyerTax)) {
+                for (Enterprise e : allEnterprises) {
+                    if (e.getTaxCode() != null && e.getTaxCode().trim().equalsIgnoreCase(buyerTax.trim())) {
+                        matchedEnterprise = e;
+                        break;
+                    }
+                }
+            }
+
+            Enterprise newEnterprise = null;
+            if (matchedEnterprise == null && !isBlank(buyerTax) && !isBlank(buyerName)) {
+                if (isBlank(buyerType)) {
+                    errors.add("Khách hàng chưa có trong hệ thống -- cần điền \"Loại KH\" để tạo mới.");
+                }
+                if (isBlank(buyerGroup)) {
+                    errors.add("Khách hàng chưa có trong hệ thống -- cần điền \"Nhóm KH\" để tạo mới.");
+                }
+                Province province = null;
+                District ward = null;
+                if (isBlank(buyerProvince) || isBlank(buyerWard) || isBlank(buyerAddressDetail)) {
+                    errors.add("Khách hàng chưa có trong hệ thống -- cần điền đủ Tỉnh/Thành, Xã/Phường, Địa chỉ chi tiết để tạo mới.");
+                } else {
+                    province = findProvinceByName(addressDAO.findAllProvinces(), buyerProvince);
+                    if (province == null) {
+                        errors.add("Không tìm thấy tỉnh/thành \"" + buyerProvince.trim() + "\".");
+                    } else {
+                        ward = findWardByName(addressDAO.findWardsByProvinceId(province.getProvinceId()), buyerWard);
+                        if (ward == null) {
+                            errors.add("Không tìm thấy xã/phường \"" + buyerWard.trim() + "\" thuộc \"" + buyerProvince.trim() + "\".");
+                        }
+                    }
+                }
+                if (province != null && ward != null) {
+                    newEnterprise = new Enterprise();
+                    newEnterprise.setEnterpriseName(buyerName.trim());
+                    newEnterprise.setCustomerType(emptyToNull(buyerType));
+                    newEnterprise.setCustomerGroup(emptyToNull(buyerGroup));
+                    newEnterprise.setTaxCode(buyerTax.trim());
+                    newEnterprise.setEmail(buyerEmail.trim());
+                    newEnterprise.setPhone(buyerPhone.trim());
+                    newEnterprise.setWebsite(emptyToNull(buyerWebsite));
+                    newEnterprise.setLegalRepresentative(emptyToNull(buyerRep));
+                    newEnterprise.setStatus("Active");
+                    newEnterprise.setAccountOwnerId(ownerId);
+                    Address address = new Address();
+                    address.setStreetAndLocalName(buyerAddressDetail.trim());
+                    address.setDistrictId(ward.getDistrictId());
+                    newEnterprise.setAddress(address);
+                }
+            }
+
+            List<ContractProduct> items = new ArrayList<>();
+            for (int row = 1; row <= IMPORT_MAX_PRODUCT_ROWS; row++) {
+                String code = PdfUtil.readField(acroForm, "product" + row + "Code");
+                if (isBlank(code)) {
+                    continue;
+                }
+                Product product = productDAO.findByCode(code.trim());
+                if (product == null) {
+                    errors.add("Dòng sản phẩm " + row + ": không tìm thấy mã sản phẩm \"" + code.trim() + "\".");
+                    continue;
+                }
+                String qtyText = PdfUtil.readField(acroForm, "product" + row + "Qty");
+                Integer qty = parseIntOrNull(qtyText);
+                if (qty == null || qty <= 0) {
+                    errors.add("Dòng sản phẩm " + row + ": số lượng không hợp lệ.");
+                    continue;
+                }
+                String unit = PdfUtil.readField(acroForm, "product" + row + "Unit");
+                String notes = PdfUtil.readField(acroForm, "product" + row + "Notes");
+
+                ContractProduct item = new ContractProduct();
+                item.setProductId(product.getProductId());
+                item.setQuantity(qty);
+                item.setUnit(isBlank(unit) ? "Cái" : unit.trim());
+                item.setNotes(emptyToNull(notes));
+                items.add(item);
+            }
+
+            if (!errors.isEmpty()) {
+                request.setAttribute("importErrors", errors);
+                request.getRequestDispatcher(IMPORT_VIEW).forward(request, response);
+                return;
+            }
+
+            int enterpriseId;
+            if (matchedEnterprise != null) {
+                enterpriseId = matchedEnterprise.getEnterpriseId();
+            } else {
+                newEnterprise.setEnterpriseCode(customerDAO.generateNextEnterpriseCode());
+                enterpriseId = customerDAO.insert(newEnterprise);
+                if (enterpriseId <= 0) {
+                    request.setAttribute("importErrors", List.of("Lưu khách hàng mới thất bại (có thể MST/email/SĐT đã tồn tại)."));
+                    request.getRequestDispatcher(IMPORT_VIEW).forward(request, response);
+                    return;
+                }
+            }
+
+            Contract contract = new Contract();
+            contract.setContractCode(isBlank(contractCode) ? contractDAO.generateNextContractCode() : contractCode.trim());
+            contract.setTitle(title.trim());
+            contract.setContractType(contractType.trim());
+            contract.setSigningDate(signDate);
+            contract.setEffectiveDate(effectiveDate);
+            contract.setEndDate(endDate);
+            contract.setEnterpriseId(enterpriseId);
+            contract.setOwnerId(ownerId);
+
+            int contractId = contractDAO.insert(contract);
+            if (contractId <= 0) {
+                request.setAttribute("importErrors", List.of("Lưu hợp đồng thất bại (có thể mã hợp đồng đã tồn tại)."));
+                request.getRequestDispatcher(IMPORT_VIEW).forward(request, response);
+                return;
+            }
+            contractDAO.insertProducts(contractId, items);
+
+            request.setAttribute("importSuccessCode", contract.getContractCode());
+            request.setAttribute("importSuccessId", contractId);
+            request.getRequestDispatcher(IMPORT_VIEW).forward(request, response);
+        } catch (Exception ex) {
+            request.setAttribute("importError", "Không đọc được file -- hãy chắc chắn đây là file .pdf đúng mẫu.");
+            request.getRequestDispatcher(IMPORT_VIEW).forward(request, response);
+        }
+    }
+
+    private Date parsePdfDate(String value) {
+        if (value == null || value.trim().isEmpty()) {
+            return null;
+        }
+        try {
+            SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yyyy");
+            sdf.setLenient(false);
+            return new Date(sdf.parse(value.trim()).getTime());
+        } catch (java.text.ParseException ex) {
+            return null;
+        }
+    }
+
+    private Province findProvinceByName(List<Province> provinces, String name) {
+        String normalized = normalize(name);
+        for (Province p : provinces) {
+            if (normalize(p.getShortName()).equals(normalized) || normalize(p.getProvinceName()).equals(normalized)) {
+                return p;
+            }
+        }
+        return null;
+    }
+
+    private District findWardByName(List<District> wards, String name) {
+        String normalized = normalize(name);
+        for (District d : wards) {
+            if (normalize(d.getShortName()).equals(normalized) || normalize(d.getDistrictName()).equals(normalized)) {
+                return d;
+            }
+        }
+        return null;
+    }
+
+    private User findUserByUsername(List<User> staff, String username) {
+        String normalized = normalize(username);
+        for (User u : staff) {
+            if (u.getUsername() != null && normalize(u.getUsername()).equals(normalized)) {
+                return u;
+            }
+        }
+        return null;
+    }
+
+    private String normalize(String value) {
+        return value == null ? "" : value.trim().toLowerCase();
+    }
+
+    private boolean isBlank(String value) {
+        return value == null || value.trim().isEmpty();
+    }
+
+    /** BR-09: chấp nhận cả số di động lẫn số bàn Việt Nam (VD: 024 3822 1234). */
+    private boolean isValidPhone(String phone) {
+        if (phone == null) {
+            return false;
+        }
+        return phone.replaceAll("[\\s.-]", "").matches("^(0|\\+84)[0-9]{9,10}$");
+    }
+
+    private boolean isValidEmail(String email) {
+        return email != null && email.matches("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$");
     }
 
     private String safe(String value) {

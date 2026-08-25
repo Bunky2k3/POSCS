@@ -147,6 +147,7 @@
             </div>
             <div class="header-actions">
                 <a href="${pageContext.request.contextPath}/contract?action=exportExcel&keyword=${fn:escapeXml(keyword)}&status=${fn:escapeXml(statusFilter)}&type=${fn:escapeXml(typeFilter)}" class="btn-outline-action"><i class="fa-solid fa-file-excel"></i> Xuất Excel</a>
+                <a href="${pageContext.request.contextPath}/contract?action=importForm" class="btn-outline-action"><i class="fa-solid fa-file-pdf"></i> Nhập PDF</a>
                 <a href="${pageContext.request.contextPath}/contract?action=new" class="btn-add"><i class="fa-solid fa-plus"></i> Tạo hợp đồng</a>
             </div>
         </div>

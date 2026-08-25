@@ -96,6 +96,28 @@ public class ProductDAO {
         return 0;
     }
 
+    /** Tra 1 sản phẩm theo mã (product_code), phục vụ nhập PDF hợp đồng. Trả về null nếu không tồn tại. */
+    public Product findByCode(String productCode) {
+        String sql = "SELECT product_id, product_code, product_name FROM products WHERE product_code = ? AND is_deleted = 0";
+        try (Connection conn = DBContext.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, productCode);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    Product p = new Product();
+                    p.setProductId(rs.getInt("product_id"));
+                    p.setProductCode(rs.getString("product_code"));
+                    p.setProductName(rs.getString("product_name"));
+                    return p;
+                }
+            }
+        } catch (SQLException ex) {
+            System.err.println("--- LOI TRA SAN PHAM THEO MA ---");
+            ex.printStackTrace();
+        }
+        return null;
+    }
+
     /**
      * Lấy chi tiết 1 sản phẩm theo ID, đã join danh mục + toàn bộ ảnh/catalogue
      * (theo display_order). Trả về null nếu không tồn tại.

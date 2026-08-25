@@ -6,16 +6,23 @@ import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 import jakarta.servlet.ServletContext;
+import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPageContentStream;
 import org.apache.pdfbox.pdmodel.font.PDFont;
 import org.apache.pdfbox.pdmodel.font.PDType0Font;
+import org.apache.pdfbox.pdmodel.interactive.form.PDAcroForm;
+import org.apache.pdfbox.pdmodel.interactive.form.PDField;
 
 /**
  * Helper dùng chung để dựng PDF qua Apache PDFBox -- hiện chỉ phục vụ xuất
- * PDF hợp đồng (ContractController), nên chỉ có đúng những primitive cần
- * dùng (text 1 dòng, đoạn văn tự xuống dòng, bảng cột cố định), không dựng
- * thành framework layout tổng quát.
+ * PDF hợp đồng (ContractController). Nội dung pháp lý cố định (quốc hiệu,
+ * các điều khoản, khối chữ ký) nằm sẵn trong file mẫu có AcroForm
+ * (web/WEB-INF/templates/hopdong_template.pdf); ContractController chỉ điền
+ * các field động (mã hợp đồng, thông tin khách hàng, ngày tháng...) qua
+ * loadTemplate/fillField, rồi tự vẽ thêm bảng hạng mục sản phẩm (số dòng
+ * thay đổi theo từng hợp đồng nên không thể là 1 field cố định) đè lên vùng
+ * trống đã chừa sẵn trong file mẫu bằng drawTable.
  *
  * PDFBox không tự có glyph tiếng Việt trong 14 font chuẩn -- phải nhúng 1
  * font TrueType thật (Noto Sans, giấy phép OFL, xem web/WEB-INF/fonts/) qua
@@ -33,6 +40,49 @@ public final class PdfUtil {
 
     public static PDFont loadVietnameseFont(PDDocument document, ServletContext servletContext) throws IOException {
         return PDType0Font.load(document, new ByteArrayInputStream(fontBytes(servletContext)));
+    }
+
+    /** Nạp 1 file PDF mẫu (đặt trong WEB-INF, ví dụ hợp đồng có sẵn AcroForm) từ webapp resource. */
+    public static PDDocument loadTemplate(ServletContext servletContext, String resourcePath) throws IOException {
+        try (InputStream in = servletContext.getResourceAsStream(resourcePath)) {
+            if (in == null) {
+                throw new IOException("Khong tim thay PDF template: " + resourcePath);
+            }
+            return Loader.loadPDF(in.readAllBytes());
+        }
+    }
+
+    /** Điền giá trị 1 field AcroForm theo tên, bỏ qua an toàn nếu field không tồn tại hoặc giá trị null. */
+    public static void fillField(PDAcroForm acroForm, String name, String value) throws IOException {
+        PDField field = acroForm.getField(name);
+        if (field != null) {
+            field.setValue(value == null ? "" : value);
+        }
+    }
+
+    /**
+     * Đọc giá trị 1 field AcroForm theo tên, đã trim; trả về "" nếu field không
+     * tồn tại/rỗng/null. Với field kiểu combo (PDComboBox), getValueAsString()
+     * của PDFBox trả về dạng "[Giá trị]" (bọc ngoặc vuông như mảng) thay vì
+     * chuỗi thuần -- bóc lớp ngoặc đó ra nếu có.
+     */
+    public static String readField(PDAcroForm acroForm, String name) {
+        if (acroForm == null) {
+            return "";
+        }
+        PDField field = acroForm.getField(name);
+        if (field == null) {
+            return "";
+        }
+        String value = field.getValueAsString();
+        if (value == null) {
+            return "";
+        }
+        value = value.trim();
+        if (value.length() >= 2 && value.charAt(0) == '[' && value.charAt(value.length() - 1) == ']') {
+            value = value.substring(1, value.length() - 1).trim();
+        }
+        return value;
     }
 
     private static byte[] fontBytes(ServletContext servletContext) throws IOException {
@@ -60,16 +110,6 @@ public final class PdfUtil {
         cs.newLineAtOffset(x, y);
         cs.showText(text == null ? "" : text);
         cs.endText();
-    }
-
-    /** Vẽ đoạn text tự xuống dòng trong khối rộng maxWidth, trả về y sau khi vẽ xong (nhỏ hơn y đầu vào). */
-    public static float drawWrapped(PDPageContentStream cs, PDFont font, float fontSize, float x, float y,
-            float maxWidth, float lineHeight, String text) throws IOException {
-        for (String line : wrapLines(font, fontSize, maxWidth, text)) {
-            drawText(cs, font, fontSize, x, y, line);
-            y -= lineHeight;
-        }
-        return y;
     }
 
     /** Bẻ 1 đoạn text dài thành các dòng vừa maxWidth theo font/cỡ chữ hiện tại. */
