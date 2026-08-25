@@ -399,20 +399,29 @@ public class ProductDAO {
         try (Connection conn = DBContext.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql);
              ResultSet rs = ps.executeQuery()) {
-            int nextNumber = 1;
-            if (rs.next()) {
-                String lastCode = rs.getString("product_code");
-                String digits = lastCode.replaceAll("[^0-9]", "");
-                if (!digits.isEmpty()) {
-                    nextNumber = Integer.parseInt(digits) + 1;
-                }
-            }
-            return String.format("SP-%04d", nextNumber);
+            return nextProductCodeAfter(rs.next() ? rs.getString("product_code") : null);
         } catch (SQLException ex) {
             System.err.println("--- LOI SINH MA SAN PHAM ---");
             ex.printStackTrace();
             return null;
         }
+    }
+
+    /**
+     * Tính mã sản phẩm kế tiếp dựa trên 1 mã product_code đã biết, không cần
+     * đọc CSDL -- dùng khi nhập hàng loạt (import Excel) để không phải lặp
+     * lại truy vấn SELECT MAX cho từng dòng, chỉ cần gọi generateNextProductCode()
+     * 1 lần rồi tăng dần bằng hàm này.
+     */
+    public String nextProductCodeAfter(String previousCode) {
+        int nextNumber = 1;
+        if (previousCode != null) {
+            String digits = previousCode.replaceAll("[^0-9]", "");
+            if (!digits.isEmpty()) {
+                nextNumber = Integer.parseInt(digits) + 1;
+            }
+        }
+        return String.format("SP-%04d", nextNumber);
     }
 
     /** Thử lại tối đa bao nhiêu lần khi product_code sinh ra bị trùng (xem insert()). */

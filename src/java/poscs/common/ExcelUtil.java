@@ -147,9 +147,32 @@ public final class ExcelUtil {
      * người dùng để dư dòng cuối file khi chỉnh sửa).
      */
     public static List<Row> readRows(InputStream inputStream, int headerRowIndex) throws IOException {
+        return readRows(inputStream, headerRowIndex, null);
+    }
+
+    /**
+     * Như {@link #readRows(InputStream, int)}, nhưng nếu `expectedHeaders`
+     * khác null thì kiểm tra dòng header thực tế khớp đúng thứ tự/tên với
+     * `expectedHeaders` trước khi đọc dữ liệu -- việc đọc cell theo cột hoàn
+     * toàn dựa vào vị trí (COL_* ở từng controller), nên nếu người dùng chèn/
+     * xoá/đảo cột trong file mẫu rồi tải lên, dữ liệu sẽ bị đọc lệch cột một
+     * cách âm thầm nếu không có kiểm tra này -- ném IOException để controller
+     * báo lỗi thay vì import nhầm dữ liệu.
+     */
+    public static List<Row> readRows(InputStream inputStream, int headerRowIndex, String[] expectedHeaders) throws IOException {
         List<Row> result = new ArrayList<>();
         try (Workbook workbook = new HSSFWorkbook(inputStream)) {
             Sheet sheet = workbook.getSheetAt(0);
+            if (expectedHeaders != null) {
+                Row headerRow = sheet.getRow(headerRowIndex);
+                for (int c = 0; c < expectedHeaders.length; c++) {
+                    String actual = cellString(headerRow, c);
+                    if (!actual.trim().equalsIgnoreCase(expectedHeaders[c].trim())) {
+                        throw new IOException("Cột " + (c + 1) + " của file phải là \"" + expectedHeaders[c]
+                                + "\" (đang là \"" + actual + "\") -- hãy tải lại file mẫu mới nhất, không thêm/bớt/đổi thứ tự cột.");
+                    }
+                }
+            }
             int last = sheet.getLastRowNum();
             for (int i = headerRowIndex + 1; i <= last; i++) {
                 Row row = sheet.getRow(i);

@@ -157,20 +157,29 @@ public class CustomerDAO {
         try (Connection conn = DBContext.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql);
              ResultSet rs = ps.executeQuery()) {
-            int nextNumber = 1;
-            if (rs.next()) {
-                String lastCode = rs.getString("enterprise_code");
-                String digits = lastCode.replaceAll("[^0-9]", "");
-                if (!digits.isEmpty()) {
-                    nextNumber = Integer.parseInt(digits) + 1;
-                }
-            }
-            return String.format("KH-%04d", nextNumber);
+            return nextEnterpriseCodeAfter(rs.next() ? rs.getString("enterprise_code") : null);
         } catch (SQLException ex) {
             System.err.println("--- LOI SINH MA KHACH HANG ---");
             ex.printStackTrace();
             return null;
         }
+    }
+
+    /**
+     * Tính mã khách hàng kế tiếp dựa trên 1 mã enterprise_code đã biết, không
+     * cần đọc CSDL -- dùng khi nhập hàng loạt (import Excel/PDF) để không phải
+     * lặp lại truy vấn SELECT MAX cho từng dòng, chỉ cần gọi generateNextEnterpriseCode()
+     * 1 lần rồi tăng dần bằng hàm này.
+     */
+    public String nextEnterpriseCodeAfter(String previousCode) {
+        int nextNumber = 1;
+        if (previousCode != null) {
+            String digits = previousCode.replaceAll("[^0-9]", "");
+            if (!digits.isEmpty()) {
+                nextNumber = Integer.parseInt(digits) + 1;
+            }
+        }
+        return String.format("KH-%04d", nextNumber);
     }
 
     /**

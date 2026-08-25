@@ -278,17 +278,23 @@ public class CustomerController extends HttpServlet {
 
         List<Row> rows;
         try (java.io.InputStream in = filePart.getInputStream()) {
-            rows = ExcelUtil.readRows(in, 0);
+            rows = ExcelUtil.readRows(in, 0, IMPORT_HEADERS);
         } catch (Exception ex) {
-            request.setAttribute("importError", "Không đọc được file -- hãy chắc chắn đây là file .xlsx đúng mẫu.");
+            String detail = ex.getMessage();
+            request.setAttribute("importError", "Không đọc được file -- hãy chắc chắn đây là file .xlsx đúng mẫu."
+                    + (detail != null ? " (" + detail + ")" : ""));
             request.getRequestDispatcher(IMPORT_VIEW).forward(request, response);
             return;
         }
 
         int rowNumber = 1; // dòng 1 là header trong file gốc
+        // Sinh mã KH-xxxx 1 lần rồi tăng dần trong vòng lặp thay vì gọi lại
+        // generateNextEnterpriseCode() (1 SELECT MAX riêng) cho từng dòng --
+        // với vài trăm dòng, tránh vài trăm round-trip DB không cần thiết.
+        String[] nextCode = {customerDAO.generateNextEnterpriseCode()};
         for (Row row : rows) {
             rowNumber++;
-            String rowError = importOneCustomerRow(row, rowNumber, provinces, staff, currentUser);
+            String rowError = importOneCustomerRow(row, rowNumber, provinces, staff, currentUser, nextCode);
             if (rowError == null) {
                 successCount++;
             } else {
@@ -302,8 +308,15 @@ public class CustomerController extends HttpServlet {
         request.getRequestDispatcher(IMPORT_VIEW).forward(request, response);
     }
 
-    /** @return null nếu insert thành công, ngược lại là mô tả lỗi kèm số dòng để hiển thị cho người dùng. */
-    private String importOneCustomerRow(Row row, int rowNumber, List<Province> provinces, List<User> staff, User currentUser) {
+    /**
+     * @param nextCode mảng 1 phần tử giữ mã KH-xxxx sẽ dùng cho dòng này -- hàm tự
+     * cập nhật lại phần tử này (dựa trên mã enterprise_code thực sự vừa lưu
+     * thành công, có thể khác nextCode[0] nếu insert() phải tự thử lại do
+     * trùng mã) để dòng kế tiếp dùng, tránh phải đọc lại CSDL mỗi dòng.
+     * @return null nếu insert thành công, ngược lại là mô tả lỗi kèm số dòng để hiển thị cho người dùng.
+     */
+    private String importOneCustomerRow(Row row, int rowNumber, List<Province> provinces, List<User> staff,
+            User currentUser, String[] nextCode) {
         String name = ExcelUtil.cellString(row, COL_NAME);
         String type = ExcelUtil.cellString(row, COL_TYPE);
         String group = ExcelUtil.cellString(row, COL_GROUP);
@@ -358,9 +371,18 @@ public class CustomerController extends HttpServlet {
             return "Dòng " + rowNumber + ": dữ liệu không hợp lệ (kiểm tra lại định dạng các trường).";
         }
 
-        e.setEnterpriseCode(customerDAO.generateNextEnterpriseCode());
+        e.setEnterpriseCode(nextCode[0]);
         int newId = customerDAO.insert(e);
-        return newId > 0 ? null : "Dòng " + rowNumber + ": lưu vào CSDL thất bại (có thể MST/email/SĐT đã tồn tại).";
+        if (newId > 0) {
+            // insert() có thể đã tự thử lại với mã khác nếu nextCode[0] bị trùng
+            // (xem CustomerDAO.insert) -- luôn tính mã kế tiếp từ mã thực sự vừa lưu.
+            nextCode[0] = customerDAO.nextEnterpriseCodeAfter(e.getEnterpriseCode());
+            return null;
+        }
+        // Lưu thất bại hẳn (hết số lần thử lại, hoặc lỗi khác) -- đọc lại mã mới
+        // nhất từ CSDL để đồng bộ lại trước khi tiếp tục các dòng sau.
+        nextCode[0] = customerDAO.generateNextEnterpriseCode();
+        return "Dòng " + rowNumber + ": lưu vào CSDL thất bại (có thể MST/email/SĐT đã tồn tại).";
     }
 
     private Province findProvinceByName(List<Province> provinces, String name) {

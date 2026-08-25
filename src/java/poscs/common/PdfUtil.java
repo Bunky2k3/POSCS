@@ -12,6 +12,7 @@ import org.apache.pdfbox.pdmodel.PDPageContentStream;
 import org.apache.pdfbox.pdmodel.font.PDFont;
 import org.apache.pdfbox.pdmodel.font.PDType0Font;
 import org.apache.pdfbox.pdmodel.interactive.form.PDAcroForm;
+import org.apache.pdfbox.pdmodel.interactive.form.PDComboBox;
 import org.apache.pdfbox.pdmodel.interactive.form.PDField;
 
 /**
@@ -52,19 +53,30 @@ public final class PdfUtil {
         }
     }
 
-    /** Điền giá trị 1 field AcroForm theo tên, bỏ qua an toàn nếu field không tồn tại hoặc giá trị null. */
+    /**
+     * Điền giá trị 1 field AcroForm theo tên, bỏ qua an toàn nếu field không
+     * tồn tại hoặc giá trị null -- nhưng vẫn ghi log cảnh báo khi field không
+     * tồn tại, để phát hiện được nếu file mẫu bị đổi tên field (khác với
+     * "không có AcroForm" thì báo lỗi thẳng, xem loadTemplate/exportPdf).
+     */
     public static void fillField(PDAcroForm acroForm, String name, String value) throws IOException {
-        PDField field = acroForm.getField(name);
-        if (field != null) {
-            field.setValue(value == null ? "" : value);
+        if (acroForm == null) {
+            return;
         }
+        PDField field = acroForm.getField(name);
+        if (field == null) {
+            System.err.println("--- CANH BAO: FIELD PDF \"" + name + "\" KHONG TON TAI TRONG FILE MAU -- BO QUA ---");
+            return;
+        }
+        field.setValue(value == null ? "" : value);
     }
 
     /**
      * Đọc giá trị 1 field AcroForm theo tên, đã trim; trả về "" nếu field không
-     * tồn tại/rỗng/null. Với field kiểu combo (PDComboBox), getValueAsString()
+     * tồn tại/rỗng/null. Chỉ với field kiểu combo (PDComboBox), getValueAsString()
      * của PDFBox trả về dạng "[Giá trị]" (bọc ngoặc vuông như mảng) thay vì
-     * chuỗi thuần -- bóc lớp ngoặc đó ra nếu có.
+     * chuỗi thuần -- bóc lớp ngoặc đó ra nếu có. Field kiểu text giữ nguyên giá
+     * trị, kể cả khi người dùng gõ dấu "[" "]" thật trong nội dung.
      */
     public static String readField(PDAcroForm acroForm, String name) {
         if (acroForm == null) {
@@ -79,7 +91,8 @@ public final class PdfUtil {
             return "";
         }
         value = value.trim();
-        if (value.length() >= 2 && value.charAt(0) == '[' && value.charAt(value.length() - 1) == ']') {
+        if (field instanceof PDComboBox
+                && value.length() >= 2 && value.charAt(0) == '[' && value.charAt(value.length() - 1) == ']') {
             value = value.substring(1, value.length() - 1).trim();
         }
         return value;
@@ -138,13 +151,14 @@ public final class PdfUtil {
 
     /**
      * Vẽ 1 bảng cột cố định (viền + header nền xám + wrap text từng ô) bắt
-     * đầu tại (x, topY), trả về y sau khi vẽ xong toàn bộ bảng. Giả định cả
-     * bảng vừa trong phần còn lại của trang hiện tại -- không tự chia
-     * trang, vì use case hiện tại (hạng mục sản phẩm hợp đồng) thường chỉ
-     * vài dòng; không xây layout engine đa trang cho 1 chỗ dùng duy nhất.
+     * đầu tại (x, topY), trả về y sau khi vẽ xong toàn bộ bảng. Không tự
+     * chia trang (không xây layout engine đa trang cho 1 chỗ dùng duy nhất)
+     * -- nhưng để tránh vẽ đè lên nội dung tĩnh bên dưới bảng khi có quá
+     * nhiều dòng/ghi chú dài, sẽ dừng lại ngay khi dòng tiếp theo vượt quá
+     * `minY` và ghi log cảnh báo số dòng bị bỏ qua thay vì âm thầm vẽ tràn.
      */
     public static float drawTable(PDPageContentStream cs, PDFont font, PDFont boldFont, float fontSize,
-            float x, float topY, float[] columnWidths, String[] headers, List<String[]> rows) throws IOException {
+            float x, float topY, float minY, float[] columnWidths, String[] headers, List<String[]> rows) throws IOException {
         float rowPadding = 4f;
         float lineHeight = fontSize + 3f;
         float tableWidth = sum(columnWidths);
@@ -165,7 +179,8 @@ public final class PdfUtil {
         y -= headerHeight;
 
         // Data rows
-        for (String[] row : rows) {
+        for (int r = 0; r < rows.size(); r++) {
+            String[] row = rows.get(r);
             int maxLines = 1;
             List<List<String>> wrappedCells = new ArrayList<>();
             for (int c = 0; c < columnWidths.length; c++) {
@@ -175,6 +190,11 @@ public final class PdfUtil {
                 maxLines = Math.max(maxLines, wrapped.size());
             }
             float rowHeight = maxLines * lineHeight + rowPadding * 2;
+
+            if (y - rowHeight < minY) {
+                System.err.println("--- CANH BAO: BANG PDF TRAN TRANG -- BO QUA " + (rows.size() - r) + " DONG CON LAI ---");
+                break;
+            }
 
             colX = x;
             for (int c = 0; c < columnWidths.length; c++) {

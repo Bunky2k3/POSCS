@@ -192,9 +192,11 @@ public class ProductController extends HttpServlet {
 
         List<Row> rows;
         try (java.io.InputStream in = filePart.getInputStream()) {
-            rows = ExcelUtil.readRows(in, 0);
+            rows = ExcelUtil.readRows(in, 0, IMPORT_HEADERS);
         } catch (Exception ex) {
-            request.setAttribute("importError", "Không đọc được file -- hãy chắc chắn đây là file .xlsx đúng mẫu.");
+            String detail = ex.getMessage();
+            request.setAttribute("importError", "Không đọc được file -- hãy chắc chắn đây là file .xlsx đúng mẫu."
+                    + (detail != null ? " (" + detail + ")" : ""));
             request.getRequestDispatcher(IMPORT_VIEW).forward(request, response);
             return;
         }
@@ -202,9 +204,13 @@ public class ProductController extends HttpServlet {
         List<String> errors = new ArrayList<>();
         int successCount = 0;
         int rowNumber = 1; // dòng 1 là header trong file gốc
+        // Sinh mã SP-xxxx 1 lần rồi tăng dần trong vòng lặp thay vì gọi lại
+        // generateNextProductCode() (1 SELECT MAX riêng) cho từng dòng --
+        // với vài trăm dòng, tránh vài trăm round-trip DB không cần thiết.
+        String[] nextCode = {productDAO.generateNextProductCode()};
         for (Row row : rows) {
             rowNumber++;
-            String rowError = importOneProductRow(row, rowNumber, categoryIdByName);
+            String rowError = importOneProductRow(row, rowNumber, categoryIdByName, nextCode);
             if (rowError == null) {
                 successCount++;
             } else {
@@ -218,8 +224,14 @@ public class ProductController extends HttpServlet {
         request.getRequestDispatcher(IMPORT_VIEW).forward(request, response);
     }
 
-    /** @return null nếu insert thành công, ngược lại là mô tả lỗi kèm số dòng để hiển thị cho người dùng. */
-    private String importOneProductRow(Row row, int rowNumber, Map<String, Integer> categoryIdByName) {
+    /**
+     * @param nextCode mảng 1 phần tử giữ mã SP-xxxx sẽ dùng cho dòng này -- hàm tự
+     * cập nhật lại phần tử này (dựa trên mã product_code thực sự vừa lưu
+     * thành công, có thể khác nextCode[0] nếu insert() phải tự thử lại do
+     * trùng mã) để dòng kế tiếp dùng, tránh phải đọc lại CSDL mỗi dòng.
+     * @return null nếu insert thành công, ngược lại là mô tả lỗi kèm số dòng để hiển thị cho người dùng.
+     */
+    private String importOneProductRow(Row row, int rowNumber, Map<String, Integer> categoryIdByName, String[] nextCode) {
         String name = ExcelUtil.cellString(row, COL_NAME);
         String description = ExcelUtil.cellString(row, COL_DESCRIPTION);
         String categoryName = ExcelUtil.cellString(row, COL_CATEGORY);
@@ -244,9 +256,18 @@ public class ProductController extends HttpServlet {
             return "Dòng " + rowNumber + ": dữ liệu không hợp lệ.";
         }
 
-        p.setProductCode(productDAO.generateNextProductCode());
+        p.setProductCode(nextCode[0]);
         int newId = productDAO.insert(p);
-        return newId > 0 ? null : "Dòng " + rowNumber + ": lưu vào CSDL thất bại.";
+        if (newId > 0) {
+            // insert() có thể đã tự thử lại với mã khác nếu nextCode[0] bị trùng
+            // (xem ProductDAO.insert) -- luôn tính mã kế tiếp từ mã thực sự vừa lưu.
+            nextCode[0] = productDAO.nextProductCodeAfter(p.getProductCode());
+            return null;
+        }
+        // Lưu thất bại hẳn (hết số lần thử lại, hoặc lỗi khác) -- đọc lại mã mới
+        // nhất từ CSDL để đồng bộ lại trước khi tiếp tục các dòng sau.
+        nextCode[0] = productDAO.generateNextProductCode();
+        return "Dòng " + rowNumber + ": lưu vào CSDL thất bại.";
     }
 
     private String normalize(String value) {
