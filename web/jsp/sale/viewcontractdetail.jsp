@@ -85,6 +85,17 @@
         .totals-row.grand { border-top: 1.5px solid #eef2f6; margin-top: 6px; padding-top: 12px; font-weight: 700; font-size: 1rem; color: var(--primary-dark); }
 
         @media (max-width: 768px) { .info-card, .detail-header { padding: 20px; } }
+
+        .toast-msg {
+            position: fixed; top: 24px; right: 24px; z-index: 999;
+            background: #fff; border-left: 4px solid var(--success);
+            border-radius: 12px; padding: 14px 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+            display: flex; align-items: center; gap: 12px; font-size: 0.88rem; color: #111827; font-weight: 500;
+            transform: translateX(130%); transition: transform 0.35s ease;
+        }
+        .toast-msg.show { transform: translateX(0); }
+        .toast-msg.blocked { border-left-color: var(--danger); }
+        .toast-msg.blocked i { color: var(--danger); font-size: 1.2rem; }
     </style>
 </head>
 <body>
@@ -95,6 +106,13 @@
         <%@ include file="/jsp/common/sidebar.jsp" %>
         <div class="main-content">
 
+
+    <c:if test="${param.error == 'pdf_overflow'}">
+        <div class="toast-msg blocked show">
+            <i class="fa-solid fa-circle-xmark"></i>
+            <span>Không xuất được PDF: hợp đồng có quá nhiều dòng sản phẩm/ghi chú dài để vừa 1 trang. Hãy rút gọn ghi chú hoặc liên hệ quản trị viên.</span>
+        </div>
+    </c:if>
 
     <div class="page-container">
         <a href="${pageContext.request.contextPath}/contract" class="back-link-top"><i class="fa-solid fa-arrow-left-long"></i> Quay lại danh sách</a>

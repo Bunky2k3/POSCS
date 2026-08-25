@@ -272,9 +272,11 @@ public class ContractController extends HttpServlet {
             if (rowsDrawn < tableRows.size()) {
                 // Bảng sản phẩm dài hơn chỗ trống còn lại của trang mẫu -- không
                 // gửi 1 file PDF hợp đồng bị thiếu dữ liệu cho người dùng mà
-                // không báo gì (xem javadoc drawTable).
-                response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
-                        "Hợp đồng có quá nhiều dòng sản phẩm để xuất vừa 1 trang PDF -- vui lòng liên hệ quản trị viên.");
+                // không báo gì (xem javadoc drawTable). Quay lại trang chi tiết
+                // hợp đồng (thay vì response.sendError ra trang lỗi mặc định
+                // của container, không có giao diện/điều hướng của app) kèm mã
+                // lỗi để hiển thị thông báo rõ ràng -- xem viewcontractdetail.jsp.
+                response.sendRedirect(request.getContextPath() + "/contract?action=view&id=" + id + "&error=pdf_overflow");
                 return;
             }
 

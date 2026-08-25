@@ -341,24 +341,45 @@ public class ContractDAO {
         String sql = "INSERT INTO contractproducts (contract_id, product_id, quantity, unit, notes) VALUES (?, ?, ?, ?, ?)";
         try (Connection conn = DBContext.getConnection()) {
             conn.setAutoCommit(false);
-            try (PreparedStatement ps = conn.prepareStatement(sql)) {
-                for (ContractProduct item : items) {
-                    ps.setInt(1, contractId);
-                    ps.setInt(2, item.getProductId());
-                    ps.setInt(3, item.getQuantity());
-                    ps.setString(4, item.getUnit());
-                    ps.setString(5, item.getNotes());
-                    ps.addBatch();
+            // committed chỉ true sau conn.commit() thành công -- dùng để finally bên
+            // dưới biết có cần rollback không, thay vì 2 khối catch tách rời (1 cái
+            // rollback+rethrow, 1 cái log+return false) dễ làm mất lỗi gốc nếu chính
+            // rollback()/setAutoCommit(true) cũng ném lỗi. Cả 2 lệnh dọn dẹp trong
+            // finally đều tự bắt lỗi riêng để KHÔNG bao giờ ghi đè lên kết quả
+            // "committed" thật sự -- tránh trường hợp insert đã commit xong nhưng
+            // setAutoCommit(true) ném lỗi khiến hàm báo false sai sự thật.
+            boolean committed = false;
+            try {
+                try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                    for (ContractProduct item : items) {
+                        ps.setInt(1, contractId);
+                        ps.setInt(2, item.getProductId());
+                        ps.setInt(3, item.getQuantity());
+                        ps.setString(4, item.getUnit());
+                        ps.setString(5, item.getNotes());
+                        ps.addBatch();
+                    }
+                    ps.executeBatch();
+                    conn.commit();
+                    committed = true;
                 }
-                ps.executeBatch();
-                conn.commit();
-                return true;
-            } catch (SQLException ex) {
-                conn.rollback();
-                throw ex;
             } finally {
-                conn.setAutoCommit(true);
+                if (!committed) {
+                    try {
+                        conn.rollback();
+                    } catch (SQLException rollbackEx) {
+                        System.err.println("--- LOI ROLLBACK HANG MUC SAN PHAM HOP DONG ---");
+                        rollbackEx.printStackTrace();
+                    }
+                }
+                try {
+                    conn.setAutoCommit(true);
+                } catch (SQLException autoCommitEx) {
+                    System.err.println("--- LOI RESET AUTOCOMMIT SAU KHI THEM HANG MUC SAN PHAM ---");
+                    autoCommitEx.printStackTrace();
+                }
             }
+            return committed;
         } catch (SQLException ex) {
             System.err.println("--- LOI THEM HANG MUC SAN PHAM HOP DONG ---");
             ex.printStackTrace();
