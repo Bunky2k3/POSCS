@@ -240,6 +240,7 @@
                         <div class="alert alert-danger py-2 px-3 mb-4" style="font-size: 0.9rem; border-radius: 12px;">
                             <c:choose>
                                 <c:when test="${param.error == 'invalid_credentials'}">Sai tên đăng nhập hoặc mật khẩu.</c:when>
+                                <c:when test="${param.error == 'account_inactive'}">Tài khoản này đã bị khóa hoặc ngừng hoạt động. Vui lòng liên hệ quản trị viên để được hỗ trợ.</c:when>
                                 <c:when test="${param.error == 'missing_fields'}">Vui lòng nhập đầy đủ tên đăng nhập và mật khẩu.</c:when>
                                 <c:otherwise>Đăng nhập thất bại. Vui lòng thử lại.</c:otherwise>
                             </c:choose>
