@@ -3450,6 +3450,20 @@ INSERT INTO `roles` (`role_name`) VALUES
 ('Kỹ thuật'),
 ('CSKH');
 
+DROP TABLE IF EXISTS `departments`;
+CREATE TABLE `departments` (
+  `department_id` int NOT NULL AUTO_INCREMENT,
+  `department_name` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
+  PRIMARY KEY (`department_id`),
+  UNIQUE KEY `department_name` (`department_name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+INSERT INTO `departments` (`department_name`) VALUES
+('Ban giám đốc'),
+('Kinh doanh'),
+('Kỹ thuật'),
+('Chăm sóc khách hàng');
+
 DROP TABLE IF EXISTS `users`;
 CREATE TABLE `users` (
   `user_id` int NOT NULL AUTO_INCREMENT,
@@ -3467,7 +3481,7 @@ CREATE TABLE `users` (
   `personal_email` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `address_id` int DEFAULT NULL,
   `avatar_url` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `department` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `department_id` int NOT NULL,
   `hire_date` date NOT NULL,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -3479,8 +3493,10 @@ CREATE TABLE `users` (
   UNIQUE KEY `phone` (`phone`),
   KEY `role_id` (`role_id`),
   KEY `address_id` (`address_id`),
+  KEY `department_id` (`department_id`),
   CONSTRAINT `users_ibfk_1` FOREIGN KEY (`role_id`) REFERENCES `roles` (`role_id`),
-  CONSTRAINT `users_ibfk_2` FOREIGN KEY (`address_id`) REFERENCES `addresses` (`address_id`) ON DELETE SET NULL
+  CONSTRAINT `users_ibfk_2` FOREIGN KEY (`address_id`) REFERENCES `addresses` (`address_id`) ON DELETE SET NULL,
+  CONSTRAINT `users_department_fk` FOREIGN KEY (`department_id`) REFERENCES `departments` (`department_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 DROP TABLE IF EXISTS `enterprises`;

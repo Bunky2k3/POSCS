@@ -3,9 +3,10 @@
 <%@taglib prefix="fn" uri="jakarta.tags.functions"%>
 <%--
     Servlet cần đặt các request attribute sau trước khi forward tới trang này:
-      - employee     : poscs.model.User (đã kèm .role, .address.district nếu có)
-      - roleList     : List<poscs.model.Role>
-      - provinceList : List<poscs.model.Province>
+      - employee       : poscs.model.User (đã kèm .role, .department, .address.district nếu có)
+      - roleList       : List<poscs.model.Role>
+      - departmentList : List<poscs.model.Department>
+      - provinceList   : List<poscs.model.Province>
 --%>
 <!DOCTYPE html>
 <html lang="vi">
@@ -18,6 +19,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
     <link rel="stylesheet" href="${pageContext.request.contextPath}/css/appshell.css">
 
     <style>
@@ -67,7 +69,6 @@
                     <div class="alert alert-danger py-2 px-3 mb-4" style="font-size: 0.9rem; border-radius: 12px;">
                         <c:choose>
                             <c:when test="${param.error == 'invalid'}">Vui lòng nhập đầy đủ và đúng định dạng các trường bắt buộc.</c:when>
-                            <c:when test="${param.error == 'duplicate_email'}">Email này đã được sử dụng bởi tài khoản khác.</c:when>
                             <c:when test="${param.error == 'duplicate_phone'}">Số điện thoại này đã được sử dụng bởi tài khoản khác.</c:when>
                             <c:when test="${param.error == 'duplicate_citizen'}">Số CCCD/CMND này đã được sử dụng bởi tài khoản khác.</c:when>
                             <c:when test="${param.error == 'update_failed'}">Không thể cập nhật nhân viên. Vui lòng thử lại.</c:when>
@@ -85,14 +86,17 @@
                     <div class="section-header"><h5>Thông tin công việc</h5></div>
                     <div class="row">
                         <div class="col-md-6 field-row">
-                            <label for="email">Email công ty (dùng đăng nhập)</label>
-                            <input type="email" class="form-control" id="email" name="email" value="${employee.email}">
-                            <span class="error-text" id="err-email">Địa chỉ email không hợp lệ.</span>
+                            <label for="email">Email công ty (dùng đăng nhập, hệ thống tự cấp -- không thể sửa)</label>
+                            <input type="email" class="form-control" id="email" value="${employee.email}" disabled readonly>
                         </div>
                         <div class="col-md-6 field-row">
                             <label for="department">Phòng ban</label>
-                            <input type="text" class="form-control" id="department" name="department" value="${employee.department}">
-                            <span class="error-text" id="err-department">Trường này không được để trống.</span>
+                            <select class="form-select" id="department" name="departmentId">
+                                <c:forEach var="d" items="${departmentList}">
+                                    <option value="${d.departmentId}" ${d.departmentId == employee.departmentId ? 'selected' : ''}>${fn:escapeXml(d.departmentName)}</option>
+                                </c:forEach>
+                            </select>
+                            <span class="error-text" id="err-department">Vui lòng chọn phòng ban.</span>
                         </div>
                         <div class="col-md-6 field-row">
                             <label for="roleId">Vai trò</label>
@@ -153,8 +157,9 @@
                             <span class="error-text" id="err-phone">Số điện thoại không hợp lệ.</span>
                         </div>
                         <div class="col-md-6 field-row">
-                            <label for="personalEmail">Email cá nhân <span class="text-muted" style="text-transform:none; font-weight:400;">(không bắt buộc)</span></label>
+                            <label for="personalEmail">Email cá nhân <span class="text-muted" style="text-transform:none; font-weight:400;">(dùng để gửi tài khoản)</span></label>
                             <input type="email" class="form-control" id="personalEmail" name="personalEmail" value="${employee.personalEmail}">
+                            <span class="error-text" id="err-personalEmail">Vui lòng nhập email cá nhân hợp lệ.</span>
                         </div>
                     </div>
 
@@ -203,7 +208,30 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
     <script>
+        // allowInput: true để vẫn gõ tay được như input thường; attachDateMask chỉ
+        // cho gõ chữ số (không gõ được chữ cái) và tự chèn "/", tối đa 8 chữ số
+        // (ddmmyyyy) nên không gõ được năm quá 4 chữ số.
+        function attachDateMask(input) {
+            if (!input) { return; }
+            input.addEventListener('input', function () {
+                var digits = input.value.replace(/\D/g, '').slice(0, 8);
+                var parts = [];
+                if (digits.length > 0) { parts.push(digits.slice(0, 2)); }
+                if (digits.length > 2) { parts.push(digits.slice(2, 4)); }
+                if (digits.length > 4) { parts.push(digits.slice(4, 8)); }
+                input.value = parts.join('/');
+            });
+        }
+        var dateFieldOptions = { dateFormat: 'Y-m-d', altInput: true, altFormat: 'd/m/Y', allowInput: true, minDate: '1900-01-01' };
+        var dobPicker = flatpickr(document.getElementById('dateOfBirth'), Object.assign({}, dateFieldOptions, { maxDate: 'today' }));
+        var hireDatePicker = flatpickr(document.getElementById('hireDate'), dateFieldOptions);
+        [dobPicker, hireDatePicker].forEach(function (picker) {
+            attachDateMask(picker.altInput);
+            if (picker.altInput) { picker.altInput.placeholder = 'dd/mm/yyyy'; }
+        });
+
         function isValidPhone(value) { return /^(0|\+84)[0-9]{9,10}$/.test(value.replace(/[\s.-]/g, '')); }
         function isValidEmail(value) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value); }
 
@@ -246,7 +274,7 @@
             var valid = true;
             document.querySelectorAll('.error-text').forEach(function (el) { el.style.display = 'none'; });
 
-            var requiredIds = ['lastName', 'firstName', 'citizenId', 'department', 'roleId', 'hireDate', 'dateOfBirth'];
+            var requiredIds = ['lastName', 'firstName', 'citizenId', 'department', 'roleId', 'hireDate', 'dateOfBirth', 'personalEmail'];
             requiredIds.forEach(function (id) {
                 var el = document.getElementById(id);
                 if (!el.value.trim()) {
@@ -268,9 +296,9 @@
                 valid = false;
             }
 
-            var email = document.getElementById('email');
-            if (!isValidEmail(email.value)) {
-                document.getElementById('err-email').style.display = 'block';
+            var personalEmail = document.getElementById('personalEmail');
+            if (!isValidEmail(personalEmail.value)) {
+                document.getElementById('err-personalEmail').style.display = 'block';
                 valid = false;
             }
 

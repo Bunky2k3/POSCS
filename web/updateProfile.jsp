@@ -12,6 +12,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
     <link rel="stylesheet" href="${pageContext.request.contextPath}/css/appshell.css">
 
     <style>
@@ -190,7 +191,7 @@
                         </div>
                         <div class="col-md-6 field-row">
                             <label>Phòng ban</label>
-                            <div class="readonly-value"><c:out value="${profile.department}"/></div>
+                            <div class="readonly-value"><c:out value="${profile.department.departmentName}"/></div>
                         </div>
                         <div class="col-md-6 field-row">
                             <label>Vai trò</label>
@@ -299,7 +300,10 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
     <script>
+        flatpickr('#dob', { dateFormat: 'Y-m-d', altInput: true, altFormat: 'd/m/Y', minDate: '1900-01-01', maxDate: 'today' });
+
         // ===== Avatar preview =====
         document.getElementById('avatarInput').addEventListener('change', function (e) {
             var file = e.target.files[0];

@@ -30,6 +30,9 @@ import poscs.model.User;
 @WebServlet(name = "EmployeeController", urlPatterns = {"/employee"})
 public class EmployeeController extends HttpServlet {
 
+    /** BR-31: email công ty do hệ thống tự cấp (chưa có hộp thư thật), dạng &lt;username&gt;@postef.com.vn. */
+    private static final String COMPANY_EMAIL_DOMAIN = "@postef.com.vn";
+
     private static final int PAGE_SIZE = 10;
     private static final String LIST_VIEW = "/jsp/admin/listEmployee.jsp";
     private static final String DETAIL_VIEW = "/jsp/admin/viewdetailEmployee.jsp";
@@ -89,6 +92,9 @@ public class EmployeeController extends HttpServlet {
                 break;
             case "toggleStatus":
                 handleToggleStatus(request, response);
+                break;
+            case "sendAccount":
+                handleSendAccount(request, response);
                 break;
             default:
                 response.sendRedirect(request.getContextPath() + "/employee");
@@ -151,6 +157,7 @@ public class EmployeeController extends HttpServlet {
     private void showCreateForm(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
         request.setAttribute("roleList", employeeDAO.findAllRoles());
+        request.setAttribute("departmentList", employeeDAO.findAllDepartments());
         request.setAttribute("provinceList", addressDAO.findAllProvinces());
         request.getRequestDispatcher(CREATE_VIEW).forward(request, response);
     }
@@ -165,6 +172,7 @@ public class EmployeeController extends HttpServlet {
         }
         request.setAttribute("employee", employee);
         request.setAttribute("roleList", employeeDAO.findAllRoles());
+        request.setAttribute("departmentList", employeeDAO.findAllDepartments());
         request.setAttribute("provinceList", addressDAO.findAllProvinces());
         request.getRequestDispatcher(UPDATE_VIEW).forward(request, response);
     }
@@ -174,22 +182,18 @@ public class EmployeeController extends HttpServlet {
     // ------------------------------------------------------------------
 
     /**
-     * UC-26 Create Employee: tạo tài khoản + sinh username/mật khẩu tạm rồi
-     * gửi qua email công ty của nhân viên -- đây là lý do controller này
-     * cần EmailUtil, khác các controller CRUD khác. Nếu gửi mail thất bại
-     * (SMTP lỗi) tài khoản vẫn đã được tạo (đằng nào Admin cũng có thể tra
-     * lại thông tin và báo tay cho nhân viên) -- chỉ báo warning qua query
-     * param thay vì rollback cả việc tạo tài khoản.
+     * UC-26 Create Employee: chỉ tạo hồ sơ + tự cấp email công ty
+     * (username@postef.com.vn, chưa phải hộp thư thật) + tự sinh username/mật
+     * khẩu tạm (hash ngay, không giữ lại bản rõ) -- KHÔNG gửi email ở bước
+     * này. Việc gửi thông tin tài khoản cho nhân viên là hành động Admin chủ
+     * động bấm riêng ở trang chi tiết (xem handleSendAccount), để Admin có
+     * thể rà lại thông tin trước khi gửi và gửi lại được nếu cần.
      */
     private void handleCreate(HttpServletRequest request, HttpServletResponse response) throws IOException {
         User u = buildUserFromRequest(request, new User());
 
-        if (!isValidCommonFields(u) || isBlank(u.getEmail()) || !isValidEmail(u.getEmail())) {
+        if (!isValidCommonFields(u)) {
             response.sendRedirect(request.getContextPath() + "/employee?action=new&error=invalid");
-            return;
-        }
-        if (employeeDAO.existsByEmail(u.getEmail(), null)) {
-            response.sendRedirect(request.getContextPath() + "/employee?action=new&error=duplicate_email");
             return;
         }
         if (employeeDAO.existsByPhone(u.getPhone(), null)) {
@@ -202,19 +206,44 @@ public class EmployeeController extends HttpServlet {
         }
 
         String username = employeeDAO.generateUniqueUsername(u.getLastName(), u.getMiddleName(), u.getFirstName());
-        String tempPassword = generateTempPassword();
         u.setUsername(username);
-        u.setPasswordHash(BCrypt.hashpw(tempPassword, BCrypt.gensalt()));
+        u.setEmail(username + COMPANY_EMAIL_DOMAIN);
+        u.setPasswordHash(BCrypt.hashpw(generateTempPassword(), BCrypt.gensalt()));
 
         int newId = employeeDAO.insert(u);
         if (newId <= 0) {
             response.sendRedirect(request.getContextPath() + "/employee?action=new&error=create_failed");
             return;
         }
+        response.sendRedirect(request.getContextPath() + "/employee?action=view&id=" + newId);
+    }
 
-        boolean mailSent = EmailUtil.sendNewAccountEmail(u.getEmail(), u.getFullName(), username, tempPassword);
-        String suffix = mailSent ? "" : "&warning=mail_failed";
-        response.sendRedirect(request.getContextPath() + "/employee?action=view&id=" + newId + suffix);
+    /**
+     * Admin chủ động bấm "Gửi thông tin tài khoản" ở trang chi tiết (tạo mới
+     * lẫn gửi lại đều dùng chung action này) -- vì mật khẩu tạm đã hash ngay
+     * lúc tạo/lần gửi trước và không lưu bản rõ ở đâu cả, mỗi lần bấm đều
+     * CẤP LẠI 1 mật khẩu tạm mới rồi gửi, không phải gửi lại y hệt mật khẩu
+     * cũ. Gửi tới EMAIL CÁ NHÂN (kênh chắc chắn nhận được, khác email công ty
+     * tự cấp chưa có hộp thư thật).
+     */
+    private void handleSendAccount(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        Integer id = parseIntOrNull(request.getParameter("id"));
+        User employee = id != null ? employeeDAO.findById(id) : null;
+        if (employee == null) {
+            response.sendRedirect(request.getContextPath() + "/employee?error=notfound");
+            return;
+        }
+
+        String tempPassword = generateTempPassword();
+        boolean updated = employeeDAO.updatePasswordHash(id, BCrypt.hashpw(tempPassword, BCrypt.gensalt()));
+        if (!updated) {
+            response.sendRedirect(request.getContextPath() + "/employee?action=view&id=" + id + "&error=send_failed");
+            return;
+        }
+
+        boolean mailSent = EmailUtil.sendNewAccountEmail(employee.getPersonalEmail(), employee.getFullName(), employee.getEmail(), employee.getUsername(), tempPassword);
+        String suffix = mailSent ? "&sent=1" : "&warning=mail_failed";
+        response.sendRedirect(request.getContextPath() + "/employee?action=view&id=" + id + suffix);
     }
 
     private void handleUpdate(HttpServletRequest request, HttpServletResponse response) throws IOException {
@@ -227,12 +256,8 @@ public class EmployeeController extends HttpServlet {
         User u = buildUserFromRequest(request, new User());
         u.setUserId(id);
 
-        if (!isValidCommonFields(u) || isBlank(u.getEmail()) || !isValidEmail(u.getEmail())) {
+        if (!isValidCommonFields(u)) {
             response.sendRedirect(request.getContextPath() + "/employee?action=edit&id=" + id + "&error=invalid");
-            return;
-        }
-        if (employeeDAO.existsByEmail(u.getEmail(), id)) {
-            response.sendRedirect(request.getContextPath() + "/employee?action=edit&id=" + id + "&error=duplicate_email");
             return;
         }
         if (employeeDAO.existsByPhone(u.getPhone(), id)) {
@@ -286,7 +311,6 @@ public class EmployeeController extends HttpServlet {
     }
 
     private User buildUserFromRequest(HttpServletRequest request, User u) {
-        u.setEmail(emptyToNull(request.getParameter("email")));
         u.setLastName(emptyToNull(request.getParameter("lastName")));
         u.setMiddleName(emptyToNull(request.getParameter("middleName")));
         u.setFirstName(emptyToNull(request.getParameter("firstName")));
@@ -295,12 +319,15 @@ public class EmployeeController extends HttpServlet {
         u.setCitizenId(emptyToNull(request.getParameter("citizenId")));
         u.setPhone(emptyToNull(request.getParameter("phone")));
         u.setPersonalEmail(emptyToNull(request.getParameter("personalEmail")));
-        u.setDepartment(emptyToNull(request.getParameter("department")));
         u.setHireDate(parseDateOrNull(request.getParameter("hireDate")));
 
         Integer roleId = parseIntOrNull(request.getParameter("roleId"));
         if (roleId != null) {
             u.setRoleId(roleId);
+        }
+        Integer departmentId = parseIntOrNull(request.getParameter("departmentId"));
+        if (departmentId != null) {
+            u.setDepartmentId(departmentId);
         }
 
         Integer districtId = parseIntOrNull(request.getParameter("districtId"));
@@ -316,15 +343,17 @@ public class EmployeeController extends HttpServlet {
 
     /**
      * BR-28 (Phòng ban + Vai trò bắt buộc), BR-29 (ngày sinh hợp lệ trong
-     * quá khứ), BR-30 (giới tính hợp lệ), BR-09 (định dạng SĐT). Các trường
-     * bắt buộc khác của users (họ, tên, CCCD, ngày sinh, ngày vào làm) đều
-     * NOT NULL trong DB nên phải chặn ở đây trước khi tới tầng DAO.
+     * quá khứ), BR-30 (giới tính hợp lệ), BR-09 (định dạng SĐT), BR-31 (email
+     * cá nhân bắt buộc + hợp lệ -- là kênh duy nhất để gửi tài khoản/mật khẩu
+     * vì email công ty tự cấp chưa có hộp thư thật). Các trường bắt buộc
+     * khác của users (họ, tên, CCCD, ngày sinh, ngày vào làm) đều NOT NULL
+     * trong DB nên phải chặn ở đây trước khi tới tầng DAO.
      */
     private boolean isValidCommonFields(User u) {
         if (isBlank(u.getLastName()) || isBlank(u.getFirstName()) || isBlank(u.getCitizenId())) {
             return false;
         }
-        if (u.getRoleId() <= 0 || isBlank(u.getDepartment())) {
+        if (u.getRoleId() <= 0 || u.getDepartmentId() <= 0) {
             return false;
         }
         if (!"Nam".equals(u.getGender()) && !"Nữ".equals(u.getGender()) && !"Khác".equals(u.getGender())) {
@@ -334,6 +363,9 @@ public class EmployeeController extends HttpServlet {
             return false;
         }
         if (u.getHireDate() == null) {
+            return false;
+        }
+        if (isBlank(u.getPersonalEmail()) || !isValidEmail(u.getPersonalEmail())) {
             return false;
         }
         return isValidPhone(u.getPhone());

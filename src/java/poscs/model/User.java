@@ -11,10 +11,12 @@ public class User {
     
     // Thuộc tính lưu trữ ID khóa ngoại
     private int roleId;
+    private int departmentId;
     private Integer addressId; // Dùng Integer thay vì int vì DB cho phép NULL
-    
+
     // Thuộc tính Object để chứa dữ liệu join từ các bảng khác
     private Role role;
+    private Department department;
     private Address address;
 
     private String lastName;
@@ -26,7 +28,6 @@ public class User {
     private String phone;
     private String personalEmail;
     private String avatarUrl;
-    private String department;
     private Date hireDate;
     
     private Timestamp createdAt;
@@ -38,10 +39,10 @@ public class User {
     }
 
     // Constructor có tham số (Có thể tạo thêm constructor với ít tham số hơn tùy nhu cầu)
-    public User(int userId, String username, String email, String passwordHash, int roleId, 
-                String lastName, String middleName, String firstName, String gender, 
-                Date dateOfBirth, String citizenId, String phone, String personalEmail, 
-                Integer addressId, String avatarUrl, String department, Date hireDate, 
+    public User(int userId, String username, String email, String passwordHash, int roleId,
+                String lastName, String middleName, String firstName, String gender,
+                Date dateOfBirth, String citizenId, String phone, String personalEmail,
+                Integer addressId, String avatarUrl, int departmentId, Date hireDate,
                 Timestamp createdAt, Timestamp updatedAt, boolean isDeleted) {
         this.userId = userId;
         this.username = username;
@@ -58,7 +59,7 @@ public class User {
         this.personalEmail = personalEmail;
         this.addressId = addressId;
         this.avatarUrl = avatarUrl;
-        this.department = department;
+        this.departmentId = departmentId;
         this.hireDate = hireDate;
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
@@ -125,8 +126,11 @@ public class User {
     public String getAvatarUrl() { return avatarUrl; }
     public void setAvatarUrl(String avatarUrl) { this.avatarUrl = avatarUrl; }
 
-    public String getDepartment() { return department; }
-    public void setDepartment(String department) { this.department = department; }
+    public int getDepartmentId() { return departmentId; }
+    public void setDepartmentId(int departmentId) { this.departmentId = departmentId; }
+
+    public Department getDepartment() { return department; }
+    public void setDepartment(Department department) { this.department = department; }
 
     public Date getHireDate() { return hireDate; }
     public void setHireDate(Date hireDate) { this.hireDate = hireDate; }

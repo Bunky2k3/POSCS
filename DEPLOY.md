@@ -98,7 +98,30 @@ implement full CRUD with server-side role-based access control (see
 `AuthenticationController` handles login/logout/change-password/
 profile, with session-fixation protection on login and a
 rate-limited forgot-password/OTP flow. Creating an employee
-(`EmployeeController`) generates a username + temporary password and
-emails them to the employee via `EmailUtil` — falls back to printing
-to the server console in dev mode if `MAIL_USERNAME`/`MAIL_PASSWORD`
-aren't set (see below).
+(`EmployeeController`) generates a username + temporary password;
+sending that account info (and OTP emails) is done via `EmailUtil`,
+which calls the SendGrid HTTP API — falls back to printing to the
+server console in dev mode if `SENDGRID_API_KEY`/`MAIL_FROM` aren't
+set (see below).
+
+### Email (SendGrid)
+
+`EmailUtil` reads `SENDGRID_API_KEY` and `MAIL_FROM` from environment
+variables (same pattern as `DB_URL`/`DB_USER`/`DB_PASSWORD` above —
+set them wherever the servlet container process picks up env vars,
+e.g. Tomcat's `bin/setenv.sh`/`bin/setenv.bat`):
+
+```bash
+export SENDGRID_API_KEY="SG.xxxxxxxxxxxxxxxxxxxxxxxx"
+export MAIL_FROM="your-verified-sender@yourdomain.com"
+```
+
+1. Create a SendGrid account (free tier: 100 emails/day) at
+   https://signup.sendgrid.com/
+2. Verify a Single Sender (the address `MAIL_FROM` will use) at
+   https://app.sendgrid.com/settings/sender_auth/senders
+3. Create an API key at https://app.sendgrid.com/settings/api_keys
+
+If either variable is unset, `EmailUtil` prints the email content to
+the server console instead of sending it — safe for local dev, but
+make sure both are set before going live.

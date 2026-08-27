@@ -114,7 +114,7 @@
                             <div class="employee-code">NV-<c:out value="${emp.userId}"/></div>
                         </div>
                     </div>
-                    <div class="employee-field"><i class="fa-solid fa-building"></i>${fn:escapeXml(emp.department)} &middot; ${fn:escapeXml(emp.role.roleName)}</div>
+                    <div class="employee-field"><i class="fa-solid fa-building"></i>${fn:escapeXml(emp.department.departmentName)} &middot; ${fn:escapeXml(emp.role.roleName)}</div>
                     <div class="employee-field"><i class="fa-solid fa-envelope"></i>${fn:escapeXml(emp.email)}</div>
                     <span class="status-badge ${emp.deleted ? 'status-inactive' : 'status-active'}">${emp.deleted ? 'Ngừng hoạt động' : 'Đang hoạt động'}</span>
                 </a>
