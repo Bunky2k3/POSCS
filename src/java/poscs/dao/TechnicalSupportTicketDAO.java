@@ -209,6 +209,31 @@ public class TechnicalSupportTicketDAO {
         return 0;
     }
 
+    /**
+     * Như countOverdueOrDueSoon(), nhưng trả về danh sách đầy đủ thay vì chỉ
+     * đếm -- phục vụ NotificationScheduler tạo thông báo nhắc từng kỹ thuật
+     * viên được giao phiếu sắp/đã quá hạn SLA.
+     */
+    public List<TechnicalRequest> findOverdueOrDueSoon() {
+        List<TechnicalRequest> result = new ArrayList<>();
+        String sql = SELECT_BASE +
+                     "WHERE t.is_deleted = 0 AND t.status <> ? " +
+                     "AND t.sla_deadline IS NOT NULL AND t.sla_deadline <= DATE_ADD(NOW(), INTERVAL 24 HOUR)";
+        try (Connection conn = DBContext.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, STATUS_CLOSED);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    result.add(mapRow(rs));
+                }
+            }
+        } catch (SQLException ex) {
+            System.err.println("--- LOI TRUY VAN PHIEU SAP TRE HAN ---");
+            ex.printStackTrace();
+        }
+        return result;
+    }
+
     /** Lấy chi tiết 1 phiếu hỗ trợ theo ID, đã join khách hàng/hợp đồng/kỹ thuật viên/người tạo. Trả về null nếu không tồn tại. */
     public TechnicalRequest findById(int ticketId) {
         String sql = SELECT_BASE + "WHERE t.ticket_id = ? AND t.is_deleted = 0";
