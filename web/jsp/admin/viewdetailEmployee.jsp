@@ -76,9 +76,19 @@
     <div class="page-container">
         <a href="${pageContext.request.contextPath}/employee" class="back-link"><i class="fa-solid fa-arrow-left"></i> Quay lại danh sách nhân viên</a>
 
+        <c:if test="${not empty param.sent && param.sent == '1'}">
+            <div class="alert alert-success py-2 px-3 mb-3" style="font-size: 0.9rem; border-radius: 12px;">
+                Đã gửi thông tin tài khoản (mật khẩu tạm mới) tới email cá nhân của nhân viên.
+            </div>
+        </c:if>
         <c:if test="${not empty param.warning && param.warning == 'mail_failed'}">
             <div class="alert alert-warning py-2 px-3 mb-3" style="font-size: 0.9rem; border-radius: 12px;">
-                Đã tạo tài khoản thành công nhưng gửi email thông báo thất bại. Vui lòng cung cấp tài khoản cho nhân viên theo cách khác.
+                Đã cấp mật khẩu tạm mới nhưng gửi email thất bại. Vui lòng cung cấp tài khoản cho nhân viên theo cách khác hoặc thử gửi lại.
+            </div>
+        </c:if>
+        <c:if test="${not empty param.error && param.error == 'send_failed'}">
+            <div class="alert alert-danger py-2 px-3 mb-3" style="font-size: 0.9rem; border-radius: 12px;">
+                Không thể gửi thông tin tài khoản. Vui lòng thử lại.
             </div>
         </c:if>
         <c:if test="${not empty param.error && param.error == 'cannot_self_ban'}">
@@ -114,7 +124,7 @@
                     </div>
                     <div class="col-md-6 field-row">
                         <label>Phòng ban</label>
-                        <div class="view-value"><c:out value="${employee.department}"/></div>
+                        <div class="view-value"><c:out value="${employee.department.departmentName}"/></div>
                     </div>
                     <div class="col-md-6 field-row">
                         <label>Ngày vào làm</label>
@@ -183,8 +193,9 @@
                     </c:otherwise>
                 </c:choose>
 
-                <!-- ===== Khóa / Mở khóa tài khoản (BR-25, BR-26) ===== -->
+                <!-- ===== Gửi thông tin tài khoản (BR-31) + Khóa / Mở khóa tài khoản (BR-25, BR-26) ===== -->
                 <div class="action-bar">
+                    <button type="button" class="btn-primary" data-bs-toggle="modal" data-bs-target="#sendAccountModal"><i class="fa-solid fa-paper-plane me-1"></i> Gửi thông tin tài khoản</button>
                     <c:choose>
                         <c:when test="${employee.deleted}">
                             <button type="button" class="btn-success-outline" data-bs-toggle="modal" data-bs-target="#toggleStatusModal"><i class="fa-solid fa-lock-open me-1"></i> Mở khóa tài khoản</button>
@@ -198,6 +209,30 @@
         </div>
     </div>
 
+        </div>
+    </div>
+
+    <!-- ===== Modal xác nhận gửi thông tin tài khoản (BR-31) ===== -->
+    <div class="modal fade" id="sendAccountModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <div class="modal-icon-warn" style="background:#eaf6ff; color:var(--primary-dark);"><i class="fa-solid fa-paper-plane"></i></div>
+                </div>
+                <div class="modal-body">
+                    <h5 class="mb-2" style="font-weight:700; color:#111827;">Xác nhận gửi thông tin tài khoản</h5>
+                    Hệ thống sẽ cấp 1 mật khẩu tạm <strong>mới</strong> và gửi cùng tên đăng nhập, email công ty tới email cá nhân (<c:out value="${employee.personalEmail}"/>) của <strong><c:out value="${employee.fullName}"/></strong>. Mật khẩu tạm cũ (nếu có) sẽ không còn dùng được nữa.
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn-modal-cancel" data-bs-dismiss="modal">Hủy</button>
+                    <form method="POST" action="${pageContext.request.contextPath}/employee">
+                        <input type="hidden" name="csrfToken" value="${csrfToken}">
+                        <input type="hidden" name="action" value="sendAccount">
+                        <input type="hidden" name="id" value="${employee.userId}">
+                        <button type="submit" class="btn-primary" style="border-radius:10px;">Xác nhận gửi</button>
+                    </form>
+                </div>
+            </div>
         </div>
     </div>
 

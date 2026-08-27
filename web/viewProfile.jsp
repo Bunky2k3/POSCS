@@ -128,7 +128,7 @@
                     </div>
                     <div class="col-md-6 field-row">
                         <label>Phòng ban</label>
-                        <div class="view-value"><c:out value="${profile.department}"/></div>
+                        <div class="view-value"><c:out value="${profile.department.departmentName}"/></div>
                     </div>
                     <div class="col-md-6 field-row">
                         <label>Vai trò</label>
