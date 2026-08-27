@@ -286,6 +286,16 @@ public class AuthenticationController extends HttpServlet {
             return;
         }
 
+        // Chỉ SAU KHI đã xác minh đúng mật khẩu mới kiểm tra tài khoản có bị
+        // khóa (is_deleted=1) hay không, rồi mới báo riêng "tài khoản bị khóa"
+        // -- nếu kiểm tra trước bước xác minh mật khẩu, kẻ dò mật khẩu có thể
+        // lợi dụng sự khác biệt giữa 2 thông báo lỗi để suy ra tài khoản nào
+        // tồn tại (user enumeration), kể cả khi không biết đúng mật khẩu.
+        if (user.isDeleted()) {
+            redirectToLoginWithError(request, response, "account_inactive", identifier);
+            return;
+        }
+
         // Đăng nhập thành công: huỷ session cũ (nếu có) trước khi tạo session mới,
         // thay vì tái sử dụng session hiện tại -- nếu không, 1 session ID được kẻ
         // tấn công cài sẵn từ trước (session fixation, vd qua URL dạng
@@ -323,7 +333,12 @@ public class AuthenticationController extends HttpServlet {
         // KHÔNG dùng hash cũ đang cache trong session -- phòng trường hợp mật
         // khẩu đã bị đổi ở nơi khác (vd. một tab khác) từ lúc đăng nhập tới giờ.
         User freshUser = employeeDAO.findByUsernameOrEmail(currentUser.getUsername());
-        if (freshUser == null) {
+        // freshUser.isDeleted(): tài khoản có thể đã bị khóa bởi admin từ lúc
+        // đăng nhập tới giờ (findByUsernameOrEmail giờ trả về cả tài khoản bị
+        // khóa, xem ghi chú ở EmployeeDAO) -- coi như phiên hết hiệu lực, huỷ
+        // session và đá về màn hình đăng nhập, KHÔNG cho đổi mật khẩu.
+        if (freshUser == null || freshUser.isDeleted()) {
+            session.invalidate();
             response.sendRedirect(request.getContextPath() + "/login.jsp");
             return;
         }

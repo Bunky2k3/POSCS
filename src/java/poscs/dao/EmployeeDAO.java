@@ -19,15 +19,19 @@ import poscs.model.User;
 public class EmployeeDAO {
 
     /**
-     * Tra cứu 1 nhân viên đang hoạt động (is_deleted=0) theo username HOẶC
-     * email, kèm role -- dùng cho đăng nhập. Trả về null nếu không tìm thấy.
+     * Tra cứu 1 nhân viên theo username HOẶC email, kèm role -- dùng cho
+     * đăng nhập. Trả về null nếu không tìm thấy. LƯU Ý: không lọc theo
+     * is_deleted ở đây -- tài khoản bị khóa (is_deleted=1) vẫn được trả về
+     * để controller có thể phân biệt "sai mật khẩu" với "tài khoản bị khóa"
+     * và báo thông báo lỗi phù hợp (chỉ sau khi đã xác minh đúng mật khẩu,
+     * để không lộ trạng thái tài khoản cho kẻ dò mật khẩu).
      */
     public User findByUsernameOrEmail(String identifier) {
         // JOIN sẵn bảng roles để lấy luôn role_name, tránh phải query thêm lần 2.
         String sql = "SELECT u.user_id, u.username, u.email, u.password_hash, u.role_id, " +
-                     "u.last_name, u.middle_name, u.first_name, u.department_id, r.role_name " +
+                     "u.last_name, u.middle_name, u.first_name, u.department_id, u.is_deleted, r.role_name " +
                      "FROM users u JOIN roles r ON u.role_id = r.role_id " +
-                     "WHERE (u.username = ? OR u.email = ?) AND u.is_deleted = 0";
+                     "WHERE (u.username = ? OR u.email = ?)";
         try (Connection conn = DBContext.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             // Cùng 1 giá trị identifier được so khớp với cả 2 cột username và email,
@@ -47,6 +51,7 @@ public class EmployeeDAO {
                     u.setMiddleName(rs.getString("middle_name"));
                     u.setFirstName(rs.getString("first_name"));
                     u.setDepartmentId(rs.getInt("department_id"));
+                    u.setDeleted(rs.getBoolean("is_deleted"));
                     u.setRole(new Role(rs.getInt("role_id"), rs.getString("role_name")));
                     return u;
                 }
