@@ -251,6 +251,27 @@ public class ContractDAO {
         return result;
     }
 
+    /**
+     * Gỡ 1 dòng hạng mục sản phẩm khỏi hợp đồng (contractproducts không có cột
+     * is_deleted nên xoá cứng, khác với contracts/enterprises dùng xoá mềm).
+     * contractId dùng để đảm bảo chỉ xoá đúng dòng thuộc hợp đồng đang thao
+     * tác, tránh 1 contractProductId sai/giả mạo xoá nhầm dòng của hợp đồng
+     * khác.
+     */
+    public boolean deleteProductLine(int contractProductId, int contractId) {
+        String sql = "DELETE FROM contractproducts WHERE contract_product_id = ? AND contract_id = ?";
+        try (Connection conn = DBContext.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, contractProductId);
+            ps.setInt(2, contractId);
+            return ps.executeUpdate() > 0;
+        } catch (SQLException ex) {
+            System.err.println("--- LOI XOA HANG MUC SAN PHAM HOP DONG ---");
+            ex.printStackTrace();
+            return false;
+        }
+    }
+
     /** Sinh mã hợp đồng tiếp theo dạng HD-0001, HD-0002, ... */
     public String generateNextContractCode() {
         String sql = "SELECT contract_code FROM contracts ORDER BY contract_id DESC LIMIT 1";
