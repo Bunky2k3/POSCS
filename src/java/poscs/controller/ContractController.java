@@ -122,6 +122,12 @@ public class ContractController extends HttpServlet {
             case "importPdf":
                 handleImportPdf(request, response);
                 break;
+            case "addProduct":
+                handleAddProduct(request, response);
+                break;
+            case "removeProduct":
+                handleRemoveProduct(request, response);
+                break;
             default:
                 response.sendRedirect(request.getContextPath() + "/contract");
         }
@@ -171,6 +177,8 @@ public class ContractController extends HttpServlet {
         request.setAttribute("contract", contract);
         request.setAttribute("canDelete", contractDAO.canDelete(id));
         request.setAttribute("contractProducts", contractDAO.findProductsByContractId(id));
+        // Danh sách sản phẩm còn hoạt động, phục vụ dropdown "Thêm sản phẩm" bên dưới bảng hạng mục.
+        request.setAttribute("productOptions", productDAO.findAll(1, Integer.MAX_VALUE, null, null));
 
         request.getRequestDispatcher(DETAIL_VIEW).forward(request, response);
     }
@@ -692,6 +700,60 @@ public class ContractController extends HttpServlet {
 
         contractDAO.softDelete(id);
         response.sendRedirect(request.getContextPath() + "/contract");
+    }
+
+    /** Gắn thêm 1 dòng sản phẩm/dịch vụ vào hợp đồng đã có -- nút "Thêm sản phẩm" ở viewcontractdetail.jsp. */
+    private void handleAddProduct(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        if (!AccessControl.requireFullAccess(request, response, AccessControl.Resource.CONTRACT)) {
+            return;
+        }
+        Integer contractId = parseIntOrNull(request.getParameter("contractId"));
+        if (contractId == null || contractDAO.findById(contractId) == null) {
+            response.sendRedirect(request.getContextPath() + "/contract?error=notfound");
+            return;
+        }
+
+        Integer productId = parseIntOrNull(request.getParameter("productId"));
+        Integer quantity = parseQuantityOrNull(request.getParameter("quantity"));
+        String unit = request.getParameter("unit");
+        String notes = request.getParameter("notes");
+
+        Product product = productId != null ? productDAO.findById(productId) : null;
+        if (product == null || quantity == null || quantity <= 0) {
+            response.sendRedirect(request.getContextPath() + "/contract?action=view&id=" + contractId + "&error=add_product_invalid");
+            return;
+        }
+
+        ContractProduct item = new ContractProduct();
+        item.setProductId(product.getProductId());
+        item.setQuantity(quantity);
+        item.setUnit(isBlank(unit) ? "Cái" : unit.trim());
+        item.setNotes(emptyToNull(notes));
+
+        if (!contractDAO.insertProducts(contractId, List.of(item))) {
+            response.sendRedirect(request.getContextPath() + "/contract?action=view&id=" + contractId + "&error=add_product_failed");
+            return;
+        }
+        response.sendRedirect(request.getContextPath() + "/contract?action=view&id=" + contractId);
+    }
+
+    /** Gỡ 1 dòng sản phẩm/dịch vụ khỏi hợp đồng -- nút "Xoá" từng dòng ở viewcontractdetail.jsp. */
+    private void handleRemoveProduct(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        if (!AccessControl.requireFullAccess(request, response, AccessControl.Resource.CONTRACT)) {
+            return;
+        }
+        Integer contractId = parseIntOrNull(request.getParameter("contractId"));
+        Integer contractProductId = parseIntOrNull(request.getParameter("contractProductId"));
+        if (contractId == null || contractProductId == null) {
+            response.sendRedirect(request.getContextPath() + "/contract?error=notfound");
+            return;
+        }
+
+        if (!contractDAO.deleteProductLine(contractProductId, contractId)) {
+            response.sendRedirect(request.getContextPath() + "/contract?action=view&id=" + contractId + "&error=remove_product_failed");
+            return;
+        }
+        response.sendRedirect(request.getContextPath() + "/contract?action=view&id=" + contractId);
     }
 
     // ------------------------------------------------------------------

@@ -84,6 +84,22 @@
         .totals-row { display: flex; justify-content: space-between; padding: 7px 0; font-size: 0.88rem; color: #374151; }
         .totals-row.grand { border-top: 1.5px solid #eef2f6; margin-top: 6px; padding-top: 12px; font-weight: 700; font-size: 1rem; color: var(--primary-dark); }
 
+        .btn-remove-item {
+            width: 28px; height: 28px; border-radius: 8px; border: 1px solid #fecaca;
+            background: #fff5f5; color: var(--danger); display: inline-flex; align-items: center; justify-content: center;
+            font-size: 0.8rem; cursor: pointer;
+        }
+        .btn-remove-item:hover { background: var(--danger); color: #fff; }
+
+        .add-product-form { margin-top: 18px; padding-top: 18px; border-top: 1.5px solid #eef2f6; }
+        .add-product-form .form-label { font-size: 0.75rem; font-weight: 600; color: #6b7280; margin-bottom: 4px; }
+        .add-product-form .form-control, .add-product-form .form-select { border-radius: 10px; font-size: 0.88rem; }
+        .btn-add-item {
+            width: 100%; height: 38px; border-radius: 10px; border: none;
+            background: linear-gradient(120deg, var(--primary), var(--primary-light)); color: #fff; cursor: pointer;
+        }
+        .btn-add-item:hover { opacity: 0.9; }
+
         @media (max-width: 768px) { .info-card, .detail-header { padding: 20px; } }
 
         .toast-msg {
@@ -111,6 +127,24 @@
         <div class="toast-msg blocked show">
             <i class="fa-solid fa-circle-xmark"></i>
             <span>Không xuất được PDF: hợp đồng có quá nhiều dòng sản phẩm/ghi chú dài để vừa 1 trang. Hãy rút gọn ghi chú hoặc liên hệ quản trị viên.</span>
+        </div>
+    </c:if>
+    <c:if test="${param.error == 'add_product_invalid'}">
+        <div class="toast-msg blocked show">
+            <i class="fa-solid fa-circle-xmark"></i>
+            <span>Không thêm được sản phẩm: vui lòng chọn sản phẩm và nhập số lượng hợp lệ.</span>
+        </div>
+    </c:if>
+    <c:if test="${param.error == 'add_product_failed'}">
+        <div class="toast-msg blocked show">
+            <i class="fa-solid fa-circle-xmark"></i>
+            <span>Thêm sản phẩm thất bại -- vui lòng thử lại.</span>
+        </div>
+    </c:if>
+    <c:if test="${param.error == 'remove_product_failed'}">
+        <div class="toast-msg blocked show">
+            <i class="fa-solid fa-circle-xmark"></i>
+            <span>Không gỡ được sản phẩm này -- vui lòng thử lại.</span>
         </div>
     </c:if>
 
@@ -212,6 +246,7 @@
                                 <th class="num" style="width:90px;">Số lượng</th>
                                 <th style="width:110px;">Đơn vị</th>
                                 <th>Ghi chú</th>
+                                <th style="width:40px;"></th>
                             </tr>
                         </thead>
                         <tbody>
@@ -227,12 +262,50 @@
                                     <td class="num">${cp.quantity}</td>
                                     <td>${fn:escapeXml(cp.unit)}</td>
                                     <td>${not empty cp.notes ? fn:escapeXml(cp.notes) : '—'}</td>
+                                    <td>
+                                        <button type="button" class="btn-remove-item" title="Gỡ sản phẩm này"
+                                                onclick="confirmRemoveProduct(${cp.contractProductId})">
+                                            <i class="fa-solid fa-xmark"></i>
+                                        </button>
+                                    </td>
                                 </tr>
                             </c:forEach>
                         </tbody>
                     </table>
                 </c:otherwise>
             </c:choose>
+
+            <form class="add-product-form" method="POST" action="${pageContext.request.contextPath}/contract">
+                <input type="hidden" name="csrfToken" value="${csrfToken}">
+                <input type="hidden" name="action" value="addProduct">
+                <input type="hidden" name="contractId" value="${contract.contractId}">
+                <div class="row g-2 align-items-end">
+                    <div class="col-md-4">
+                        <label class="form-label">Sản phẩm</label>
+                        <select name="productId" class="form-select" required>
+                            <option value="" selected disabled>-- Chọn sản phẩm --</option>
+                            <c:forEach var="p" items="${productOptions}">
+                                <option value="${p.productId}">${fn:escapeXml(p.productCode)} - ${fn:escapeXml(p.productName)}</option>
+                            </c:forEach>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Số lượng</label>
+                        <input type="text" name="quantity" class="form-control" placeholder="VD: 1.000" required>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Đơn vị</label>
+                        <input type="text" name="unit" class="form-control" placeholder="Cái">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Ghi chú</label>
+                        <input type="text" name="notes" class="form-control" placeholder="Không bắt buộc">
+                    </div>
+                    <div class="col-md-1">
+                        <button type="submit" class="btn-add-item" title="Thêm sản phẩm"><i class="fa-solid fa-plus"></i></button>
+                    </div>
+                </div>
+            </form>
         </div>
 
         <!-- ===== Ghi chú / điều khoản ===== -->
@@ -252,11 +325,26 @@
         <input type="hidden" name="id" id="deleteFormId">
     </form>
 
+    <!-- Form ẩn để gửi yêu cầu gỡ 1 dòng sản phẩm qua POST -->
+    <form id="removeProductForm" method="POST" action="${pageContext.request.contextPath}/contract" style="display:none">
+        <input type="hidden" name="csrfToken" value="${csrfToken}">
+        <input type="hidden" name="action" value="removeProduct">
+        <input type="hidden" name="contractId" value="${contract.contractId}">
+        <input type="hidden" name="contractProductId" id="removeProductFormId">
+    </form>
+
     <script>
         function confirmDelete(contractId) {
             if (confirm('Bạn có chắc chắn muốn xóa hợp đồng này?')) {
                 document.getElementById('deleteFormId').value = contractId;
                 document.getElementById('deleteForm').submit();
+            }
+        }
+
+        function confirmRemoveProduct(contractProductId) {
+            if (confirm('Gỡ sản phẩm này khỏi hợp đồng?')) {
+                document.getElementById('removeProductFormId').value = contractProductId;
+                document.getElementById('removeProductForm').submit();
             }
         }
     </script>
