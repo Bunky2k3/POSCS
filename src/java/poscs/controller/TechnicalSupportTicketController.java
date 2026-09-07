@@ -214,14 +214,21 @@ public class TechnicalSupportTicketController extends HttpServlet {
         if (t.getContractId() == null) {
             t.setContractId(existing.getContractId());
         }
+        // Chụp lại status/resolvedAt GỐC trước khi set field mới -- ở nhánh
+        // không Full access, t chính LÀ existing (cùng reference), nên nếu đọc
+        // existing.getStatus() sau khi đã t.setStatus() thì sẽ đọc lại đúng giá
+        // trị vừa mới set, luôn thấy "đã đóng từ trước" ngay lần đóng đầu tiên
+        // và không bao giờ stamp được resolved_at cho case kỹ thuật viên tự đóng.
+        String previousStatus = existing.getStatus();
+        Timestamp previousResolvedAt = existing.getResolvedAt();
         t.setStatus(emptyToNull(request.getParameter("status")));
         t.setResolutionSummary(emptyToNull(request.getParameter("resolutionSummary")));
         if (TechnicalSupportTicketDAO.STATUS_CLOSED.equals(t.getStatus())) {
             // Chỉ stamp resolved_at = bây giờ ở lần đầu tiên chuyển sang "Đã đóng"
             // -- nếu phiếu đã đóng từ trước (sửa lại resolutionSummary chẳng hạn),
             // giữ nguyên thời điểm đóng gốc thay vì ghi đè lại mỗi lần lưu.
-            t.setResolvedAt(TechnicalSupportTicketDAO.STATUS_CLOSED.equals(existing.getStatus())
-                    ? existing.getResolvedAt()
+            t.setResolvedAt(TechnicalSupportTicketDAO.STATUS_CLOSED.equals(previousStatus)
+                    ? previousResolvedAt
                     : new Timestamp(System.currentTimeMillis()));
         } else {
             t.setResolvedAt(null);
