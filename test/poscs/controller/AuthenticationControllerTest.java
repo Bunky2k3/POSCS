@@ -57,6 +57,11 @@ public class AuthenticationControllerTest {
         request = mock(HttpServletRequest.class);
         response = mock(HttpServletResponse.class);
         when(request.getContextPath()).thenReturn(CONTEXT_PATH);
+        // Bộ đếm rate-limit đăng nhập là static, dùng chung cho cả class trong
+        // JVM test này (xem AuthenticationController.LOGIN_ATTEMPTS_BY_IP) --
+        // mỗi test phải có 1 IP giả RIÊNG, không thì số lần sai của test này
+        // sẽ cộng dồn vào test khác chạy sau, gây fail ngẫu nhiên theo thứ tự chạy.
+        when(request.getRemoteAddr()).thenReturn(java.util.UUID.randomUUID().toString());
     }
 
     private static void setField(Object target, String fieldName, Object value) throws Exception {
@@ -188,6 +193,50 @@ public class AuthenticationControllerTest {
         controller.doPost(request, response);
 
         verify(response).sendRedirect(contains("error=invalid_credentials"));
+    }
+
+    /** BR mới: chống dò mật khẩu -- quá MAX_LOGIN_ATTEMPTS (5) lần sai từ cùng 1 IP thì tạm khoá thêm. */
+    @Test
+    public void login_tooManyFailedAttemptsFromSameIp_locksOutEvenWithCorrectPasswordAfterward() throws Exception {
+        when(request.getServletPath()).thenReturn("/login");
+        when(request.getParameter("username")).thenReturn("annd");
+        when(employeeDAO.findByUsernameOrEmail("annd")).thenReturn(userWithPassword("correct-password"));
+
+        when(request.getParameter("password")).thenReturn("wrong-password");
+        for (int i = 0; i < 5; i++) {
+            controller.doPost(request, response);
+        }
+
+        // Lần thứ 6, gõ ĐÚNG mật khẩu -- vẫn phải bị chặn vì IP đã bị khoá tạm.
+        when(request.getParameter("password")).thenReturn("correct-password");
+        controller.doPost(request, response);
+
+        verify(response).sendRedirect(contains("error=too_many_attempts"));
+        verify(response, never()).sendRedirect(CONTEXT_PATH + "/dashboard");
+    }
+
+    @Test
+    public void login_successResetsFailedAttemptCounterForThatIp() throws Exception {
+        when(request.getServletPath()).thenReturn("/login");
+        when(request.getParameter("username")).thenReturn("annd");
+        when(employeeDAO.findByUsernameOrEmail("annd")).thenReturn(userWithPassword("correct-password"));
+        when(request.getSession(true)).thenReturn(mock(HttpSession.class));
+
+        // 4 lần sai (chưa chạm ngưỡng 5) rồi 1 lần đúng -- phải xoá bộ đếm.
+        when(request.getParameter("password")).thenReturn("wrong-password");
+        for (int i = 0; i < 4; i++) {
+            controller.doPost(request, response);
+        }
+        when(request.getParameter("password")).thenReturn("correct-password");
+        controller.doPost(request, response);
+        verify(response).sendRedirect(CONTEXT_PATH + "/dashboard"); // xác nhận lần đúng đã đăng nhập thành công
+
+        // Sai tiếp 1 lần nữa sau khi đã đăng nhập thành công -- KHÔNG được coi
+        // là lần sai thứ 5 cộng dồn từ trước, vì bộ đếm phải đã được xoá.
+        when(request.getParameter("password")).thenReturn("wrong-password");
+        controller.doPost(request, response);
+
+        verify(response, never()).sendRedirect(contains("error=too_many_attempts"));
     }
 
     @Test
