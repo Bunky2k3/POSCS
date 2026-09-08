@@ -242,6 +242,7 @@
                                 <c:when test="${param.error == 'invalid_credentials'}">Sai tên đăng nhập hoặc mật khẩu.</c:when>
                                 <c:when test="${param.error == 'account_inactive'}">Tài khoản này đã bị khóa hoặc ngừng hoạt động. Vui lòng liên hệ quản trị viên để được hỗ trợ.</c:when>
                                 <c:when test="${param.error == 'missing_fields'}">Vui lòng nhập đầy đủ tên đăng nhập và mật khẩu.</c:when>
+                                <c:when test="${param.error == 'too_many_attempts'}">Bạn đã nhập sai quá nhiều lần. Vui lòng thử lại sau ít phút.</c:when>
                                 <c:otherwise>Đăng nhập thất bại. Vui lòng thử lại.</c:otherwise>
                             </c:choose>
                         </div>

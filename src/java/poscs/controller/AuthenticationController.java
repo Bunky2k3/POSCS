@@ -5,6 +5,8 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.sql.Date;
 import java.time.format.DateTimeFormatter;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.MultipartConfig;
 import jakarta.servlet.annotation.WebServlet;
@@ -37,6 +39,29 @@ public class AuthenticationController extends HttpServlet {
 
     private final EmployeeDAO employeeDAO = new EmployeeDAO();
     private final AddressDAO addressDAO = new AddressDAO();
+
+    // Số lần đăng nhập sai tối đa cho phép từ 1 địa chỉ IP trước khi tạm khoá
+    // -- không có giới hạn này thì /login có thể bị dò mật khẩu (brute-force)
+    // hoặc rải mật khẩu qua nhiều tài khoản (password spraying) không giới
+    // hạn số lần, giống lỗ hổng OTP đã sửa ở PasswordResetController.
+    private static final int MAX_LOGIN_ATTEMPTS = 5;
+    private static final long LOGIN_LOCKOUT_MILLIS = 15 * 60 * 1000L; // 15 phút
+
+    /**
+     * Đếm theo ĐỊA CHỈ IP, không theo username/email đã gõ -- nếu đếm theo
+     * định danh tài khoản, việc có bị khoá hay không sẽ vô tình lộ ra tài
+     * khoản đó CÓ TỒN TẠI (chỉ tài khoản thật mới tích luỹ được số lần sai),
+     * phá vỡ đúng nguyên tắc chống user-enumeration mà handleLogin đã cố
+     * gắng giữ (cùng 1 lỗi "invalid_credentials" cho cả 2 trường hợp không
+     * tồn tại lẫn sai mật khẩu). Đếm theo IP còn chặn được cả kiểu tấn công
+     * rải mật khẩu qua nhiều username khác nhau từ cùng 1 nguồn.
+     */
+    private static final Map<String, LoginAttemptState> LOGIN_ATTEMPTS_BY_IP = new ConcurrentHashMap<>();
+
+    private static final class LoginAttemptState {
+        private int failedCount;
+        private long lockedUntilMillis;
+    }
 
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
@@ -275,6 +300,13 @@ public class AuthenticationController extends HttpServlet {
             return;
         }
 
+        String clientIp = request.getRemoteAddr();
+        long now = System.currentTimeMillis();
+        if (isLockedOut(clientIp, now)) {
+            redirectToLoginWithError(request, response, "too_many_attempts", identifier);
+            return;
+        }
+
         User user = employeeDAO.findByUsernameOrEmail(identifier);
         // Gộp chung 2 trường hợp "không tìm thấy user" và "sai mật khẩu" thành
         // cùng 1 thông báo lỗi ở phía client (login.jsp), để không lộ cho kẻ tấn
@@ -282,9 +314,12 @@ public class AuthenticationController extends HttpServlet {
         // bước kiểm tra: nếu user == null thì gọi BCrypt.checkpw sẽ NullPointerException,
         // nên phải kiểm tra user == null trước bằng toán tử || ngắn mạch).
         if (user == null || !BCrypt.checkpw(password, user.getPasswordHash())) {
+            recordFailedLoginAttempt(clientIp, now);
             redirectToLoginWithError(request, response, "invalid_credentials", identifier);
             return;
         }
+        // Mật khẩu đúng -- xoá bộ đếm sai của IP này, không giữ lại tính vào lần sau.
+        LOGIN_ATTEMPTS_BY_IP.remove(clientIp);
 
         // Chỉ SAU KHI đã xác minh đúng mật khẩu mới kiểm tra tài khoản có bị
         // khóa (is_deleted=1) hay không, rồi mới báo riêng "tài khoản bị khóa"
@@ -395,6 +430,22 @@ public class AuthenticationController extends HttpServlet {
             url += "&username=" + URLEncoder.encode(identifier, StandardCharsets.UTF_8);
         }
         response.sendRedirect(url);
+    }
+
+    private boolean isLockedOut(String clientIp, long now) {
+        LoginAttemptState state = LOGIN_ATTEMPTS_BY_IP.get(clientIp);
+        return state != null && state.lockedUntilMillis > now;
+    }
+
+    /** Tăng bộ đếm sai của 1 IP; đủ MAX_LOGIN_ATTEMPTS lần thì khoá tạm LOGIN_LOCKOUT_MILLIS. */
+    private void recordFailedLoginAttempt(String clientIp, long now) {
+        LoginAttemptState state = LOGIN_ATTEMPTS_BY_IP.computeIfAbsent(clientIp, k -> new LoginAttemptState());
+        synchronized (state) {
+            state.failedCount++;
+            if (state.failedCount >= MAX_LOGIN_ATTEMPTS) {
+                state.lockedUntilMillis = now + LOGIN_LOCKOUT_MILLIS;
+            }
+        }
     }
 
     /** Trim khoảng trắng thừa; chuỗi rỗng sau khi trim coi như null (chưa nhập). */
