@@ -87,7 +87,7 @@
                     <div class="row">
                         <div class="col-md-6 field-row">
                             <label for="email">Email công ty (dùng đăng nhập, hệ thống tự cấp -- không thể sửa)</label>
-                            <input type="email" class="form-control" id="email" value="${employee.email}" disabled readonly>
+                            <input type="email" class="form-control" id="email" value="${fn:escapeXml(employee.email)}" disabled readonly>
                         </div>
                         <div class="col-md-6 field-row">
                             <label for="department">Phòng ban</label>
@@ -119,16 +119,16 @@
                     <div class="row">
                         <div class="col-md-4 field-row">
                             <label for="lastName">Họ</label>
-                            <input type="text" class="form-control" id="lastName" name="lastName" value="${employee.lastName}">
+                            <input type="text" class="form-control" id="lastName" name="lastName" value="${fn:escapeXml(employee.lastName)}">
                             <span class="error-text" id="err-lastName">Trường này không được để trống.</span>
                         </div>
                         <div class="col-md-4 field-row">
                             <label for="middleName">Tên đệm</label>
-                            <input type="text" class="form-control" id="middleName" name="middleName" value="${employee.middleName}">
+                            <input type="text" class="form-control" id="middleName" name="middleName" value="${fn:escapeXml(employee.middleName)}">
                         </div>
                         <div class="col-md-4 field-row">
                             <label for="firstName">Tên</label>
-                            <input type="text" class="form-control" id="firstName" name="firstName" value="${employee.firstName}">
+                            <input type="text" class="form-control" id="firstName" name="firstName" value="${fn:escapeXml(employee.firstName)}">
                             <span class="error-text" id="err-firstName">Trường này không được để trống.</span>
                         </div>
 
@@ -147,18 +147,18 @@
                         </div>
                         <div class="col-md-4 field-row">
                             <label for="citizenId">Số CCCD/CMND</label>
-                            <input type="text" class="form-control" id="citizenId" name="citizenId" value="${employee.citizenId}">
+                            <input type="text" class="form-control" id="citizenId" name="citizenId" value="${fn:escapeXml(employee.citizenId)}">
                             <span class="error-text" id="err-citizenId">Trường này không được để trống.</span>
                         </div>
 
                         <div class="col-md-6 field-row">
                             <label for="phone">Số điện thoại</label>
-                            <input type="tel" class="form-control" id="phone" name="phone" value="${employee.phone}">
+                            <input type="tel" class="form-control" id="phone" name="phone" value="${fn:escapeXml(employee.phone)}">
                             <span class="error-text" id="err-phone">Số điện thoại không hợp lệ.</span>
                         </div>
                         <div class="col-md-6 field-row">
                             <label for="personalEmail">Email cá nhân <span class="text-muted" style="text-transform:none; font-weight:400;">(dùng để gửi tài khoản)</span></label>
-                            <input type="email" class="form-control" id="personalEmail" name="personalEmail" value="${employee.personalEmail}">
+                            <input type="email" class="form-control" id="personalEmail" name="personalEmail" value="${fn:escapeXml(employee.personalEmail)}">
                             <span class="error-text" id="err-personalEmail">Vui lòng nhập email cá nhân hợp lệ.</span>
                         </div>
                     </div>
@@ -171,7 +171,7 @@
                             <select class="form-select" id="province" name="provinceId">
                                 <option value="">-- Chọn tỉnh / thành phố --</option>
                                 <c:forEach var="prov" items="${provinceList}">
-                                    <option value="${prov.provinceId}" ${employee.address != null && employee.address.district != null && prov.provinceId == employee.address.district.provinceId ? 'selected' : ''}>${prov.shortName}</option>
+                                    <option value="${prov.provinceId}" ${employee.address != null && employee.address.district != null && prov.provinceId == employee.address.district.provinceId ? 'selected' : ''}>${fn:escapeXml(prov.shortName)}</option>
                                 </c:forEach>
                             </select>
                         </div>
@@ -180,7 +180,7 @@
                             <select class="form-select" id="district" name="districtId">
                                 <c:choose>
                                     <c:when test="${employee.address != null && employee.address.district != null}">
-                                        <option value="${employee.address.districtId}" selected>${employee.address.district.shortName}</option>
+                                        <option value="${employee.address.districtId}" selected>${fn:escapeXml(employee.address.district.shortName)}</option>
                                     </c:when>
                                     <c:otherwise>
                                         <option value="">-- Chọn tỉnh / thành phố trước --</option>

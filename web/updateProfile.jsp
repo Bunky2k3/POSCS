@@ -208,16 +208,16 @@
                     <div class="row">
                         <div class="col-md-4 field-row">
                             <label for="lastName">Họ</label>
-                            <input type="text" class="form-control" id="lastName" name="lastName" value="${profile.lastName}">
+                            <input type="text" class="form-control" id="lastName" name="lastName" value="${fn:escapeXml(profile.lastName)}">
                             <span class="error-text" id="err-lastName">Trường này không được để trống.</span>
                         </div>
                         <div class="col-md-4 field-row">
                             <label for="middleName">Tên đệm</label>
-                            <input type="text" class="form-control" id="middleName" name="middleName" value="${profile.middleName}">
+                            <input type="text" class="form-control" id="middleName" name="middleName" value="${fn:escapeXml(profile.middleName)}">
                         </div>
                         <div class="col-md-4 field-row">
                             <label for="firstName">Tên</label>
-                            <input type="text" class="form-control" id="firstName" name="firstName" value="${profile.firstName}">
+                            <input type="text" class="form-control" id="firstName" name="firstName" value="${fn:escapeXml(profile.firstName)}">
                             <span class="error-text" id="err-firstName">Trường này không được để trống.</span>
                         </div>
 
@@ -235,18 +235,18 @@
                         </div>
                         <div class="col-md-4 field-row">
                             <label for="citizenId">Số CCCD/CMND</label>
-                            <input type="text" class="form-control" id="citizenId" name="citizenId" value="${profile.citizenId}">
+                            <input type="text" class="form-control" id="citizenId" name="citizenId" value="${fn:escapeXml(profile.citizenId)}">
                             <span class="error-text" id="err-citizenId">Trường này không được để trống.</span>
                         </div>
 
                         <div class="col-md-6 field-row">
                             <label for="phone">Số điện thoại</label>
-                            <input type="tel" class="form-control" id="phone" name="phone" value="${profile.phone}">
+                            <input type="tel" class="form-control" id="phone" name="phone" value="${fn:escapeXml(profile.phone)}">
                             <span class="error-text" id="err-phone">Số điện thoại không hợp lệ.</span>
                         </div>
                         <div class="col-md-6 field-row">
                             <label for="personalEmail">Email cá nhân</label>
-                            <input type="email" class="form-control" id="personalEmail" name="personalEmail" value="${profile.personalEmail}">
+                            <input type="email" class="form-control" id="personalEmail" name="personalEmail" value="${fn:escapeXml(profile.personalEmail)}">
                             <span class="error-text" id="err-email">Địa chỉ email không hợp lệ.</span>
                         </div>
                     </div>
@@ -259,7 +259,7 @@
                             <select class="form-select" id="province" name="provinceId">
                                 <option value="">-- Chọn tỉnh / thành phố --</option>
                                 <c:forEach var="prov" items="${provinceList}">
-                                    <option value="${prov.provinceId}" ${profile.address != null && profile.address.district != null && prov.provinceId == profile.address.district.provinceId ? 'selected' : ''}>${prov.shortName}</option>
+                                    <option value="${prov.provinceId}" ${profile.address != null && profile.address.district != null && prov.provinceId == profile.address.district.provinceId ? 'selected' : ''}>${fn:escapeXml(prov.shortName)}</option>
                                 </c:forEach>
                             </select>
                             <span class="error-text" id="err-province">Vui lòng chọn tỉnh / thành phố.</span>
@@ -269,7 +269,7 @@
                             <select class="form-select" id="district" name="districtId">
                                 <c:choose>
                                     <c:when test="${profile.address != null && profile.address.district != null}">
-                                        <option value="${profile.address.districtId}" selected>${profile.address.district.shortName}</option>
+                                        <option value="${profile.address.districtId}" selected>${fn:escapeXml(profile.address.district.shortName)}</option>
                                     </c:when>
                                     <c:otherwise>
                                         <option value="">-- Chọn xã / phường --</option>

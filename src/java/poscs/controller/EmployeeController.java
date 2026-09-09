@@ -14,6 +14,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.mindrot.jbcrypt.BCrypt;
 import poscs.common.AccessControl;
 import poscs.common.EmailUtil;
+import poscs.common.TextRules;
 import poscs.dao.AddressDAO;
 import poscs.dao.EmployeeDAO;
 import poscs.model.Address;
@@ -351,6 +352,12 @@ public class EmployeeController extends HttpServlet {
      */
     private boolean isValidCommonFields(User u) {
         if (isBlank(u.getLastName()) || isBlank(u.getFirstName()) || isBlank(u.getCitizenId())) {
+            return false;
+        }
+        if (!TextRules.isSafeFreeText(u.getLastName())
+                || !TextRules.isSafeFreeText(u.getMiddleName())
+                || !TextRules.isSafeFreeText(u.getFirstName())
+                || (u.getAddress() != null && !TextRules.isSafeFreeText(u.getAddress().getStreetAndLocalName()))) {
             return false;
         }
         if (u.getRoleId() <= 0 || u.getDepartmentId() <= 0) {

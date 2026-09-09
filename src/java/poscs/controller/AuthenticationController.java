@@ -15,6 +15,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 import org.mindrot.jbcrypt.BCrypt;
+import poscs.common.TextRules;
 import poscs.dao.AddressDAO;
 import poscs.dao.EmployeeDAO;
 import poscs.model.Address;
@@ -188,6 +189,16 @@ public class AuthenticationController extends HttpServlet {
             response.sendRedirect(request.getContextPath() + "/updateProfile?error=missing_fields");
             return;
         }
+        // Họ tên/địa chỉ là ô văn bản tự do duy nhất người dùng tự gõ ở đây
+        // (SĐT/email đã có regex riêng bên dưới) -- chặn ký tự phá ngữ cảnh
+        // HTML để dữ liệu vào CSDL luôn sạch, xem TextRules.
+        String middleName = trimToNull(request.getParameter("middleName"));
+        String addressDetail = trimToNull(request.getParameter("addressDetail"));
+        if (!TextRules.isSafeFreeText(lastName) || !TextRules.isSafeFreeText(middleName)
+                || !TextRules.isSafeFreeText(firstName) || !TextRules.isSafeFreeText(addressDetail)) {
+            response.sendRedirect(request.getContextPath() + "/updateProfile?error=invalid_characters");
+            return;
+        }
         if (phone == null || !phone.replaceAll("\\s", "").matches("^(0|\\+84)(3|5|7|8|9)[0-9]{8}$")) {
             response.sendRedirect(request.getContextPath() + "/updateProfile?error=invalid_phone");
             return;
@@ -211,7 +222,7 @@ public class AuthenticationController extends HttpServlet {
         User user = new User();
         user.setUserId(currentUser.getUserId());
         user.setLastName(lastName);
-        user.setMiddleName(trimToNull(request.getParameter("middleName")));
+        user.setMiddleName(middleName);
         user.setFirstName(firstName);
         user.setGender(request.getParameter("gender"));
         user.setDateOfBirth(parseDateOrNull(request.getParameter("dob")));
@@ -342,6 +353,11 @@ public class AuthenticationController extends HttpServlet {
             oldSession.invalidate();
         }
         HttpSession session = request.getSession(true);
+        // Bỏ chuỗi băm mật khẩu trước khi cất object này vào session: mọi JSP
+        // đều đọc được ${sessionScope.currentUser.*}, nên chỉ cần một lần lỡ
+        // tay in cả object ra là lộ hash. Sau checkpw() ở trên thì không còn
+        // chỗ nào cần tới nó nữa.
+        user.setPasswordHash(null);
         session.setAttribute("currentUser", user);
         response.sendRedirect(request.getContextPath() + "/dashboard");
     }

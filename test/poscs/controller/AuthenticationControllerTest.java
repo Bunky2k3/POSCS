@@ -8,6 +8,7 @@ import jakarta.servlet.http.HttpSession;
 import org.junit.Before;
 import org.junit.Test;
 import org.mindrot.jbcrypt.BCrypt;
+import org.mockito.ArgumentCaptor;
 import poscs.dao.AddressDAO;
 import poscs.dao.EmployeeDAO;
 import poscs.model.Role;
@@ -77,6 +78,30 @@ public class AuthenticationControllerTest {
         u.setPasswordHash(BCrypt.hashpw(plainPassword, BCrypt.gensalt()));
         u.setRole(new Role(2, "Sales"));
         return u;
+    }
+
+    // ------------------------------------------------------------------
+    // Không để chuỗi băm mật khẩu lọt vào session
+    // ------------------------------------------------------------------
+
+    @Test
+    public void login_storesUserInSessionWithoutThePasswordHash() throws Exception {
+        when(request.getServletPath()).thenReturn("/login");
+        when(request.getParameter("username")).thenReturn("annd");
+        when(request.getParameter("password")).thenReturn("correct-password");
+        when(employeeDAO.findByUsernameOrEmail("annd"))
+                .thenAnswer(inv -> userWithPassword("correct-password"));
+        HttpSession session = mock(HttpSession.class);
+        when(request.getSession(true)).thenReturn(session);
+
+        controller.doPost(request, response);
+
+        // Mọi JSP đọc được ${sessionScope.currentUser.*}, nên object nằm trong
+        // session không được mang theo hash -- chỉ cần một lần lỡ in cả object.
+        ArgumentCaptor<User> stored = ArgumentCaptor.forClass(User.class);
+        verify(session).setAttribute(eq("currentUser"), stored.capture());
+        org.junit.Assert.assertNull("Session không được giữ chuỗi băm mật khẩu",
+                stored.getValue().getPasswordHash());
     }
 
     private HttpSession loggedInSession(User currentUser) {
@@ -219,7 +244,12 @@ public class AuthenticationControllerTest {
     public void login_successResetsFailedAttemptCounterForThatIp() throws Exception {
         when(request.getServletPath()).thenReturn("/login");
         when(request.getParameter("username")).thenReturn("annd");
-        when(employeeDAO.findByUsernameOrEmail("annd")).thenReturn(userWithPassword("correct-password"));
+        // Trả về object mới mỗi lượt tra, đúng như DAO thật (mỗi lần gọi là một
+        // vòng map ResultSet riêng). Dùng chung một instance cho cả 6 lượt sẽ
+        // sai thực tế: handleLogin xoá password hash khỏi object trước khi cất
+        // vào session, nên lượt sau sẽ gặp hash null.
+        when(employeeDAO.findByUsernameOrEmail("annd"))
+                .thenAnswer(inv -> userWithPassword("correct-password"));
         when(request.getSession(true)).thenReturn(mock(HttpSession.class));
 
         // 4 lần sai (chưa chạm ngưỡng 5) rồi 1 lần đúng -- phải xoá bộ đếm.
@@ -429,6 +459,52 @@ public class AuthenticationControllerTest {
 
         verify(employeeDAO, never()).updateProfile(any());
         verify(response).sendRedirect(CONTEXT_PATH + "/updateProfile?error=invalid_phone");
+    }
+
+    @Test
+    public void updateProfile_nameContainingMarkup_isRejected() throws Exception {
+        when(request.getServletPath()).thenReturn("/UpdateProfileServlet");
+        loggedInSession(userWithPassword("whatever"));
+        stubValidUpdateProfileFields();
+        when(request.getParameter("lastName")).thenReturn("Nguyễn\" onfocus=alert(1) x=\"");
+
+        controller.doPost(request, response);
+
+        // Họ tên hiển thị lại trong thuộc tính value="..." của form sửa nhân
+        // viên mà Admin mở -- nên ký tự đóng thuộc tính không được lưu xuống,
+        // dù chỗ xuất đã escape (phòng thủ hai lớp).
+        verify(employeeDAO, never()).updateProfile(any());
+        verify(response).sendRedirect(CONTEXT_PATH + "/updateProfile?error=invalid_characters");
+    }
+
+    @Test
+    public void updateProfile_addressContainingMarkup_isRejected() throws Exception {
+        when(request.getServletPath()).thenReturn("/UpdateProfileServlet");
+        loggedInSession(userWithPassword("whatever"));
+        stubValidUpdateProfileFields();
+        when(request.getParameter("addressDetail")).thenReturn("12 Nguyễn Trãi <script>");
+
+        controller.doPost(request, response);
+
+        verify(employeeDAO, never()).updateProfile(any());
+        verify(response).sendRedirect(CONTEXT_PATH + "/updateProfile?error=invalid_characters");
+    }
+
+    @Test
+    public void updateProfile_vietnameseNameWithDiacritics_isAccepted() throws Exception {
+        when(request.getServletPath()).thenReturn("/UpdateProfileServlet");
+        loggedInSession(userWithPassword("whatever"));
+        stubValidUpdateProfileFields();
+        when(request.getParameter("lastName")).thenReturn("Nguyễn");
+        when(request.getParameter("middleName")).thenReturn("Đình");
+        when(request.getParameter("firstName")).thenReturn("Dũng");
+        when(employeeDAO.updateProfile(any())).thenReturn(true);
+
+        controller.doPost(request, response);
+
+        // Bộ lọc chỉ chặn < > " -- không được chặn nhầm tên tiếng Việt có dấu.
+        verify(employeeDAO).updateProfile(any());
+        verify(response).sendRedirect(CONTEXT_PATH + "/viewProfile");
     }
 
     @Test

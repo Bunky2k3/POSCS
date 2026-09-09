@@ -179,7 +179,7 @@
                             <select class="form-select" id="province" name="provinceId">
                                 <option value="">-- Chọn tỉnh / thành phố --</option>
                                 <c:forEach var="prov" items="${provinceList}">
-                                    <option value="${prov.provinceId}">${prov.shortName}</option>
+                                    <option value="${prov.provinceId}">${fn:escapeXml(prov.shortName)}</option>
                                 </c:forEach>
                             </select>
                         </div>
