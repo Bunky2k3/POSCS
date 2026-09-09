@@ -9,7 +9,7 @@
 
       KHÔNG bật <secure>: nó khiến trình duyệt chỉ gửi cookie qua HTTPS, nên bật
       sẵn sẽ làm hỏng việc chạy thử qua http://localhost. Khi triển khai thật
-      sau TLS thì nên bật -- xem DEPLOY.md.
+      sau TLS thì nên bật (xem DEPLOY.md).
     -->
     <session-config>
         <cookie-config>

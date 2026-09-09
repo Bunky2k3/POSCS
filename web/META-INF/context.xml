@@ -4,8 +4,8 @@
       SameSite=Lax: trình duyệt không gửi cookie phiên kèm request POST xuất
       phát từ site khác, nên form độc hại trên trang ngoài không mượn được
       phiên đăng nhập của người dùng. Đây là lớp thứ hai bên cạnh CSRF token đã
-      enforce trong AuthenticationFilter -- không thay thế nó, vì SameSite phụ
-      thuộc trình duyệt còn token thì server tự kiểm.
+      enforce trong AuthenticationFilter, không thay thế nó: SameSite phụ thuộc
+      trình duyệt, còn token thì server tự kiểm.
 
       Đặt ở context.xml thay vì web.xml vì <cookie-config> của Servlet 6.0 chưa
       có phần tử SameSite; đây là cấu hình riêng của Tomcat.

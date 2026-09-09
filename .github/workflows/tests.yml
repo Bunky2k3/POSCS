@@ -36,6 +36,13 @@ jobs:
           fi
           ant -version
 
+      # web.xml/context.xml chỉ được đọc lúc Tomcat triển khai, nên một lỗi cú
+      # pháp ở đó lọt qua cả `ant test` lẫn `ant compile-jsps` rồi mới làm hỏng
+      # toàn bộ ứng dụng khi deploy. Đã dính đúng một lần: dấu "--" nằm trong
+      # comment XML (không hợp lệ) khiến context /POSCS không khởi động được.
+      - name: Check deployment descriptors are well-formed XML
+        run: xmllint --noout web/WEB-INF/web.xml web/META-INF/context.xml
+
       # Đây là dự án NetBeans Ant, nên build-impl.xml mong đợi hai thứ mà IDE
       # thường tự cấp: classpath của Tomcat đã đăng ký, và jar CopyLibs nằm
       # trong thư mục cài NetBeans. Trên runner không có cái nào -- cả hai được
