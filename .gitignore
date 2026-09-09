@@ -23,6 +23,10 @@
 # reproducible builds across machines.
 !/lib/*.jar
 !/lib-test/*.jar
+# Compile-only jars that NetBeans normally supplies from the IDE and the
+# registered Tomcat -- committed so CI can build without either. Never
+# referenced by javac.classpath, so they stay out of the WAR.
+!/lib-build/*.jar
 
 # virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
 hs_err_pid*
