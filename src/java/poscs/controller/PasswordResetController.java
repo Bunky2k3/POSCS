@@ -2,6 +2,8 @@ package poscs.controller;
 
 import java.io.IOException;
 import java.security.SecureRandom;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServlet;
@@ -51,6 +53,21 @@ public class PasswordResetController extends HttpServlet {
     // ai cũng có thể POST thẳng vào /ResendOtpServlet liên tục để biến hệ thống
     // thành công cụ dội mail vào hòm thư nạn nhân.
     private static final long RESEND_COOLDOWN_MILLIS = 30 * 1000;
+
+    // Cooldown ở trên gắn với session, nên chỉ cần xoá cookie là lách được:
+    // mỗi request "mới tinh" lại có session mới, chưa từng gửi mã, và luồng
+    // bước 1 sẽ gửi thêm một email nữa cho địa chỉ nạn nhân. Vì thế phải giới
+    // hạn thêm theo IP -- cùng cách /login đang chặn dò mật khẩu -- để không
+    // ai biến hệ thống thành công cụ dội mail vào hòm thư người khác.
+    private static final int MAX_OTP_REQUESTS_PER_IP = 10;
+    private static final long OTP_REQUEST_WINDOW_MILLIS = 15 * 60 * 1000L;
+
+    private static final Map<String, OtpRequestState> OTP_REQUESTS_BY_IP = new ConcurrentHashMap<>();
+
+    private static final class OtpRequestState {
+        private int count;
+        private long windowStartMillis;
+    }
 
     private static final String SESSION_RESET_EMAIL = "resetEmail";
     private static final String SESSION_RESET_OTP = "resetOtp";
@@ -109,12 +126,48 @@ public class PasswordResetController extends HttpServlet {
         // verifyOtp.jsp giống nhau; nếu email không tồn tại thì đơn giản là
         // không có OTP nào được sinh/lưu/gửi, nên bước xác thực OTP ở sau chắc
         // chắn sẽ thất bại (không có gì để so khớp).
+        // Kiểm hạn mức TRƯỚC khi tra CSDL: quá hạn thì không gửi mail, cũng
+        // không chạm DB. Vẫn điều hướng sang verifyOtp.jsp như mọi trường hợp
+        // khác để không tiết lộ email nào có tài khoản (xem ghi chú bên trên).
+        if (!allowOtpRequest(clientIp(request), System.currentTimeMillis())) {
+            response.sendRedirect(request.getContextPath() + "/verifyOtp.jsp");
+            return;
+        }
+
         User user = employeeDAO.findByUsernameOrEmail(email);
         if (user != null) {
             issueOtp(request.getSession(true), email);
         }
 
         response.sendRedirect(request.getContextPath() + "/verifyOtp.jsp");
+    }
+
+    /**
+     * true nếu IP này còn lượt yêu cầu mã trong cửa sổ hiện tại. Cửa sổ trượt
+     * kiểu "reset theo mốc": hết OTP_REQUEST_WINDOW_MILLIS thì bắt đầu đếm lại
+     * từ đầu -- đủ để chặn dội mail mà không phải giữ lịch sử từng lần gọi.
+     */
+    private boolean allowOtpRequest(String clientIp, long now) {
+        // Dọn các mốc đã hết hạn để map không phình mãi theo số IP từng ghé qua.
+        OTP_REQUESTS_BY_IP.values().removeIf(s -> now - s.windowStartMillis > OTP_REQUEST_WINDOW_MILLIS);
+
+        OtpRequestState state = OTP_REQUESTS_BY_IP.computeIfAbsent(clientIp, k -> {
+            OtpRequestState fresh = new OtpRequestState();
+            fresh.windowStartMillis = now;
+            return fresh;
+        });
+        synchronized (state) {
+            if (now - state.windowStartMillis > OTP_REQUEST_WINDOW_MILLIS) {
+                state.windowStartMillis = now;
+                state.count = 0;
+            }
+            state.count++;
+            return state.count <= MAX_OTP_REQUESTS_PER_IP;
+        }
+    }
+
+    private String clientIp(HttpServletRequest request) {
+        return request.getRemoteAddr();
     }
 
     // ------------------------------------------------------------------
@@ -134,6 +187,13 @@ public class PasswordResetController extends HttpServlet {
 
         Long lastSent = (Long) session.getAttribute(SESSION_RESET_OTP_LAST_SENT);
         if (lastSent != null && System.currentTimeMillis() - lastSent < RESEND_COOLDOWN_MILLIS) {
+            response.sendRedirect(request.getContextPath() + "/verifyOtp.jsp?error=resend_too_soon");
+            return;
+        }
+
+        // Gửi lại cũng tiêu lượt của cùng hạn mức theo IP: chỉ chờ hết 30 giây
+        // mỗi lần thì vẫn dội được đều đặn vào một hòm thư suốt cả ngày.
+        if (!allowOtpRequest(clientIp(request), System.currentTimeMillis())) {
             response.sendRedirect(request.getContextPath() + "/verifyOtp.jsp?error=resend_too_soon");
             return;
         }
