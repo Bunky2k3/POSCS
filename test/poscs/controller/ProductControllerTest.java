@@ -207,7 +207,8 @@ public class ProductControllerTest {
         when(request.getParts()).thenReturn(Arrays.asList(imagePart));
 
         try (MockedStatic<FileStorage> fs = mockStatic(FileStorage.class)) {
-            fs.when(() -> FileStorage.save(imagePart, "products/images")).thenReturn("/uploads/products/images/x.jpg");
+            fs.when(() -> FileStorage.save(imagePart, "products/images", FileStorage.IMAGE_EXTENSIONS))
+                    .thenReturn("/uploads/products/images/x.jpg");
 
             controller.doPost(request, response);
 

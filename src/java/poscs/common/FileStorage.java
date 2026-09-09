@@ -6,6 +6,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.util.Set;
 import java.util.UUID;
 import jakarta.servlet.http.Part;
 
@@ -21,6 +22,20 @@ public final class FileStorage {
     private static final String UPLOAD_ROOT = System.getenv().getOrDefault(
             "UPLOAD_DIR", Paths.get(System.getProperty("user.home"), "poscs_uploads").toString());
 
+    /**
+     * Đuôi file được phép cho ô chọn ảnh.
+     *
+     * KHÔNG có ".svg": SVG là tài liệu XML, mở thẳng bằng URL thì trình duyệt
+     * thực thi &lt;script&gt; bên trong nó ngay trên origin của ứng dụng --
+     * mà trang chi tiết sản phẩm có sẵn thẻ &lt;a href="..."&gt; trỏ đúng vào
+     * file ảnh. Ảnh raster không có khả năng đó.
+     */
+    public static final Set<String> IMAGE_EXTENSIONS =
+            Set.of(".jpg", ".jpeg", ".png", ".gif", ".webp");
+
+    /** Đuôi file được phép cho ô chọn tài liệu (catalogue sản phẩm). */
+    public static final Set<String> DOCUMENT_EXTENSIONS = Set.of(".pdf");
+
     private FileStorage() {
     }
 
@@ -34,14 +49,24 @@ public final class FileStorage {
      * (chỉ giữ phần mở rộng) để tránh trùng tên, ký tự lạ, hay path
      * traversal qua tên file gốc do trình duyệt gửi lên (không đáng tin).
      *
+     * <p>Chỉ nhận các đuôi file nằm trong {@code allowedExtensions} -- đây là
+     * chỗ chặn file có thể chứa mã chạy được (SVG, HTML...) lọt vào kho upload
+     * rồi được UploadFileController phục vụ lại trên chính origin của ứng dụng.
+     *
      * @return URL tương đối theo context path (dạng "/uploads/...") để lưu
-     *         vào DB, hoặc null nếu part rỗng (người dùng không chọn file).
+     *         vào DB; null nếu part rỗng (người dùng không chọn file) HOẶC
+     *         đuôi file không được phép -- nơi gọi đã coi null là "không có
+     *         file" nên file bị từ chối đơn giản là không được lưu.
      */
-    public static String save(Part part, String subfolder) throws IOException {
+    public static String save(Part part, String subfolder, Set<String> allowedExtensions) throws IOException {
         if (part == null || part.getSize() <= 0) {
             return null;
         }
-        String fileName = UUID.randomUUID() + extensionOf(part.getSubmittedFileName());
+        String extension = extensionOf(part.getSubmittedFileName());
+        if (!allowedExtensions.contains(extension)) {
+            return null;
+        }
+        String fileName = UUID.randomUUID() + extension;
 
         Path targetDir = getUploadRoot().resolve(subfolder);
         Files.createDirectories(targetDir);

@@ -70,6 +70,14 @@ public class AuthenticationFilter implements Filter {
         response.setHeader("Pragma", "no-cache");
         response.setDateHeader("Expires", 0);
 
+        // Không cho trình duyệt tự đoán kiểu nội dung từ chính dữ liệu và bỏ
+        // qua Content-Type do server khai báo -- nếu không, một file người dùng
+        // tải lên có thể được diễn giải thành HTML và chạy trên origin này.
+        response.setHeader("X-Content-Type-Options", "nosniff");
+        // Chặn nhúng trang vào iframe của site khác (clickjacking): mọi thao
+        // tác trong hệ thống đều sau đăng nhập, không trang nào cần được nhúng.
+        response.setHeader("X-Frame-Options", "DENY");
+
         boolean isPublicPath = PUBLIC_PATHS.contains(request.getServletPath());
 
         // Riêng login.jsp: hễ có request nào chạm tới trang này (kể cả bấm
