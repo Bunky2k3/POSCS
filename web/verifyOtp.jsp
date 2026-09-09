@@ -209,8 +209,15 @@
                             <c:when test="${param.error == 'expired'}">Mã OTP đã hết hạn, vui lòng quay lại và yêu cầu gửi mã mới.</c:when>
                             <c:when test="${param.error == 'invalid_otp'}">Mã OTP không đúng, vui lòng thử lại.</c:when>
                             <c:when test="${param.error == 'too_many_attempts'}">Bạn đã nhập sai quá nhiều lần, vui lòng quay lại và yêu cầu gửi mã mới.</c:when>
+                            <c:when test="${param.error == 'resend_too_soon'}">Bạn vừa yêu cầu gửi mã, vui lòng đợi hết thời gian đếm ngược rồi thử lại.</c:when>
                             <c:otherwise>Đã có lỗi xảy ra. Vui lòng thử lại.</c:otherwise>
                         </c:choose>
+                    </div>
+                </c:if>
+
+                <c:if test="${param.resent == '1'}">
+                    <div class="alert alert-success py-2 px-3 mb-3" style="font-size: 0.85rem; border-radius: 12px;">
+                        Đã gửi mã OTP mới, vui lòng kiểm tra hộp thư của bạn.
                     </div>
                 </c:if>
 
@@ -242,6 +249,12 @@
                         <i class="fa-solid fa-arrow-left-long me-1"></i> Quay lại đăng nhập
                     </a>
                 </div>
+            </form>
+
+            <%-- Form riêng (ngoài verifyOtpForm) vì gửi lại mã POST tới servlet
+                 khác và không mang theo otpCode người dùng đang gõ dở. --%>
+            <form action="ResendOtpServlet" method="POST" id="resendOtpForm">
+                <input type="hidden" name="csrfToken" value="${csrfToken}">
             </form>
 
             <p class="resend-text">
@@ -346,7 +359,7 @@
 
         function resendOtp() {
             if (document.getElementById('resendLink').classList.contains('disabled')) return;
-            // TODO: gọi API/servlet gửi lại OTP, ví dụ: window.location.href = 'ForgotPasswordServlet?resend=true';
+            document.getElementById('resendOtpForm').submit();
         }
     </script>
 </body>

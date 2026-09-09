@@ -49,7 +49,8 @@ public class AuthenticationFilter implements Filter {
             "/login",
             "/ForgotPasswordServlet",
             "/VerifyOtpServlet",
-            "/ResetPasswordServlet"
+            "/ResetPasswordServlet",
+            "/ResendOtpServlet"
     );
 
     // Số thông báo gần nhất bơm sẵn cho dropdown chuông ở topbar.jsp (trang

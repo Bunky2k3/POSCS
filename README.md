@@ -74,9 +74,8 @@ For deploying to a real server (staging/production), see
 See [PERMISSIONS.md](PERMISSIONS.md) for the role-based access matrix
 (who can do what per feature). Login/session enforcement is wired up
 in `AuthenticationController`/`AuthenticationFilter`, and the matrix
-is enforced server-side for Customer/Contract/Ticket via
-`poscs.common.AccessControl` — see PERMISSIONS.md for what's still
-pending (Product/Employee).
+is enforced server-side for Customer/Contract/Product/Ticket/Employee
+via `poscs.common.AccessControl`.
 
 ## Security
 
@@ -88,5 +87,7 @@ pending (Product/Employee).
   reusing whatever session ID the request arrived with (see
   `AuthenticationController#handleLogin`).
 - **OTP rate limiting:** the forgot-password flow locks out a code
-  after 5 failed verification attempts (`PasswordResetController`).
+  after 5 failed verification attempts, and enforces a 30-second
+  server-side cooldown between resend requests
+  (`PasswordResetController`).
 - **Role-based access control:** see [PERMISSIONS.md](PERMISSIONS.md).

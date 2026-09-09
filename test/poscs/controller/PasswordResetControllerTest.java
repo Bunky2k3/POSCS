@@ -28,6 +28,9 @@ import static org.mockito.Mockito.*;
  *   <li>Bước 3 (đặt mật khẩu) phải chặn truy cập thẳng khi chưa qua bước 2
  *       (otpVerified=true), và luôn dọn sạch session dù thành công hay thất
  *       bại.</li>
+ *   <li>Gửi lại mã (/ResendOtpServlet) phải tôn trọng khoảng chờ 30 giây ở
+ *       phía server -- đồng hồ đếm ngược trong verifyOtp.jsp chỉ là JS, không
+ *       cản được ai POST thẳng vào URL để dội mail.</li>
  * </ul>
  * Dùng session giả lưu attribute thật bằng HashMap (get/set/remove) để logic
  * session thật chạy đúng, không phải mock lại từng bước. JUnit 4 -- xem
@@ -203,6 +206,121 @@ public class PasswordResetControllerTest {
         verify(response).sendRedirect(CONTEXT_PATH + "/resetPassword.jsp");
         org.junit.Assert.assertEquals(Boolean.TRUE, attrs.get("otpVerified"));
         org.junit.Assert.assertNull("OTP phải bị xoá ngay sau khi dùng, chặn dùng lại lần 2", attrs.get("resetOtp"));
+    }
+
+    // ------------------------------------------------------------------
+    // Bước 2 (phụ): /ResendOtpServlet
+    // ------------------------------------------------------------------
+
+    @Test
+    public void resendOtp_noSession_redirectsWithSessionExpiredError() throws Exception {
+        when(request.getServletPath()).thenReturn("/ResendOtpServlet");
+        when(request.getSession(false)).thenReturn(null);
+
+        try (MockedStatic<EmailUtil> emailUtil = mockStatic(EmailUtil.class)) {
+            controller.doPost(request, response);
+
+            verify(response).sendRedirect(CONTEXT_PATH + "/forgotPassword.jsp?error=session_expired");
+            emailUtil.verify(() -> EmailUtil.sendOtpEmail(anyString(), anyString()), never());
+        }
+    }
+
+    @Test
+    public void resendOtp_sessionWithoutEmail_redirectsWithSessionExpiredError() throws Exception {
+        when(request.getServletPath()).thenReturn("/ResendOtpServlet");
+        // Session tồn tại nhưng chưa qua bước 1 -- không có địa chỉ nào để gửi tới.
+        HttpSession session = fakeSession(new HashMap<>());
+        when(request.getSession(false)).thenReturn(session);
+
+        try (MockedStatic<EmailUtil> emailUtil = mockStatic(EmailUtil.class)) {
+            controller.doPost(request, response);
+
+            verify(response).sendRedirect(CONTEXT_PATH + "/forgotPassword.jsp?error=session_expired");
+            emailUtil.verify(() -> EmailUtil.sendOtpEmail(anyString(), anyString()), never());
+        }
+    }
+
+    @Test
+    public void resendOtp_withinCooldown_sendsNothingAndKeepsExistingOtp() throws Exception {
+        when(request.getServletPath()).thenReturn("/ResendOtpServlet");
+        Map<String, Object> attrs = new HashMap<>();
+        attrs.put("resetEmail", "annd@example.com");
+        attrs.put("resetOtp", "123456");
+        attrs.put("resetOtpLastSent", System.currentTimeMillis() - 5000); // mới gửi 5 giây trước
+        HttpSession session = fakeSession(attrs);
+        when(request.getSession(false)).thenReturn(session);
+
+        try (MockedStatic<EmailUtil> emailUtil = mockStatic(EmailUtil.class)) {
+            controller.doPost(request, response);
+
+            verify(response).sendRedirect(CONTEXT_PATH + "/verifyOtp.jsp?error=resend_too_soon");
+            // Không có mail nào được gửi -- đây chính là điều ngăn endpoint này
+            // bị gọi liên tục để dội mail vào hòm thư nạn nhân.
+            emailUtil.verify(() -> EmailUtil.sendOtpEmail(anyString(), anyString()), never());
+            org.junit.Assert.assertEquals("Mã đang có hiệu lực không được đụng tới", "123456", attrs.get("resetOtp"));
+        }
+    }
+
+    @Test
+    public void resendOtp_afterCooldown_sendsNewOtpToSessionEmail() throws Exception {
+        when(request.getServletPath()).thenReturn("/ResendOtpServlet");
+        Map<String, Object> attrs = new HashMap<>();
+        attrs.put("resetEmail", "annd@example.com");
+        attrs.put("resetOtpLastSent", System.currentTimeMillis() - 31_000); // đã quá 30 giây
+        HttpSession session = fakeSession(attrs);
+        when(request.getSession(false)).thenReturn(session);
+
+        try (MockedStatic<EmailUtil> emailUtil = mockStatic(EmailUtil.class)) {
+            emailUtil.when(() -> EmailUtil.sendOtpEmail(anyString(), anyString())).thenReturn(true);
+
+            controller.doPost(request, response);
+
+            verify(response).sendRedirect(CONTEXT_PATH + "/verifyOtp.jsp?resent=1");
+            // Gửi tới đúng email đã lưu ở bước 1 -- người dùng không phải gõ lại.
+            emailUtil.verify(() -> EmailUtil.sendOtpEmail(eq("annd@example.com"), anyString()));
+            org.junit.Assert.assertNotNull("Mã mới phải được lưu vào session", attrs.get("resetOtp"));
+        }
+    }
+
+    @Test
+    public void resendOtp_neverSentBefore_isAllowed() throws Exception {
+        when(request.getServletPath()).thenReturn("/ResendOtpServlet");
+        Map<String, Object> attrs = new HashMap<>();
+        attrs.put("resetEmail", "annd@example.com");
+        // resetOtpLastSent chưa từng được set -- không có gì để so, phải cho qua.
+        HttpSession session = fakeSession(attrs);
+        when(request.getSession(false)).thenReturn(session);
+
+        try (MockedStatic<EmailUtil> emailUtil = mockStatic(EmailUtil.class)) {
+            emailUtil.when(() -> EmailUtil.sendOtpEmail(anyString(), anyString())).thenReturn(true);
+
+            controller.doPost(request, response);
+
+            verify(response).sendRedirect(CONTEXT_PATH + "/verifyOtp.jsp?resent=1");
+            emailUtil.verify(() -> EmailUtil.sendOtpEmail(eq("annd@example.com"), anyString()));
+        }
+    }
+
+    @Test
+    public void resendOtp_replacesOldCodeAndResetsAttemptCounter() throws Exception {
+        when(request.getServletPath()).thenReturn("/ResendOtpServlet");
+        Map<String, Object> attrs = new HashMap<>();
+        attrs.put("resetEmail", "annd@example.com");
+        attrs.put("resetOtp", "111111");
+        attrs.put("resetOtpAttempts", 3);
+        HttpSession session = fakeSession(attrs);
+        when(request.getSession(false)).thenReturn(session);
+
+        try (MockedStatic<EmailUtil> emailUtil = mockStatic(EmailUtil.class)) {
+            emailUtil.when(() -> EmailUtil.sendOtpEmail(anyString(), anyString())).thenReturn(true);
+
+            controller.doPost(request, response);
+
+            // Mã cũ chết ngay: tại một thời điểm chỉ đúng 1 mã dùng được, nên bấm
+            // "gửi lại" nhiều lần không để lại một loạt mã còn sống rải rác.
+            org.junit.Assert.assertNotEquals("Mã cũ phải bị thay", "111111", attrs.get("resetOtp"));
+            org.junit.Assert.assertNull("Bộ đếm nhập sai phải reset cho mã mới", attrs.get("resetOtpAttempts"));
+        }
     }
 
     // ------------------------------------------------------------------
