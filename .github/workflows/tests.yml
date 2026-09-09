@@ -26,6 +26,16 @@ jobs:
           # Khớp javac.source/javac.target trong nbproject/project.properties.
           java-version: '21'
 
+      # Ảnh runner của GitHub vốn có sẵn Ant, nhưng danh sách phần mềm cài sẵn
+      # có thể đổi giữa các phiên bản ảnh -- tự cài khi thiếu để CI không đỏ vì
+      # lý do chẳng liên quan gì tới code.
+      - name: Ensure Ant is available
+        run: |
+          if ! command -v ant >/dev/null; then
+            sudo apt-get update && sudo apt-get install -y ant
+          fi
+          ant -version
+
       # Đây là dự án NetBeans Ant, nên build-impl.xml mong đợi hai thứ mà IDE
       # thường tự cấp: classpath của Tomcat đã đăng ký, và jar CopyLibs nằm
       # trong thư mục cài NetBeans. Trên runner không có cái nào -- cả hai được
