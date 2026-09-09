@@ -1,0 +1,57 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Một push mới lên cùng nhánh sẽ huỷ lượt chạy cũ còn dở -- không ai quan tâm
+# kết quả của commit đã bị thay thế.
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: ant test (JDK 21)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          # Khớp javac.source/javac.target trong nbproject/project.properties.
+          java-version: '21'
+
+      # Ảnh runner của GitHub vốn có sẵn Ant, nhưng danh sách phần mềm cài sẵn
+      # có thể đổi giữa các phiên bản ảnh -- tự cài khi thiếu để CI không đỏ vì
+      # lý do chẳng liên quan gì tới code.
+      - name: Ensure Ant is available
+        run: |
+          if ! command -v ant >/dev/null; then
+            sudo apt-get update && sudo apt-get install -y ant
+          fi
+          ant -version
+
+      # Đây là dự án NetBeans Ant, nên build-impl.xml mong đợi hai thứ mà IDE
+      # thường tự cấp: classpath của Tomcat đã đăng ký, và jar CopyLibs nằm
+      # trong thư mục cài NetBeans. Trên runner không có cái nào -- cả hai được
+      # trỏ vào lib-build/ đã commit sẵn trong repo.
+      - name: Run unit tests
+        run: |
+          ant -Dj2ee.platform.classpath="$GITHUB_WORKSPACE/lib-build/jakarta.servlet-api-6.1.jar" \
+              -Dlibs.CopyLibs.classpath="$GITHUB_WORKSPACE/lib-build/org-netbeans-modules-java-j2seproject-copylibstask.jar" \
+              test
+
+      # Ant chỉ in "Tests FAILED" rồi dừng; muốn biết ca nào hỏng và vì sao thì
+      # phải mở file XML, nên luôn tải lên kể cả khi build đỏ.
+      - name: Upload JUnit results
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: junit-results
+          path: build/test/results/
+          if-no-files-found: warn
