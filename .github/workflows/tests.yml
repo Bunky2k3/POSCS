@@ -40,8 +40,22 @@ jobs:
       # pháp ở đó lọt qua cả `ant test` lẫn `ant compile-jsps` rồi mới làm hỏng
       # toàn bộ ứng dụng khi deploy. Đã dính đúng một lần: dấu "--" nằm trong
       # comment XML (không hợp lệ) khiến context /POSCS không khởi động được.
+      # Dùng Python (có sẵn trên mọi ảnh runner) thay vì xmllint -- libxml2-utils
+      # KHÔNG được cài sẵn, đã thử và fail bằng "command not found".
       - name: Check deployment descriptors are well-formed XML
-        run: xmllint --noout web/WEB-INF/web.xml web/META-INF/context.xml
+        run: |
+          python3 - <<'PY'
+          import sys, xml.etree.ElementTree as ET
+          failed = False
+          for path in ("web/WEB-INF/web.xml", "web/META-INF/context.xml"):
+              try:
+                  ET.parse(path)
+                  print(f"OK   {path}")
+              except ET.ParseError as e:
+                  print(f"LOI  {path}: {e}")
+                  failed = True
+          sys.exit(1 if failed else 0)
+          PY
 
       # Đây là dự án NetBeans Ant, nên build-impl.xml mong đợi hai thứ mà IDE
       # thường tự cấp: classpath của Tomcat đã đăng ký, và jar CopyLibs nằm
