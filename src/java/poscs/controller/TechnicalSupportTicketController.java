@@ -53,6 +53,12 @@ public class TechnicalSupportTicketController extends HttpServlet {
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
+        // Cho JSP biết người đang xem có quyền Full trên tài nguyên này không,
+        // để ẩn các nút hành động không dùng được (Tạo/Sửa/Xoá/Nhập/Xuất) thay
+        // vì để người ta bấm vào rồi nhận 403. Đây CHỈ là lớp trình bày --
+        // chặn thật vẫn nằm ở AccessControl.requireFullAccess trong doPost.
+        request.setAttribute("canManage",
+                AccessControl.hasFullAccess(request, AccessControl.Resource.TICKET));
         String action = request.getParameter("action");
         if (action == null) {
             action = "list";
@@ -140,6 +146,12 @@ public class TechnicalSupportTicketController extends HttpServlet {
 
         request.setAttribute("ticket", ticket);
         request.setAttribute("canDelete", ticketDAO.canDelete(id));
+        // Nút "Sửa" phải hiện cho cả kỹ thuật viên ĐANG ĐƯỢC GIAO phiếu này --
+        // họ không có quyền Full trên Ticket, nhưng vẫn được cập nhật trạng
+        // thái/ghi chú xử lý của đúng phiếu của mình (xem PERMISSIONS.md).
+        request.setAttribute("canEdit",
+                AccessControl.hasFullAccess(request, AccessControl.Resource.TICKET)
+                        || AccessControl.canUpdateAssignedTicket(request, ticket));
 
         request.getRequestDispatcher(DETAIL_VIEW).forward(request, response);
     }

@@ -149,9 +149,11 @@
                 <p>Quản lý toàn bộ hợp đồng cung cấp và thi công thiết bị viễn thông</p>
             </div>
             <div class="header-actions">
-                <a href="${pageContext.request.contextPath}/contract?action=exportExcel&keyword=${fn:escapeXml(keyword)}&status=${fn:escapeXml(statusFilter)}&type=${fn:escapeXml(typeFilter)}" class="btn-outline-action"><i class="fa-solid fa-file-excel"></i> Xuất Excel</a>
-                <a href="${pageContext.request.contextPath}/contract?action=importForm" class="btn-outline-action"><i class="fa-solid fa-file-pdf"></i> Nhập PDF</a>
-                <a href="${pageContext.request.contextPath}/contract?action=new" class="btn-add"><i class="fa-solid fa-plus"></i> Tạo hợp đồng</a>
+                <c:if test="${canManage}">
+                    <a href="${pageContext.request.contextPath}/contract?action=exportExcel&keyword=${fn:escapeXml(keyword)}&status=${fn:escapeXml(statusFilter)}&type=${fn:escapeXml(typeFilter)}" class="btn-outline-action"><i class="fa-solid fa-file-excel"></i> Xuất Excel</a>
+                    <a href="${pageContext.request.contextPath}/contract?action=importForm" class="btn-outline-action"><i class="fa-solid fa-file-pdf"></i> Nhập PDF</a>
+                    <a href="${pageContext.request.contextPath}/contract?action=new" class="btn-add"><i class="fa-solid fa-plus"></i> Tạo hợp đồng</a>
+                </c:if>
             </div>
         </div>
 
@@ -226,15 +228,17 @@
                                 <td>
                                     <div class="action-icons">
                                         <button class="act-view" title="Xem chi tiết" onclick="location.href='${pageContext.request.contextPath}/contract?action=view&id=${contract.contractId}'"><i class="fa-regular fa-eye"></i></button>
-                                        <button class="act-edit" title="Sửa" onclick="location.href='${pageContext.request.contextPath}/contract?action=edit&id=${contract.contractId}'"><i class="fa-solid fa-pen"></i></button>
-                                        <c:choose>
-                                            <c:when test="${contract.status == 'Chưa hiệu lực'}">
-                                                <button class="act-delete" title="Xóa" onclick="openDeleteModal(${contract.contractId}, '${fn:escapeXml(contract.contractCode)}')"><i class="fa-solid fa-trash"></i></button>
-                                            </c:when>
-                                            <c:otherwise>
-                                                <button class="act-delete" title="Chỉ được xóa hợp đồng ở trạng thái chưa hiệu lực" disabled><i class="fa-solid fa-trash"></i></button>
-                                            </c:otherwise>
-                                        </c:choose>
+                                        <c:if test="${canManage}">
+                                            <button class="act-edit" title="Sửa" onclick="location.href='${pageContext.request.contextPath}/contract?action=edit&id=${contract.contractId}'"><i class="fa-solid fa-pen"></i></button>
+                                            <c:choose>
+                                                <c:when test="${contract.status == 'Chưa hiệu lực'}">
+                                                    <button class="act-delete" title="Xóa" onclick="openDeleteModal(${contract.contractId}, '${fn:escapeXml(contract.contractCode)}')"><i class="fa-solid fa-trash"></i></button>
+                                                </c:when>
+                                                <c:otherwise>
+                                                    <button class="act-delete" title="Chỉ được xóa hợp đồng ở trạng thái chưa hiệu lực" disabled><i class="fa-solid fa-trash"></i></button>
+                                                </c:otherwise>
+                                            </c:choose>
+                                        </c:if>
                                     </div>
                                 </td>
                             </tr>

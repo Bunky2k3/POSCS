@@ -80,6 +80,12 @@ public class ContractController extends HttpServlet {
             listByEnterpriseAsJson(request, response);
             return;
         }
+        // Cho JSP biết người đang xem có quyền Full trên tài nguyên này không,
+        // để ẩn các nút hành động không dùng được (Tạo/Sửa/Xoá/Nhập/Xuất) thay
+        // vì để người ta bấm vào rồi nhận 403. Đây CHỈ là lớp trình bày --
+        // chặn thật vẫn nằm ở AccessControl.requireFullAccess trong doPost.
+        request.setAttribute("canManage",
+                AccessControl.hasFullAccess(request, AccessControl.Resource.CONTRACT));
         String action = request.getParameter("action");
         if (action == null) {
             action = "list";

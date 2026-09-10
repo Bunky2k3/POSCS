@@ -127,15 +127,19 @@
             </div>
             <div class="header-actions">
                 <a href="${pageContext.request.contextPath}/ticket?action=exportPdf&id=${ticket.ticketId}" class="btn-delete-detail" style="cursor:pointer; color:var(--primary); border-color:#e5e7eb;"><i class="fa-solid fa-file-pdf"></i> Xuất phiếu</a>
-                <a href="${pageContext.request.contextPath}/ticket?action=edit&id=${ticket.ticketId}" class="btn-edit-detail"><i class="fa-solid fa-pen"></i> Sửa thông tin</a>
-                <c:choose>
-                    <c:when test="${canDelete}">
-                        <button type="button" class="btn-delete-detail" style="cursor:pointer; color:var(--danger); border-color:var(--danger);" onclick="confirmDelete(${ticket.ticketId})"><i class="fa-solid fa-trash"></i> Xóa</button>
-                    </c:when>
-                    <c:otherwise>
-                        <button class="btn-delete-detail" disabled title="Không thể xóa phiếu đang có người xử lý dở dang"><i class="fa-solid fa-trash"></i> Xóa</button>
-                    </c:otherwise>
-                </c:choose>
+                <c:if test="${canEdit}">
+                    <a href="${pageContext.request.contextPath}/ticket?action=edit&id=${ticket.ticketId}" class="btn-edit-detail"><i class="fa-solid fa-pen"></i> Sửa thông tin</a>
+                </c:if>
+                <c:if test="${canManage}">
+                    <c:choose>
+                        <c:when test="${canDelete}">
+                            <button type="button" class="btn-delete-detail" style="cursor:pointer; color:var(--danger); border-color:var(--danger);" onclick="confirmDelete(${ticket.ticketId})"><i class="fa-solid fa-trash"></i> Xóa</button>
+                        </c:when>
+                        <c:otherwise>
+                            <button class="btn-delete-detail" disabled title="Không thể xóa phiếu đang có người xử lý dở dang"><i class="fa-solid fa-trash"></i> Xóa</button>
+                        </c:otherwise>
+                    </c:choose>
+                </c:if>
             </div>
         </div>
 

@@ -229,9 +229,11 @@
                 </div>
             </div>
             <div class="header-actions">
-                <button class="btn-edit-detail" type="button" onclick="openEvaluateModal()"><i class="fa-solid fa-chart-line"></i> Đánh giá lại xếp hạng</button>
-                <a href="${pageContext.request.contextPath}/customer?action=edit&id=${customer.enterpriseId}" class="btn-edit-detail"><i class="fa-solid fa-pen"></i> Sửa thông tin</a>
-                <button class="btn-delete-detail" onclick="openDeleteModal()"><i class="fa-solid fa-trash"></i> Xóa</button>
+                <c:if test="${canManage}">
+                    <button class="btn-edit-detail" type="button" onclick="openEvaluateModal()"><i class="fa-solid fa-chart-line"></i> Đánh giá lại xếp hạng</button>
+                    <a href="${pageContext.request.contextPath}/customer?action=edit&id=${customer.enterpriseId}" class="btn-edit-detail"><i class="fa-solid fa-pen"></i> Sửa thông tin</a>
+                    <button class="btn-delete-detail" onclick="openDeleteModal()"><i class="fa-solid fa-trash"></i> Xóa</button>
+                </c:if>
             </div>
         </div>
 

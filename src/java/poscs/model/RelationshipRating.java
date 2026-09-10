@@ -21,13 +21,24 @@ public enum RelationshipRating {
         return dbValue;
     }
 
+    /**
+     * Đọc ngược giá trị lưu trong CSDL thành hằng số enum.
+     *
+     * Trả về null khi gặp giá trị lạ (hoặc null) thay vì ném exception: hàm
+     * này chạy trong vòng lặp map từng dòng ResultSet, nên một dòng dữ liệu
+     * bất thường mà ném lên sẽ làm hỏng CẢ danh sách khách hàng (HTTP 500),
+     * chứ không phải chỉ hỏng đúng dòng đó. Cột trong CSDL là ENUM nên bình
+     * thường không thể lệch, nhưng vẫn xảy ra khi dữ liệu được nạp bằng công
+     * cụ làm sai mã hoá -- lúc đó chuỗi đọc lên là "CÃ³ nguy cÆ¡..." và không
+     * khớp hằng số nào.
+     */
     public static RelationshipRating fromDbValue(String dbValue) {
         for (RelationshipRating rating : values()) {
             if (rating.dbValue.equals(dbValue)) {
                 return rating;
             }
         }
-        throw new IllegalArgumentException("Unknown relationship rating: " + dbValue);
+        return null;
     }
 
     @Override
