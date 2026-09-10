@@ -17,7 +17,8 @@
              request attribute "noSidebar" trước khi include topbar, để nút thu
              gọn không hiện ra rồi bấm không ăn gì. --%>
         <c:if test="${not noSidebar}">
-            <button type="button" class="sidebar-toggle" id="sidebarToggle" aria-label="Thu gọn menu">
+            <button type="button" class="sidebar-toggle" id="sidebarToggle"
+                    aria-label="Mở/đóng menu điều hướng" aria-controls="sidebar" aria-expanded="false">
                 <i class="fa-solid fa-bars"></i>
             </button>
         </c:if>

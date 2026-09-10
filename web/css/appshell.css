@@ -100,6 +100,42 @@ body { font-family: 'Inter', sans-serif; background: #f3f4f6; min-height: 100vh;
 .sidebar.collapsed:hover .sidebar-link { justify-content: flex-start; }
 .sidebar.collapsed:hover .sidebar-link span { display: inline; }
 .main-content { flex: 1; min-width: 0; }
-@media (max-width: 900px) { .sidebar { display: none; } /* TODO: drawer thu gọn thay vì ẩn hẳn */ }
+
+/* ===== Sidebar trên máy nhỏ (điện thoại, tablet dọc) =====
+   Trước đây dưới 900px sidebar bị display:none -- nghĩa là trên điện thoại
+   KHÔNG có cách nào vào Khách hàng / Hợp đồng / Sản phẩm / Phiếu hỗ trợ /
+   Nhân viên, mà nút hamburger vẫn hiện và bấm không ăn gì (nó chỉ bật lớp
+   .collapsed lên một phần tử đang ẩn). Giờ nó trượt ra như ngăn kéo. */
+@media (max-width: 900px) {
+    .sidebar {
+        position: fixed; top: 0; left: 0; bottom: 0; z-index: 60;
+        width: 260px; padding-top: 18px;
+        overflow-y: auto;
+        box-shadow: 4px 0 24px rgba(0, 40, 80, 0.18);
+        transform: translateX(-100%);
+        transition: transform 0.22s ease;
+    }
+    /* Ở khổ này ngăn kéo luôn mở hết bề ngang, bỏ chế độ thu gọn của desktop
+       để không dính hai trạng thái chồng nhau. */
+    .sidebar.collapsed { width: 260px; }
+    .sidebar.collapsed .sidebar-link { justify-content: flex-start; }
+    .sidebar.collapsed .sidebar-link span { display: inline; }
+
+    .sidebar.drawer-open { transform: translateX(0); }
+
+    .sidebar-backdrop {
+        position: fixed; inset: 0; z-index: 55;
+        background: rgba(4, 30, 55, 0.45);
+        opacity: 0; pointer-events: none;
+        transition: opacity 0.22s ease;
+    }
+    .sidebar-backdrop.show { opacity: 1; pointer-events: auto; }
+}
+
+/* Trên desktop lớp ngăn kéo không tồn tại -- chốt lại để nếu người dùng thu
+   nhỏ cửa sổ khi ngăn kéo đang mở thì sidebar quay về cột tĩnh, không kẹt. */
+@media (min-width: 901px) {
+    .sidebar-backdrop { display: none; }
+}
 
 .card-box { background: #fff; border-radius: 16px; box-shadow: 0 10px 30px rgba(0, 40, 80, 0.08); }
