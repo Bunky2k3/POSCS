@@ -238,6 +238,29 @@
             </div>
         </div>
 
+        <%-- ===== Bản PDF đã ký, xem ngay tại đây =====
+             Chỉ hiện khi link nhận ra được là file Drive (controller dựng sẵn
+             drivePreviewUrl). Link tới nơi khác vẫn còn nút "Mở PDF trên Drive"
+             ở đầu trang -- nhúng chúng dễ ra khung trắng vì site đó tự chặn. --%>
+        <c:if test="${not empty drivePreviewUrl}">
+            <div class="info-card card-box">
+                <div class="section-header">
+                    <h5>Bản PDF đã ký</h5>
+                    <a href="${fn:escapeXml(contract.attachmentUrl)}" target="_blank" rel="noopener noreferrer"
+                       style="font-size:0.85rem; color:var(--primary); font-weight:600; text-decoration:none;">
+                        Mở trên Drive <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                    </a>
+                </div>
+                <iframe src="${fn:escapeXml(drivePreviewUrl)}"
+                        style="width:100%; height:640px; border:1px solid #eef2f6; border-radius:12px;"
+                        allow="autoplay" title="Bản PDF hợp đồng"></iframe>
+                <p style="font-size:0.78rem; color:#9ca3af; margin:10px 0 0;">
+                    Không thấy nội dung? File trên Drive có thể đang giới hạn quyền xem --
+                    hãy mở bằng link ở trên để đăng nhập Google và kiểm tra quyền truy cập.
+                </p>
+            </div>
+        </c:if>
+
         <!-- ===== Hạng mục sản phẩm / dịch vụ ===== -->
         <div class="info-card card-box">
             <div class="section-header"><h5>Hạng mục sản phẩm / dịch vụ</h5></div>

@@ -9,6 +9,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 import org.junit.Before;
 import org.junit.Test;
+import org.mockito.ArgumentCaptor;
 import poscs.dao.AddressDAO;
 import poscs.dao.ContractDAO;
 import poscs.dao.CustomerDAO;
@@ -20,6 +21,7 @@ import poscs.model.Product;
 import poscs.model.Role;
 import poscs.model.User;
 
+import static org.junit.Assert.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
@@ -105,6 +107,44 @@ public class ContractControllerTest {
         controller.doGet(request, response);
 
         verify(response).sendRedirect(CONTEXT_PATH + "/contract?error=notfound");
+    }
+
+    /** Mở trang chi tiết của 1 hợp đồng có link đính kèm, trả về giá trị drivePreviewUrl đã dựng. */
+    private Object drivePreviewAttributeFor(String attachmentUrl) throws Exception {
+        when(request.getParameter("action")).thenReturn("view");
+        when(request.getParameter("id")).thenReturn("5");
+        Contract contract = new Contract();
+        contract.setContractId(5);
+        contract.setAttachmentUrl(attachmentUrl);
+        when(contractDAO.findById(5)).thenReturn(contract);
+        RequestDispatcher dispatcher = mock(RequestDispatcher.class);
+        when(request.getRequestDispatcher("/jsp/sale/viewcontractdetail.jsp")).thenReturn(dispatcher);
+
+        controller.doGet(request, response);
+
+        ArgumentCaptor<Object> captor = ArgumentCaptor.forClass(Object.class);
+        verify(request).setAttribute(eq("drivePreviewUrl"), captor.capture());
+        return captor.getValue();
+    }
+
+    @Test
+    public void view_driveLink_isConvertedToEmbeddablePreviewUrl() throws Exception {
+        // Link Drive người dùng copy ra luôn ở dạng /view; chỉ bản /preview mới
+        // nhúng được vào iframe.
+        assertEquals("https://drive.google.com/file/d/1AbC_de-F/preview",
+                drivePreviewAttributeFor("https://drive.google.com/file/d/1AbC_de-F/view?usp=sharing"));
+    }
+
+    @Test
+    public void view_nonDriveLink_producesNoPreviewUrl() throws Exception {
+        // Site khác thường tự chặn bị nhúng (X-Frame-Options) -- khung trắng
+        // khó hiểu hơn hẳn một cái link, nên không nhúng.
+        assertNull(drivePreviewAttributeFor("https://noi-bo.congty.vn/hop-dong.pdf"));
+    }
+
+    @Test
+    public void view_noAttachment_producesNoPreviewUrl() throws Exception {
+        assertNull(drivePreviewAttributeFor(null));
     }
 
     @Test
