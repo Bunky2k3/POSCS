@@ -417,11 +417,16 @@
 
             <!-- ===== Dropdown avatar ===== -->
             <div class="dropdown">
-                <img src="https://ui-avatars.com/api/?name=${fn:escapeXml(sessionScope.currentUser.firstName)}&background=0568a6&color=fff"
+                <%-- Ảnh đại diện đã tải lên nếu có; chưa có thì rơi về ảnh chữ cái đầu. --%>
+                <c:set var="avatarSrc" value="https://ui-avatars.com/api/?name=${fn:escapeXml(sessionScope.currentUser.firstName)}&amp;background=0568a6&amp;color=fff"/>
+                <c:if test="${not empty sessionScope.currentUser.avatarUrl}">
+                    <c:set var="avatarSrc" value="${pageContext.request.contextPath}${sessionScope.currentUser.avatarUrl}"/>
+                </c:if>
+                <img src="${fn:escapeXml(avatarSrc)}"
                      class="avatar-mini" alt="avatar" data-bs-toggle="dropdown" aria-expanded="false">
                 <ul class="dropdown-menu dropdown-menu-end">
                     <li class="dd-user-header">
-                        <img src="https://ui-avatars.com/api/?name=${fn:escapeXml(sessionScope.currentUser.firstName)}&background=0568a6&color=fff" alt="avatar">
+                        <img src="${fn:escapeXml(avatarSrc)}" alt="avatar">
                         <div>
                             <div class="dd-name"><c:out value="${sessionScope.currentUser.fullName}"/></div>
                             <div class="dd-role"><c:out value="${sessionScope.currentUser.role.roleName}"/></div>
