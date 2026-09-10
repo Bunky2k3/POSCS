@@ -7,6 +7,7 @@
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Quên mật khẩu - POSCS Portal</title>
+    <link rel="icon" type="image/png" href="${pageContext.request.contextPath}/img/favicon.png">
 
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -217,8 +218,8 @@
             <div class="col-md-7 form-panel bg-white">
 
                 <div class="d-md-none text-center mb-4">
-                    <img src="${pageContext.request.contextPath}/img/postef-logo.png"
-                         alt="POSTEF" class="brand-logo brand-logo-lg mx-auto">
+                    <img src="${pageContext.request.contextPath}/img/poscs-logo.png"
+                         alt="POSCS Portal" class="brand-logo brand-logo-lg mx-auto">
                 </div>
 
                 <div class="icon-circle">

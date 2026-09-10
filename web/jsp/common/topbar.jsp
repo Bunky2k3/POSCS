@@ -12,7 +12,7 @@
 --%>
 <nav class="topbar">
     <div class="topbar-left">
-        <a href="${pageContext.request.contextPath}/dashboard" class="brand" title="POSCS Portal"><img src="${pageContext.request.contextPath}/img/postef-logo.png" alt="POSTEF - POSCS Portal" class="brand-mark"></a>
+        <a href="${pageContext.request.contextPath}/dashboard" class="brand" title="Về trang chủ - POSCS Portal"><img src="${pageContext.request.contextPath}/img/poscs-logo.png" alt="POSCS Portal" class="brand-mark"></a>
         <%-- Trang không include sidebar.jsp (vd changePassword.jsp) thì set
              request attribute "noSidebar" trước khi include topbar, để nút thu
              gọn không hiện ra rồi bấm không ăn gì. --%>

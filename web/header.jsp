@@ -10,6 +10,7 @@
     <head>
         <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
         <title>JSP Page</title>
+        <link rel="icon" type="image/png" href="${pageContext.request.contextPath}/img/favicon.png">
     </head>
     <body>
         <h1>Hello World!</h1>
