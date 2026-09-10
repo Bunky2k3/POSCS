@@ -15,13 +15,14 @@ import static org.junit.Assert.*;
 import static org.mockito.Mockito.*;
 
 /**
- * Test cho ContractLookupController -- servlet AJAX trả JSON tự dựng thủ
+ * Test cho nhánh /contract/byEnterprise của ContractController -- endpoint
+ * AJAX trả JSON tự dựng thủ
  * công (như AddressController). Trọng tâm: escape đúng ký tự đặc biệt trong
  * tiêu đề hợp đồng, và enterpriseId thiếu/sai phải trả 400 + mảng rỗng.
  */
 public class ContractLookupControllerTest {
 
-    private ContractLookupController controller;
+    private ContractController controller;
     private ContractDAO contractDAO;
     private HttpServletRequest request;
     private HttpServletResponse response;
@@ -29,12 +30,15 @@ public class ContractLookupControllerTest {
 
     @Before
     public void setUp() throws Exception {
-        controller = new ContractLookupController();
+        controller = new ContractController();
         contractDAO = mock(ContractDAO.class);
         setField(controller, "contractDAO", contractDAO);
 
         request = mock(HttpServletRequest.class);
         response = mock(HttpServletResponse.class);
+        // ContractController phân nhánh theo servlet path TRƯỚC khi đọc tham số
+        // "action" -- thiếu stub này thì request rơi vào nhánh danh sách HTML.
+        when(request.getServletPath()).thenReturn("/contract/byEnterprise");
         output = new StringWriter();
         when(response.getWriter()).thenReturn(new PrintWriter(output));
     }

@@ -17,7 +17,7 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 /**
- * Test cho PasswordResetController -- luồng "Quên mật khẩu" 3 bước (email ->
+ * Test cho luồng "Quên mật khẩu" của AuthenticationController -- luồng "Quên mật khẩu" 3 bước (email ->
  * OTP -> mật khẩu mới), toàn bộ trạng thái tạm nằm trong session. Trọng tâm:
  * <ul>
  *   <li>Chống user enumeration ở bước 1: email tồn tại hay không đều
@@ -40,7 +40,7 @@ public class PasswordResetControllerTest {
 
     private static final String CONTEXT_PATH = "/POSCS";
 
-    private PasswordResetController controller;
+    private AuthenticationController controller;
     private EmployeeDAO employeeDAO;
 
     private HttpServletRequest request;
@@ -48,7 +48,7 @@ public class PasswordResetControllerTest {
 
     @Before
     public void setUp() throws Exception {
-        controller = new PasswordResetController();
+        controller = new AuthenticationController();
         employeeDAO = mock(EmployeeDAO.class);
         setField(controller, "employeeDAO", employeeDAO);
 

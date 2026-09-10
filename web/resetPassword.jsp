@@ -206,7 +206,7 @@
                 Xác thực OTP thành công. Vui lòng đặt mật khẩu mới cho tài khoản của bạn.
             </div>
 
-            <%-- PasswordResetController#handleResetPassword kiểm tra session có otpVerified = true không trước khi cho đặt mật khẩu mới --%>
+            <%-- AuthenticationController#handleResetPassword kiểm tra session có otpVerified = true không trước khi cho đặt mật khẩu mới --%>
             <form action="ResetPasswordServlet" method="POST" id="resetPasswordForm" onsubmit="return validateForm();">
                 <input type="hidden" name="csrfToken" value="${csrfToken}">
 

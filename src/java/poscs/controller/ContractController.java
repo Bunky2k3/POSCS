@@ -47,7 +47,7 @@ import poscs.model.User;
  * bằng AccessControl.requireFullAccess ở đầu mỗi hàm handleCreate/
  * handleUpdate/handleDelete (Kỹ thuật/CSKH chỉ View only trên Contract).
  */
-@WebServlet(name = "ContractController", urlPatterns = {"/contract"})
+@WebServlet(name = "ContractController", urlPatterns = {"/contract", "/contract/byEnterprise"})
 @MultipartConfig(maxFileSize = 5 * 1024 * 1024, maxRequestSize = 10 * 1024 * 1024, fileSizeThreshold = 1024 * 1024)
 public class ContractController extends HttpServlet {
 
@@ -74,6 +74,12 @@ public class ContractController extends HttpServlet {
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
+        // /contract/byEnterprise trả JSON cho dropdown "Hợp đồng liên quan" ở
+        // form phiếu hỗ trợ -- không đi qua tham số action như các màn hình khác.
+        if ("/contract/byEnterprise".equals(request.getServletPath())) {
+            listByEnterpriseAsJson(request, response);
+            return;
+        }
         String action = request.getParameter("action");
         if (action == null) {
             action = "list";
@@ -795,6 +801,72 @@ public class ContractController extends HttpServlet {
         }
         java.util.regex.Matcher m = DRIVE_FILE_ID.matcher(url);
         return m.find() ? "https://drive.google.com/file/d/" + m.group(1) + "/preview" : null;
+    }
+
+
+    /**
+     * Danh sách hợp đồng của 1 khách hàng, trả về JSON cho dropdown "Hợp đồng
+     * liên quan" ở form phiếu hỗ trợ (addnewTicket.jsp/updateTicket.jsp nạp
+     * qua AJAX sau khi chọn khách hàng).
+     *
+     * Tự dựng JSON thay vì dùng Jackson: lib/ chỉ có jackson-databind, thiếu
+     * jackson-core/jackson-annotations nên ObjectMapper không chạy được.
+     */
+    private void listByEnterpriseAsJson(HttpServletRequest request, HttpServletResponse response)
+            throws IOException {
+        response.setContentType("application/json;charset=UTF-8");
+
+        Integer enterpriseId = parseIntOrNull(request.getParameter("enterpriseId"));
+        if (enterpriseId == null) {
+            response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+            try (java.io.PrintWriter out = response.getWriter()) {
+                out.write("[]");
+            }
+            return;
+        }
+
+        List<Contract> contracts = contractDAO.findByEnterpriseId(enterpriseId);
+        try (java.io.PrintWriter out = response.getWriter()) {
+            out.write(toJsonArray(contracts));
+        }
+    }
+
+    private String toJsonArray(List<Contract> contracts) {
+        StringBuilder sb = new StringBuilder("[");
+        for (int i = 0; i < contracts.size(); i++) {
+            Contract c = contracts.get(i);
+            if (i > 0) {
+                sb.append(',');
+            }
+            sb.append("{\"id\":").append(c.getContractId())
+              .append(",\"code\":\"").append(escapeJson(c.getContractCode())).append("\"")
+              .append(",\"title\":\"").append(escapeJson(c.getTitle())).append("\"}");
+        }
+        return sb.append(']').toString();
+    }
+
+    private String escapeJson(String value) {
+        if (value == null) {
+            return "";
+        }
+        StringBuilder sb = new StringBuilder(value.length());
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            switch (c) {
+                case '"': sb.append("\\\""); break;
+                case '\\': sb.append("\\\\"); break;
+                case '\n': sb.append("\\n"); break;
+                case '\r': sb.append("\\r"); break;
+                case '\t': sb.append("\\t"); break;
+                default:
+                    if (c < 0x20) {
+                        sb.append(String.format("\\u%04x", (int) c));
+                    } else {
+                        sb.append(c);
+                    }
+            }
+        }
+        return sb.toString();
     }
 
     private Contract buildContractFromRequest(HttpServletRequest request, Contract c) {

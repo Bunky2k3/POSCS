@@ -8,7 +8,7 @@
       - userList      : List<poscs.model.User>       (toàn bộ nhân viên, để đổ dropdown "Kỹ thuật viên phụ trách")
 
     Dropdown "Hợp đồng liên quan" KHÔNG đổ sẵn từ server -- JS nạp qua AJAX
-    (GET /contract/byEnterprise?enterpriseId=..., xem ContractLookupController)
+    (GET /contract/byEnterprise?enterpriseId=..., xem ContractController)
     ngay khi chọn khách hàng, vì hợp đồng phụ thuộc khách hàng đã chọn.
 --%>
 <!DOCTYPE html>
