@@ -60,6 +60,7 @@
     }
     .topbar .brand:hover { color: var(--primary-dark); }
     .topbar .brand i { color: var(--primary); font-size: 1.2rem; }
+    .topbar .brand .brand-mark { height: 24px; width: auto; }
     .topbar-left { display: flex; align-items: center; gap: 32px; }
     .topbar-nav { display: flex; align-items: center; gap: 4px; }
     .topbar-nav-link { color: #6b7280; font-weight: 600; font-size: 0.87rem; text-decoration: none; padding: 8px 14px; border-radius: 8px; transition: background 0.15s, color 0.15s; }
@@ -367,7 +368,7 @@
 
     <nav class="topbar">
         <div class="topbar-left">
-            <a href="${pageContext.request.contextPath}/dashboard" class="brand"><i class="fa-solid fa-tower-broadcast"></i> POSCS Portal</a>
+            <a href="${pageContext.request.contextPath}/dashboard" class="brand"><img src="${pageContext.request.contextPath}/img/postef-logo.png" alt="POSTEF" class="brand-mark"> POSCS Portal</a>
             <div class="topbar-nav">
                 <a href="${pageContext.request.contextPath}/dashboard" class="topbar-nav-link">Trang chủ</a>
                 <a href="${pageContext.request.contextPath}/customer" class="topbar-nav-link">Khách hàng</a>

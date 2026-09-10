@@ -40,33 +40,27 @@
             margin: 20px;
         }
 
-        .placeholder-box {
-            border: 2px dashed;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            text-align: center;
-            border-radius: 8px;
-            font-size: 0.85rem;
-            font-weight: 600;
-            padding: 10px;
-            line-height: 1.4;
-        }
-        
-        .placeholder-light {
-            border-color: rgba(255, 255, 255, 0.7);
-            background: rgba(255, 255, 255, 0.15);
-            color: #ffffff;
+        /* Logo lấy từ postef.com.vn (web/img/postef-logo.png) là bản màu gốc:
+           chữ xanh trên nền trong suốt. Trên panel branding nền xanh đậm cần
+           bản trắng, nên lật màu bằng filter thay vì kèm thêm một file ảnh
+           thứ hai phải tự chỉnh và giữ đồng bộ. */
+        .brand-logo {
+            height: 44px;
+            width: auto;
+            display: block;
         }
 
-        .placeholder-dark {
-            border-color: #a1a1aa;
-            background: #f4f4f5;
-            color: #52525b;
+        .brand-logo-light {
+            filter: brightness(0) invert(1);
         }
 
         .brand-panel {
-            background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 60%, var(--primary-light) 100%);
+            /* Ảnh nền doanh nghiệp (banner trang chủ postef.com.vn) nằm dưới
+               lớp gradient mờ -- gradient vẫn phải đủ đặc để chữ trắng bên
+               trên đọc được, ảnh chỉ đóng vai trò vân nền. */
+            background:
+                linear-gradient(135deg, rgba(0, 60, 110, 0.93) 0%, rgba(5, 104, 166, 0.88) 60%, rgba(15, 158, 219, 0.85) 100%),
+                url("${pageContext.request.contextPath}/img/brand-bg.jpg") center / cover no-repeat;
             color: white;
             padding: 3rem;
             display: flex;
@@ -195,18 +189,10 @@
         <div class="row g-0">
             <!-- Cột trái: Branding (Ẩn trên Mobile) -->
             <div class="col-md-5 d-none d-md-flex brand-panel">
-                <div class="placeholder-box placeholder-light mb-4" style="position: absolute; top: 20px; right: 20px; padding: 5px 15px; font-size: 0.75rem; z-index: 1;">
-                    [VỊ TRÍ 2]<br>Ảnh Nền Doanh Nghiệp
-                </div>
 
                 <div style="z-index: 1;">
-                    <div class="placeholder-box placeholder-light mb-4" style="height: 60px; width: 220px;">
-                        <i class="fa-regular fa-image me-2 fs-4"></i>
-                        <div class="text-start">
-                            [VỊ TRÍ 3] <br>
-                            <span style="font-size: 0.75rem; font-weight: 400;">Logo (Màu trắng)</span>
-                        </div>
-                    </div>
+                    <img src="${pageContext.request.contextPath}/img/postef-logo.png"
+                         alt="POSTEF" class="brand-logo brand-logo-light mb-4">
                     
                     <h2 class="fw-bold mb-3">POSCS Portal</h2>
                     <p class="fs-6" style="color: rgba(255,255,255,0.85); line-height: 1.6;">
@@ -219,13 +205,8 @@
             <div class="col-md-7 form-panel bg-white">
                 
                 <div class="d-md-none text-center mb-4">
-                    <div class="placeholder-box placeholder-dark mx-auto mb-3" style="height: 60px; width: 200px;">
-                        <i class="fa-regular fa-image me-2 fs-4 text-secondary"></i>
-                        <div class="text-start">
-                            [VỊ TRÍ 4] <br>
-                            <span style="font-size: 0.75rem; font-weight: 400;">Logo (Màu gốc)</span>
-                        </div>
-                    </div>
+                    <img src="${pageContext.request.contextPath}/img/postef-logo.png"
+                         alt="POSTEF" class="brand-logo mx-auto mb-3">
                     <h3 class="fw-bold">POSCS Portal</h3>
                 </div>
 

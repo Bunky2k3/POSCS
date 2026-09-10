@@ -52,6 +52,14 @@ public class AuthenticationFilter implements Filter {
             "/ResendOtpServlet"
     );
 
+    // Ảnh thương hiệu đóng gói sẵn trong WAR (logo, ảnh nền panel branding).
+    // login.jsp và forgotPassword.jsp nhúng chúng khi người dùng CHƯA đăng
+    // nhập, nên nếu filter chặn thì trình duyệt nhận về 302 trỏ login.jsp
+    // thay vì file ảnh -- logo sẽ không hiện. Chỉ mở đúng thư mục này: file
+    // do người dùng tải lên nằm ở "/uploads/*" (UploadFileController) và vẫn
+    // phải đăng nhập mới xem được.
+    private static final String BRANDING_ASSET_PREFIX = "/img/";
+
     // Số thông báo gần nhất bơm sẵn cho dropdown chuông ở topbar.jsp (trang
     // "Xem tất cả" tự tra lại đầy đủ qua NotificationController, không dùng
     // request attribute này).
@@ -77,7 +85,8 @@ public class AuthenticationFilter implements Filter {
         // tác trong hệ thống đều sau đăng nhập, không trang nào cần được nhúng.
         response.setHeader("X-Frame-Options", "DENY");
 
-        boolean isPublicPath = PUBLIC_PATHS.contains(request.getServletPath());
+        boolean isPublicPath = PUBLIC_PATHS.contains(request.getServletPath())
+                || request.getServletPath().startsWith(BRANDING_ASSET_PREFIX);
 
         // Riêng login.jsp: hễ có request nào chạm tới trang này (kể cả bấm
         // Back quay lại, không qua nút "Đăng xuất") mà vẫn còn session hợp
