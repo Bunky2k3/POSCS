@@ -61,6 +61,10 @@ public class ContractController extends HttpServlet {
     /** Số dòng sản phẩm tối đa trong hopdong_import_template.pdf (field product1..product15). */
     private static final int IMPORT_MAX_PRODUCT_ROWS = 15;
 
+    /** Bắt id file trong link Drive dạng .../file/d/<id>/... -- xem drivePreviewUrl(). */
+    private static final java.util.regex.Pattern DRIVE_FILE_ID =
+            java.util.regex.Pattern.compile("drive\\.google\\.com/file/d/([A-Za-z0-9_-]+)");
+
     private final ContractDAO contractDAO = new ContractDAO();
     private final CustomerDAO customerDAO = new CustomerDAO();
     private final EmployeeDAO employeeDAO = new EmployeeDAO();
@@ -176,6 +180,7 @@ public class ContractController extends HttpServlet {
         }
 
         request.setAttribute("contract", contract);
+        request.setAttribute("drivePreviewUrl", drivePreviewUrl(contract.getAttachmentUrl()));
         request.setAttribute("canDelete", contractDAO.canDelete(id));
         request.setAttribute("contractProducts", contractDAO.findProductsByContractId(id));
         // Danh sách sản phẩm còn hoạt động, phục vụ dropdown "Thêm sản phẩm" bên dưới bảng hạng mục.
@@ -773,6 +778,23 @@ public class ContractController extends HttpServlet {
         // Toàn bộ khách hàng chưa xoá, phục vụ dropdown "Khách hàng"
         request.setAttribute("customerList", customerDAO.findAll(1, Integer.MAX_VALUE, null, null, null));
         request.setAttribute("userList", employeeDAO.findAllActive());
+    }
+
+    /**
+     * Đổi link Drive dạng {@code .../file/d/<id>/view} sang {@code /preview} --
+     * bản duy nhất Google cho phép nhúng vào iframe. Trả null nếu không nhận ra
+     * là link file Drive.
+     *
+     * Cố ý chỉ nhúng link Drive: mọi site khác đều có thể tự chặn bị nhúng bằng
+     * X-Frame-Options, và một khung trắng không lời giải thích thì tệ hơn hẳn
+     * một cái link bấm được. Link lạ vẫn hiện nút "Mở PDF" như thường.
+     */
+    private String drivePreviewUrl(String url) {
+        if (url == null) {
+            return null;
+        }
+        java.util.regex.Matcher m = DRIVE_FILE_ID.matcher(url);
+        return m.find() ? "https://drive.google.com/file/d/" + m.group(1) + "/preview" : null;
     }
 
     private Contract buildContractFromRequest(HttpServletRequest request, Contract c) {
