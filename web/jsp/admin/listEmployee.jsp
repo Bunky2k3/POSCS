@@ -108,7 +108,12 @@
             <c:forEach var="emp" items="${employeeList}">
                 <a class="employee-card" href="${pageContext.request.contextPath}/employee?action=view&id=${emp.userId}">
                     <div class="employee-card-top">
-                        <img class="employee-avatar" src="https://ui-avatars.com/api/?name=${fn:escapeXml(emp.firstName)}&background=0568a6&color=fff" alt="avatar">
+                        <%-- Ảnh đại diện đã tải lên nếu có; chưa có thì rơi về ảnh chữ cái đầu. --%>
+                        <c:set var="avatarSrc" value="https://ui-avatars.com/api/?name=${fn:escapeXml(emp.firstName)}&amp;background=0568a6&amp;color=fff"/>
+                        <c:if test="${not empty emp.avatarUrl}">
+                            <c:set var="avatarSrc" value="${pageContext.request.contextPath}${emp.avatarUrl}"/>
+                        </c:if>
+                        <img class="employee-avatar" src="${fn:escapeXml(avatarSrc)}" alt="avatar">
                         <div>
                             <div class="employee-name">${fn:escapeXml(emp.fullName)}</div>
                             <div class="employee-code">NV-<c:out value="${emp.userId}"/></div>
