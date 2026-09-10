@@ -77,6 +77,8 @@
         .custom-table tbody tr:hover { background: #f9fdff; }
 
         .contract-code { font-weight: 700; color: var(--primary); font-size: 0.85rem; }
+        .code-link { color: inherit; text-decoration: none; }
+        .code-link:hover { text-decoration: underline; }
         .contract-title-link { color: #111827; font-weight: 600; text-decoration: none; }
         .contract-title-link:hover { color: var(--primary); text-decoration: underline; }
 
@@ -201,7 +203,7 @@
                     <tbody id="contractTableBody">
                         <c:forEach var="contract" items="${contractList}">
                             <tr>
-                                <td class="contract-code">${fn:escapeXml(contract.contractCode)}</td>
+                                <td class="contract-code"><a href="${pageContext.request.contextPath}/contract?action=view&id=${contract.contractId}" class="code-link">${fn:escapeXml(contract.contractCode)}</a></td>
                                 <td><a href="${pageContext.request.contextPath}/contract?action=view&id=${contract.contractId}" class="contract-title-link">${fn:escapeXml(contract.title)}</a></td>
                                 <td>
                                     <c:choose>

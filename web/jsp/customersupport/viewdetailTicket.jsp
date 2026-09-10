@@ -125,6 +125,7 @@
                 </div>
             </div>
             <div class="header-actions">
+                <a href="${pageContext.request.contextPath}/ticket?action=exportPdf&id=${ticket.ticketId}" class="btn-delete-detail" style="cursor:pointer; color:var(--primary); border-color:#e5e7eb;"><i class="fa-solid fa-file-pdf"></i> Xuất phiếu</a>
                 <a href="${pageContext.request.contextPath}/ticket?action=edit&id=${ticket.ticketId}" class="btn-edit-detail"><i class="fa-solid fa-pen"></i> Sửa thông tin</a>
                 <c:choose>
                     <c:when test="${canDelete}">

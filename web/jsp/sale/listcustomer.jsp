@@ -99,6 +99,8 @@
         .customer-code {
             font-weight: 700; color: var(--primary); font-size: 0.85rem;
         }
+        .code-link { color: inherit; text-decoration: none; }
+        .code-link:hover { text-decoration: underline; }
         .customer-name-cell { display: flex; align-items: center; gap: 10px; }
         .customer-logo {
             width: 32px; height: 32px; border-radius: 8px; overflow: hidden; flex-shrink: 0;
@@ -251,7 +253,7 @@
                     <tbody id="customerTableBody">
                         <c:forEach var="customer" items="${customerList}">
                             <tr>
-                                <td class="customer-code">${fn:escapeXml(customer.enterpriseCode)}</td>
+                                <td class="customer-code"><a href="${pageContext.request.contextPath}/customer?action=view&id=${customer.enterpriseId}" class="code-link">${fn:escapeXml(customer.enterpriseCode)}</a></td>
                                 <td>
                                     <div class="customer-name-cell">
                                         <div class="customer-logo">
