@@ -197,15 +197,17 @@
                     </a>
                 </c:if>
                 <a href="${pageContext.request.contextPath}/contract?action=exportPdf&id=${contract.contractId}" class="btn-delete-detail" style="cursor:pointer; color:var(--primary); border-color:#e5e7eb;"><i class="fa-solid fa-file-pdf"></i> Xuất PDF</a>
-                <a href="${pageContext.request.contextPath}/contract?action=edit&id=${contract.contractId}" class="btn-edit-detail"><i class="fa-solid fa-pen"></i> Sửa thông tin</a>
-                <c:choose>
-                    <c:when test="${canDelete}">
-                        <button type="button" class="btn-delete-detail" style="cursor:pointer; color:var(--danger); border-color:var(--danger);" onclick="confirmDelete(${contract.contractId})"><i class="fa-solid fa-trash"></i> Xóa</button>
-                    </c:when>
-                    <c:otherwise>
-                        <button class="btn-delete-detail" disabled title="Chỉ được xóa hợp đồng ở trạng thái chưa hiệu lực"><i class="fa-solid fa-trash"></i> Xóa</button>
-                    </c:otherwise>
-                </c:choose>
+                <c:if test="${canManage}">
+                    <a href="${pageContext.request.contextPath}/contract?action=edit&id=${contract.contractId}" class="btn-edit-detail"><i class="fa-solid fa-pen"></i> Sửa thông tin</a>
+                    <c:choose>
+                        <c:when test="${canDelete}">
+                            <button type="button" class="btn-delete-detail" style="cursor:pointer; color:var(--danger); border-color:var(--danger);" onclick="confirmDelete(${contract.contractId})"><i class="fa-solid fa-trash"></i> Xóa</button>
+                        </c:when>
+                        <c:otherwise>
+                            <button class="btn-delete-detail" disabled title="Chỉ được xóa hợp đồng ở trạng thái chưa hiệu lực"><i class="fa-solid fa-trash"></i> Xóa</button>
+                        </c:otherwise>
+                    </c:choose>
+                </c:if>
             </div>
         </div>
 
@@ -316,37 +318,39 @@
                 </c:otherwise>
             </c:choose>
 
-            <form class="add-product-form" method="POST" action="${pageContext.request.contextPath}/contract">
-                <input type="hidden" name="csrfToken" value="${csrfToken}">
-                <input type="hidden" name="action" value="addProduct">
-                <input type="hidden" name="contractId" value="${contract.contractId}">
-                <div class="row g-2 align-items-end">
-                    <div class="col-md-4">
-                        <label class="form-label">Sản phẩm</label>
-                        <select name="productId" class="form-select" required>
-                            <option value="" selected disabled>-- Chọn sản phẩm --</option>
-                            <c:forEach var="p" items="${productOptions}">
-                                <option value="${p.productId}">${fn:escapeXml(p.productCode)} - ${fn:escapeXml(p.productName)}</option>
-                            </c:forEach>
-                        </select>
+            <c:if test="${canManage}">
+                <form class="add-product-form" method="POST" action="${pageContext.request.contextPath}/contract">
+                    <input type="hidden" name="csrfToken" value="${csrfToken}">
+                    <input type="hidden" name="action" value="addProduct">
+                    <input type="hidden" name="contractId" value="${contract.contractId}">
+                    <div class="row g-2 align-items-end">
+                        <div class="col-md-4">
+                            <label class="form-label">Sản phẩm</label>
+                            <select name="productId" class="form-select" required>
+                                <option value="" selected disabled>-- Chọn sản phẩm --</option>
+                                <c:forEach var="p" items="${productOptions}">
+                                    <option value="${p.productId}">${fn:escapeXml(p.productCode)} - ${fn:escapeXml(p.productName)}</option>
+                                </c:forEach>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">Số lượng</label>
+                            <input type="text" name="quantity" class="form-control" placeholder="VD: 1.000" required>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">Đơn vị</label>
+                            <input type="text" name="unit" class="form-control" placeholder="Cái">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Ghi chú</label>
+                            <input type="text" name="notes" class="form-control" placeholder="Không bắt buộc">
+                        </div>
+                        <div class="col-md-1">
+                            <button type="submit" class="btn-add-item" title="Thêm sản phẩm"><i class="fa-solid fa-plus"></i></button>
+                        </div>
                     </div>
-                    <div class="col-md-2">
-                        <label class="form-label">Số lượng</label>
-                        <input type="text" name="quantity" class="form-control" placeholder="VD: 1.000" required>
-                    </div>
-                    <div class="col-md-2">
-                        <label class="form-label">Đơn vị</label>
-                        <input type="text" name="unit" class="form-control" placeholder="Cái">
-                    </div>
-                    <div class="col-md-3">
-                        <label class="form-label">Ghi chú</label>
-                        <input type="text" name="notes" class="form-control" placeholder="Không bắt buộc">
-                    </div>
-                    <div class="col-md-1">
-                        <button type="submit" class="btn-add-item" title="Thêm sản phẩm"><i class="fa-solid fa-plus"></i></button>
-                    </div>
-                </div>
-            </form>
+                </form>
+            </c:if>
         </div>
 
         <!-- ===== Ghi chú / điều khoản ===== -->

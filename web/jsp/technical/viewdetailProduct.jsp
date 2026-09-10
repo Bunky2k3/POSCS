@@ -196,8 +196,10 @@
                 </div>
             </div>
             <div class="header-actions">
-                <a href="${pageContext.request.contextPath}/product?action=edit&id=${product.productId}" class="btn-edit-detail"><i class="fa-solid fa-pen"></i> Sửa thông tin</a>
-                <button class="btn-delete-detail" onclick="openDeleteModal()"><i class="fa-solid fa-trash"></i> Xóa</button>
+                <c:if test="${canManage}">
+                    <a href="${pageContext.request.contextPath}/product?action=edit&id=${product.productId}" class="btn-edit-detail"><i class="fa-solid fa-pen"></i> Sửa thông tin</a>
+                    <button class="btn-delete-detail" onclick="openDeleteModal()"><i class="fa-solid fa-trash"></i> Xóa</button>
+                </c:if>
             </div>
         </div>
 

@@ -480,8 +480,8 @@ public class CustomerDAO {
         e.setStatus(rs.getString("status"));
         e.setJoinDate(rs.getDate("join_date"));
 
-        String rating = rs.getString("current_relationship_rating");
-        e.setCurrentRelationshipRating(rating != null ? RelationshipRating.fromDbValue(rating) : null);
+        e.setCurrentRelationshipRating(
+                RelationshipRating.fromDbValue(rs.getString("current_relationship_rating")));
 
         e.setCreatedAt(rs.getTimestamp("created_at"));
         e.setUpdatedAt(rs.getTimestamp("updated_at"));

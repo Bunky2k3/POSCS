@@ -140,7 +140,9 @@
                 <h2>Danh sách phiếu hỗ trợ kỹ thuật</h2>
                 <p>Theo dõi và xử lý các yêu cầu hỗ trợ kỹ thuật từ khách hàng</p>
             </div>
-            <a href="${pageContext.request.contextPath}/ticket?action=new" class="btn-add"><i class="fa-solid fa-plus"></i> Tạo phiếu hỗ trợ</a>
+            <c:if test="${canManage}">
+                <a href="${pageContext.request.contextPath}/ticket?action=new" class="btn-add"><i class="fa-solid fa-plus"></i> Tạo phiếu hỗ trợ</a>
+            </c:if>
         </div>
 
         <!-- ===== Dải trạng thái tổng quan ===== -->
@@ -232,8 +234,10 @@
                                 <td>
                                     <div class="action-icons">
                                         <button class="act-view" title="Xem chi tiết" onclick="location.href='${pageContext.request.contextPath}/ticket?action=view&id=${ticket.ticketId}'"><i class="fa-regular fa-eye"></i></button>
-                                        <button class="act-edit" title="Sửa" onclick="location.href='${pageContext.request.contextPath}/ticket?action=edit&id=${ticket.ticketId}'"><i class="fa-solid fa-pen"></i></button>
-                                        <button class="act-delete" title="Xóa" onclick="openDeleteModal(${ticket.ticketId}, '${fn:escapeXml(ticket.ticketCode)}')"><i class="fa-solid fa-trash"></i></button>
+                                        <c:if test="${canManage}">
+                                            <button class="act-edit" title="Sửa" onclick="location.href='${pageContext.request.contextPath}/ticket?action=edit&id=${ticket.ticketId}'"><i class="fa-solid fa-pen"></i></button>
+                                            <button class="act-delete" title="Xóa" onclick="openDeleteModal(${ticket.ticketId}, '${fn:escapeXml(ticket.ticketCode)}')"><i class="fa-solid fa-trash"></i></button>
+                                        </c:if>
                                     </div>
                                 </td>
                             </tr>

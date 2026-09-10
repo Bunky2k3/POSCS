@@ -55,6 +55,12 @@ public class CustomerController extends HttpServlet {
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
+        // Cho JSP biết người đang xem có quyền Full trên tài nguyên này không,
+        // để ẩn các nút hành động không dùng được (Tạo/Sửa/Xoá/Nhập/Xuất) thay
+        // vì để người ta bấm vào rồi nhận 403. Đây CHỈ là lớp trình bày --
+        // chặn thật vẫn nằm ở AccessControl.requireFullAccess trong doPost.
+        request.setAttribute("canManage",
+                AccessControl.hasFullAccess(request, AccessControl.Resource.CUSTOMER));
         String action = request.getParameter("action");
         if (action == null) {
             action = "list";

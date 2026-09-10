@@ -237,7 +237,9 @@
                 <p>Quản lý danh mục thiết bị / sản phẩm POS</p>
             </div>
             <div class="header-actions">
-                <a href="${pageContext.request.contextPath}/product?action=new" class="btn-add"><i class="fa-solid fa-plus"></i> Thêm sản phẩm</a>
+                <c:if test="${canManage}">
+                    <a href="${pageContext.request.contextPath}/product?action=new" class="btn-add"><i class="fa-solid fa-plus"></i> Thêm sản phẩm</a>
+                </c:if>
             </div>
         </div>
 
@@ -370,8 +372,10 @@
                                             </span>
                                             <div class="action-icons">
                                                 <button class="act-view" title="Xem chi tiết" onclick="location.href='${pageContext.request.contextPath}/product?action=view&id=${product.productId}'"><i class="fa-regular fa-eye"></i></button>
-                                                <button class="act-edit" title="Sửa" onclick="location.href='${pageContext.request.contextPath}/product?action=edit&id=${product.productId}'"><i class="fa-solid fa-pen"></i></button>
-                                                <button class="act-delete" title="Xóa" onclick="openDeleteModal(${product.productId}, '${fn:escapeXml(product.productName)}')"><i class="fa-solid fa-trash"></i></button>
+                                                <c:if test="${canManage}">
+                                                    <button class="act-edit" title="Sửa" onclick="location.href='${pageContext.request.contextPath}/product?action=edit&id=${product.productId}'"><i class="fa-solid fa-pen"></i></button>
+                                                    <button class="act-delete" title="Xóa" onclick="openDeleteModal(${product.productId}, '${fn:escapeXml(product.productName)}')"><i class="fa-solid fa-trash"></i></button>
+                                                </c:if>
                                             </div>
                                         </div>
                                     </div>

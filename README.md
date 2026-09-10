@@ -12,7 +12,7 @@ NetBeans Ant project, backed by a MySQL database.
 - **Database:** MySQL (via `mysql-connector-j` and `commons-dbutils`,
   connection pooling with `HikariCP`)
 - **Notable libraries:** `jbcrypt` (password hashing), `jakarta.mail`
-  (email), `commons-fileupload`, `poi` (Excel), `pdfbox` (PDF), `jackson-databind` (JSON)
+  (email), `poi` (Excel), `pdfbox` (PDF), `jackson-databind` (JSON)
 
 ## Project Structure
 
@@ -90,5 +90,5 @@ via `poscs.common.AccessControl`.
 - **OTP rate limiting:** the forgot-password flow locks out a code
   after 5 failed verification attempts, and enforces a 30-second
   server-side cooldown between resend requests
-  (`PasswordResetController`).
+  (`AuthenticationController`).
 - **Role-based access control:** see [PERMISSIONS.md](PERMISSIONS.md).
