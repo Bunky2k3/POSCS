@@ -1,4 +1,4 @@
-package poscs.filter;
+package poscs.common;
 
 import java.io.IOException;
 import java.util.Set;
@@ -11,7 +11,6 @@ import jakarta.servlet.annotation.WebFilter;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
-import poscs.common.CsrfUtil;
 import poscs.dao.NotificationDAO;
 import poscs.model.User;
 
