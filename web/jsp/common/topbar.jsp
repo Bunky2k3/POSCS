@@ -12,10 +12,16 @@
 --%>
 <nav class="topbar">
     <div class="topbar-left">
-        <a href="${pageContext.request.contextPath}/dashboard" class="brand"><img src="${pageContext.request.contextPath}/img/postef-logo.png" alt="POSTEF" class="brand-mark"> POSCS Portal</a>
-        <button type="button" class="sidebar-toggle" id="sidebarToggle" aria-label="Thu gọn menu">
-            <i class="fa-solid fa-bars"></i>
-        </button>
+        <a href="${pageContext.request.contextPath}/dashboard" class="brand" title="Về trang chủ - POSCS Portal"><img src="${pageContext.request.contextPath}/img/poscs-logo.png" alt="POSCS Portal" class="brand-mark"></a>
+        <%-- Trang không include sidebar.jsp (vd changePassword.jsp) thì set
+             request attribute "noSidebar" trước khi include topbar, để nút thu
+             gọn không hiện ra rồi bấm không ăn gì. --%>
+        <c:if test="${not noSidebar}">
+            <button type="button" class="sidebar-toggle" id="sidebarToggle"
+                    aria-label="Mở/đóng menu điều hướng" aria-controls="sidebar" aria-expanded="false">
+                <i class="fa-solid fa-bars"></i>
+            </button>
+        </c:if>
     </div>
     <div class="topbar-right">
         <div class="dropdown">

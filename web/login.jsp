@@ -7,6 +7,7 @@
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Đăng nhập - POSCS Portal</title>
+    <link rel="icon" type="image/png" href="${pageContext.request.contextPath}/img/favicon.png">
     
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -48,44 +49,53 @@
             height: 44px;
             width: auto;
             display: block;
+            /* .brand-panel là flex column, mặc định align-items kéo giãn item
+               con cho bằng chiều ngang panel -- ảnh logo là item con trực tiếp
+               nên bị kéo bè ra gần gấp đôi (345px thay vì 175px), chữ POSTEF
+               nhìn dãn hết cỡ. width:auto KHÔNG cứu được, phải chặn stretch. */
+            align-self: flex-start;
         }
 
         .brand-logo-light {
-            filter: brightness(0) invert(1);
+            /* brightness(0) invert(1): lật logo màu gốc thành trắng.
+               drop-shadow: ảnh nền phía sau có mảng sáng, cần bóng mềm để logo
+               trắng không lẫn vào. */
+            filter: brightness(0) invert(1) drop-shadow(0 2px 6px rgba(0, 30, 60, 0.55));
+        }
+
+        /* Logo đứng một mình ở bản mobile (không còn dòng "POSCS Portal" kèm
+           bên dưới nữa) nên phóng to hơn một chút. */
+        .brand-logo-lg {
+            height: 52px;
+        }
+
+        .brand-copy p {
+            color: rgba(255, 255, 255, 0.9);
+            line-height: 1.6;
         }
 
         .brand-panel {
-            /* Ảnh nền doanh nghiệp (banner trang chủ postef.com.vn) nằm dưới
-               lớp gradient mờ -- gradient vẫn phải đủ đặc để chữ trắng bên
-               trên đọc được, ảnh chỉ đóng vai trò vân nền. */
+            /* Ảnh nền doanh nghiệp (banner trang chủ postef.com.vn). Lớp phủ
+               chuyển sắc theo CHIỀU DỌC chứ không phủ đều: đậm ở trên cho logo
+               trắng nổi, gần như trong suốt ở giữa để nhìn rõ ảnh, đậm hẳn ở
+               dưới cho khối chữ trắng đọc được. Phủ đều tay như trước làm ảnh
+               chìm hẳn, nhìn chỉ thấy một mảng xanh. */
             background:
-                linear-gradient(135deg, rgba(0, 60, 110, 0.93) 0%, rgba(5, 104, 166, 0.88) 60%, rgba(15, 158, 219, 0.85) 100%),
+                linear-gradient(180deg,
+                    rgba(0, 45, 85, 0.62) 0%,
+                    rgba(0, 45, 85, 0.12) 28%,
+                    rgba(0, 45, 85, 0.22) 52%,
+                    rgba(0, 40, 78, 0.95) 100%),
                 url("${pageContext.request.contextPath}/img/brand-bg.jpg") center / cover no-repeat;
             color: white;
-            padding: 3rem;
+            padding: 2.25rem 2.25rem 2.75rem;
             display: flex;
             flex-direction: column;
-            justify-content: center;
+            /* Logo bám mép trên, khối chữ dồn xuống đáy -- tách hẳn hai khối
+               nhận diện ra hai đầu panel thay vì xếp sát nhau ở giữa. */
+            justify-content: space-between;
             position: relative;
             overflow: hidden;
-        }
-
-        /* Trang trí sóng nước phía sau, đồng bộ với changePassword.jsp */
-        .brand-panel::before, .brand-panel::after {
-            content: "";
-            position: absolute;
-            border-radius: 50%;
-            background: rgba(255,255,255,0.08);
-            z-index: 0;
-        }
-        .brand-panel::before {
-            width: 260px; height: 260px;
-            top: -90px; left: -90px;
-        }
-        .brand-panel::after {
-            width: 220px; height: 220px;
-            bottom: -80px; right: -60px;
-            background: rgba(255,255,255,0.1);
         }
 
         .form-panel {
@@ -189,13 +199,12 @@
         <div class="row g-0">
             <!-- Cột trái: Branding (Ẩn trên Mobile) -->
             <div class="col-md-5 d-none d-md-flex brand-panel">
+                <img src="${pageContext.request.contextPath}/img/postef-logo.png"
+                     alt="POSTEF" class="brand-logo brand-logo-light">
 
-                <div style="z-index: 1;">
-                    <img src="${pageContext.request.contextPath}/img/postef-logo.png"
-                         alt="POSTEF" class="brand-logo brand-logo-light mb-4">
-                    
+                <div class="brand-copy">
                     <h2 class="fw-bold mb-3">POSCS Portal</h2>
-                    <p class="fs-6" style="color: rgba(255,255,255,0.85); line-height: 1.6;">
+                    <p class="fs-6 mb-0">
                         Hệ thống quản lý dịch vụ hỗ trợ kỹ thuật và hợp đồng chuyên nghiệp dành cho doanh nghiệp B2B.
                     </p>
                 </div>
@@ -205,9 +214,8 @@
             <div class="col-md-7 form-panel bg-white">
                 
                 <div class="d-md-none text-center mb-4">
-                    <img src="${pageContext.request.contextPath}/img/postef-logo.png"
-                         alt="POSTEF" class="brand-logo mx-auto mb-3">
-                    <h3 class="fw-bold">POSCS Portal</h3>
+                    <img src="${pageContext.request.contextPath}/img/poscs-logo.png"
+                         alt="POSCS Portal" class="brand-logo brand-logo-lg mx-auto">
                 </div>
 
                 <div class="mb-4">
