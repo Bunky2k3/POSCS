@@ -152,10 +152,14 @@
             <!-- ===== Banner ===== -->
             <div class="profile-banner">
                 <div class="avatar-wrap">
-                    <img id="avatarPreview" class="avatar-img"
-                         src="https://ui-avatars.com/api/?name=<c:out value="${profile.firstName}"/>&background=ffffff&color=0568a6&size=128" alt="Avatar">
+                    <%-- Ảnh đại diện đã tải lên nếu có; chưa có thì rơi về ảnh chữ cái đầu. --%>
+                    <c:set var="avatarSrc" value="https://ui-avatars.com/api/?name=${fn:escapeXml(profile.firstName)}&amp;background=ffffff&amp;color=0568a6&amp;size=128"/>
+                    <c:if test="${not empty profile.avatarUrl}">
+                        <c:set var="avatarSrc" value="${pageContext.request.contextPath}${profile.avatarUrl}"/>
+                    </c:if>
+                    <img id="avatarPreview" class="avatar-img" src="${fn:escapeXml(avatarSrc)}" alt="Avatar">
                     <label class="avatar-edit-btn" for="avatarInput"><i class="fa-solid fa-camera"></i></label>
-                    <input type="file" name="avatar" id="avatarInput" accept="image/*" hidden>
+                    <input type="file" name="avatar" id="avatarInput" accept=".jpg,.jpeg,.png,.gif,.webp" hidden>
                 </div>
                 <h3>Sửa thông tin cá nhân</h3>
                 <span class="role-badge"><c:out value="${profile.role.roleName}"/></span>
@@ -170,6 +174,9 @@
                             <c:when test="${param.error == 'invalid_phone'}">Số điện thoại không hợp lệ.</c:when>
                             <c:when test="${param.error == 'invalid_email'}">Địa chỉ email không hợp lệ.</c:when>
                             <c:when test="${param.error == 'missing_address'}">Vui lòng chọn Tỉnh/Thành phố và Xã/Phường.</c:when>
+                            <c:when test="${param.error == 'invalid_characters'}">Họ tên và địa chỉ không được chứa ký tự &lt; &gt; ". Vui lòng nhập lại.</c:when>
+                            <c:when test="${param.error == 'invalid_image_type'}">Ảnh đại diện chỉ nhận file JPG, PNG, GIF hoặc WEBP. Vui lòng chọn lại.</c:when>
+                            <c:when test="${param.error == 'update_failed'}">Không lưu được thay đổi. Vui lòng thử lại.</c:when>
                             <c:otherwise>Đã có lỗi xảy ra. Vui lòng thử lại.</c:otherwise>
                         </c:choose>
                     </div>

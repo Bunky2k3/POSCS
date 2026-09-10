@@ -8,7 +8,10 @@ import jakarta.servlet.http.HttpSession;
 import org.junit.Before;
 import org.junit.Test;
 import org.mindrot.jbcrypt.BCrypt;
+import jakarta.servlet.http.Part;
 import org.mockito.ArgumentCaptor;
+import org.mockito.MockedStatic;
+import poscs.common.FileStorage;
 import poscs.dao.AddressDAO;
 import poscs.dao.EmployeeDAO;
 import poscs.model.Role;
@@ -505,6 +508,51 @@ public class AuthenticationControllerTest {
         // Bộ lọc chỉ chặn < > " -- không được chặn nhầm tên tiếng Việt có dấu.
         verify(employeeDAO).updateProfile(any());
         verify(response).sendRedirect(CONTEXT_PATH + "/viewProfile");
+    }
+
+    @Test
+    public void updateProfile_avatarWithDisallowedType_rejectsBeforeSaving() throws Exception {
+        when(request.getServletPath()).thenReturn("/UpdateProfileServlet");
+        loggedInSession(userWithPassword("whatever"));
+        stubValidUpdateProfileFields();
+        Part svg = mock(Part.class);
+        when(svg.getSize()).thenReturn(1024L);
+        when(svg.getSubmittedFileName()).thenReturn("avatar.svg");
+        when(request.getPart("avatar")).thenReturn(svg);
+
+        try (MockedStatic<FileStorage> fs = mockStatic(FileStorage.class)) {
+            fs.when(() -> FileStorage.isAcceptable(svg, FileStorage.IMAGE_EXTENSIONS)).thenReturn(false);
+
+            controller.doPost(request, response);
+
+            verify(employeeDAO, never()).updateProfile(any());
+            verify(response).sendRedirect(CONTEXT_PATH + "/updateProfile?error=invalid_image_type");
+        }
+    }
+
+    @Test
+    public void updateProfile_noNewAvatarChosen_keepsTheExistingOne() throws Exception {
+        when(request.getServletPath()).thenReturn("/UpdateProfileServlet");
+        loggedInSession(userWithPassword("whatever"));
+        stubValidUpdateProfileFields();
+        User existing = new User();
+        existing.setUserId(7);
+        existing.setAvatarUrl("/uploads/avatars/cu.png");
+        when(employeeDAO.findProfileById(7)).thenReturn(existing);
+        when(employeeDAO.updateProfile(any())).thenReturn(true);
+
+        try (MockedStatic<FileStorage> fs = mockStatic(FileStorage.class)) {
+            fs.when(() -> FileStorage.isAcceptable(any(), any())).thenReturn(true);
+            // Ô chọn ảnh để trống -> save() trả null, giống hệt lúc file bị từ chối.
+            fs.when(() -> FileStorage.save(any(), anyString(), any())).thenReturn(null);
+
+            controller.doPost(request, response);
+
+            // Không được xoá ảnh cũ chỉ vì lần lưu này người dùng không đổi ảnh.
+            ArgumentCaptor<User> saved = ArgumentCaptor.forClass(User.class);
+            verify(employeeDAO).updateProfile(saved.capture());
+            org.junit.Assert.assertEquals("/uploads/avatars/cu.png", saved.getValue().getAvatarUrl());
+        }
     }
 
     @Test

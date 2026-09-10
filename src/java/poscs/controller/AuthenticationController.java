@@ -17,6 +17,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 import org.mindrot.jbcrypt.BCrypt;
 import poscs.common.EmailUtil;
+import poscs.common.FileStorage;
 import poscs.common.TextRules;
 import poscs.dao.AddressDAO;
 import poscs.dao.EmployeeDAO;
@@ -43,6 +44,9 @@ public class AuthenticationController extends HttpServlet {
 
     private final EmployeeDAO employeeDAO = new EmployeeDAO();
     private final AddressDAO addressDAO = new AddressDAO();
+
+    /** Thư mục con trong kho upload dành cho ảnh đại diện -- xem FileStorage. */
+    private static final String AVATAR_SUBFOLDER = "avatars";
 
     // Số lần đăng nhập sai tối đa cho phép từ 1 địa chỉ IP trước khi tạm khoá
     // -- không có giới hạn này thì /login có thể bị dò mật khẩu (brute-force)
@@ -178,7 +182,8 @@ public class AuthenticationController extends HttpServlet {
     // Lưu thay đổi hồ sơ cá nhân
     // ------------------------------------------------------------------
 
-    private void handleUpdateProfile(HttpServletRequest request, HttpServletResponse response) throws IOException {
+    private void handleUpdateProfile(HttpServletRequest request, HttpServletResponse response)
+            throws ServletException, IOException {
         HttpSession session = request.getSession(false);
         User currentUser = session != null ? (User) session.getAttribute("currentUser") : null;
         if (currentUser == null) {
@@ -224,6 +229,13 @@ public class AuthenticationController extends HttpServlet {
             return;
         }
 
+        // Kiểm ảnh đại diện TRƯỚC khi ghi, giống các ô chọn file khác -- file
+        // sai loại phải báo lỗi chứ không được lặng lẽ biến mất.
+        if (!FileStorage.isAcceptable(request.getPart("avatar"), FileStorage.IMAGE_EXTENSIONS)) {
+            response.sendRedirect(request.getContextPath() + "/updateProfile?error=invalid_image_type");
+            return;
+        }
+
         // Tra 1 lần duy nhất để biết profile hiện có addressId hay chưa (dùng
         // cho setAddressFromRequest bên dưới) -- tránh tra lại DB thêm lần nữa.
         User currentProfile = employeeDAO.findProfileById(currentUser.getUserId());
@@ -238,6 +250,12 @@ public class AuthenticationController extends HttpServlet {
         user.setCitizenId(citizenId);
         user.setPhone(phone);
         user.setPersonalEmail(personalEmail);
+        // Ô chọn ảnh để trống vẫn gửi lên 1 Part rỗng -> save() trả null; khi đó
+        // giữ ảnh cũ thay vì xoá mất chỉ vì lần lưu này người dùng không đổi ảnh.
+        String newAvatarUrl = FileStorage.save(request.getPart("avatar"), AVATAR_SUBFOLDER,
+                FileStorage.IMAGE_EXTENSIONS);
+        user.setAvatarUrl(newAvatarUrl != null ? newAvatarUrl
+                : (currentProfile != null ? currentProfile.getAvatarUrl() : null));
         setAddressFromRequest(user, currentProfile, districtId, request);
 
         boolean ok = employeeDAO.updateProfile(user);
@@ -245,6 +263,10 @@ public class AuthenticationController extends HttpServlet {
             response.sendRedirect(request.getContextPath() + "/updateProfile?error=update_failed");
             return;
         }
+        // Topbar lấy ảnh từ currentUser trong session (có mặt ở mọi trang), nên
+        // phải cập nhật luôn -- không thì ảnh mới chỉ xuất hiện sau lần đăng
+        // nhập kế tiếp, người dùng tưởng lưu hỏng.
+        currentUser.setAvatarUrl(user.getAvatarUrl());
         response.sendRedirect(request.getContextPath() + "/viewProfile");
     }
 

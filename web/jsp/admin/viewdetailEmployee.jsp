@@ -99,7 +99,12 @@
 
         <div class="profile-card">
             <div class="profile-banner">
-                <img class="avatar-img" src="https://ui-avatars.com/api/?name=${fn:escapeXml(employee.firstName)}&background=ffffff&color=0568a6&size=128" alt="Avatar">
+                <%-- Ảnh đại diện đã tải lên nếu có; chưa có thì rơi về ảnh chữ cái đầu. --%>
+                <c:set var="avatarSrc" value="https://ui-avatars.com/api/?name=${fn:escapeXml(employee.firstName)}&amp;background=ffffff&amp;color=0568a6&amp;size=128"/>
+                <c:if test="${not empty employee.avatarUrl}">
+                    <c:set var="avatarSrc" value="${pageContext.request.contextPath}${employee.avatarUrl}"/>
+                </c:if>
+                <img class="avatar-img" src="${fn:escapeXml(avatarSrc)}" alt="Avatar">
                 <h3><c:out value="${employee.fullName}"/></h3>
                 <p style="opacity:0.85; margin-bottom:10px;">NV-<c:out value="${employee.userId}"/></p>
                 <div class="badge-row">

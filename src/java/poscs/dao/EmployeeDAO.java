@@ -29,7 +29,7 @@ public class EmployeeDAO {
     public User findByUsernameOrEmail(String identifier) {
         // JOIN sẵn bảng roles để lấy luôn role_name, tránh phải query thêm lần 2.
         String sql = "SELECT u.user_id, u.username, u.email, u.password_hash, u.role_id, " +
-                     "u.last_name, u.middle_name, u.first_name, u.department_id, u.is_deleted, r.role_name " +
+                     "u.last_name, u.middle_name, u.first_name, u.department_id, u.avatar_url, u.is_deleted, r.role_name " +
                      "FROM users u JOIN roles r ON u.role_id = r.role_id " +
                      "WHERE (u.username = ? OR u.email = ?)";
         try (Connection conn = DBContext.getConnection();
@@ -51,6 +51,7 @@ public class EmployeeDAO {
                     u.setMiddleName(rs.getString("middle_name"));
                     u.setFirstName(rs.getString("first_name"));
                     u.setDepartmentId(rs.getInt("department_id"));
+                    u.setAvatarUrl(rs.getString("avatar_url")); // topbar doc anh dai dien tu session
                     u.setDeleted(rs.getBoolean("is_deleted"));
                     u.setRole(new Role(rs.getInt("role_id"), rs.getString("role_name")));
                     return u;
@@ -147,7 +148,8 @@ public class EmployeeDAO {
      */
     public boolean updateProfile(User user) {
         String sql = "UPDATE users SET last_name = ?, middle_name = ?, first_name = ?, gender = ?, " +
-                     "date_of_birth = ?, citizen_id = ?, phone = ?, personal_email = ?, address_id = ? " +
+                     "date_of_birth = ?, citizen_id = ?, phone = ?, personal_email = ?, address_id = ?, " +
+                     "avatar_url = ? " +
                      "WHERE user_id = ? AND is_deleted = 0";
         try (Connection conn = DBContext.getConnection()) {
             // resolveAddressId() (insert/update dòng addresses) và UPDATE users
@@ -172,7 +174,8 @@ public class EmployeeDAO {
                     } else {
                         ps.setNull(9, Types.INTEGER);
                     }
-                    ps.setInt(10, user.getUserId());
+                    ps.setString(10, user.getAvatarUrl());
+                    ps.setInt(11, user.getUserId());
                     boolean ok = ps.executeUpdate() > 0;
                     if (ok) {
                         conn.commit();
