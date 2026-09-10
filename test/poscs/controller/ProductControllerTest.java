@@ -204,15 +204,67 @@ public class ProductControllerTest {
         Part imagePart = mock(Part.class);
         when(imagePart.getName()).thenReturn("images");
         when(imagePart.getSize()).thenReturn(1024L);
+        when(imagePart.getSubmittedFileName()).thenReturn("anh.jpg");
         when(request.getParts()).thenReturn(Arrays.asList(imagePart));
 
         try (MockedStatic<FileStorage> fs = mockStatic(FileStorage.class)) {
+            // Cả lớp FileStorage bị mock nên isAcceptable() mặc định trả false;
+            // phải stub rõ, nếu không controller sẽ từ chối file ngay từ đầu.
+            fs.when(() -> FileStorage.isAcceptable(imagePart, FileStorage.IMAGE_EXTENSIONS)).thenReturn(true);
             fs.when(() -> FileStorage.save(imagePart, "products/images", FileStorage.IMAGE_EXTENSIONS))
                     .thenReturn("/uploads/products/images/x.jpg");
 
             controller.doPost(request, response);
 
             verify(productDAO).addImage(42, "/uploads/products/images/x.jpg");
+        }
+    }
+
+    @Test
+    public void create_withDisallowedImageType_rejectsBeforeCreatingTheProduct() throws Exception {
+        when(request.getParameter("action")).thenReturn("create");
+        when(request.getParameter("productName")).thenReturn("Router ABC");
+        when(request.getParameter("categoryId")).thenReturn("1");
+
+        Part svgPart = mock(Part.class);
+        when(svgPart.getName()).thenReturn("images");
+        when(svgPart.getSize()).thenReturn(1024L);
+        when(svgPart.getSubmittedFileName()).thenReturn("payload.svg");
+        when(request.getParts()).thenReturn(Arrays.asList(svgPart));
+
+        try (MockedStatic<FileStorage> fs = mockStatic(FileStorage.class)) {
+            fs.when(() -> FileStorage.isAcceptable(svgPart, FileStorage.IMAGE_EXTENSIONS)).thenReturn(false);
+
+            controller.doPost(request, response);
+
+            // Kiểm phải xảy ra TRƯỚC khi ghi: nếu để saveNewImages() tự bỏ qua
+            // file thì sản phẩm đã được tạo rồi, người dùng nhận về một bản ghi
+            // thiếu ảnh mà không có lời giải thích nào.
+            verify(productDAO, never()).insert(any(Product.class));
+            verify(productDAO, never()).addImage(anyInt(), anyString());
+            verify(response).sendRedirect(CONTEXT_PATH + "/product?action=new&error=invalid_image_type");
+        }
+    }
+
+    @Test
+    public void create_withDisallowedCatalogueType_rejectsBeforeCreatingTheProduct() throws Exception {
+        when(request.getParameter("action")).thenReturn("create");
+        when(request.getParameter("productName")).thenReturn("Router ABC");
+        when(request.getParameter("categoryId")).thenReturn("1");
+
+        Part docPart = mock(Part.class);
+        when(docPart.getName()).thenReturn("catalogues");
+        when(docPart.getSize()).thenReturn(1024L);
+        when(docPart.getSubmittedFileName()).thenReturn("tai-lieu.docx");
+        when(request.getParts()).thenReturn(Arrays.asList(docPart));
+
+        try (MockedStatic<FileStorage> fs = mockStatic(FileStorage.class)) {
+            fs.when(() -> FileStorage.isAcceptable(docPart, FileStorage.DOCUMENT_EXTENSIONS)).thenReturn(false);
+
+            controller.doPost(request, response);
+
+            verify(productDAO, never()).insert(any(Product.class));
+            verify(response).sendRedirect(CONTEXT_PATH + "/product?action=new&error=invalid_catalogue_type");
         }
     }
 

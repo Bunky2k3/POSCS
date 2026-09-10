@@ -5,8 +5,11 @@ import jakarta.servlet.RequestDispatcher;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
+import jakarta.servlet.http.Part;
 import org.junit.Before;
 import org.junit.Test;
+import org.mockito.MockedStatic;
+import poscs.common.FileStorage;
 import poscs.dao.AddressDAO;
 import poscs.dao.ContractDAO;
 import poscs.dao.CustomerDAO;
@@ -224,6 +227,28 @@ public class CustomerControllerTest {
 
         verify(customerDAO, never()).insert(any());
         verify(response).sendRedirect(CONTEXT_PATH + "/customer?action=new&error=invalid");
+    }
+
+    @Test
+    public void create_logoWithDisallowedType_rejectsBeforeInserting() throws Exception {
+        when(request.getParameter("action")).thenReturn("create");
+        stubValidCreateFields();
+        Part logoPart = mock(Part.class);
+        when(logoPart.getSize()).thenReturn(1024L);
+        when(logoPart.getSubmittedFileName()).thenReturn("logo.svg");
+        when(request.getPart("logo")).thenReturn(logoPart);
+
+        try (MockedStatic<FileStorage> fs = mockStatic(FileStorage.class)) {
+            fs.when(() -> FileStorage.isAcceptable(logoPart, FileStorage.IMAGE_EXTENSIONS)).thenReturn(false);
+
+            controller.doPost(request, response);
+
+            // Trước đây file sai loại chỉ khiến save() trả null -- giống hệt khi
+            // không chọn file -- nên khách hàng vẫn được tạo, không có logo và
+            // không có lời giải thích nào.
+            verify(customerDAO, never()).insert(any());
+            verify(response).sendRedirect(CONTEXT_PATH + "/customer?action=new&error=invalid_image_type");
+        }
     }
 
     @Test

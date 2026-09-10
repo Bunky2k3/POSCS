@@ -440,6 +440,9 @@ public class CustomerController extends HttpServlet {
         if (!AccessControl.requireFullAccess(request, response, AccessControl.Resource.CUSTOMER)) {
             return;
         }
+        if (!logoIsAcceptable(request, response, request.getContextPath() + "/customer?action=new")) {
+            return;
+        }
         Enterprise e = new Enterprise();
         e.setEnterpriseName(request.getParameter("customerName"));
         e.setCustomerType(request.getParameter("customerType"));
@@ -482,6 +485,9 @@ public class CustomerController extends HttpServlet {
         Enterprise existing = id != null ? customerDAO.findById(id) : null;
         if (existing == null) {
             response.sendRedirect(request.getContextPath() + "/customer?error=notfound");
+            return;
+        }
+        if (!logoIsAcceptable(request, response, request.getContextPath() + "/customer?action=edit&id=" + id)) {
             return;
         }
 
@@ -630,6 +636,24 @@ public class CustomerController extends HttpServlet {
      * để trống sẽ làm INSERT/UPDATE thất bại ở tầng DB thay vì báo lỗi rõ
      * ràng "invalid" ngay tại đây.
      */
+    /**
+     * Kiểm ô chọn logo TRƯỚC khi đụng tới CSDL. Trả về false (và đã tự redirect
+     * kèm lỗi) nếu file sai loại.
+     *
+     * Phải chạy sớm: FileStorage.save() được gọi ngay lúc dựng Enterprise, và
+     * nó trả về null cho file sai loại y hệt khi người dùng không chọn gì --
+     * nên nếu không chặn ở đây thì luồng tạo mới lặng lẽ lưu khách hàng không
+     * logo, còn luồng sửa thì lặng lẽ giữ nguyên logo cũ.
+     */
+    private boolean logoIsAcceptable(HttpServletRequest request, HttpServletResponse response,
+            String redirectBase) throws ServletException, IOException {
+        if (FileStorage.isAcceptable(request.getPart("logo"), FileStorage.IMAGE_EXTENSIONS)) {
+            return true;
+        }
+        response.sendRedirect(redirectBase + "&error=invalid_image_type");
+        return false;
+    }
+
     private boolean isValidCommonFields(Enterprise e) {
         if (isBlank(e.getEnterpriseName()) || isBlank(e.getCustomerType()) || isBlank(e.getCustomerGroup())) {
             return false;
