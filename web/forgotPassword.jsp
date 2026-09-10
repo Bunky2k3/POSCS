@@ -243,7 +243,7 @@
                     </p>
                 </div>
 
-                <%-- PasswordResetController#handleForgotPassword: kiểm tra email tồn tại, sinh mã OTP, lưu vào session, gửi OTP qua email, rồi redirect sang verifyOtp.jsp --%>
+                <%-- AuthenticationController#handleForgotPassword: kiểm tra email tồn tại, sinh mã OTP, lưu vào session, gửi OTP qua email, rồi redirect sang verifyOtp.jsp --%>
                 <form action="ForgotPasswordServlet" method="POST" id="forgotPasswordForm">
                     <input type="hidden" name="csrfToken" value="${csrfToken}">
                     <c:if test="${not empty param.error}">
