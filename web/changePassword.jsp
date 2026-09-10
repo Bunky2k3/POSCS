@@ -274,11 +274,8 @@
 </head>
 <body>
 
+    <c:set var="noSidebar" value="true" scope="request"/>
     <%@ include file="/jsp/common/topbar.jsp" %>
-    <div class="app-shell">
-        <c:set var="activeNav" value="profile" scope="request"/>
-        <%@ include file="/jsp/common/sidebar.jsp" %>
-        <div class="main-content">
 
     <div class="auth-content">
         <div class="container">
@@ -420,8 +417,6 @@
         }
     </script>
 
-        </div>
-    </div>
 
     <script src="${pageContext.request.contextPath}/js/appshell.js"></script>
 </body>

@@ -48,6 +48,11 @@
             height: 44px;
             width: auto;
             display: block;
+            /* .brand-panel là flex column, mặc định align-items kéo giãn item
+               con cho bằng chiều ngang panel -- ảnh logo là item con trực tiếp
+               nên bị kéo bè ra gần gấp đôi (345px thay vì 175px), chữ POSTEF
+               nhìn dãn hết cỡ. width:auto KHÔNG cứu được, phải chặn stretch. */
+            align-self: flex-start;
         }
 
         .brand-logo-light {
