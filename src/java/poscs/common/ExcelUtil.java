@@ -1,30 +1,22 @@
 package poscs.common;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import jakarta.servlet.http.HttpServletResponse;
 import org.apache.poi.hssf.usermodel.HSSFWorkbook;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellStyle;
 import org.apache.poi.ss.usermodel.CellType;
-import org.apache.poi.ss.usermodel.DataValidation;
-import org.apache.poi.ss.usermodel.DataValidationConstraint;
-import org.apache.poi.ss.usermodel.DataValidationHelper;
 import org.apache.poi.ss.usermodel.FillPatternType;
 import org.apache.poi.ss.usermodel.Font;
 import org.apache.poi.ss.usermodel.IndexedColors;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
-import org.apache.poi.ss.util.CellRangeAddressList;
-import org.apache.poi.ss.util.CellReference;
 
 /**
  * Helper dùng chung cho xuất/nhập Excel qua Apache POI -- tránh lặp
@@ -59,173 +51,6 @@ public final class ExcelUtil {
             writeDataRows(sheet, headers.length, rows);
             setDefaultColumnWidths(sheet, headers.length);
             streamAsAttachment(response, workbook, fileNamePrefix);
-        }
-    }
-
-    /**
-     * Tạo file mẫu để nhập Excel: dòng đầu là header, có thể kèm dropdown
-     * (data validation) cho 1 số cột -- ví dụ danh mục sản phẩm, loại/nhóm
-     * khách hàng -- để người dùng không gõ sai giá trị. `dropdownOptions`:
-     * key = chỉ số cột (0-based), value = danh sách giá trị hợp lệ cho cột
-     * đó. `maxDataRows` = số dòng trống bên dưới header được áp dropdown
-     * (Excel không cho áp validation cho "cả cột" một cách rẻ, nên giới hạn
-     * ở mức đủ dùng, ví dụ 200 dòng).
-     */
-    public static void writeTemplate(HttpServletResponse response, String fileNamePrefix,
-            String[] headers, Map<Integer, List<String>> dropdownOptions, int maxDataRows)
-            throws IOException {
-        try (Workbook workbook = new HSSFWorkbook()) {
-            Sheet sheet = workbook.createSheet("Data");
-            writeHeaderRow(workbook, sheet, headers);
-
-            if (dropdownOptions != null && !dropdownOptions.isEmpty()) {
-                addDropdownValidations(workbook, sheet, dropdownOptions, maxDataRows);
-            }
-
-            setDefaultColumnWidths(sheet, headers.length);
-            streamAsAttachment(response, workbook, fileNamePrefix);
-        }
-    }
-
-    /**
-     * Excel giới hạn danh sách dropdown kiểu "liệt kê trực tiếp trong công
-     * thức" (explicit list) ở khoảng 255 ký tự -- danh mục sản phẩm (33
-     * mục) hay tỉnh/thành (34 mục) vượt giới hạn này dễ dàng và làm dropdown
-     * bị Excel từ chối hoặc hiển thị sai. Với danh sách dài, ghi giá trị ra
-     * 1 sheet ẩn ("RefData") rồi tham chiếu theo vùng ô thay vì liệt kê
-     * trực tiếp -- không giới hạn số mục.
-     */
-    private static void addDropdownValidations(Workbook workbook, Sheet sheet,
-            Map<Integer, List<String>> dropdownOptions, int maxDataRows) {
-        DataValidationHelper dvHelper = sheet.getDataValidationHelper();
-        Sheet refSheet = null;
-        int refCol = 0;
-        for (Map.Entry<Integer, List<String>> entry : dropdownOptions.entrySet()) {
-            int col = entry.getKey();
-            List<String> options = entry.getValue();
-            DataValidationConstraint constraint;
-            if (options.size() <= 15 && totalLength(options) <= 200) {
-                constraint = dvHelper.createExplicitListConstraint(options.toArray(new String[0]));
-            } else {
-                if (refSheet == null) {
-                    refSheet = workbook.createSheet("RefData");
-                    workbook.setSheetHidden(workbook.getSheetIndex(refSheet), true);
-                }
-                for (int i = 0; i < options.size(); i++) {
-                    Row row = refSheet.getRow(i);
-                    if (row == null) {
-                        row = refSheet.createRow(i);
-                    }
-                    row.createCell(refCol).setCellValue(options.get(i));
-                }
-                String colLetter = CellReference.convertNumToColString(refCol);
-                String formula = "RefData!$" + colLetter + "$1:$" + colLetter + "$" + options.size();
-                constraint = dvHelper.createFormulaListConstraint(formula);
-                refCol++;
-            }
-            CellRangeAddressList addressList = new CellRangeAddressList(1, maxDataRows, col, col);
-            DataValidation validation = dvHelper.createValidation(constraint, addressList);
-            validation.setShowErrorBox(true);
-            validation.createErrorBox("Giá trị không hợp lệ", "Vui lòng chọn 1 giá trị trong danh sách thả xuống.");
-            sheet.addValidationData(validation);
-        }
-    }
-
-    private static int totalLength(List<String> options) {
-        int len = 0;
-        for (String s : options) {
-            len += s.length() + 1;
-        }
-        return len;
-    }
-
-    /**
-     * Đọc toàn bộ dòng dữ liệu (bỏ qua `headerRowIndex` dòng đầu) từ file
-     * .xls tải lên, dùng cho import. Trả về danh sách các `Row` POI để
-     * controller tự đọc cell theo cột bằng {@link #cellString(Row, int)}/
-     * {@link #cellInt(Row, int)}. Bỏ qua các dòng hoàn toàn trống (thường do
-     * người dùng để dư dòng cuối file khi chỉnh sửa).
-     */
-    public static List<Row> readRows(InputStream inputStream, int headerRowIndex) throws IOException {
-        return readRows(inputStream, headerRowIndex, null);
-    }
-
-    /**
-     * Như {@link #readRows(InputStream, int)}, nhưng nếu `expectedHeaders`
-     * khác null thì kiểm tra dòng header thực tế khớp đúng thứ tự/tên với
-     * `expectedHeaders` trước khi đọc dữ liệu -- việc đọc cell theo cột hoàn
-     * toàn dựa vào vị trí (COL_* ở từng controller), nên nếu người dùng chèn/
-     * xoá/đảo cột trong file mẫu rồi tải lên, dữ liệu sẽ bị đọc lệch cột một
-     * cách âm thầm nếu không có kiểm tra này -- ném IOException để controller
-     * báo lỗi thay vì import nhầm dữ liệu.
-     */
-    public static List<Row> readRows(InputStream inputStream, int headerRowIndex, String[] expectedHeaders) throws IOException {
-        List<Row> result = new ArrayList<>();
-        try (Workbook workbook = new HSSFWorkbook(inputStream)) {
-            Sheet sheet = workbook.getSheetAt(0);
-            if (expectedHeaders != null) {
-                Row headerRow = sheet.getRow(headerRowIndex);
-                for (int c = 0; c < expectedHeaders.length; c++) {
-                    String actual = cellString(headerRow, c);
-                    if (!actual.trim().equalsIgnoreCase(expectedHeaders[c].trim())) {
-                        throw new IOException("Cột " + (c + 1) + " của file phải là \"" + expectedHeaders[c]
-                                + "\" (đang là \"" + actual + "\") -- hãy tải lại file mẫu mới nhất, không thêm/bớt/đổi thứ tự cột.");
-                    }
-                }
-            }
-            int last = sheet.getLastRowNum();
-            for (int i = headerRowIndex + 1; i <= last; i++) {
-                Row row = sheet.getRow(i);
-                if (row != null && !isRowBlank(row)) {
-                    result.add(row);
-                }
-            }
-        }
-        return result;
-    }
-
-    /** Đọc cell dạng chuỗi an toàn -- trả "" nếu cell trống/không tồn tại, tự ép kiểu số/ngày về chuỗi nếu cần. */
-    public static String cellString(Row row, int col) {
-        if (row == null) {
-            return "";
-        }
-        Cell cell = row.getCell(col);
-        if (cell == null) {
-            return "";
-        }
-        switch (cell.getCellType()) {
-            case STRING:
-                return cell.getStringCellValue().trim();
-            case NUMERIC:
-                double value = cell.getNumericCellValue();
-                if (value == Math.floor(value) && !Double.isInfinite(value)) {
-                    return String.valueOf((long) value);
-                }
-                return String.valueOf(value);
-            case BOOLEAN:
-                return String.valueOf(cell.getBooleanCellValue());
-            case FORMULA:
-                try {
-                    return cell.getStringCellValue().trim();
-                } catch (IllegalStateException ex) {
-                    return String.valueOf(cell.getNumericCellValue());
-                }
-            case BLANK:
-            default:
-                return "";
-        }
-    }
-
-    /** Đọc cell dạng số nguyên an toàn -- trả null nếu cell trống/không parse được. */
-    public static Integer cellInt(Row row, int col) {
-        String s = cellString(row, col);
-        if (s.isEmpty()) {
-            return null;
-        }
-        try {
-            return Integer.parseInt(s.trim());
-        } catch (NumberFormatException ex) {
-            return null;
         }
     }
 
@@ -317,14 +142,5 @@ public final class ExcelUtil {
         try (OutputStream out = response.getOutputStream()) {
             workbook.write(out);
         }
-    }
-
-    private static boolean isRowBlank(Row row) {
-        for (int c = row.getFirstCellNum(); c < row.getLastCellNum(); c++) {
-            if (!cellString(row, c).isEmpty()) {
-                return false;
-            }
-        }
-        return true;
     }
 }

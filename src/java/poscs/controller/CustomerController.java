@@ -4,11 +4,7 @@ import java.io.IOException;
 import java.sql.Date;
 import java.time.LocalDate;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-import org.apache.poi.ss.usermodel.Row;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.MultipartConfig;
 import jakarta.servlet.annotation.WebServlet;
@@ -27,9 +23,7 @@ import poscs.dao.EmployeeDAO;
 import poscs.dao.TechnicalSupportTicketDAO;
 import poscs.model.Address;
 import poscs.model.CustomerLifecycleEvent;
-import poscs.model.District;
 import poscs.model.Enterprise;
-import poscs.model.Province;
 import poscs.model.RelationshipRating;
 import poscs.model.User;
 
@@ -50,16 +44,6 @@ public class CustomerController extends HttpServlet {
     private static final String DETAIL_VIEW = "/jsp/sale/viewcustomerdetail.jsp";
     private static final String CREATE_VIEW = "/jsp/sale/addnewcustomer.jsp";
     private static final String UPDATE_VIEW = "/jsp/sale/updatecustomer.jsp";
-    private static final String IMPORT_VIEW = "/jsp/sale/importcustomer.jsp";
-
-    // Cột trong file mẫu nhập Excel (xem downloadImportTemplate/handleImportExcel).
-    private static final String[] IMPORT_HEADERS = {
-        "Tên doanh nghiệp*", "Loại KH*", "Nhóm KH*", "Mã số thuế*", "Email*", "Số điện thoại*",
-        "Website", "Tỉnh/Thành*", "Xã/Phường*", "Địa chỉ chi tiết*", "Người phụ trách (username)"
-    };
-    private static final int COL_NAME = 0, COL_TYPE = 1, COL_GROUP = 2, COL_TAX = 3, COL_EMAIL = 4,
-            COL_PHONE = 5, COL_WEBSITE = 6, COL_PROVINCE = 7, COL_WARD = 8, COL_ADDRESS_DETAIL = 9,
-            COL_OWNER_USERNAME = 10;
 
     private final CustomerDAO customerDAO = new CustomerDAO();
     private final EmployeeDAO employeeDAO = new EmployeeDAO();
@@ -88,12 +72,6 @@ public class CustomerController extends HttpServlet {
             case "exportExcel":
                 exportExcel(request, response);
                 break;
-            case "importForm":
-                showImportForm(request, response);
-                break;
-            case "downloadTemplate":
-                downloadImportTemplate(request, response);
-                break;
             case "list":
             default:
                 showList(request, response);
@@ -120,9 +98,6 @@ public class CustomerController extends HttpServlet {
                 break;
             case "evaluate":
                 handleEvaluate(request, response);
-                break;
-            case "importExcel":
-                handleImportExcel(request, response);
                 break;
             default:
                 response.sendRedirect(request.getContextPath() + "/customer");
@@ -227,208 +202,6 @@ public class CustomerController extends HttpServlet {
             });
         }
         ExcelUtil.writeWorkbook(response, "khach_hang", headers, rows);
-    }
-
-    /** Hiển thị form nhập Excel hàng loạt (chưa xử lý gì) -- nút "Nhập Excel" ở listcustomer.jsp. */
-    private void showImportForm(HttpServletRequest request, HttpServletResponse response)
-            throws ServletException, IOException {
-        request.getRequestDispatcher(IMPORT_VIEW).forward(request, response);
-    }
-
-    /** Sinh file mẫu .xlsx cho nhập khách hàng, có dropdown Loại KH/Nhóm KH/Tỉnh-Thành để hạn chế gõ sai. */
-    private void downloadImportTemplate(HttpServletRequest request, HttpServletResponse response) throws IOException {
-        Map<Integer, List<String>> dropdowns = new HashMap<>();
-        dropdowns.put(COL_TYPE, Arrays.asList("Nhà mạng viễn thông", "Nhà thầu thi công", "Đại lý phân phối"));
-        dropdowns.put(COL_GROUP, Arrays.asList("VIP", "Thân thiết", "Tiềm năng", "Thường"));
-        List<String> provinceNames = new ArrayList<>();
-        for (Province p : addressDAO.findAllProvinces()) {
-            provinceNames.add(p.getShortName());
-        }
-        dropdowns.put(COL_PROVINCE, provinceNames);
-        ExcelUtil.writeTemplate(response, "mau_nhap_khach_hang", IMPORT_HEADERS, dropdowns, 200);
-    }
-
-    /**
-     * Nhập hàng loạt khách hàng từ file .xlsx theo mẫu downloadImportTemplate().
-     * Mỗi dòng độc lập -- 1 dòng lỗi không chặn các dòng còn lại. Tỉnh/Thành
-     * và Xã/Phường trong file là TÊN (không phải ID) nên phải so khớp lại với
-     * addressDAO.findAllProvinces()/findWardsByProvinceId() -- không có sẵn
-     * hàm tra theo tên nào trong AddressDAO nên so khớp thủ công ở đây
-     * (rút gọn theo getShortName(), bỏ dấu cách/hoa-thường).
-     */
-    private void handleImportExcel(HttpServletRequest request, HttpServletResponse response)
-            throws ServletException, IOException {
-        if (!AccessControl.requireFullAccess(request, response, AccessControl.Resource.CUSTOMER)) {
-            return;
-        }
-
-        Part filePart = request.getPart("file");
-        if (filePart == null || filePart.getSize() <= 0) {
-            request.setAttribute("importError", "Vui lòng chọn file .xlsx để nhập.");
-            request.getRequestDispatcher(IMPORT_VIEW).forward(request, response);
-            return;
-        }
-
-        List<Province> provinces = addressDAO.findAllProvinces();
-        List<User> staff = employeeDAO.findAllActive();
-        User currentUser = AccessControl.currentUser(request);
-
-        List<String> errors = new ArrayList<>();
-        int successCount = 0;
-
-        List<Row> rows;
-        try (java.io.InputStream in = filePart.getInputStream()) {
-            rows = ExcelUtil.readRows(in, 0, IMPORT_HEADERS);
-        } catch (Exception ex) {
-            String detail = ex.getMessage();
-            request.setAttribute("importError", "Không đọc được file -- hãy chắc chắn đây là file .xlsx đúng mẫu."
-                    + (detail != null ? " (" + detail + ")" : ""));
-            request.getRequestDispatcher(IMPORT_VIEW).forward(request, response);
-            return;
-        }
-
-        int rowNumber = 1; // dòng 1 là header trong file gốc
-        // Sinh mã KH-xxxx 1 lần rồi tăng dần trong vòng lặp thay vì gọi lại
-        // generateNextEnterpriseCode() (1 SELECT MAX riêng) cho từng dòng --
-        // với vài trăm dòng, tránh vài trăm round-trip DB không cần thiết.
-        String seedCode = customerDAO.generateNextEnterpriseCode();
-        if (seedCode == null) {
-            request.setAttribute("importError", "Không sinh được mã khách hàng -- có thể mất kết nối CSDL, hãy thử lại.");
-            request.getRequestDispatcher(IMPORT_VIEW).forward(request, response);
-            return;
-        }
-        String[] nextCode = {seedCode};
-        for (Row row : rows) {
-            rowNumber++;
-            String rowError = importOneCustomerRow(row, rowNumber, provinces, staff, currentUser, nextCode);
-            if (rowError == null) {
-                successCount++;
-            } else {
-                errors.add(rowError);
-            }
-        }
-
-        request.setAttribute("importSuccessCount", successCount);
-        request.setAttribute("importErrorCount", errors.size());
-        request.setAttribute("importErrors", errors);
-        request.getRequestDispatcher(IMPORT_VIEW).forward(request, response);
-    }
-
-    /**
-     * @param nextCode mảng 1 phần tử giữ mã KH-xxxx sẽ dùng cho dòng này -- hàm tự
-     * cập nhật lại phần tử này (dựa trên mã enterprise_code thực sự vừa lưu
-     * thành công, có thể khác nextCode[0] nếu insert() phải tự thử lại do
-     * trùng mã) để dòng kế tiếp dùng, tránh phải đọc lại CSDL mỗi dòng.
-     * @return null nếu insert thành công, ngược lại là mô tả lỗi kèm số dòng để hiển thị cho người dùng.
-     */
-    private String importOneCustomerRow(Row row, int rowNumber, List<Province> provinces, List<User> staff,
-            User currentUser, String[] nextCode) {
-        String name = ExcelUtil.cellString(row, COL_NAME);
-        String type = ExcelUtil.cellString(row, COL_TYPE);
-        String group = ExcelUtil.cellString(row, COL_GROUP);
-        String tax = ExcelUtil.cellString(row, COL_TAX);
-        String email = ExcelUtil.cellString(row, COL_EMAIL);
-        String phone = ExcelUtil.cellString(row, COL_PHONE);
-        String website = ExcelUtil.cellString(row, COL_WEBSITE);
-        String provinceName = ExcelUtil.cellString(row, COL_PROVINCE);
-        String wardName = ExcelUtil.cellString(row, COL_WARD);
-        String addressDetail = ExcelUtil.cellString(row, COL_ADDRESS_DETAIL);
-        String ownerUsername = ExcelUtil.cellString(row, COL_OWNER_USERNAME);
-
-        if (isBlank(name) || isBlank(type) || isBlank(group) || isBlank(tax) || isBlank(email)
-                || isBlank(phone) || isBlank(provinceName) || isBlank(wardName) || isBlank(addressDetail)) {
-            return "Dòng " + rowNumber + ": thiếu trường bắt buộc (đánh dấu *).";
-        }
-        if (!isValidPhone(phone)) {
-            return "Dòng " + rowNumber + ": số điện thoại không đúng định dạng.";
-        }
-        if (!isValidEmail(email)) {
-            return "Dòng " + rowNumber + ": email không đúng định dạng.";
-        }
-
-        Province province = findProvinceByName(provinces, provinceName);
-        if (province == null) {
-            return "Dòng " + rowNumber + ": không tìm thấy tỉnh/thành \"" + provinceName + "\".";
-        }
-        District ward = findWardByName(addressDAO.findWardsByProvinceId(province.getProvinceId()), wardName);
-        if (ward == null) {
-            return "Dòng " + rowNumber + ": không tìm thấy xã/phường \"" + wardName + "\" thuộc \"" + provinceName + "\".";
-        }
-
-        Enterprise e = new Enterprise();
-        e.setEnterpriseName(name);
-        e.setCustomerType(type);
-        e.setCustomerGroup(group);
-        e.setTaxCode(tax);
-        e.setEmail(email);
-        e.setPhone(phone);
-        e.setWebsite(emptyToNull(website));
-        e.setStatus("Active");
-
-        Address address = new Address();
-        address.setStreetAndLocalName(addressDetail);
-        address.setDistrictId(ward.getDistrictId());
-        e.setAddress(address);
-
-        User owner = isBlank(ownerUsername) ? null : findUserByUsername(staff, ownerUsername);
-        e.setAccountOwnerId(owner != null ? owner.getUserId() : currentUser.getUserId());
-
-        if (!isValidCommonFields(e)) {
-            return "Dòng " + rowNumber + ": dữ liệu không hợp lệ (kiểm tra lại định dạng các trường).";
-        }
-
-        e.setEnterpriseCode(nextCode[0]);
-        int newId = customerDAO.insert(e);
-        if (newId > 0) {
-            // insert() có thể đã tự thử lại với mã khác nếu nextCode[0] bị trùng
-            // (xem CustomerDAO.insert) -- luôn tính mã kế tiếp từ mã thực sự vừa lưu.
-            nextCode[0] = customerDAO.nextEnterpriseCodeAfter(e.getEnterpriseCode());
-            return null;
-        }
-        // Lưu thất bại hẳn (hết số lần thử lại, hoặc lỗi khác) -- đọc lại mã mới
-        // nhất từ CSDL để đồng bộ lại trước khi tiếp tục các dòng sau; nếu chính
-        // lần đọc lại này cũng lỗi (null), giữ nguyên nextCode[0] cũ thay vì để
-        // null lọt sang dòng kế tiếp -- insert() ở dòng sau vẫn tự thử lại mã
-        // khác nếu bị trùng.
-        String resynced = customerDAO.generateNextEnterpriseCode();
-        if (resynced != null) {
-            nextCode[0] = resynced;
-        }
-        return "Dòng " + rowNumber + ": lưu vào CSDL thất bại (có thể MST/email/SĐT đã tồn tại).";
-    }
-
-    private Province findProvinceByName(List<Province> provinces, String name) {
-        String normalized = normalize(name);
-        for (Province p : provinces) {
-            if (normalize(p.getShortName()).equals(normalized) || normalize(p.getProvinceName()).equals(normalized)) {
-                return p;
-            }
-        }
-        return null;
-    }
-
-    private District findWardByName(List<District> wards, String name) {
-        String normalized = normalize(name);
-        for (District d : wards) {
-            if (normalize(d.getShortName()).equals(normalized) || normalize(d.getDistrictName()).equals(normalized)) {
-                return d;
-            }
-        }
-        return null;
-    }
-
-    private User findUserByUsername(List<User> staff, String username) {
-        String normalized = username.trim().toLowerCase();
-        for (User u : staff) {
-            if (u.getUsername() != null && u.getUsername().trim().toLowerCase().equals(normalized)) {
-                return u;
-            }
-        }
-        return null;
-    }
-
-    private String normalize(String value) {
-        return value == null ? "" : value.trim().toLowerCase();
     }
 
     // ------------------------------------------------------------------

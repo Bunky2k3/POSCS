@@ -236,7 +236,6 @@
                 <p>Quản lý danh mục thiết bị / sản phẩm POS</p>
             </div>
             <div class="header-actions">
-                <a href="${pageContext.request.contextPath}/product?action=importForm" class="btn-outline-action"><i class="fa-solid fa-file-import"></i> Nhập Excel</a>
                 <a href="${pageContext.request.contextPath}/product?action=new" class="btn-add"><i class="fa-solid fa-plus"></i> Thêm sản phẩm</a>
             </div>
         </div>

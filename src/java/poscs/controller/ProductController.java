@@ -15,9 +15,7 @@ import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.Part;
-import org.apache.poi.ss.usermodel.Row;
 import poscs.common.AccessControl;
-import poscs.common.ExcelUtil;
 import poscs.common.FileStorage;
 import poscs.dao.ProductDAO;
 import poscs.model.Product;
@@ -49,11 +47,6 @@ public class ProductController extends HttpServlet {
 
     private static final String IMAGE_SUBFOLDER = "products/images";
     private static final String CATALOGUE_SUBFOLDER = "products/catalogues";
-    private static final String IMPORT_VIEW = "/jsp/technical/importproduct.jsp";
-
-    // Cột trong file mẫu nhập Excel (xem downloadImportTemplate/handleImportExcel).
-    private static final String[] IMPORT_HEADERS = {"Tên sản phẩm*", "Mô tả", "Danh mục*"};
-    private static final int COL_NAME = 0, COL_DESCRIPTION = 1, COL_CATEGORY = 2;
 
     private final ProductDAO productDAO = new ProductDAO();
 
@@ -73,12 +66,6 @@ public class ProductController extends HttpServlet {
                 break;
             case "edit":
                 showEditForm(request, response);
-                break;
-            case "importForm":
-                showImportForm(request, response);
-                break;
-            case "downloadTemplate":
-                downloadImportTemplate(request, response);
                 break;
             case "list":
             default:
@@ -103,9 +90,6 @@ public class ProductController extends HttpServlet {
                 break;
             case "delete":
                 handleDelete(request, response);
-                break;
-            case "importExcel":
-                handleImportExcel(request, response);
                 break;
             default:
                 response.sendRedirect(request.getContextPath() + "/product");
@@ -147,144 +131,6 @@ public class ProductController extends HttpServlet {
         request.setAttribute("categoryFilter", categoryFilter);
 
         request.getRequestDispatcher(LIST_VIEW).forward(request, response);
-    }
-
-    /** Hiển thị form nhập Excel hàng loạt (chưa xử lý gì) -- nút "Nhập Excel" ở listProduct.jsp. */
-    private void showImportForm(HttpServletRequest request, HttpServletResponse response)
-            throws ServletException, IOException {
-        request.getRequestDispatcher(IMPORT_VIEW).forward(request, response);
-    }
-
-    /** Sinh file mẫu .xlsx cho nhập sản phẩm, có dropdown Danh mục lấy đúng tên từ productcategories để tránh gõ sai. */
-    private void downloadImportTemplate(HttpServletRequest request, HttpServletResponse response) throws IOException {
-        List<String> categoryNames = new ArrayList<>();
-        for (ProductCategory c : productDAO.findAllCategories()) {
-            categoryNames.add(c.getCategoryName());
-        }
-        Map<Integer, List<String>> dropdowns = new HashMap<>();
-        dropdowns.put(COL_CATEGORY, categoryNames);
-        ExcelUtil.writeTemplate(response, "mau_nhap_san_pham", IMPORT_HEADERS, dropdowns, 200);
-    }
-
-    /**
-     * Nhập hàng loạt sản phẩm từ file .xlsx theo mẫu downloadImportTemplate().
-     * Mỗi dòng độc lập -- 1 dòng lỗi không chặn các dòng còn lại. Danh mục
-     * trong file là TÊN nên phải so khớp lại với productDAO.findAllCategories()
-     * (rút gọn theo tên, bỏ khoảng trắng thừa/hoa-thường).
-     */
-    private void handleImportExcel(HttpServletRequest request, HttpServletResponse response)
-            throws ServletException, IOException {
-        if (!AccessControl.requireFullAccess(request, response, AccessControl.Resource.PRODUCT)) {
-            return;
-        }
-
-        Part filePart = request.getPart("file");
-        if (filePart == null || filePart.getSize() <= 0) {
-            request.setAttribute("importError", "Vui lòng chọn file .xlsx để nhập.");
-            request.getRequestDispatcher(IMPORT_VIEW).forward(request, response);
-            return;
-        }
-
-        Map<String, Integer> categoryIdByName = new HashMap<>();
-        for (ProductCategory c : productDAO.findAllCategories()) {
-            categoryIdByName.put(normalize(c.getCategoryName()), c.getCategoryId());
-        }
-
-        List<Row> rows;
-        try (java.io.InputStream in = filePart.getInputStream()) {
-            rows = ExcelUtil.readRows(in, 0, IMPORT_HEADERS);
-        } catch (Exception ex) {
-            String detail = ex.getMessage();
-            request.setAttribute("importError", "Không đọc được file -- hãy chắc chắn đây là file .xlsx đúng mẫu."
-                    + (detail != null ? " (" + detail + ")" : ""));
-            request.getRequestDispatcher(IMPORT_VIEW).forward(request, response);
-            return;
-        }
-
-        String seedCode = productDAO.generateNextProductCode();
-        if (seedCode == null) {
-            request.setAttribute("importError", "Không sinh được mã sản phẩm -- có thể mất kết nối CSDL, hãy thử lại.");
-            request.getRequestDispatcher(IMPORT_VIEW).forward(request, response);
-            return;
-        }
-
-        List<String> errors = new ArrayList<>();
-        int successCount = 0;
-        int rowNumber = 1; // dòng 1 là header trong file gốc
-        // Sinh mã SP-xxxx 1 lần rồi tăng dần trong vòng lặp thay vì gọi lại
-        // generateNextProductCode() (1 SELECT MAX riêng) cho từng dòng --
-        // với vài trăm dòng, tránh vài trăm round-trip DB không cần thiết.
-        String[] nextCode = {seedCode};
-        for (Row row : rows) {
-            rowNumber++;
-            String rowError = importOneProductRow(row, rowNumber, categoryIdByName, nextCode);
-            if (rowError == null) {
-                successCount++;
-            } else {
-                errors.add(rowError);
-            }
-        }
-
-        request.setAttribute("importSuccessCount", successCount);
-        request.setAttribute("importErrorCount", errors.size());
-        request.setAttribute("importErrors", errors);
-        request.getRequestDispatcher(IMPORT_VIEW).forward(request, response);
-    }
-
-    /**
-     * @param nextCode mảng 1 phần tử giữ mã SP-xxxx sẽ dùng cho dòng này -- hàm tự
-     * cập nhật lại phần tử này (dựa trên mã product_code thực sự vừa lưu
-     * thành công, có thể khác nextCode[0] nếu insert() phải tự thử lại do
-     * trùng mã) để dòng kế tiếp dùng, tránh phải đọc lại CSDL mỗi dòng.
-     * @return null nếu insert thành công, ngược lại là mô tả lỗi kèm số dòng để hiển thị cho người dùng.
-     */
-    private String importOneProductRow(Row row, int rowNumber, Map<String, Integer> categoryIdByName, String[] nextCode) {
-        String name = ExcelUtil.cellString(row, COL_NAME);
-        String description = ExcelUtil.cellString(row, COL_DESCRIPTION);
-        String categoryName = ExcelUtil.cellString(row, COL_CATEGORY);
-
-        if (isBlank(name)) {
-            return "Dòng " + rowNumber + ": thiếu tên sản phẩm.";
-        }
-        if (isBlank(categoryName)) {
-            return "Dòng " + rowNumber + ": thiếu danh mục.";
-        }
-        Integer categoryId = categoryIdByName.get(normalize(categoryName));
-        if (categoryId == null) {
-            return "Dòng " + rowNumber + ": không tìm thấy danh mục \"" + categoryName + "\".";
-        }
-
-        Product p = new Product();
-        p.setProductName(name);
-        p.setDescription(emptyToNull(description));
-        p.setCategoryId(categoryId);
-
-        if (!isValidCommonFields(p)) {
-            return "Dòng " + rowNumber + ": dữ liệu không hợp lệ.";
-        }
-
-        p.setProductCode(nextCode[0]);
-        int newId = productDAO.insert(p);
-        if (newId > 0) {
-            // insert() có thể đã tự thử lại với mã khác nếu nextCode[0] bị trùng
-            // (xem ProductDAO.insert) -- luôn tính mã kế tiếp từ mã thực sự vừa lưu.
-            nextCode[0] = productDAO.nextProductCodeAfter(p.getProductCode());
-            return null;
-        }
-        // Lưu thất bại hẳn (hết số lần thử lại, hoặc lỗi khác) -- đọc lại mã mới
-        // nhất từ CSDL để đồng bộ lại trước khi tiếp tục các dòng sau; nếu chính
-        // lần đọc lại này cũng lỗi (null), giữ nguyên nextCode[0] cũ thay vì để
-        // null lọt sang dòng kế tiếp -- insert() ở dòng sau vẫn tự thử lại mã
-        // khác nếu bị trùng.
-        String resynced = productDAO.generateNextProductCode();
-        if (resynced != null) {
-            nextCode[0] = resynced;
-        }
-        return "Dòng " + rowNumber + ": lưu vào CSDL thất bại.";
-    }
-
-    private String normalize(String value) {
-        return value == null ? "" : value.trim().toLowerCase();
     }
 
     // ------------------------------------------------------------------
