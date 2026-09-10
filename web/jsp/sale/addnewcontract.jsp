@@ -6,9 +6,9 @@
       - customerList : List<poscs.model.Enterprise> (toàn bộ khách hàng, để đổ dropdown "Khách hàng")
       - userList      : List<poscs.model.User>       (toàn bộ nhân viên, để đổ dropdown "Người phụ trách")
 
-    Bảng hạng mục bên dưới CHƯA lưu xuống DB -- các ô không có thuộc tính
-    name nên không được submit. Hạng mục thật được gắn ở trang chi tiết hợp
-    đồng sau khi tạo (action addProduct). Phần này chỉ demo giao diện.
+    Form này chỉ tạo bản ghi trong bảng contracts. Hạng mục sản phẩm/dịch vụ
+    (contractproducts) được gắn ở trang chi tiết hợp đồng sau khi tạo xong,
+    qua action addProduct -- không nhập tại đây.
 --%>
 <!DOCTYPE html>
 <html lang="vi">
@@ -43,23 +43,6 @@
         .form-control, .form-select { padding: 0.6rem 0.9rem; border-radius: 10px; border: 1px solid #e5e7eb; background-color: #f9fafb; font-size: 0.9rem; }
         .form-control:focus, .form-select:focus { background-color: #ffffff; border-color: var(--primary-light); box-shadow: 0 0 0 4px rgba(15, 158, 219, 0.15); }
         .error-text { color: var(--danger); font-size: 12px; margin-top: 5px; display: none; }
-
-        /* ===== Bảng hạng mục ===== */
-        .item-table { width: 100%; border-collapse: separate; border-spacing: 0; }
-        .item-table th {
-            font-size: 0.72rem; text-transform: uppercase; color: #9ca3af; font-weight: 700;
-            padding: 8px 10px; border-bottom: 1.5px solid #eef2f6; text-align: left;
-        }
-        .item-table td { padding: 8px 10px; vertical-align: middle; border-bottom: 1px solid #f3f4f6; }
-        .item-table input { width: 100%; padding: 8px 10px; border-radius: 8px; border: 1px solid #e5e7eb; background: #f9fafb; font-size: 0.86rem; }
-        .item-table input:focus { outline: none; border-color: var(--primary-light); background: #fff; }
-        .btn-remove-item { width: 30px; height: 30px; border-radius: 8px; border: none; background: #fdecef; color: var(--danger); cursor: pointer; }
-        .btn-remove-item:hover { background: #fbd6dd; }
-        .btn-add-item {
-            margin-top: 12px; background: #fff; border: 1.5px dashed var(--primary-light); color: var(--primary);
-            border-radius: 10px; padding: 8px 16px; font-size: 0.85rem; font-weight: 600; cursor: pointer;
-        }
-        .btn-add-item:hover { background: #f0f9ff; }
 
         .action-bar { display: flex; gap: 12px; margin-top: 28px; justify-content: flex-end; border-top: 1.5px solid #eef2f6; padding-top: 22px; }
         .btn-primary { background: linear-gradient(120deg, var(--primary), var(--primary-light)); border: none; border-radius: 10px; padding: 0.6rem 1.4rem; font-weight: 600; font-size: 0.9rem; box-shadow: 0 6px 16px rgba(5, 104, 166, 0.3); }
@@ -166,19 +149,9 @@
                 </div>
 
                 <div class="section-header"><h5>Hạng mục sản phẩm / dịch vụ</h5></div>
-                <table class="item-table">
-                    <thead>
-                        <tr><th style="width:70%">Tên sản phẩm/dịch vụ</th><th style="width:22%">Số lượng</th><th style="width:8%"></th></tr>
-                    </thead>
-                    <tbody id="itemsBody">
-                        <tr class="item-row">
-                            <td><input type="text" class="item-name" placeholder="VD: Cáp quang OM4 4FO" value="Cáp quang OM4 4FO"></td>
-                            <td><input type="number" class="item-qty" min="1" value="500"></td>
-                            <td><button type="button" class="btn-remove-item" onclick="removeRow(this)"><i class="fa-solid fa-xmark"></i></button></td>
-                        </tr>
-                    </tbody>
-                </table>
-                <button type="button" class="btn-add-item" onclick="addRow()"><i class="fa-solid fa-plus me-1"></i>Thêm hạng mục</button>
+                <p style="font-size:0.86rem; color:#6b7280; margin:0 0 4px;">
+                    Sau khi tạo xong hợp đồng, mở trang chi tiết để thêm sản phẩm/dịch vụ vào hợp đồng.
+                </p>
 
 
                 <div class="action-bar">
@@ -194,23 +167,6 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        function addRow() {
-            var tbody = document.getElementById('itemsBody');
-            var tr = document.createElement('tr');
-            tr.className = 'item-row';
-            tr.innerHTML =
-                '<td><input type="text" class="item-name" placeholder="Tên sản phẩm/dịch vụ"></td>' +
-                '<td><input type="number" class="item-qty" min="1" value="1"></td>' +
-                '<td><button type="button" class="btn-remove-item" onclick="removeRow(this)"><i class="fa-solid fa-xmark"></i></button></td>';
-            tbody.appendChild(tr);
-        }
-
-        function removeRow(btn) {
-            var rows = document.querySelectorAll('.item-row');
-            if (rows.length <= 1) return; // giữ lại tối thiểu 1 dòng
-            btn.closest('.item-row').remove();
-        }
-
         function validateForm() {
             var valid = true;
             document.querySelectorAll('.error-text').forEach(function (el) { el.style.display = 'none'; });
