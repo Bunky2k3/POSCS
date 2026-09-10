@@ -142,8 +142,48 @@ public class UploadFileControllerTest {
             controller.doGet(request, response);
         }
 
-        // Đuôi lạ không có trong CONTENT_TYPES -- probeContentType() thường trả về null
-        // cho đuôi này, nên fallback "application/octet-stream" (không phải null/lỗi).
+        // Đuôi lạ không nằm trong danh sách cho phép -- phải ép tải về, không
+        // để trình duyệt tự diễn giải thành nội dung chạy được.
         verify(response).setContentType("application/octet-stream");
+        verify(response).setHeader("Content-Disposition", "attachment");
+    }
+
+    // ------------------------------------------------------------------
+    // Không phục vụ nội dung chạy được trên chính origin của ứng dụng
+    // ------------------------------------------------------------------
+
+    @Test
+    public void svgFile_isForcedToDownloadInsteadOfRenderedAsImage() throws Exception {
+        Path file = uploadRoot.resolve("payload.svg");
+        Files.write(file, "<svg xmlns=\"http://www.w3.org/2000/svg\"><script>x()</script></svg>".getBytes());
+
+        when(request.getPathInfo()).thenReturn("/payload.svg");
+
+        try (MockedStatic<FileStorage> fs = mockUploadRoot()) {
+            controller.doGet(request, response);
+        }
+
+        // Trả về image/svg+xml là trình duyệt chạy <script> bên trong ngay trên
+        // origin này. Upload đã chặn .svg, nhưng file lỡ lưu từ trước vẫn còn
+        // trong kho nên tầng phục vụ phải tự chặn lấy.
+        verify(response, never()).setContentType("image/svg+xml");
+        verify(response).setContentType("application/octet-stream");
+        verify(response).setHeader("Content-Disposition", "attachment");
+    }
+
+    @Test
+    public void servedFile_alwaysCarriesNoSniffHeader() throws Exception {
+        Path file = uploadRoot.resolve("logo.png");
+        Files.write(file, new byte[]{1, 2, 3});
+
+        when(request.getPathInfo()).thenReturn("/logo.png");
+
+        try (MockedStatic<FileStorage> fs = mockUploadRoot()) {
+            controller.doGet(request, response);
+        }
+
+        // Thiếu header này thì trình duyệt có thể tự đoán kiểu từ nội dung và
+        // bỏ qua Content-Type, vô hiệu hoá luôn việc ép octet-stream ở trên.
+        verify(response).setHeader("X-Content-Type-Options", "nosniff");
     }
 }

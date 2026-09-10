@@ -505,7 +505,7 @@ public class ProductController extends HttpServlet {
     /** Lưu mọi file được chọn ở input "images" (name lặp lại vì có "multiple") vào productimages. */
     private void saveNewImages(HttpServletRequest request, int productId) throws ServletException, IOException {
         for (Part part : filePartsNamed(request, "images")) {
-            String url = FileStorage.save(part, IMAGE_SUBFOLDER);
+            String url = FileStorage.save(part, IMAGE_SUBFOLDER, FileStorage.IMAGE_EXTENSIONS);
             if (url != null) {
                 productDAO.addImage(productId, url);
             }
@@ -515,7 +515,7 @@ public class ProductController extends HttpServlet {
     /** Lưu mọi file được chọn ở input "catalogues" (name lặp lại vì có "multiple") vào productcatalogues. */
     private void saveNewCatalogues(HttpServletRequest request, int productId) throws ServletException, IOException {
         for (Part part : filePartsNamed(request, "catalogues")) {
-            String url = FileStorage.save(part, CATALOGUE_SUBFOLDER);
+            String url = FileStorage.save(part, CATALOGUE_SUBFOLDER, FileStorage.DOCUMENT_EXTENSIONS);
             if (url != null) {
                 productDAO.addCatalogue(productId, url, part.getSubmittedFileName());
             }

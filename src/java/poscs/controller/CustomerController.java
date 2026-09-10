@@ -450,7 +450,7 @@ public class CustomerController extends HttpServlet {
         e.setWebsite(emptyToNull(request.getParameter("website")));
         e.setStatus("Active");
         e.setJoinDate(parseDateOrNull(request.getParameter("joinDate")));
-        e.setLogoUrl(FileStorage.save(request.getPart("logo"), LOGO_SUBFOLDER));
+        e.setLogoUrl(FileStorage.save(request.getPart("logo"), LOGO_SUBFOLDER, FileStorage.IMAGE_EXTENSIONS));
 
         Integer accountOwnerId = parseIntOrNull(request.getParameter("accountOwnerId"));
         if (accountOwnerId != null) {
@@ -498,7 +498,7 @@ public class CustomerController extends HttpServlet {
         // Chỉ ghi đè logo khi người dùng thực sự chọn ảnh mới -- input file để
         // trống vẫn gửi lên 1 Part rỗng (size=0), FileStorage.save trả về null
         // trong trường hợp đó, nên giữ nguyên logo cũ thay vì xoá mất.
-        String newLogoUrl = FileStorage.save(request.getPart("logo"), LOGO_SUBFOLDER);
+        String newLogoUrl = FileStorage.save(request.getPart("logo"), LOGO_SUBFOLDER, FileStorage.IMAGE_EXTENSIONS);
         e.setLogoUrl(newLogoUrl != null ? newLogoUrl : existing.getLogoUrl());
 
         Integer accountOwnerId = parseIntOrNull(request.getParameter("accountOwnerId"));

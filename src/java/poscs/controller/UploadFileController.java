@@ -22,13 +22,18 @@ import poscs.common.FileStorage;
 @WebServlet(name = "UploadFileController", urlPatterns = {"/uploads/*"})
 public class UploadFileController extends HttpServlet {
 
-    // Files.probeContentType() dựa vào cấu hình MIME của hệ điều hành, có
-    // thể trả về null cho các đuôi file phổ biến trên một số máy Windows --
-    // fallback thủ công để ảnh/PDF luôn có Content-Type đúng, trình duyệt
-    // hiển thị được thay vì tải xuống dạng "unknown file".
-    private static final Map<String, String> CONTENT_TYPES = Map.of(
+    // Danh sách CHO PHÉP các kiểu được trả về nguyên trạng cho trình duyệt
+    // hiển thị. Cố tình không dùng Files.probeContentType() làm nguồn chính:
+    // nó đọc cấu hình MIME của hệ điều hành, nên một file lạ vẫn có thể được
+    // gán kiểu chạy được (vd image/svg+xml, text/html) và thực thi script
+    // ngay trên origin của ứng dụng khi người dùng mở thẳng URL file đó.
+    //
+    // KHÔNG có ".svg": SVG là tài liệu XML chạy được &lt;script&gt;. Upload
+    // đã chặn từ FileStorage, nhưng file lỡ lưu trước đó vẫn nằm trong kho,
+    // nên chặn thêm ở đây -- chúng sẽ rơi xuống nhánh tải về bên dưới.
+    private static final Map<String, String> INLINE_CONTENT_TYPES = Map.of(
             ".jpg", "image/jpeg", ".jpeg", "image/jpeg", ".png", "image/png",
-            ".gif", "image/gif", ".webp", "image/webp", ".svg", "image/svg+xml",
+            ".gif", "image/gif", ".webp", "image/webp",
             ".pdf", "application/pdf"
     );
 
@@ -51,7 +56,20 @@ public class UploadFileController extends HttpServlet {
             return;
         }
 
-        response.setContentType(contentTypeOf(requested));
+        String inlineType = INLINE_CONTENT_TYPES.get(extensionOf(requested));
+        if (inlineType != null) {
+            response.setContentType(inlineType);
+        } else {
+            // Kiểu không nằm trong danh sách cho phép: ép tải về thay vì hiển
+            // thị, để nội dung không bao giờ được diễn giải thành trang chạy
+            // được trên origin của ứng dụng.
+            response.setContentType("application/octet-stream");
+            response.setHeader("Content-Disposition", "attachment");
+        }
+        // Chặn trình duyệt tự đoán kiểu từ nội dung file và bỏ qua Content-Type
+        // ở trên -- không có header này thì việc ép octet-stream vẫn có thể bị
+        // vượt qua bằng content sniffing.
+        response.setHeader("X-Content-Type-Options", "nosniff");
         response.setContentLengthLong(Files.size(requested));
 
         try (OutputStream out = response.getOutputStream()) {
@@ -59,15 +77,9 @@ public class UploadFileController extends HttpServlet {
         }
     }
 
-    private String contentTypeOf(Path file) throws IOException {
+    private static String extensionOf(Path file) {
         String fileName = file.getFileName().toString();
         int dot = fileName.lastIndexOf('.');
-        String ext = dot >= 0 ? fileName.substring(dot).toLowerCase() : "";
-        String mapped = CONTENT_TYPES.get(ext);
-        if (mapped != null) {
-            return mapped;
-        }
-        String probed = Files.probeContentType(file);
-        return probed != null ? probed : "application/octet-stream";
+        return dot >= 0 ? fileName.substring(dot).toLowerCase() : "";
     }
 }
