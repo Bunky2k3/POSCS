@@ -142,6 +142,18 @@
         </div>
 
         <div class="card-box">
+            <c:if test="${not empty param.error}">
+                <div class="alert alert-danger py-2 px-3 mb-3" style="font-size: 0.9rem; border-radius: 12px;">
+                    <c:choose>
+                        <c:when test="${param.error == 'invalid_image_type'}">Ảnh sản phẩm chỉ nhận file JPG, PNG, GIF hoặc WEBP. Vui lòng chọn lại.</c:when>
+                        <c:when test="${param.error == 'invalid_catalogue_type'}">Catalogue chỉ nhận file PDF. Vui lòng chọn lại.</c:when>
+                        <c:when test="${param.error == 'invalid'}">Thông tin sản phẩm chưa hợp lệ. Vui lòng kiểm tra lại các ô bắt buộc.</c:when>
+                        <c:when test="${param.error == 'update_failed'}">Không lưu được thay đổi. Vui lòng thử lại.</c:when>
+                        <c:otherwise>Đã có lỗi xảy ra. Vui lòng thử lại.</c:otherwise>
+                    </c:choose>
+                </div>
+            </c:if>
+
             <form id="updateProductForm" action="${pageContext.request.contextPath}/product" method="POST" enctype="multipart/form-data" onsubmit="return validateForm();">
                 <input type="hidden" name="csrfToken" value="${csrfToken}">
                 <input type="hidden" name="action" value="update">
@@ -195,7 +207,7 @@
                         <div class="sub-label">Thêm ảnh mới</div>
                         <div class="upload-dropzone">
                             <label for="imagesInput" class="upload-btn"><i class="fa-solid fa-images"></i> Chọn ảnh từ máy</label>
-                            <input type="file" name="images" id="imagesInput" accept="image/*" multiple hidden>
+                            <input type="file" name="images" id="imagesInput" accept=".jpg,.jpeg,.png,.gif,.webp" multiple hidden>
                             <div class="upload-hint">Có thể chọn nhiều ảnh cùng lúc (JPG, PNG, WEBP...).</div>
                         </div>
                         <div class="file-preview-grid" id="imagePreviewGrid"></div>
@@ -218,7 +230,7 @@
                         <div class="sub-label">Thêm file catalogue mới</div>
                         <div class="upload-dropzone">
                             <label for="cataloguesInput" class="upload-btn"><i class="fa-solid fa-file-pdf"></i> Chọn file catalogue</label>
-                            <input type="file" name="catalogues" id="cataloguesInput" accept="application/pdf" multiple hidden>
+                            <input type="file" name="catalogues" id="cataloguesInput" accept=".pdf" multiple hidden>
                             <div class="upload-hint">Có thể chọn nhiều file catalogue (PDF) cùng lúc.</div>
                         </div>
                         <div class="file-chip-list" id="catalogueChipList"></div>

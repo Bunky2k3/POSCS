@@ -423,6 +423,10 @@ public class ProductController extends HttpServlet {
             return;
         }
 
+        if (!filesAreAcceptable(request, response, request.getContextPath() + "/product?action=new")) {
+            return;
+        }
+
         p.setProductCode(productDAO.generateNextProductCode());
         int newId = productDAO.insert(p);
         if (newId <= 0) {
@@ -459,6 +463,10 @@ public class ProductController extends HttpServlet {
 
         if (!isValidCommonFields(p)) {
             response.sendRedirect(request.getContextPath() + "/product?action=edit&id=" + id + "&error=invalid");
+            return;
+        }
+
+        if (!filesAreAcceptable(request, response, request.getContextPath() + "/product?action=edit&id=" + id)) {
             return;
         }
 
@@ -520,6 +528,31 @@ public class ProductController extends HttpServlet {
                 productDAO.addCatalogue(productId, url, part.getSubmittedFileName());
             }
         }
+    }
+
+    /**
+     * Kiểm mọi file người dùng vừa chọn TRƯỚC khi đụng tới CSDL. Trả về false
+     * (và đã tự redirect kèm lỗi) nếu có file sai loại.
+     *
+     * Phải chạy trước insert/update: saveNewImages() chạy sau khi sản phẩm đã
+     * được ghi, nên nếu để nó tự bỏ qua file sai loại thì người dùng nhận về
+     * một sản phẩm đã tạo nhưng thiếu ảnh, không có lời giải thích nào.
+     */
+    private boolean filesAreAcceptable(HttpServletRequest request, HttpServletResponse response,
+            String redirectBase) throws ServletException, IOException {
+        for (Part part : filePartsNamed(request, "images")) {
+            if (!FileStorage.isAcceptable(part, FileStorage.IMAGE_EXTENSIONS)) {
+                response.sendRedirect(redirectBase + "&error=invalid_image_type");
+                return false;
+            }
+        }
+        for (Part part : filePartsNamed(request, "catalogues")) {
+            if (!FileStorage.isAcceptable(part, FileStorage.DOCUMENT_EXTENSIONS)) {
+                response.sendRedirect(redirectBase + "&error=invalid_catalogue_type");
+                return false;
+            }
+        }
+        return true;
     }
 
     /** request.getParts() lọc theo tên field + bỏ qua part rỗng (input file để trống vẫn gửi lên 1 part size=0). */

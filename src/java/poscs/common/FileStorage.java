@@ -36,6 +36,22 @@ public final class FileStorage {
     /** Đuôi file được phép cho ô chọn tài liệu (catalogue sản phẩm). */
     public static final Set<String> DOCUMENT_EXTENSIONS = Set.of(".pdf");
 
+    /**
+     * true nếu part này lưu được: hoặc người dùng bỏ trống ô chọn file (part
+     * rỗng, không phải lỗi), hoặc đuôi file nằm trong danh sách cho phép.
+     *
+     * Dùng để kiểm TRƯỚC khi ghi bất cứ thứ gì xuống CSDL. {@link #save} cũng
+     * tự từ chối file sai loại, nhưng nó trả về null giống hệt trường hợp
+     * "không chọn file" -- nơi gọi không phân biệt được để báo lỗi, và nếu
+     * kiểm muộn thì bản ghi chính đã được tạo mất rồi.
+     */
+    public static boolean isAcceptable(Part part, Set<String> allowedExtensions) {
+        if (part == null || part.getSize() <= 0) {
+            return true;
+        }
+        return allowedExtensions.contains(extensionOf(part.getSubmittedFileName()));
+    }
+
     private FileStorage() {
     }
 

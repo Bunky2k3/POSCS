@@ -112,6 +112,17 @@
         </div>
 
         <div class="card-box">
+            <c:if test="${not empty param.error}">
+                <div class="alert alert-danger py-2 px-3 mb-3" style="font-size: 0.9rem; border-radius: 12px;">
+                    <c:choose>
+                        <c:when test="${param.error == 'invalid_image_type'}">Logo chỉ nhận file ảnh JPG, PNG, GIF hoặc WEBP. Logo cũ được giữ nguyên.</c:when>
+                        <c:when test="${param.error == 'invalid'}">Thông tin khách hàng chưa hợp lệ. Vui lòng kiểm tra lại các ô bắt buộc.</c:when>
+                        <c:when test="${param.error == 'update_failed'}">Không lưu được thay đổi. Vui lòng thử lại.</c:when>
+                        <c:otherwise>Đã có lỗi xảy ra. Vui lòng thử lại.</c:otherwise>
+                    </c:choose>
+                </div>
+            </c:if>
+
             <form id="createCustomerForm" action="${pageContext.request.contextPath}/customer" method="POST" enctype="multipart/form-data" onsubmit="return validateForm();">
                 <input type="hidden" name="csrfToken" value="${csrfToken}">
                 <input type="hidden" name="action" value="update">
@@ -128,7 +139,7 @@
                             </c:choose>
                         </div>
                         <label class="logo-edit-btn" for="logoInput"><i class="fa-solid fa-camera"></i></label>
-                        <input type="file" name="logo" id="logoInput" accept="image/*" hidden onchange="previewLogo(this)">
+                        <input type="file" name="logo" id="logoInput" accept=".jpg,.jpeg,.png,.gif,.webp" hidden onchange="previewLogo(this)">
                     </div>
                     <div class="logo-upload-hint">Logo doanh nghiệp (không bắt buộc)</div>
                 </div>
