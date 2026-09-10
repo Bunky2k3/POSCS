@@ -111,8 +111,12 @@
 
             <!-- ===== Banner ===== -->
             <div class="profile-banner">
-                <img class="avatar-img"
-                     src="https://ui-avatars.com/api/?name=<c:out value="${profile.firstName}"/>&background=ffffff&color=0568a6&size=128" alt="Avatar">
+                <%-- Ảnh đại diện đã tải lên nếu có; chưa có thì rơi về ảnh chữ cái đầu. --%>
+                <c:set var="avatarSrc" value="https://ui-avatars.com/api/?name=${fn:escapeXml(profile.firstName)}&amp;background=ffffff&amp;color=0568a6&amp;size=128"/>
+                <c:if test="${not empty profile.avatarUrl}">
+                    <c:set var="avatarSrc" value="${pageContext.request.contextPath}${profile.avatarUrl}"/>
+                </c:if>
+                <img class="avatar-img" src="${fn:escapeXml(avatarSrc)}" alt="Avatar">
                 <h3><c:out value="${profile.fullName}"/></h3>
                 <span class="role-badge"><c:out value="${profile.role.roleName}"/></span>
             </div>
