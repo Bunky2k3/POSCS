@@ -21,7 +21,8 @@ src/java/poscs/
   controller/   Servlets handling HTTP requests
   dao/          Data access objects for database operations
   model/        Domain entities (User, Role, Address, ...)
-  common/       Shared utility classes
+  common/       Shared utilities, plus the servlet filter and the
+                scheduled-notification listener
 web/            JSP pages and static web resources
 nbproject/      NetBeans/Ant project configuration
 build.xml       Ant build script

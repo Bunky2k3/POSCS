@@ -1,4 +1,4 @@
-package poscs.scheduler;
+package poscs.common;
 
 import jakarta.servlet.ServletContextEvent;
 import jakarta.servlet.ServletContextListener;
