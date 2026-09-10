@@ -412,7 +412,7 @@ public class ContractDAO {
     public boolean update(Contract contract) {
         String sql = "UPDATE contracts SET " +
                 "title = ?, contract_type = ?, signing_date = ?, effective_date = ?, end_date = ?, " +
-                "enterprise_id = ?, owner_id = ?, status = ? " +
+                "enterprise_id = ?, owner_id = ?, attachment_url = ?, status = ? " +
                 "WHERE contract_id = ? AND is_deleted = 0";
 
         try (Connection conn = DBContext.getConnection();
@@ -424,8 +424,9 @@ public class ContractDAO {
             ps.setDate(5, contract.getEndDate());
             ps.setInt(6, contract.getEnterpriseId());
             ps.setInt(7, contract.getOwnerId());
-            ps.setString(8, computeStatus(contract.getEffectiveDate(), contract.getEndDate()));
-            ps.setInt(9, contract.getContractId());
+            ps.setString(8, contract.getAttachmentUrl());
+            ps.setString(9, computeStatus(contract.getEffectiveDate(), contract.getEndDate()));
+            ps.setInt(10, contract.getContractId());
             return ps.executeUpdate() > 0;
         } catch (SQLException ex) {
             System.err.println("--- LOI CAP NHAT HOP DONG ---");
