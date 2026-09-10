@@ -11,125 +11,33 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link rel="stylesheet" href="${pageContext.request.contextPath}/css/appshell.css">
 
 <style>
+    /* Bảng màu chung (--primary*, --danger, --success...) và toàn bộ khung
+       topbar/sidebar/layout nay lấy từ css/appshell.css, KHÔNG khai báo lại ở
+       đây nữa. Chỉ giữ mấy biến riêng của trang này. */
     :root {
-        --primary-dark: #003c6e;
-        --primary: #0568a6;
-        --primary-light: #0f9edb;
-        --primary-lighter: #6fd0ff;
-        --accent: #00c2ff;
         --text-dark: #0a2540;
         --text-muted: #5c7a92;
-        --danger: #e2536b;
-        --success: #2fbf8f;
         --bg-card: #ffffff;
     }
 
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-
-    html, body { height: 100%; }
-
-    body {
-        min-height: 100vh;
-        font-family: 'Inter', sans-serif;
-        display: flex;
-        flex-direction: column;
+    /* Reset chỉ áp cho phần nội dung của trang -- trước đây đặt trên "*" nên
+       giờ sẽ đụng cả topbar/sidebar dùng chung. */
+    .auth-content *, .auth-content *::before, .auth-content *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
     }
 
-    /* ===== Topbar (đồng bộ với viewProfile.jsp / updateProfile.jsp) ===== */
-    .topbar {
-        background: #ffffff;
-        box-shadow: 0 2px 12px rgba(0, 60, 110, 0.08);
-        padding: 14px 28px;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        position: sticky;
-        top: 0;
-        z-index: 50;
-    }
-    .topbar .brand {
-        font-weight: 700;
-        color: var(--primary-dark);
-        font-size: 1.05rem;
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        text-decoration: none;
-    }
-    .topbar .brand:hover { color: var(--primary-dark); }
-    .topbar .brand i { color: var(--primary); font-size: 1.2rem; }
-    .topbar .brand .brand-mark { height: 24px; width: auto; }
-    .topbar-left { display: flex; align-items: center; gap: 32px; }
-    .topbar-nav { display: flex; align-items: center; gap: 4px; }
-    .topbar-nav-link { color: #6b7280; font-weight: 600; font-size: 0.87rem; text-decoration: none; padding: 8px 14px; border-radius: 8px; transition: background 0.15s, color 0.15s; }
-    .topbar-nav-link:hover { background: #f0f9ff; color: var(--primary-dark); }
-    .topbar-nav-link.active { background: #eaf6ff; color: var(--primary-dark); }
-    @media (max-width: 900px) { .topbar-nav { display: none; } }
-
-    .topbar-right { display: flex; align-items: center; gap: 18px; }
-    .bell-icon { color: #6b7280; font-size: 1.1rem; cursor: pointer; position: relative; }
-    .bell-icon .dot {
-        position: absolute; top: -3px; right: -4px;
-        width: 8px; height: 8px; border-radius: 50%;
-        background: var(--danger); border: 1.5px solid #fff;
-    }
-    .avatar-mini {
-        width: 38px; height: 38px; border-radius: 50%;
-        object-fit: cover; cursor: pointer;
-        border: 2px solid var(--primary-light);
-    }
-
-    /* ===== Dropdown chung (avatar + thông báo) ===== */
-    .dropdown-menu {
-        border: none; border-radius: 14px;
-        box-shadow: 0 14px 34px rgba(0, 40, 80, 0.18);
-        padding: 8px; margin-top: 12px !important;
-        min-width: 230px;
-    }
-    .dropdown-item {
-        border-radius: 8px; padding: 9px 12px;
-        font-size: 0.87rem; color: #374151;
-    }
-    .dropdown-item:hover, .dropdown-item:focus {
-        background: #f0f9ff; color: var(--primary-dark);
-    }
-    .dropdown-item.text-danger:hover {
-        background: #fdecef; color: var(--danger) !important;
-    }
-    .dd-user-header {
-        display: flex; align-items: center; gap: 10px;
-        padding: 8px 10px 12px;
-    }
-    .dd-user-header img {
-        width: 42px; height: 42px; border-radius: 50%; object-fit: cover;
-    }
-    .dd-user-header .dd-name { font-weight: 600; font-size: 0.9rem; color: #111827; }
-    .dd-user-header .dd-role { font-size: 0.75rem; color: #6b7280; }
-
-    .notif-dropdown { min-width: 320px; max-height: 380px; overflow-y: auto; }
-    .notif-header {
-        display: flex; justify-content: space-between; align-items: center;
-        padding: 6px 10px 10px; font-weight: 700; font-size: 0.9rem; color: var(--primary-dark);
-    }
-    .notif-count {
-        background: var(--primary); color: #fff; font-size: 0.68rem;
-        padding: 2px 9px; border-radius: 10px; font-weight: 600;
-    }
-    .notif-item { display: flex; gap: 10px; align-items: flex-start; white-space: normal; }
-    .notif-icon {
-        width: 34px; height: 34px; border-radius: 50%;
-        background: #eef6fb; color: var(--primary);
-        display: flex; align-items: center; justify-content: center;
-        flex-shrink: 0; font-size: 0.85rem;
-    }
-    .notif-text { font-size: 0.85rem; color: #111827; font-weight: 500; line-height: 1.3; }
-    .notif-time { font-size: 0.72rem; color: #9ca3af; margin-top: 2px; }
 
     /* ===== Vùng nội dung đổi mật khẩu (nền gradient xanh) ===== */
     .auth-content {
-        flex: 1;
+        /* Trước đây <body> là flex column nên chỉ cần flex:1 là vùng này cao
+           hết phần còn lại. Giờ trang nằm trong khung app-shell dùng chung,
+           phải tự chốt chiều cao tối thiểu = viewport trừ chiều cao topbar. */
+        min-height: calc(100vh - 66px);
         display: flex;
         justify-content: center;
         padding: 24px;
@@ -366,82 +274,11 @@
 </head>
 <body>
 
-    <nav class="topbar">
-        <div class="topbar-left">
-            <a href="${pageContext.request.contextPath}/dashboard" class="brand"><img src="${pageContext.request.contextPath}/img/postef-logo.png" alt="POSTEF" class="brand-mark"> POSCS Portal</a>
-            <div class="topbar-nav">
-                <a href="${pageContext.request.contextPath}/dashboard" class="topbar-nav-link">Trang chủ</a>
-                <a href="${pageContext.request.contextPath}/customer" class="topbar-nav-link">Khách hàng</a>
-                <a href="${pageContext.request.contextPath}/contract" class="topbar-nav-link">Hợp đồng</a>
-            </div>
-        </div>
-        <div class="topbar-right">
-
-            <!-- ===== Dropdown thông báo ===== -->
-            <div class="dropdown">
-                <div class="bell-icon" data-bs-toggle="dropdown" aria-expanded="false">
-                    <i class="fa-regular fa-bell"></i><span class="dot"></span>
-                </div>
-                <ul class="dropdown-menu dropdown-menu-end notif-dropdown">
-                    <li class="notif-header">Thông báo <span class="notif-count">3 mới</span></li>
-                    <li>
-                        <a class="dropdown-item notif-item" href="#">
-                            <span class="notif-icon"><i class="fa-solid fa-file-contract"></i></span>
-                            <div>
-                                <div class="notif-text">Hợp đồng #HD-0231 sắp hết hạn</div>
-                                <div class="notif-time">10 phút trước</div>
-                            </div>
-                        </a>
-                    </li>
-                    <li>
-                        <a class="dropdown-item notif-item" href="#">
-                            <span class="notif-icon"><i class="fa-solid fa-headset"></i></span>
-                            <div>
-                                <div class="notif-text">Phiếu hỗ trợ #TK-1042 vừa được giao cho bạn</div>
-                                <div class="notif-time">1 giờ trước</div>
-                            </div>
-                        </a>
-                    </li>
-                    <li>
-                        <a class="dropdown-item notif-item" href="#">
-                            <span class="notif-icon"><i class="fa-solid fa-user-plus"></i></span>
-                            <div>
-                                <div class="notif-text">Khách hàng mới được thêm: Viettel Bắc Ninh</div>
-                                <div class="notif-time">Hôm qua</div>
-                            </div>
-                        </a>
-                    </li>
-                    <li><hr class="dropdown-divider"></li>
-                    <li><a class="dropdown-item text-center small" href="#">Xem tất cả thông báo</a></li>
-                </ul>
-            </div>
-
-            <!-- ===== Dropdown avatar ===== -->
-            <div class="dropdown">
-                <%-- Ảnh đại diện đã tải lên nếu có; chưa có thì rơi về ảnh chữ cái đầu. --%>
-                <c:set var="avatarSrc" value="https://ui-avatars.com/api/?name=${fn:escapeXml(sessionScope.currentUser.firstName)}&amp;background=0568a6&amp;color=fff"/>
-                <c:if test="${not empty sessionScope.currentUser.avatarUrl}">
-                    <c:set var="avatarSrc" value="${pageContext.request.contextPath}${sessionScope.currentUser.avatarUrl}"/>
-                </c:if>
-                <img src="${fn:escapeXml(avatarSrc)}"
-                     class="avatar-mini" alt="avatar" data-bs-toggle="dropdown" aria-expanded="false">
-                <ul class="dropdown-menu dropdown-menu-end">
-                    <li class="dd-user-header">
-                        <img src="${fn:escapeXml(avatarSrc)}" alt="avatar">
-                        <div>
-                            <div class="dd-name"><c:out value="${sessionScope.currentUser.fullName}"/></div>
-                            <div class="dd-role"><c:out value="${sessionScope.currentUser.role.roleName}"/></div>
-                        </div>
-                    </li>
-                    <li><hr class="dropdown-divider"></li>
-                    <li><a class="dropdown-item" href="${pageContext.request.contextPath}/viewProfile"><i class="fa-regular fa-id-card me-2"></i>Thông tin cá nhân</a></li>
-                    <li><a class="dropdown-item" href="changePassword.jsp"><i class="fa-solid fa-key me-2"></i>Đổi mật khẩu</a></li>
-                    <li><hr class="dropdown-divider"></li>
-                    <li><a class="dropdown-item text-danger" href="${pageContext.request.contextPath}/login?action=logout"><i class="fa-solid fa-arrow-right-from-bracket me-2"></i>Đăng xuất</a></li>
-                </ul>
-            </div>
-        </div>
-    </nav>
+    <%@ include file="/jsp/common/topbar.jsp" %>
+    <div class="app-shell">
+        <c:set var="activeNav" value="profile" scope="request"/>
+        <%@ include file="/jsp/common/sidebar.jsp" %>
+        <div class="main-content">
 
     <div class="auth-content">
         <div class="container">
@@ -583,5 +420,9 @@
         }
     </script>
 
+        </div>
+    </div>
+
+    <script src="${pageContext.request.contextPath}/js/appshell.js"></script>
 </body>
 </html>
