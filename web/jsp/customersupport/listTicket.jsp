@@ -61,6 +61,8 @@
         .custom-table tbody tr:hover { background: #f9fdff; }
 
         .ticket-code { font-weight: 700; color: var(--primary); font-size: 0.85rem; }
+        .code-link { color: inherit; text-decoration: none; }
+        .code-link:hover { text-decoration: underline; }
         .ticket-title-link { color: #111827; font-weight: 600; text-decoration: none; }
         .ticket-title-link:hover { color: var(--primary); text-decoration: underline; }
         .contract-link { color: var(--primary); font-weight: 600; text-decoration: none; font-size: 0.83rem; }
@@ -190,7 +192,7 @@
                     <tbody id="ticketTableBody">
                         <c:forEach var="ticket" items="${ticketList}">
                             <tr>
-                                <td class="ticket-code">${fn:escapeXml(ticket.ticketCode)}</td>
+                                <td class="ticket-code"><a href="${pageContext.request.contextPath}/ticket?action=view&id=${ticket.ticketId}" class="code-link">${fn:escapeXml(ticket.ticketCode)}</a></td>
                                 <td><a href="${pageContext.request.contextPath}/ticket?action=view&id=${ticket.ticketId}" class="ticket-title-link">${fn:escapeXml(ticket.ticketType)}</a></td>
                                 <td>
                                     <c:choose>

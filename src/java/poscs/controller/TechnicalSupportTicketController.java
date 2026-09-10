@@ -10,7 +10,14 @@ import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
+import java.text.SimpleDateFormat;
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.pdmodel.PDPage;
+import org.apache.pdfbox.pdmodel.PDPageContentStream;
+import org.apache.pdfbox.pdmodel.common.PDRectangle;
+import org.apache.pdfbox.pdmodel.font.PDFont;
 import poscs.common.AccessControl;
+import poscs.common.PdfUtil;
 import poscs.dao.CustomerDAO;
 import poscs.dao.EmployeeDAO;
 import poscs.dao.TechnicalSupportTicketDAO;
@@ -59,6 +66,9 @@ public class TechnicalSupportTicketController extends HttpServlet {
                 break;
             case "edit":
                 showEditForm(request, response);
+                break;
+            case "exportPdf":
+                exportPdf(request, response);
                 break;
             case "list":
             default:
@@ -132,6 +142,96 @@ public class TechnicalSupportTicketController extends HttpServlet {
         request.setAttribute("canDelete", ticketDAO.canDelete(id));
 
         request.getRequestDispatcher(DETAIL_VIEW).forward(request, response);
+    }
+
+    /**
+     * Xuất 1 phiếu hỗ trợ ra PDF để in/gửi khách.
+     *
+     * Vẽ thẳng bằng PDFBox thay vì điền vào file mẫu như hợp đồng: phiếu hỗ trợ
+     * không có mẫu in sẵn nào, và nội dung ở đây chỉ là các cặp nhãn/giá trị
+     * cộng 2 đoạn văn -- dựng một AcroForm chỉ để điền vào là công vô ích.
+     * Font tiếng Việt lấy từ PdfUtil.loadVietnameseFont (font mặc định của
+     * PDFBox không có glyph tiếng Việt, xuất ra sẽ mất dấu hết).
+     */
+    private void exportPdf(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        Integer id = parseIntOrNull(request.getParameter("id"));
+        TechnicalRequest t = id != null ? ticketDAO.findById(id) : null;
+        if (t == null) {
+            response.sendRedirect(request.getContextPath() + "/ticket?error=notfound");
+            return;
+        }
+
+        try (PDDocument document = new PDDocument()) {
+            PDPage page = new PDPage(PDRectangle.A4);
+            document.addPage(page);
+            PDFont font = PdfUtil.loadVietnameseFont(document, getServletContext());
+
+            float margin = 56f;
+            float right = page.getMediaBox().getWidth() - margin;
+            float y = page.getMediaBox().getHeight() - margin;
+
+            try (PDPageContentStream cs = new PDPageContentStream(document, page)) {
+                PdfUtil.drawText(cs, font, 17, margin, y, "PHIẾU HỖ TRỢ KỸ THUẬT");
+                y -= 22;
+                PdfUtil.drawText(cs, font, 11, margin, y, "Mã phiếu: " + nz(t.getTicketCode()));
+                y -= 26;
+
+                y = drawPair(cs, font, margin, y, "Khách hàng",
+                        t.getEnterprise() != null ? t.getEnterprise().getEnterpriseName() : "—");
+                y = drawPair(cs, font, margin, y, "Hợp đồng liên quan",
+                        t.getContract() != null ? t.getContract().getContractCode() : "—");
+                y = drawPair(cs, font, margin, y, "Loại phiếu", t.getTicketType());
+                y = drawPair(cs, font, margin, y, "Mức ưu tiên", t.getPriority());
+                y = drawPair(cs, font, margin, y, "Kênh tiếp nhận", t.getReceptionChannel());
+                y = drawPair(cs, font, margin, y, "Trạng thái", t.getStatus());
+                y = drawPair(cs, font, margin, y, "Ngày tạo", formatDate(t.getCreatedDate()));
+                y = drawPair(cs, font, margin, y, "Hạn xử lý (SLA)", formatDateTime(t.getSlaDeadline()));
+                y = drawPair(cs, font, margin, y, "Kỹ thuật viên phụ trách",
+                        t.getAssignedTechnician() != null ? t.getAssignedTechnician().getFullName() : "—");
+                y = drawPair(cs, font, margin, y, "Thời điểm đóng", formatDateTime(t.getResolvedAt()));
+
+                y -= 10;
+                y = drawParagraph(cs, font, margin, right - margin, y, "Mô tả sự cố", t.getDescription());
+                y = drawParagraph(cs, font, margin, right - margin, y, "Kết quả xử lý", t.getResolutionSummary());
+            }
+
+            response.setContentType("application/pdf");
+            String fileName = "phieu_" + nz(t.getTicketCode()).replace("/", "-") + ".pdf";
+            response.setHeader("Content-Disposition", "attachment; filename=\"" + fileName + "\"");
+            document.save(response.getOutputStream());
+        }
+    }
+
+    /** Vẽ 1 dòng "Nhãn: giá trị", trả về toạ độ y cho dòng kế tiếp. */
+    private float drawPair(PDPageContentStream cs, PDFont font, float x, float y, String label, String value)
+            throws IOException {
+        PdfUtil.drawText(cs, font, 10, x, y, label + ": " + nz(value));
+        return y - 17;
+    }
+
+    /** Vẽ 1 đoạn văn có tiêu đề, tự bẻ dòng theo bề rộng trang. */
+    private float drawParagraph(PDPageContentStream cs, PDFont font, float x, float width, float y,
+            String title, String body) throws IOException {
+        PdfUtil.drawText(cs, font, 11, x, y, title);
+        y -= 16;
+        for (String line : PdfUtil.wrapLines(font, 10, width, nz(body))) {
+            PdfUtil.drawText(cs, font, 10, x, y, line);
+            y -= 14;
+        }
+        return y - 8;
+    }
+
+    /** Giá trị trống hiện dấu gạch thay vì để trắng, cho người đọc biết là "chưa có" chứ không phải lỗi in. */
+    private String nz(String value) {
+        return value == null || value.trim().isEmpty() ? "—" : value;
+    }
+
+    private String formatDate(Date date) {
+        return date == null ? "—" : new SimpleDateFormat("dd/MM/yyyy").format(date);
+    }
+
+    private String formatDateTime(Timestamp ts) {
+        return ts == null ? "—" : new SimpleDateFormat("dd/MM/yyyy HH:mm").format(ts);
     }
 
     private void showCreateForm(HttpServletRequest request, HttpServletResponse response)
