@@ -8,8 +8,8 @@
       - customerList : List<poscs.model.Enterprise>
       - userList      : List<poscs.model.User>
 
-    Hạng mục sản phẩm/dịch vụ bên dưới hiện chưa được lưu xuống DB, xem ghi
-    chú ở addnewcontract.jsp -- phần này chỉ demo giao diện.
+    Form này chỉ sửa bản ghi trong bảng contracts. Hạng mục sản phẩm/dịch vụ
+    được thêm/gỡ ở trang chi tiết hợp đồng, không sửa tại đây.
 --%>
 <!DOCTYPE html>
 <html lang="vi">
@@ -45,27 +45,6 @@
         .form-control:focus, .form-select:focus { background-color: #ffffff; border-color: var(--primary-light); box-shadow: 0 0 0 4px rgba(15, 158, 219, 0.15); }
         .error-text { color: var(--danger); font-size: 12px; margin-top: 5px; display: none; }
 
-        /* ===== Bảng hạng mục ===== */
-        .item-table { width: 100%; border-collapse: separate; border-spacing: 0; }
-        .item-table th {
-            font-size: 0.72rem; text-transform: uppercase; color: #9ca3af; font-weight: 700;
-            padding: 8px 10px; border-bottom: 1.5px solid #eef2f6; text-align: left;
-        }
-        .item-table td { padding: 8px 10px; vertical-align: middle; border-bottom: 1px solid #f3f4f6; }
-        .item-table input { width: 100%; padding: 8px 10px; border-radius: 8px; border: 1px solid #e5e7eb; background: #f9fafb; font-size: 0.86rem; }
-        .item-table input:focus { outline: none; border-color: var(--primary-light); background: #fff; }
-        .item-table .item-subtotal { font-weight: 600; color: #111827; white-space: nowrap; }
-        .btn-remove-item { width: 30px; height: 30px; border-radius: 8px; border: none; background: #fdecef; color: var(--danger); cursor: pointer; }
-        .btn-remove-item:hover { background: #fbd6dd; }
-        .btn-add-item {
-            margin-top: 12px; background: #fff; border: 1.5px dashed var(--primary-light); color: var(--primary);
-            border-radius: 10px; padding: 8px 16px; font-size: 0.85rem; font-weight: 600; cursor: pointer;
-        }
-        .btn-add-item:hover { background: #f0f9ff; }
-
-        .totals-box { margin-top: 18px; margin-left: auto; max-width: 320px; }
-        .totals-row { display: flex; justify-content: space-between; padding: 7px 0; font-size: 0.88rem; color: #374151; }
-        .totals-row.grand { border-top: 1.5px solid #eef2f6; margin-top: 6px; padding-top: 12px; font-weight: 700; font-size: 1rem; color: var(--primary-dark); }
 
         .action-bar { display: flex; gap: 12px; margin-top: 28px; justify-content: flex-end; border-top: 1.5px solid #eef2f6; padding-top: 22px; }
         .btn-primary { background: linear-gradient(120deg, var(--primary), var(--primary-light)); border: none; border-radius: 10px; padding: 0.6rem 1.4rem; font-weight: 600; font-size: 0.9rem; box-shadow: 0 6px 16px rgba(5, 104, 166, 0.3); }
@@ -174,34 +153,10 @@
                 </div>
 
                 <div class="section-header"><h5>Hạng mục sản phẩm / dịch vụ</h5></div>
-                <table class="item-table">
-                    <thead>
-                        <tr><th style="width:38%">Tên sản phẩm/dịch vụ</th><th style="width:14%">Số lượng</th><th style="width:20%">Đơn giá (đ)</th><th style="width:20%">Thành tiền</th><th style="width:8%"></th></tr>
-                    </thead>
-                    <tbody id="itemsBody">
-                        <tr class="item-row">
-                            <td><input type="text" class="item-name" value="Cáp quang OM4 4FO"></td>
-                            <td><input type="number" class="item-qty" min="1" value="500" oninput="calcRow(this)"></td>
-                            <td><input type="number" class="item-price" min="0" value="1800000" oninput="calcRow(this)"></td>
-                            <td class="item-subtotal">900.000.000 đ</td>
-                            <td><button type="button" class="btn-remove-item" onclick="removeRow(this)"><i class="fa-solid fa-xmark"></i></button></td>
-                        </tr>
-                        <tr class="item-row">
-                            <td><input type="text" class="item-name" value="Đầu nối quang SC/APC"></td>
-                            <td><input type="number" class="item-qty" min="1" value="1000" oninput="calcRow(this)"></td>
-                            <td><input type="number" class="item-price" min="0" value="35000" oninput="calcRow(this)"></td>
-                            <td class="item-subtotal">35.000.000 đ</td>
-                            <td><button type="button" class="btn-remove-item" onclick="removeRow(this)"><i class="fa-solid fa-xmark"></i></button></td>
-                        </tr>
-                    </tbody>
-                </table>
-                <button type="button" class="btn-add-item" onclick="addRow()"><i class="fa-solid fa-plus me-1"></i>Thêm hạng mục</button>
+                <p style="font-size:0.86rem; color:#6b7280; margin:0 0 4px;">
+                    Hạng mục được thêm và gỡ ở trang chi tiết hợp đồng, không sửa tại đây.
+                </p>
 
-                <div class="totals-box">
-                    <div class="totals-row"><span>Tổng tiền hàng</span><span id="subTotal">935.000.000 đ</span></div>
-                    <div class="totals-row"><span>Thuế GTGT (10%)</span><span id="vatTotal">93.500.000 đ</span></div>
-                    <div class="totals-row grand"><span>Tổng cộng</span><span id="grandTotal">1.028.500.000 đ</span></div>
-                </div>
 
                 <div class="action-bar">
                     <a href="${pageContext.request.contextPath}/contract?action=view&id=${contract.contractId}" class="btn-cancel">Hủy</a>
@@ -216,53 +171,6 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        function formatVND(num) {
-            return num.toLocaleString('vi-VN') + ' đ';
-        }
-
-        function calcRow(el) {
-            var row = el.closest('.item-row');
-            var qty = parseFloat(row.querySelector('.item-qty').value) || 0;
-            var price = parseFloat(row.querySelector('.item-price').value) || 0;
-            row.querySelector('.item-subtotal').textContent = formatVND(qty * price);
-            calcTotals();
-        }
-
-        function calcTotals() {
-            var rows = document.querySelectorAll('.item-row');
-            var subTotal = 0;
-            rows.forEach(function (row) {
-                var qty = parseFloat(row.querySelector('.item-qty').value) || 0;
-                var price = parseFloat(row.querySelector('.item-price').value) || 0;
-                subTotal += qty * price;
-            });
-            var vat = Math.round(subTotal * 0.1);
-            var grand = subTotal + vat;
-            document.getElementById('subTotal').textContent = formatVND(subTotal);
-            document.getElementById('vatTotal').textContent = formatVND(vat);
-            document.getElementById('grandTotal').textContent = formatVND(grand);
-        }
-
-        function addRow() {
-            var tbody = document.getElementById('itemsBody');
-            var tr = document.createElement('tr');
-            tr.className = 'item-row';
-            tr.innerHTML =
-                '<td><input type="text" class="item-name" placeholder="Tên sản phẩm/dịch vụ"></td>' +
-                '<td><input type="number" class="item-qty" min="1" value="1" oninput="calcRow(this)"></td>' +
-                '<td><input type="number" class="item-price" min="0" value="0" oninput="calcRow(this)"></td>' +
-                '<td class="item-subtotal">0 đ</td>' +
-                '<td><button type="button" class="btn-remove-item" onclick="removeRow(this)"><i class="fa-solid fa-xmark"></i></button></td>';
-            tbody.appendChild(tr);
-        }
-
-        function removeRow(btn) {
-            var rows = document.querySelectorAll('.item-row');
-            if (rows.length <= 1) return; // giữ lại tối thiểu 1 dòng
-            btn.closest('.item-row').remove();
-            calcTotals();
-        }
-
         function validateForm() {
             var valid = true;
             document.querySelectorAll('.error-text').forEach(function (el) { el.style.display = 'none'; });
