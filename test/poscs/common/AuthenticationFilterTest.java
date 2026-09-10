@@ -114,6 +114,40 @@ public class AuthenticationFilterTest {
     }
 
     @Test
+    public void get_brandingImage_notLoggedIn_isAllowedThrough() throws Exception {
+        // login.jsp nhúng logo/ảnh nền khi chưa đăng nhập: nếu filter chặn thì
+        // trình duyệt nhận 302 về login.jsp thay vì file ảnh, logo mất tiêu.
+        when(request.getMethod()).thenReturn("GET");
+        when(request.getServletPath()).thenReturn("/img/postef-logo.png");
+        Map<String, Object> attrs = new HashMap<>();
+        HttpSession session = fakeSession(attrs);
+        when(request.getSession(true)).thenReturn(session);
+        when(request.getSession(false)).thenReturn(null);
+
+        filter.doFilter(request, response, chain);
+
+        verify(chain).doFilter(request, response);
+        verify(response, never()).sendRedirect(anyString());
+    }
+
+    @Test
+    public void get_uploadedFile_notLoggedIn_isStillBlocked() throws Exception {
+        // Mở "/img/" KHÔNG được kéo theo file người dùng tải lên ("/uploads/*"):
+        // ảnh đại diện, đính kèm hợp đồng vẫn phải đăng nhập mới xem được.
+        when(request.getMethod()).thenReturn("GET");
+        when(request.getServletPath()).thenReturn("/uploads/avatars/a1b2.png");
+        Map<String, Object> attrs = new HashMap<>();
+        HttpSession session = fakeSession(attrs);
+        when(request.getSession(true)).thenReturn(session);
+        when(request.getSession(false)).thenReturn(null);
+
+        filter.doFilter(request, response, chain);
+
+        verify(chain, never()).doFilter(any(), any());
+        verify(response).sendRedirect("/POSCS/login.jsp");
+    }
+
+    @Test
     public void get_nonPublicPath_loggedIn_isAllowedThroughAndInjectsNotificationData() throws Exception {
         when(request.getMethod()).thenReturn("GET");
         when(request.getServletPath()).thenReturn("/customer");

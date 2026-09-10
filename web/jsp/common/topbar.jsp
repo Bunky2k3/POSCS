@@ -12,7 +12,7 @@
 --%>
 <nav class="topbar">
     <div class="topbar-left">
-        <a href="${pageContext.request.contextPath}/dashboard" class="brand"><i class="fa-solid fa-tower-broadcast"></i> POSCS Portal</a>
+        <a href="${pageContext.request.contextPath}/dashboard" class="brand"><img src="${pageContext.request.contextPath}/img/postef-logo.png" alt="POSTEF" class="brand-mark"> POSCS Portal</a>
         <button type="button" class="sidebar-toggle" id="sidebarToggle" aria-label="Thu gọn menu">
             <i class="fa-solid fa-bars"></i>
         </button>
