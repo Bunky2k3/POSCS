@@ -59,9 +59,15 @@ public class AuthenticationController extends HttpServlet {
      */
     private static final Map<String, LoginAttemptState> LOGIN_ATTEMPTS_BY_IP = new ConcurrentHashMap<>();
 
+    // Giữ mốc đếm của 1 IP thêm bao lâu sau lần gõ sai cuối. Phải dài hơn
+    // LOGIN_LOCKOUT_MILLIS, nếu không mốc bị dọn khi khoá còn hiệu lực và
+    // người đang bị khoá lại thử được ngay.
+    private static final long LOGIN_ATTEMPT_RETENTION_MILLIS = LOGIN_LOCKOUT_MILLIS * 2;
+
     private static final class LoginAttemptState {
         private int failedCount;
         private long lockedUntilMillis;
+        private long lastFailureMillis;
     }
 
     @Override
@@ -455,9 +461,17 @@ public class AuthenticationController extends HttpServlet {
 
     /** Tăng bộ đếm sai của 1 IP; đủ MAX_LOGIN_ATTEMPTS lần thì khoá tạm LOGIN_LOCKOUT_MILLIS. */
     private void recordFailedLoginAttempt(String clientIp, long now) {
+        // Chỉ IP đăng nhập THÀNH CÔNG mới được xoá khỏi map (xem handleLogin),
+        // nên IP chỉ toàn gõ sai sẽ nằm lại mãi -- người quét cả dải IP hay chỉ
+        // là lượng người dùng tích tụ theo thời gian đều làm map phình không
+        // giới hạn. Dọn các mốc đã hết hiệu lực trước khi thêm mốc mới.
+        LOGIN_ATTEMPTS_BY_IP.values().removeIf(s -> s.lastFailureMillis > 0
+                && now - s.lastFailureMillis > LOGIN_ATTEMPT_RETENTION_MILLIS);
+
         LoginAttemptState state = LOGIN_ATTEMPTS_BY_IP.computeIfAbsent(clientIp, k -> new LoginAttemptState());
         synchronized (state) {
             state.failedCount++;
+            state.lastFailureMillis = now;
             if (state.failedCount >= MAX_LOGIN_ATTEMPTS) {
                 state.lockedUntilMillis = now + LOGIN_LOCKOUT_MILLIS;
             }

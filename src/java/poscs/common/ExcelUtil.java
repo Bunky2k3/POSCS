@@ -249,6 +249,31 @@ public final class ExcelUtil {
         }
     }
 
+    /**
+     * Chặn formula injection khi xuất Excel.
+     *
+     * Excel coi ô bắt đầu bằng = + - @ (hoặc tab/xuống dòng rồi tới các ký tự
+     * đó) là CÔNG THỨC chứ không phải chữ, dù ta ghi xuống dưới dạng text. Dữ
+     * liệu trong file xuất ra là do người dùng nhập (tên khách hàng, ghi chú,
+     * mô tả...), nên một người nhập tên dạng {@code =HYPERLINK(...)} có thể
+     * khiến máy của đồng nghiệp mở file đó chạy công thức -- kéo dữ liệu ô
+     * khác gửi ra ngoài, hoặc hiện link dụ bấm.
+     *
+     * Thêm dấu nháy đơn ở đầu: Excel hiểu đó là "ép kiểu chữ", hiển thị đúng
+     * nội dung gốc mà không tính toán gì.
+     */
+    private static String neutralizeFormula(String value) {
+        if (value.isEmpty()) {
+            return value;
+        }
+        char first = value.charAt(0);
+        if (first == '=' || first == '+' || first == '-' || first == '@'
+                || first == '\t' || first == '\r' || first == '\n') {
+            return "'" + value;
+        }
+        return value;
+    }
+
     private static void writeDataRows(Sheet sheet, int columnCount, List<Object[]> rows) {
         int rowIndex = 1;
         for (Object[] rowData : rows) {
@@ -263,7 +288,7 @@ public final class ExcelUtil {
                 } else if (value instanceof java.util.Date) {
                     cell.setCellValue(new SimpleDateFormat("dd/MM/yyyy").format((java.util.Date) value));
                 } else {
-                    cell.setCellValue(value.toString());
+                    cell.setCellValue(neutralizeFormula(value.toString()));
                 }
             }
         }

@@ -55,6 +55,10 @@ public class PasswordResetControllerTest {
         request = mock(HttpServletRequest.class);
         response = mock(HttpServletResponse.class);
         when(request.getContextPath()).thenReturn(CONTEXT_PATH);
+        // Hạn mức yêu cầu OTP đếm theo IP trong một map static, sống xuyên suốt
+        // cả lớp test -- cho mỗi test một IP riêng để chúng không tiêu lượt của
+        // nhau và kết quả không phụ thuộc thứ tự chạy.
+        when(request.getRemoteAddr()).thenReturn(java.util.UUID.randomUUID().toString());
     }
 
     private static void setField(Object target, String fieldName, Object value) throws Exception {
@@ -206,6 +210,51 @@ public class PasswordResetControllerTest {
         verify(response).sendRedirect(CONTEXT_PATH + "/resetPassword.jsp");
         org.junit.Assert.assertEquals(Boolean.TRUE, attrs.get("otpVerified"));
         org.junit.Assert.assertNull("OTP phải bị xoá ngay sau khi dùng, chặn dùng lại lần 2", attrs.get("resetOtp"));
+    }
+
+    @Test
+    public void forgotPassword_beyondPerIpQuota_stopsSendingMail() throws Exception {
+        when(request.getServletPath()).thenReturn("/ForgotPasswordServlet");
+        when(request.getParameter("email")).thenReturn("annd@example.com");
+        when(employeeDAO.findByUsernameOrEmail("annd@example.com")).thenReturn(new User());
+        Map<String, Object> attrs = new HashMap<>();
+        HttpSession session = fakeSession(attrs);
+        when(request.getSession(true)).thenReturn(session);
+
+        try (MockedStatic<EmailUtil> emailUtil = mockStatic(EmailUtil.class)) {
+            emailUtil.when(() -> EmailUtil.sendOtpEmail(anyString(), anyString())).thenReturn(true);
+
+            // Cooldown 30 giây chỉ gắn với session, xoá cookie là lách được --
+            // nên hạn mức theo IP mới là thứ chặn được kiểu dội mail liên tục.
+            for (int i = 0; i < 15; i++) {
+                controller.doPost(request, response);
+            }
+
+            emailUtil.verify(() -> EmailUtil.sendOtpEmail(anyString(), anyString()), times(10));
+        }
+    }
+
+    @Test
+    public void forgotPassword_quotaExhausted_stillRedirectsIdenticallyToHideTheLimit() throws Exception {
+        when(request.getServletPath()).thenReturn("/ForgotPasswordServlet");
+        when(request.getParameter("email")).thenReturn("annd@example.com");
+        when(employeeDAO.findByUsernameOrEmail("annd@example.com")).thenReturn(new User());
+        Map<String, Object> attrs = new HashMap<>();
+        HttpSession session = fakeSession(attrs);
+        when(request.getSession(true)).thenReturn(session);
+
+        try (MockedStatic<EmailUtil> emailUtil = mockStatic(EmailUtil.class)) {
+            emailUtil.when(() -> EmailUtil.sendOtpEmail(anyString(), anyString())).thenReturn(true);
+
+            for (int i = 0; i < 12; i++) {
+                controller.doPost(request, response);
+            }
+
+            // Nếu lần bị chặn trả về trang/tham số khác, kẻ tấn công dò được
+            // đúng ngưỡng và cả việc email nào có tài khoản -- phá luôn nguyên
+            // tắc chống enumeration mà bước 1 đang giữ.
+            verify(response, times(12)).sendRedirect(CONTEXT_PATH + "/verifyOtp.jsp");
+        }
     }
 
     // ------------------------------------------------------------------

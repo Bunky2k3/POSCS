@@ -3,6 +3,20 @@
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="https://jakarta.ee/xml/ns/jakartaee https://jakarta.ee/xml/ns/jakartaee/web-app_6_0.xsd"
          version="6.0">
+    <!--
+      Cookie phiên: HttpOnly chặn JavaScript đọc JSESSIONID (Tomcat vốn bật sẵn,
+      khai báo ở đây để không phụ thuộc mặc định của container).
+
+      KHÔNG bật <secure>: nó khiến trình duyệt chỉ gửi cookie qua HTTPS, nên bật
+      sẵn sẽ làm hỏng việc chạy thử qua http://localhost. Khi triển khai thật
+      sau TLS thì nên bật (xem DEPLOY.md).
+    -->
+    <session-config>
+        <cookie-config>
+            <http-only>true</http-only>
+        </cookie-config>
+    </session-config>
+
     <error-page>
         <error-code>403</error-code>
         <location>/error403.jsp</location>
