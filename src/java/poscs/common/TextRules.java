@@ -26,4 +26,24 @@ public final class TextRules {
         }
         return value.indexOf('<') < 0 && value.indexOf('>') < 0 && value.indexOf('"') < 0;
     }
+
+    /**
+     * true nếu giá trị là URL http/https an toàn để đặt vào thuộc tính href.
+     * null/rỗng coi là hợp lệ (nơi gọi tự quyết có bắt buộc hay không).
+     *
+     * Bắt buộc kiểm SCHEME ở đây chứ không thể chỉ trông vào escape lúc hiển
+     * thị: {@code fn:escapeXml} làm chuỗi an toàn về mặt HTML nhưng KHÔNG ngăn
+     * được {@code javascript:alert(1)} chạy khi người dùng bấm vào link. Chỉ
+     * cho phép http/https là cách duy nhất chặn được lớp này.
+     */
+    public static boolean isSafeHttpUrl(String value) {
+        if (value == null || value.isEmpty()) {
+            return true;
+        }
+        if (!isSafeFreeText(value)) {
+            return false;
+        }
+        String lower = value.toLowerCase();
+        return lower.startsWith("http://") || lower.startsWith("https://");
+    }
 }

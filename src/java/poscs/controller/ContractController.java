@@ -22,6 +22,7 @@ import org.apache.pdfbox.pdmodel.interactive.form.PDAcroForm;
 import poscs.common.AccessControl;
 import poscs.common.ExcelUtil;
 import poscs.common.PdfUtil;
+import poscs.common.TextRules;
 import poscs.dao.AddressDAO;
 import poscs.dao.ContractDAO;
 import poscs.dao.CustomerDAO;
@@ -647,6 +648,10 @@ public class ContractController extends HttpServlet {
             response.sendRedirect(request.getContextPath() + "/contract?action=new&error=invalid");
             return;
         }
+        if (!TextRules.isSafeHttpUrl(c.getAttachmentUrl())) {
+            response.sendRedirect(request.getContextPath() + "/contract?action=new&error=invalid_drive_link");
+            return;
+        }
         c.setContractCode(contractDAO.generateNextContractCode());
 
         int newId = contractDAO.insert(c);
@@ -671,6 +676,10 @@ public class ContractController extends HttpServlet {
         c.setContractId(id);
         if (!isValid(c)) {
             response.sendRedirect(request.getContextPath() + "/contract?action=edit&id=" + id + "&error=invalid");
+            return;
+        }
+        if (!TextRules.isSafeHttpUrl(c.getAttachmentUrl())) {
+            response.sendRedirect(request.getContextPath() + "/contract?action=edit&id=" + id + "&error=invalid_drive_link");
             return;
         }
 
@@ -781,6 +790,10 @@ public class ContractController extends HttpServlet {
         if (ownerId != null) {
             c.setOwnerId(ownerId);
         }
+        // Link tới bản PDF đã ký, thường là file trên Google Drive -- người
+        // dùng tự tải lên rồi dán link vào đây (giống cách catalogue sản phẩm
+        // đang lưu link Drive). Hệ thống không đụng tới file đó.
+        c.setAttachmentUrl(emptyToNull(request.getParameter("attachmentUrl")));
         return c;
     }
 

@@ -94,6 +94,17 @@
         </div>
 
         <div class="card-box">
+            <c:if test="${not empty param.error}">
+                <div class="alert alert-danger py-2 px-3 mb-3" style="font-size: 0.9rem; border-radius: 12px;">
+                    <c:choose>
+                        <c:when test="${param.error == 'invalid_drive_link'}">Link file PDF phải là địa chỉ bắt đầu bằng http:// hoặc https://. Vui lòng dán lại.</c:when>
+                        <c:when test="${param.error == 'invalid'}">Thông tin hợp đồng chưa hợp lệ. Vui lòng kiểm tra lại các ô bắt buộc.</c:when>
+                        <c:when test="${param.error == 'update_failed'}">Không lưu được thay đổi. Vui lòng thử lại.</c:when>
+                        <c:otherwise>Đã có lỗi xảy ra. Vui lòng thử lại.</c:otherwise>
+                    </c:choose>
+                </div>
+            </c:if>
+
             <form id="createContractForm" action="${pageContext.request.contextPath}/contract" method="POST" onsubmit="return validateForm();">
                 <input type="hidden" name="csrfToken" value="${csrfToken}">
                 <input type="hidden" name="action" value="update">
@@ -150,6 +161,15 @@
                             </c:forEach>
                         </select>
                         <span class="error-text" id="err-owner">Vui lòng chọn người phụ trách.</span>
+                    </div>
+                    <div class="col-12 field-row">
+                        <label>Link file PDF hợp đồng (Google Drive)</label>
+                        <input type="url" class="form-control" id="attachmentUrl" name="attachmentUrl"
+                               value="${fn:escapeXml(contract.attachmentUrl)}"
+                               placeholder="VD: https://drive.google.com/file/d/...">
+                        <span style="font-size:0.78rem; color:#9ca3af; display:block; margin-top:6px;">
+                            Tải bản PDF đã ký lên Drive rồi dán link vào đây. Để trống nếu chưa có.
+                        </span>
                     </div>
                 </div>
 

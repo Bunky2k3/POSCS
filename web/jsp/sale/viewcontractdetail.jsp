@@ -178,6 +178,14 @@
                 </div>
             </div>
             <div class="header-actions">
+                <%-- Link tới bản PDF đã ký trên Drive, do người dùng tự dán vào
+                     form. Controller đã bắt buộc scheme http/https trước khi lưu
+                     (xem TextRules.isSafeHttpUrl) -- escape ở đây thôi không đủ,
+                     vì nó không chặn được href="javascript:...". --%>
+                <c:if test="${not empty contract.attachmentUrl}">
+                    <a href="${fn:escapeXml(contract.attachmentUrl)}" target="_blank" rel="noopener noreferrer"
+                       class="btn-delete-detail" style="cursor:pointer; color:var(--primary); border-color:#e5e7eb;"><i class="fa-brands fa-google-drive"></i> Mở PDF trên Drive</a>
+                </c:if>
                 <a href="${pageContext.request.contextPath}/contract?action=exportPdf&id=${contract.contractId}" class="btn-delete-detail" style="cursor:pointer; color:var(--primary); border-color:#e5e7eb;"><i class="fa-solid fa-file-pdf"></i> Xuất PDF</a>
                 <a href="${pageContext.request.contextPath}/contract?action=edit&id=${contract.contractId}" class="btn-edit-detail"><i class="fa-solid fa-pen"></i> Sửa thông tin</a>
                 <c:choose>
