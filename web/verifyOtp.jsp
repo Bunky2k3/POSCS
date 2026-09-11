@@ -320,38 +320,84 @@
             return true;
         }
 
-        // Đếm ngược thời gian hiệu lực OTP (5 phút)
+        // Đếm ngược thời gian hiệu lực OTP.
+        //
+        // Lấy mốc hết hạn THẬT từ session (AuthenticationController.issueOtp ghi
+        // resetOtpExpiry = thời điểm phát mã + 5 phút) thay vì cứ hardcode 5:00
+        // mỗi lần tải trang. Trước đây gõ sai 1 lần là server redirect về đây,
+        // trang tải lại và đồng hồ nhảy về 05:00 trong khi mã thật sắp chết --
+        // giao diện nói ngược hẳn với server, người dùng gõ đúng mã vẫn bị báo
+        // hết hạn.
         (function () {
-            var totalSeconds = 5 * 60;
+            var expiryAt = Number('${sessionScope.resetOtpExpiry}') || 0;
+            var totalSeconds = expiryAt
+                    ? Math.max(0, Math.round((expiryAt - Date.now()) / 1000))
+                    : 5 * 60;
             var el = document.getElementById('countdown');
             var wrapper = document.getElementById('expiryText');
             var submitBtn = document.getElementById('submitBtn');
+
+            function expire() {
+                el.textContent = '00:00';
+                wrapper.classList.add('expired');
+                wrapper.innerHTML = 'Mã OTP đã <strong>hết hạn</strong>, vui lòng gửi lại mã mới';
+                submitBtn.disabled = true;
+            }
+
+            function render() {
+                var m = Math.floor(totalSeconds / 60);
+                var s = totalSeconds % 60;
+                el.textContent = (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s;
+            }
+
+            // Mã có thể đã chết TRƯỚC khi trang kịp vẽ (quay lại đây sau khi gõ
+            // sai ở giây cuối) -- phải chốt trạng thái ngay, không đợi tick đầu.
+            if (totalSeconds <= 0) {
+                expire();
+                return;
+            }
+            render();
+
             var timer = setInterval(function () {
                 totalSeconds--;
                 if (totalSeconds <= 0) {
                     clearInterval(timer);
-                    el.textContent = '00:00';
-                    wrapper.classList.add('expired');
-                    wrapper.innerHTML = 'Mã OTP đã <strong>hết hạn</strong>, vui lòng gửi lại mã mới';
-                    submitBtn.disabled = true;
+                    expire();
                     return;
                 }
-                var m = Math.floor(totalSeconds / 60);
-                var s = totalSeconds % 60;
-                el.textContent = (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s;
+                render();
             }, 1000);
         })();
 
-        // Đếm ngược cho phép gửi lại mã (30 giây)
+        // Đếm ngược cho phép gửi lại mã -- cũng tính từ mốc THẬT trong session
+        // (resetOtpLastSent), không phải từ lúc tải trang. Server chặn bằng
+        // RESEND_COOLDOWN_MILLIS = 30 giây kể từ lần gửi gần nhất; đếm lại từ
+        // 30 sau mỗi lần redirect khiến nút bị khoá cả khi server đã cho gửi.
         (function () {
-            var resendSeconds = 30;
+            var lastSentAt = Number('${sessionScope.resetOtpLastSent}') || 0;
+            var resendSeconds = lastSentAt
+                    ? Math.max(0, 30 - Math.round((Date.now() - lastSentAt) / 1000))
+                    : 30;
             var link = document.getElementById('resendLink');
+
+            function enableResend() {
+                link.textContent = 'Gửi lại mã OTP';
+                link.classList.remove('disabled');
+            }
+
+            // Đã qua 30 giây kể từ lần gửi trước -> mở khoá ngay, đừng bắt chờ
+            // thêm một vòng 30 giây nữa chỉ vì trang vừa được tải lại.
+            if (resendSeconds <= 0) {
+                enableResend();
+                return;
+            }
+            link.textContent = 'Gửi lại mã (' + (resendSeconds < 10 ? '0' : '') + resendSeconds + ')';
+
             var timer = setInterval(function () {
                 resendSeconds--;
                 if (resendSeconds <= 0) {
                     clearInterval(timer);
-                    link.textContent = 'Gửi lại mã OTP';
-                    link.classList.remove('disabled');
+                    enableResend();
                     return;
                 }
                 link.textContent = 'Gửi lại mã (' + (resendSeconds < 10 ? '0' : '') + resendSeconds + ')';

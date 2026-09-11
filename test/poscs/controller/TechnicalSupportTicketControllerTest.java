@@ -16,6 +16,7 @@ import jakarta.servlet.http.HttpSession;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.ArgumentCaptor;
+import poscs.dao.ContractDAO;
 import poscs.dao.CustomerDAO;
 import poscs.dao.EmployeeDAO;
 import poscs.dao.TechnicalSupportTicketDAO;
@@ -46,6 +47,7 @@ public class TechnicalSupportTicketControllerTest {
     private TechnicalSupportTicketController controller;
     private TechnicalSupportTicketDAO ticketDAO;
     private CustomerDAO customerDAO;
+    private ContractDAO contractDAO;
     private EmployeeDAO employeeDAO;
 
     private HttpServletRequest request;
@@ -58,10 +60,12 @@ public class TechnicalSupportTicketControllerTest {
 
         ticketDAO = mock(TechnicalSupportTicketDAO.class);
         customerDAO = mock(CustomerDAO.class);
+        contractDAO = mock(ContractDAO.class);
         employeeDAO = mock(EmployeeDAO.class);
 
         setField(controller, "ticketDAO", ticketDAO);
         setField(controller, "customerDAO", customerDAO);
+        setField(controller, "contractDAO", contractDAO);
         setField(controller, "employeeDAO", employeeDAO);
 
         request = mock(HttpServletRequest.class);
@@ -502,5 +506,121 @@ public class TechnicalSupportTicketControllerTest {
         when(request.getParameter("description")).thenReturn("Thiết bị lỗi nguồn");
         when(request.getParameter("status")).thenReturn("Đang xử lý");
         when(ticketDAO.update(any(TechnicalRequest.class))).thenReturn(true);
+    }
+
+    // ------------------------------------------------------------------
+    // Hợp đồng gắn vào phiếu phải thuộc đúng khách hàng của phiếu
+    // ------------------------------------------------------------------
+
+    private Contract contractOwnedBy(int contractId, int enterpriseId) {
+        Contract c = new Contract();
+        c.setContractId(contractId);
+        c.setEnterpriseId(enterpriseId);
+        return c;
+    }
+
+    @Test
+    public void update_contractBelongsToAnotherEnterprise_isRejected() throws Exception {
+        // Không có ràng buộc nào ở CSDL cho cặp (enterprise_id, contract_id),
+        // nên đây là tuyến chặn duy nhất. Thiếu nó là ghi được phiếu "khách
+        // hàng B, hợp đồng của A" -- trang chi tiết, PDF và Excel đều hiện
+        // hợp đồng của công ty khác.
+        when(ticketDAO.findById(3)).thenReturn(fullyValidExistingTicket());
+        stubValidUpdateParams();
+        when(request.getParameter("enterpriseId")).thenReturn("10");
+        when(request.getParameter("contractId")).thenReturn("77");
+        when(contractDAO.findById(77)).thenReturn(contractOwnedBy(77, 999)); // của khách hàng khác
+
+        controller.doPost(request, response);
+
+        verify(ticketDAO, never()).update(any(TechnicalRequest.class));
+        verify(response).sendRedirect(CONTEXT_PATH + "/ticket?action=edit&id=3&error=contract_mismatch");
+    }
+
+    @Test
+    public void update_contractBelongsToSameEnterprise_isAccepted() throws Exception {
+        when(ticketDAO.findById(3)).thenReturn(fullyValidExistingTicket());
+        stubValidUpdateParams();
+        when(request.getParameter("enterpriseId")).thenReturn("10");
+        when(request.getParameter("contractId")).thenReturn("77");
+        when(contractDAO.findById(77)).thenReturn(contractOwnedBy(77, 10));
+
+        controller.doPost(request, response);
+
+        verify(ticketDAO).update(any(TechnicalRequest.class));
+    }
+
+    @Test
+    public void update_contractIdMissingAndPickerNeverLoaded_keepsOldContract() throws Exception {
+        // Form gửi đi trước khi AJAX loadContracts() xong (mạng chậm / JS tắt):
+        // không có marker contractLoaded -> phải GIỮ hợp đồng cũ, nếu không mỗi
+        // lần lưu vội là mất liên kết hợp đồng.
+        TechnicalRequest existing = fullyValidExistingTicket();
+        existing.setContractId(55);
+        when(ticketDAO.findById(3)).thenReturn(existing);
+        stubValidUpdateParams();
+        when(request.getParameter("contractId")).thenReturn(null);
+        when(request.getParameter("contractLoaded")).thenReturn(null);
+        when(contractDAO.findById(55)).thenReturn(contractOwnedBy(55, 10));
+
+        controller.doPost(request, response);
+
+        ArgumentCaptor<TechnicalRequest> saved = ArgumentCaptor.forClass(TechnicalRequest.class);
+        verify(ticketDAO).update(saved.capture());
+        assertEquals(Integer.valueOf(55), saved.getValue().getContractId());
+    }
+
+    @Test
+    public void update_contractClearedWhilePickerWasUsable_detachesInsteadOfRestoring() throws Exception {
+        // Người dùng đổi sang khách hàng khác (JS xoá trắng ô hợp đồng) hoặc
+        // chọn "Không gắn hợp đồng". Marker contractLoaded=1 chứng tỏ ô chọn đã
+        // dùng được, nên để trống là CỐ Ý -- khôi phục hợp đồng cũ ở đây chính
+        // là cách phiếu dính hợp đồng của khách hàng khác.
+        TechnicalRequest existing = fullyValidExistingTicket();
+        existing.setContractId(55);
+        when(ticketDAO.findById(3)).thenReturn(existing);
+        stubValidUpdateParams();
+        when(request.getParameter("contractId")).thenReturn("");
+        when(request.getParameter("contractLoaded")).thenReturn("1");
+
+        controller.doPost(request, response);
+
+        ArgumentCaptor<TechnicalRequest> saved = ArgumentCaptor.forClass(TechnicalRequest.class);
+        verify(ticketDAO).update(saved.capture());
+        assertNull("Phải gỡ hẳn hợp đồng, không được giữ lại của khách hàng cũ",
+                saved.getValue().getContractId());
+    }
+
+    @Test
+    public void create_contractBelongsToAnotherEnterprise_isRejected() throws Exception {
+        when(request.getParameter("action")).thenReturn("create");
+        when(request.getParameter("enterpriseId")).thenReturn("10");
+        when(request.getParameter("ticketType")).thenReturn("Bảo hành");
+        when(request.getParameter("priority")).thenReturn("Cao");
+        when(request.getParameter("receptionChannel")).thenReturn("Điện thoại");
+        when(request.getParameter("assignedTechnicianId")).thenReturn("50");
+        when(request.getParameter("description")).thenReturn("Thiết bị lỗi nguồn");
+        when(request.getParameter("contractId")).thenReturn("77");
+        when(contractDAO.findById(77)).thenReturn(contractOwnedBy(77, 999));
+
+        controller.doPost(request, response);
+
+        verify(ticketDAO, never()).insert(any(TechnicalRequest.class));
+        verify(response).sendRedirect(CONTEXT_PATH + "/ticket?action=new&error=contract_mismatch");
+    }
+
+    @Test
+    public void update_contractIdPointsAtDeletedContract_isRejected() throws Exception {
+        // findById trả null (hợp đồng đã bị xoá mềm hoặc id bịa) -- không được
+        // coi là hợp lệ chỉ vì "không tra được để so".
+        when(ticketDAO.findById(3)).thenReturn(fullyValidExistingTicket());
+        stubValidUpdateParams();
+        when(request.getParameter("contractId")).thenReturn("77");
+        when(contractDAO.findById(77)).thenReturn(null);
+
+        controller.doPost(request, response);
+
+        verify(ticketDAO, never()).update(any(TechnicalRequest.class));
+        verify(response).sendRedirect(CONTEXT_PATH + "/ticket?action=edit&id=3&error=contract_mismatch");
     }
 }
