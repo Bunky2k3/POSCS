@@ -478,5 +478,15 @@
     "status": "Đạt",
     "actual": "Chưa đăng nhập: 4 màn hình nội bộ đều bị đẩy về trang đăng nhập",
     "note": ""
+  },
+  "MAN_BCRYPT": {
+    "status": "Đạt",
+    "actual": "Kiểm trực tiếp CSDL: 56/56 bản ghi users lưu mật khẩu dạng bcrypt ($2a$/$2b$), độ dài hash nhỏ nhất 60 ký tự; bảng chỉ có cột password_hash, không có cột nào lưu bản rõ",
+    "note": "Kiểm tay ngày phát hành tài liệu"
+  },
+  "MAN_CSRF": {
+    "status": "Đạt",
+    "actual": "Gửi POST xoá khách hàng bằng phiên hợp lệ nhưng không kèm csrfToken -> HTTP 403; kèm token giả mạo -> HTTP 403",
+    "note": "Kiểm tay ngày phát hành tài liệu"
   }
 }

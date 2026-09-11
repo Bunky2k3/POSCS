@@ -1,0 +1,493 @@
+{
+  "_note": "Mỗi mục có 'ref' là danh sách mã test case đã chạy làm căn cứ. Script chỉ đánh Yes khi TẤT CẢ mã trong 'ref' đều Đạt trong kết quả chạy thật; mục không có 'ref' để trống cho khách hàng tự xác nhận.",
+  "items": [
+    {
+      "m": "Xác thực & tài khoản",
+      "c": "Đăng nhập được bằng tên đăng nhập hoặc email công ty, sai thông tin thì bị từ chối",
+      "ref": [
+        "TC_LOGIN_001",
+        "TC_LOGIN_002",
+        "TC_LOGIN_005",
+        "TC_LOGIN_006"
+      ]
+    },
+    {
+      "m": "Xác thực & tài khoản",
+      "c": "Báo lỗi khi sai tài khoản giống hệt khi sai mật khẩu, không để lộ tài khoản nào có thật",
+      "ref": [
+        "TC_LOGIN_005"
+      ]
+    },
+    {
+      "m": "Xác thực & tài khoản",
+      "c": "Khoá tạm đăng nhập từ một máy sau 5 lần sai liên tiếp, tự mở lại sau 15 phút",
+      "ref": [
+        "TC_LOGIN_007",
+        "TC_LOGIN_008",
+        "TC_LOGIN_009"
+      ]
+    },
+    {
+      "m": "Xác thực & tài khoản",
+      "c": "Mật khẩu lưu dưới dạng băm, không lưu bản rõ ở bất kỳ đâu",
+      "ref": [
+        "MAN_BCRYPT"
+      ]
+    },
+    {
+      "m": "Xác thực & tài khoản",
+      "c": "Người dùng tự đổi được mật khẩu; đổi xong phiên cũ bị huỷ, phải đăng nhập lại",
+      "ref": [
+        "TC_CHGPWD_001",
+        "ST_AUTH_006"
+      ]
+    },
+    {
+      "m": "Xác thực & tài khoản",
+      "c": "Quên mật khẩu lấy lại được bằng mã OTP gửi qua email, mã hết hạn sau 5 phút",
+      "ref": [
+        "ST_AUTH_009",
+        "ST_AUTH_011",
+        "ST_AUTH_012",
+        "TC_OTP_004"
+      ]
+    },
+    {
+      "m": "Xác thực & tài khoản",
+      "c": "Chặn dò mã OTP: sai 5 lần thì huỷ mã, giới hạn 10 lần yêu cầu gửi mã trong 15 phút",
+      "ref": [
+        "TC_OTP_003",
+        "TC_FORGOT_005"
+      ]
+    },
+    {
+      "m": "Xác thực & tài khoản",
+      "c": "Chưa đăng nhập thì không mở được bất kỳ màn hình nghiệp vụ nào",
+      "ref": [
+        "TC_LOGIN_014",
+        "ST_ACL_019"
+      ]
+    },
+    {
+      "m": "Quản lý khách hàng",
+      "c": "Thêm, sửa, xoá hồ sơ khách hàng doanh nghiệp kèm logo và địa chỉ hành chính",
+      "ref": [
+        "TC_CUSADD_001",
+        "TC_CUSEDIT_002",
+        "TC_CUSDEL_001",
+        "TC_CUSADD_013"
+      ]
+    },
+    {
+      "m": "Quản lý khách hàng",
+      "c": "Kiểm tra dữ liệu đầu vào: số điện thoại, email, mã số thuế, ngày tham gia",
+      "ref": [
+        "TC_CUSADD_005",
+        "TC_CUSADD_009",
+        "TC_CUSADD_010",
+        "TC_CUSADD_012"
+      ]
+    },
+    {
+      "m": "Quản lý khách hàng",
+      "c": "Tìm kiếm theo tên hoặc mã số thuế, lọc theo loại khách hàng và người phụ trách",
+      "ref": [
+        "TC_CUSLIST_002",
+        "TC_CUSLIST_003",
+        "TC_CUSLIST_006",
+        "TC_CUSLIST_007"
+      ]
+    },
+    {
+      "m": "Quản lý khách hàng",
+      "c": "Chấm và theo dõi mức quan hệ khách hàng, mỗi lần chấm được ghi vào lịch sử",
+      "ref": [
+        "TC_CUSEVAL_001",
+        "TC_CUSEVAL_003",
+        "ST_CUS_004"
+      ]
+    },
+    {
+      "m": "Quản lý khách hàng",
+      "c": "Không xoá được khách hàng còn hợp đồng đang hiệu lực",
+      "ref": [
+        "TC_CUSDEL_002",
+        "ST_CUS_020"
+      ]
+    },
+    {
+      "m": "Quản lý khách hàng",
+      "c": "Xuất danh sách khách hàng ra Excel theo đúng bộ lọc đang xem",
+      "ref": [
+        "TC_CUSEXP_001",
+        "TC_CUSEXP_002"
+      ]
+    },
+    {
+      "m": "Quản lý hợp đồng",
+      "c": "Thêm, sửa, xoá hợp đồng gắn với khách hàng và người phụ trách",
+      "ref": [
+        "TC_CTRADD_001",
+        "TC_CTREDIT_002",
+        "TC_CTRDEL_001"
+      ]
+    },
+    {
+      "m": "Quản lý hợp đồng",
+      "c": "Ràng buộc thứ tự ngày ký ≤ ngày hiệu lực ≤ ngày kết thúc",
+      "ref": [
+        "TC_CTRADD_006",
+        "TC_CTRADD_007",
+        "TC_CTRADD_008",
+        "TC_CTRADD_009"
+      ]
+    },
+    {
+      "m": "Quản lý hợp đồng",
+      "c": "Trạng thái hợp đồng tự tính theo ngày hiện tại, không phải nhập tay",
+      "ref": [
+        "TC_CTRLIST_002",
+        "ST_CUS_010",
+        "ST_CUS_011",
+        "ST_CUS_013"
+      ]
+    },
+    {
+      "m": "Quản lý hợp đồng",
+      "c": "Cảnh báo hợp đồng sắp hết hạn từ 30 ngày trước",
+      "ref": [
+        "TC_CTRLIST_003",
+        "TC_CTRLIST_004"
+      ]
+    },
+    {
+      "m": "Quản lý hợp đồng",
+      "c": "Gắn và gỡ được dòng sản phẩm trong hợp đồng, chặn số lượng không hợp lệ",
+      "ref": [
+        "TC_CTRADDPRD_001",
+        "TC_CTRADDPRD_003",
+        "TC_CTRDELPRD_001"
+      ]
+    },
+    {
+      "m": "Quản lý hợp đồng",
+      "c": "Chỉ xoá được hợp đồng chưa tới ngày hiệu lực (BR-46)",
+      "ref": [
+        "TC_CTRDEL_002",
+        "ST_CUS_014"
+      ]
+    },
+    {
+      "m": "Quản lý hợp đồng",
+      "c": "Nhập nhanh một hợp đồng mới từ file PDF điền theo mẫu do hệ thống phát ra",
+      "ref": [
+        "TC_CTRIMPORT_001",
+        "TC_CTRIMPORT_002",
+        "TC_CTRIMPORT_003"
+      ]
+    },
+    {
+      "m": "Quản lý hợp đồng",
+      "c": "Xuất danh sách hợp đồng ra Excel và xuất một hợp đồng ra PDF tiếng Việt có dấu",
+      "ref": [
+        "TC_CTREXP_001",
+        "TC_CTREXP_003",
+        "TC_CTREXP_004"
+      ]
+    },
+    {
+      "m": "Quản lý sản phẩm",
+      "c": "Thêm, sửa, xoá sản phẩm theo cây danh mục nhiều cấp",
+      "ref": [
+        "TC_PRDADD_001",
+        "TC_PRDEDIT_002",
+        "TC_PRDDEL_001",
+        "TC_PRDLIST_002"
+      ]
+    },
+    {
+      "m": "Quản lý sản phẩm",
+      "c": "Mỗi sản phẩm gắn được nhiều ảnh và tài liệu catalogue dạng PDF",
+      "ref": [
+        "TC_PRDADD_005",
+        "TC_PRDADD_007",
+        "ST_PRD_008"
+      ]
+    },
+    {
+      "m": "Quản lý sản phẩm",
+      "c": "Chỉ nhận đúng định dạng tệp cho phép, từ chối tệp có thể chứa mã độc",
+      "ref": [
+        "TC_PRDADD_006",
+        "TC_PRDADD_008",
+        "TC_UPLOAD_005"
+      ]
+    },
+    {
+      "m": "Quản lý sản phẩm",
+      "c": "Mã sản phẩm sinh tự động, không trùng và tăng liên tiếp",
+      "ref": [
+        "TC_PRDADD_004",
+        "ST_PRD_002"
+      ]
+    },
+    {
+      "m": "Quản lý sản phẩm",
+      "c": "Không xoá được sản phẩm đang nằm trong hợp đồng; gỡ khỏi hợp đồng rồi mới xoá được",
+      "ref": [
+        "TC_PRDDEL_002",
+        "ST_PRD_015",
+        "ST_PRD_017"
+      ]
+    },
+    {
+      "m": "Phiếu hỗ trợ kỹ thuật",
+      "c": "Tiếp nhận phiếu hỗ trợ gắn đúng khách hàng, hợp đồng, kênh tiếp nhận và mức ưu tiên",
+      "ref": [
+        "TC_TKADD_001",
+        "ST_TK_001"
+      ]
+    },
+    {
+      "m": "Phiếu hỗ trợ kỹ thuật",
+      "c": "Chỉ chọn được hợp đồng thuộc đúng khách hàng của phiếu",
+      "ref": [
+        "TC_TKADD_008",
+        "ST_TK_003"
+      ]
+    },
+    {
+      "m": "Phiếu hỗ trợ kỹ thuật",
+      "c": "Phân công phiếu cho kỹ thuật viên và theo dõi trạng thái xử lý",
+      "ref": [
+        "TC_TKEDIT_002",
+        "ST_TK_005"
+      ]
+    },
+    {
+      "m": "Phiếu hỗ trợ kỹ thuật",
+      "c": "Mỗi lần đổi trạng thái được ghi lại kèm người thực hiện và thời điểm",
+      "ref": [
+        "TC_TKEDIT_002",
+        "ST_TK_006",
+        "ST_TK_007"
+      ]
+    },
+    {
+      "m": "Phiếu hỗ trợ kỹ thuật",
+      "c": "Đóng phiếu kèm tóm tắt kết quả xử lý; mốc đóng không bị ghi đè khi lưu lại",
+      "ref": [
+        "TC_TKEDIT_003",
+        "TC_TKEDIT_005",
+        "ST_TK_012"
+      ]
+    },
+    {
+      "m": "Phiếu hỗ trợ kỹ thuật",
+      "c": "Cảnh báo phiếu quá hạn hoặc sắp tới hạn SLA ngay trên màn hình danh sách",
+      "ref": [
+        "TC_TKLIST_008",
+        "ST_TK_014",
+        "ST_TK_015",
+        "ST_TK_016"
+      ]
+    },
+    {
+      "m": "Phiếu hỗ trợ kỹ thuật",
+      "c": "Xuất danh sách phiếu ra Excel và xuất một phiếu ra PDF",
+      "ref": [
+        "TC_TKEXP_001",
+        "TC_TKEXP_004"
+      ]
+    },
+    {
+      "m": "Quản lý nhân viên",
+      "c": "Admin tạo hồ sơ nhân viên, hệ thống tự sinh tên đăng nhập từ họ tên đã bỏ dấu",
+      "ref": [
+        "TC_EMPADD_001",
+        "TC_EMPADD_002",
+        "TC_EMPADD_003"
+      ]
+    },
+    {
+      "m": "Quản lý nhân viên",
+      "c": "Không cho trùng số CCCD và số điện thoại giữa các nhân viên",
+      "ref": [
+        "TC_EMPADD_014",
+        "TC_EMPADD_015",
+        "TC_EMPEDIT_004",
+        "TC_EMPEDIT_005"
+      ]
+    },
+    {
+      "m": "Quản lý nhân viên",
+      "c": "Gửi tên đăng nhập và mật khẩu tạm tới email cá nhân của nhân viên",
+      "ref": [
+        "TC_EMPSEND_001",
+        "ST_AUTH_003",
+        "ST_AUTH_004"
+      ]
+    },
+    {
+      "m": "Quản lý nhân viên",
+      "c": "Gửi email thất bại thì không ghi đè mật khẩu đang dùng của nhân viên",
+      "ref": [
+        "TC_EMPSEND_003"
+      ]
+    },
+    {
+      "m": "Quản lý nhân viên",
+      "c": "Khoá và mở khoá tài khoản; khoá xong thì phiên đang mở bị cắt ngay",
+      "ref": [
+        "TC_EMPBAN_001",
+        "TC_EMPBAN_004",
+        "ST_AUTH_015",
+        "ST_AUTH_016"
+      ]
+    },
+    {
+      "m": "Quản lý nhân viên",
+      "c": "Admin không tự khoá được tài khoản đang đăng nhập của chính mình",
+      "ref": [
+        "TC_EMPBAN_003"
+      ]
+    },
+    {
+      "m": "Phân quyền & an toàn",
+      "c": "Bốn vai trò Admin, Sales, Kỹ thuật, CSKH có quyền đúng theo ma trận đã thống nhất",
+      "ref": [
+        "ST_ACL_001",
+        "ST_ACL_002",
+        "ST_ACL_003",
+        "ST_ACL_004"
+      ]
+    },
+    {
+      "m": "Phân quyền & an toàn",
+      "c": "Vai trò chỉ được xem thì không thêm/sửa/xoá được, kể cả khi gọi thẳng vào hệ thống",
+      "ref": [
+        "ST_ACL_005",
+        "ST_ACL_006",
+        "ST_ACL_007",
+        "ST_ACL_008"
+      ]
+    },
+    {
+      "m": "Phân quyền & an toàn",
+      "c": "Kỹ thuật viên chỉ cập nhật được phiếu giao cho chính mình, không phân công lại được",
+      "ref": [
+        "ST_ACL_010",
+        "ST_ACL_011",
+        "ST_ACL_012"
+      ]
+    },
+    {
+      "m": "Phân quyền & an toàn",
+      "c": "Đổi vai trò của nhân viên có hiệu lực ở phiên đăng nhập tiếp theo",
+      "ref": [
+        "ST_ACL_013",
+        "ST_ACL_014"
+      ]
+    },
+    {
+      "m": "Phân quyền & an toàn",
+      "c": "Chống giả mạo yêu cầu từ trang khác (CSRF) cho mọi thao tác gửi dữ liệu",
+      "ref": [
+        "MAN_CSRF"
+      ]
+    },
+    {
+      "m": "Phân quyền & an toàn",
+      "c": "Chống chèn mã độc qua ô nhập liệu và qua tệp tải lên",
+      "ref": [
+        "TC_LOGIN_012",
+        "TC_LOGIN_013",
+        "TC_UPDPROF_005",
+        "TC_PRDADD_009"
+      ]
+    },
+    {
+      "m": "Phân quyền & an toàn",
+      "c": "Không đọc được tệp nằm ngoài thư mục cho phép qua đường dẫn tự chế",
+      "ref": [
+        "TC_UPLOAD_004",
+        "TC_LOG_009",
+        "ST_ACL_018"
+      ]
+    },
+    {
+      "m": "Báo cáo & thông báo",
+      "c": "Bảng điều khiển tổng hợp số khách hàng, tình hình hợp đồng, doanh thu tháng và phiếu hỗ trợ",
+      "ref": [
+        "TC_DASH_001",
+        "TC_DASH_003",
+        "TC_DASH_004",
+        "ST_CUS_003"
+      ]
+    },
+    {
+      "m": "Báo cáo & thông báo",
+      "c": "Bảng điều khiển vẫn hiển thị đúng khi chưa có dữ liệu nghiệp vụ nào",
+      "ref": [
+        "TC_DASH_008"
+      ]
+    },
+    {
+      "m": "Báo cáo & thông báo",
+      "c": "Hệ thống tự sinh thông báo hợp đồng sắp hết hạn cho người phụ trách, không sinh trùng",
+      "ref": [
+        "TC_NOTI_009",
+        "ST_CUS_015",
+        "ST_CUS_016"
+      ]
+    },
+    {
+      "m": "Báo cáo & thông báo",
+      "c": "Mỗi người chỉ xem và đánh dấu đã đọc thông báo của chính mình",
+      "ref": [
+        "TC_NOTI_002",
+        "TC_NOTI_004",
+        "TC_NOTI_005"
+      ]
+    },
+    {
+      "m": "Báo cáo & thông báo",
+      "c": "Nội dung xuất Excel không bị Excel hiểu nhầm thành công thức",
+      "ref": [
+        "TC_CUSEXP_004",
+        "TC_TKEXP_006"
+      ]
+    },
+    {
+      "m": "Báo cáo & thông báo",
+      "c": "Chỉ Admin xem và tải được nhật ký hệ thống",
+      "ref": [
+        "TC_LOG_001",
+        "TC_LOG_012",
+        "TC_LOG_013",
+        "ST_ACL_016",
+        "ST_ACL_017"
+      ]
+    },
+    {
+      "m": "Vận hành & bàn giao",
+      "c": "Triển khai được lên Apache Tomcat bằng file WAR, cấu hình kết nối qua biến môi trường"
+    },
+    {
+      "m": "Vận hành & bàn giao",
+      "c": "Giao diện hiển thị tiếng Việt có dấu đầy đủ trên mọi màn hình và mọi file kết xuất"
+    },
+    {
+      "m": "Vận hành & bàn giao",
+      "c": "Tốc độ phản hồi các màn hình danh sách chấp nhận được với khối lượng dữ liệu thực tế"
+    },
+    {
+      "m": "Vận hành & bàn giao",
+      "c": "Bố cục, màu sắc và cách đặt tên chức năng phù hợp với thói quen làm việc của người dùng"
+    },
+    {
+      "m": "Vận hành & bàn giao",
+      "c": "Tài liệu hướng dẫn sử dụng và hướng dẫn triển khai đầy đủ để bàn giao"
+    }
+  ]
+}

@@ -307,3 +307,36 @@ python tools/testdoc/run_systemtest.py --part scheduler2 --log <...>
   "SLA qua 160255" rồi tìm "SLA 160255" sẽ không ra dòng nào.
 - Hai lần tạo dữ liệu trong cùng lượt không được trùng số điện thoại hay mã số
   thuế — các cột đó UNIQUE.
+
+---
+
+# Report 5.4 - User Acceptance Test
+
+```bash
+python tools/testdoc/gen_uat.py
+```
+
+Kết quả mặc định: `%USERPROFILE%\Documents\POSCS_UserAcceptanceTest.xlsx`
+
+Đây là bản **khách hàng ký nghiệm thu**, nên script không tự ý đánh dấu chấp
+nhận. Mỗi mục trong `uat_checklist.json` khai một danh sách mã test case làm
+căn cứ; ô "Đạt" chỉ được tích khi **tất cả** mã đó đều Đạt trong kết quả chạy
+thật của Report 5.2 và 5.3. Mục nào có test case trượt thì bị tích vào ô "Chưa
+đạt"; mục không khai căn cứ (tốc độ, bố cục, tài liệu bàn giao) để trống cả hai
+ô cho bên nghiệm thu tự đánh giá.
+
+Vì vậy phải chạy xong 5.2 và 5.3 trước khi sinh file này, nếu không mọi mục đều
+ra "chưa đối chiếu được".
+
+Cột "Căn cứ" là phần thêm so với mẫu gốc, để người ký lần ngược về đúng test
+case đã chạy. Không cần thì xoá cột H.
+
+Hai mã căn cứ đặc biệt không đến từ hai lượt trên mà kiểm tay rồi ghi thẳng vào
+`systemtest_results.json`:
+
+- `MAN_BCRYPT` — truy vấn CSDL xác nhận mọi bản ghi `users` lưu mật khẩu dạng
+  bcrypt và bảng không có cột nào chứa bản rõ.
+- `MAN_CSRF` — gửi POST xoá khách hàng bằng phiên hợp lệ nhưng thiếu token và
+  với token giả mạo, cả hai phải trả 403.
+
+Chạy lại hai kiểm tra này khi cần làm mới bằng chứng.
