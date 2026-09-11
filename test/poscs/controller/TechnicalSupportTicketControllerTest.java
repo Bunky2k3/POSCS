@@ -1,8 +1,15 @@
 package poscs.controller;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.lang.reflect.Field;
+import java.sql.Date;
 import java.sql.Timestamp;
+import java.util.Arrays;
+import java.util.Collections;
 import jakarta.servlet.RequestDispatcher;
+import jakarta.servlet.ServletOutputStream;
+import jakarta.servlet.WriteListener;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
@@ -11,10 +18,16 @@ import org.junit.Test;
 import poscs.dao.CustomerDAO;
 import poscs.dao.EmployeeDAO;
 import poscs.dao.TechnicalSupportTicketDAO;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.ss.usermodel.WorkbookFactory;
+import poscs.model.Contract;
+import poscs.model.Enterprise;
 import poscs.model.Role;
 import poscs.model.TechnicalRequest;
 import poscs.model.User;
 
+import static org.junit.Assert.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
@@ -279,5 +292,121 @@ public class TechnicalSupportTicketControllerTest {
 
         verify(ticketDAO).softDelete(3);
         verify(response).sendRedirect(CONTEXT_PATH + "/ticket");
+    }
+
+    // ------------------------------------------------------------------
+    // GET ?action=exportExcel
+    // ------------------------------------------------------------------
+
+    /**
+     * Hứng byte mà controller ghi ra response, để mở lại bằng chính POI --
+     * khác các test còn lại (chỉ verify lời gọi), test này chạy POI THẬT nên
+     * bắt được cả lỗi sinh workbook lẫn lỗi thiếu thư viện lúc chạy.
+     */
+    private ByteArrayOutputStream captureResponseBody() throws Exception {
+        ByteArrayOutputStream captured = new ByteArrayOutputStream();
+        when(response.getOutputStream()).thenReturn(new ServletOutputStream() {
+            @Override
+            public void write(int b) {
+                captured.write(b);
+            }
+
+            @Override
+            public boolean isReady() {
+                return true;
+            }
+
+            @Override
+            public void setWriteListener(WriteListener listener) {
+            }
+        });
+        return captured;
+    }
+
+    private TechnicalRequest ticketForExport() {
+        TechnicalRequest t = fullyValidExistingTicket();
+        t.setTicketCode("TK-0007");
+        Enterprise e = new Enterprise();
+        e.setEnterpriseName("Công ty Cổ phần Viễn thông Sông Hồng");
+        t.setEnterprise(e);
+        Contract c = new Contract();
+        c.setContractCode("HD-0001");
+        t.setContract(c);
+        t.setCreatedDate(Date.valueOf("2026-08-20"));
+        return t;
+    }
+
+    @Test
+    public void exportExcel_writesRealWorkbookWithHeaderAndOneRowPerTicket() throws Exception {
+        when(request.getParameter("action")).thenReturn("exportExcel");
+        when(ticketDAO.findAll(eq(1), eq(Integer.MAX_VALUE), any(), any(), any()))
+                .thenReturn(Arrays.asList(ticketForExport(), ticketForExport()));
+        ByteArrayOutputStream captured = captureResponseBody();
+
+        controller.doGet(request, response);
+
+        try (Workbook wb = WorkbookFactory.create(new ByteArrayInputStream(captured.toByteArray()))) {
+            Sheet sheet = wb.getSheetAt(0);
+            assertEquals("1 dòng header + 2 dòng phiếu", 2, sheet.getLastRowNum());
+            assertEquals("Mã phiếu", sheet.getRow(0).getCell(0).getStringCellValue());
+            assertEquals("TK-0007", sheet.getRow(1).getCell(0).getStringCellValue());
+            assertEquals("Công ty Cổ phần Viễn thông Sông Hồng",
+                    sheet.getRow(1).getCell(2).getStringCellValue());
+            assertEquals("HD-0001", sheet.getRow(1).getCell(3).getStringCellValue());
+        }
+    }
+
+    @Test
+    public void exportExcel_sendsFileAsAttachmentNotHtml() throws Exception {
+        when(request.getParameter("action")).thenReturn("exportExcel");
+        when(ticketDAO.findAll(eq(1), eq(Integer.MAX_VALUE), any(), any(), any()))
+                .thenReturn(Collections.emptyList());
+        captureResponseBody();
+
+        controller.doGet(request, response);
+
+        verify(response).setContentType("application/vnd.ms-excel");
+        verify(response).setHeader(eq("Content-Disposition"), contains("attachment; filename=\"phieu_ho_tro_"));
+        verify(request, never()).getRequestDispatcher(anyString());
+    }
+
+    @Test
+    public void exportExcel_passesCurrentFiltersThroughAndIgnoresPaging() throws Exception {
+        // Xuất theo đúng bộ lọc đang áp trên màn hình, nhưng KHÔNG phân trang:
+        // người dùng lọc ra cái họ cần rồi muốn cả tập đó, không phải 1 trang.
+        when(request.getParameter("action")).thenReturn("exportExcel");
+        when(request.getParameter("keyword")).thenReturn("trạm BTS");
+        when(request.getParameter("status")).thenReturn("Đang xử lý");
+        when(request.getParameter("priority")).thenReturn("Cao");
+        when(ticketDAO.findAll(anyInt(), anyInt(), any(), any(), any()))
+                .thenReturn(Collections.emptyList());
+        captureResponseBody();
+
+        controller.doGet(request, response);
+
+        verify(ticketDAO).findAll(1, Integer.MAX_VALUE, "trạm BTS", "Đang xử lý", "Cao");
+    }
+
+    @Test
+    public void exportExcel_neutralisesFormulaSoExcelDoesNotExecuteIt() throws Exception {
+        // Mô tả sự cố do người dùng nhập; bắt đầu bằng "=" là Excel coi như
+        // công thức. ExcelUtil phải thêm dấu nháy đơn để nó thành chữ.
+        when(request.getParameter("action")).thenReturn("exportExcel");
+        TechnicalRequest t = ticketForExport();
+        t.setDescription("=HYPERLINK(\"http://kegian.example\",\"Bấm vào đây\")");
+        when(ticketDAO.findAll(eq(1), eq(Integer.MAX_VALUE), any(), any(), any()))
+                .thenReturn(Collections.singletonList(t));
+        ByteArrayOutputStream captured = captureResponseBody();
+
+        controller.doGet(request, response);
+
+        try (Workbook wb = WorkbookFactory.create(new ByteArrayInputStream(captured.toByteArray()))) {
+            String moTa = wb.getSheetAt(0).getRow(1).getCell(13).getStringCellValue();
+            assertTrue("Phải còn nguyên nội dung gốc cho người đọc: " + moTa,
+                    moTa.contains("HYPERLINK"));
+            assertNotEquals("Ô không được là công thức",
+                    org.apache.poi.ss.usermodel.CellType.FORMULA,
+                    wb.getSheetAt(0).getRow(1).getCell(13).getCellType());
+        }
     }
 }
