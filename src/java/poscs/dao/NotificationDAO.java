@@ -6,6 +6,8 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import poscs.model.Notification;
 
 /**
@@ -19,6 +21,8 @@ import poscs.model.Notification;
  * lần job chạy lại.
  */
 public class NotificationDAO {
+
+    private static final Logger LOG = LoggerFactory.getLogger(NotificationDAO.class);
 
     /** Tạo 1 thông báo mới. refType/refId có thể null (thông báo không gắn với đối tượng nguồn cụ thể). */
     public boolean insert(int userId, String title, String refType, Integer refId) {
@@ -35,8 +39,7 @@ public class NotificationDAO {
             }
             return ps.executeUpdate() > 0;
         } catch (SQLException ex) {
-            System.err.println("--- LOI TAO THONG BAO ---");
-            ex.printStackTrace();
+            LOG.error("Loi tao thong bao (userId={}, refType={}, refId={})", userId, refType, refId, ex);
             return false;
         }
     }
@@ -57,8 +60,7 @@ public class NotificationDAO {
                 return rs.next();
             }
         } catch (SQLException ex) {
-            System.err.println("--- LOI KIEM TRA THONG BAO DA TON TAI ---");
-            ex.printStackTrace();
+            LOG.error("Loi kiem tra thong bao da ton tai (userId={}, refType={}, refId={})", userId, refType, refId, ex);
             // Lỗi đọc thì coi như "đã có" để tránh spam thông báo trùng lặp
             // nếu đây là lỗi tạm thời (an toàn hơn false -> tạo trùng).
             return true;
@@ -74,8 +76,7 @@ public class NotificationDAO {
                 return rs.next() ? rs.getInt(1) : 0;
             }
         } catch (SQLException ex) {
-            System.err.println("--- LOI DEM THONG BAO CHUA DOC ---");
-            ex.printStackTrace();
+            LOG.error("Loi dem thong bao chua doc (userId={})", userId, ex);
             return 0;
         }
     }
@@ -107,8 +108,7 @@ public class NotificationDAO {
                 }
             }
         } catch (SQLException ex) {
-            System.err.println("--- LOI DOC DANH SACH THONG BAO ---");
-            ex.printStackTrace();
+            LOG.error("Loi doc danh sach thong bao (userId={})", userId, ex);
         }
         return result;
     }
@@ -122,8 +122,7 @@ public class NotificationDAO {
             ps.setInt(2, userId);
             return ps.executeUpdate() > 0;
         } catch (SQLException ex) {
-            System.err.println("--- LOI DANH DAU DA DOC THONG BAO ---");
-            ex.printStackTrace();
+            LOG.error("Loi danh dau da doc thong bao (notificationId={}, userId={})", notificationId, userId, ex);
             return false;
         }
     }
@@ -135,8 +134,7 @@ public class NotificationDAO {
             ps.setInt(1, userId);
             return ps.executeUpdate();
         } catch (SQLException ex) {
-            System.err.println("--- LOI DANH DAU TAT CA THONG BAO DA DOC ---");
-            ex.printStackTrace();
+            LOG.error("Loi danh dau tat ca thong bao da doc (userId={})", userId, ex);
             return 0;
         }
     }

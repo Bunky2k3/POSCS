@@ -114,6 +114,50 @@ This project is set up as a NetBeans Ant-based web application:
 For deploying to a real server (staging/production), see
 [DEPLOY.md](DEPLOY.md).
 
+## Logging
+
+Errors are logged through SLF4J (`slf4j-api` + `slf4j-simple`, both already in
+`lib/`). There is no `printStackTrace()` left in the codebase: a bare stack
+trace says *what* broke but never *which record* or *who was doing it*, which
+is exactly what you need when a tester reports "it just said update_failed".
+
+Two layers, meant to be read together:
+
+- **DAO** — `LOG.error("Loi cap nhat hop dong (contractCode={})", ..., ex)`:
+  the failing operation, its key parameters, and the SQL exception.
+- **Controller** — `LOG.warn("Cap nhat hop dong that bai (actor={}, contractId={})", ...)`
+  on every branch that redirects with a generic `?error=..._failed`. `actor` is
+  `username#userId` (`poscs.common.Logs.actor`), because a DAO cannot see the
+  request and therefore cannot know who was logged in.
+
+Messages are written without Vietnamese diacritics, matching the existing
+console output — log files are read over SSH and through container log viewers,
+where the encoding is not guaranteed.
+
+Passwords, password hashes, OTP codes and temporary passwords are never logged.
+(The exception is `EmailUtil`'s DEV MODE, which prints the OTP and the temporary
+password *on purpose* when no SMTP server is configured — that is the only way
+to complete those flows locally. Configure SMTP and the branch never runs.)
+
+### Where the logs go
+
+`slf4j-simple` writes to stderr, which the servlet container captures: with
+Tomcat that is `logs/catalina.out` plus the daily-rotated `logs/catalina.<date>.log`.
+Nothing extra to configure, and rotation is handled by the container.
+
+To send them to a file of their own instead, add a system property when
+starting the container (Tomcat: `bin/setenv.sh` / `bin/setenv.bat`) — note
+`slf4j-simple` does not rotate this file:
+
+```bash
+CATALINA_OPTS="$CATALINA_OPTS -Dorg.slf4j.simpleLogger.logFile=/var/log/poscs/poscs.log"
+```
+
+Level and format defaults live in [`src/java/simplelogger.properties`](src/java/simplelogger.properties)
+(`info` by default); the same system properties override them per deployment,
+e.g. `-Dorg.slf4j.simpleLogger.log.poscs=debug` for this application's packages
+only.
+
 ## Roles and permissions
 
 See [PERMISSIONS.md](PERMISSIONS.md) for the role-based access matrix

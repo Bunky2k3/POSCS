@@ -12,9 +12,12 @@ import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.Part;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import poscs.common.AccessControl;
 import poscs.common.ExcelUtil;
 import poscs.common.FileStorage;
+import poscs.common.Logs;
 import poscs.dao.AddressDAO;
 import poscs.dao.ContractDAO;
 import poscs.dao.CustomerDAO;
@@ -36,6 +39,8 @@ import poscs.model.User;
 @WebServlet(name = "CustomerController", urlPatterns = {"/customer"})
 @MultipartConfig(maxFileSize = 5 * 1024 * 1024, maxRequestSize = 10 * 1024 * 1024, fileSizeThreshold = 1024 * 1024)
 public class CustomerController extends HttpServlet {
+
+    private static final Logger LOG = LoggerFactory.getLogger(CustomerController.class);
 
     private static final String LOGO_SUBFOLDER = "enterprise_logos";
 
@@ -260,6 +265,7 @@ public class CustomerController extends HttpServlet {
         e.setEnterpriseCode(customerDAO.generateNextEnterpriseCode());
         int newId = customerDAO.insert(e);
         if (newId <= 0) {
+            LOG.warn("Tao khach hang that bai (actor={}, enterpriseCode={})", Logs.actor(request), e.getEnterpriseCode());
             response.sendRedirect(request.getContextPath() + "/customer?action=new&error=create_failed");
             return;
         }
@@ -311,6 +317,7 @@ public class CustomerController extends HttpServlet {
 
         boolean ok = customerDAO.update(e);
         if (!ok) {
+            LOG.warn("Cap nhat khach hang that bai (actor={}, enterpriseId={})", Logs.actor(request), id);
             response.sendRedirect(request.getContextPath() + "/customer?action=edit&id=" + id + "&error=update_failed");
             return;
         }

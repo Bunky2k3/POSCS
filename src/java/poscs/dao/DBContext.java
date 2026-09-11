@@ -92,6 +92,10 @@ public class DBContext {
     /**
      * HÀM MAIN ĐỂ KIỂM TRA KẾT NỐI.
      * Bạn có thể chạy trực tiếp file này để kiểm tra.
+     *
+     * Cố ý in ra System.out/System.err thay vì dùng logger như phần còn lại
+     * của dự án: đây là công cụ chạy tay ở terminal, người chạy muốn thấy kết
+     * quả ngay trên màn hình chứ không phải đi tìm trong file log.
      */
     public static void main(String[] args) {
         System.out.println("Dang thuc hien kiem tra ket noi den MySQL...");

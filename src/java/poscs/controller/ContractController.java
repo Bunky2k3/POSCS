@@ -19,8 +19,11 @@ import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.PDPageContentStream;
 import org.apache.pdfbox.pdmodel.font.PDFont;
 import org.apache.pdfbox.pdmodel.interactive.form.PDAcroForm;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import poscs.common.AccessControl;
 import poscs.common.ExcelUtil;
+import poscs.common.Logs;
 import poscs.common.PdfUtil;
 import poscs.common.TextRules;
 import poscs.dao.AddressDAO;
@@ -50,6 +53,8 @@ import poscs.model.User;
 @WebServlet(name = "ContractController", urlPatterns = {"/contract", "/contract/byEnterprise"})
 @MultipartConfig(maxFileSize = 5 * 1024 * 1024, maxRequestSize = 10 * 1024 * 1024, fileSizeThreshold = 1024 * 1024)
 public class ContractController extends HttpServlet {
+
+    private static final Logger LOG = LoggerFactory.getLogger(ContractController.class);
 
     private static final int PAGE_SIZE = 10;
     private static final String LIST_VIEW = "/jsp/sale/listcontract.jsp";
@@ -574,8 +579,7 @@ public class ContractController extends HttpServlet {
             request.setAttribute("importSuccessId", contractId);
             request.getRequestDispatcher(IMPORT_VIEW).forward(request, response);
         } catch (Exception ex) {
-            System.err.println("--- LOI NHAP HOP DONG TU PDF ---");
-            ex.printStackTrace();
+            LOG.error("Loi nhap hop dong tu pdf", ex);
             request.setAttribute("importError", "Không đọc được file -- hãy chắc chắn đây là file .pdf đúng mẫu.");
             request.getRequestDispatcher(IMPORT_VIEW).forward(request, response);
         }
@@ -703,6 +707,7 @@ public class ContractController extends HttpServlet {
 
         int newId = contractDAO.insert(c);
         if (newId <= 0) {
+            LOG.warn("Tao hop dong that bai (actor={}, contractCode={})", Logs.actor(request), c.getContractCode());
             response.sendRedirect(request.getContextPath() + "/contract?action=new&error=create_failed");
             return;
         }
@@ -732,6 +737,7 @@ public class ContractController extends HttpServlet {
 
         boolean ok = contractDAO.update(c);
         if (!ok) {
+            LOG.warn("Cap nhat hop dong that bai (actor={}, contractId={})", Logs.actor(request), id);
             response.sendRedirect(request.getContextPath() + "/contract?action=edit&id=" + id + "&error=update_failed");
             return;
         }
@@ -787,6 +793,8 @@ public class ContractController extends HttpServlet {
         item.setNotes(emptyToNull(notes));
 
         if (!contractDAO.insertProducts(contractId, List.of(item))) {
+            LOG.warn("Them san pham vao hop dong that bai (actor={}, contractId={}, productId={})",
+                    Logs.actor(request), contractId, item.getProductId());
             response.sendRedirect(request.getContextPath() + "/contract?action=view&id=" + contractId + "&error=add_product_failed");
             return;
         }
@@ -806,6 +814,8 @@ public class ContractController extends HttpServlet {
         }
 
         if (!contractDAO.deleteProductLine(contractProductId, contractId)) {
+            LOG.warn("Xoa san pham khoi hop dong that bai (actor={}, contractId={}, contractProductId={})",
+                    Logs.actor(request), contractId, contractProductId);
             response.sendRedirect(request.getContextPath() + "/contract?action=view&id=" + contractId + "&error=remove_product_failed");
             return;
         }

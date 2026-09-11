@@ -9,6 +9,8 @@ import jakarta.mail.Transport;
 import jakarta.mail.internet.InternetAddress;
 import jakarta.mail.internet.MimeMessage;
 import java.util.Properties;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Gửi email qua SMTP Gmail. Cấu hình lấy từ biến môi trường (giống
@@ -16,6 +18,8 @@ import java.util.Properties;
  * deploy thật.
  */
 public class EmailUtil {
+
+    private static final Logger LOG = LoggerFactory.getLogger(EmailUtil.class);
 
     private static final String SMTP_HOST = System.getenv().getOrDefault("MAIL_SMTP_HOST", "smtp.gmail.com");
     private static final String SMTP_PORT = System.getenv().getOrDefault("MAIL_SMTP_PORT", "587");
@@ -36,8 +40,8 @@ public class EmailUtil {
      */
     public static boolean sendOtpEmail(String toEmail, String otpCode) {
         if (MAIL_USERNAME.isEmpty() || MAIL_PASSWORD.isEmpty()) {
-            System.out.println("--- [DEV MODE] CHUA CAU HINH SMTP, IN OTP RA CONSOLE ---");
-            System.out.println("Gui toi: " + toEmail + " | Ma OTP: " + otpCode);
+            LOG.info("[DEV MODE] Chua cau hinh SMTP, in OTP ra log.");
+            LOG.info("Gui toi: {} | Ma OTP: {}", toEmail, otpCode);
             return true;
         }
 
@@ -67,8 +71,7 @@ public class EmailUtil {
             Transport.send(message);
             return true;
         } catch (MessagingException ex) {
-            System.err.println("--- LOI GUI EMAIL OTP ---");
-            ex.printStackTrace();
+            LOG.error("Loi gui email otp (toEmail={})", toEmail, ex); // KHONG log otpCode
             return false;
         }
     }
@@ -84,8 +87,9 @@ public class EmailUtil {
      */
     public static boolean sendNewAccountEmail(String toEmail, String fullName, String companyEmail, String username, String tempPassword) {
         if (MAIL_USERNAME.isEmpty() || MAIL_PASSWORD.isEmpty()) {
-            System.out.println("--- [DEV MODE] CHUA CAU HINH SMTP, IN THONG TIN TAI KHOAN RA CONSOLE ---");
-            System.out.println("Gui toi: " + toEmail + " | Email cong ty: " + companyEmail + " | Username: " + username + " | Mat khau tam: " + tempPassword);
+            LOG.info("[DEV MODE] Chua cau hinh SMTP, in thong tin tai khoan ra log.");
+            LOG.info("Gui toi: {} | Email cong ty: {} | Username: {} | Mat khau tam: {}",
+                    toEmail, companyEmail, username, tempPassword);
             return true;
         }
 
@@ -119,8 +123,7 @@ public class EmailUtil {
             Transport.send(message);
             return true;
         } catch (MessagingException ex) {
-            System.err.println("--- LOI GUI EMAIL TAI KHOAN MOI ---");
-            ex.printStackTrace();
+            LOG.error("Loi gui email tai khoan moi (toEmail={}, username={})", toEmail, username, ex); // KHONG log tempPassword
             return false;
         }
     }

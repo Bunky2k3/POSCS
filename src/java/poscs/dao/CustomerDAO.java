@@ -7,6 +7,8 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import poscs.model.Address;
 import poscs.model.District;
 import poscs.model.Enterprise;
@@ -21,6 +23,8 @@ import poscs.model.User;
  * bảng đó thuộc về ContractDAO/TechnicalSupportTicketDAO.
  */
 public class CustomerDAO {
+
+    private static final Logger LOG = LoggerFactory.getLogger(CustomerDAO.class);
 
     private static final String SELECT_ENTERPRISE_BASE =
         "SELECT e.enterprise_id, e.enterprise_code, e.enterprise_name, e.customer_type, e.customer_group, " +
@@ -59,8 +63,7 @@ public class CustomerDAO {
                 }
             }
         } catch (SQLException ex) {
-            System.err.println("--- LOI TRUY VAN DANH SACH KHACH HANG ---");
-            ex.printStackTrace();
+            LOG.error("Loi truy van danh sach khach hang (accountOwnerId={})", accountOwnerId, ex);
         }
         return result;
     }
@@ -80,8 +83,7 @@ public class CustomerDAO {
                 }
             }
         } catch (SQLException ex) {
-            System.err.println("--- LOI DEM SO LUONG KHACH HANG ---");
-            ex.printStackTrace();
+            LOG.error("Loi dem so luong khach hang (accountOwnerId={})", accountOwnerId, ex);
         }
         return 0;
     }
@@ -97,8 +99,7 @@ public class CustomerDAO {
                 return rs.getInt(1);
             }
         } catch (SQLException ex) {
-            System.err.println("--- LOI DEM KHACH HANG MOI TRONG THANG ---");
-            ex.printStackTrace();
+            LOG.error("Loi dem khach hang moi trong thang", ex);
         }
         return 0;
     }
@@ -115,8 +116,7 @@ public class CustomerDAO {
                 }
             }
         } catch (SQLException ex) {
-            System.err.println("--- LOI TRUY VAN CHI TIET KHACH HANG ---");
-            ex.printStackTrace();
+            LOG.error("Loi truy van chi tiet khach hang (enterpriseId={})", enterpriseId, ex);
         }
         return null;
     }
@@ -145,8 +145,7 @@ public class CustomerDAO {
                 }
             }
         } catch (SQLException ex) {
-            System.err.println("--- LOI TRUY VAN NGUOI LIEN HE ---");
-            ex.printStackTrace();
+            LOG.error("Loi truy van nguoi lien he (enterpriseId={})", enterpriseId, ex);
         }
         return result;
     }
@@ -159,8 +158,7 @@ public class CustomerDAO {
              ResultSet rs = ps.executeQuery()) {
             return nextEnterpriseCodeAfter(rs.next() ? rs.getString("enterprise_code") : null);
         } catch (SQLException ex) {
-            System.err.println("--- LOI SINH MA KHACH HANG ---");
-            ex.printStackTrace();
+            LOG.error("Loi sinh ma khach hang", ex);
             return null;
         }
     }
@@ -263,8 +261,7 @@ public class CustomerDAO {
                     conn.setAutoCommit(true);
                 }
             } catch (SQLException ex) {
-                System.err.println("--- LOI THEM KHACH HANG ---");
-                ex.printStackTrace();
+                LOG.error("Loi them khach hang (enterpriseCode={})", enterprise.getEnterpriseCode(), ex);
                 return -1;
             }
         }
@@ -321,8 +318,8 @@ public class CustomerDAO {
                 conn.setAutoCommit(true);
             }
         } catch (SQLException ex) {
-            System.err.println("--- LOI CAP NHAT KHACH HANG ---");
-            ex.printStackTrace();
+            LOG.error("Loi cap nhat khach hang (enterpriseId={}, enterpriseCode={})",
+                    enterprise.getEnterpriseId(), enterprise.getEnterpriseCode(), ex);
             return false;
         }
     }
@@ -336,8 +333,7 @@ public class CustomerDAO {
             ps.setInt(2, enterpriseId);
             return ps.executeUpdate() > 0;
         } catch (SQLException ex) {
-            System.err.println("--- LOI CAP NHAT XEP HANG KHACH HANG ---");
-            ex.printStackTrace();
+            LOG.error("Loi cap nhat xep hang khach hang (enterpriseId={})", enterpriseId, ex);
             return false;
         }
     }
@@ -350,8 +346,7 @@ public class CustomerDAO {
             ps.setInt(1, enterpriseId);
             return ps.executeUpdate() > 0;
         } catch (SQLException ex) {
-            System.err.println("--- LOI XOA KHACH HANG ---");
-            ex.printStackTrace();
+            LOG.error("Loi xoa khach hang (enterpriseId={})", enterpriseId, ex);
             return false;
         }
     }
@@ -376,8 +371,7 @@ public class CustomerDAO {
                 return rs.next() && rs.getInt(1) > 0;
             }
         } catch (SQLException ex) {
-            System.err.println("--- LOI KIEM TRA HOP DONG CON HIEU LUC ---");
-            ex.printStackTrace();
+            LOG.error("Loi kiem tra hop dong con hieu luc (enterpriseId={})", enterpriseId, ex);
             return true; // an toàn: nếu không kiểm tra được thì coi như có, chặn xoá
         }
     }

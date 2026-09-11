@@ -9,6 +9,8 @@ import java.sql.Types;
 import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.List;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import poscs.model.Address;
 import poscs.model.Department;
 import poscs.model.District;
@@ -17,6 +19,8 @@ import poscs.model.Role;
 import poscs.model.User;
 
 public class EmployeeDAO {
+
+    private static final Logger LOG = LoggerFactory.getLogger(EmployeeDAO.class);
 
     /**
      * Tra cứu 1 nhân viên theo username HOẶC email, kèm role -- dùng cho
@@ -61,8 +65,7 @@ public class EmployeeDAO {
                 // hợp lệ, không phải lỗi hệ thống).
             }
         } catch (SQLException ex) {
-            System.err.println("--- LOI TRUY VAN DANG NHAP ---");
-            ex.printStackTrace();
+            LOG.error("Loi truy van dang nhap (identifier={})", identifier, ex);
         }
         return null;
     }
@@ -133,8 +136,7 @@ public class EmployeeDAO {
                 }
             }
         } catch (SQLException ex) {
-            System.err.println("--- LOI TRUY VAN HO SO CA NHAN ---");
-            ex.printStackTrace();
+            LOG.error("Loi truy van ho so ca nhan (userId={})", userId, ex);
         }
         return null;
     }
@@ -191,8 +193,7 @@ public class EmployeeDAO {
                 conn.setAutoCommit(true);
             }
         } catch (SQLException ex) {
-            System.err.println("--- LOI CAP NHAT HO SO CA NHAN ---");
-            ex.printStackTrace();
+            LOG.error("Loi cap nhat ho so ca nhan (userId={}, username={})", user.getUserId(), user.getUsername(), ex);
             return false;
         }
     }
@@ -242,8 +243,7 @@ public class EmployeeDAO {
             // executeUpdate() trả về số hàng bị ảnh hưởng; ==1 nghĩa là cập nhật đúng 1 user.
             return ps.executeUpdate() == 1;
         } catch (SQLException ex) {
-            System.err.println("--- LOI CAP NHAT MAT KHAU ---");
-            ex.printStackTrace();
+            LOG.error("Loi cap nhat mat khau (email={})", email, ex);
             return false;
         }
     }
@@ -272,8 +272,7 @@ public class EmployeeDAO {
                 result.add(u);
             }
         } catch (SQLException ex) {
-            System.err.println("--- LOI TRUY VAN DANH SACH NHAN VIEN ---");
-            ex.printStackTrace();
+            LOG.error("Loi truy van danh sach nhan vien", ex);
         }
         return result;
     }
@@ -293,8 +292,7 @@ public class EmployeeDAO {
                 result.add(new Role(rs.getInt("role_id"), rs.getString("role_name")));
             }
         } catch (SQLException ex) {
-            System.err.println("--- LOI TRUY VAN DANH SACH VAI TRO ---");
-            ex.printStackTrace();
+            LOG.error("Loi truy van danh sach vai tro", ex);
         }
         return result;
     }
@@ -310,8 +308,7 @@ public class EmployeeDAO {
                 result.add(new Department(rs.getInt("department_id"), rs.getString("department_name")));
             }
         } catch (SQLException ex) {
-            System.err.println("--- LOI TRUY VAN DANH SACH PHONG BAN ---");
-            ex.printStackTrace();
+            LOG.error("Loi truy van danh sach phong ban", ex);
         }
         return result;
     }
@@ -344,8 +341,7 @@ public class EmployeeDAO {
                 }
             }
         } catch (SQLException ex) {
-            System.err.println("--- LOI TRUY VAN DANH SACH NHAN VIEN (PHAN TRANG) ---");
-            ex.printStackTrace();
+            LOG.error("Loi truy van danh sach nhan vien (phan trang)", ex);
         }
         return result;
     }
@@ -361,8 +357,7 @@ public class EmployeeDAO {
                 return rs.next() ? rs.getInt(1) : 0;
             }
         } catch (SQLException ex) {
-            System.err.println("--- LOI DEM DANH SACH NHAN VIEN ---");
-            ex.printStackTrace();
+            LOG.error("Loi dem danh sach nhan vien", ex);
             return 0;
         }
     }
@@ -434,8 +429,7 @@ public class EmployeeDAO {
                 }
             }
         } catch (SQLException ex) {
-            System.err.println("--- LOI TRUY VAN CHI TIET NHAN VIEN ---");
-            ex.printStackTrace();
+            LOG.error("Loi truy van chi tiet nhan vien (userId={})", userId, ex);
         }
         return null;
     }
@@ -490,8 +484,7 @@ public class EmployeeDAO {
                 return rs.next();
             }
         } catch (SQLException ex) {
-            System.err.println("--- LOI KIEM TRA TRUNG LAP (" + column + ") ---");
-            ex.printStackTrace();
+            LOG.error("Loi kiem tra trung lap (column={}, excludeUserId={})", column, excludeUserId, ex);
             return true; // an toàn: coi như đã trùng để chặn insert/update lỗi thay vì để lọt xuống DB
         }
     }
@@ -529,8 +522,7 @@ public class EmployeeDAO {
                 return rs.next();
             }
         } catch (SQLException ex) {
-            System.err.println("--- LOI KIEM TRA TRUNG USERNAME ---");
-            ex.printStackTrace();
+            LOG.error("Loi kiem tra trung username (username={})", username, ex);
             return true;
         }
     }
@@ -597,8 +589,7 @@ public class EmployeeDAO {
                 conn.setAutoCommit(true);
             }
         } catch (SQLException ex) {
-            System.err.println("--- LOI TAO NHAN VIEN MOI ---");
-            ex.printStackTrace();
+            LOG.error("Loi tao nhan vien moi (username={})", user.getUsername(), ex);
             return -1;
         }
     }
@@ -651,8 +642,7 @@ public class EmployeeDAO {
                 conn.setAutoCommit(true);
             }
         } catch (SQLException ex) {
-            System.err.println("--- LOI CAP NHAT NHAN VIEN ---");
-            ex.printStackTrace();
+            LOG.error("Loi cap nhat nhan vien (userId={}, username={})", user.getUserId(), user.getUsername(), ex);
             return false;
         }
     }
@@ -671,8 +661,7 @@ public class EmployeeDAO {
             ps.setInt(2, userId);
             return ps.executeUpdate() > 0;
         } catch (SQLException ex) {
-            System.err.println("--- LOI CAP NHAT MAT KHAU TAM ---");
-            ex.printStackTrace();
+            LOG.error("Loi cap nhat mat khau tam (userId={})", userId, ex);
             return false;
         }
     }
@@ -686,8 +675,7 @@ public class EmployeeDAO {
             ps.setInt(2, userId);
             return ps.executeUpdate() > 0;
         } catch (SQLException ex) {
-            System.err.println("--- LOI KHOA/MO KHOA NHAN VIEN ---");
-            ex.printStackTrace();
+            LOG.error("Loi khoa/mo khoa nhan vien (userId={})", userId, ex);
             return false;
         }
     }

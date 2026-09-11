@@ -15,8 +15,11 @@ import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.Part;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import poscs.common.AccessControl;
 import poscs.common.FileStorage;
+import poscs.common.Logs;
 import poscs.dao.ProductDAO;
 import poscs.model.Product;
 import poscs.model.ProductCategory;
@@ -38,6 +41,8 @@ import poscs.model.ProductCategory;
 @WebServlet(name = "ProductController", urlPatterns = {"/product"})
 @MultipartConfig(maxFileSize = 20 * 1024 * 1024, maxRequestSize = 100 * 1024 * 1024, fileSizeThreshold = 1024 * 1024)
 public class ProductController extends HttpServlet {
+
+    private static final Logger LOG = LoggerFactory.getLogger(ProductController.class);
 
     private static final int PAGE_SIZE = 10;
     private static final String LIST_VIEW = "/jsp/technical/listProduct.jsp";
@@ -293,6 +298,7 @@ public class ProductController extends HttpServlet {
         p.setProductCode(productDAO.generateNextProductCode());
         int newId = productDAO.insert(p);
         if (newId <= 0) {
+            LOG.warn("Tao san pham that bai (actor={}, productCode={})", Logs.actor(request), p.getProductCode());
             response.sendRedirect(request.getContextPath() + "/product?action=new&error=create_failed");
             return;
         }
@@ -335,6 +341,7 @@ public class ProductController extends HttpServlet {
 
         boolean ok = productDAO.update(p);
         if (!ok) {
+            LOG.warn("Cap nhat san pham that bai (actor={}, productId={})", Logs.actor(request), id);
             response.sendRedirect(request.getContextPath() + "/product?action=edit&id=" + id + "&error=update_failed");
             return;
         }

@@ -19,8 +19,11 @@ import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.PDPageContentStream;
 import org.apache.pdfbox.pdmodel.common.PDRectangle;
 import org.apache.pdfbox.pdmodel.font.PDFont;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import poscs.common.AccessControl;
 import poscs.common.ExcelUtil;
+import poscs.common.Logs;
 import poscs.common.PdfUtil;
 import poscs.dao.ContractDAO;
 import poscs.dao.CustomerDAO;
@@ -45,6 +48,8 @@ import poscs.model.User;
  */
 @WebServlet(name = "TechnicalSupportTicketController", urlPatterns = {"/ticket"})
 public class TechnicalSupportTicketController extends HttpServlet {
+
+    private static final Logger LOG = LoggerFactory.getLogger(TechnicalSupportTicketController.class);
 
     private static final int PAGE_SIZE = 10;
     private static final String LIST_VIEW = "/jsp/customersupport/listTicket.jsp";
@@ -421,6 +426,7 @@ public class TechnicalSupportTicketController extends HttpServlet {
 
         int newId = ticketDAO.insert(t);
         if (newId <= 0) {
+            LOG.warn("Tao phieu ho tro that bai (actor={}, ticketCode={})", Logs.actor(request), t.getTicketCode());
             response.sendRedirect(request.getContextPath() + "/ticket?action=new&error=create_failed");
             return;
         }
@@ -512,6 +518,7 @@ public class TechnicalSupportTicketController extends HttpServlet {
 
         boolean ok = ticketDAO.update(t);
         if (!ok) {
+            LOG.warn("Cap nhat phieu ho tro that bai (actor={}, ticketId={})", Logs.actor(request), id);
             response.sendRedirect(request.getContextPath() + "/ticket?action=edit&id=" + id + "&error=update_failed");
             return;
         }

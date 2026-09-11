@@ -9,6 +9,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import poscs.model.Contract;
 import poscs.model.Enterprise;
 import poscs.model.Product;
@@ -25,6 +27,8 @@ import poscs.model.ProductImage;
  * productcategories.
  */
 public class ProductDAO {
+
+    private static final Logger LOG = LoggerFactory.getLogger(ProductDAO.class);
 
     private static final String SELECT_BASE =
         "SELECT p.product_id, p.product_code, p.product_name, p.description, " +
@@ -55,8 +59,7 @@ public class ProductDAO {
                 }
             }
         } catch (SQLException ex) {
-            System.err.println("--- LOI TRUY VAN DANH SACH SAN PHAM ---");
-            ex.printStackTrace();
+            LOG.error("Loi truy van danh sach san pham (categoryId={})", categoryId, ex);
         }
         // Danh sách chỉ cần 1 ảnh đại diện/sản phẩm (không cần load hết ảnh +
         // catalogue như trang chi tiết) -- PAGE_SIZE nhỏ (10) nên N truy vấn
@@ -90,8 +93,7 @@ public class ProductDAO {
                 }
             }
         } catch (SQLException ex) {
-            System.err.println("--- LOI DEM SO LUONG SAN PHAM ---");
-            ex.printStackTrace();
+            LOG.error("Loi dem so luong san pham (categoryId={})", categoryId, ex);
         }
         return 0;
     }
@@ -112,8 +114,7 @@ public class ProductDAO {
                 }
             }
         } catch (SQLException ex) {
-            System.err.println("--- LOI TRA SAN PHAM THEO MA ---");
-            ex.printStackTrace();
+            LOG.error("Loi tra san pham theo ma (productCode={})", productCode, ex);
         }
         return null;
     }
@@ -136,8 +137,7 @@ public class ProductDAO {
                 }
             }
         } catch (SQLException ex) {
-            System.err.println("--- LOI TRUY VAN CHI TIET SAN PHAM ---");
-            ex.printStackTrace();
+            LOG.error("Loi truy van chi tiet san pham (productId={})", productId, ex);
         }
         return null;
     }
@@ -154,8 +154,7 @@ public class ProductDAO {
                 result.add(mapCategoryRow(rs));
             }
         } catch (SQLException ex) {
-            System.err.println("--- LOI TRUY VAN DANH MUC SAN PHAM ---");
-            ex.printStackTrace();
+            LOG.error("Loi truy van danh muc san pham", ex);
         }
         return result;
     }
@@ -175,8 +174,7 @@ public class ProductDAO {
                 result.put(rs.getInt("category_id"), rs.getInt("cnt"));
             }
         } catch (SQLException ex) {
-            System.err.println("--- LOI DEM SAN PHAM THEO DANH MUC ---");
-            ex.printStackTrace();
+            LOG.error("Loi dem san pham theo danh muc", ex);
         }
         return result;
     }
@@ -224,8 +222,7 @@ public class ProductDAO {
                 }
             }
         } catch (SQLException ex) {
-            System.err.println("--- LOI TRUY VAN HOP DONG THEO SAN PHAM ---");
-            ex.printStackTrace();
+            LOG.error("Loi truy van hop dong theo san pham (productId={})", productId, ex);
         }
         return result;
     }
@@ -254,8 +251,7 @@ public class ProductDAO {
                 }
             }
         } catch (SQLException ex) {
-            System.err.println("--- LOI TRUY VAN ANH SAN PHAM ---");
-            ex.printStackTrace();
+            LOG.error("Loi truy van anh san pham (productId={})", productId, ex);
         }
         return result;
     }
@@ -271,8 +267,7 @@ public class ProductDAO {
                 return rs.next() ? rs.getString("image_url") : null;
             }
         } catch (SQLException ex) {
-            System.err.println("--- LOI TRUY VAN ANH DAI DIEN SAN PHAM ---");
-            ex.printStackTrace();
+            LOG.error("Loi truy van anh dai dien san pham (productId={})", productId, ex);
             return null;
         }
     }
@@ -293,8 +288,7 @@ public class ProductDAO {
                 return keys.next() ? keys.getInt(1) : -1;
             }
         } catch (SQLException ex) {
-            System.err.println("--- LOI THEM ANH SAN PHAM ---");
-            ex.printStackTrace();
+            LOG.error("Loi them anh san pham (productId={})", productId, ex);
             return -1;
         }
     }
@@ -311,8 +305,7 @@ public class ProductDAO {
             ps.setInt(2, productId);
             return ps.executeUpdate() > 0;
         } catch (SQLException ex) {
-            System.err.println("--- LOI XOA ANH SAN PHAM ---");
-            ex.printStackTrace();
+            LOG.error("Loi xoa anh san pham (imageId={}, productId={})", imageId, productId, ex);
             return false;
         }
     }
@@ -342,8 +335,7 @@ public class ProductDAO {
                 }
             }
         } catch (SQLException ex) {
-            System.err.println("--- LOI TRUY VAN CATALOGUE SAN PHAM ---");
-            ex.printStackTrace();
+            LOG.error("Loi truy van catalogue san pham (productId={})", productId, ex);
         }
         return result;
     }
@@ -365,8 +357,7 @@ public class ProductDAO {
                 return keys.next() ? keys.getInt(1) : -1;
             }
         } catch (SQLException ex) {
-            System.err.println("--- LOI THEM CATALOGUE SAN PHAM ---");
-            ex.printStackTrace();
+            LOG.error("Loi them catalogue san pham (productId={})", productId, ex);
             return -1;
         }
     }
@@ -383,8 +374,7 @@ public class ProductDAO {
             ps.setInt(2, productId);
             return ps.executeUpdate() > 0;
         } catch (SQLException ex) {
-            System.err.println("--- LOI XOA CATALOGUE SAN PHAM ---");
-            ex.printStackTrace();
+            LOG.error("Loi xoa catalogue san pham (catalogueId={}, productId={})", catalogueId, productId, ex);
             return false;
         }
     }
@@ -401,8 +391,7 @@ public class ProductDAO {
              ResultSet rs = ps.executeQuery()) {
             return nextProductCodeAfter(rs.next() ? rs.getString("product_code") : null);
         } catch (SQLException ex) {
-            System.err.println("--- LOI SINH MA SAN PHAM ---");
-            ex.printStackTrace();
+            LOG.error("Loi sinh ma san pham", ex);
             return null;
         }
     }
@@ -459,8 +448,7 @@ public class ProductDAO {
                     product.setProductCode(generateNextProductCode());
                     continue;
                 }
-                System.err.println("--- LOI THEM SAN PHAM ---");
-                ex.printStackTrace();
+                LOG.error("Loi them san pham (productCode={})", product.getProductCode(), ex);
                 return -1;
             }
         }
@@ -480,8 +468,8 @@ public class ProductDAO {
             ps.setInt(4, product.getProductId());
             return ps.executeUpdate() > 0;
         } catch (SQLException ex) {
-            System.err.println("--- LOI CAP NHAT SAN PHAM ---");
-            ex.printStackTrace();
+            LOG.error("Loi cap nhat san pham (productId={}, productCode={})",
+                    product.getProductId(), product.getProductCode(), ex);
             return false;
         }
     }
@@ -498,8 +486,7 @@ public class ProductDAO {
                 return rs.next() && rs.getInt(1) > 0;
             }
         } catch (SQLException ex) {
-            System.err.println("--- LOI KIEM TRA SAN PHAM DANG DUOC SU DUNG ---");
-            ex.printStackTrace();
+            LOG.error("Loi kiem tra san pham dang duoc su dung (productId={})", productId, ex);
             return true; // an toàn: nếu không kiểm tra được thì coi như có, chặn xoá
         }
     }
@@ -512,8 +499,7 @@ public class ProductDAO {
             ps.setInt(1, productId);
             return ps.executeUpdate() > 0;
         } catch (SQLException ex) {
-            System.err.println("--- LOI XOA SAN PHAM ---");
-            ex.printStackTrace();
+            LOG.error("Loi xoa san pham (productId={})", productId, ex);
             return false;
         }
     }
