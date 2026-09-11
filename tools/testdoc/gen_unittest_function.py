@@ -147,14 +147,16 @@ ABNORMAL_WORDS = (
 )
 
 FONT_NAME = "Times New Roman"
+FONT_SIZE = 13
+TITLE_SIZE = 16
 
 THIN = Side(style="thin", color="FF999999")
 BOX = Border(left=THIN, right=THIN, top=THIN, bottom=THIN)
 HDR_FILL = PatternFill("solid", fgColor="FFD9E1F2")
 LBL_FILL = PatternFill("solid", fgColor="FFF2F2F2")
-TITLE_FONT = Font(name=FONT_NAME, bold=True, size=14)
-BOLD = Font(name=FONT_NAME, bold=True)
-BASE = Font(name=FONT_NAME)
+TITLE_FONT = Font(name=FONT_NAME, bold=True, size=TITLE_SIZE)
+BOLD = Font(name=FONT_NAME, bold=True, size=FONT_SIZE)
+BASE = Font(name=FONT_NAME, size=FONT_SIZE)
 WRAP = Alignment(wrap_text=True, vertical="top")
 CENTER = Alignment(horizontal="center", vertical="center")
 
@@ -390,21 +392,20 @@ def put(ws, row, col, value, font=None, fill=None, align=None, border=True):
 
 def build_guideline(wb):
     ws = wb.create_sheet("Hướng dẫn")
-    ws.column_dimensions["A"].width = 130
+    ws.column_dimensions["A"].width = 118
     lines = GUIDELINE.read_text(encoding="utf-8").split("\x1e")
     for i, line in enumerate(lines, start=1):
         cell = ws.cell(row=i, column=1, value=line)
         cell.alignment = Alignment(wrap_text=True, vertical="top")
-        if i == 1:
-            cell.font = TITLE_FONT
+        cell.font = TITLE_FONT if i == 1 else BASE
         if "\n" in line:
-            ws.row_dimensions[i].height = 15 * (line.count("\n") + 1)
+            ws.row_dimensions[i].height = (FONT_SIZE + 5) * (line.count("\n") + 1)
     return ws
 
 
 def build_cover(wb):
     ws = wb.create_sheet("Trang bìa")
-    for col, width in zip("ABCDEF", (22, 40, 14, 14, 18, 26)):
+    for col, width in zip("ABCDEF", (25, 45, 16, 16, 20, 29)):
         ws.column_dimensions[col].width = width
     ws.merge_cells("B2:E2")
     put(ws, 2, 2, "TÀI LIỆU UNIT TEST", font=TITLE_FONT, align=CENTER, border=False)
@@ -434,7 +435,7 @@ def build_cover(wb):
 
 def build_method_list(wb, groups, names):
     ws = wb.create_sheet("Danh sách hàm")
-    for col, width in zip("ABCDEF", (6, 30, 30, 34, 52, 30)):
+    for col, width in zip("ABCDEF", (7, 34, 34, 38, 58, 34)):
         ws.column_dimensions[col].width = width
     put(ws, 2, 3, "DANH SÁCH HÀM ĐƯỢC KIỂM THỬ", font=TITLE_FONT, border=False)
     info = [("Tên dự án", PROJECT_NAME),
@@ -459,7 +460,8 @@ def build_method_list(wb, groups, names):
         put(ws, row, 2, prod_class)
         cell = put(ws, row, 3, method)
         cell.hyperlink = "#'%s'!A1" % name
-        cell.font = Font(name=FONT_NAME, color="FF0563C1", underline="single")
+        cell.font = Font(name=FONT_NAME, size=FONT_SIZE, color="FF0563C1",
+                         underline="single")
         put(ws, row, 4, name)
         put(ws, row, 5, "%d test case, nguồn: %s.java"
             % (len(cases), cases[0]["test_class"]), align=WRAP)
@@ -470,7 +472,7 @@ def build_method_list(wb, groups, names):
 
 def build_statistics(wb, groups, names):
     ws = wb.create_sheet("Thống kê")
-    for col, width in zip("ABCDEFGHI", (6, 42, 10, 10, 12, 8, 8, 8, 16)):
+    for col, width in zip("ABCDEFGHI", (7, 47, 11, 11, 13, 9, 9, 9, 18)):
         ws.column_dimensions[col].width = width
     put(ws, 2, 1, "BÁO CÁO KẾT QUẢ UNIT TEST", font=TITLE_FONT, border=False)
     info = [("Tên dự án", PROJECT_NAME, "Người lập", CREATOR),
@@ -517,12 +519,12 @@ def build_statistics(wb, groups, names):
 def build_case_sheet(wb, key, cases, name):
     prod_class, method = key
     ws = wb.create_sheet(name)
-    ws.column_dimensions["A"].width = 11
-    ws.column_dimensions["B"].width = 22
+    ws.column_dimensions["A"].width = 13
+    ws.column_dimensions["B"].width = 25
     ws.column_dimensions["C"].width = 3
-    ws.column_dimensions["D"].width = 62
+    ws.column_dimensions["D"].width = 68
     for i in range(len(cases)):
-        ws.column_dimensions[get_column_letter(5 + i)].width = 10
+        ws.column_dimensions[get_column_letter(5 + i)].width = 11
 
     last = 4 + len(cases)
     counts = collections.Counter(c["status"] for c in cases)
@@ -635,13 +637,14 @@ def parse_out_path(argv):
 def apply_font(wb):
     """Ép toàn bộ workbook về một font, giữ nguyên cỡ chữ và kiểu đậm/nghiêng."""
     normal = wb._named_styles["Normal"]
-    normal.font = Font(name=FONT_NAME, size=normal.font.size or 11)
+    normal.font = Font(name=FONT_NAME, size=FONT_SIZE)
     for ws in wb.worksheets:
         for row in ws.iter_rows():
             for cell in row:
                 old = cell.font
                 if old.name != FONT_NAME:
-                    cell.font = Font(name=FONT_NAME, size=old.size,
+                    cell.font = Font(name=FONT_NAME,
+                                     size=old.size or FONT_SIZE,
                                      bold=old.bold, italic=old.italic,
                                      underline=old.underline, color=old.color)
 
