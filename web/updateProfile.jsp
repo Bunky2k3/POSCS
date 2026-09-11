@@ -177,6 +177,8 @@
                             <c:when test="${param.error == 'missing_address'}">Vui lòng chọn Tỉnh/Thành phố và Xã/Phường.</c:when>
                             <c:when test="${param.error == 'invalid_characters'}">Họ tên và địa chỉ không được chứa ký tự &lt; &gt; ". Vui lòng nhập lại.</c:when>
                             <c:when test="${param.error == 'invalid_image_type'}">Ảnh đại diện chỉ nhận file JPG, PNG, GIF hoặc WEBP. Vui lòng chọn lại.</c:when>
+                            <c:when test="${param.error == 'duplicate_phone'}">Số điện thoại này đã được dùng cho một nhân viên khác. Vui lòng kiểm tra lại.</c:when>
+                            <c:when test="${param.error == 'duplicate_citizen'}">Số CCCD/CMND này đã được dùng cho một nhân viên khác. Vui lòng kiểm tra lại.</c:when>
                             <c:when test="${param.error == 'update_failed'}">Không lưu được thay đổi. Vui lòng thử lại.</c:when>
                             <c:otherwise>Đã có lỗi xảy ra. Vui lòng thử lại.</c:otherwise>
                         </c:choose>

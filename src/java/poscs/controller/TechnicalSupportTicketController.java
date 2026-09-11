@@ -3,6 +3,8 @@ package poscs.controller;
 import java.io.IOException;
 import java.sql.Date;
 import java.sql.Timestamp;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.List;
 import jakarta.servlet.ServletException;
@@ -292,6 +294,22 @@ public class TechnicalSupportTicketController extends HttpServlet {
         return date == null ? "—" : new SimpleDateFormat("dd/MM/yyyy").format(date);
     }
 
+    /**
+     * Đọc giá trị của &lt;input type="datetime-local"&gt; ("yyyy-MM-ddTHH:mm")
+     * thành Timestamp. Trả null khi để trống hoặc sai định dạng -- hạn SLA
+     * không bắt buộc, và handleUpdate sẽ giữ lại giá trị cũ khi nhận null.
+     */
+    private Timestamp parseDateTimeOrNull(String value) {
+        if (value == null || value.trim().isEmpty()) {
+            return null;
+        }
+        try {
+            return Timestamp.valueOf(LocalDateTime.parse(value.trim()));
+        } catch (DateTimeParseException ex) {
+            return null;
+        }
+    }
+
     private String formatDateTime(Timestamp ts) {
         return ts == null ? "—" : new SimpleDateFormat("dd/MM/yyyy HH:mm").format(ts);
     }
@@ -376,6 +394,16 @@ public class TechnicalSupportTicketController extends HttpServlet {
         if (t.getContractId() == null) {
             t.setContractId(existing.getContractId());
         }
+        // Hạn SLA không có ô nhập trên form sửa, nên buildTicketFromRequest
+        // không bao giờ set nó. Không giữ lại từ bản cũ ở đây thì mỗi lần
+        // Admin/CSKH bấm lưu (dù chỉ đổi trạng thái) là ghi đè sla_deadline
+        // thành NULL -- phiếu lập tức biến mất khỏi ô "sắp/đã quá hạn" trên
+        // dashboard VÀ khỏi lịch nhắc SLA của NotificationScheduler, vì cả
+        // hai đều lọc "sla_deadline IS NOT NULL". Mất dữ liệu âm thầm, không
+        // báo lỗi ở đâu cả.
+        if (t.getSlaDeadline() == null) {
+            t.setSlaDeadline(existing.getSlaDeadline());
+        }
         // Chụp lại status/resolvedAt GỐC trước khi set field mới -- ở nhánh
         // không Full access, t chính LÀ existing (cùng reference), nên nếu đọc
         // existing.getStatus() sau khi đã t.setStatus() thì sẽ đọc lại đúng giá
@@ -454,6 +482,7 @@ public class TechnicalSupportTicketController extends HttpServlet {
         }
         t.setDescription(emptyToNull(request.getParameter("description")));
         t.setWarranty("on".equals(request.getParameter("isWarranty")));
+        t.setSlaDeadline(parseDateTimeOrNull(request.getParameter("slaDeadline")));
         return t;
     }
 

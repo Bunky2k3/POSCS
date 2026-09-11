@@ -1,6 +1,7 @@
 <%@page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
 <%@taglib prefix="c" uri="jakarta.tags.core"%>
 <%@taglib prefix="fn" uri="jakarta.tags.functions"%>
+<%@taglib prefix="fmt" uri="jakarta.tags.fmt"%>
 <%--
     Request attribute do TechnicalSupportTicketController#showEditForm
     thiết lập trước khi forward tới trang này:
@@ -156,6 +157,15 @@
                             <option value="Website" ${ticket.receptionChannel == 'Website' ? 'selected' : ''}>Website</option>
                         </select>
                         <span class="error-text" id="err-receptionChannel">Vui lòng chọn kênh tiếp nhận.</span>
+                    </div>
+
+                    <%-- Hạn xử lý SLA: dashboard ("phiếu sắp/đã quá hạn") và lịch nhắc
+                         của NotificationScheduler đều dựa vào cột này. Trước đây không
+                         có ô nhập nên phiếu tạo từ hệ thống luôn có sla_deadline NULL,
+                         hai chức năng đó coi như không chạy. Không bắt buộc. --%>
+                    <div class="col-md-6 field-row">
+                        <label>Hạn xử lý (SLA)</label>
+                        <input type="datetime-local" class="form-control" id="slaDeadline" name="slaDeadline" value="<fmt:formatDate value="${ticket.slaDeadline}" pattern="yyyy-MM-dd'T'HH:mm"/>">
                     </div>
 
                     <div class="col-md-6 field-row">

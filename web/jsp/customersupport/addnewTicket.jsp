@@ -157,6 +157,15 @@
                         <span class="error-text" id="err-receptionChannel">Vui lòng chọn kênh tiếp nhận.</span>
                     </div>
 
+                    <%-- Hạn xử lý SLA: dashboard ("phiếu sắp/đã quá hạn") và lịch nhắc
+                         của NotificationScheduler đều dựa vào cột này. Trước đây không
+                         có ô nhập nên phiếu tạo từ hệ thống luôn có sla_deadline NULL,
+                         hai chức năng đó coi như không chạy. Không bắt buộc. --%>
+                    <div class="col-md-6 field-row">
+                        <label>Hạn xử lý (SLA)</label>
+                        <input type="datetime-local" class="form-control" id="slaDeadline" name="slaDeadline">
+                    </div>
+
                     <div class="col-md-6 field-row">
                         <label>Kỹ thuật viên phụ trách <span class="req">*</span></label>
                         <select class="form-select" id="technician" name="assignedTechnicianId">
