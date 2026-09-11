@@ -146,12 +146,15 @@ ABNORMAL_WORDS = (
     "without", "not", "no",
 )
 
+FONT_NAME = "Times New Roman"
+
 THIN = Side(style="thin", color="FF999999")
 BOX = Border(left=THIN, right=THIN, top=THIN, bottom=THIN)
 HDR_FILL = PatternFill("solid", fgColor="FFD9E1F2")
 LBL_FILL = PatternFill("solid", fgColor="FFF2F2F2")
-TITLE_FONT = Font(bold=True, size=14)
-BOLD = Font(bold=True)
+TITLE_FONT = Font(name=FONT_NAME, bold=True, size=14)
+BOLD = Font(name=FONT_NAME, bold=True)
+BASE = Font(name=FONT_NAME)
 WRAP = Alignment(wrap_text=True, vertical="top")
 CENTER = Alignment(horizontal="center", vertical="center")
 
@@ -375,8 +378,7 @@ def sheet_names(groups):
 
 def put(ws, row, col, value, font=None, fill=None, align=None, border=True):
     cell = ws.cell(row=row, column=col, value=value)
-    if font:
-        cell.font = font
+    cell.font = font or BASE
     if fill:
         cell.fill = fill
     if align:
@@ -457,7 +459,7 @@ def build_method_list(wb, groups, names):
         put(ws, row, 2, prod_class)
         cell = put(ws, row, 3, method)
         cell.hyperlink = "#'%s'!A1" % name
-        cell.font = Font(color="FF0563C1", underline="single")
+        cell.font = Font(name=FONT_NAME, color="FF0563C1", underline="single")
         put(ws, row, 4, name)
         put(ws, row, 5, "%d test case, nguồn: %s.java"
             % (len(cases), cases[0]["test_class"]), align=WRAP)
@@ -630,6 +632,20 @@ def parse_out_path(argv):
     return DEFAULT_OUT
 
 
+def apply_font(wb):
+    """Ép toàn bộ workbook về một font, giữ nguyên cỡ chữ và kiểu đậm/nghiêng."""
+    normal = wb._named_styles["Normal"]
+    normal.font = Font(name=FONT_NAME, size=normal.font.size or 11)
+    for ws in wb.worksheets:
+        for row in ws.iter_rows():
+            for cell in row:
+                old = cell.font
+                if old.name != FONT_NAME:
+                    cell.font = Font(name=FONT_NAME, size=old.size,
+                                     bold=old.bold, italic=old.italic,
+                                     underline=old.underline, color=old.color)
+
+
 def main(argv=()):
     out = parse_out_path(list(argv))
     groups, unknown = collect()
@@ -642,6 +658,7 @@ def main(argv=()):
     build_statistics(wb, groups, names)
     for key, cases in groups.items():
         build_case_sheet(wb, key, cases, names[key])
+    apply_font(wb)
     out.parent.mkdir(parents=True, exist_ok=True)
     wb.save(out)
 
