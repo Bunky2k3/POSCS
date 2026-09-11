@@ -719,7 +719,9 @@ public class ContractController extends HttpServlet {
             return;
         }
         Integer id = parseIntOrNull(request.getParameter("contractId"));
-        if (id == null) {
+        // Kiểm tồn tại trước khi kiểm dữ liệu: sửa một id không có thật mà báo
+        // "dữ liệu chưa hợp lệ" thì người dùng đi sửa form mãi không xong.
+        if (id == null || contractDAO.findById(id) == null) {
             response.sendRedirect(request.getContextPath() + "/contract?error=notfound");
             return;
         }
@@ -749,8 +751,11 @@ public class ContractController extends HttpServlet {
             return;
         }
         Integer id = parseIntOrNull(request.getParameter("id"));
-        if (id == null) {
-            response.sendRedirect(request.getContextPath() + "/contract");
+        // Kiểm tồn tại trước canDelete: với id không có thật thì canDelete cũng
+        // trả false, và người dùng nhận thông báo "không thể xoá" -- sai hẳn lý
+        // do, tưởng là vướng ràng buộc nghiệp vụ.
+        if (id == null || contractDAO.findById(id) == null) {
+            response.sendRedirect(request.getContextPath() + "/contract?error=notfound");
             return;
         }
 

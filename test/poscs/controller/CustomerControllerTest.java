@@ -146,6 +146,7 @@ public class CustomerControllerTest {
     public void delete_customerHasActiveContracts_blocksDeletion() throws Exception {
         when(request.getParameter("action")).thenReturn("delete");
         when(request.getParameter("id")).thenReturn("7");
+        when(customerDAO.findById(7)).thenReturn(new Enterprise());
         when(customerDAO.hasActiveContracts(7)).thenReturn(true);
 
         controller.doPost(request, response);
@@ -158,6 +159,7 @@ public class CustomerControllerTest {
     public void delete_customerHasNoActiveContracts_softDeletesAndRedirectsToList() throws Exception {
         when(request.getParameter("action")).thenReturn("delete");
         when(request.getParameter("id")).thenReturn("7");
+        when(customerDAO.findById(7)).thenReturn(new Enterprise());
         when(customerDAO.hasActiveContracts(7)).thenReturn(false);
 
         controller.doPost(request, response);
@@ -327,4 +329,24 @@ public class CustomerControllerTest {
         verify(dispatcher).forward(request, response);
         verify(response, never()).sendError(eq(HttpServletResponse.SC_FORBIDDEN), anyString());
     }
+
+    /**
+     * Xoá một id không có thật phải báo không tìm thấy. Trước đây hàm chỉ kiểm
+     * id có phải số hay không rồi gọi thẳng softDelete: UPDATE không chạm dòng
+     * nào, người dùng bị đẩy về danh sách không kèm thông báo gì và tưởng đã
+     * xoá xong.
+     */
+    @Test
+    public void delete_customerNotFound_redirectsWithNotFoundAndNeverSoftDeletes() throws Exception {
+        when(request.getParameter("action")).thenReturn("delete");
+        when(request.getParameter("id")).thenReturn("999999");
+        when(customerDAO.findById(999999)).thenReturn(null);
+
+        controller.doPost(request, response);
+
+        verify(customerDAO, never()).hasActiveContracts(anyInt());
+        verify(customerDAO, never()).softDelete(anyInt());
+        verify(response).sendRedirect(CONTEXT_PATH + "/customer?error=notfound");
+    }
+
 }

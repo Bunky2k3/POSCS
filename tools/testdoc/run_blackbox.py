@@ -135,9 +135,15 @@ def test_login():
         loc = r.headers.get("Location") or ""
         return loc.split("error=")[-1].split("&")[0]
 
+    # Không tách thành mã test case riêng: đây chính là phần "giống hệt trường hợp
+    # sai mật khẩu" trong kết quả mong đợi của TC_LOGIN_005, nên ghi đè kết quả
+    # của ca đó cho đầy đủ.
     e1, e2 = err_of("khongtontai2", "x"), err_of("admin", "SaiMatKhau2")
-    expect("TC_LOGIN_005b", e1 == e2,
-           "Lỗi khi sai tài khoản = lỗi khi sai mật khẩu: %r vs %r" % (e1, e2))
+    same = e1 == e2
+    prev = results["TC_LOGIN_005"]
+    record("TC_LOGIN_005", "Đạt" if prev["status"] == "Đạt" and same else "Trượt",
+           prev["actual"] + " | lỗi khi sai tài khoản = lỗi khi sai mật khẩu: %r vs %r"
+           % (e1, e2))
 
     record("TC_LOGIN_007", "N/A",
            "Bỏ qua trong lượt tự động: khoá IP 15 phút sẽ chặn các test case sau",
@@ -798,9 +804,16 @@ def test_systemlog(sessions):
     expect("TC_LOG_006", r.status_code == 200,
            "lines=999999999 -> HTTP %s" % r.status_code)
 
+    # Chọn file lạ thì ứng dụng chuyển hướng kèm error=notfound; đi theo redirect
+    # để xem trang đích có thật sự hiện thông báo hay không.
     r = s.get(BASE + "/systemLog?file=khongcothat.log", allow_redirects=False)
-    expect("TC_LOG_008", r.status_code == 200 and "Không tìm thấy file log" in utf8(r),
-           "file lạ -> HTTP %s, có thông báo không tìm thấy file log" % r.status_code)
+    loc = r.headers.get("Location") or ""
+    final = s.get(BASE + "/systemLog?error=notfound") if r.status_code == 302 else r
+    expect("TC_LOG_008",
+           r.status_code == 302 and "error=notfound" in loc
+           and "Không tìm thấy file log" in utf8(final),
+           "file lạ -> HTTP %s %s, trang đích có thông báo không tìm thấy file log"
+           % (r.status_code, loc))
 
     r = s.get(BASE + "/systemLog?file=../../conf/server.xml", allow_redirects=False)
     leaked = "<Server" in r.text or "Connector" in r.text

@@ -329,8 +329,11 @@ public class CustomerController extends HttpServlet {
             return;
         }
         Integer id = parseIntOrNull(request.getParameter("id"));
-        if (id == null) {
-            response.sendRedirect(request.getContextPath() + "/customer");
+        // Phải kiểm bản ghi có tồn tại TRƯỚC các ràng buộc nghiệp vụ: id rác chạy
+        // thẳng xuống softDelete thì UPDATE không chạm dòng nào và người dùng bị
+        // đẩy về danh sách không kèm thông báo gì, tưởng đã xoá xong.
+        if (id == null || customerDAO.findById(id) == null) {
+            response.sendRedirect(request.getContextPath() + "/customer?error=notfound");
             return;
         }
 

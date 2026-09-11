@@ -248,6 +248,7 @@ public class ContractControllerTest {
     public void update_validFields_updatesAndRedirectsToDetail() throws Exception {
         when(request.getParameter("action")).thenReturn("update");
         when(request.getParameter("contractId")).thenReturn("5");
+        when(contractDAO.findById(5)).thenReturn(new Contract());
         stubValidContractFields();
         when(contractDAO.update(any(Contract.class))).thenReturn(true);
 
@@ -265,6 +266,7 @@ public class ContractControllerTest {
     public void delete_contractNotDeletable_blocksDeletion() throws Exception {
         when(request.getParameter("action")).thenReturn("delete");
         when(request.getParameter("id")).thenReturn("5");
+        when(contractDAO.findById(5)).thenReturn(new Contract());
         when(contractDAO.canDelete(5)).thenReturn(false);
 
         controller.doPost(request, response);
@@ -277,6 +279,7 @@ public class ContractControllerTest {
     public void delete_contractDeletable_softDeletesAndRedirectsToList() throws Exception {
         when(request.getParameter("action")).thenReturn("delete");
         when(request.getParameter("id")).thenReturn("5");
+        when(contractDAO.findById(5)).thenReturn(new Contract());
         when(contractDAO.canDelete(5)).thenReturn(true);
 
         controller.doPost(request, response);
@@ -419,4 +422,36 @@ public class ContractControllerTest {
         verify(dispatcher).forward(request, response);
         verify(response, never()).sendError(eq(HttpServletResponse.SC_FORBIDDEN), anyString());
     }
+
+    /**
+     * Xoá id không có thật: canDelete cũng trả false cho id đó, nên nếu kiểm
+     * ràng buộc trước thì người dùng nhận thông báo "không thể xoá" -- sai hẳn
+     * lý do. Phải báo không tìm thấy.
+     */
+    @Test
+    public void delete_contractNotFound_redirectsWithNotFoundNotCannotDelete() throws Exception {
+        when(request.getParameter("action")).thenReturn("delete");
+        when(request.getParameter("id")).thenReturn("999999");
+        when(contractDAO.findById(999999)).thenReturn(null);
+
+        controller.doPost(request, response);
+
+        verify(contractDAO, never()).canDelete(anyInt());
+        verify(contractDAO, never()).softDelete(anyInt());
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?error=notfound");
+    }
+
+    /** Sửa id không có thật: báo không tìm thấy chứ không phải dữ liệu không hợp lệ. */
+    @Test
+    public void update_contractNotFound_redirectsWithNotFoundNotInvalid() throws Exception {
+        when(request.getParameter("action")).thenReturn("update");
+        when(request.getParameter("contractId")).thenReturn("999999");
+        when(contractDAO.findById(999999)).thenReturn(null);
+
+        controller.doPost(request, response);
+
+        verify(contractDAO, never()).update(any(Contract.class));
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?error=notfound");
+    }
+
 }

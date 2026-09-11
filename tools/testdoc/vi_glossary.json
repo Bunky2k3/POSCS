@@ -509,5 +509,11 @@
   "Wrong Code": "Sai mã OTP",
   "Wrong Csrf Token": "Sai token CSRF",
   "Wrong Old Password": "Sai mật khẩu cũ",
-  "Wrong Password": "Sai mật khẩu"
+  "Wrong Password": "Sai mật khẩu",
+  "No File Parameter": "Không truyền tham số file",
+  "Redirects With Not Found And Never Soft Deletes": "Chuyển hướng kèm lỗi không tìm thấy và không gọi xoá mềm",
+  "Redirects With Not Found Instead Of Blank Page": "Chuyển hướng kèm lỗi không tìm thấy thay vì trang trống",
+  "Redirects With Not Found Not Cannot Delete": "Chuyển hướng kèm lỗi không tìm thấy, không phải lỗi không thể xoá",
+  "Redirects With Not Found Not Invalid": "Chuyển hướng kèm lỗi không tìm thấy, không phải lỗi dữ liệu không hợp lệ",
+  "Still Opens Default Log File": "Vẫn mở file log mặc định"
 }

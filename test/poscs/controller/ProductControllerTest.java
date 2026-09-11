@@ -287,6 +287,7 @@ public class ProductControllerTest {
     public void update_validFields_updatesAndRedirectsToDetail() throws Exception {
         when(request.getParameter("action")).thenReturn("update");
         when(request.getParameter("productId")).thenReturn("7");
+        when(productDAO.findById(7)).thenReturn(new Product());
         when(request.getParameter("productName")).thenReturn("Router XYZ");
         when(request.getParameter("categoryId")).thenReturn("2");
         when(productDAO.update(any(Product.class))).thenReturn(true);
@@ -306,6 +307,7 @@ public class ProductControllerTest {
     public void update_removedImageIdsWithGarbageToken_deletesOnlyValidIdsSkipsInvalid() throws Exception {
         when(request.getParameter("action")).thenReturn("update");
         when(request.getParameter("productId")).thenReturn("70"); // khác hẳn các id ảnh bên dưới, tránh trùng số
+        when(productDAO.findById(70)).thenReturn(new Product());
         when(request.getParameter("productName")).thenReturn("Router XYZ");
         when(request.getParameter("categoryId")).thenReturn("2");
         when(request.getParameter("removedImageIds")).thenReturn("3,7,x,12");
@@ -328,6 +330,7 @@ public class ProductControllerTest {
     public void delete_productUsedInContracts_blocksDeletion() throws Exception {
         when(request.getParameter("action")).thenReturn("delete");
         when(request.getParameter("id")).thenReturn("7");
+        when(productDAO.findById(7)).thenReturn(new Product());
         when(productDAO.isUsedInContracts(7)).thenReturn(true);
 
         controller.doPost(request, response);
@@ -340,6 +343,7 @@ public class ProductControllerTest {
     public void delete_productNotUsedInContracts_softDeletesAndRedirectsToList() throws Exception {
         when(request.getParameter("action")).thenReturn("delete");
         when(request.getParameter("id")).thenReturn("7");
+        when(productDAO.findById(7)).thenReturn(new Product());
         when(productDAO.isUsedInContracts(7)).thenReturn(false);
 
         controller.doPost(request, response);
@@ -393,4 +397,35 @@ public class ProductControllerTest {
         verify(dispatcher).forward(request, response);
         verify(response, never()).sendError(eq(HttpServletResponse.SC_FORBIDDEN), anyString());
     }
+
+    /** Xoá id không có thật: báo không tìm thấy, không chạm DAO xoá. */
+    @Test
+    public void delete_productNotFound_redirectsWithNotFoundAndNeverSoftDeletes() throws Exception {
+        when(request.getParameter("action")).thenReturn("delete");
+        when(request.getParameter("id")).thenReturn("999999");
+        when(productDAO.findById(999999)).thenReturn(null);
+
+        controller.doPost(request, response);
+
+        verify(productDAO, never()).isUsedInContracts(anyInt());
+        verify(productDAO, never()).softDelete(anyInt());
+        verify(response).sendRedirect(CONTEXT_PATH + "/product?error=notfound");
+    }
+
+    /**
+     * Sửa id không có thật phải báo không tìm thấy chứ không phải "dữ liệu chưa
+     * hợp lệ" -- báo sai lý do thì người dùng đi sửa form mãi không xong.
+     */
+    @Test
+    public void update_productNotFound_redirectsWithNotFoundNotInvalid() throws Exception {
+        when(request.getParameter("action")).thenReturn("update");
+        when(request.getParameter("productId")).thenReturn("999999");
+        when(productDAO.findById(999999)).thenReturn(null);
+
+        controller.doPost(request, response);
+
+        verify(productDAO, never()).update(any(Product.class));
+        verify(response).sendRedirect(CONTEXT_PATH + "/product?error=notfound");
+    }
+
 }
