@@ -239,7 +239,8 @@ PERM_CASES = [
      {"action": "addProduct", "contractId": "1", "productId": "1", "quantity": "1"}, 403,
      "Kỹ thuật gọi contract action=addProduct"),
     ("TC_CTRDELPRD_005", "cskh", "POST", "/contract",
-     {"action": "removeProduct", "contractId": "1", "lineId": "1"}, 403,
+     {"action": "removeProduct", "contractId": "1",
+      "contractProductId": "1"}, 403,
      "CSKH gọi contract action=removeProduct"),
     ("TC_CTRIMPORT_008", "tech", "POST", "/contract", {"action": "importPdf"}, 403,
      "Kỹ thuật gọi contract action=importPdf"),
@@ -527,7 +528,7 @@ def test_contract_validation(sessions):
            "chưa chọn sản phẩm -> %s" % loc)
 
     r = post(s, "/contract", {"action": "removeProduct", "contractId": "1",
-                              "lineId": "999999"})
+                              "contractProductId": "999999"})
     loc = r.headers.get("Location") or ""
     expect("TC_CTRDELPRD_003", "remove_product_failed" in loc or "error" in loc,
            "gỡ dòng sản phẩm không tồn tại -> %s" % loc)

@@ -169,3 +169,68 @@ Lưu ý khi viết thêm ca tự động:
   quyền, và ca kiểm phân quyền sẽ đạt vì lý do sai.
 - Luôn có một ca đối chứng đường đi đúng cho mỗi module. Không có nó thì một
   payload sai toàn tập vẫn làm mọi ca "thiếu trường X" đều đạt.
+
+## Ba lượt chạy tự động
+
+| Script | Kiểm cái gì | Thời gian |
+|---|---|---|
+| `run_blackbox.py` | Mã HTTP và tham số redirect: đăng nhập, kiểm tra dữ liệu vào, phân quyền 403, endpoint JSON, path traversal | ~30 giây |
+| `run_blackbox_ui.py` | Nội dung thật: HTML trả về (số dòng, thông báo), file .xls/.pdf tải xuống, tải file lên, mã OTP đọc từ log | ~3 phút |
+| `run_blackbox_rest.py` | Nhập hợp đồng từ PDF, các ca biên về ngày, và những ca phải **chờ theo đồng hồ thật** | ~22 phút |
+
+Chạy theo đúng thứ tự trên; mỗi lượt gộp kết quả vào cùng `blackbox_results.json`.
+
+```bash
+mysql -h127.0.0.1 -uroot -p poscs_bbtest < tools/testdoc/blackbox/fixtures.sql
+python tools/testdoc/run_blackbox.py
+python tools/testdoc/run_blackbox_ui.py --log <đường dẫn catalina stdout>
+python tools/testdoc/run_blackbox_rest.py --log <đường dẫn catalina stdout>
+python tools/testdoc/gen_integration_blackbox.py
+```
+
+`--log` trỏ tới file hứng stdout/stderr của Tomcat. `EmailUtil` chạy DEV MODE khi
+chưa cấu hình SMTP nên in mã OTP và mật khẩu tạm ra đó — nhờ vậy chạy được trọn
+luồng quên mật khẩu và gửi thông tin tài khoản mà không cần hộp thư thật.
+
+### Bốn thứ bắt buộc phải làm đúng thứ tự
+
+1. **Nạp lại `blackbox/fixtures.sql` trước mỗi lượt.** Bộ test có ca đổi mật
+   khẩu thật và khoá tài khoản thật; không nạp lại thì lượt sau đăng nhập
+   không được và mọi ca phía sau trượt oan.
+2. **Khởi động lại Tomcat trước lượt 3.** Hạn mức 10 yêu cầu OTP/IP trong 15
+   phút nằm trong bộ nhớ máy chủ; lượt trước dùng hết thì nhánh OTP không chạy
+   được.
+3. **`test_otp_quota` phải sau `test_otp_timing`** — nó cố tình làm cạn hạn mức.
+4. **`test_login_lockout` là phần cuối cùng** — nó khoá IP 15 phút, chạy sớm thì
+   chặn mọi ca đăng nhập sau đó.
+
+Chạy kèm `--skip-slow` để bỏ hai đoạn chờ dài (OTP hết hạn 5 phút, khoá IP 15
+phút); ba ca tương ứng sẽ thành "N/A" kèm lý do.
+
+### Cạm bẫy khi viết thêm ca tự động
+
+- POST tới `/customer`, `/product`, `/contract` phải gửi **multipart** — các
+  controller này khai báo `@MultipartConfig` và gọi `request.getPart(...)`;
+  gửi urlencoded sẽ thành HTTP 500.
+- Mọi POST cần `csrfToken` lấy từ trang có render ô ẩn đó (`/changePassword.jsp`
+  hợp với mọi vai trò đã đăng nhập).
+- Tên tham số không nhất quán giữa các handler: cập nhật dùng `customerId`,
+  `contractId`, `productId`, `ticketId`, `userId`; xoá thì tất cả dùng `id`;
+  xác thực OTP dùng `otpCode`; gỡ sản phẩm khỏi hợp đồng dùng
+  `contractProductId`. Dùng sai tên thì request dừng ở nhánh "không tìm thấy"
+  **trước** bước kiểm quyền, và ca kiểm phân quyền sẽ đạt vì lý do sai.
+- Ô "Xếp hạng quan hệ" gửi **tên hằng enum** (`GOOD`/`NEEDS_REVIEW`/`BAD`/
+  `AT_RISK`), không phải chuỗi tiếng Việt.
+- Quên mật khẩu tra theo **email công ty hoặc tên đăng nhập**, không phải email
+  cá nhân.
+- Danh sách Nhân viên và Sản phẩm dựng bằng lưới thẻ chứ không phải `<table>`;
+  đếm `<tr>` sẽ luôn ra 0. Lưới rỗng vẫn có một phần tử con `.empty-state`.
+- Khi kiểm "kết quả lọc không lẫn giá trị khác", chỉ đọc chữ trong khối kết
+  quả: đọc cả trang sẽ dính tên mọi trạng thái trong `<option>` của bộ lọc.
+- Nhập hợp đồng từ PDF: ô chọn file tên là `file`; các ô `/Ch` chỉ nhận đúng
+  giá trị trong `/Opt` của mẫu; khách hàng chưa có trong hệ thống thì phải điền
+  đủ Tỉnh/Thành + Xã/Phường + Địa chỉ chi tiết. Handler **forward** lại trang
+  nhập cả khi thành công lẫn khi lỗi, phải đọc chữ trên trang chứ đừng nhìn mã
+  HTTP.
+- Luôn có ca đối chứng đường đi đúng cho mỗi module. Không có nó thì một payload
+  sai toàn tập vẫn làm mọi ca "thiếu trường X" đều đạt.
