@@ -12,6 +12,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import poscs.model.Contract;
 import poscs.model.ContractProduct;
 import poscs.model.Enterprise;
@@ -31,6 +33,8 @@ import poscs.model.User;
  * thêm/sửa hợp đồng chưa có UI để gắn/gỡ sản phẩm (chỉ đọc, chưa ghi).
  */
 public class ContractDAO {
+
+    private static final Logger LOG = LoggerFactory.getLogger(ContractDAO.class);
 
     public static final String STATUS_DRAFT = "Chưa hiệu lực";
     public static final String STATUS_ACTIVE = "Đang hiệu lực";
@@ -87,8 +91,7 @@ public class ContractDAO {
                 }
             }
         } catch (SQLException ex) {
-            System.err.println("--- LOI TRUY VAN HOP DONG THEO KHACH HANG ---");
-            ex.printStackTrace();
+            LOG.error("Loi truy van hop dong theo khach hang (enterpriseId={})", enterpriseId, ex);
         }
         return result;
     }
@@ -112,8 +115,7 @@ public class ContractDAO {
                 }
             }
         } catch (SQLException ex) {
-            System.err.println("--- LOI TRUY VAN DANH SACH HOP DONG ---");
-            ex.printStackTrace();
+            LOG.error("Loi truy van danh sach hop dong", ex);
         }
         return result;
     }
@@ -134,8 +136,7 @@ public class ContractDAO {
                 }
             }
         } catch (SQLException ex) {
-            System.err.println("--- LOI DEM SO LUONG HOP DONG ---");
-            ex.printStackTrace();
+            LOG.error("Loi dem so luong hop dong", ex);
         }
         return 0;
     }
@@ -168,8 +169,7 @@ public class ContractDAO {
                 summary.put(STATUS_ACTIVE, rs.getInt("active_count"));
             }
         } catch (SQLException ex) {
-            System.err.println("--- LOI THONG KE TRANG THAI HOP DONG ---");
-            ex.printStackTrace();
+            LOG.error("Loi thong ke trang thai hop dong", ex);
         }
         return summary;
     }
@@ -190,8 +190,7 @@ public class ContractDAO {
                 }
             }
         } catch (SQLException ex) {
-            System.err.println("--- LOI TRUY VAN HOP DONG SAP HET HAN ---");
-            ex.printStackTrace();
+            LOG.error("Loi truy van hop dong sap het han", ex);
         }
         return result;
     }
@@ -208,8 +207,7 @@ public class ContractDAO {
                 }
             }
         } catch (SQLException ex) {
-            System.err.println("--- LOI TRUY VAN CHI TIET HOP DONG ---");
-            ex.printStackTrace();
+            LOG.error("Loi truy van chi tiet hop dong (contractId={})", contractId, ex);
         }
         return null;
     }
@@ -245,8 +243,7 @@ public class ContractDAO {
                 }
             }
         } catch (SQLException ex) {
-            System.err.println("--- LOI TRUY VAN SAN PHAM HOP DONG ---");
-            ex.printStackTrace();
+            LOG.error("Loi truy van san pham hop dong (contractId={})", contractId, ex);
         }
         return result;
     }
@@ -266,8 +263,7 @@ public class ContractDAO {
             ps.setInt(2, contractId);
             return ps.executeUpdate() > 0;
         } catch (SQLException ex) {
-            System.err.println("--- LOI XOA HANG MUC SAN PHAM HOP DONG ---");
-            ex.printStackTrace();
+            LOG.error("Loi xoa hang muc san pham hop dong (contractProductId={}, contractId={})", contractProductId, contractId, ex);
             return false;
         }
     }
@@ -288,8 +284,7 @@ public class ContractDAO {
             }
             return String.format("HD-%04d", nextNumber);
         } catch (SQLException ex) {
-            System.err.println("--- LOI SINH MA HOP DONG ---");
-            ex.printStackTrace();
+            LOG.error("Loi sinh ma hop dong", ex);
             return null;
         }
     }
@@ -338,8 +333,7 @@ public class ContractDAO {
                     contract.setContractCode(generateNextContractCode());
                     continue;
                 }
-                System.err.println("--- LOI THEM HOP DONG ---");
-                ex.printStackTrace();
+                LOG.error("Loi them hop dong (contractCode={})", contract.getContractCode(), ex);
                 return -1;
             }
         }
@@ -389,21 +383,18 @@ public class ContractDAO {
                     try {
                         conn.rollback();
                     } catch (SQLException rollbackEx) {
-                        System.err.println("--- LOI ROLLBACK HANG MUC SAN PHAM HOP DONG ---");
-                        rollbackEx.printStackTrace();
+                        LOG.error("Loi rollback hang muc san pham hop dong (contractId={})", contractId, rollbackEx);
                     }
                 }
                 try {
                     conn.setAutoCommit(true);
                 } catch (SQLException autoCommitEx) {
-                    System.err.println("--- LOI RESET AUTOCOMMIT SAU KHI THEM HANG MUC SAN PHAM ---");
-                    autoCommitEx.printStackTrace();
+                    LOG.error("Loi reset autocommit sau khi them hang muc san pham (contractId={})", contractId, autoCommitEx);
                 }
             }
             return committed;
         } catch (SQLException ex) {
-            System.err.println("--- LOI THEM HANG MUC SAN PHAM HOP DONG ---");
-            ex.printStackTrace();
+            LOG.error("Loi them hang muc san pham hop dong (contractId={})", contractId, ex);
             return false;
         }
     }
@@ -429,8 +420,8 @@ public class ContractDAO {
             ps.setInt(10, contract.getContractId());
             return ps.executeUpdate() > 0;
         } catch (SQLException ex) {
-            System.err.println("--- LOI CAP NHAT HOP DONG ---");
-            ex.printStackTrace();
+            LOG.error("Loi cap nhat hop dong (contractId={}, contractCode={})",
+                    contract.getContractId(), contract.getContractCode(), ex);
             return false;
         }
     }
@@ -448,8 +439,7 @@ public class ContractDAO {
                 }
             }
         } catch (SQLException ex) {
-            System.err.println("--- LOI KIEM TRA DIEU KIEN XOA HOP DONG ---");
-            ex.printStackTrace();
+            LOG.error("Loi kiem tra dieu kien xoa hop dong (contractId={})", contractId, ex);
         }
         return false;
     }
@@ -462,8 +452,7 @@ public class ContractDAO {
             ps.setInt(1, contractId);
             return ps.executeUpdate() > 0;
         } catch (SQLException ex) {
-            System.err.println("--- LOI XOA HOP DONG ---");
-            ex.printStackTrace();
+            LOG.error("Loi xoa hop dong (contractId={})", contractId, ex);
             return false;
         }
     }

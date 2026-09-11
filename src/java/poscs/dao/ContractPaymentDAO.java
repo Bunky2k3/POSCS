@@ -8,6 +8,8 @@ import java.sql.SQLException;
 import java.time.YearMonth;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * DAO cho bảng contract_payments -- phục vụ tính doanh thu (dựa trên
@@ -16,6 +18,8 @@ import java.util.Map;
  * đụng tới.
  */
 public class ContractPaymentDAO {
+
+    private static final Logger LOG = LoggerFactory.getLogger(ContractPaymentDAO.class);
 
     /** Tổng tiền đã thu trong 1 tháng cụ thể. Trả về 0 nếu không có khoản thu nào. */
     public BigDecimal sumInvoiceAmountByMonth(int year, int month) {
@@ -31,8 +35,7 @@ public class ContractPaymentDAO {
                 }
             }
         } catch (SQLException ex) {
-            System.err.println("--- LOI TINH DOANH THU THEO THANG ---");
-            ex.printStackTrace();
+            LOG.error("Loi tinh doanh thu theo thang", ex);
         }
         return BigDecimal.ZERO;
     }
@@ -66,8 +69,7 @@ public class ContractPaymentDAO {
                 }
             }
         } catch (SQLException ex) {
-            System.err.println("--- LOI TINH DOANH THU THEO N THANG ---");
-            ex.printStackTrace();
+            LOG.error("Loi tinh doanh thu theo n thang", ex);
         }
         return result;
     }
@@ -84,8 +86,7 @@ public class ContractPaymentDAO {
                 }
             }
         } catch (SQLException ex) {
-            System.err.println("--- LOI TINH GIA TRI HOP DONG ---");
-            ex.printStackTrace();
+            LOG.error("Loi tinh gia tri hop dong (contractId={})", contractId, ex);
         }
         return BigDecimal.ZERO;
     }

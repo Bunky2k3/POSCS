@@ -12,8 +12,11 @@ import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.mindrot.jbcrypt.BCrypt;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import poscs.common.AccessControl;
 import poscs.common.EmailUtil;
+import poscs.common.Logs;
 import poscs.common.TextRules;
 import poscs.dao.AddressDAO;
 import poscs.dao.EmployeeDAO;
@@ -30,6 +33,8 @@ import poscs.model.User;
  */
 @WebServlet(name = "EmployeeController", urlPatterns = {"/employee"})
 public class EmployeeController extends HttpServlet {
+
+    private static final Logger LOG = LoggerFactory.getLogger(EmployeeController.class);
 
     /** BR-31: email công ty do hệ thống tự cấp (chưa có hộp thư thật), dạng &lt;username&gt;@postef.com.vn. */
     private static final String COMPANY_EMAIL_DOMAIN = "@postef.com.vn";
@@ -213,6 +218,7 @@ public class EmployeeController extends HttpServlet {
 
         int newId = employeeDAO.insert(u);
         if (newId <= 0) {
+            LOG.warn("Tao nhan vien that bai (actor={}, username={})", Logs.actor(request), u.getUsername());
             response.sendRedirect(request.getContextPath() + "/employee?action=new&error=create_failed");
             return;
         }
@@ -263,6 +269,7 @@ public class EmployeeController extends HttpServlet {
         // mật khẩu mới), và Admin bấm lại là cấp mã mới.
         boolean updated = employeeDAO.updatePasswordHash(id, BCrypt.hashpw(tempPassword, BCrypt.gensalt()));
         if (!updated) {
+            LOG.warn("Gui email tai khoan that bai (actor={}, userId={})", Logs.actor(request), id);
             response.sendRedirect(request.getContextPath() + "/employee?action=view&id=" + id + "&error=send_failed");
             return;
         }
@@ -294,6 +301,7 @@ public class EmployeeController extends HttpServlet {
 
         boolean ok = employeeDAO.update(u);
         if (!ok) {
+            LOG.warn("Cap nhat nhan vien that bai (actor={}, userId={})", Logs.actor(request), id);
             response.sendRedirect(request.getContextPath() + "/employee?action=edit&id=" + id + "&error=update_failed");
             return;
         }

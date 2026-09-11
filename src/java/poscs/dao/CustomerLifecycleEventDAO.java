@@ -7,6 +7,8 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import poscs.model.CustomerLifecycleEvent;
 import poscs.model.RelationshipRating;
 import poscs.model.User;
@@ -17,6 +19,8 @@ import poscs.model.User;
  * viewcustomerdetail.jsp (xem CustomerController#handleEvaluate).
  */
 public class CustomerLifecycleEventDAO {
+
+    private static final Logger LOG = LoggerFactory.getLogger(CustomerLifecycleEventDAO.class);
 
     /** Ghi 1 sự kiện mới. Trả về event_id vừa tạo, hoặc -1 nếu thất bại. */
     public int insert(CustomerLifecycleEvent event) {
@@ -41,8 +45,7 @@ public class CustomerLifecycleEventDAO {
                 return keys.next() ? keys.getInt(1) : -1;
             }
         } catch (SQLException ex) {
-            System.err.println("--- LOI GHI LICH SU DANH GIA KHACH HANG ---");
-            ex.printStackTrace();
+            LOG.error("Loi ghi lich su danh gia khach hang (enterpriseId={})", event.getEnterpriseId(), ex);
             return -1;
         }
     }
@@ -84,8 +87,7 @@ public class CustomerLifecycleEventDAO {
                 }
             }
         } catch (SQLException ex) {
-            System.err.println("--- LOI DOC LICH SU DANH GIA KHACH HANG ---");
-            ex.printStackTrace();
+            LOG.error("Loi doc lich su danh gia khach hang (enterpriseId={})", enterpriseId, ex);
         }
         return result;
     }

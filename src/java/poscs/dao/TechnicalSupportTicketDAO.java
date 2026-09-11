@@ -11,6 +11,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import poscs.model.Contract;
 import poscs.model.Enterprise;
 import poscs.model.TechnicalRequest;
@@ -23,6 +25,8 @@ import poscs.model.User;
  * khác.
  */
 public class TechnicalSupportTicketDAO {
+
+    private static final Logger LOG = LoggerFactory.getLogger(TechnicalSupportTicketDAO.class);
 
     public static final String STATUS_NEW = "Mới tiếp nhận";
     public static final String STATUS_IN_PROGRESS = "Đang xử lý";
@@ -78,8 +82,7 @@ public class TechnicalSupportTicketDAO {
                 }
             }
         } catch (SQLException ex) {
-            System.err.println("--- LOI TRUY VAN TICKET THEO KHACH HANG ---");
-            ex.printStackTrace();
+            LOG.error("Loi truy van ticket theo khach hang (enterpriseId={})", enterpriseId, ex);
         }
         return result;
     }
@@ -103,8 +106,7 @@ public class TechnicalSupportTicketDAO {
                 }
             }
         } catch (SQLException ex) {
-            System.err.println("--- LOI TRUY VAN DANH SACH PHIEU HO TRO ---");
-            ex.printStackTrace();
+            LOG.error("Loi truy van danh sach phieu ho tro", ex);
         }
         return result;
     }
@@ -125,8 +127,7 @@ public class TechnicalSupportTicketDAO {
                 }
             }
         } catch (SQLException ex) {
-            System.err.println("--- LOI DEM SO LUONG PHIEU HO TRO ---");
-            ex.printStackTrace();
+            LOG.error("Loi dem so luong phieu ho tro", ex);
         }
         return 0;
     }
@@ -161,8 +162,7 @@ public class TechnicalSupportTicketDAO {
                 }
             }
         } catch (SQLException ex) {
-            System.err.println("--- LOI THONG KE TRANG THAI PHIEU HO TRO ---");
-            ex.printStackTrace();
+            LOG.error("Loi thong ke trang thai phieu ho tro", ex);
         }
         return summary;
     }
@@ -183,8 +183,7 @@ public class TechnicalSupportTicketDAO {
                 }
             }
         } catch (SQLException ex) {
-            System.err.println("--- LOI TRUY VAN PHIEU CAN CHU Y ---");
-            ex.printStackTrace();
+            LOG.error("Loi truy van phieu can chu y", ex);
         }
         return result;
     }
@@ -203,8 +202,7 @@ public class TechnicalSupportTicketDAO {
                 }
             }
         } catch (SQLException ex) {
-            System.err.println("--- LOI DEM PHIEU SAP TRE HAN ---");
-            ex.printStackTrace();
+            LOG.error("Loi dem phieu sap tre han", ex);
         }
         return 0;
     }
@@ -228,8 +226,7 @@ public class TechnicalSupportTicketDAO {
                 }
             }
         } catch (SQLException ex) {
-            System.err.println("--- LOI TRUY VAN PHIEU SAP TRE HAN ---");
-            ex.printStackTrace();
+            LOG.error("Loi truy van phieu sap tre han", ex);
         }
         return result;
     }
@@ -246,8 +243,7 @@ public class TechnicalSupportTicketDAO {
                 }
             }
         } catch (SQLException ex) {
-            System.err.println("--- LOI TRUY VAN CHI TIET PHIEU HO TRO ---");
-            ex.printStackTrace();
+            LOG.error("Loi truy van chi tiet phieu ho tro (ticketId={})", ticketId, ex);
         }
         return null;
     }
@@ -268,8 +264,7 @@ public class TechnicalSupportTicketDAO {
             }
             return String.format("TK-%04d", nextNumber);
         } catch (SQLException ex) {
-            System.err.println("--- LOI SINH MA PHIEU HO TRO ---");
-            ex.printStackTrace();
+            LOG.error("Loi sinh ma phieu ho tro", ex);
             return null;
         }
     }
@@ -321,8 +316,7 @@ public class TechnicalSupportTicketDAO {
                     t.setTicketCode(generateNextTicketCode());
                     continue;
                 }
-                System.err.println("--- LOI THEM PHIEU HO TRO ---");
-                ex.printStackTrace();
+                LOG.error("Loi them phieu ho tro (ticketCode={})", t.getTicketCode(), ex);
                 return -1;
             }
         }
@@ -354,8 +348,8 @@ public class TechnicalSupportTicketDAO {
             ps.setInt(13, t.getTicketId());
             return ps.executeUpdate() > 0;
         } catch (SQLException ex) {
-            System.err.println("--- LOI CAP NHAT PHIEU HO TRO ---");
-            ex.printStackTrace();
+            LOG.error("Loi cap nhat phieu ho tro (ticketId={}, ticketCode={})",
+                    t.getTicketId(), t.getTicketCode(), ex);
             return false;
         }
     }
@@ -372,8 +366,7 @@ public class TechnicalSupportTicketDAO {
                 }
             }
         } catch (SQLException ex) {
-            System.err.println("--- LOI KIEM TRA DIEU KIEN XOA PHIEU HO TRO ---");
-            ex.printStackTrace();
+            LOG.error("Loi kiem tra dieu kien xoa phieu ho tro (ticketId={})", ticketId, ex);
         }
         return false;
     }
@@ -386,8 +379,7 @@ public class TechnicalSupportTicketDAO {
             ps.setInt(1, ticketId);
             return ps.executeUpdate() > 0;
         } catch (SQLException ex) {
-            System.err.println("--- LOI XOA PHIEU HO TRO ---");
-            ex.printStackTrace();
+            LOG.error("Loi xoa phieu ho tro (ticketId={})", ticketId, ex);
             return false;
         }
     }

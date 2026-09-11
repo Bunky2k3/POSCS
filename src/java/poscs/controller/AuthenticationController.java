@@ -16,8 +16,11 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 import org.mindrot.jbcrypt.BCrypt;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import poscs.common.EmailUtil;
 import poscs.common.FileStorage;
+import poscs.common.Logs;
 import poscs.common.TextRules;
 import poscs.dao.AddressDAO;
 import poscs.dao.EmployeeDAO;
@@ -41,6 +44,8 @@ import poscs.model.User;
 // các trường text ra request.getParameter() như bình thường.
 @MultipartConfig
 public class AuthenticationController extends HttpServlet {
+
+    private static final Logger LOG = LoggerFactory.getLogger(AuthenticationController.class);
 
     private final EmployeeDAO employeeDAO = new EmployeeDAO();
     private final AddressDAO addressDAO = new AddressDAO();
@@ -274,6 +279,7 @@ public class AuthenticationController extends HttpServlet {
 
         boolean ok = employeeDAO.updateProfile(user);
         if (!ok) {
+            LOG.warn("Cap nhat ho so ca nhan that bai (actor={})", Logs.actor(request));
             response.sendRedirect(request.getContextPath() + "/updateProfile?error=update_failed");
             return;
         }
@@ -481,6 +487,7 @@ public class AuthenticationController extends HttpServlet {
         String newHash = BCrypt.hashpw(newPassword, BCrypt.gensalt());
         boolean ok = employeeDAO.updatePasswordByEmail(freshUser.getEmail(), newHash);
         if (!ok) {
+            LOG.warn("Doi mat khau that bai o buoc ghi CSDL (actor={})", Logs.actor(request));
             response.sendRedirect(request.getContextPath() + "/changePassword.jsp?error=update_failed");
             return;
         }
@@ -785,6 +792,7 @@ public class AuthenticationController extends HttpServlet {
         session.removeAttribute(SESSION_OTP_VERIFIED);
 
         if (!ok) {
+            LOG.warn("Dat lai mat khau that bai o buoc ghi CSDL (email={})", email);
             response.sendRedirect(request.getContextPath() + "/forgotPassword.jsp?error=update_failed");
             return;
         }

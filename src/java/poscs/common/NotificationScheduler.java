@@ -9,6 +9,8 @@ import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import poscs.dao.ContractDAO;
 import poscs.dao.NotificationDAO;
 import poscs.dao.TechnicalSupportTicketDAO;
@@ -31,6 +33,8 @@ import poscs.model.TechnicalRequest;
  */
 @WebListener
 public class NotificationScheduler implements ServletContextListener {
+
+    private static final Logger LOG = LoggerFactory.getLogger(NotificationScheduler.class);
 
     private static final long INITIAL_DELAY_MINUTES = 1;
     private static final long PERIOD_MINUTES = 60;
@@ -63,8 +67,7 @@ public class NotificationScheduler implements ServletContextListener {
             generateContractExpiringNotifications();
             generateTicketSlaNotifications();
         } catch (Exception ex) {
-            System.err.println("--- LOI CHAY NOTIFICATION SCHEDULER ---");
-            ex.printStackTrace();
+            LOG.error("Loi chay notification scheduler", ex);
         }
     }
 

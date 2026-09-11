@@ -8,6 +8,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import poscs.model.District;
 import poscs.model.Province;
 
@@ -26,6 +28,8 @@ import poscs.model.Province;
  * (xem AddressController).
  */
 public class AddressDAO {
+
+    private static final Logger LOG = LoggerFactory.getLogger(AddressDAO.class);
 
     private static volatile List<Province> provincesCache;
     private static final Map<Integer, List<District>> wardsByProvinceCache = new ConcurrentHashMap<>();
@@ -47,8 +51,7 @@ public class AddressDAO {
                 result.add(p);
             }
         } catch (SQLException ex) {
-            System.err.println("--- LOI TRUY VAN DANH SACH TINH/THANH PHO ---");
-            ex.printStackTrace();
+            LOG.error("Loi truy van danh sach tinh/thanh pho", ex);
             return result;
         }
         provincesCache = result;
@@ -88,8 +91,7 @@ public class AddressDAO {
                 }
             }
         } catch (SQLException ex) {
-            System.err.println("--- LOI TRUY VAN XA/PHUONG THEO TINH ---");
-            ex.printStackTrace();
+            LOG.error("Loi truy van xa/phuong theo tinh (provinceId={})", provinceId, ex);
         }
         return result;
     }

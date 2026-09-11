@@ -6,6 +6,8 @@ import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 import jakarta.servlet.ServletContext;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPageContentStream;
@@ -33,6 +35,8 @@ import org.apache.pdfbox.pdmodel.interactive.form.PDField;
  * PDDocument khác nhau).
  */
 public final class PdfUtil {
+
+    private static final Logger LOG = LoggerFactory.getLogger(PdfUtil.class);
 
     private static volatile byte[] vietnameseFontBytes;
 
@@ -65,7 +69,7 @@ public final class PdfUtil {
         }
         PDField field = acroForm.getField(name);
         if (field == null) {
-            System.err.println("--- CANH BAO: FIELD PDF \"" + name + "\" KHONG TON TAI TRONG FILE MAU -- BO QUA ---");
+            LOG.warn("Field PDF khong ton tai trong file mau, bo qua (field={})", name);
             return;
         }
         field.setValue(value == null ? "" : value);
@@ -194,7 +198,7 @@ public final class PdfUtil {
             float rowHeight = maxLines * lineHeight + rowPadding * 2;
 
             if (y - rowHeight < minY) {
-                System.err.println("--- CANH BAO: BANG PDF TRAN TRANG -- BO QUA " + (rows.size() - r) + " DONG CON LAI ---");
+                LOG.warn("Bang PDF tran trang, bo qua {} dong con lai", rows.size() - r);
                 return r;
             }
 
