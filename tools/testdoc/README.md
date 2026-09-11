@@ -234,3 +234,20 @@ phút); ba ca tương ứng sẽ thành "N/A" kèm lý do.
   HTTP.
 - Luôn có ca đối chứng đường đi đúng cho mỗi module. Không có nó thì một payload
   sai toàn tập vẫn làm mọi ca "thiếu trường X" đều đạt.
+
+### Ba ca cần môi trường riêng
+
+Không chạy được trong lượt tự động thường; dựng thêm rồi chạy tay:
+
+- **TC_EMPSEND_003** (gửi mail lỗi thì không đổi mật khẩu): khởi động Tomcat
+  với `MAIL_USERNAME`/`MAIL_PASSWORD` bất kỳ và `MAIL_SMTP_HOST=127.0.0.1`,
+  `MAIL_SMTP_PORT=1`. `EmailUtil` bỏ DEV MODE, kết nối SMTP bị từ chối ngay nên
+  không phải chờ timeout.
+- **TC_DASH_008** (Dashboard trên CSDL rỗng): tạo CSDL thứ hai, nạp
+  `db/schema.sql`, `TRUNCATE` các bảng nghiệp vụ (giữ users/roles/departments/
+  provinces/districts), nạp `fixtures.sql`, rồi trỏ `DB_URL` sang đó.
+- **TC_NOTI_009** (tác vụ nền sinh thông báo hợp đồng sắp hết hạn): tạo hợp
+  đồng kết thúc trong 30 ngày, xoá sạch `notifications` có
+  `ref_type='contract_expiring'`, khởi động lại Tomcat rồi chờ ~70 giây
+  (`NotificationScheduler` chạy lần đầu sau 1 phút, sau đó mỗi 60 phút). Khởi
+  động lại lần nữa để xác nhận không sinh bản ghi trùng.

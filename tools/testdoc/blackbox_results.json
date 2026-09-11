@@ -1560,9 +1560,9 @@
     "note": ""
   },
   "TC_EMPSEND_003": {
-    "status": "N/A",
-    "actual": "Cần chặn SMTP để giả lập gửi mail lỗi; môi trường này chạy DEV MODE nên luôn 'gửi' thành công",
-    "note": "Làm ở vòng chạy tay"
+    "status": "Đạt",
+    "actual": "SMTP trỏ vào cổng đóng: gửi mail thất bại -> /POSCS/employee?action=view&id=18&error=mail_failed; nhân viên VẪN đăng nhập được bằng mật khẩu cũ (được) — mật khẩu chưa bị ghi đè",
+    "note": ""
   },
   "TC_UPDPROF_001": {
     "status": "Đạt",
@@ -1760,9 +1760,9 @@
     "note": ""
   },
   "TC_DASH_008": {
-    "status": "N/A",
-    "actual": "Cần CSDL rỗng hoàn toàn; CSDL kiểm thử đang có dữ liệu mẫu",
-    "note": "Chạy riêng trên CSDL trắng"
+    "status": "Đạt",
+    "actual": "CSDL chỉ có 6 tài khoản, 0 khách hàng/hợp đồng/sản phẩm/phiếu: Dashboard trả HTTP 200, 854 ký tự nội dung, 9 ô hiện số 0, còn đủ các khối khách hàng/hợp đồng/doanh thu/phiếu, không có vết ngoại lệ",
+    "note": ""
   },
   "TC_NOTI_001": {
     "status": "Đạt",
@@ -1790,9 +1790,9 @@
     "note": ""
   },
   "TC_NOTI_009": {
-    "status": "N/A",
-    "actual": "Thông báo hợp đồng sắp hết hạn do tác vụ nền sinh, cần chờ lịch chạy",
-    "note": "Chạy ở vòng dài hơn"
+    "status": "Đạt",
+    "actual": "Tác vụ nền sinh thông báo cho người phụ trách: trang thông báo của sale01 hiện 16 mục 'sắp hết hạn' (CSDL có 11 bản ghi contract_expiring); khởi động lại lần 2 vẫn 11 bản ghi, không ref_id nào bị trùng",
+    "note": ""
   },
   "TC_LOG_002": {
     "status": "Đạt",
