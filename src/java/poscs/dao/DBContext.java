@@ -7,14 +7,26 @@ import java.sql.SQLException;
 
 public class DBContext {
 
-    // Cấu hình lấy từ biến môi trường; các giá trị mặc định chỉ dùng cho
-    // môi trường dev cục bộ, KHÔNG chứa bất kỳ credential thật nào.
-    private static final String DB_URL
-            = System.getenv().getOrDefault("DB_URL", "jdbc:mysql://localhost:3306/poscs_db");
-    private static final String DB_USER_NAME
-            = System.getenv().getOrDefault("DB_USER", "root");
-    private static final String DB_PASSWORD
-            = System.getenv().getOrDefault("DB_PASSWORD", "1234");
+    // Cấu hình lấy từ system property, rồi tới biến môi trường; các giá trị
+    // mặc định chỉ dùng cho môi trường dev cục bộ, KHÔNG chứa bất kỳ
+    // credential thật nào.
+    //
+    // System property được ưu tiên vì biến môi trường không đặt được từ bên
+    // trong JVM: test tích hợp cần trỏ DAO sang CSDL dùng-một-lần
+    // (poscs_it) thay vì CSDL thật, mà cách duy nhất làm được điều đó khi
+    // tiến trình đã chạy là -D. Khi chạy thật trong Tomcat thì không ai
+    // truyền -D nên vẫn rơi về đúng biến môi trường như trước.
+    private static final String DB_URL = config("DB_URL", "jdbc:mysql://localhost:3306/poscs_db");
+    private static final String DB_USER_NAME = config("DB_USER", "root");
+    private static final String DB_PASSWORD = config("DB_PASSWORD", "1234");
+
+    private static String config(String key, String defaultValue) {
+        String fromProperty = System.getProperty(key);
+        if (fromProperty != null && !fromProperty.isEmpty()) {
+            return fromProperty;
+        }
+        return System.getenv().getOrDefault(key, defaultValue);
+    }
 
     private static final HikariDataSource DATA_SOURCE = buildDataSource();
 

@@ -16,6 +16,25 @@ jobs:
     name: ant test (JDK 21)
     runs-on: ubuntu-latest
 
+    # MySQL thật cho các test tích hợp (poscs.integration.*). Không có service
+    # này thì chúng tự SKIP -- CI vẫn xanh nhưng mất hẳn lớp kiểm tra bắt được
+    # lỗi SQL/schema, đúng loại lỗi mà 340 test mock không thấy.
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: ci-root-password
+          # Tên PHẢI kết thúc bằng "_it": IntegrationDb từ chối chạy trên CSDL
+          # không mang hậu tố đó, vì mỗi lượt chạy sẽ xoá sạch dữ liệu.
+          MYSQL_DATABASE: poscs_it
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
     steps:
       - uses: actions/checkout@v5
 
@@ -91,12 +110,41 @@ jobs:
       # Đây là dự án NetBeans Ant, nên build-impl.xml mong đợi hai thứ mà IDE
       # thường tự cấp: classpath của Tomcat đã đăng ký, và jar CopyLibs nằm
       # trong thư mục cài NetBeans. Trên runner không có cái nào -- cả hai được
-      # trỏ vào lib-build/ đã commit sẵn trong repo.
-      - name: Run unit tests
+      # test-sys-prop.* được build-impl.xml chuyển thành system property của JVM
+      # test (xem <syspropertyset> trong macrodef junit). Phải đi đường này vì
+      # biến môi trường không đặt được từ trong JVM, mà DBContext thì đọc
+      # system property trước rồi mới tới biến môi trường.
+      - name: Run unit and integration tests
         run: |
           ant -Dj2ee.platform.classpath="$GITHUB_WORKSPACE/lib-build/jakarta.servlet-api-6.1.jar" \
               -Dlibs.CopyLibs.classpath="$GITHUB_WORKSPACE/lib-build/org-netbeans-modules-java-j2seproject-copylibstask.jar" \
+              -Dtest-sys-prop.DB_URL="jdbc:mysql://127.0.0.1:3306/poscs_it?allowPublicKeyRetrieval=true&useSSL=false" \
+              -Dtest-sys-prop.DB_USER=root \
+              -Dtest-sys-prop.DB_PASSWORD=ci-root-password \
               test
+
+      # Test tích hợp tự SKIP khi không kết nối được CSDL -- rất tiện ở máy cá
+      # nhân, nhưng trên CI thì "skip hết" nhìn y hệt "pass hết". Chốt lại là
+      # chúng THẬT SỰ đã chạy, không thì MySQL service hỏng mà không ai biết.
+      - name: Assert integration tests actually ran
+        if: always()
+        run: |
+          python3 - <<'PYCHECK'
+          import glob, sys, xml.etree.ElementTree as ET
+          files = glob.glob("build/test/results/*poscs.integration*.xml")
+          if not files:
+              print("KHONG thay ket qua cua poscs.integration -- test tich hop chua chay.")
+              sys.exit(1)
+          total = skipped = 0
+          for f in files:
+              root = ET.parse(f).getroot()
+              total += int(root.get("tests", 0))
+              skipped += int(root.get("skipped", 0))
+          print("Integration: %d test, %d skipped" % (total, skipped))
+          if total == 0 or skipped == total:
+              print("Tat ca deu bi SKIP -- CSDL tich hop khong dung duoc.")
+              sys.exit(1)
+          PYCHECK
 
       # Ant chỉ in "Tests FAILED" rồi dừng; muốn biết ca nào hỏng và vì sao thì
       # phải mở file XML, nên luôn tải lên kể cả khi build đỏ.
