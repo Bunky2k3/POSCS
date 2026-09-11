@@ -165,6 +165,7 @@ public class TechnicalSupportTicketController extends HttpServlet {
 
         request.setAttribute("ticket", ticket);
         request.setAttribute("canDelete", ticketDAO.canDelete(id));
+        request.setAttribute("ticketHistory", ticketDAO.findHistoryByTicketId(id));
         // Nút "Sửa" phải hiện cho cả kỹ thuật viên ĐANG ĐƯỢC GIAO phiếu này --
         // họ không có quyền Full trên Ticket, nhưng vẫn được cập nhật trạng
         // thái/ghi chú xử lý của đúng phiếu của mình (xem PERMISSIONS.md).
@@ -516,7 +517,13 @@ public class TechnicalSupportTicketController extends HttpServlet {
             return;
         }
 
-        boolean ok = ticketDAO.update(t);
+        // Ghi chú nội bộ chỉ đi kèm DÒNG LỊCH SỬ của lần đổi trạng thái này,
+        // không lưu vào phiếu: nó trả lời "vì sao lúc đó đổi", nên gắn vào
+        // đúng thời điểm đó mới có nghĩa. DAO tự bỏ qua nếu trạng thái không
+        // đổi. Người thực hiện lấy từ session, không nhận từ form -- form thì
+        // ai cũng sửa được, mà đây là cột dùng để quy trách nhiệm.
+        int changedBy = resolveCurrentUserId(request, existing.getAssignedTechnicianId());
+        boolean ok = ticketDAO.update(t, changedBy, emptyToNull(request.getParameter("internalNote")));
         if (!ok) {
             LOG.warn("Cap nhat phieu ho tro that bai (actor={}, ticketId={})", Logs.actor(request), id);
             response.sendRedirect(request.getContextPath() + "/ticket?action=edit&id=" + id + "&error=update_failed");

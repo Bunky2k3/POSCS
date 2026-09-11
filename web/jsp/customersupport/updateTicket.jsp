@@ -220,6 +220,16 @@
                         <label>Kết quả xử lý</label>
                         <textarea class="form-control" id="resolutionSummary" name="resolutionSummary" rows="3" placeholder="Ghi chú kết quả xử lý (điền khi đóng phiếu)">${fn:escapeXml(ticket.resolutionSummary)}</textarea>
                     </div>
+                    <%--
+                      Ghi chú nội bộ KHÔNG lưu vào phiếu mà đi kèm dòng lịch sử
+                      của lần đổi trạng thái này, nên ô luôn để trống khi mở
+                      form (không đổ giá trị cũ vào). Không đổi trạng thái thì
+                      ô này bị bỏ qua.
+                    --%>
+                    <div class="col-12 field-row">
+                        <label>Ghi chú nội bộ <span class="text-muted" style="text-transform: none; font-weight: 400;">(không bắt buộc, chỉ hiện ở lịch sử xử lý)</span></label>
+                        <textarea class="form-control" id="internalNote" name="internalNote" rows="2" placeholder="Vì sao đổi trạng thái lần này?"></textarea>
+                    </div>
                 </div>
 
                 <div class="action-bar">

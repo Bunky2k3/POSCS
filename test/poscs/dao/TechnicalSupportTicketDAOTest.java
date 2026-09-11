@@ -170,31 +170,58 @@ public class TechnicalSupportTicketDAOTest {
     }
 
     // ------------------------------------------------------------------
-    // update -- cột nullable
+    // update -- cột nullable, transaction, và lịch sử đổi trạng thái
     // ------------------------------------------------------------------
+
+    private static final int CHANGED_BY = 7;
+
+    /** PreparedStatement của câu UPDATE trong lần gọi update() vừa rồi. */
+    private PreparedStatement updatePs;
+    /** PreparedStatement của câu INSERT vào technicalrequesthistory (nếu có gọi). */
+    private PreparedStatement historyPs;
+
+    /**
+     * Connection giả cho luồng update() có transaction: trả về 3 statement khác
+     * nhau cho 3 câu SQL (SELECT ... FOR UPDATE / UPDATE / INSERT lịch sử), nhờ
+     * vậy test phân biệt được câu nào đã chạy -- {@link JdbcStub#connectionReturning}
+     * trả chung một mock nên không làm được việc đó.
+     *
+     * @param currentStatus trạng thái đang lưu trong CSDL; null = phiếu không còn.
+     * @param affectedRows  số dòng câu UPDATE tác động.
+     */
+    private Connection transactionalConnection(String currentStatus, int affectedRows) throws Exception {
+        PreparedStatement selectPs = statementReturning(currentStatus == null
+                ? resultSetOf(java.util.List.of())
+                : singleRow(row("status", currentStatus)));
+        updatePs = mock(PreparedStatement.class);
+        when(updatePs.executeUpdate()).thenReturn(affectedRows);
+        historyPs = mock(PreparedStatement.class);
+
+        Connection conn = mock(Connection.class);
+        when(conn.prepareStatement(contains("FOR UPDATE"))).thenReturn(selectPs);
+        when(conn.prepareStatement(contains("UPDATE technicalrequests"))).thenReturn(updatePs);
+        when(conn.prepareStatement(contains("technicalrequesthistory"))).thenReturn(historyPs);
+        return conn;
+    }
 
     @Test
     public void update_openTicket_bindsSqlNullForResolvedAt() throws Exception {
-        PreparedStatement ps = mock(PreparedStatement.class);
-        when(ps.executeUpdate()).thenReturn(1);
-        Connection conn = connectionReturning(ps);
+        Connection conn = transactionalConnection(TechnicalSupportTicketDAO.STATUS_IN_PROGRESS, 1);
 
         try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
             db.when(DBContext::getConnection).thenReturn(conn);
 
             TechnicalRequest t = ticket(); // resolvedAt để null
-            assertTrue(dao.update(t));
+            assertTrue(dao.update(t, CHANGED_BY, null));
 
-            verify(ps).setNull(eq(12), anyInt());
-            verify(ps, never()).setTimestamp(eq(12), any(Timestamp.class));
+            verify(updatePs).setNull(eq(12), anyInt());
+            verify(updatePs, never()).setTimestamp(eq(12), any(Timestamp.class));
         }
     }
 
     @Test
     public void update_closedTicket_bindsResolvedAtTimestamp() throws Exception {
-        PreparedStatement ps = mock(PreparedStatement.class);
-        when(ps.executeUpdate()).thenReturn(1);
-        Connection conn = connectionReturning(ps);
+        Connection conn = transactionalConnection(TechnicalSupportTicketDAO.STATUS_IN_PROGRESS, 1);
 
         try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
             db.when(DBContext::getConnection).thenReturn(conn);
@@ -204,37 +231,37 @@ public class TechnicalSupportTicketDAOTest {
             t.setStatus(TechnicalSupportTicketDAO.STATUS_CLOSED);
             t.setResolvedAt(resolvedAt);
 
-            assertTrue(dao.update(t));
-            verify(ps).setTimestamp(12, resolvedAt);
+            assertTrue(dao.update(t, CHANGED_BY, null));
+            verify(updatePs).setTimestamp(12, resolvedAt);
         }
     }
 
     @Test
     public void update_nullContractId_bindsSqlNullInsteadOfZero() throws Exception {
-        PreparedStatement ps = mock(PreparedStatement.class);
-        when(ps.executeUpdate()).thenReturn(1);
-        Connection conn = connectionReturning(ps);
+        Connection conn = transactionalConnection(TechnicalSupportTicketDAO.STATUS_IN_PROGRESS, 1);
 
         try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
             db.when(DBContext::getConnection).thenReturn(conn);
 
             // Phiếu không gắn hợp đồng nào -- 0 sẽ vi phạm khoá ngoại.
-            dao.update(ticket());
+            dao.update(ticket(), CHANGED_BY, null);
 
-            verify(ps).setNull(eq(2), anyInt());
+            verify(updatePs).setNull(eq(2), anyInt());
         }
     }
 
     @Test
     public void update_ticketAlreadySoftDeleted_returnsFalse() throws Exception {
-        PreparedStatement ps = mock(PreparedStatement.class);
-        when(ps.executeUpdate()).thenReturn(0); // WHERE is_deleted = 0 không khớp
-        Connection conn = connectionReturning(ps);
+        // SELECT ... WHERE is_deleted = 0 không thấy dòng nào.
+        Connection conn = transactionalConnection(null, 1);
 
         try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
             db.when(DBContext::getConnection).thenReturn(conn);
 
-            assertFalse(dao.update(ticket()));
+            assertFalse(dao.update(ticket(), CHANGED_BY, null));
+            verify(updatePs, never()).executeUpdate();
+            verify(conn, never()).commit();
+            verify(conn).rollback();
         }
     }
 
@@ -243,7 +270,86 @@ public class TechnicalSupportTicketDAOTest {
         try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
             db.when(DBContext::getConnection).thenThrow(new SQLException("hỏng"));
 
-            assertFalse(dao.update(ticket()));
+            assertFalse(dao.update(ticket(), CHANGED_BY, null));
+        }
+    }
+
+    /**
+     * Trạng thái đổi -> phải ghi đúng 1 dòng lịch sử, kèm trạng thái CŨ đọc
+     * từ CSDL (không phải trạng thái nào bên gọi tự truyền vào).
+     */
+    @Test
+    public void update_statusChanged_writesHistoryRowInSameTransaction() throws Exception {
+        Connection conn = transactionalConnection(TechnicalSupportTicketDAO.STATUS_NEW, 1);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            TechnicalRequest t = ticket(); // status = Đang xử lý
+            assertTrue(dao.update(t, CHANGED_BY, "Đã liên hệ khách"));
+
+            verify(historyPs).setInt(1, t.getTicketId());
+            verify(historyPs).setString(2, TechnicalSupportTicketDAO.STATUS_NEW);
+            verify(historyPs).setString(3, TechnicalSupportTicketDAO.STATUS_IN_PROGRESS);
+            verify(historyPs).setInt(4, CHANGED_BY);
+            verify(historyPs).setString(5, "Đã liên hệ khách");
+            verify(historyPs).executeUpdate();
+            verify(conn).commit();
+        }
+    }
+
+    /**
+     * Sửa mô tả/người phụ trách mà không đổi trạng thái thì KHÔNG sinh dòng
+     * lịch sử nào -- nếu không, dòng thời gian đầy những bước "A -> A" vô nghĩa
+     * và người đọc không còn thấy được diễn biến thật.
+     */
+    @Test
+    public void update_statusUnchanged_writesNoHistoryRow() throws Exception {
+        Connection conn = transactionalConnection(TechnicalSupportTicketDAO.STATUS_IN_PROGRESS, 1);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            assertTrue(dao.update(ticket(), CHANGED_BY, "ghi chú không đi kèm bước chuyển nào"));
+
+            verify(conn, never()).prepareStatement(contains("technicalrequesthistory"));
+            verify(conn).commit();
+        }
+    }
+
+    /**
+     * Câu UPDATE không tác động dòng nào (phiếu vừa bị xoá mềm giữa chừng) thì
+     * rollback, và tuyệt đối không được để lại dòng lịch sử mồ côi.
+     */
+    @Test
+    public void update_noRowAffected_rollsBackAndWritesNoHistory() throws Exception {
+        Connection conn = transactionalConnection(TechnicalSupportTicketDAO.STATUS_NEW, 0);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            assertFalse(dao.update(ticket(), CHANGED_BY, null));
+
+            verify(conn, never()).prepareStatement(contains("technicalrequesthistory"));
+            verify(conn, never()).commit();
+            verify(conn).rollback();
+            verify(conn).setAutoCommit(true);
+        }
+    }
+
+    /** Ghi lịch sử hỏng -> cả lần cập nhật cũng phải bị huỷ, không commit nửa vời. */
+    @Test
+    public void update_historyInsertFails_rollsBackTheWholeUpdate() throws Exception {
+        Connection conn = transactionalConnection(TechnicalSupportTicketDAO.STATUS_NEW, 1);
+        when(historyPs.executeUpdate()).thenThrow(new SQLException("khoá ngoại changed_by"));
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            assertFalse(dao.update(ticket(), CHANGED_BY, null));
+
+            verify(conn, never()).commit();
+            verify(conn).rollback();
         }
     }
 
