@@ -1,0 +1,102 @@
+{
+  "name": "Phân quyền và giám sát hệ thống",
+  "sheet": "WF_PhanQuyen",
+  "prefix": "ST_ACL",
+  "description": "Đi qua ma trận phân quyền của cả bốn vai trò trên năm nhóm tài nguyên, kiểm tra việc đổi vai trò có hiệu lực đúng lúc, và phần giám sát chỉ Admin được dùng",
+  "precondition": "Có sẵn tài khoản đủ bốn vai trò: Admin, Sales, Kỹ thuật, CSKH",
+  "roles": "Cả bốn vai trò",
+  "sections": [
+    {
+      "name": "Bước 1 — Mỗi vai trò làm đúng phần việc của mình",
+      "cases": [
+        {"d": "Admin thao tác được trên cả năm nhóm tài nguyên",
+         "s": ["Đăng nhập bằng Admin",
+               "Lần lượt tạo/sửa/xoá ở Khách hàng, Hợp đồng, Sản phẩm, Phiếu hỗ trợ, Nhân viên"],
+         "e": "Mọi thao tác đều thực hiện được"},
+        {"d": "Sales toàn quyền với Khách hàng và Hợp đồng",
+         "s": ["Đăng nhập bằng Sales",
+               "Tạo, sửa rồi xoá một khách hàng và một hợp đồng"],
+         "e": "Thực hiện được đầy đủ"},
+        {"d": "Kỹ thuật toàn quyền với Sản phẩm",
+         "s": ["Đăng nhập bằng Kỹ thuật", "Tạo, sửa rồi xoá một sản phẩm"],
+         "e": "Thực hiện được đầy đủ"},
+        {"d": "CSKH toàn quyền với Phiếu hỗ trợ",
+         "s": ["Đăng nhập bằng CSKH", "Tạo, sửa rồi xoá một phiếu hỗ trợ"],
+         "e": "Thực hiện được đầy đủ"}
+      ]
+    },
+    {
+      "name": "Bước 2 — Vai trò chỉ được xem thì không sửa được",
+      "cases": [
+        {"d": "Sales bị chặn ở Sản phẩm và Phiếu hỗ trợ",
+         "s": ["Đăng nhập bằng Sales",
+               "Mở danh sách Sản phẩm và Phiếu hỗ trợ",
+               "Gửi yêu cầu tạo sản phẩm và yêu cầu cập nhật một phiếu"],
+         "e": "Xem được cả hai danh sách nhưng mọi thao tác thay đổi đều trả về 403"},
+        {"d": "Kỹ thuật bị chặn ở Khách hàng và Hợp đồng",
+         "s": ["Đăng nhập bằng Kỹ thuật",
+               "Gửi yêu cầu tạo khách hàng và cập nhật hợp đồng"],
+         "e": "Cả hai đều trả về 403"},
+        {"d": "CSKH bị chặn ở Khách hàng, Hợp đồng và Sản phẩm",
+         "s": ["Đăng nhập bằng CSKH",
+               "Gửi yêu cầu tạo/sửa ở cả ba nhóm tài nguyên"],
+         "e": "Tất cả đều trả về 403"},
+        {"d": "Ẩn nút trên giao diện không phải lớp bảo vệ duy nhất",
+         "s": ["Đăng nhập bằng vai trò chỉ được xem",
+               "Dùng công cụ trình duyệt hiện lại nút đang bị ẩn và bấm"],
+         "e": "Máy chủ vẫn từ chối bằng 403 — chặn không phụ thuộc giao diện"},
+        {"d": "Xuất Excel được tính là thao tác đọc",
+         "s": ["Đăng nhập bằng vai trò chỉ được xem",
+               "Bấm Xuất Excel ở danh sách tương ứng"],
+         "e": "Tải được file bình thường, không bị chặn"}
+      ]
+    },
+    {
+      "name": "Bước 3 — Ngoại lệ của vai trò Kỹ thuật với phiếu hỗ trợ",
+      "cases": [
+        {"d": "Kỹ thuật viên cập nhật được phiếu giao cho chính mình",
+         "s": ["Đăng nhập bằng kỹ thuật viên được giao một phiếu",
+               "Đổi trạng thái và ghi kết quả xử lý phiếu đó"],
+         "e": "Cập nhật thành công — đây là ngoại lệ duy nhất của vai trò Kỹ thuật với Phiếu hỗ trợ"},
+        {"d": "Nhưng không cập nhật được phiếu của người khác",
+         "s": ["Gửi yêu cầu cập nhật phiếu đang giao cho kỹ thuật viên khác"],
+         "e": "Trả về 403"},
+        {"d": "Và không phân công lại phiếu cho người khác",
+         "s": ["Ở phiếu của chính mình, sửa ô ẩn để đổi kỹ thuật viên phụ trách",
+               "Bấm Lưu"],
+         "e": "Người phụ trách không đổi — Kỹ thuật chỉ được sửa trạng thái và kết quả xử lý"}
+      ]
+    },
+    {
+      "name": "Bước 4 — Đổi vai trò và phần dành riêng cho Admin",
+      "cases": [
+        {"d": "Admin đổi vai trò của một nhân viên",
+         "s": ["Đăng nhập bằng Admin", "Mở chi tiết một nhân viên Sales",
+               "Đổi vai trò sang CSKH", "Bấm Lưu"],
+         "e": "Lưu thành công, trang chi tiết hiện vai trò mới"},
+        {"d": "Quyền mới có hiệu lực ở phiên đăng nhập tiếp theo",
+         "s": ["Nhân viên đó đăng xuất rồi đăng nhập lại",
+               "Thử tạo khách hàng và thử tạo phiếu hỗ trợ"],
+         "e": "Không tạo được khách hàng nữa nhưng tạo được phiếu hỗ trợ — đúng quyền của vai trò mới"},
+        {"d": "Chỉ Admin mở được màn hình Nhân viên",
+         "s": ["Lần lượt đăng nhập bằng Sales, Kỹ thuật, CSKH",
+               "Gõ thẳng đường dẫn màn hình Nhân viên"],
+         "e": "Cả ba vai trò đều nhận 403, kể cả thao tác xem danh sách"},
+        {"d": "Chỉ Admin mở được Nhật ký hệ thống",
+         "s": ["Lần lượt đăng nhập bằng ba vai trò còn lại",
+               "Gõ thẳng đường dẫn Nhật ký hệ thống và đường dẫn tải file log"],
+         "e": "Cả hai đường dẫn đều trả về 403, không nội dung log nào bị lộ"},
+        {"d": "Admin xem và tải được nhật ký hệ thống",
+         "s": ["Đăng nhập bằng Admin", "Mở Nhật ký hệ thống",
+               "Chọn một file, lọc theo từ khoá", "Bấm Tải file"],
+         "e": "Xem được nội dung, lọc được theo từ khoá, file tải về dưới dạng đính kèm"},
+        {"d": "Không đọc được file nằm ngoài thư mục log",
+         "s": ["Sửa tham số tên file trên thanh địa chỉ thành đường dẫn đi ra ngoài thư mục log"],
+         "e": "Bị từ chối kèm thông báo không tìm thấy file log; không nội dung file cấu hình nào bị trả về"},
+        {"d": "Chưa đăng nhập thì không vào được bất kỳ màn hình nội bộ nào",
+         "s": ["Xoá cookie", "Gõ thẳng đường dẫn Dashboard, Khách hàng, Hợp đồng, Phiếu hỗ trợ"],
+         "e": "Tất cả đều bị đẩy về trang đăng nhập"}
+      ]
+    }
+  ]
+}

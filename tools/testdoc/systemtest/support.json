@@ -1,0 +1,113 @@
+{
+  "name": "Xử lý phiếu hỗ trợ kỹ thuật",
+  "sheet": "WF_PhieuHoTro",
+  "prefix": "ST_TK",
+  "description": "CSKH tiếp nhận yêu cầu của khách hàng, gắn đúng hợp đồng và giao cho kỹ thuật viên; kỹ thuật viên cập nhật tiến độ trong phạm vi quyền của mình rồi đóng phiếu; hệ thống ghi lịch sử và cảnh báo khi quá hạn SLA",
+  "precondition": "Đăng nhập được bằng CSKH và Kỹ thuật; đã có khách hàng kèm hợp đồng",
+  "roles": "CSKH (tiếp nhận), Kỹ thuật (xử lý), Sales (chỉ được xem)",
+  "sections": [
+    {
+      "name": "Bước 1 — CSKH tiếp nhận phiếu",
+      "cases": [
+        {"d": "Tạo phiếu hỗ trợ gắn đúng hợp đồng của khách hàng",
+         "s": ["Đăng nhập bằng CSKH", "Mở Phiếu hỗ trợ > Thêm phiếu",
+               "Chọn khách hàng đã có hợp đồng",
+               "Mở dropdown Hợp đồng, chọn một hợp đồng của chính khách hàng đó",
+               "Chọn loại phiếu, mức ưu tiên, kênh tiếp nhận, kỹ thuật viên phụ trách",
+               "Nhập mô tả và hạn SLA", "Bấm Lưu"],
+         "e": "Lưu thành công, mã phiếu sinh tự động, trạng thái mặc định là Mới tiếp nhận"},
+        {"d": "Dropdown hợp đồng chỉ liệt kê hợp đồng của khách hàng đang chọn",
+         "s": ["Ở form tạo phiếu, chọn khách hàng A và xem danh sách hợp đồng",
+               "Đổi sang khách hàng B", "Mở lại dropdown Hợp đồng"],
+         "e": "Danh sách nạp lại theo khách hàng B, không còn hợp đồng của khách hàng A"},
+        {"d": "Không gắn được hợp đồng của khách hàng khác",
+         "s": ["Chọn khách hàng A",
+               "Dùng công cụ trình duyệt đổi giá trị hợp đồng sang của khách hàng B",
+               "Bấm Lưu"],
+         "e": "Bị từ chối kèm thông báo hợp đồng không thuộc khách hàng của phiếu; không tạo phiếu"},
+        {"d": "Phiếu mới xuất hiện ở bộ lọc trạng thái Mới tiếp nhận",
+         "s": ["Mở danh sách phiếu", "Lọc trạng thái Mới tiếp nhận"],
+         "e": "Phiếu vừa tạo nằm trong kết quả; không lẫn phiếu ở trạng thái khác"}
+      ]
+    },
+    {
+      "name": "Bước 2 — Kỹ thuật viên xử lý trong phạm vi quyền",
+      "cases": [
+        {"d": "Kỹ thuật viên được giao cập nhật trạng thái phiếu của mình",
+         "s": ["Đăng nhập bằng kỹ thuật viên được giao phiếu",
+               "Mở phiếu đó", "Đổi trạng thái sang Đang xử lý",
+               "Nhập tiến độ vào ô kết quả xử lý", "Bấm Lưu"],
+         "e": "Cập nhật thành công; trang chi tiết hiện trạng thái Đang xử lý",
+         "p": "Phiếu có kỹ thuật viên phụ trách đúng là người đang đăng nhập"},
+        {"d": "Lịch sử ghi lại lần đổi trạng thái vừa rồi",
+         "s": ["Xem khối lịch sử trên trang chi tiết phiếu"],
+         "e": "Có dòng ghi trạng thái cũ, trạng thái mới, người thực hiện và thời điểm"},
+        {"d": "Lưu mà không đổi trạng thái thì không ghi thêm lịch sử",
+         "s": ["Sửa mô tả tiến độ, giữ nguyên trạng thái", "Bấm Lưu",
+               "Đếm lại số dòng lịch sử"],
+         "e": "Nội dung được cập nhật nhưng số dòng lịch sử không tăng"},
+        {"d": "Kỹ thuật viên không sửa được phiếu giao cho người khác",
+         "s": ["Đăng nhập bằng kỹ thuật viên thứ hai",
+               "Gửi yêu cầu cập nhật phiếu đang giao cho người thứ nhất"],
+         "e": "Trả về trang lỗi 403; phiếu không đổi"},
+        {"d": "Kỹ thuật viên không tạo và không xoá được phiếu",
+         "s": ["Đăng nhập bằng Kỹ thuật",
+               "Gửi yêu cầu tạo phiếu mới và yêu cầu xoá phiếu đang giao cho mình"],
+         "e": "Cả hai đều trả về 403 — quyền cập nhật phiếu được giao không bao gồm tạo hay xoá"},
+        {"d": "Vai trò Sales chỉ xem được phiếu",
+         "s": ["Đăng nhập bằng Sales", "Mở danh sách phiếu",
+               "Gửi yêu cầu cập nhật một phiếu bất kỳ"],
+         "e": "Xem được danh sách nhưng yêu cầu cập nhật trả về 403"}
+      ]
+    },
+    {
+      "name": "Bước 3 — Đóng phiếu và cảnh báo SLA",
+      "cases": [
+        {"d": "Kỹ thuật viên đóng phiếu kèm tóm tắt kết quả xử lý",
+         "s": ["Mở phiếu đang xử lý", "Đổi trạng thái sang Đã đóng",
+               "Nhập tóm tắt kết quả xử lý", "Bấm Lưu"],
+         "e": "Trạng thái chuyển sang Đã đóng; hệ thống ghi mốc thời gian đóng phiếu"},
+        {"d": "Lưu lại phiếu đã đóng không làm mất mốc đóng ban đầu",
+         "s": ["Mở lại phiếu đã đóng", "Bấm Lưu mà không đổi gì",
+               "Đối chiếu mốc thời gian đóng"],
+         "e": "Mốc thời gian đóng giữ nguyên giá trị ban đầu, không bị ghi đè bằng thời điểm hiện tại"},
+        {"d": "Mở lại phiếu đã đóng khi khách hàng báo chưa xong",
+         "s": ["Đổi trạng thái phiếu đã đóng về Đang xử lý", "Bấm Lưu"],
+         "e": "Trạng thái đổi lại được và lịch sử ghi thêm một dòng"},
+        {"d": "Phiếu quá hạn SLA được đánh dấu trên danh sách",
+         "s": ["Tạo phiếu có hạn SLA nằm trong quá khứ và chưa đóng",
+               "Mở danh sách phiếu"],
+         "e": "Phiếu đó hiện nhãn cảnh báo quá hạn SLA, phân biệt rõ với phiếu còn hạn"},
+        {"d": "Phiếu sắp tới hạn SLA cũng được đánh dấu",
+         "s": ["Tạo phiếu có hạn SLA còn dưới 24 giờ", "Mở danh sách phiếu"],
+         "e": "Phiếu hiện nhãn sắp tới hạn, khác nhãn quá hạn"},
+        {"d": "Phiếu đã đóng không còn bị cảnh báo dù quá hạn",
+         "s": ["Đóng phiếu quá hạn ở bước trên", "Mở lại danh sách"],
+         "e": "Phiếu không còn nhãn cảnh báo — đã xong thì không tính là trễ"},
+        {"d": "Số cảnh báo trên Dashboard khớp với danh sách",
+         "s": ["Ghi lại số phiếu cần chú ý trên Dashboard",
+               "Đối chiếu với số phiếu mang nhãn cảnh báo ở danh sách"],
+         "e": "Hai con số dùng cùng một quy tắc (chưa đóng, còn dưới 24 giờ hoặc đã quá hạn)"}
+      ]
+    },
+    {
+      "name": "Bước 4 — Kết xuất và dọn dẹp",
+      "cases": [
+        {"d": "Xuất danh sách phiếu ra Excel theo bộ lọc trạng thái",
+         "s": ["Lọc danh sách theo trạng thái Đã đóng", "Bấm Xuất Excel",
+               "Mở file vừa tải"],
+         "e": "File chỉ chứa phiếu đã đóng, đọc được bằng Excel"},
+        {"d": "Xuất một phiếu ra PDF",
+         "s": ["Mở chi tiết phiếu", "Bấm Xuất PDF", "Mở file"],
+         "e": "File PDF mở được, nội dung phiếu đầy đủ, tiếng Việt đủ dấu"},
+        {"d": "CSKH xoá phiếu đủ điều kiện",
+         "s": ["Đăng nhập bằng CSKH", "Mở phiếu đủ điều kiện xoá",
+               "Bấm Xoá", "Xác nhận"],
+         "e": "Xoá thành công; phiếu biến mất khỏi danh sách"},
+        {"d": "Mở lại phiếu đã xoá bằng đường dẫn cũ",
+         "s": ["Gõ lại URL chi tiết của phiếu vừa xoá"],
+         "e": "Chuyển về danh sách kèm thông báo không tìm thấy, không hiện dữ liệu"}
+      ]
+    }
+  ]
+}

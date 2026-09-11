@@ -194,14 +194,27 @@ public class SystemLogControllerTest {
 
     /** Tên file bịa không được làm trang vỡ, chỉ là không có nội dung để hiện. */
     @Test
-    public void view_unknownFileName_showsNoContentInsteadOfFailing() throws Exception {
-        stubDispatcher();
+    public void view_unknownFileName_redirectsWithNotFoundInsteadOfBlankPage() throws Exception {
         when(request.getParameter("file")).thenReturn("../../etc/passwd");
 
         controller.doGet(request, response);
 
-        assertNull(attribute("selectedFile"));
-        assertTrue(((List<?>) attribute("logContent")).isEmpty());
+        // Trước đây trang vẫn render nhưng trống trơn, không kèm thông báo nào --
+        // người dùng không biết vì sao không thấy gì. systemLog.jsp đã có sẵn
+        // thông báo cho error=notfound, nhánh tải file cũng dùng đúng tham số này.
+        verify(response).sendRedirect(CONTEXT_PATH + "/systemLog?error=notfound");
+        verify(request, never()).getRequestDispatcher(anyString());
+    }
+
+    /** Không truyền tham số file thì vẫn mở file mặc định như cũ, không báo lỗi. */
+    @Test
+    public void view_noFileParameter_stillOpensDefaultLogFile() throws Exception {
+        stubDispatcher();
+
+        controller.doGet(request, response);
+
+        verify(response, never()).sendRedirect(anyString());
+        assertNotNull(attribute("logFiles"));
     }
 
     /** Số dòng do người dùng gửi lên phải bị kẹp, không cho kéo cả file khổng lồ ra màn hình. */

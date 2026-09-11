@@ -65,6 +65,15 @@ public class SystemLogController extends HttpServlet {
         String keyword = trimToNull(request.getParameter("keyword"));
 
         Path file = LogFiles.resolve(selected);
+        // Người dùng chỉ đích danh một file mà không mở được (tên sai, file đã bị
+        // xoá, hoặc đường dẫn trỏ ra ngoài thư mục log): báo đúng lý do thay vì
+        // render trang trống không kèm thông báo nào. Nhánh tải file đã làm vậy
+        // từ trước, còn nhánh xem thì chưa -- systemLog.jsp có sẵn thông báo cho
+        // error=notfound.
+        if (file == null && request.getParameter("file") != null) {
+            response.sendRedirect(request.getContextPath() + "/systemLog?error=notfound");
+            return;
+        }
         List<String> content = file == null ? List.of() : LogFiles.tail(file, lines);
         if (keyword != null) {
             String needle = keyword.toLowerCase(Locale.ROOT);

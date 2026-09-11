@@ -11,6 +11,7 @@ import jakarta.servlet.annotation.WebFilter;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
+import poscs.dao.EmployeeDAO;
 import poscs.dao.NotificationDAO;
 import poscs.model.User;
 
@@ -66,6 +67,7 @@ public class AuthenticationFilter implements Filter {
     private static final int RECENT_NOTIFICATIONS_LIMIT = 5;
 
     private final NotificationDAO notificationDAO = new NotificationDAO();
+    private final EmployeeDAO employeeDAO = new EmployeeDAO();
 
     @Override
     public void doFilter(ServletRequest req, ServletResponse res, FilterChain chain)
@@ -124,6 +126,27 @@ public class AuthenticationFilter implements Filter {
         if (!loggedIn) {
             response.sendRedirect(request.getContextPath() + "/login.jsp");
             return;
+        }
+
+        // Tài khoản có thể đã bị admin khoá SAU khi người này đăng nhập. Chỉ
+        // chặn ở màn hình đăng nhập là không đủ: phiên đang mở vẫn xem và sửa
+        // được dữ liệu cho tới khi họ tự đăng xuất hoặc session hết hạn -- tức
+        // là thao tác khoá tài khoản (nhân viên nghỉ việc, lộ mật khẩu) không
+        // có tác dụng ngay, đúng lúc cần nhất.
+        //
+        // Kiểm mỗi request thay vì cache theo thời gian: cache bao nhiêu giây
+        // thì tài khoản bị khoá vẫn dùng được bấy nhiêu giây. Một câu SELECT
+        // theo cột UNIQUE, và filter này vốn đã chạy 2 query thông báo cho mỗi
+        // trang, nên thêm câu này không đổi bậc chi phí.
+        if (!isStaticAssetPath(request.getServletPath())) {
+            User sessionUser = (User) session.getAttribute("currentUser");
+            User freshUser = employeeDAO.findByUsernameOrEmail(sessionUser.getUsername());
+            if (freshUser == null || freshUser.isDeleted()) {
+                session.invalidate();
+                response.sendRedirect(request.getContextPath()
+                        + "/login.jsp?error=account_inactive");
+                return;
+            }
         }
 
         // Bơm sẵn dữ liệu chuông thông báo cho topbar.jsp -- topbar được

@@ -1,0 +1,110 @@
+{
+  "name": "Từ khách hàng mới tới hợp đồng hết hạn",
+  "sheet": "WF_KhachHang_HopDong",
+  "prefix": "ST_CUS",
+  "description": "Sales tiếp nhận khách hàng mới, đánh giá quan hệ, ký hợp đồng kèm sản phẩm, theo dõi hợp đồng đổi trạng thái theo thời gian, nhận thông báo sắp hết hạn và xuất báo cáo",
+  "precondition": "Đăng nhập bằng tài khoản Sales; danh mục sản phẩm đã có dữ liệu",
+  "roles": "Sales (chính), Admin (đối chiếu Dashboard)",
+  "sections": [
+    {
+      "name": "Bước 1 — Tiếp nhận khách hàng mới",
+      "cases": [
+        {"d": "Tạo hồ sơ khách hàng doanh nghiệp mới",
+         "s": ["Đăng nhập bằng Sales", "Mở Khách hàng > Thêm khách hàng",
+               "Nhập tên doanh nghiệp, loại, nhóm, mã số thuế",
+               "Nhập điện thoại, email, chọn Tỉnh/Thành và Xã/Phường",
+               "Chọn chính mình làm người phụ trách", "Bấm Lưu"],
+         "e": "Lưu thành công, chuyển sang trang chi tiết, mã khách hàng sinh tự động"},
+        {"d": "Khách hàng mới xuất hiện trong danh sách và tìm được theo mã số thuế",
+         "s": ["Quay về danh sách khách hàng",
+               "Nhập mã số thuế vừa tạo vào ô tìm kiếm", "Bấm Tìm"],
+         "e": "Kết quả trả về đúng một dòng là khách hàng vừa tạo"},
+        {"d": "Số tổng khách hàng trên Dashboard tăng thêm 1",
+         "s": ["Ghi lại số tổng khách hàng trên Dashboard trước khi tạo",
+               "Tạo khách hàng mới", "Mở lại Dashboard"],
+         "e": "Số tổng khách hàng tăng đúng 1 đơn vị"},
+        {"d": "Đánh giá mức quan hệ lần đầu cho khách hàng",
+         "s": ["Mở chi tiết khách hàng", "Bấm Đánh giá",
+               "Chọn mức Tiềm năng/Tốt và nhập lý do", "Bấm Lưu"],
+         "e": "Mức quan hệ hiện tại đổi theo lựa chọn; lịch sử đánh giá thêm một dòng ghi đúng người và ngày"}
+      ]
+    },
+    {
+      "name": "Bước 2 — Ký hợp đồng và gắn sản phẩm",
+      "cases": [
+        {"d": "Tạo hợp đồng cho đúng khách hàng vừa tiếp nhận",
+         "s": ["Mở Hợp đồng > Thêm hợp đồng", "Nhập tiêu đề và loại hợp đồng",
+               "Chọn khách hàng vừa tạo, chọn người phụ trách",
+               "Chọn ngày ký, ngày hiệu lực trong tương lai, ngày kết thúc",
+               "Bấm Lưu"],
+         "e": "Lưu thành công, mã hợp đồng sinh tự động; trạng thái hiển thị là Chưa hiệu lực vì chưa tới ngày hiệu lực"},
+        {"d": "Hợp đồng xuất hiện trong khối hợp đồng của khách hàng",
+         "s": ["Mở lại trang chi tiết khách hàng"],
+         "e": "Khối hợp đồng liệt kê đúng hợp đồng vừa tạo kèm trạng thái tương ứng"},
+        {"d": "Thêm hai dòng sản phẩm vào hợp đồng",
+         "s": ["Mở chi tiết hợp đồng",
+               "Chọn sản phẩm thứ nhất, nhập số lượng 3, bấm Thêm",
+               "Chọn sản phẩm thứ hai, nhập số lượng 1, bấm Thêm"],
+         "e": "Bảng sản phẩm của hợp đồng có đủ hai dòng với đúng số lượng"},
+        {"d": "Không thêm được sản phẩm với số lượng không hợp lệ",
+         "s": ["Chọn một sản phẩm", "Nhập số lượng 0", "Bấm Thêm"],
+         "e": "Bị từ chối kèm thông báo phải chọn sản phẩm và nhập số lượng hợp lệ; bảng sản phẩm không đổi"},
+        {"d": "Sản phẩm đang nằm trong hợp đồng thì không xoá được khỏi danh mục",
+         "s": ["Đăng nhập bằng Kỹ thuật", "Mở chi tiết sản phẩm vừa gắn",
+               "Bấm Xoá", "Xác nhận"],
+         "e": "Bị chặn kèm thông báo sản phẩm đang được dùng trong hợp đồng",
+         "p": "Sản phẩm đã được gắn vào hợp đồng ở bước trước"}
+      ]
+    },
+    {
+      "name": "Bước 3 — Hợp đồng đổi trạng thái theo thời gian",
+      "cases": [
+        {"d": "Hợp đồng tới ngày hiệu lực thì chuyển sang Đang hiệu lực",
+         "s": ["Sửa hợp đồng, đặt ngày hiệu lực là hôm nay và ngày kết thúc sau 90 ngày",
+               "Lưu và xem lại trang chi tiết"],
+         "e": "Trạng thái hiển thị là Đang hiệu lực"},
+        {"d": "Hợp đồng còn đúng 30 ngày thì chuyển sang Sắp hết hạn",
+         "s": ["Sửa ngày kết thúc thành hôm nay cộng 30 ngày", "Lưu và xem lại"],
+         "e": "Trạng thái hiển thị là Sắp hết hạn — 30 ngày là giá trị biên"},
+        {"d": "Lọc danh sách theo trạng thái Sắp hết hạn thấy hợp đồng này",
+         "s": ["Mở danh sách hợp đồng", "Chọn lọc trạng thái Sắp hết hạn"],
+         "e": "Hợp đồng vừa sửa nằm trong kết quả lọc"},
+        {"d": "Hợp đồng quá ngày kết thúc thì chuyển sang Đã hết hạn",
+         "s": ["Sửa ngày kết thúc về một ngày trong quá khứ", "Lưu và xem lại"],
+         "e": "Trạng thái hiển thị là Đã hết hạn"},
+        {"d": "Hợp đồng đã có hiệu lực thì không xoá được",
+         "s": ["Mở chi tiết hợp đồng đang hoặc đã có hiệu lực", "Bấm Xoá", "Xác nhận"],
+         "e": "Bị chặn kèm thông báo không thể xoá; hợp đồng vẫn còn trong danh sách",
+         "n": "BR-46: chỉ hợp đồng Chưa hiệu lực mới được xoá"}
+      ]
+    },
+    {
+      "name": "Bước 4 — Cảnh báo và báo cáo",
+      "cases": [
+        {"d": "Tác vụ nền sinh thông báo hợp đồng sắp hết hạn cho người phụ trách",
+         "s": ["Đưa hợp đồng về trạng thái Sắp hết hạn",
+               "Chờ tác vụ nền chạy (khởi động lại ứng dụng thì chạy sau 1 phút)",
+               "Mở trang Thông báo bằng tài khoản người phụ trách"],
+         "e": "Có thông báo nêu đúng mã hợp đồng và số ngày còn lại"},
+        {"d": "Chạy lại tác vụ nền không sinh thông báo trùng",
+         "s": ["Khởi động lại ứng dụng lần nữa", "Chờ tác vụ nền chạy",
+               "Đếm lại số thông báo loại hợp đồng sắp hết hạn"],
+         "e": "Số thông báo không tăng thêm; mỗi hợp đồng chỉ có đúng một thông báo"},
+        {"d": "Dashboard hiện hợp đồng sắp hết hạn kèm số ngày còn lại",
+         "s": ["Mở Dashboard"],
+         "e": "Khối hợp đồng sắp hết hạn liệt kê hợp đồng này, hợp đồng gần hết hạn nhất xếp trước"},
+        {"d": "Xuất danh sách hợp đồng ra Excel theo bộ lọc đang áp dụng",
+         "s": ["Mở danh sách hợp đồng", "Lọc trạng thái Sắp hết hạn",
+               "Bấm Xuất Excel", "Mở file vừa tải"],
+         "e": "File chỉ chứa các hợp đồng thoả bộ lọc, có dòng tiêu đề và mỗi hợp đồng một dòng"},
+        {"d": "Xuất một hợp đồng ra PDF đọc được",
+         "s": ["Mở chi tiết hợp đồng", "Bấm Xuất PDF", "Mở file vừa tải"],
+         "e": "File PDF mở được, trình bày đúng thông tin hợp đồng, tiếng Việt đủ dấu"},
+        {"d": "Xoá khách hàng bị chặn khi còn hợp đồng hiệu lực",
+         "s": ["Đưa hợp đồng về trạng thái Đang hiệu lực",
+               "Mở chi tiết khách hàng", "Bấm Xoá", "Xác nhận"],
+         "e": "Bị chặn kèm thông báo khách hàng còn hợp đồng đang hiệu lực"}
+      ]
+    }
+  ]
+}

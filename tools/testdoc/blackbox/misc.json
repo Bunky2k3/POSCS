@@ -1,0 +1,596 @@
+{
+  "module": "Chức năng dùng chung",
+  "functions": [
+    {
+      "name": "Bảng điều khiển (Dashboard)",
+      "sheet": "Dashboard",
+      "prefix": "TC_DASH",
+      "screen": "/POSCS/dashboard",
+      "description": "Trang tổng quan số liệu khách hàng, hợp đồng, doanh thu và phiếu hỗ trợ",
+      "precondition": "Đang đăng nhập; CSDL có dữ liệu ở cả bốn nhóm",
+      "cases": [
+        {
+          "d": "Mở trang Dashboard sau khi đăng nhập",
+          "s": [
+            "Đăng nhập vào hệ thống"
+          ],
+          "t": "-",
+          "e": "Vào thẳng Dashboard, hiện đủ các ô: tổng khách hàng, khách hàng mới trong tháng, tình hình hợp đồng, doanh thu tháng và tình hình phiếu hỗ trợ"
+        },
+        {
+          "d": "Số tổng khách hàng khớp với danh sách",
+          "s": [
+            "Ghi lại số tổng khách hàng trên Dashboard",
+            "Mở danh sách khách hàng và đối chiếu tổng số bản ghi"
+          ],
+          "t": "-",
+          "e": "Hai con số khớp nhau"
+        },
+        {
+          "d": "Khối tình hình hợp đồng",
+          "s": [
+            "Xem khối tình hình hợp đồng trên Dashboard"
+          ],
+          "t": "-",
+          "e": "Hiện số hợp đồng Đang hiệu lực và số hợp đồng Sắp hết hạn; hai con số khớp với kết quả lọc tương ứng ở màn hình danh sách hợp đồng",
+          "n": "Dashboard chỉ làm nổi hai nhóm này, không liệt kê đủ bốn trạng thái — bốn trạng thái đầy đủ xem ở TC_CTRLIST_002"
+        },
+        {
+          "d": "Doanh thu tháng và phần trăm tăng trưởng",
+          "s": [
+            "Xem ô doanh thu tháng này"
+          ],
+          "p": "Tháng trước có phát sinh doanh thu",
+          "t": "-",
+          "e": "Hiện doanh thu tháng này kèm phần trăm tăng/giảm so với tháng trước"
+        },
+        {
+          "d": "Tháng trước không có doanh thu",
+          "s": [
+            "Xoá hết dữ liệu doanh thu của tháng trước",
+            "Mở Dashboard"
+          ],
+          "p": "Tháng trước không có đợt thanh toán nào",
+          "t": "-",
+          "e": "Vẫn hiện doanh thu tháng này, phần trăm tăng trưởng được bỏ qua chứ không hiện lỗi chia cho 0"
+        },
+        {
+          "d": "Danh sách hợp đồng sắp hết hạn",
+          "s": [
+            "Xem khối hợp đồng sắp hết hạn"
+          ],
+          "p": "Có hợp đồng kết thúc trong vòng 30 ngày",
+          "t": "-",
+          "e": "Liệt kê hợp đồng kèm số ngày còn lại và giá trị, hợp đồng gần hết hạn nhất xếp trước"
+        },
+        {
+          "d": "Số phiếu quá hạn hoặc sắp tới hạn SLA",
+          "s": [
+            "Xem ô cảnh báo phiếu hỗ trợ"
+          ],
+          "p": "Có phiếu quá hạn SLA",
+          "t": "-",
+          "e": "Con số khớp với số phiếu quá hạn/sắp tới hạn khi lọc ở màn hình danh sách phiếu"
+        },
+        {
+          "d": "CSDL rỗng hoàn toàn",
+          "s": [
+            "Chạy trên CSDL mới chưa có dữ liệu nghiệp vụ",
+            "Mở Dashboard"
+          ],
+          "p": "CSDL chỉ có tài khoản đăng nhập, chưa có khách hàng/hợp đồng/phiếu",
+          "t": "-",
+          "e": "Các ô hiện số 0, trang không báo lỗi và không để trống trắng"
+        },
+        {
+          "d": "Mọi vai trò đều mở được Dashboard",
+          "s": [
+            "Lần lượt đăng nhập bằng Admin, Sales, Kỹ thuật, CSKH",
+            "Mở Dashboard"
+          ],
+          "t": "-",
+          "e": "Cả bốn vai trò đều xem được Dashboard"
+        }
+      ]
+    },
+    {
+      "name": "Thông báo",
+      "sheet": "Notification",
+      "prefix": "TC_NOTI",
+      "screen": "/POSCS/notifications",
+      "description": "Xem danh sách thông báo và đánh dấu đã đọc",
+      "precondition": "Đang đăng nhập; tài khoản đã có thông báo",
+      "cases": [
+        {
+          "d": "Chuông thông báo hiện số chưa đọc",
+          "s": [
+            "Đăng nhập",
+            "Xem biểu tượng chuông trên thanh trên cùng"
+          ],
+          "p": "Tài khoản có thông báo chưa đọc",
+          "t": "-",
+          "e": "Chuông hiện đúng số thông báo chưa đọc của chính người đang đăng nhập"
+        },
+        {
+          "d": "Mở trang danh sách thông báo",
+          "s": [
+            "Bấm vào biểu tượng chuông",
+            "Chọn Xem tất cả"
+          ],
+          "t": "-",
+          "e": "Hiện danh sách thông báo của riêng người đang đăng nhập, mới nhất xếp trước"
+        },
+        {
+          "d": "Đánh dấu một thông báo là đã đọc",
+          "s": [
+            "Bấm vào một thông báo chưa đọc"
+          ],
+          "t": "id thông báo của chính mình",
+          "e": "Thông báo chuyển sang trạng thái đã đọc, số trên chuông giảm đi 1"
+        },
+        {
+          "d": "Đánh dấu tất cả là đã đọc",
+          "s": [
+            "Bấm Đánh dấu tất cả đã đọc"
+          ],
+          "p": "Có nhiều thông báo chưa đọc",
+          "t": "-",
+          "e": "Toàn bộ thông báo của người đang đăng nhập chuyển sang đã đọc, số trên chuông về 0"
+        },
+        {
+          "d": "Đánh dấu đã đọc thông báo của người khác",
+          "s": [
+            "Lấy id thông báo thuộc tài khoản B",
+            "Đăng nhập bằng tài khoản A",
+            "Gửi yêu cầu đánh dấu đã đọc id đó"
+          ],
+          "p": "Thông báo thuộc về tài khoản B",
+          "t": "id thông báo của B",
+          "e": "Thông báo của B vẫn ở trạng thái chưa đọc — thao tác chỉ tác động lên thông báo của chính mình"
+        },
+        {
+          "d": "Gọi trang thông báo khi chưa đăng nhập",
+          "s": [
+            "Xoá cookie",
+            "Gõ thẳng /POSCS/notifications"
+          ],
+          "p": "Chưa đăng nhập",
+          "t": "URL: /POSCS/notifications",
+          "e": "Bị chuyển về trang đăng nhập"
+        },
+        {
+          "d": "Gọi đánh dấu đã đọc mà không kèm id",
+          "s": [
+            "Gọi /POSCS/notifications?action=read không kèm tham số id"
+          ],
+          "t": "URL: /POSCS/notifications?action=read",
+          "e": "Không báo lỗi 500, chuyển về trang thông báo bình thường"
+        },
+        {
+          "d": "Tài khoản chưa có thông báo nào",
+          "s": [
+            "Đăng nhập bằng tài khoản mới tạo",
+            "Mở trang thông báo"
+          ],
+          "p": "Tài khoản chưa có thông báo",
+          "t": "-",
+          "e": "Hiện thông báo danh sách trống, chuông không hiện số"
+        },
+        {
+          "d": "Thông báo hợp đồng sắp hết hạn được sinh tự động",
+          "s": [
+            "Tạo hợp đồng có ngày kết thúc trong vòng 30 ngày",
+            "Chờ tác vụ nền chạy hoặc khởi động lại ứng dụng",
+            "Mở trang thông báo của người phụ trách hợp đồng"
+          ],
+          "p": "Có hợp đồng sắp hết hạn",
+          "t": "-",
+          "e": "Người phụ trách nhận được thông báo về hợp đồng sắp hết hạn, chạy lại tác vụ nền không sinh thông báo trùng lặp"
+        }
+      ]
+    },
+    {
+      "name": "Nhật ký hệ thống",
+      "sheet": "SystemLog",
+      "prefix": "TC_LOG",
+      "screen": "/POSCS/systemLog",
+      "description": "Xem và tải file nhật ký ứng dụng, chỉ dành cho Admin",
+      "precondition": "Đăng nhập bằng tài khoản Admin; thư mục log đã có file",
+      "cases": [
+        {
+          "d": "Mở màn hình nhật ký hệ thống",
+          "s": [
+            "Đăng nhập bằng Admin",
+            "Mở /POSCS/systemLog"
+          ],
+          "t": "-",
+          "e": "Hiện danh sách file log kèm dung lượng dạng người đọc được, file sửa gần nhất xếp trước"
+        },
+        {
+          "d": "Mặc định mở file application log",
+          "s": [
+            "Mở màn hình nhật ký lần đầu"
+          ],
+          "t": "-",
+          "e": "Nội dung hiển thị là application log chứ không phải access log"
+        },
+        {
+          "d": "Xem nội dung một file log",
+          "s": [
+            "Chọn một file trong danh sách"
+          ],
+          "t": "file: poscs.log",
+          "e": "Hiện các dòng cuối của file theo đúng thứ tự gốc"
+        },
+        {
+          "d": "Đổi số dòng hiển thị",
+          "s": [
+            "Nhập số dòng cần xem",
+            "Bấm Xem"
+          ],
+          "t": "lines: 50",
+          "e": "Hiện đúng 50 dòng cuối"
+        },
+        {
+          "d": "Nhập số dòng là chữ",
+          "s": [
+            "Nhập chuỗi chữ vào ô số dòng",
+            "Bấm Xem"
+          ],
+          "t": "lines: abc",
+          "e": "Quay về số dòng mặc định, không báo lỗi 500"
+        },
+        {
+          "d": "Nhập số dòng quá lớn",
+          "s": [
+            "Nhập số dòng rất lớn",
+            "Bấm Xem"
+          ],
+          "t": "lines: 999999999",
+          "e": "Bị kẹp về giới hạn cho phép, trang vẫn hiển thị được"
+        },
+        {
+          "d": "Lọc nội dung log theo từ khoá",
+          "s": [
+            "Nhập từ khoá vào ô tìm kiếm",
+            "Bấm Xem"
+          ],
+          "t": "keyword: error",
+          "e": "Chỉ hiện các dòng chứa từ khoá, không phân biệt hoa thường"
+        },
+        {
+          "d": "Chọn file không có trong danh sách",
+          "s": [
+            "Sửa tham số file trên thanh địa chỉ thành tên lạ"
+          ],
+          "t": "URL: /POSCS/systemLog?file=khongcothat.log",
+          "e": "Hiện \"Không tìm thấy file log đó. Danh sách bên dưới là các file đang có.\""
+        },
+        {
+          "d": "Thử đọc file ngoài thư mục log",
+          "s": [
+            "Sửa tham số file thành đường dẫn đi ra ngoài thư mục log"
+          ],
+          "t": "URL: /POSCS/systemLog?file=../../conf/server.xml",
+          "e": "Bị từ chối, không hiển thị nội dung file nằm ngoài thư mục log",
+          "n": "Kiểm thử chống path traversal"
+        },
+        {
+          "d": "Tải file log về máy",
+          "s": [
+            "Bấm Tải file"
+          ],
+          "t": "file: poscs.log",
+          "e": "File được tải về dưới dạng đính kèm, không hiển thị thẳng như trang HTML"
+        },
+        {
+          "d": "File log rỗng",
+          "s": [
+            "Chọn một file log không có nội dung"
+          ],
+          "p": "Thư mục log có file rỗng",
+          "t": "file: file log rỗng",
+          "e": "Hiện khung nội dung trống, không báo lỗi"
+        },
+        {
+          "d": "Vai trò không phải Admin mở màn hình nhật ký",
+          "s": [
+            "Đăng nhập bằng Sales",
+            "Gõ thẳng /POSCS/systemLog"
+          ],
+          "p": "Đăng nhập bằng vai trò Sales",
+          "t": "URL: /POSCS/systemLog",
+          "e": "Trả về trang lỗi 403"
+        },
+        {
+          "d": "Vai trò không phải Admin gọi thẳng action=download",
+          "s": [
+            "Đăng nhập bằng CSKH",
+            "Gõ /POSCS/systemLog?action=download&file=poscs.log"
+          ],
+          "p": "Đăng nhập bằng vai trò CSKH",
+          "t": "URL: /POSCS/systemLog?action=download&file=poscs.log",
+          "e": "Trả về trang lỗi 403 và không có nội dung file nào được trả về"
+        }
+      ]
+    },
+    {
+      "name": "Phục vụ file tải lên",
+      "sheet": "UploadFile",
+      "prefix": "TC_UPLOAD",
+      "screen": "/POSCS/uploads/*",
+      "description": "Trả về các file ảnh và tài liệu đã tải lên hệ thống",
+      "precondition": "Đã có file được tải lên qua các chức năng sản phẩm, khách hàng hoặc hồ sơ cá nhân",
+      "cases": [
+        {
+          "d": "Mở một file ảnh đã tải lên",
+          "s": [
+            "Lấy đường dẫn ảnh từ trang chi tiết sản phẩm",
+            "Mở đường dẫn đó trên trình duyệt"
+          ],
+          "t": "URL: /POSCS/uploads/products/images/<tên file>.jpg",
+          "e": "Ảnh hiển thị đúng, trả về đúng kiểu nội dung và đúng dung lượng"
+        },
+        {
+          "d": "Mở file không tồn tại",
+          "s": [
+            "Gõ đường dẫn tới file không có thật"
+          ],
+          "t": "URL: /POSCS/uploads/khongcothat.jpg",
+          "e": "Trả về 404, không báo lỗi 500"
+        },
+        {
+          "d": "Gọi /uploads/ mà không kèm tên file",
+          "s": [
+            "Gõ /POSCS/uploads/"
+          ],
+          "t": "URL: /POSCS/uploads/",
+          "e": "Trả về 404, không liệt kê danh sách file trong thư mục"
+        },
+        {
+          "d": "Thử đọc file ngoài thư mục tải lên",
+          "s": [
+            "Gõ đường dẫn có chứa ../ để đi ra ngoài thư mục uploads"
+          ],
+          "t": "URL: /POSCS/uploads/../WEB-INF/web.xml",
+          "e": "Bị từ chối, không trả về nội dung file cấu hình",
+          "n": "Kiểm thử chống path traversal"
+        },
+        {
+          "d": "File SVG không được hiển thị trực tiếp",
+          "s": [
+            "Nếu có file .svg trong thư mục uploads, mở đường dẫn tới nó"
+          ],
+          "p": "Thư mục uploads có file .svg",
+          "t": "URL tới file .svg",
+          "e": "File bị buộc tải về thay vì hiển thị như ảnh, script bên trong không chạy"
+        },
+        {
+          "d": "File không có phần mở rộng",
+          "s": [
+            "Mở đường dẫn tới file không có đuôi"
+          ],
+          "p": "Thư mục uploads có file không đuôi",
+          "t": "URL tới file không đuôi",
+          "e": "Trả về kiểu nội dung an toàn (tải về), không đoán bừa thành HTML"
+        },
+        {
+          "d": "Phản hồi luôn có header chống đoán kiểu nội dung",
+          "s": [
+            "Mở một file ảnh",
+            "Xem tab Network của trình duyệt"
+          ],
+          "t": "-",
+          "e": "Phản hồi có header X-Content-Type-Options: nosniff"
+        }
+      ]
+    },
+    {
+      "name": "Tra cứu địa chỉ và hợp đồng (AJAX)",
+      "sheet": "AjaxLookup",
+      "prefix": "TC_AJAX",
+      "screen": "/POSCS/address/wards — /POSCS/contract/byEnterprise",
+      "description": "Hai endpoint trả JSON phục vụ dropdown động trên các form",
+      "precondition": "Đang đăng nhập",
+      "cases": [
+        {
+          "d": "Lấy danh sách Xã/Phường theo tỉnh",
+          "s": [
+            "Gọi /POSCS/address/wards với mã tỉnh hợp lệ"
+          ],
+          "t": "provinceId: 1",
+          "e": "Trả về mảng JSON các xã/phường thuộc đúng tỉnh đó"
+        },
+        {
+          "d": "Gọi không kèm mã tỉnh",
+          "s": [
+            "Gọi /POSCS/address/wards không kèm tham số"
+          ],
+          "t": "URL: /POSCS/address/wards",
+          "e": "Trả về mã 400 kèm mảng rỗng, không báo lỗi 500"
+        },
+        {
+          "d": "Mã tỉnh không phải số",
+          "s": [
+            "Gọi endpoint với mã tỉnh là chữ"
+          ],
+          "t": "provinceId: abc",
+          "e": "Trả về mã 400 kèm mảng rỗng"
+        },
+        {
+          "d": "Mã tỉnh không tồn tại",
+          "s": [
+            "Gọi endpoint với mã tỉnh không có trong CSDL"
+          ],
+          "t": "provinceId: 999999",
+          "e": "Trả về mảng JSON rỗng, không báo lỗi"
+        },
+        {
+          "d": "Gọi hai lần cùng một tỉnh",
+          "s": [
+            "Gọi endpoint hai lần liên tiếp với cùng mã tỉnh"
+          ],
+          "t": "provinceId: 1 (hai lần)",
+          "e": "Lần thứ hai trả về kết quả giống hệt và nhanh hơn (lấy từ bộ nhớ đệm)"
+        },
+        {
+          "d": "Lấy danh sách hợp đồng theo khách hàng",
+          "s": [
+            "Gọi /POSCS/contract/byEnterprise với mã khách hàng hợp lệ"
+          ],
+          "t": "enterpriseId: khách hàng có hợp đồng",
+          "e": "Trả về mảng JSON các hợp đồng của đúng khách hàng đó"
+        },
+        {
+          "d": "Khách hàng chưa có hợp đồng",
+          "s": [
+            "Gọi endpoint với khách hàng chưa có hợp đồng nào"
+          ],
+          "p": "Khách hàng chưa có hợp đồng",
+          "t": "enterpriseId: khách hàng mới tạo",
+          "e": "Trả về mảng JSON rỗng"
+        },
+        {
+          "d": "Gọi không kèm mã khách hàng",
+          "s": [
+            "Gọi /POSCS/contract/byEnterprise không kèm tham số"
+          ],
+          "t": "URL: /POSCS/contract/byEnterprise",
+          "e": "Trả về mã 400 kèm mảng rỗng"
+        },
+        {
+          "d": "Tiêu đề hợp đồng có ký tự đặc biệt",
+          "s": [
+            "Tạo hợp đồng có tiêu đề chứa dấu nháy kép",
+            "Gọi endpoint lấy hợp đồng của khách hàng đó"
+          ],
+          "p": "Có hợp đồng với tiêu đề chứa ký tự đặc biệt",
+          "t": "Tiêu đề: Hợp đồng \"ABC\"",
+          "e": "JSON trả về hợp lệ, ký tự đặc biệt được escape đúng, trình duyệt phân tích được"
+        }
+      ]
+    },
+    {
+      "name": "Ma trận phân quyền theo vai trò",
+      "sheet": "AccessControl",
+      "prefix": "TC_ACL",
+      "screen": "Toàn hệ thống",
+      "description": "Kiểm tra chéo quyền truy cập của bốn vai trò trên năm nhóm tài nguyên",
+      "precondition": "Có sẵn tài khoản thuộc đủ bốn vai trò: Admin, Sales, Kỹ thuật, CSKH",
+      "cases": [
+        {
+          "d": "Admin có toàn quyền trên mọi tài nguyên",
+          "s": [
+            "Đăng nhập bằng Admin",
+            "Lần lượt thêm/sửa/xoá ở Khách hàng, Hợp đồng, Sản phẩm, Phiếu hỗ trợ, Nhân viên"
+          ],
+          "t": "-",
+          "e": "Mọi thao tác đều thực hiện được"
+        },
+        {
+          "d": "Sales toàn quyền với Khách hàng và Hợp đồng",
+          "s": [
+            "Đăng nhập bằng Sales",
+            "Thêm/sửa/xoá khách hàng và hợp đồng"
+          ],
+          "t": "-",
+          "e": "Thực hiện được đầy đủ"
+        },
+        {
+          "d": "Sales chỉ được xem Sản phẩm và Phiếu hỗ trợ",
+          "s": [
+            "Đăng nhập bằng Sales",
+            "Mở danh sách Sản phẩm và Phiếu hỗ trợ",
+            "Thử gọi thẳng action=create của hai tài nguyên này"
+          ],
+          "t": "POST /POSCS/product action=create và /POSCS/ticket action=create",
+          "e": "Xem được danh sách nhưng mọi thao tác thêm/sửa/xoá đều trả về 403"
+        },
+        {
+          "d": "Kỹ thuật toàn quyền với Sản phẩm",
+          "s": [
+            "Đăng nhập bằng Kỹ thuật",
+            "Thêm/sửa/xoá sản phẩm"
+          ],
+          "t": "-",
+          "e": "Thực hiện được đầy đủ"
+        },
+        {
+          "d": "Kỹ thuật chỉ được xem Khách hàng và Hợp đồng",
+          "s": [
+            "Đăng nhập bằng Kỹ thuật",
+            "Thử gọi thẳng action=create của Khách hàng và Hợp đồng"
+          ],
+          "t": "POST /POSCS/customer và /POSCS/contract action=create",
+          "e": "Đều trả về 403"
+        },
+        {
+          "d": "Kỹ thuật được cập nhật phiếu giao cho mình",
+          "s": [
+            "Đăng nhập bằng kỹ thuật viên đang được giao một phiếu",
+            "Đổi trạng thái và ghi kết quả xử lý phiếu đó"
+          ],
+          "p": "Có phiếu giao cho chính người đăng nhập",
+          "t": "-",
+          "e": "Cập nhật được — đây là ngoại lệ duy nhất của vai trò Kỹ thuật với Phiếu hỗ trợ"
+        },
+        {
+          "d": "CSKH toàn quyền với Phiếu hỗ trợ",
+          "s": [
+            "Đăng nhập bằng CSKH",
+            "Thêm/sửa/xoá phiếu hỗ trợ"
+          ],
+          "t": "-",
+          "e": "Thực hiện được đầy đủ"
+        },
+        {
+          "d": "CSKH chỉ được xem Khách hàng, Hợp đồng, Sản phẩm",
+          "s": [
+            "Đăng nhập bằng CSKH",
+            "Thử gọi thẳng action=create của ba tài nguyên này"
+          ],
+          "t": "POST action=create ở ba tài nguyên",
+          "e": "Đều trả về 403"
+        },
+        {
+          "d": "Chỉ Admin truy cập được Nhân viên và Nhật ký hệ thống",
+          "s": [
+            "Lần lượt đăng nhập bằng Sales, Kỹ thuật, CSKH",
+            "Gõ thẳng /POSCS/employee và /POSCS/systemLog"
+          ],
+          "t": "-",
+          "e": "Cả ba vai trò đều nhận 403 ở cả hai đường dẫn"
+        },
+        {
+          "d": "Ẩn nút trên giao diện không phải là lớp bảo vệ duy nhất",
+          "s": [
+            "Đăng nhập bằng vai trò chỉ được xem",
+            "Dùng công cụ trình duyệt hiện lại nút đang bị ẩn",
+            "Bấm nút đó"
+          ],
+          "t": "-",
+          "e": "Máy chủ vẫn từ chối bằng 403 — việc chặn không phụ thuộc vào giao diện"
+        },
+        {
+          "d": "Xuất Excel được tính là thao tác đọc",
+          "s": [
+            "Đăng nhập bằng vai trò chỉ được xem",
+            "Bấm Xuất Excel ở danh sách tương ứng"
+          ],
+          "t": "-",
+          "e": "Tải được file bình thường, không bị chặn 403"
+        },
+        {
+          "d": "Đổi vai trò có hiệu lực ở phiên đăng nhập tiếp theo",
+          "s": [
+            "Admin đổi vai trò của nhân viên B từ Sales sang CSKH",
+            "B đăng xuất và đăng nhập lại",
+            "B thử thêm khách hàng"
+          ],
+          "t": "-",
+          "e": "B không còn thêm được khách hàng, nhưng thêm được phiếu hỗ trợ — quyền khớp với vai trò mới"
+        }
+      ]
+    }
+  ]
+}

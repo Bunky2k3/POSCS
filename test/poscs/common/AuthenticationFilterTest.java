@@ -9,6 +9,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 import org.junit.Before;
 import org.junit.Test;
+import poscs.dao.EmployeeDAO;
 import poscs.dao.NotificationDAO;
 import poscs.model.Role;
 import poscs.model.User;
@@ -36,6 +37,7 @@ public class AuthenticationFilterTest {
 
     private AuthenticationFilter filter;
     private NotificationDAO notificationDAO;
+    private EmployeeDAO employeeDAO;
 
     private HttpServletRequest request;
     private HttpServletResponse response;
@@ -46,6 +48,12 @@ public class AuthenticationFilterTest {
         filter = new AuthenticationFilter();
         notificationDAO = mock(NotificationDAO.class);
         setField(filter, "notificationDAO", notificationDAO);
+        // Mặc định: tài khoản trong session vẫn đang hoạt động. Filter tra lại
+        // CSDL mỗi request để phát hiện tài khoản bị khoá giữa chừng, nên test
+        // nào có người dùng đăng nhập đều cần stub này.
+        employeeDAO = mock(EmployeeDAO.class);
+        setField(filter, "employeeDAO", employeeDAO);
+        when(employeeDAO.findByUsernameOrEmail(anyString())).thenReturn(activeUser());
 
         request = mock(HttpServletRequest.class);
         response = mock(HttpServletResponse.class);
@@ -73,7 +81,15 @@ public class AuthenticationFilterTest {
     private User loggedInUser() {
         User u = new User();
         u.setUserId(7);
+        u.setUsername("sale01");
         u.setRole(new Role(2, "Sales"));
+        return u;
+    }
+
+    /** Bản ghi đọc lại từ CSDL: cùng tài khoản, chưa bị khoá. */
+    private User activeUser() {
+        User u = loggedInUser();
+        u.setDeleted(false);
         return u;
     }
 
@@ -283,5 +299,89 @@ public class AuthenticationFilterTest {
         verify(response).setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
         verify(response).setHeader("Pragma", "no-cache");
         verify(response).setDateHeader("Expires", 0);
+    }
+
+    // ------------------------------------------------------------------
+    // Tài khoản bị khoá SAU khi đã đăng nhập
+    // ------------------------------------------------------------------
+
+    /**
+     * Admin khoá tài khoản trong lúc người đó đang mở phiên làm việc. Trước
+     * đây filter chỉ kiểm "có currentUser trong session hay không", nên phiên
+     * cũ vẫn xem và sửa dữ liệu được cho tới lúc tự đăng xuất -- thao tác khoá
+     * tài khoản không có tác dụng ngay, đúng lúc cần nhất (nghỉ việc, lộ mật
+     * khẩu).
+     */
+    @Test
+    public void get_accountLockedAfterLogin_invalidatesSessionAndRedirectsToLogin() throws Exception {
+        when(request.getMethod()).thenReturn("GET");
+        when(request.getServletPath()).thenReturn("/customer");
+        Map<String, Object> attrs = new HashMap<>();
+        attrs.put("currentUser", loggedInUser());
+        HttpSession session = fakeSession(attrs);
+        when(request.getSession(true)).thenReturn(session);
+        when(request.getSession(false)).thenReturn(session);
+
+        User locked = loggedInUser();
+        locked.setDeleted(true);
+        when(employeeDAO.findByUsernameOrEmail("sale01")).thenReturn(locked);
+
+        filter.doFilter(request, response, chain);
+
+        verify(session).invalidate();
+        verify(response).sendRedirect("/POSCS/login.jsp?error=account_inactive");
+        verify(chain, never()).doFilter(any(), any());
+    }
+
+    /** Tài khoản bị xoá hẳn khỏi CSDL cũng phải cắt phiên y như bị khoá. */
+    @Test
+    public void get_accountDeletedAfterLogin_invalidatesSession() throws Exception {
+        when(request.getMethod()).thenReturn("GET");
+        when(request.getServletPath()).thenReturn("/customer");
+        Map<String, Object> attrs = new HashMap<>();
+        attrs.put("currentUser", loggedInUser());
+        HttpSession session = fakeSession(attrs);
+        when(request.getSession(true)).thenReturn(session);
+        when(request.getSession(false)).thenReturn(session);
+        when(employeeDAO.findByUsernameOrEmail("sale01")).thenReturn(null);
+
+        filter.doFilter(request, response, chain);
+
+        verify(session).invalidate();
+        verify(chain, never()).doFilter(any(), any());
+    }
+
+    /** Tài khoản còn hoạt động thì đi tiếp bình thường, không bị chặn nhầm. */
+    @Test
+    public void get_accountStillActive_isAllowedThrough() throws Exception {
+        when(request.getMethod()).thenReturn("GET");
+        when(request.getServletPath()).thenReturn("/customer");
+        Map<String, Object> attrs = new HashMap<>();
+        attrs.put("currentUser", loggedInUser());
+        HttpSession session = fakeSession(attrs);
+        when(request.getSession(true)).thenReturn(session);
+        when(request.getSession(false)).thenReturn(session);
+
+        filter.doFilter(request, response, chain);
+
+        verify(chain).doFilter(request, response);
+        verify(response, never()).sendRedirect(anyString());
+    }
+
+    /** Request tài nguyên tĩnh không tra CSDL -- giữ nguyên tối ưu sẵn có. */
+    @Test
+    public void get_staticAssetPath_doesNotQueryAccountStatus() throws Exception {
+        when(request.getMethod()).thenReturn("GET");
+        when(request.getServletPath()).thenReturn("/css/style.css");
+        Map<String, Object> attrs = new HashMap<>();
+        attrs.put("currentUser", loggedInUser());
+        HttpSession session = fakeSession(attrs);
+        when(request.getSession(true)).thenReturn(session);
+        when(request.getSession(false)).thenReturn(session);
+
+        filter.doFilter(request, response, chain);
+
+        verify(employeeDAO, never()).findByUsernameOrEmail(anyString());
+        verify(chain).doFilter(request, response);
     }
 }

@@ -315,7 +315,9 @@ public class ProductController extends HttpServlet {
             return;
         }
         Integer id = parseIntOrNull(request.getParameter("productId"));
-        if (id == null) {
+        // Kiểm tồn tại trước khi kiểm dữ liệu -- xem ghi chú cùng loại ở
+        // ContractController.handleUpdate.
+        if (id == null || productDAO.findById(id) == null) {
             response.sendRedirect(request.getContextPath() + "/product?error=notfound");
             return;
         }
@@ -359,8 +361,10 @@ public class ProductController extends HttpServlet {
             return;
         }
         Integer id = parseIntOrNull(request.getParameter("id"));
-        if (id == null) {
-            response.sendRedirect(request.getContextPath() + "/product");
+        // Kiểm tồn tại trước ràng buộc nghiệp vụ -- xem ghi chú cùng loại ở
+        // CustomerController.handleDelete.
+        if (id == null || productDAO.findById(id) == null) {
+            response.sendRedirect(request.getContextPath() + "/product?error=notfound");
             return;
         }
 

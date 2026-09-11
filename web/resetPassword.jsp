@@ -1,5 +1,11 @@
 <%@page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
 <%@taglib prefix="c" uri="jakarta.tags.core"%>
+<%-- Chưa xác thực OTP thì không có gì để đặt lại: form ở đây chắc chắn không gửi được (máy chủ sẽ từ chối
+     POST), nên hiện ra chỉ khiến người dùng điền xong mới biết là vô
+     ích. Đá thẳng về bước đầu của luồng. --%>
+<c:if test="${empty sessionScope.otpVerified}">
+    <c:redirect url="/forgotPassword.jsp?error=unauthorized"/>
+</c:if>
 <!DOCTYPE html>
 <html lang="vi">
 <head>

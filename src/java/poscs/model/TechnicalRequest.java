@@ -107,6 +107,31 @@ public class TechnicalRequest {
     public void setReceptionChannel(String receptionChannel) { this.receptionChannel = receptionChannel; }
 
     public Timestamp getSlaDeadline() { return slaDeadline; }
+
+    /**
+     * Phiếu đã trễ hạn SLA: quá hạn mà vẫn chưa đóng.
+     *
+     * Tính trong model chứ không lưu thành cột, cùng lý do với trạng thái hợp
+     * đồng ở ContractDAO.computeStatus: giá trị phụ thuộc thời điểm xem, lưu
+     * xuống CSDL là sai ngay hôm sau. Dashboard đã đếm theo đúng quy tắc này
+     * (xem TechnicalSupportTicketDAO.countOverdueOrDueSoon), nhưng màn hình
+     * danh sách trước đây không hiển thị gì -- người trực không nhìn ra phiếu
+     * nào đang trễ nếu không mở từng phiếu.
+     */
+    public boolean isSlaOverdue() {
+        return slaDeadline != null
+                && !"Đã đóng".equals(status)
+                && slaDeadline.getTime() < System.currentTimeMillis();
+    }
+
+    /** Sắp tới hạn SLA: còn dưới 24 giờ và chưa đóng. Cùng ngưỡng với dashboard. */
+    public boolean isSlaDueSoon() {
+        if (slaDeadline == null || "Đã đóng".equals(status) || isSlaOverdue()) {
+            return false;
+        }
+        long remaining = slaDeadline.getTime() - System.currentTimeMillis();
+        return remaining <= 24L * 60 * 60 * 1000;
+    }
     public void setSlaDeadline(Timestamp slaDeadline) { this.slaDeadline = slaDeadline; }
 
     public Date getCreatedDate() { return createdDate; }
