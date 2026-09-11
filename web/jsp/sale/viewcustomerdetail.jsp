@@ -219,7 +219,7 @@
                                 ${customer.currentRelationshipRating == 'GOOD' ? 'rating-good' : ''}
                                 ${customer.currentRelationshipRating == 'NEEDS_REVIEW' ? 'rating-watch' : ''}
                                 ${customer.currentRelationshipRating == 'BAD' ? 'rating-bad' : ''}
-                                ${customer.currentRelationshipRating == 'AT_RISK' ? 'rating-risk' : ''}">${customer.currentRelationshipRating}</span>
+                                ${customer.currentRelationshipRating == 'AT_RISK' ? 'rating-risk' : ''}">${customer.currentRelationshipRating.dbValue}</span>
                         </c:if>
                     </h2>
                     <div style="color:#6b7280; font-size:0.85rem;">
@@ -347,7 +347,7 @@
                                             ${event.relationshipRating == 'GOOD' ? 'rating-good' : ''}
                                             ${event.relationshipRating == 'NEEDS_REVIEW' ? 'rating-watch' : ''}
                                             ${event.relationshipRating == 'BAD' ? 'rating-bad' : ''}
-                                            ${event.relationshipRating == 'AT_RISK' ? 'rating-risk' : ''}">${event.relationshipRating}</span>
+                                            ${event.relationshipRating == 'AT_RISK' ? 'rating-risk' : ''}">${event.relationshipRating.dbValue}</span>
                                     </td>
                                     <td>${fn:escapeXml(event.description)}</td>
                                     <td>
@@ -538,7 +538,7 @@
             <span>
                 Đã đánh giá lại.
                 <c:choose>
-                    <c:when test="${customer.currentRelationshipRating != null}">Xếp hạng hiện tại: <strong>${customer.currentRelationshipRating}</strong></c:when>
+                    <c:when test="${customer.currentRelationshipRating != null}">Xếp hạng hiện tại: <strong>${customer.currentRelationshipRating.dbValue}</strong></c:when>
                     <c:otherwise>Chưa đủ dữ liệu để xếp hạng.</c:otherwise>
                 </c:choose>
             </span>

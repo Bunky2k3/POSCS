@@ -91,6 +91,11 @@
         .status-progress { background: #fff4e0; color: var(--warning); } .status-progress .dot { background: var(--warning); }
         .status-closed { background: #e8faf3; color: var(--success); } .status-closed .dot { background: var(--success); }
 
+        /* Cảnh báo hạn xử lý: cùng ngưỡng với ô cảnh báo trên Dashboard
+           (quá hạn, hoặc còn dưới 24 giờ và chưa đóng). */
+        .sla-overdue { background: #fdecec; color: var(--danger, #d92d20); } .sla-overdue .dot { background: var(--danger, #d92d20); }
+        .sla-soon { background: #fff4e0; color: var(--warning); } .sla-soon .dot { background: var(--warning); }
+
         .action-icons { display: flex; gap: 6px; justify-content: flex-end; }
         .action-icons button {
             width: 32px; height: 32px; border-radius: 8px; border: none; background: #f3f4f6; color: #6b7280; cursor: pointer;
@@ -240,6 +245,8 @@
                                         <c:when test="${ticket.status == 'Đã đóng'}"><span class="pill status-closed"><span class="dot"></span>Đã đóng</span></c:when>
                                         <c:otherwise><span class="pill status-new"><span class="dot"></span>Mới tiếp nhận</span></c:otherwise>
                                     </c:choose>
+                                    <c:if test="${ticket.slaOverdue}"><span class="pill sla-overdue" title="Đã quá hạn xử lý theo SLA"><span class="dot"></span>Quá hạn SLA</span></c:if>
+                                    <c:if test="${ticket.slaDueSoon}"><span class="pill sla-soon" title="Còn dưới 24 giờ tới hạn SLA"><span class="dot"></span>Sắp tới hạn</span></c:if>
                                 </td>
                                 <td>
                                     <c:choose>

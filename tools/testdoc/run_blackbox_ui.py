@@ -878,8 +878,8 @@ def test_crud(S):
         # Cột "Xếp hạng" in ra ${event.relationshipRating}; nếu JSP trả về tên
         # hằng enum thì người dùng thấy AT_RISK thay vì "Có nguy cơ rời bỏ".
         expect("TC_CUSEVAL_002", got == "AT_RISK" and shown == "Có nguy cơ rời bỏ",
-               "Lưu đúng (ô xếp hạng = %r) nhưng bảng lịch sử hiển thị %r "
-               "thay vì nhãn tiếng Việt 'Có nguy cơ rời bỏ'" % (got, shown))
+               "Ô xếp hạng lưu %r; bảng lịch sử hiển thị %r (mong đợi nhãn "
+               "tiếng Việt 'Có nguy cơ rời bỏ')" % (got, shown))
 
         R.post(s, "/customer", {"action": "evaluate", "id": cust_id, "rating": "BAD"})
         rows = history_rows()

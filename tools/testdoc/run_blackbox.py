@@ -66,6 +66,10 @@ def csrf(session, page="/changePassword.jsp"):
 def login(role, base=BASE):
     """Trả về (session, response cuối) — không tự theo redirect."""
     s = requests.Session()
+    # JSTL <fmt:formatDate> chỉ áp dụng pattern khi xác định được locale của
+    # request; thiếu header này thì nó in thẳng Date.toString() và mọi phép
+    # kiểm ngày tháng đọc ra kết quả khác hẳn thứ người dùng thật nhìn thấy.
+    s.headers["Accept-Language"] = "vi-VN,vi;q=0.9,en;q=0.8"
     token = csrf(s, "/login.jsp")
     user, pwd = ACCOUNTS[role]
     r = s.post(base + "/login", allow_redirects=False,
