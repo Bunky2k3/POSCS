@@ -53,6 +53,50 @@ Don't edit a live database by hand. Add a file under
 documents the naming convention and full workflow (including keeping
 `db/schema.sql` in sync so new setups stay up to date).
 
+## Tests
+
+`ant test` runs everything. Two very different layers live side by side:
+
+- **Unit tests** (`test/poscs/**`, ~340 of them) mock JDBC via
+  `poscs.dao.JdbcStub`, so no SQL ever reaches a database. They are fast and
+  need no setup — but by construction they cannot catch a wrong column name,
+  invalid SQL, a schema drift, a violated UNIQUE/foreign key, a transaction
+  that fails to roll back, or the same rule computed two different ways in
+  Java and in SQL.
+- **Integration tests** (`test/poscs/integration/**`) run the real DAOs
+  against a real MySQL. They cover exactly the gap above.
+
+### Running the integration tests
+
+They need a **disposable** database whose name ends in `_it` — every run wipes
+it. `IntegrationDb` refuses to run anywhere else, so a stray `DB_URL` pointing
+at `poscs_db` cannot destroy real data.
+
+```bash
+mysql -u root -p -e "CREATE DATABASE poscs_it CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+
+ant -Dtest-sys-prop.DB_URL=jdbc:mysql://localhost:3306/poscs_it \
+    -Dtest-sys-prop.DB_USER=root \
+    -Dtest-sys-prop.DB_PASSWORD=yourpassword \
+    test
+```
+
+The schema is loaded from `db/schema.sql` — the same file real setups use — so
+a change there is exercised by the tests automatically.
+
+`test-sys-prop.*` is how NetBeans' generated `build-impl.xml` forwards values
+into the test JVM as system properties. It has to be a system property rather
+than an environment variable, because a JVM cannot set env vars for itself;
+`poscs.dao.DBContext` therefore reads a system property first and falls back to
+the environment (which is what Tomcat uses in production).
+
+### Without MySQL
+
+Plain `ant test` stays green: the integration tests **skip** themselves when
+they are not pointed at an `_it` database. That keeps a fresh clone working
+with no setup — at the cost that "all skipped" looks just like "all passed",
+so CI has an explicit step asserting they really ran.
+
 ## Building and Running
 
 This project is set up as a NetBeans Ant-based web application:
