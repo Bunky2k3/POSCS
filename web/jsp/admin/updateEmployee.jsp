@@ -191,7 +191,7 @@
                         </div>
                         <div class="col-12 field-row">
                             <label for="addressDetail">Địa chỉ chi tiết</label>
-                            <input type="text" class="form-control" id="addressDetail" name="addressDetail" value="${employee.address != null ? employee.address.streetAndLocalName : ''}">
+                            <input type="text" class="form-control" id="addressDetail" name="addressDetail" value="${fn:escapeXml(employee.address != null ? employee.address.streetAndLocalName : '')}">
                         </div>
                     </div>
 

@@ -51,6 +51,8 @@ public class TechnicalSupportTicketController extends HttpServlet {
     private static final String DETAIL_VIEW = "/jsp/customersupport/viewdetailTicket.jsp";
     private static final String CREATE_VIEW = "/jsp/customersupport/addnewTicket.jsp";
     private static final String UPDATE_VIEW = "/jsp/customersupport/updateTicket.jsp";
+    /** Lề (điểm) của trang PDF xuất phiếu -- dùng cho cả 4 phía. */
+    private static final float PDF_MARGIN = 56f;
 
     private final TechnicalSupportTicketDAO ticketDAO = new TechnicalSupportTicketDAO();
     private final CustomerDAO customerDAO = new CustomerDAO();
@@ -64,7 +66,8 @@ public class TechnicalSupportTicketController extends HttpServlet {
         // Cho JSP biết người đang xem có quyền Full trên tài nguyên này không,
         // để ẩn các nút hành động không dùng được (Tạo/Sửa/Xoá/Nhập/Xuất) thay
         // vì để người ta bấm vào rồi nhận 403. Đây CHỈ là lớp trình bày --
-        // chặn thật vẫn nằm ở AccessControl.requireFullAccess trong doPost.
+        // chặn thật nằm ở AccessControl.requireFullAccess trong doPost và ở
+        // đầu mỗi trang form bên dưới (gõ thẳng URL cũng không vào được).
         request.setAttribute("canManage",
                 AccessControl.hasFullAccess(request, AccessControl.Resource.TICKET));
         String action = request.getParameter("action");
@@ -168,15 +171,6 @@ public class TechnicalSupportTicketController extends HttpServlet {
     }
 
     /**
-     * Xuất 1 phiếu hỗ trợ ra PDF để in/gửi khách.
-     *
-     * Vẽ thẳng bằng PDFBox thay vì điền vào file mẫu như hợp đồng: phiếu hỗ trợ
-     * không có mẫu in sẵn nào, và nội dung ở đây chỉ là các cặp nhãn/giá trị
-     * cộng 2 đoạn văn -- dựng một AcroForm chỉ để điền vào là công vô ích.
-     * Font tiếng Việt lấy từ PdfUtil.loadVietnameseFont (font mặc định của
-     * PDFBox không có glyph tiếng Việt, xuất ra sẽ mất dấu hết).
-     */
-    /**
      * Xuất danh sách phiếu hỗ trợ ra Excel -- nút "Xuất Excel" ở listTicket.jsp.
      *
      * Xuất theo ĐÚNG bộ lọc đang áp trên màn hình (từ khoá/trạng thái/độ ưu
@@ -221,6 +215,24 @@ public class TechnicalSupportTicketController extends HttpServlet {
         ExcelUtil.writeWorkbook(response, "phieu_ho_tro", headers, rows);
     }
 
+    /**
+     * Xuất 1 phiếu hỗ trợ ra PDF để in/gửi khách.
+     *
+     * Vẽ thẳng bằng PDFBox thay vì điền vào file mẫu như hợp đồng: phiếu hỗ trợ
+     * không có mẫu in sẵn nào, và nội dung ở đây chỉ là các cặp nhãn/giá trị
+     * cộng 2 đoạn văn -- dựng một AcroForm chỉ để điền vào là công vô ích.
+     * Font tiếng Việt lấy từ PdfUtil.loadVietnameseFont (font mặc định của
+     * PDFBox không có glyph tiếng Việt, xuất ra sẽ mất dấu hết).
+     *
+     * Dựng TOÀN BỘ nội dung thành danh sách dòng trước, rồi mới đổ ra trang
+     * (xem {@link #renderPaginated}), thay vì vừa tính vừa vẽ. Lý do: "Mô tả
+     * sự cố" và "Kết quả xử lý" là cột TEXT, người dùng gõ bao nhiêu cũng
+     * được. Cách cũ chỉ tạo đúng 1 trang A4 và cứ trừ dần toạ độ y, nên phần
+     * vượt quá chiều cao trang được vẽ ra NGOÀI vùng giấy: PDFBox không báo
+     * lỗi gì, file mở lên vẫn bình thường, chỉ là mất hẳn phần cuối mà không
+     * ai biết. Tách 2 bước thì việc "hết chỗ -> sang trang mới" chỉ là một
+     * phép so sánh, không còn chỗ nào vẽ lố ra ngoài được nữa.
+     */
     private void exportPdf(HttpServletRequest request, HttpServletResponse response) throws IOException {
         Integer id = parseIntOrNull(request.getParameter("id"));
         TechnicalRequest t = id != null ? ticketDAO.findById(id) : null;
@@ -230,38 +242,31 @@ public class TechnicalSupportTicketController extends HttpServlet {
         }
 
         try (PDDocument document = new PDDocument()) {
-            PDPage page = new PDPage(PDRectangle.A4);
-            document.addPage(page);
             PDFont font = PdfUtil.loadVietnameseFont(document, getServletContext());
+            float contentWidth = PDRectangle.A4.getWidth() - PDF_MARGIN * 2;
 
-            float margin = 56f;
-            float right = page.getMediaBox().getWidth() - margin;
-            float y = page.getMediaBox().getHeight() - margin;
+            List<PdfLine> lines = new ArrayList<>();
+            lines.add(new PdfLine(17, "PHIẾU HỖ TRỢ KỸ THUẬT", 22));
+            lines.add(new PdfLine(11, "Mã phiếu: " + nz(t.getTicketCode()), 26));
 
-            try (PDPageContentStream cs = new PDPageContentStream(document, page)) {
-                PdfUtil.drawText(cs, font, 17, margin, y, "PHIẾU HỖ TRỢ KỸ THUẬT");
-                y -= 22;
-                PdfUtil.drawText(cs, font, 11, margin, y, "Mã phiếu: " + nz(t.getTicketCode()));
-                y -= 26;
+            addPair(lines, "Khách hàng",
+                    t.getEnterprise() != null ? t.getEnterprise().getEnterpriseName() : "—");
+            addPair(lines, "Hợp đồng liên quan",
+                    t.getContract() != null ? t.getContract().getContractCode() : "—");
+            addPair(lines, "Loại phiếu", t.getTicketType());
+            addPair(lines, "Mức ưu tiên", t.getPriority());
+            addPair(lines, "Kênh tiếp nhận", t.getReceptionChannel());
+            addPair(lines, "Trạng thái", t.getStatus());
+            addPair(lines, "Ngày tạo", formatDate(t.getCreatedDate()));
+            addPair(lines, "Hạn xử lý (SLA)", formatDateTime(t.getSlaDeadline()));
+            addPair(lines, "Kỹ thuật viên phụ trách",
+                    t.getAssignedTechnician() != null ? t.getAssignedTechnician().getFullName() : "—");
+            addPair(lines, "Thời điểm đóng", formatDateTime(t.getResolvedAt()));
 
-                y = drawPair(cs, font, margin, y, "Khách hàng",
-                        t.getEnterprise() != null ? t.getEnterprise().getEnterpriseName() : "—");
-                y = drawPair(cs, font, margin, y, "Hợp đồng liên quan",
-                        t.getContract() != null ? t.getContract().getContractCode() : "—");
-                y = drawPair(cs, font, margin, y, "Loại phiếu", t.getTicketType());
-                y = drawPair(cs, font, margin, y, "Mức ưu tiên", t.getPriority());
-                y = drawPair(cs, font, margin, y, "Kênh tiếp nhận", t.getReceptionChannel());
-                y = drawPair(cs, font, margin, y, "Trạng thái", t.getStatus());
-                y = drawPair(cs, font, margin, y, "Ngày tạo", formatDate(t.getCreatedDate()));
-                y = drawPair(cs, font, margin, y, "Hạn xử lý (SLA)", formatDateTime(t.getSlaDeadline()));
-                y = drawPair(cs, font, margin, y, "Kỹ thuật viên phụ trách",
-                        t.getAssignedTechnician() != null ? t.getAssignedTechnician().getFullName() : "—");
-                y = drawPair(cs, font, margin, y, "Thời điểm đóng", formatDateTime(t.getResolvedAt()));
+            addParagraph(lines, font, contentWidth, "Mô tả sự cố", t.getDescription());
+            addParagraph(lines, font, contentWidth, "Kết quả xử lý", t.getResolutionSummary());
 
-                y -= 10;
-                y = drawParagraph(cs, font, margin, right - margin, y, "Mô tả sự cố", t.getDescription());
-                y = drawParagraph(cs, font, margin, right - margin, y, "Kết quả xử lý", t.getResolutionSummary());
-            }
+            renderPaginated(document, font, lines);
 
             response.setContentType("application/pdf");
             String fileName = "phieu_" + nz(t.getTicketCode()).replace("/", "-") + ".pdf";
@@ -270,23 +275,62 @@ public class TechnicalSupportTicketController extends HttpServlet {
         }
     }
 
-    /** Vẽ 1 dòng "Nhãn: giá trị", trả về toạ độ y cho dòng kế tiếp. */
-    private float drawPair(PDPageContentStream cs, PDFont font, float x, float y, String label, String value)
-            throws IOException {
-        PdfUtil.drawText(cs, font, 10, x, y, label + ": " + nz(value));
-        return y - 17;
+    /** 1 dòng chữ đã biết cỡ chữ và khoảng cách xuống dòng kế tiếp, chưa gắn với trang nào. */
+    private static final class PdfLine {
+
+        private final float fontSize;
+        private final String text;
+        private final float leading;
+
+        private PdfLine(float fontSize, String text, float leading) {
+            this.fontSize = fontSize;
+            this.text = text;
+            this.leading = leading;
+        }
     }
 
-    /** Vẽ 1 đoạn văn có tiêu đề, tự bẻ dòng theo bề rộng trang. */
-    private float drawParagraph(PDPageContentStream cs, PDFont font, float x, float width, float y,
-            String title, String body) throws IOException {
-        PdfUtil.drawText(cs, font, 11, x, y, title);
-        y -= 16;
-        for (String line : PdfUtil.wrapLines(font, 10, width, nz(body))) {
-            PdfUtil.drawText(cs, font, 10, x, y, line);
-            y -= 14;
+    /** Thêm 1 dòng "Nhãn: giá trị". */
+    private void addPair(List<PdfLine> lines, String label, String value) {
+        lines.add(new PdfLine(10, label + ": " + nz(value), 17));
+    }
+
+    /** Thêm 1 đoạn văn có tiêu đề, tự bẻ dòng theo bề rộng trang. */
+    private void addParagraph(List<PdfLine> lines, PDFont font, float width, String title, String body)
+            throws IOException {
+        lines.add(new PdfLine(11, title, 16));
+        List<String> wrapped = PdfUtil.wrapLines(font, 10, width, nz(body));
+        for (int i = 0; i < wrapped.size(); i++) {
+            // Dòng cuối của đoạn chừa thêm khoảng trống trước tiêu đề đoạn sau.
+            lines.add(new PdfLine(10, wrapped.get(i), i == wrapped.size() - 1 ? 22 : 14));
         }
-        return y - 8;
+    }
+
+    /**
+     * Đổ danh sách dòng ra tài liệu, tự mở trang mới mỗi khi dòng kế tiếp
+     * không còn nằm trọn phía trên lề dưới. Luôn tạo ít nhất 1 trang (phiếu
+     * nào cũng có mã phiếu nên danh sách không bao giờ rỗng).
+     */
+    private void renderPaginated(PDDocument document, PDFont font, List<PdfLine> lines) throws IOException {
+        float top = PDRectangle.A4.getHeight() - PDF_MARGIN;
+        int index = 0;
+        while (index < lines.size()) {
+            PDPage page = new PDPage(PDRectangle.A4);
+            document.addPage(page);
+            float y = top;
+            try (PDPageContentStream cs = new PDPageContentStream(document, page)) {
+                while (index < lines.size()) {
+                    PdfLine line = lines.get(index);
+                    // Cỡ chữ trừ đi vì y là toạ độ CHÂN chữ: chữ còn ăn lên
+                    // trên, nên chỉ cần chân chữ nằm trên lề dưới là đủ.
+                    if (y - line.fontSize < PDF_MARGIN && y < top) {
+                        break; // Hết chỗ -> sang trang mới.
+                    }
+                    PdfUtil.drawText(cs, font, line.fontSize, PDF_MARGIN, y, line.text);
+                    y -= line.leading;
+                    index++;
+                }
+            }
+        }
     }
 
     /** Giá trị trống hiện dấu gạch thay vì để trắng, cho người đọc biết là "chưa có" chứ không phải lỗi in. */
@@ -320,6 +364,11 @@ public class TechnicalSupportTicketController extends HttpServlet {
 
     private void showCreateForm(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
+        // Trang form cũng là thao tác quản trị: vai trò chỉ-xem không được
+        // vào đây, dù nút bấm đã ẩn ở danh sách (xem PERMISSIONS.md).
+        if (!AccessControl.requireFullAccess(request, response, AccessControl.Resource.TICKET)) {
+            return;
+        }
         setDropdownAttributes(request);
         request.getRequestDispatcher(CREATE_VIEW).forward(request, response);
     }
@@ -330,6 +379,15 @@ public class TechnicalSupportTicketController extends HttpServlet {
         TechnicalRequest ticket = id != null ? ticketDAO.findById(id) : null;
         if (ticket == null) {
             response.sendRedirect(request.getContextPath() + "/ticket?error=notfound");
+            return;
+        }
+
+        // Cùng điều kiện với handleUpdate: ngoài vai trò có quyền Full, kỹ
+        // thuật viên ĐANG ĐƯỢC GIAO đúng phiếu này cũng được mở form (họ được
+        // cập nhật trạng thái/kết quả xử lý của phiếu mình -- PERMISSIONS.md).
+        if (!AccessControl.hasFullAccess(request, AccessControl.Resource.TICKET)
+                && !AccessControl.canUpdateAssignedTicket(request, ticket)) {
+            response.sendError(HttpServletResponse.SC_FORBIDDEN, "Bạn không có quyền thực hiện thao tác này.");
             return;
         }
 

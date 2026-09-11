@@ -17,8 +17,8 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 /**
- * Test cho luồng "Quên mật khẩu" của AuthenticationController -- luồng "Quên mật khẩu" 3 bước (email ->
- * OTP -> mật khẩu mới), toàn bộ trạng thái tạm nằm trong session. Trọng tâm:
+ * Test cho luồng "Quên mật khẩu" của AuthenticationController -- 3 bước
+ * (email -> OTP -> mật khẩu mới), toàn bộ trạng thái tạm nằm trong session. Trọng tâm:
  * <ul>
  *   <li>Chống user enumeration ở bước 1: email tồn tại hay không đều
  *       redirect y hệt nhau sang verifyOtp.jsp, chỉ khác ở việc OTP có thực
@@ -36,7 +36,7 @@ import static org.mockito.Mockito.*;
  * session thật chạy đúng, không phải mock lại từng bước. JUnit 4 -- xem
  * CustomerControllerTest.
  */
-public class PasswordResetControllerTest {
+public class PasswordResetFlowTest {
 
     private static final String CONTEXT_PATH = "/POSCS";
 

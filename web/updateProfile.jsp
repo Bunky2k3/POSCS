@@ -290,7 +290,7 @@
                         </div>
                         <div class="col-12 field-row">
                             <label for="addressDetail">Địa chỉ chi tiết <span class="text-muted" style="text-transform: none; font-weight: 400;">(không bắt buộc)</span></label>
-                            <input type="text" class="form-control" id="addressDetail" name="addressDetail" value="${profile.address != null ? profile.address.streetAndLocalName : ''}">
+                            <input type="text" class="form-control" id="addressDetail" name="addressDetail" value="${fn:escapeXml(profile.address != null ? profile.address.streetAndLocalName : '')}">
                         </div>
                     </div>
 

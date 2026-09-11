@@ -287,4 +287,44 @@ public class CustomerControllerTest {
 
         verify(response).sendRedirect(CONTEXT_PATH + "/customer?action=new&error=create_failed");
     }
+
+    // ------------------------------------------------------------------
+    // GET ?action=new / edit -- trang form cũng phải gác quyền
+    // ------------------------------------------------------------------
+
+    /** Ẩn nút ở JSP chỉ là lớp trình bày; gõ thẳng URL vẫn phải bị chặn. */
+    @Test
+    public void createForm_withoutFullAccess_returns403InsteadOfRendering() throws Exception {
+        loginAs("Kỹ thuật"); // chỉ View only trên CUSTOMER
+        when(request.getParameter("action")).thenReturn("new");
+
+        controller.doGet(request, response);
+
+        verify(response).sendError(eq(HttpServletResponse.SC_FORBIDDEN), anyString());
+        verify(request, never()).getRequestDispatcher("/jsp/sale/addnewcustomer.jsp");
+    }
+
+    @Test
+    public void editForm_withoutFullAccess_returns403InsteadOfRendering() throws Exception {
+        loginAs("Kỹ thuật");
+        when(request.getParameter("action")).thenReturn("edit");
+        when(request.getParameter("id")).thenReturn("5");
+
+        controller.doGet(request, response);
+
+        verify(response).sendError(eq(HttpServletResponse.SC_FORBIDDEN), anyString());
+        verify(request, never()).getRequestDispatcher("/jsp/sale/updatecustomer.jsp");
+    }
+
+    @Test
+    public void createForm_withFullAccess_stillRenders() throws Exception {
+        RequestDispatcher dispatcher = mock(RequestDispatcher.class);
+        when(request.getRequestDispatcher("/jsp/sale/addnewcustomer.jsp")).thenReturn(dispatcher);
+        when(request.getParameter("action")).thenReturn("new");
+
+        controller.doGet(request, response);
+
+        verify(dispatcher).forward(request, response);
+        verify(response, never()).sendError(eq(HttpServletResponse.SC_FORBIDDEN), anyString());
+    }
 }

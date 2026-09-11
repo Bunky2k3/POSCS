@@ -67,5 +67,12 @@ status") without giving them Full CRUD. Enforced in
   controllers set from `AccessControl.hasFullAccess(...)`. That is a
   presentation convenience so nobody clicks into a 403 — never the
   enforcement itself, which stays in the controller.
+- The **form pages themselves** (`?action=new`, `?action=edit`, and
+  Contract's `?action=importForm`) are gated the same way as the POST that
+  submits them, so typing the URL by hand gets a 403 instead of a form that
+  can only fail on submit. Ticket's `?action=edit` follows the same rule as
+  `handleUpdate`: Full access *or* the assigned technician — gating the form
+  more tightly than the write would leave that technician with permission to
+  save and no way in.
 - `Employee` (user account management) has no "View only" tier for
   non-Admin roles — it's Admin-only end to end.

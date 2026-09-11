@@ -380,4 +380,43 @@ public class ContractControllerTest {
 
         verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=view&id=5");
     }
+
+    // ------------------------------------------------------------------
+    // GET ?action=new / edit / importForm -- trang form cũng phải gác quyền
+    // ------------------------------------------------------------------
+
+    /**
+     * Ẩn nút ở JSP (canManage) chỉ là lớp trình bày; gõ thẳng URL vẫn phải bị
+     * chặn. Với importForm thì đây còn là đúng điều PERMISSIONS.md ghi -- nhập
+     * PDF TẠO hợp đồng nên là thao tác Full-access, không phải "đọc".
+     */
+    @Test
+    public void formPages_withoutFullAccess_return403InsteadOfRendering() throws Exception {
+        for (String action : new String[]{"new", "edit", "importForm"}) {
+            setUp(); // mock mới cho mỗi vòng, tránh verify dính lời gọi vòng trước
+            loginAs("Kỹ thuật"); // chỉ View only trên CONTRACT
+            when(request.getParameter("action")).thenReturn(action);
+            when(request.getParameter("id")).thenReturn("5");
+            when(contractDAO.findById(5)).thenReturn(new Contract());
+
+            controller.doGet(request, response);
+
+            verify(response).sendError(eq(HttpServletResponse.SC_FORBIDDEN), anyString());
+            verify(request, never()).getRequestDispatcher("/jsp/sale/addnewcontract.jsp");
+            verify(request, never()).getRequestDispatcher("/jsp/sale/updatecontract.jsp");
+            verify(request, never()).getRequestDispatcher("/jsp/sale/importcontract.jsp");
+        }
+    }
+
+    @Test
+    public void createForm_withFullAccess_stillRenders() throws Exception {
+        RequestDispatcher dispatcher = mock(RequestDispatcher.class);
+        when(request.getRequestDispatcher("/jsp/sale/addnewcontract.jsp")).thenReturn(dispatcher);
+        when(request.getParameter("action")).thenReturn("new");
+
+        controller.doGet(request, response);
+
+        verify(dispatcher).forward(request, response);
+        verify(response, never()).sendError(eq(HttpServletResponse.SC_FORBIDDEN), anyString());
+    }
 }

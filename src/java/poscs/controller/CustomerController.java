@@ -58,7 +58,8 @@ public class CustomerController extends HttpServlet {
         // Cho JSP biết người đang xem có quyền Full trên tài nguyên này không,
         // để ẩn các nút hành động không dùng được (Tạo/Sửa/Xoá/Nhập/Xuất) thay
         // vì để người ta bấm vào rồi nhận 403. Đây CHỈ là lớp trình bày --
-        // chặn thật vẫn nằm ở AccessControl.requireFullAccess trong doPost.
+        // chặn thật nằm ở AccessControl.requireFullAccess trong doPost và ở
+        // đầu mỗi trang form bên dưới (gõ thẳng URL cũng không vào được).
         request.setAttribute("canManage",
                 AccessControl.hasFullAccess(request, AccessControl.Resource.CUSTOMER));
         String action = request.getParameter("action");
@@ -161,6 +162,11 @@ public class CustomerController extends HttpServlet {
 
     private void showCreateForm(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
+        // Trang form cũng là thao tác quản trị: vai trò chỉ-xem không được
+        // vào đây, dù nút bấm đã ẩn ở danh sách (xem PERMISSIONS.md).
+        if (!AccessControl.requireFullAccess(request, response, AccessControl.Resource.CUSTOMER)) {
+            return;
+        }
         request.setAttribute("userList", employeeDAO.findAllActive());
         request.setAttribute("provinceList", addressDAO.findAllProvinces());
         request.getRequestDispatcher(CREATE_VIEW).forward(request, response);
@@ -168,6 +174,11 @@ public class CustomerController extends HttpServlet {
 
     private void showEditForm(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
+        // Trang form cũng là thao tác quản trị: vai trò chỉ-xem không được
+        // vào đây, dù nút bấm đã ẩn ở danh sách (xem PERMISSIONS.md).
+        if (!AccessControl.requireFullAccess(request, response, AccessControl.Resource.CUSTOMER)) {
+            return;
+        }
         Integer id = parseIntOrNull(request.getParameter("id"));
         Enterprise customer = id != null ? customerDAO.findById(id) : null;
         if (customer == null) {
