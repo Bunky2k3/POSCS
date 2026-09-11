@@ -228,6 +228,20 @@ public class AuthenticationController extends HttpServlet {
             response.sendRedirect(request.getContextPath() + "/updateProfile?error=missing_address");
             return;
         }
+        // phone và citizen_id đều có UNIQUE KEY. Không kiểm trước ở đây thì một
+        // số trùng (gõ nhầm 1 chữ số thành số của đồng nghiệp) sẽ rơi xuống tận
+        // DB, bật lên thành SQLException và người dùng chỉ thấy "update_failed"
+        // chung chung -- không hiểu vì sao, gõ lại y nguyên rồi lại hỏng.
+        // EmployeeController.handleUpdate đã kiểm đúng cách từ trước, đường sửa
+        // hồ sơ tự phục vụ này thì bị bỏ sót.
+        if (employeeDAO.existsByPhone(phone, currentUser.getUserId())) {
+            response.sendRedirect(request.getContextPath() + "/updateProfile?error=duplicate_phone");
+            return;
+        }
+        if (employeeDAO.existsByCitizenId(citizenId, currentUser.getUserId())) {
+            response.sendRedirect(request.getContextPath() + "/updateProfile?error=duplicate_citizen");
+            return;
+        }
 
         // Kiểm ảnh đại diện TRƯỚC khi ghi, giống các ô chọn file khác -- file
         // sai loại phải báo lỗi chứ không được lặng lẽ biến mất.
@@ -512,6 +526,15 @@ public class AuthenticationController extends HttpServlet {
 
         LoginAttemptState state = LOGIN_ATTEMPTS_BY_IP.computeIfAbsent(clientIp, k -> new LoginAttemptState());
         synchronized (state) {
+            // Đợt khoá trước đã hết hạn -> bắt đầu lại từ đầu. Không reset thì
+            // failedCount chỉ có tăng, nên sau lần bị khoá đầu tiên, CHỈ CẦN gõ
+            // sai thêm 1 lần là lại dính đủ 15 phút nữa (6 >= 5), lặp vô hạn.
+            // Bộ dọn theo LOGIN_ATTEMPT_RETENTION_MILLIS ở trên không cứu được,
+            // vì mỗi lần sai lại làm mới lastFailureMillis.
+            if (state.lockedUntilMillis > 0 && now > state.lockedUntilMillis) {
+                state.failedCount = 0;
+                state.lockedUntilMillis = 0;
+            }
             state.failedCount++;
             state.lastFailureMillis = now;
             if (state.failedCount >= MAX_LOGIN_ATTEMPTS) {

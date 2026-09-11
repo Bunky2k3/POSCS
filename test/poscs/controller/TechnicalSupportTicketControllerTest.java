@@ -15,6 +15,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 import org.junit.Before;
 import org.junit.Test;
+import org.mockito.ArgumentCaptor;
 import poscs.dao.CustomerDAO;
 import poscs.dao.EmployeeDAO;
 import poscs.dao.TechnicalSupportTicketDAO;
@@ -408,5 +409,98 @@ public class TechnicalSupportTicketControllerTest {
                     org.apache.poi.ss.usermodel.CellType.FORMULA,
                     wb.getSheetAt(0).getRow(1).getCell(13).getCellType());
         }
+    }
+
+    // ------------------------------------------------------------------
+    // Hạn SLA -- không được mất khi sửa phiếu
+    // ------------------------------------------------------------------
+
+    @Test
+    public void update_formOmitsSlaDeadline_keepsTheStoredOne() throws Exception {
+        // Form sửa không bắt buộc nhập hạn SLA. Nếu handleUpdate không giữ lại
+        // giá trị cũ thì mỗi lần Admin/CSKH bấm lưu là ghi đè sla_deadline
+        // thành NULL -- phiếu biến mất khỏi ô "sắp/đã quá hạn" trên dashboard
+        // và khỏi lịch nhắc SLA, vì cả hai đều lọc "sla_deadline IS NOT NULL".
+        Timestamp stored = Timestamp.valueOf("2026-08-27 10:00:00");
+        TechnicalRequest existing = fullyValidExistingTicket();
+        existing.setSlaDeadline(stored);
+        when(ticketDAO.findById(3)).thenReturn(existing);
+        stubValidUpdateParams();
+        when(request.getParameter("slaDeadline")).thenReturn(null);
+
+        controller.doPost(request, response);
+
+        ArgumentCaptor<TechnicalRequest> saved = ArgumentCaptor.forClass(TechnicalRequest.class);
+        verify(ticketDAO).update(saved.capture());
+        assertEquals("Hạn SLA cũ phải được giữ nguyên", stored, saved.getValue().getSlaDeadline());
+    }
+
+    @Test
+    public void update_formSendsNewSlaDeadline_overwritesTheStoredOne() throws Exception {
+        TechnicalRequest existing = fullyValidExistingTicket();
+        existing.setSlaDeadline(Timestamp.valueOf("2026-08-27 10:00:00"));
+        when(ticketDAO.findById(3)).thenReturn(existing);
+        stubValidUpdateParams();
+        when(request.getParameter("slaDeadline")).thenReturn("2026-09-30T17:30");
+
+        controller.doPost(request, response);
+
+        ArgumentCaptor<TechnicalRequest> saved = ArgumentCaptor.forClass(TechnicalRequest.class);
+        verify(ticketDAO).update(saved.capture());
+        assertEquals(Timestamp.valueOf("2026-09-30 17:30:00"), saved.getValue().getSlaDeadline());
+    }
+
+    @Test
+    public void update_slaDeadlineUnparseable_keepsTheStoredOneInsteadOfWiping() throws Exception {
+        // Giá trị rác (người dùng sửa tay URL, hoặc trình duyệt cũ gửi định dạng
+        // khác) phải rơi về "coi như không nhập", KHÔNG được biến thành NULL.
+        Timestamp stored = Timestamp.valueOf("2026-08-27 10:00:00");
+        TechnicalRequest existing = fullyValidExistingTicket();
+        existing.setSlaDeadline(stored);
+        when(ticketDAO.findById(3)).thenReturn(existing);
+        stubValidUpdateParams();
+        when(request.getParameter("slaDeadline")).thenReturn("hom qua");
+
+        controller.doPost(request, response);
+
+        ArgumentCaptor<TechnicalRequest> saved = ArgumentCaptor.forClass(TechnicalRequest.class);
+        verify(ticketDAO).update(saved.capture());
+        assertEquals(stored, saved.getValue().getSlaDeadline());
+    }
+
+    @Test
+    public void create_readsSlaDeadlineFromForm() throws Exception {
+        // Trước đây không có ô nhập nào nên phiếu tạo từ hệ thống luôn có
+        // sla_deadline NULL, khiến dashboard và lịch nhắc SLA thành vô dụng.
+        when(request.getParameter("action")).thenReturn("create");
+        when(request.getParameter("enterpriseId")).thenReturn("10");
+        when(request.getParameter("ticketType")).thenReturn("Bảo hành");
+        when(request.getParameter("priority")).thenReturn("Cao");
+        when(request.getParameter("receptionChannel")).thenReturn("Điện thoại");
+        when(request.getParameter("assignedTechnicianId")).thenReturn("50");
+        when(request.getParameter("description")).thenReturn("Thiết bị lỗi nguồn");
+        when(request.getParameter("slaDeadline")).thenReturn("2026-09-30T17:30");
+        when(ticketDAO.generateNextTicketCode()).thenReturn("TK-0099");
+        when(ticketDAO.insert(any(TechnicalRequest.class))).thenReturn(77);
+
+        controller.doPost(request, response);
+
+        ArgumentCaptor<TechnicalRequest> saved = ArgumentCaptor.forClass(TechnicalRequest.class);
+        verify(ticketDAO).insert(saved.capture());
+        assertEquals(Timestamp.valueOf("2026-09-30 17:30:00"), saved.getValue().getSlaDeadline());
+    }
+
+    /** Bộ tham số đủ để handleUpdate đi qua isValid và gọi tới ticketDAO.update. */
+    private void stubValidUpdateParams() {
+        when(request.getParameter("action")).thenReturn("update");
+        when(request.getParameter("ticketId")).thenReturn("3");
+        when(request.getParameter("enterpriseId")).thenReturn("10");
+        when(request.getParameter("ticketType")).thenReturn("Bảo hành");
+        when(request.getParameter("priority")).thenReturn("Cao");
+        when(request.getParameter("receptionChannel")).thenReturn("Điện thoại");
+        when(request.getParameter("assignedTechnicianId")).thenReturn("50");
+        when(request.getParameter("description")).thenReturn("Thiết bị lỗi nguồn");
+        when(request.getParameter("status")).thenReturn("Đang xử lý");
+        when(ticketDAO.update(any(TechnicalRequest.class))).thenReturn(true);
     }
 }

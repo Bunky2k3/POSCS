@@ -17,6 +17,7 @@ import poscs.dao.EmployeeDAO;
 import poscs.model.Role;
 import poscs.model.User;
 
+import static org.junit.Assert.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
@@ -241,6 +242,61 @@ public class AuthenticationControllerTest {
 
         verify(response).sendRedirect(contains("error=too_many_attempts"));
         verify(response, never()).sendRedirect(CONTEXT_PATH + "/dashboard");
+    }
+
+    @Test
+    public void login_afterLockoutExpires_getsAFreshFiveAttemptBudget() throws Exception {
+        // Bộ đếm sai phải được đặt lại khi đợt khoá trước đã hết hạn. Không đặt
+        // lại thì failedCount chỉ có tăng, nên sau lần bị khoá đầu tiên CHỈ CẦN
+        // gõ sai thêm 1 lần là lại dính đủ 15 phút nữa (6 >= 5) -- lặp vô hạn,
+        // và vì map khoá theo IP nên cả văn phòng dùng chung IP cùng dính.
+        //
+        // Không chờ được 15 phút thật trong test, nên gọi thẳng 2 hàm private
+        // với mốc thời gian tự chọn.
+        String ip = "10.20.30.40";
+        long t0 = 1_000_000_000L;
+        long lockout = readLongConstant("LOGIN_LOCKOUT_MILLIS");
+
+        for (int i = 0; i < 5; i++) {
+            invokeRecordFailedLoginAttempt(ip, t0);
+        }
+        assertTrue("5 lần sai phải bị khoá", invokeIsLockedOut(ip, t0 + 1));
+
+        long afterLockout = t0 + lockout + 1;
+        assertFalse("hết 15 phút thì phải mở khoá", invokeIsLockedOut(ip, afterLockout));
+
+        // Gõ sai ĐÚNG MỘT lần sau khi hết khoá -- chưa được khoá lại.
+        invokeRecordFailedLoginAttempt(ip, afterLockout);
+        assertFalse("1 lần sai sau khi hết khoá không được khoá tiếp",
+                invokeIsLockedOut(ip, afterLockout + 1));
+
+        // ...và phải còn đủ budget: 4 lần nữa mới chạm ngưỡng.
+        for (int i = 0; i < 3; i++) {
+            invokeRecordFailedLoginAttempt(ip, afterLockout);
+        }
+        assertFalse("mới 4/5 lần sai", invokeIsLockedOut(ip, afterLockout + 1));
+        invokeRecordFailedLoginAttempt(ip, afterLockout);
+        assertTrue("đủ 5 lần sai thì khoá lại", invokeIsLockedOut(ip, afterLockout + 1));
+    }
+
+    private void invokeRecordFailedLoginAttempt(String ip, long now) throws Exception {
+        java.lang.reflect.Method m = AuthenticationController.class
+                .getDeclaredMethod("recordFailedLoginAttempt", String.class, long.class);
+        m.setAccessible(true);
+        m.invoke(controller, ip, now);
+    }
+
+    private boolean invokeIsLockedOut(String ip, long now) throws Exception {
+        java.lang.reflect.Method m = AuthenticationController.class
+                .getDeclaredMethod("isLockedOut", String.class, long.class);
+        m.setAccessible(true);
+        return (Boolean) m.invoke(controller, ip, now);
+    }
+
+    private long readLongConstant(String name) throws Exception {
+        Field f = AuthenticationController.class.getDeclaredField(name);
+        f.setAccessible(true);
+        return f.getLong(null);
     }
 
     @Test

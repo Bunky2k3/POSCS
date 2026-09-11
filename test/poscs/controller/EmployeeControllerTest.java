@@ -271,29 +271,91 @@ public class EmployeeControllerTest {
         verify(response).sendRedirect(CONTEXT_PATH + "/employee?error=notfound");
     }
 
-    @Test
-    public void sendAccount_passwordUpdateFails_redirectsWithSendFailedError() throws Exception {
-        when(request.getParameter("action")).thenReturn("sendAccount");
-        when(request.getParameter("id")).thenReturn("15");
-        User employee = new User();
-        employee.setUserId(15);
-        when(employeeDAO.findById(15)).thenReturn(employee);
-        when(employeeDAO.updatePasswordHash(eq(15), anyString())).thenReturn(false);
-
-        controller.doPost(request, response);
-
-        verify(response).sendRedirect(CONTEXT_PATH + "/employee?action=view&id=15&error=send_failed");
-    }
-
-    @Test
-    public void sendAccount_mailSucceeds_redirectsWithSentFlag() throws Exception {
-        when(request.getParameter("action")).thenReturn("sendAccount");
-        when(request.getParameter("id")).thenReturn("15");
+    /** Nhân viên đủ điều kiện nhận mail: có email cá nhân thật. */
+    private User employeeWithPersonalEmail() {
         User employee = new User();
         employee.setUserId(15);
         employee.setLastName("Nguyễn");
         employee.setFirstName("An");
+        employee.setUsername("annguyen");
+        employee.setEmail("annguyen@poscs.vn");
+        employee.setPersonalEmail("an.nguyen@gmail.com");
+        return employee;
+    }
+
+    @Test
+    public void sendAccount_mailFails_leavesOldPasswordUntouched() throws Exception {
+        // Điểm mấu chốt: gửi mail TRƯỚC, ghi hash sau. Nếu SMTP lỗi mà vẫn đổi
+        // mật khẩu thì nhân viên mất mật khẩu đang dùng được, còn mật khẩu mới
+        // không tồn tại ở đâu cả -- tài khoản đang chạy bỗng nhiên chết.
+        when(request.getParameter("action")).thenReturn("sendAccount");
+        when(request.getParameter("id")).thenReturn("15");
+        when(employeeDAO.findById(15)).thenReturn(employeeWithPersonalEmail());
+
+        try (org.mockito.MockedStatic<EmailUtil> emailUtil = mockStatic(EmailUtil.class)) {
+            emailUtil.when(() -> EmailUtil.sendNewAccountEmail(any(), any(), any(), any(), any())).thenReturn(false);
+
+            controller.doPost(request, response);
+
+            verify(employeeDAO, never()).updatePasswordHash(anyInt(), anyString());
+            verify(response).sendRedirect(CONTEXT_PATH + "/employee?action=view&id=15&error=mail_failed");
+        }
+    }
+
+    @Test
+    public void sendAccount_noPersonalEmail_refusesBeforeTouchingPassword() throws Exception {
+        // personal_email cho phép NULL. Gửi tới địa chỉ rỗng chắc chắn hỏng, nên
+        // phải từ chối TRƯỚC khi đụng tới mật khẩu.
+        when(request.getParameter("action")).thenReturn("sendAccount");
+        when(request.getParameter("id")).thenReturn("15");
+        User employee = employeeWithPersonalEmail();
+        employee.setPersonalEmail(null);
         when(employeeDAO.findById(15)).thenReturn(employee);
+
+        try (org.mockito.MockedStatic<EmailUtil> emailUtil = mockStatic(EmailUtil.class)) {
+            controller.doPost(request, response);
+
+            emailUtil.verifyNoInteractions();
+            verify(employeeDAO, never()).updatePasswordHash(anyInt(), anyString());
+            verify(response).sendRedirect(CONTEXT_PATH + "/employee?action=view&id=15&error=no_personal_email");
+        }
+    }
+
+    @Test
+    public void sendAccount_blankPersonalEmail_refusesBeforeTouchingPassword() throws Exception {
+        when(request.getParameter("action")).thenReturn("sendAccount");
+        when(request.getParameter("id")).thenReturn("15");
+        User employee = employeeWithPersonalEmail();
+        employee.setPersonalEmail("   ");
+        when(employeeDAO.findById(15)).thenReturn(employee);
+
+        controller.doPost(request, response);
+
+        verify(employeeDAO, never()).updatePasswordHash(anyInt(), anyString());
+        verify(response).sendRedirect(CONTEXT_PATH + "/employee?action=view&id=15&error=no_personal_email");
+    }
+
+    @Test
+    public void sendAccount_mailSucceedsThenPasswordWriteFails_redirectsWithSendFailedError() throws Exception {
+        when(request.getParameter("action")).thenReturn("sendAccount");
+        when(request.getParameter("id")).thenReturn("15");
+        when(employeeDAO.findById(15)).thenReturn(employeeWithPersonalEmail());
+        when(employeeDAO.updatePasswordHash(eq(15), anyString())).thenReturn(false);
+
+        try (org.mockito.MockedStatic<EmailUtil> emailUtil = mockStatic(EmailUtil.class)) {
+            emailUtil.when(() -> EmailUtil.sendNewAccountEmail(any(), any(), any(), any(), any())).thenReturn(true);
+
+            controller.doPost(request, response);
+
+            verify(response).sendRedirect(CONTEXT_PATH + "/employee?action=view&id=15&error=send_failed");
+        }
+    }
+
+    @Test
+    public void sendAccount_mailSucceeds_sendsToPersonalEmailThenStoresHash() throws Exception {
+        when(request.getParameter("action")).thenReturn("sendAccount");
+        when(request.getParameter("id")).thenReturn("15");
+        when(employeeDAO.findById(15)).thenReturn(employeeWithPersonalEmail());
         when(employeeDAO.updatePasswordHash(eq(15), anyString())).thenReturn(true);
 
         try (org.mockito.MockedStatic<EmailUtil> emailUtil = mockStatic(EmailUtil.class)) {
@@ -301,27 +363,11 @@ public class EmployeeControllerTest {
 
             controller.doPost(request, response);
 
+            // Gửi tới email CÁ NHÂN, không phải email công ty vừa cấp (chưa có hộp thư thật).
+            emailUtil.verify(() -> EmailUtil.sendNewAccountEmail(
+                    eq("an.nguyen@gmail.com"), any(), eq("annguyen@poscs.vn"), eq("annguyen"), anyString()));
+            verify(employeeDAO).updatePasswordHash(eq(15), anyString());
             verify(response).sendRedirect(CONTEXT_PATH + "/employee?action=view&id=15&sent=1");
-        }
-    }
-
-    @Test
-    public void sendAccount_mailFails_redirectsWithWarningFlag() throws Exception {
-        when(request.getParameter("action")).thenReturn("sendAccount");
-        when(request.getParameter("id")).thenReturn("15");
-        User employee = new User();
-        employee.setUserId(15);
-        employee.setLastName("Nguyễn");
-        employee.setFirstName("An");
-        when(employeeDAO.findById(15)).thenReturn(employee);
-        when(employeeDAO.updatePasswordHash(eq(15), anyString())).thenReturn(true);
-
-        try (org.mockito.MockedStatic<EmailUtil> emailUtil = mockStatic(EmailUtil.class)) {
-            emailUtil.when(() -> EmailUtil.sendNewAccountEmail(any(), any(), any(), any(), any())).thenReturn(false);
-
-            controller.doPost(request, response);
-
-            verify(response).sendRedirect(CONTEXT_PATH + "/employee?action=view&id=15&warning=mail_failed");
         }
     }
 }

@@ -82,9 +82,16 @@
                 Đã gửi thông tin tài khoản (mật khẩu tạm mới) tới email cá nhân của nhân viên.
             </div>
         </c:if>
-        <c:if test="${not empty param.warning && param.warning == 'mail_failed'}">
-            <div class="alert alert-warning py-2 px-3 mb-3" style="font-size: 0.9rem; border-radius: 12px;">
-                Đã cấp mật khẩu tạm mới nhưng gửi email thất bại. Vui lòng cung cấp tài khoản cho nhân viên theo cách khác hoặc thử gửi lại.
+        <%-- Gửi mail chạy TRƯỚC khi ghi mật khẩu mới, nên hai lỗi dưới đây đều có
+             nghĩa là mật khẩu cũ của nhân viên VẪN còn dùng được. --%>
+        <c:if test="${not empty param.error && param.error == 'mail_failed'}">
+            <div class="alert alert-danger py-2 px-3 mb-3" style="font-size: 0.9rem; border-radius: 12px;">
+                Gửi email thất bại nên chưa cấp mật khẩu mới &mdash; tài khoản của nhân viên vẫn dùng mật khẩu cũ. Kiểm tra lại email cá nhân hoặc cấu hình gửi thư rồi thử lại.
+            </div>
+        </c:if>
+        <c:if test="${not empty param.error && param.error == 'no_personal_email'}">
+            <div class="alert alert-danger py-2 px-3 mb-3" style="font-size: 0.9rem; border-radius: 12px;">
+                Nhân viên này chưa có email cá nhân nên không gửi được thông tin tài khoản. Vui lòng bổ sung email cá nhân trước.
             </div>
         </c:if>
         <c:if test="${not empty param.error && param.error == 'send_failed'}">

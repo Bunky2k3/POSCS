@@ -235,16 +235,38 @@ public class EmployeeController extends HttpServlet {
             return;
         }
 
+        // personal_email cho phép NULL trong CSDL, nên phải chặn ở đây: gửi tới
+        // địa chỉ rỗng chắc chắn thất bại, mà mật khẩu thì đã bị đổi mất rồi.
+        if (employee.getPersonalEmail() == null || employee.getPersonalEmail().trim().isEmpty()) {
+            response.sendRedirect(request.getContextPath() + "/employee?action=view&id=" + id + "&error=no_personal_email");
+            return;
+        }
+
+        // THỨ TỰ QUAN TRỌNG: gửi mail TRƯỚC, ghi hash sau.
+        //
+        // Làm ngược lại (đổi mật khẩu rồi mới gửi) thì khi SMTP lỗi hoặc email
+        // cá nhân trống, mật khẩu đang dùng được của nhân viên đã bị ghi đè
+        // mất, còn mật khẩu mới thì không tồn tại ở đâu cả (không lưu bản rõ) --
+        // tài khoản đang chạy bình thường bỗng nhiên không đăng nhập được, mà
+        // dấu hiệu duy nhất là một tham số warning trên URL của Admin.
         String tempPassword = generateTempPassword();
+        boolean mailSent = EmailUtil.sendNewAccountEmail(employee.getPersonalEmail(), employee.getFullName(),
+                employee.getEmail(), employee.getUsername(), tempPassword);
+        if (!mailSent) {
+            // Chưa đụng tới mật khẩu cũ -- nhân viên vẫn đăng nhập được như trước.
+            response.sendRedirect(request.getContextPath() + "/employee?action=view&id=" + id + "&error=mail_failed");
+            return;
+        }
+
+        // Mail đã đi. Nếu bước ghi hash lỗi, mật khẩu trong mail sẽ không dùng
+        // được -- vẫn tốt hơn trường hợp cũ (mất mật khẩu cũ mà không ai biết
+        // mật khẩu mới), và Admin bấm lại là cấp mã mới.
         boolean updated = employeeDAO.updatePasswordHash(id, BCrypt.hashpw(tempPassword, BCrypt.gensalt()));
         if (!updated) {
             response.sendRedirect(request.getContextPath() + "/employee?action=view&id=" + id + "&error=send_failed");
             return;
         }
-
-        boolean mailSent = EmailUtil.sendNewAccountEmail(employee.getPersonalEmail(), employee.getFullName(), employee.getEmail(), employee.getUsername(), tempPassword);
-        String suffix = mailSent ? "&sent=1" : "&warning=mail_failed";
-        response.sendRedirect(request.getContextPath() + "/employee?action=view&id=" + id + suffix);
+        response.sendRedirect(request.getContextPath() + "/employee?action=view&id=" + id + "&sent=1");
     }
 
     private void handleUpdate(HttpServletRequest request, HttpServletResponse response) throws IOException {
