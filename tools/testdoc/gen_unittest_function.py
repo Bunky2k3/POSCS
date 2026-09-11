@@ -517,111 +517,118 @@ def build_statistics(wb, groups, names):
 
 
 def build_case_sheet(wb, key, cases, name):
+    """Một sheet cho một hàm: khối thông tin ở trên, ma trận UTCID ở dưới.
+
+    Khối thông tin nằm gọn trong ba cột A-C (nhãn / giá trị) chứ không trải
+    ngang qua các cột UTCID - các cột đó chỉ rộng vừa đủ chứa một chữ "O", đặt
+    tên hàm hay tiêu đề dài lên đó thì chữ tràn sang ô bên cạnh.
+    """
     prod_class, method = key
     ws = wb.create_sheet(name)
-    ws.column_dimensions["A"].width = 13
-    ws.column_dimensions["B"].width = 25
-    ws.column_dimensions["C"].width = 3
-    ws.column_dimensions["D"].width = 68
+    ws.column_dimensions["A"].width = 28
+    ws.column_dimensions["B"].width = 30
+    ws.column_dimensions["C"].width = 62
     for i in range(len(cases)):
-        ws.column_dimensions[get_column_letter(5 + i)].width = 11
+        ws.column_dimensions[get_column_letter(4 + i)].width = 11
 
-    last = 4 + len(cases)
     counts = collections.Counter(c["status"] for c in cases)
     types = collections.Counter(c["type"] for c in cases)
 
-    put(ws, 1, 1, "Lớp kiểm thử", font=BOLD, fill=LBL_FILL)
-    put(ws, 1, 3, prod_class)
-    put(ws, 1, 4, "Hàm kiểm thử", font=BOLD, fill=LBL_FILL)
-    put(ws, 1, 5, method)
-    put(ws, 2, 1, "Người lập", font=BOLD, fill=LBL_FILL)
-    put(ws, 2, 3, CREATOR)
-    put(ws, 2, 4, "Người thực thi", font=BOLD, fill=LBL_FILL)
-    put(ws, 2, 5, CREATOR)
-    put(ws, 3, 1, "Yêu cầu kiểm thử", font=BOLD, fill=LBL_FILL)
-    put(ws, 3, 3, "Kiểm thử đơn vị hàm %s() của lớp %s (mã nguồn test: %s.java)"
-        % (method, prod_class, cases[0]["test_class"]), align=WRAP)
+    # --- khối thông tin: nhãn ở cột A, giá trị trải B:C -------------------
+    info = [
+        ("Lớp kiểm thử", prod_class),
+        ("Hàm kiểm thử", method),
+        ("Người lập", CREATOR),
+        ("Người thực thi", CREATOR),
+        ("Yêu cầu kiểm thử",
+         "Kiểm thử đơn vị hàm %s() của lớp %s (mã nguồn test: %s.java)"
+         % (method, prod_class, cases[0]["test_class"])),
+        ("Tổng số test case", len(cases)),
+        ("Đạt / Trượt / Chưa chạy", "%d / %d / %d"
+         % (counts["Passed"], counts["Failed"], counts["Untested"])),
+        ("Loại N / A / B", "%d / %d / %d"
+         % (types["N"], types["A"], types["B"])),
+    ]
+    for r, (label, value) in enumerate(info, start=1):
+        put(ws, r, 1, label, font=BOLD, fill=LBL_FILL)
+        put(ws, r, 2, value, align=WRAP)
+        put(ws, r, 3, None)
+        ws.merge_cells(start_row=r, start_column=2, end_row=r, end_column=3)
 
-    labels = ["Đạt", "Trượt", "Chưa chạy", "N", "A", "B", "Tổng số test case"]
-    values = [counts["Passed"], counts["Failed"], counts["Untested"],
-              types["N"], types["A"], types["B"], len(cases)]
-    for j, (label, value) in enumerate(zip(labels, values)):
-        put(ws, 4, 1 + j, label, font=BOLD, fill=HDR_FILL, align=CENTER)
-        put(ws, 5, 1 + j, value, align=CENTER)
-
-    row = 7
-    put(ws, row, 4, "UTCID", font=BOLD, fill=HDR_FILL, align=CENTER)
+    head = len(info) + 2
+    put(ws, head, 1, None, fill=HDR_FILL)
+    put(ws, head, 2, None, fill=HDR_FILL)
+    put(ws, head, 3, "UTCID", font=BOLD, fill=HDR_FILL, align=CENTER)
     for i in range(len(cases)):
-        put(ws, row, 5 + i, "UTCID%02d" % (i + 1),
+        put(ws, head, 4 + i, "UTCID%02d" % (i + 1),
             font=BOLD, fill=HDR_FILL, align=CENTER)
 
     def block(title, rows_data, start):
-        """rows_data: list[(nhãn cột B, text cột D, set cột được đánh dấu O)]"""
+        """rows_data: list[(nhãn cột B, mô tả cột C, tập cột được đánh dấu O)]"""
         r = start
         for idx, (label, text, marks) in enumerate(rows_data):
             put(ws, r, 1, title if idx == 0 else None,
                 font=BOLD, fill=LBL_FILL, align=CENTER)
             put(ws, r, 2, label, font=BOLD if label else None, align=WRAP)
-            put(ws, r, 3, None)
-            put(ws, r, 4, text, align=WRAP)
+            put(ws, r, 3, text, align=WRAP)
             for i in range(len(cases)):
-                put(ws, r, 5 + i, "O" if i in marks else None, align=CENTER)
+                put(ws, r, 4 + i, "O" if i in marks else None, align=CENTER)
             r += 1
         if r - start > 1:
             ws.merge_cells(start_row=start, start_column=1,
                            end_row=r - 1, end_column=1)
         return r
 
-    # --- Condition -------------------------------------------------------
+    def grouped(field):
+        """Gom các test case trùng nội dung về cùng một dòng."""
+        order, by_text = [], collections.defaultdict(set)
+        for i, case in enumerate(cases):
+            if case[field] not in by_text:
+                order.append(case[field])
+            by_text[case[field]].add(i)
+        return [(text, by_text[text]) for text in order]
+
+    # --- Điều kiện --------------------------------------------------------
     cond_rows = [("Tiền điều kiện", cases[0]["precondition"],
                   set(range(len(cases))))]
-    order, by_text = [], collections.defaultdict(set)
-    for i, case in enumerate(cases):
-        if case["condition"] not in by_text:
-            order.append(case["condition"])
-        by_text[case["condition"]].add(i)
-    for idx, text in enumerate(order):
-        cond_rows.append(("Đầu vào" if idx == 0 else "", text, by_text[text]))
-    row = block("Điều kiện", cond_rows, 8) + 1
+    for idx, (text, marks) in enumerate(grouped("condition")):
+        cond_rows.append(("Đầu vào" if idx == 0 else "", text, marks))
+    row = block("Điều kiện", cond_rows, head + 1) + 1
 
-    # --- Confirm ---------------------------------------------------------
-    order, by_text = [], collections.defaultdict(set)
-    for i, case in enumerate(cases):
-        if case["expectation"] not in by_text:
-            order.append(case["expectation"])
-        by_text[case["expectation"]].add(i)
-    conf_rows = [("Kết quả trả về" if idx == 0 else "", text, by_text[text])
-                 for idx, text in enumerate(order)]
+    # --- Xác nhận ---------------------------------------------------------
+    conf_rows = [("Kết quả trả về" if idx == 0 else "", text, marks)
+                 for idx, (text, marks) in enumerate(grouped("expectation"))]
     row = block("Xác nhận", conf_rows, row) + 1
 
-    # --- Result ----------------------------------------------------------
-    put(ws, row, 1, "Kết quả", font=BOLD, fill=LBL_FILL, align=CENTER)
-    put(ws, row, 2, "Loại (N: thường, A: bất thường, B: biên)", align=WRAP)
-    for i, case in enumerate(cases):
-        put(ws, row, 5 + i, case["type"], align=CENTER)
-    put(ws, row + 1, 1, None, fill=LBL_FILL)
-    put(ws, row + 1, 2, "Đạt (P) / Trượt (F)", font=BOLD)
-    for i, case in enumerate(cases):
-        mark = {"Passed": "P", "Failed": "F", "Untested": "U"}[case["status"]]
-        put(ws, row + 1, 5 + i, mark, align=CENTER)
-    put(ws, row + 2, 1, None, fill=LBL_FILL)
-    put(ws, row + 2, 2, "Ngày thực thi", font=BOLD)
-    for i in range(len(cases)):
-        put(ws, row + 2, 5 + i, ISSUE_DATE, align=CENTER)
-    put(ws, row + 3, 1, None, fill=LBL_FILL)
-    put(ws, row + 3, 2, "Mã lỗi ghi nhận", font=BOLD)
-    for i in range(len(cases)):
-        put(ws, row + 3, 5 + i, None)
+    # --- Kết quả ----------------------------------------------------------
+    result_rows = [
+        ("Loại (N: thường, A: bất thường, B: biên)",
+         [c["type"] for c in cases]),
+        ("Đạt (P) / Trượt (F)",
+         [{"Passed": "P", "Failed": "F", "Untested": "U"}[c["status"]]
+          for c in cases]),
+        ("Ngày thực thi", [ISSUE_DATE] * len(cases)),
+        ("Mã lỗi ghi nhận", [None] * len(cases)),
+    ]
+    for idx, (label, values) in enumerate(result_rows):
+        r = row + idx
+        put(ws, r, 1, "Kết quả" if idx == 0 else None,
+            font=BOLD, fill=LBL_FILL, align=CENTER)
+        put(ws, r, 2, label, font=BOLD, align=WRAP)
+        put(ws, r, 3, None)
+        for i, value in enumerate(values):
+            put(ws, r, 4 + i, value, align=CENTER)
     ws.merge_cells(start_row=row, start_column=1,
-                   end_row=row + 3, end_column=1)
+                   end_row=row + len(result_rows) - 1, end_column=1)
 
-    # Truy vết ngược về JUnit: tên method test của từng UTCID.
-    trace = row + 5
-    put(ws, trace, 2, "Đối chiếu hàm JUnit", font=BOLD, fill=LBL_FILL)
+    # --- Truy vết ngược về JUnit -----------------------------------------
+    trace = row + len(result_rows) + 1
+    put(ws, trace, 1, "Đối chiếu hàm JUnit", font=BOLD, fill=LBL_FILL)
     for i, case in enumerate(cases):
-        put(ws, trace + i, 4, "UTCID%02d  ->  %s" % (i + 1, case["test_name"]),
-            align=WRAP, border=False)
-    ws.freeze_panes = "E8"
+        put(ws, trace + i, 2, "UTCID%02d" % (i + 1), align=CENTER)
+        put(ws, trace + i, 3, case["test_name"], align=WRAP)
+
+    ws.freeze_panes = ws.cell(row=head + 1, column=4).coordinate
     return ws
 
 
@@ -647,6 +654,7 @@ def apply_font(wb):
                                      size=old.size or FONT_SIZE,
                                      bold=old.bold, italic=old.italic,
                                      underline=old.underline, color=old.color)
+
 
 
 def main(argv=()):
