@@ -151,9 +151,12 @@
                 <p>Theo dõi và xử lý các yêu cầu hỗ trợ kỹ thuật từ khách hàng</p>
             </div>
             <div class="header-actions">
+                <%-- Giữ nguyên bộ lọc đang áp để file xuất ra khớp đúng những gì đang thấy trên màn hình. --%>
+                <%-- Xuất Excel là thao tác ĐỌC: chỉ lấy đúng dữ liệu vai trò này vốn đã
+                     xem được trên màn hình, đổi sang dạng file. Nên KHÔNG khoá theo
+                     canManage -- xem PERMISSIONS.md. --%>
+                <a href="${pageContext.request.contextPath}/ticket?action=exportExcel&keyword=${fn:escapeXml(keyword)}&status=${fn:escapeXml(statusFilter)}&priority=${fn:escapeXml(priorityFilter)}" class="btn-outline-action"><i class="fa-solid fa-file-excel"></i> Xuất Excel</a>
                 <c:if test="${canManage}">
-                    <%-- Giữ nguyên bộ lọc đang áp để file xuất ra khớp đúng những gì đang thấy trên màn hình. --%>
-                    <a href="${pageContext.request.contextPath}/ticket?action=exportExcel&keyword=${fn:escapeXml(keyword)}&status=${fn:escapeXml(statusFilter)}&priority=${fn:escapeXml(priorityFilter)}" class="btn-outline-action"><i class="fa-solid fa-file-excel"></i> Xuất Excel</a>
                     <a href="${pageContext.request.contextPath}/ticket?action=new" class="btn-add"><i class="fa-solid fa-plus"></i> Tạo phiếu hỗ trợ</a>
                 </c:if>
             </div>

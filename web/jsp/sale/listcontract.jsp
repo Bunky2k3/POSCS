@@ -149,8 +149,12 @@
                 <p>Quản lý toàn bộ hợp đồng cung cấp và thi công thiết bị viễn thông</p>
             </div>
             <div class="header-actions">
+                <%-- Xuất Excel là thao tác ĐỌC: chỉ lấy đúng dữ liệu vai trò này vốn đã
+                     xem được trên màn hình, đổi sang dạng file. Nên KHÔNG khoá theo
+                     canManage -- xem PERMISSIONS.md. --%>
+                <a href="${pageContext.request.contextPath}/contract?action=exportExcel&keyword=${fn:escapeXml(keyword)}&status=${fn:escapeXml(statusFilter)}&type=${fn:escapeXml(typeFilter)}" class="btn-outline-action"><i class="fa-solid fa-file-excel"></i> Xuất Excel</a>
+                <%-- Nhập PDF thì ngược lại: nó TẠO hợp đồng mới, nên vẫn khoá. --%>
                 <c:if test="${canManage}">
-                    <a href="${pageContext.request.contextPath}/contract?action=exportExcel&keyword=${fn:escapeXml(keyword)}&status=${fn:escapeXml(statusFilter)}&type=${fn:escapeXml(typeFilter)}" class="btn-outline-action"><i class="fa-solid fa-file-excel"></i> Xuất Excel</a>
                     <a href="${pageContext.request.contextPath}/contract?action=importForm" class="btn-outline-action"><i class="fa-solid fa-file-pdf"></i> Nhập PDF</a>
                     <a href="${pageContext.request.contextPath}/contract?action=new" class="btn-add"><i class="fa-solid fa-plus"></i> Tạo hợp đồng</a>
                 </c:if>

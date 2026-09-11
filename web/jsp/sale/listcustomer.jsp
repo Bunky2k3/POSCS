@@ -209,8 +209,11 @@
                 <p>Quản lý thông tin khách hàng doanh nghiệp đối tác</p>
             </div>
             <div class="header-actions">
+                <%-- Xuất Excel là thao tác ĐỌC: chỉ lấy đúng dữ liệu vai trò này vốn đã
+                     xem được trên màn hình, đổi sang dạng file. Nên KHÔNG khoá theo
+                     canManage -- xem PERMISSIONS.md. --%>
+                <a href="${pageContext.request.contextPath}/customer?action=exportExcel&keyword=${fn:escapeXml(keyword)}&type=${fn:escapeXml(typeFilter)}&assigneeId=${assigneeFilter}" class="btn-outline-action"><i class="fa-solid fa-file-excel"></i> Xuất Excel</a>
                 <c:if test="${canManage}">
-                    <a href="${pageContext.request.contextPath}/customer?action=exportExcel&keyword=${fn:escapeXml(keyword)}&type=${fn:escapeXml(typeFilter)}&assigneeId=${assigneeFilter}" class="btn-outline-action"><i class="fa-solid fa-file-excel"></i> Xuất Excel</a>
                     <a href="${pageContext.request.contextPath}/customer?action=new" class="btn-add"><i class="fa-solid fa-plus"></i> Thêm khách hàng</a>
                 </c:if>
             </div>
