@@ -21,6 +21,7 @@ File .xlsx là tài liệu nộp, KHÔNG nằm trong repo. Mặc định ghi ra
 
 import collections
 import datetime
+import json
 import pathlib
 import re
 import sys
@@ -35,6 +36,7 @@ TEST_DIR = ROOT / "test"
 RESULT_DIR = ROOT / "build" / "test" / "results"
 DEFAULT_OUT = pathlib.Path.home() / "Documents" / "POSCS_UnitTest_Function.xlsx"
 GUIDELINE = pathlib.Path(__file__).with_name("guideline_unittest.txt")
+GLOSSARY = pathlib.Path(__file__).with_name("vi_glossary.json")
 
 PROJECT_NAME = "POSCS - Point Of Sale & Customer Support System"
 PROJECT_CODE = "POSCS"
@@ -228,6 +230,28 @@ def classify(condition_raw, expectation_raw=""):
     return "N"
 
 
+def load_glossary():
+    """Bản dịch tiếng Việt cho chuỗi điều kiện/kỳ vọng sinh từ tên test."""
+    data = json.loads(GLOSSARY.read_text(encoding="utf-8"))
+    return {k: v for k, v in data.items() if not k.startswith("_")}
+
+
+VI = load_glossary()
+MISSING = set()
+
+
+def vi(text):
+    """Dịch sang tiếng Việt; chưa có trong từ điển thì giữ nguyên và ghi nhận."""
+    if not text:
+        return text
+    if text in VI:
+        return VI[text]
+    if re.search(r"[À-ỹ]", text):      # đã là tiếng Việt sẵn
+        return text
+    MISSING.add(text)
+    return text
+
+
 def precondition_for(package, source):
     """Điều kiện tiền đề thật của lớp test, suy ra từ chính mã nguồn test."""
     if "mock(" not in source and "@Mock" not in source:
@@ -309,8 +333,8 @@ def collect():
                 "test_class": test_class,
                 "package": package,
                 "test_name": test_name,
-                "condition": condition or "Dữ liệu hợp lệ (trường hợp mặc định)",
-                "expectation": expectation or "Thực thi đúng như đặc tả",
+                "condition": vi(condition) or "Dữ liệu hợp lệ (trường hợp mặc định)",
+                "expectation": vi(expectation) or "Thực thi đúng như đặc tả",
                 "type": classify(condition_raw, expect_raw),
                 "status": status,
                 "precondition": precondition,
@@ -363,7 +387,7 @@ def put(ws, row, col, value, font=None, fill=None, align=None, border=True):
 
 
 def build_guideline(wb):
-    ws = wb.create_sheet("Guideline")
+    ws = wb.create_sheet("Hướng dẫn")
     ws.column_dimensions["A"].width = 130
     lines = GUIDELINE.read_text(encoding="utf-8").split("\x1e")
     for i, line in enumerate(lines, start=1):
@@ -377,29 +401,29 @@ def build_guideline(wb):
 
 
 def build_cover(wb):
-    ws = wb.create_sheet("Cover")
+    ws = wb.create_sheet("Trang bìa")
     for col, width in zip("ABCDEF", (22, 40, 14, 14, 18, 26)):
         ws.column_dimensions[col].width = width
     ws.merge_cells("B2:E2")
-    put(ws, 2, 2, "UNIT TEST DOCUMENT", font=TITLE_FONT, align=CENTER, border=False)
+    put(ws, 2, 2, "TÀI LIỆU UNIT TEST", font=TITLE_FONT, align=CENTER, border=False)
     rows = [
-        ("Project Name", PROJECT_NAME, "Creator", CREATOR),
-        ("Project Code", PROJECT_CODE, "Issue Date", ISSUE_DATE),
-        ("Document Code", DOC_CODE, "Version", "1.0"),
+        ("Tên dự án", PROJECT_NAME, "Người lập", CREATOR),
+        ("Mã dự án", PROJECT_CODE, "Ngày phát hành", ISSUE_DATE),
+        ("Mã tài liệu", DOC_CODE, "Phiên bản", "1.0"),
     ]
     for i, (label, value, label2, value2) in enumerate(rows, start=4):
         put(ws, i, 1, label, font=BOLD, fill=LBL_FILL)
         put(ws, i, 2, value)
         put(ws, i, 5, label2, font=BOLD, fill=LBL_FILL)
         put(ws, i, 6, value2)
-    put(ws, 9, 1, "Record of change", font=BOLD, border=False)
-    headers = ["Effective Date", "Version", "Change Item", "*A,D,M",
-               "Change description", "Reference"]
+    put(ws, 9, 1, "Lịch sử thay đổi", font=BOLD, border=False)
+    headers = ["Ngày hiệu lực", "Phiên bản", "Mục thay đổi", "*A,D,M",
+               "Mô tả thay đổi", "Tham chiếu"]
     for j, head in enumerate(headers, start=1):
         put(ws, 10, j, head, font=BOLD, fill=HDR_FILL, align=CENTER)
     put(ws, 11, 1, ISSUE_DATE)
     put(ws, 11, 2, "1.0")
-    put(ws, 11, 3, "All")
+    put(ws, 11, 3, "Toàn bộ")
     put(ws, 11, 4, "A")
     put(ws, 11, 5, "Tạo mới tài liệu Unit Test cho POSCS")
     put(ws, 11, 6, "")
@@ -407,22 +431,22 @@ def build_cover(wb):
 
 
 def build_method_list(wb, groups, names):
-    ws = wb.create_sheet("MethodList")
+    ws = wb.create_sheet("Danh sách hàm")
     for col, width in zip("ABCDEF", (6, 30, 30, 34, 52, 30)):
         ws.column_dimensions[col].width = width
-    put(ws, 2, 3, "Method List", font=TITLE_FONT, border=False)
-    info = [("Project Name", PROJECT_NAME),
-            ("Project Code", PROJECT_CODE),
-            ("Normal number of Test cases/KLOC", 100),
-            ("Test Environment Setup Description",
+    put(ws, 2, 3, "DANH SÁCH HÀM ĐƯỢC KIỂM THỬ", font=TITLE_FONT, border=False)
+    info = [("Tên dự án", PROJECT_NAME),
+            ("Mã dự án", PROJECT_CODE),
+            ("Định mức test case / KLOC", 100),
+            ("Môi trường thực thi kiểm thử",
              "1. JDK 21\n2. Apache Ant (NetBeans project)\n"
              "3. JUnit 4.13.2 + Mockito 5.23.0 (lib-test/)\n"
              "4. Lệnh chạy: ant test")]
     for i, (label, value) in enumerate(info, start=4):
         put(ws, i, 1, label, font=BOLD, fill=LBL_FILL)
         put(ws, i, 3, value, align=WRAP)
-    headers = ["No", "Module Name", "Method Name", "Sheet Name",
-               "Description", "Pre-Condition"]
+    headers = ["STT", "Tên lớp", "Tên hàm", "Tên sheet",
+               "Mô tả", "Tiền điều kiện"]
     for j, head in enumerate(headers, start=1):
         put(ws, 10, j, head, font=BOLD, fill=HDR_FILL, align=CENTER)
     row = 11
@@ -443,22 +467,22 @@ def build_method_list(wb, groups, names):
 
 
 def build_statistics(wb, groups, names):
-    ws = wb.create_sheet("Statistics")
+    ws = wb.create_sheet("Thống kê")
     for col, width in zip("ABCDEFGHI", (6, 42, 10, 10, 12, 8, 8, 8, 16)):
         ws.column_dimensions[col].width = width
-    put(ws, 2, 1, "UNIT TEST REPORT", font=TITLE_FONT, border=False)
-    info = [("Project Name", PROJECT_NAME, "Creator", CREATOR),
-            ("Project Code", PROJECT_CODE, "Reviewer/Approver", ""),
-            ("Document Code", "POSCS_Test Report_v1.0", "Issue Date", ISSUE_DATE)]
+    put(ws, 2, 1, "BÁO CÁO KẾT QUẢ UNIT TEST", font=TITLE_FONT, border=False)
+    info = [("Tên dự án", PROJECT_NAME, "Người lập", CREATOR),
+            ("Mã dự án", PROJECT_CODE, "Người rà soát/phê duyệt", ""),
+            ("Mã tài liệu", "POSCS_Test Report_v1.0", "Ngày phát hành", ISSUE_DATE)]
     for i, (label, value, label2, value2) in enumerate(info, start=4):
         put(ws, i, 1, label, font=BOLD, fill=LBL_FILL)
         put(ws, i, 2, value)
         put(ws, i, 4, label2, font=BOLD, fill=LBL_FILL)
         put(ws, i, 6, value2)
-    put(ws, 7, 1, "Notes", font=BOLD, fill=LBL_FILL)
+    put(ws, 7, 1, "Ghi chú", font=BOLD, fill=LBL_FILL)
     put(ws, 7, 2, "Kết quả lấy từ lần chạy `ant test` ngày %s" % ISSUE_DATE)
-    headers = ["No", "Function code", "Passed", "Failed", "Untested",
-               "N", "A", "B", "Total Test Cases"]
+    headers = ["STT", "Sheet hàm", "Đạt", "Trượt", "Chưa chạy",
+               "N", "A", "B", "Tổng số test case"]
     for j, head in enumerate(headers, start=1):
         put(ws, 11, j, head, font=BOLD, fill=HDR_FILL, align=CENTER)
     row = 12
@@ -472,16 +496,16 @@ def build_statistics(wb, groups, names):
                                    types["B"], len(cases)], start=3):
             put(ws, row, j, value, align=CENTER)
         row += 1
-    put(ws, row, 2, "Sub total", font=BOLD, fill=LBL_FILL)
+    put(ws, row, 2, "Tổng cộng", font=BOLD, fill=LBL_FILL)
     for j in range(3, 10):
         col = get_column_letter(j)
         put(ws, row, j, "=SUM(%s12:%s%d)" % (col, col, row - 1),
             font=BOLD, fill=LBL_FILL, align=CENTER)
     total_row = row
-    put(ws, row + 2, 2, "Test coverage", font=BOLD)
+    put(ws, row + 2, 2, "Độ bao phủ kiểm thử", font=BOLD)
     put(ws, row + 2, 5, "=IF(I%d=0,0,100)" % total_row, align=CENTER)
     put(ws, row + 2, 6, "%", border=False)
-    put(ws, row + 3, 2, "Test successful coverage", font=BOLD)
+    put(ws, row + 3, 2, "Độ bao phủ thành công", font=BOLD)
     put(ws, row + 3, 5, "=IF(I%d=0,0,ROUND(C%d/I%d*100,1))"
         % (total_row, total_row, total_row), align=CENTER)
     put(ws, row + 3, 6, "%", border=False)
@@ -502,19 +526,19 @@ def build_case_sheet(wb, key, cases, name):
     counts = collections.Counter(c["status"] for c in cases)
     types = collections.Counter(c["type"] for c in cases)
 
-    put(ws, 1, 1, "Code Module", font=BOLD, fill=LBL_FILL)
+    put(ws, 1, 1, "Lớp kiểm thử", font=BOLD, fill=LBL_FILL)
     put(ws, 1, 3, prod_class)
-    put(ws, 1, 4, "Method", font=BOLD, fill=LBL_FILL)
+    put(ws, 1, 4, "Hàm kiểm thử", font=BOLD, fill=LBL_FILL)
     put(ws, 1, 5, method)
-    put(ws, 2, 1, "Created By", font=BOLD, fill=LBL_FILL)
+    put(ws, 2, 1, "Người lập", font=BOLD, fill=LBL_FILL)
     put(ws, 2, 3, CREATOR)
-    put(ws, 2, 4, "Executed By", font=BOLD, fill=LBL_FILL)
+    put(ws, 2, 4, "Người thực thi", font=BOLD, fill=LBL_FILL)
     put(ws, 2, 5, CREATOR)
-    put(ws, 3, 1, "Test requirement", font=BOLD, fill=LBL_FILL)
-    put(ws, 3, 3, "Kiểm thử đơn vị phương thức %s() của lớp %s (%s.java)"
+    put(ws, 3, 1, "Yêu cầu kiểm thử", font=BOLD, fill=LBL_FILL)
+    put(ws, 3, 3, "Kiểm thử đơn vị hàm %s() của lớp %s (mã nguồn test: %s.java)"
         % (method, prod_class, cases[0]["test_class"]), align=WRAP)
 
-    labels = ["Passed", "Failed", "Untested", "N", "A", "B", "Total Test Cases"]
+    labels = ["Đạt", "Trượt", "Chưa chạy", "N", "A", "B", "Tổng số test case"]
     values = [counts["Passed"], counts["Failed"], counts["Untested"],
               types["N"], types["A"], types["B"], len(cases)]
     for j, (label, value) in enumerate(zip(labels, values)):
@@ -545,7 +569,7 @@ def build_case_sheet(wb, key, cases, name):
         return r
 
     # --- Condition -------------------------------------------------------
-    cond_rows = [("Precondition", cases[0]["precondition"],
+    cond_rows = [("Tiền điều kiện", cases[0]["precondition"],
                   set(range(len(cases))))]
     order, by_text = [], collections.defaultdict(set)
     for i, case in enumerate(cases):
@@ -553,8 +577,8 @@ def build_case_sheet(wb, key, cases, name):
             order.append(case["condition"])
         by_text[case["condition"]].add(i)
     for idx, text in enumerate(order):
-        cond_rows.append(("Input" if idx == 0 else "", text, by_text[text]))
-    row = block("Condition", cond_rows, 8) + 1
+        cond_rows.append(("Đầu vào" if idx == 0 else "", text, by_text[text]))
+    row = block("Điều kiện", cond_rows, 8) + 1
 
     # --- Confirm ---------------------------------------------------------
     order, by_text = [], collections.defaultdict(set)
@@ -562,26 +586,26 @@ def build_case_sheet(wb, key, cases, name):
         if case["expectation"] not in by_text:
             order.append(case["expectation"])
         by_text[case["expectation"]].add(i)
-    conf_rows = [("Return" if idx == 0 else "", text, by_text[text])
+    conf_rows = [("Kết quả trả về" if idx == 0 else "", text, by_text[text])
                  for idx, text in enumerate(order)]
-    row = block("Confirm", conf_rows, row) + 1
+    row = block("Xác nhận", conf_rows, row) + 1
 
     # --- Result ----------------------------------------------------------
-    put(ws, row, 1, "Result", font=BOLD, fill=LBL_FILL, align=CENTER)
-    put(ws, row, 2, "Type(N : Normal, A : Abnormal, B : Boundary)", align=WRAP)
+    put(ws, row, 1, "Kết quả", font=BOLD, fill=LBL_FILL, align=CENTER)
+    put(ws, row, 2, "Loại (N: thường, A: bất thường, B: biên)", align=WRAP)
     for i, case in enumerate(cases):
         put(ws, row, 5 + i, case["type"], align=CENTER)
     put(ws, row + 1, 1, None, fill=LBL_FILL)
-    put(ws, row + 1, 2, "Passed/Failed", font=BOLD)
+    put(ws, row + 1, 2, "Đạt (P) / Trượt (F)", font=BOLD)
     for i, case in enumerate(cases):
         mark = {"Passed": "P", "Failed": "F", "Untested": "U"}[case["status"]]
         put(ws, row + 1, 5 + i, mark, align=CENTER)
     put(ws, row + 2, 1, None, fill=LBL_FILL)
-    put(ws, row + 2, 2, "Executed Date", font=BOLD)
+    put(ws, row + 2, 2, "Ngày thực thi", font=BOLD)
     for i in range(len(cases)):
         put(ws, row + 2, 5 + i, ISSUE_DATE, align=CENTER)
     put(ws, row + 3, 1, None, fill=LBL_FILL)
-    put(ws, row + 3, 2, "Defect ID", font=BOLD)
+    put(ws, row + 3, 2, "Mã lỗi ghi nhận", font=BOLD)
     for i in range(len(cases)):
         put(ws, row + 3, 5 + i, None)
     ws.merge_cells(start_row=row, start_column=1,
@@ -589,7 +613,7 @@ def build_case_sheet(wb, key, cases, name):
 
     # Truy vết ngược về JUnit: tên method test của từng UTCID.
     trace = row + 5
-    put(ws, trace, 2, "JUnit test method", font=BOLD, fill=LBL_FILL)
+    put(ws, trace, 2, "Đối chiếu hàm JUnit", font=BOLD, fill=LBL_FILL)
     for i, case in enumerate(cases):
         put(ws, trace + i, 4, "UTCID%02d  ->  %s" % (i + 1, case["test_name"]),
             align=WRAP, border=False)
@@ -627,6 +651,11 @@ def main(argv=()):
     print("  %d sheet ham, %d test case (Passed %d / Failed %d / Untested %d)"
           % (len(groups), total, status["Passed"], status["Failed"],
              status["Untested"]))
+    if MISSING:
+        print("  CHUA CO BAN DICH - them %d chuoi sau vao %s:"
+              % (len(MISSING), GLOSSARY.name))
+        for item in sorted(MISSING):
+            print('    "%s": "",' % item)
     if unknown:
         print("  CANH BAO - %d test chua map duoc:" % len(unknown))
         for item in unknown[:20]:

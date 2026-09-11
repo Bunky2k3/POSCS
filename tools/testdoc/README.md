@@ -48,6 +48,19 @@ dòng, đánh dấu `O` ở giao điểm. Cuối mỗi sheet có bảng đối c
 Test đặt tên chỉ có hai đoạn (`url_javascriptSchemeRejected`) được tách tại từ
 mở đầu phần kỳ vọng (`OUTCOME_WORDS`).
 
+## Tiếng Việt
+
+Toàn bộ nhãn, tiêu đề cột và sheet Hướng dẫn đã là tiếng Việt. Phần nội dung
+(điều kiện / kỳ vọng của từng UTCID) được dịch qua `vi_glossary.json` — từ
+điển ánh xạ chuỗi sinh từ tên method test sang tiếng Việt.
+
+Thêm test mới mà chưa có bản dịch thì script vẫn chạy, giữ nguyên chuỗi tiếng
+Anh và in ra cuối danh sách những chuỗi cần bổ sung, đã định dạng sẵn để dán
+thẳng vào `vi_glossary.json`.
+
+Tên lớp, tên hàm và tên sheet giữ nguyên tiếng Anh vì là định danh trong mã
+nguồn.
+
 ## Hai chỗ cần người rà lại
 
 1. **Cột `Type (N/A/B)`** là suy đoán từ tên test (danh sách từ khoá trong
