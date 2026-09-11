@@ -40,3 +40,7 @@ replay_pid*
 
 # Backup files NetBeans/Ant leave behind when regenerating build-impl.xml
 *.xml~
+
+# Quyền/cấu hình riêng của Claude Code trên từng máy -- cùng lý do với
+# /nbproject/private/: chỉ đúng cho máy của một người, không chia sẻ.
+/.claude/settings.local.json
