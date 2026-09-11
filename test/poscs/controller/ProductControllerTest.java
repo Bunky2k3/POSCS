@@ -347,4 +347,50 @@ public class ProductControllerTest {
         verify(productDAO).softDelete(7);
         verify(response).sendRedirect(CONTEXT_PATH + "/product");
     }
+
+    // ------------------------------------------------------------------
+    // GET ?action=new / edit -- trang form cũng phải gác quyền
+    // ------------------------------------------------------------------
+
+    private void loginWithoutProductAccess() {
+        User noAccess = new User();
+        noAccess.setRole(new Role(2, "Sales")); // chỉ View only trên PRODUCT
+        when(session.getAttribute("currentUser")).thenReturn(noAccess);
+    }
+
+    /** Ẩn nút ở JSP chỉ là lớp trình bày; gõ thẳng URL vẫn phải bị chặn. */
+    @Test
+    public void createForm_withoutFullAccess_returns403InsteadOfRendering() throws Exception {
+        loginWithoutProductAccess();
+        when(request.getParameter("action")).thenReturn("new");
+
+        controller.doGet(request, response);
+
+        verify(response).sendError(eq(HttpServletResponse.SC_FORBIDDEN), anyString());
+        verify(request, never()).getRequestDispatcher("/jsp/technical/addNewProduct.jsp");
+    }
+
+    @Test
+    public void editForm_withoutFullAccess_returns403InsteadOfRendering() throws Exception {
+        loginWithoutProductAccess();
+        when(request.getParameter("action")).thenReturn("edit");
+        when(request.getParameter("id")).thenReturn("5");
+
+        controller.doGet(request, response);
+
+        verify(response).sendError(eq(HttpServletResponse.SC_FORBIDDEN), anyString());
+        verify(request, never()).getRequestDispatcher("/jsp/technical/updateProduct.jsp");
+    }
+
+    @Test
+    public void createForm_withFullAccess_stillRenders() throws Exception {
+        RequestDispatcher dispatcher = mock(RequestDispatcher.class);
+        when(request.getRequestDispatcher("/jsp/technical/addNewProduct.jsp")).thenReturn(dispatcher);
+        when(request.getParameter("action")).thenReturn("new");
+
+        controller.doGet(request, response);
+
+        verify(dispatcher).forward(request, response);
+        verify(response, never()).sendError(eq(HttpServletResponse.SC_FORBIDDEN), anyString());
+    }
 }

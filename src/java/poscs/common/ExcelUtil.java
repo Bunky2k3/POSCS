@@ -35,6 +35,17 @@ public final class ExcelUtil {
     private static final String CONTENT_TYPE = "application/vnd.ms-excel";
     private static final String FILE_EXTENSION = ".xls";
 
+    /**
+     * Số dòng dữ liệu tối đa: định dạng .xls chứa được 65.536 dòng, dòng 0 đã
+     * dành cho tiêu đề cột.
+     *
+     * POI tự nó cũng chặn (createRow ném IllegalArgumentException "Invalid row
+     * number ... outside allowable range"), nên đây không phải để tránh mất dữ
+     * liệu âm thầm -- mà để người đọc log hiểu ngay phải làm gì (lọc hẹp lại
+     * rồi xuất từng phần) thay vì phải tra xem con số 65535 ở đâu ra.
+     */
+    private static final int MAX_DATA_ROWS = 65_535;
+
     private ExcelUtil() {
     }
 
@@ -45,6 +56,10 @@ public final class ExcelUtil {
      */
     public static void writeWorkbook(HttpServletResponse response, String fileNamePrefix,
             String[] headers, List<Object[]> rows) throws IOException {
+        if (rows.size() > MAX_DATA_ROWS) {
+            throw new IOException("Không xuất được: " + rows.size() + " dòng vượt quá giới hạn "
+                    + MAX_DATA_ROWS + " dòng của định dạng .xls. Hãy lọc hẹp lại rồi xuất từng phần.");
+        }
         try (Workbook workbook = new HSSFWorkbook()) {
             Sheet sheet = workbook.createSheet("Data");
             writeHeaderRow(workbook, sheet, headers);

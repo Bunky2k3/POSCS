@@ -16,11 +16,10 @@ import static org.mockito.Mockito.*;
 
 /**
  * Test cho nhánh /contract/byEnterprise của ContractController -- endpoint
- * AJAX trả JSON tự dựng thủ
- * công (như AddressController). Trọng tâm: escape đúng ký tự đặc biệt trong
+ * AJAX trả JSON tự dựng thủ công (như AddressController). Trọng tâm: escape đúng ký tự đặc biệt trong
  * tiêu đề hợp đồng, và enterpriseId thiếu/sai phải trả 400 + mảng rỗng.
  */
-public class ContractLookupControllerTest {
+public class ContractLookupEndpointTest {
 
     private ContractController controller;
     private ContractDAO contractDAO;

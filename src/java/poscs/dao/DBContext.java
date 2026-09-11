@@ -71,6 +71,25 @@ public class DBContext {
     }
 
     /**
+     * Đóng connection pool. Gọi đúng 1 lần lúc ứng dụng bị gỡ khỏi container
+     * (xem {@link poscs.common.DataSourceLifecycle}).
+     *
+     * Vì DATA_SOURCE là static, nó sống theo CLASSLOADER của webapp chứ không
+     * theo request -- Tomcat gỡ webapp ra không hề đụng tới nó. Không đóng thì
+     * mỗi lần redeploy (chuyện xảy ra liên tục lúc phát triển/kiểm thử) bỏ lại
+     * nguyên một pool: 10 kết nối MySQL vẫn mở cộng thread housekeeper của
+     * HikariCP vẫn chạy. Vài chục lần deploy là chạm max_connections của MySQL,
+     * và lỗi hiện ra dưới dạng "update_failed" ở màn hình nghiệp vụ chứ không
+     * chỉ thẳng vào nguyên nhân thật.
+     *
+     * HikariDataSource.close() gọi nhiều lần là vô hại (lần sau không làm gì),
+     * nên không cần tự canh cờ "đã đóng chưa".
+     */
+    public static void shutdown() {
+        DATA_SOURCE.close();
+    }
+
+    /**
      * HÀM MAIN ĐỂ KIỂM TRA KẾT NỐI.
      * Bạn có thể chạy trực tiếp file này để kiểm tra.
      */
@@ -85,7 +104,7 @@ public class DBContext {
             System.err.println("Loi khi ket noi: " + e.getMessage());
             printFailureHelp();
         } finally {
-            DATA_SOURCE.close();
+            shutdown();
         }
     }
 

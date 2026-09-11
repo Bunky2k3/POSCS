@@ -56,7 +56,8 @@ public class ProductController extends HttpServlet {
         // Cho JSP biết người đang xem có quyền Full trên tài nguyên này không,
         // để ẩn các nút hành động không dùng được (Tạo/Sửa/Xoá/Nhập/Xuất) thay
         // vì để người ta bấm vào rồi nhận 403. Đây CHỈ là lớp trình bày --
-        // chặn thật vẫn nằm ở AccessControl.requireFullAccess trong doPost.
+        // chặn thật nằm ở AccessControl.requireFullAccess trong doPost và ở
+        // đầu mỗi trang form bên dưới (gõ thẳng URL cũng không vào được).
         request.setAttribute("canManage",
                 AccessControl.hasFullAccess(request, AccessControl.Resource.PRODUCT));
         String action = request.getParameter("action");
@@ -234,12 +235,22 @@ public class ProductController extends HttpServlet {
 
     private void showCreateForm(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
+        // Trang form cũng là thao tác quản trị: vai trò chỉ-xem không được
+        // vào đây, dù nút bấm đã ẩn ở danh sách (xem PERMISSIONS.md).
+        if (!AccessControl.requireFullAccess(request, response, AccessControl.Resource.PRODUCT)) {
+            return;
+        }
         request.setAttribute("categoryList", productDAO.findAllCategories());
         request.getRequestDispatcher(CREATE_VIEW).forward(request, response);
     }
 
     private void showEditForm(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
+        // Trang form cũng là thao tác quản trị: vai trò chỉ-xem không được
+        // vào đây, dù nút bấm đã ẩn ở danh sách (xem PERMISSIONS.md).
+        if (!AccessControl.requireFullAccess(request, response, AccessControl.Resource.PRODUCT)) {
+            return;
+        }
         Integer id = parseIntOrNull(request.getParameter("id"));
         Product product = id != null ? productDAO.findById(id) : null;
         if (product == null) {

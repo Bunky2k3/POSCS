@@ -2,12 +2,15 @@ package poscs.controller;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.FileInputStream;
 import java.lang.reflect.Field;
 import java.sql.Date;
 import java.sql.Timestamp;
 import java.util.Arrays;
 import java.util.Collections;
 import jakarta.servlet.RequestDispatcher;
+import jakarta.servlet.ServletConfig;
+import jakarta.servlet.ServletContext;
 import jakarta.servlet.ServletOutputStream;
 import jakarta.servlet.WriteListener;
 import jakarta.servlet.http.HttpServletRequest;
@@ -20,6 +23,9 @@ import poscs.dao.ContractDAO;
 import poscs.dao.CustomerDAO;
 import poscs.dao.EmployeeDAO;
 import poscs.dao.TechnicalSupportTicketDAO;
+import org.apache.pdfbox.Loader;
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.text.PDFTextStripper;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.ss.usermodel.WorkbookFactory;
@@ -75,6 +81,16 @@ public class TechnicalSupportTicketControllerTest {
         when(request.getContextPath()).thenReturn(CONTEXT_PATH);
 
         loginAs("CSKH", 99); // role được Full access trên TICKET, xem PERMISSIONS.md
+
+        // exportPdf đọc font tiếng Việt qua ServletContext. Dùng ĐÚNG file font
+        // trong web/WEB-INF/fonts thay vì mock trả byte giả: PDType0Font.load
+        // phân tích thật file TTF, font giả sẽ hỏng ngay ở đó.
+        ServletContext servletContext = mock(ServletContext.class);
+        when(servletContext.getResourceAsStream("/WEB-INF/fonts/NotoSans-Regular.ttf"))
+                .thenAnswer(inv -> new FileInputStream("web/WEB-INF/fonts/NotoSans-Regular.ttf"));
+        ServletConfig servletConfig = mock(ServletConfig.class);
+        when(servletConfig.getServletContext()).thenReturn(servletContext);
+        controller.init(servletConfig);
     }
 
     private void loginAs(String roleName, int userId) {
@@ -622,5 +638,103 @@ public class TechnicalSupportTicketControllerTest {
 
         verify(ticketDAO, never()).update(any(TechnicalRequest.class));
         verify(response).sendRedirect(CONTEXT_PATH + "/ticket?action=edit&id=3&error=contract_mismatch");
+    }
+
+    // ------------------------------------------------------------------
+    // GET ?action=new / ?action=edit -- trang form cũng phải gác quyền
+    // ------------------------------------------------------------------
+
+    @Test
+    public void newForm_withoutFullAccess_returns403InsteadOfRenderingTheForm() throws Exception {
+        loginAs("Kỹ thuật", 50); // chỉ View only trên TICKET
+        when(request.getParameter("action")).thenReturn("new");
+
+        controller.doGet(request, response);
+
+        verify(response).sendError(eq(HttpServletResponse.SC_FORBIDDEN), anyString());
+        verify(request, never()).getRequestDispatcher("/jsp/customersupport/addnewTicket.jsp");
+    }
+
+    @Test
+    public void editForm_technicianNotAssignedToThisTicket_returns403() throws Exception {
+        loginAs("Kỹ thuật", 51); // phiếu được giao cho kỹ thuật viên 50
+        when(request.getParameter("action")).thenReturn("edit");
+        when(request.getParameter("id")).thenReturn("3");
+        when(ticketDAO.findById(3)).thenReturn(fullyValidExistingTicket());
+
+        controller.doGet(request, response);
+
+        verify(response).sendError(eq(HttpServletResponse.SC_FORBIDDEN), anyString());
+        verify(request, never()).getRequestDispatcher("/jsp/customersupport/updateTicket.jsp");
+    }
+
+    /**
+     * Ngoại lệ của PERMISSIONS.md: kỹ thuật viên được giao phiếu vẫn phải mở
+     * được form sửa -- gác quyền ở GET không được chặt tay hơn handleUpdate,
+     * không thì họ có quyền lưu nhưng không có đường vào để lưu.
+     */
+    @Test
+    public void editForm_assignedTechnician_canOpenTheForm() throws Exception {
+        loginAs("Kỹ thuật", 50); // đúng assignedTechnicianId của phiếu
+        when(request.getParameter("action")).thenReturn("edit");
+        when(request.getParameter("id")).thenReturn("3");
+        when(ticketDAO.findById(3)).thenReturn(fullyValidExistingTicket());
+        RequestDispatcher dispatcher = mock(RequestDispatcher.class);
+        when(request.getRequestDispatcher("/jsp/customersupport/updateTicket.jsp")).thenReturn(dispatcher);
+
+        controller.doGet(request, response);
+
+        verify(response, never()).sendError(eq(HttpServletResponse.SC_FORBIDDEN), anyString());
+        verify(dispatcher).forward(request, response);
+    }
+
+    // ------------------------------------------------------------------
+    // GET ?action=exportPdf
+    // ------------------------------------------------------------------
+
+    /** Mở lại file PDF controller vừa ghi ra, bằng chính PDFBox. */
+    private PDDocument exportPdfAndReopen(TechnicalRequest ticket) throws Exception {
+        ByteArrayOutputStream captured = captureResponseBody();
+        when(request.getParameter("action")).thenReturn("exportPdf");
+        when(request.getParameter("id")).thenReturn("3");
+        when(ticketDAO.findById(3)).thenReturn(ticket);
+
+        controller.doGet(request, response);
+
+        return Loader.loadPDF(captured.toByteArray());
+    }
+
+    @Test
+    public void exportPdf_shortTicket_fitsOnASinglePage() throws Exception {
+        try (PDDocument pdf = exportPdfAndReopen(ticketForExport())) {
+            assertEquals(1, pdf.getNumberOfPages());
+        }
+    }
+
+    /**
+     * description/resolution_summary là cột TEXT nên dài bao nhiêu cũng được.
+     * Bản đầu chỉ tạo đúng 1 trang A4 và cứ trừ dần toạ độ y, nên phần vượt
+     * quá chiều cao trang bị vẽ ra NGOÀI vùng giấy: file mở lên vẫn bình
+     * thường, chỉ mất hẳn phần cuối mà không báo gì. Chốt lại bằng 2 điều
+     * kiểm: có sang trang mới, VÀ dòng cuối cùng thật sự đọc lại được.
+     */
+    @Test
+    public void exportPdf_longDescription_flowsOntoNewPagesInsteadOfBeingDrawnOffPage() throws Exception {
+        TechnicalRequest t = ticketForExport();
+        StringBuilder longText = new StringBuilder();
+        for (int i = 1; i <= 200; i++) {
+            longText.append("Dong mo ta so ").append(i).append(". ");
+        }
+        longText.append("KETTHUCMOTA");
+        t.setDescription(longText.toString());
+        t.setResolutionSummary("KETTHUCKETQUA");
+
+        try (PDDocument pdf = exportPdfAndReopen(t)) {
+            assertTrue("Mô tả dài phải tràn sang trang mới, không được vẽ lố ra ngoài trang",
+                    pdf.getNumberOfPages() > 1);
+            String text = new PDFTextStripper().getText(pdf);
+            assertTrue("Dòng cuối của mô tả phải còn trong file", text.contains("KETTHUCMOTA"));
+            assertTrue("Phần kết quả xử lý phải còn trong file", text.contains("KETTHUCKETQUA"));
+        }
     }
 }
