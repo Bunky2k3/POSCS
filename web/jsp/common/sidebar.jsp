@@ -6,7 +6,8 @@
     Trang gọi PHẢI set request attribute "activeNav" trước khi include, để
     tô sáng đúng mục đang đứng, vd:
         <c:set var="activeNav" value="customer" scope="request"/>
-    Giá trị hợp lệ: dashboard | customer | contract | product | ticket | employee.
+    Giá trị hợp lệ: dashboard | customer | contract | product | ticket | employee
+    | systemLog.
     Không set thì không mục nào được tô sáng (không lỗi, chỉ mất highlight).
 --%>
 <aside class="sidebar" id="sidebar">
@@ -16,4 +17,7 @@
     <a href="${pageContext.request.contextPath}/product" class="sidebar-link ${activeNav == 'product' ? 'active' : ''}"><i class="fa-solid fa-box"></i><span>Sản phẩm</span></a>
     <a href="${pageContext.request.contextPath}/ticket" class="sidebar-link ${activeNav == 'ticket' ? 'active' : ''}"><i class="fa-solid fa-headset"></i><span>Phiếu hỗ trợ</span></a>
     <c:if test="${sessionScope.currentUser.role.roleName == 'Admin'}"><a href="${pageContext.request.contextPath}/employee" class="sidebar-link ${activeNav == 'employee' ? 'active' : ''}"><i class="fa-solid fa-user-tie"></i><span>Nhân viên</span></a></c:if>
+    <%-- Nhật ký hệ thống: chỉ Admin. Ẩn ở đây chỉ là cho gọn menu -- chặn thật
+         nằm ở AccessControl.requireAdmin trong SystemLogController. --%>
+    <c:if test="${sessionScope.currentUser.role.roleName == 'Admin'}"><a href="${pageContext.request.contextPath}/systemLog" class="sidebar-link ${activeNav == 'systemLog' ? 'active' : ''}"><i class="fa-solid fa-file-lines"></i><span>Nhật ký</span></a></c:if>
 </aside>
