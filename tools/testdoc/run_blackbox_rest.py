@@ -379,6 +379,23 @@ def mysql(sql):
         return False
 
 
+def reseed():
+    """Nạp lại tài khoản mẫu trước khi chạy lượt này."""
+    import subprocess
+    exe = r"C:\Program Files\MySQL\MySQL Server 9.3\bin\mysql.exe"
+    sql = pathlib.Path(__file__).with_name("blackbox") / "fixtures.sql"
+    if not pathlib.Path(exe).is_file() or not sql.is_file():
+        return False
+    try:
+        with sql.open("rb") as f:
+            subprocess.run([exe, "-h127.0.0.1", "-uroot", "-p1234",
+                            "--default-character-set=utf8mb4", "poscs_bbtest"],
+                           stdin=f, capture_output=True, timeout=60)
+        return True
+    except Exception:
+        return False
+
+
 def test_special_fixtures(s):
     """Các ca cần dữ liệu nền không dựng được qua giao diện."""
     print("\n[Dữ liệu nền đặc biệt]")
@@ -593,7 +610,17 @@ def main():
         R.results.update(json.loads(R.OUT.read_text(encoding="utf-8")))
         print("Nap %d ket qua cua cac luot truoc" % len(R.results))
 
+    # Lượt 2 có ca đổi mật khẩu THẬT (TC_CHGPWD_001) và khoá tài khoản thật, nên
+    # tới lượt này mật khẩu trong CSDL đã khác hằng số trong ACCOUNTS. Không nạp
+    # lại thì login() im lặng thất bại và mọi ca phía sau trượt oan.
+    if reseed():
+        print("Da nap lai blackbox/fixtures.sql")
+    else:
+        print("CANH BAO: khong nap lai duoc fixtures.sql, ket qua co the sai")
+
     s, _ = R.login("admin")
+    if s.get(R.BASE + "/dashboard", allow_redirects=False).status_code != 200:
+        sys.exit("Khong dang nhap duoc bang tai khoan admin -- kiem tra fixtures")
     test_import_pdf(s)
     test_boundaries(s)
     test_special_fixtures(s)

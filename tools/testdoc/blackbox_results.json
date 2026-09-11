@@ -51,7 +51,7 @@
   },
   "TC_LOGIN_011": {
     "status": "Đạt",
-    "actual": "JSESSIONID trước 4202196471F3... / sau A1033D085C3A...",
+    "actual": "JSESSIONID trước CB398328F3DD... / sau 1840C132B5D8...",
     "note": ""
   },
   "TC_LOGIN_012": {
@@ -231,7 +231,7 @@
   },
   "TC_CUSEXP_005": {
     "status": "Đạt",
-    "actual": "Kỹ thuật xuất Excel khách hàng -> HTTP 200, 32768 byte",
+    "actual": "Kỹ thuật xuất Excel khách hàng -> HTTP 200, 36864 byte",
     "note": ""
   },
   "TC_ACL_003": {
@@ -266,7 +266,7 @@
   },
   "TC_CUSADD_001": {
     "status": "Đạt",
-    "actual": "tạo khách hàng đủ thông tin hợp lệ -> /POSCS/customer?action=view&id=120",
+    "actual": "tạo khách hàng đủ thông tin hợp lệ -> /POSCS/customer?action=view&id=140",
     "note": "Ca đối chứng: hỏng ca này thì các ca lỗi bên dưới không đáng tin"
   },
   "TC_CUSADD_002": {
@@ -306,17 +306,17 @@
   },
   "TC_CUSADD_006": {
     "status": "Đạt",
-    "actual": "SĐT có dấu cách -> /POSCS/customer?action=view&id=121",
+    "actual": "SĐT có dấu cách -> /POSCS/customer?action=view&id=141",
     "note": ""
   },
   "TC_CUSADD_007": {
     "status": "Đạt",
-    "actual": "SĐT dạng +84 -> /POSCS/customer?action=view&id=122",
+    "actual": "SĐT dạng +84 -> /POSCS/customer?action=view&id=142",
     "note": ""
   },
   "TC_CUSADD_011": {
     "status": "Đạt",
-    "actual": "ngày tham gia đúng hôm nay (giá trị biên) -> /POSCS/customer?action=view&id=123",
+    "actual": "ngày tham gia đúng hôm nay (giá trị biên) -> /POSCS/customer?action=view&id=143",
     "note": ""
   },
   "TC_CUSADD_012": {
@@ -361,7 +361,7 @@
   },
   "TC_CTRADD_001": {
     "status": "Đạt",
-    "actual": "tạo hợp đồng đủ thông tin hợp lệ -> /POSCS/contract?action=view&id=121",
+    "actual": "tạo hợp đồng đủ thông tin hợp lệ -> /POSCS/contract?action=view&id=140",
     "note": "Ca đối chứng"
   },
   "TC_CTRADD_002": {
@@ -396,12 +396,12 @@
   },
   "TC_CTRADD_008": {
     "status": "Đạt",
-    "actual": "ngày ký = ngày hiệu lực (giá trị biên) -> /POSCS/contract?action=view&id=122",
+    "actual": "ngày ký = ngày hiệu lực (giá trị biên) -> /POSCS/contract?action=view&id=141",
     "note": ""
   },
   "TC_CTRADD_009": {
     "status": "Đạt",
-    "actual": "hiệu lực = kết thúc (giá trị biên) -> /POSCS/contract?action=view&id=123",
+    "actual": "hiệu lực = kết thúc (giá trị biên) -> /POSCS/contract?action=view&id=142",
     "note": ""
   },
   "TC_CTRADD_010": {
@@ -411,7 +411,7 @@
   },
   "TC_CTRADD_011": {
     "status": "Đạt",
-    "actual": "link Google Drive hợp lệ -> /POSCS/contract?action=view&id=124",
+    "actual": "link Google Drive hợp lệ -> /POSCS/contract?action=view&id=143",
     "note": ""
   },
   "TC_CTREDIT_008": {
@@ -466,7 +466,7 @@
   },
   "TC_TKADD_001": {
     "status": "Đạt",
-    "actual": "tạo phiếu đủ thông tin hợp lệ -> /POSCS/ticket?action=view&id=113",
+    "actual": "tạo phiếu đủ thông tin hợp lệ -> /POSCS/ticket?action=view&id=131",
     "note": "Ca đối chứng"
   },
   "TC_TKADD_002": {
@@ -501,7 +501,7 @@
   },
   "TC_TKADD_009": {
     "status": "Đạt",
-    "actual": "không gắn hợp đồng -> /POSCS/ticket?action=view&id=114 (hợp đồng là tuỳ chọn)",
+    "actual": "không gắn hợp đồng -> /POSCS/ticket?action=view&id=132 (hợp đồng là tuỳ chọn)",
     "note": ""
   },
   "TC_TKEDIT_012": {
@@ -526,7 +526,7 @@
   },
   "TC_EMPADD_001": {
     "status": "Đạt",
-    "actual": "tạo nhân viên đủ thông tin hợp lệ -> /POSCS/employee?action=view&id=51",
+    "actual": "tạo nhân viên đủ thông tin hợp lệ -> /POSCS/employee?action=view&id=59",
     "note": "Ca đối chứng"
   },
   "TC_EMPADD_004": {
@@ -616,7 +616,7 @@
   },
   "TC_PRDADD_001": {
     "status": "Đạt",
-    "actual": "tạo sản phẩm đủ thông tin hợp lệ -> /POSCS/product?action=view&id=184",
+    "actual": "tạo sản phẩm đủ thông tin hợp lệ -> /POSCS/product?action=view&id=200",
     "note": "Ca đối chứng"
   },
   "TC_PRDADD_002": {
@@ -671,7 +671,7 @@
   },
   "TC_AJAX_006": {
     "status": "Đạt",
-    "actual": "enterpriseId=1 -> HTTP 200, 93 phần tử",
+    "actual": "enterpriseId=1 -> HTTP 200, 108 phần tử",
     "note": ""
   },
   "TC_AJAX_008": {
@@ -726,7 +726,7 @@
   },
   "TC_DASH_001": {
     "status": "Đạt",
-    "actual": "Dashboard trả HTTP 200, 29487 byte HTML",
+    "actual": "Dashboard trả HTTP 200, 29492 byte HTML",
     "note": ""
   },
   "TC_NOTI_002": {
@@ -801,7 +801,7 @@
   },
   "TC_CTRLIST_007": {
     "status": "Đạt",
-    "actual": "Lọc 'Sắp hết hạn': 6 dòng (<= 10)",
+    "actual": "Lọc 'Sắp hết hạn': 7 dòng (<= 10)",
     "note": ""
   },
   "TC_CTRLIST_005": {
@@ -926,7 +926,7 @@
   },
   "TC_CUSVIEW_001": {
     "status": "Đạt",
-    "actual": "Chi tiết khách hàng id=1: 130792 ký tự nội dung",
+    "actual": "Chi tiết khách hàng id=1: 152365 ký tự nội dung",
     "note": ""
   },
   "TC_CUSVIEW_002": {
@@ -951,7 +951,7 @@
   },
   "TC_CTRVIEW_001": {
     "status": "Đạt",
-    "actual": "Chi tiết hợp đồng id=1: 5732 ký tự",
+    "actual": "Chi tiết hợp đồng id=1: 6086 ký tự",
     "note": ""
   },
   "TC_CTRVIEW_002": {
@@ -976,7 +976,7 @@
   },
   "TC_PRDVIEW_001": {
     "status": "Đạt",
-    "actual": "Chi tiết sản phẩm id=1: 2348 ký tự",
+    "actual": "Chi tiết sản phẩm id=1: 2480 ký tự",
     "note": ""
   },
   "TC_PRDVIEW_002": {
@@ -1001,7 +1001,7 @@
   },
   "TC_TKVIEW_001": {
     "status": "Đạt",
-    "actual": "Chi tiết phiếu id=1: 843 ký tự",
+    "actual": "Chi tiết phiếu id=1: 833 ký tự",
     "note": ""
   },
   "TC_TKVIEW_002": {
@@ -1051,12 +1051,12 @@
   },
   "TC_CUSEXP_001": {
     "status": "Đạt",
-    "actual": "Excel khách hàng: 97 dòng (gồm dòng tiêu đề), 33792 byte",
+    "actual": "Excel khách hàng: 112 dòng (gồm dòng tiêu đề), 37888 byte",
     "note": ""
   },
   "TC_CUSEXP_002": {
     "status": "Đạt",
-    "actual": "Xuất theo bộ lọc: 81 dòng (<= 97 khi không lọc)",
+    "actual": "Xuất theo bộ lọc: 95 dòng (<= 112 khi không lọc)",
     "note": ""
   },
   "TC_CUSEXP_003": {
@@ -1066,17 +1066,17 @@
   },
   "TC_CUSEXP_004": {
     "status": "Đạt",
-    "actual": "Ô bắt đầu bằng '=': lưu trong file dưới dạng \"'=1+1 145047\"",
+    "actual": "Ô bắt đầu bằng '=': lưu trong file dưới dạng \"'=1+1 152622\"",
     "note": ""
   },
   "TC_CTREXP_001": {
     "status": "Đạt",
-    "actual": "Excel hợp đồng: 116 dòng",
+    "actual": "Excel hợp đồng: 133 dòng",
     "note": ""
   },
   "TC_CTREXP_002": {
     "status": "Đạt",
-    "actual": "Xuất theo bộ lọc trạng thái: 7 dòng (<= 116)",
+    "actual": "Xuất theo bộ lọc trạng thái: 8 dòng (<= 133)",
     "note": ""
   },
   "TC_CTREXP_003": {
@@ -1091,12 +1091,12 @@
   },
   "TC_TKEXP_001": {
     "status": "Đạt",
-    "actual": "Excel phiếu hỗ trợ: 115 dòng",
+    "actual": "Excel phiếu hỗ trợ: 133 dòng",
     "note": ""
   },
   "TC_TKEXP_002": {
     "status": "Đạt",
-    "actual": "Xuất theo trạng thái: 17 dòng (<= 115)",
+    "actual": "Xuất theo trạng thái: 19 dòng (<= 133)",
     "note": ""
   },
   "TC_TKEXP_003": {
@@ -1116,12 +1116,12 @@
   },
   "TC_TKEXP_006": {
     "status": "Đạt",
-    "actual": "Mô tả bắt đầu bằng '=' lưu dưới dạng \"'=1+1 145047\"",
+    "actual": "Mô tả bắt đầu bằng '=' lưu dưới dạng \"'=1+1 152622\"",
     "note": ""
   },
   "TC_CUSADD_013": {
     "status": "Đạt",
-    "actual": "Tạo khách hàng kèm logo .png -> /POSCS/customer?action=view&id=126",
+    "actual": "Tạo khách hàng kèm logo .png -> /POSCS/customer?action=view&id=146",
     "note": ""
   },
   "TC_CUSADD_014": {
@@ -1131,7 +1131,7 @@
   },
   "TC_PRDADD_005": {
     "status": "Đạt",
-    "actual": "Tải nhiều ảnh sản phẩm -> /POSCS/product?action=view&id=185",
+    "actual": "Tải nhiều ảnh sản phẩm -> /POSCS/product?action=view&id=201",
     "note": ""
   },
   "TC_PRDADD_006": {
@@ -1141,7 +1141,7 @@
   },
   "TC_PRDADD_007": {
     "status": "Đạt",
-    "actual": "Catalogue .pdf -> /POSCS/product?action=view&id=186",
+    "actual": "Catalogue .pdf -> /POSCS/product?action=view&id=202",
     "note": ""
   },
   "TC_PRDADD_008": {
@@ -1156,7 +1156,7 @@
   },
   "TC_PRDADD_010": {
     "status": "Đạt",
-    "actual": "Đơn giá âm -> /POSCS/product?action=view&id=188",
+    "actual": "Đơn giá âm -> /POSCS/product?action=view&id=204",
     "note": "Ghi nhận hành vi thực tế: hệ thống vẫn chấp nhận"
   },
   "TC_UPLOAD_001": {
@@ -1181,27 +1181,27 @@
   },
   "TC_CUSEDIT_001": {
     "status": "Đạt",
-    "actual": "Form sửa điền sẵn tên: 'Cty CRUD 145047'",
+    "actual": "Form sửa điền sẵn tên: 'Cty CRUD 152622'",
     "note": ""
   },
   "TC_CUSEDIT_002": {
     "status": "Đạt",
-    "actual": "Sửa tên và SĐT -> /POSCS/customer?action=view&id=127, trang chi tiết hiện tên mới",
+    "actual": "Sửa tên và SĐT -> /POSCS/customer?action=view&id=147, trang chi tiết hiện tên mới",
     "note": ""
   },
   "TC_CUSEDIT_003": {
     "status": "Đạt",
-    "actual": "SĐT sai định dạng -> /POSCS/customer?action=edit&id=127&error=invalid",
+    "actual": "SĐT sai định dạng -> /POSCS/customer?action=edit&id=147&error=invalid",
     "note": ""
   },
   "TC_CUSEDIT_004": {
     "status": "Đạt",
-    "actual": "email sai định dạng -> /POSCS/customer?action=edit&id=127&error=invalid",
+    "actual": "email sai định dạng -> /POSCS/customer?action=edit&id=147&error=invalid",
     "note": ""
   },
   "TC_CUSEDIT_005": {
     "status": "Đạt",
-    "actual": "Đổi sang Xã/Phường khác -> /POSCS/customer?action=view&id=127",
+    "actual": "Đổi sang Xã/Phường khác -> /POSCS/customer?action=view&id=147",
     "note": ""
   },
   "TC_CUSEDIT_006": {
@@ -1211,27 +1211,27 @@
   },
   "TC_CUSEDIT_007": {
     "status": "Đạt",
-    "actual": "Thay logo bằng .txt -> /POSCS/customer?action=edit&id=127&error=invalid_image_type",
+    "actual": "Thay logo bằng .txt -> /POSCS/customer?action=edit&id=147&error=invalid_image_type",
     "note": ""
   },
   "TC_CUSEVAL_001": {
     "status": "Đạt",
-    "actual": "Đánh giá mức Tốt -> /POSCS/customer?action=view&id=127&evaluated=1; ô xếp hạng hiện tại = 'GOOD'",
+    "actual": "Đánh giá mức Tốt -> /POSCS/customer?action=view&id=147&evaluated=1; ô xếp hạng hiện tại = 'GOOD'",
     "note": ""
   },
   "TC_CUSEVAL_002": {
-    "status": "Trượt",
-    "actual": "Lưu đúng (ô xếp hạng = 'AT_RISK') nhưng bảng lịch sử hiển thị 'AT_RISK' thay vì nhãn tiếng Việt 'Có nguy cơ rời bỏ'",
+    "status": "Đạt",
+    "actual": "Ô xếp hạng lưu 'AT_RISK'; bảng lịch sử hiển thị 'Có nguy cơ rời bỏ' (mong đợi nhãn tiếng Việt 'Có nguy cơ rời bỏ')",
     "note": ""
   },
   "TC_CUSEVAL_003": {
     "status": "Đạt",
-    "actual": "Đánh giá 3 lần: mức hiện tại = 'BAD', bảng lịch sử có 3 dòng (dòng mới nhất trước: ['2026-09-11', 'BAD'])",
+    "actual": "Đánh giá 3 lần: mức hiện tại = 'BAD', bảng lịch sử có 3 dòng (dòng mới nhất trước: ['11/09/2026', 'Xấu'])",
     "note": ""
   },
   "TC_CUSEVAL_004": {
     "status": "Đạt",
-    "actual": "Đánh giá không nhập mô tả -> /POSCS/customer?action=view&id=127&evaluated=1",
+    "actual": "Đánh giá không nhập mô tả -> /POSCS/customer?action=view&id=147&evaluated=1",
     "note": ""
   },
   "TC_CUSDEL_001": {
@@ -1251,7 +1251,7 @@
   },
   "TC_CTREDIT_001": {
     "status": "Đạt",
-    "actual": "Form sửa điền sẵn tiêu đề: 'HD CRUD 145047'",
+    "actual": "Form sửa điền sẵn tiêu đề: 'HD CRUD 152622'",
     "note": ""
   },
   "TC_CTREDIT_002": {
@@ -1266,37 +1266,37 @@
   },
   "TC_CTREDIT_004": {
     "status": "Đạt",
-    "actual": "Sửa sang ngày ký sau ngày hiệu lực -> /POSCS/contract?action=edit&id=125&error=invalid",
+    "actual": "Sửa sang ngày ký sau ngày hiệu lực -> /POSCS/contract?action=edit&id=144&error=invalid",
     "note": ""
   },
   "TC_CTREDIT_005": {
     "status": "Đạt",
-    "actual": "Đổi khách hàng của hợp đồng -> /POSCS/contract?action=view&id=125",
+    "actual": "Đổi khách hàng của hợp đồng -> /POSCS/contract?action=view&id=144",
     "note": ""
   },
   "TC_CTREDIT_006": {
     "status": "Đạt",
-    "actual": "Link đính kèm ftp:// -> /POSCS/contract?action=edit&id=125&error=invalid_drive_link",
+    "actual": "Link đính kèm ftp:// -> /POSCS/contract?action=edit&id=144&error=invalid_drive_link",
     "note": ""
   },
   "TC_CTREDIT_007": {
     "status": "Đạt",
-    "actual": "Xoá trắng link đính kèm -> /POSCS/contract?action=view&id=125",
+    "actual": "Xoá trắng link đính kèm -> /POSCS/contract?action=view&id=144",
     "note": ""
   },
   "TC_CTRADDPRD_001": {
     "status": "Đạt",
-    "actual": "Thêm sản phẩm số lượng 3 -> /POSCS/contract?action=view&id=125",
+    "actual": "Thêm sản phẩm số lượng 3 -> /POSCS/contract?action=view&id=144",
     "note": ""
   },
   "TC_CTRADDPRD_005": {
     "status": "Đạt",
-    "actual": "Số lượng 1 (biên nhỏ nhất) -> /POSCS/contract?action=view&id=125",
+    "actual": "Số lượng 1 (biên nhỏ nhất) -> /POSCS/contract?action=view&id=144",
     "note": ""
   },
   "TC_CTRADDPRD_007": {
     "status": "Đạt",
-    "actual": "Số lượng '1.000' -> /POSCS/contract?action=view&id=125",
+    "actual": "Số lượng '1.000' -> /POSCS/contract?action=view&id=144",
     "note": "Hệ thống chấp nhận"
   },
   "TC_CTRADDPRD_008": {
@@ -1306,7 +1306,7 @@
   },
   "TC_CTRDELPRD_001": {
     "status": "Đạt",
-    "actual": "Gỡ một dòng sản phẩm: 4 dòng -> 3 dòng, /POSCS/contract?action=view&id=125",
+    "actual": "Gỡ một dòng sản phẩm: 4 dòng -> 3 dòng, /POSCS/contract?action=view&id=144",
     "note": ""
   },
   "TC_CTRDELPRD_002": {
@@ -1316,7 +1316,7 @@
   },
   "TC_CTRDELPRD_004": {
     "status": "Đạt",
-    "actual": "Gỡ dòng của hợp đồng khác khi đang ở hợp đồng này -> /POSCS/contract?action=view&id=125&error=remove_product_failed; dòng của hợp đồng kia còn nguyên",
+    "actual": "Gỡ dòng của hợp đồng khác khi đang ở hợp đồng này -> /POSCS/contract?action=view&id=144&error=remove_product_failed; dòng của hợp đồng kia còn nguyên",
     "note": ""
   },
   "TC_CTRDEL_001": {
@@ -1331,7 +1331,7 @@
   },
   "TC_CTRDEL_002": {
     "status": "Đạt",
-    "actual": "Xoá hợp đồng đã tới ngày hiệu lực -> /POSCS/contract?action=view&id=125&error=cannot_delete",
+    "actual": "Xoá hợp đồng đã tới ngày hiệu lực -> /POSCS/contract?action=view&id=144&error=cannot_delete",
     "note": ""
   },
   "TC_CTRDEL_003": {
@@ -1346,7 +1346,7 @@
   },
   "TC_PRDEDIT_001": {
     "status": "Đạt",
-    "actual": "Form sửa điền sẵn tên sản phẩm: 'SP CRUD 145047'",
+    "actual": "Form sửa điền sẵn tên sản phẩm: 'SP CRUD 152622'",
     "note": ""
   },
   "TC_PRDEDIT_002": {
@@ -1356,12 +1356,12 @@
   },
   "TC_PRDEDIT_003": {
     "status": "Đạt",
-    "actual": "Gỡ ảnh khỏi sản phẩm -> /POSCS/product?action=view&id=189",
+    "actual": "Gỡ ảnh khỏi sản phẩm -> /POSCS/product?action=view&id=205",
     "note": ""
   },
   "TC_PRDEDIT_004": {
     "status": "Đạt",
-    "actual": "Thêm ảnh mới -> /POSCS/product?action=view&id=189",
+    "actual": "Thêm ảnh mới -> /POSCS/product?action=view&id=205",
     "note": ""
   },
   "TC_PRDEDIT_005": {
@@ -1376,7 +1376,7 @@
   },
   "TC_PRDEDIT_007": {
     "status": "Đạt",
-    "actual": "Danh sách id ảnh lẫn rác '12,abc,15' -> /POSCS/product?action=view&id=189 (không lỗi 500)",
+    "actual": "Danh sách id ảnh lẫn rác '12,abc,15' -> /POSCS/product?action=view&id=205 (không lỗi 500)",
     "note": ""
   },
   "TC_PRDDEL_001": {
@@ -1396,7 +1396,7 @@
   },
   "TC_TKADD_007": {
     "status": "Đạt",
-    "actual": "Form tạo phiếu có 54 option trong các dropdown",
+    "actual": "Form tạo phiếu có 61 option trong các dropdown",
     "note": ""
   },
   "TC_TKADD_010": {
@@ -1406,12 +1406,12 @@
   },
   "TC_TKADD_011": {
     "status": "Đạt",
-    "actual": "Hạn SLA sai định dạng -> /POSCS/ticket?action=view&id=118 (không lỗi 500)",
+    "actual": "Hạn SLA sai định dạng -> /POSCS/ticket?action=view&id=136 (không lỗi 500)",
     "note": ""
   },
   "TC_TKADD_012": {
     "status": "Đạt",
-    "actual": "Mô tả 5000 ký tự -> /POSCS/ticket?action=view&id=119, trang chi tiết hiện đủ nội dung",
+    "actual": "Mô tả 5000 ký tự -> /POSCS/ticket?action=view&id=137, trang chi tiết hiện đủ nội dung",
     "note": ""
   },
   "TC_TKEDIT_001": {
@@ -1431,7 +1431,7 @@
   },
   "TC_TKEDIT_005": {
     "status": "Đạt",
-    "actual": "Đóng lại phiếu vốn đã đóng -> /POSCS/ticket?action=view&id=117, mốc đóng ban đầu giữ nguyên",
+    "actual": "Đóng lại phiếu vốn đã đóng -> /POSCS/ticket?action=view&id=135, mốc đóng ban đầu giữ nguyên",
     "note": ""
   },
   "TC_TKEDIT_006": {
@@ -1441,22 +1441,22 @@
   },
   "TC_TKEDIT_011": {
     "status": "Đạt",
-    "actual": "Bỏ trống mô tả khi sửa -> /POSCS/ticket?action=edit&id=117&error=invalid",
+    "actual": "Bỏ trống mô tả khi sửa -> /POSCS/ticket?action=edit&id=135&error=invalid",
     "note": ""
   },
   "TC_TKEDIT_010": {
     "status": "Đạt",
-    "actual": "Đổi sang hợp đồng của khách hàng khác -> /POSCS/ticket?action=edit&id=117&error=contract_mismatch",
+    "actual": "Đổi sang hợp đồng của khách hàng khác -> /POSCS/ticket?action=edit&id=135&error=contract_mismatch",
     "note": ""
   },
   "TC_TKEDIT_004": {
     "status": "Đạt",
-    "actual": "Lưu không đổi trạng thái -> /POSCS/ticket?action=view&id=117",
+    "actual": "Lưu không đổi trạng thái -> /POSCS/ticket?action=view&id=135",
     "note": ""
   },
   "TC_TKEDIT_007": {
     "status": "Đạt",
-    "actual": "tech01 (được giao phiếu) cập nhật -> HTTP 302 /POSCS/ticket?action=view&id=117",
+    "actual": "tech01 (được giao phiếu) cập nhật -> HTTP 302 /POSCS/ticket?action=view&id=135",
     "note": ""
   },
   "TC_TKEDIT_009": {
@@ -1466,12 +1466,12 @@
   },
   "TC_TKDEL_001": {
     "status": "Đạt",
-    "actual": "Xoá phiếu -> /POSCS/ticket?action=view&id=117&error=cannot_delete; mở lại -> HTTP 200",
+    "actual": "Xoá phiếu -> /POSCS/ticket?action=view&id=135&error=cannot_delete; mở lại -> HTTP 200",
     "note": ""
   },
   "TC_TKDEL_003": {
     "status": "Đạt",
-    "actual": "Xoá lại phiếu đã xoá mềm -> /POSCS/ticket?action=view&id=117&error=cannot_delete (không lỗi 500)",
+    "actual": "Xoá lại phiếu đã xoá mềm -> /POSCS/ticket?action=view&id=135&error=cannot_delete (không lỗi 500)",
     "note": ""
   },
   "TC_TKDEL_002": {
@@ -1486,12 +1486,12 @@
   },
   "TC_EMPADD_002": {
     "status": "Đạt",
-    "actual": "Tên đăng nhập sinh tự động từ họ tên: Emp145047",
+    "actual": "Tên đăng nhập sinh tự động từ họ tên: Emp152622",
     "note": ""
   },
   "TC_EMPADD_003": {
     "status": "Đạt",
-    "actual": "Tạo người trùng họ tên -> /POSCS/employee?action=view&id=53, tên đăng nhập được nối thêm số đếm",
+    "actual": "Tạo người trùng họ tên -> /POSCS/employee?action=view&id=61, tên đăng nhập được nối thêm số đếm",
     "note": ""
   },
   "TC_EMPEDIT_001": {
@@ -1501,47 +1501,47 @@
   },
   "TC_EMPEDIT_002": {
     "status": "Đạt",
-    "actual": "Sửa số điện thoại -> /POSCS/employee?action=view&id=52",
+    "actual": "Sửa số điện thoại -> /POSCS/employee?action=view&id=60",
     "note": ""
   },
   "TC_EMPEDIT_003": {
     "status": "Đạt",
-    "actual": "Đổi vai trò sang CSKH -> /POSCS/employee?action=view&id=52",
+    "actual": "Đổi vai trò sang CSKH -> /POSCS/employee?action=view&id=60",
     "note": ""
   },
   "TC_EMPEDIT_004": {
     "status": "Đạt",
-    "actual": "Sửa sang CCCD của người khác -> /POSCS/employee?action=edit&id=52&error=duplicate_citizen",
+    "actual": "Sửa sang CCCD của người khác -> /POSCS/employee?action=edit&id=60&error=duplicate_citizen",
     "note": ""
   },
   "TC_EMPEDIT_005": {
     "status": "Đạt",
-    "actual": "Sửa sang SĐT của người khác -> /POSCS/employee?action=edit&id=52&error=duplicate_phone",
+    "actual": "Sửa sang SĐT của người khác -> /POSCS/employee?action=edit&id=60&error=duplicate_phone",
     "note": ""
   },
   "TC_EMPEDIT_006": {
     "status": "Đạt",
-    "actual": "Giữ nguyên CCCD của chính mình -> /POSCS/employee?action=view&id=52 (không báo trùng)",
+    "actual": "Giữ nguyên CCCD của chính mình -> /POSCS/employee?action=view&id=60 (không báo trùng)",
     "note": ""
   },
   "TC_EMPBAN_001": {
     "status": "Đạt",
-    "actual": "Khoá tài khoản nhân viên -> /POSCS/employee?action=view&id=52",
+    "actual": "Khoá tài khoản nhân viên -> /POSCS/employee?action=view&id=60",
     "note": ""
   },
   "TC_EMPBAN_002": {
     "status": "Đạt",
-    "actual": "Mở khoá tài khoản -> /POSCS/employee?action=view&id=52",
+    "actual": "Mở khoá tài khoản -> /POSCS/employee?action=view&id=60",
     "note": ""
   },
   "TC_EMPBAN_004": {
-    "status": "Trượt",
-    "actual": "Nhân viên đang đăng nhập bị khoá giữa chừng: trước 200, sau 200",
+    "status": "Đạt",
+    "actual": "Nhân viên đang đăng nhập bị khoá giữa chừng: trước 200, sau 302",
     "note": ""
   },
   "TC_EMPSEND_001": {
     "status": "Đạt",
-    "actual": "Gửi thông tin tài khoản -> /POSCS/employee?action=view&id=52&sent=1; log ghi mật khẩu tạm; đăng nhập bằng mật khẩu tạm: được",
+    "actual": "Gửi thông tin tài khoản -> /POSCS/employee?action=view&id=60&sent=1; log ghi mật khẩu tạm; đăng nhập bằng mật khẩu tạm: được",
     "note": ""
   },
   "TC_EMPSEND_005": {
@@ -1551,12 +1551,12 @@
   },
   "TC_EMPSEND_004": {
     "status": "Đạt",
-    "actual": "Mật khẩu của lần gửi đầu sau khi gửi lại: /POSCS/login.jsp?error=invalid_credentials&username=nguyenemp145047",
+    "actual": "Mật khẩu của lần gửi đầu sau khi gửi lại: /POSCS/login.jsp?error=invalid_credentials&username=nguyenemp152622",
     "note": ""
   },
   "TC_EMPSEND_002": {
     "status": "Đạt",
-    "actual": "Nhân viên không có email cá nhân -> /POSCS/employee?action=view&id=54&error=no_personal_email (mật khẩu giữ nguyên)",
+    "actual": "Nhân viên không có email cá nhân -> /POSCS/employee?action=view&id=62&error=no_personal_email (mật khẩu giữ nguyên)",
     "note": ""
   },
   "TC_EMPSEND_003": {
@@ -1656,12 +1656,12 @@
   },
   "TC_CHGPWD_007": {
     "status": "Đạt",
-    "actual": "Bị khoá giữa lúc form đang mở, bấm Xác nhận -> HTTP 302 /POSCS/login.jsp",
+    "actual": "Bị khoá giữa lúc form đang mở, bấm Xác nhận -> HTTP 302 /POSCS/login.jsp?error=account_inactive",
     "note": ""
   },
   "TC_FORGOT_001": {
     "status": "Đạt",
-    "actual": "Gửi OTP tới email tech02@poscs.vn -> /POSCS/verifyOtp.jsp, log ghi mã 331854",
+    "actual": "Gửi OTP tới email tech02@poscs.vn -> /POSCS/verifyOtp.jsp, log ghi mã 919880",
     "note": ""
   },
   "TC_FORGOT_003": {
@@ -1681,7 +1681,7 @@
   },
   "TC_OTP_001": {
     "status": "Đạt",
-    "actual": "Nhập đúng OTP 331854 -> /POSCS/resetPassword.jsp",
+    "actual": "Nhập đúng OTP 919880 -> /POSCS/resetPassword.jsp",
     "note": ""
   },
   "TC_RESET_002": {
@@ -1705,13 +1705,13 @@
     "note": ""
   },
   "TC_RESET_004": {
-    "status": "Trượt",
-    "actual": "Vào thẳng resetPassword.jsp khi chưa xác thực OTP -> HTTP 200 ",
+    "status": "Đạt",
+    "actual": "Vào thẳng resetPassword.jsp khi chưa xác thực OTP -> HTTP 302 /POSCS/forgotPassword.jsp;jsessionid=DA83664399425D4DEFF0DDAD901A39A2?error=unauthorized",
     "note": ""
   },
   "TC_OTP_005": {
     "status": "Đạt",
-    "actual": "Vào thẳng verifyOtp.jsp khi chưa yêu cầu mã -> HTTP 200 ",
+    "actual": "Vào thẳng verifyOtp.jsp khi chưa yêu cầu mã -> HTTP 302 /POSCS/forgotPassword.jsp;jsessionid=8FA4DA6698964EA47D10CDE4BABDFEB3?error=unauthorized",
     "note": ""
   },
   "TC_FORGOT_002": {
@@ -1836,7 +1836,7 @@
   },
   "TC_ACL_004": {
     "status": "Đạt",
-    "actual": "Kỹ thuật tạo được sản phẩm -> /POSCS/product?action=view&id=190",
+    "actual": "Kỹ thuật tạo được sản phẩm -> /POSCS/product?action=view&id=206",
     "note": ""
   },
   "TC_ACL_006": {
@@ -1846,7 +1846,7 @@
   },
   "TC_ACL_007": {
     "status": "Đạt",
-    "actual": "CSKH tạo được phiếu hỗ trợ -> /POSCS/ticket?action=view&id=120",
+    "actual": "CSKH tạo được phiếu hỗ trợ -> /POSCS/ticket?action=view&id=138",
     "note": ""
   },
   "TC_ACL_011": {
@@ -1861,7 +1861,7 @@
   },
   "TC_CTRIMPORT_002": {
     "status": "Đạt",
-    "actual": "Nhập từ file điền đúng mẫu: HTTP 200, trang báo: 'Đã tạo hợp đồng HD-0128 -- xem chi tiết Tải file mẫu ('",
+    "actual": "Nhập từ file điền đúng mẫu: HTTP 200, trang báo: 'Đã tạo hợp đồng HD-0147 -- xem chi tiết Tải file mẫu ('",
     "note": ""
   },
   "TC_CTRIMPORT_003": {
@@ -1906,7 +1906,7 @@
   },
   "TC_CUSLIST_003": {
     "status": "Đạt",
-    "actual": "Tìm theo mã số thuế 0977145100 -> 1 dòng",
+    "actual": "Tìm theo mã số thuế 0974154759 -> 1 dòng",
     "note": ""
   },
   "TC_CUSVIEW_008": {
@@ -1921,12 +1921,12 @@
   },
   "TC_PRDADD_004": {
     "status": "Đạt",
-    "actual": "Hai sản phẩm tạo liên tiếp có mã 0191 -> 0192",
+    "actual": "Hai sản phẩm tạo liên tiếp có mã 0211 -> 0212",
     "note": ""
   },
   "TC_TKLIST_008": {
-    "status": "Trượt",
-    "actual": "Phiếu quá hạn SLA KHÔNG được đánh dấu nổi bật trên danh sách",
+    "status": "Đạt",
+    "actual": "Phiếu quá hạn SLA CÓ được đánh dấu nổi bật trên danh sách",
     "note": ""
   },
   "TC_AJAX_007": {
@@ -1941,7 +1941,7 @@
   },
   "TC_RESEND_001": {
     "status": "Đạt",
-    "actual": "Gửi lại sau 30 giây -> /POSCS/verifyOtp.jsp?resent=1, mã mới 708554 khác mã cũ 145236",
+    "actual": "Gửi lại sau 30 giây -> /POSCS/verifyOtp.jsp?resent=1, mã mới 093803 khác mã cũ 104236",
     "note": ""
   },
   "TC_RESEND_003": {
@@ -1956,7 +1956,7 @@
   },
   "TC_OTP_004": {
     "status": "Đạt",
-    "actual": "Nhập đúng mã 510099 sau 5 phút -> /POSCS/verifyOtp.jsp?error=expired",
+    "actual": "Nhập đúng mã 729179 sau 5 phút -> /POSCS/verifyOtp.jsp?error=expired",
     "note": ""
   },
   "TC_FORGOT_005": {
