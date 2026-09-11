@@ -166,6 +166,25 @@ in `AuthenticationController`/`AuthenticationFilter`, and the matrix
 is enforced server-side for Customer/Contract/Product/Ticket/Employee
 via `poscs.common.AccessControl`.
 
+## System log screen (Admin only)
+
+`/systemLog` lets an Admin read the server's log files in the browser and
+download one — useful during testing, when the person who hit the bug is not
+the person with shell access to the server.
+
+- Log directory: the `LOG_DIR` environment variable (or system property) if
+  set, otherwise `${catalina.base}/logs` — where the container collects what
+  the application writes to stderr.
+- Only `.log` / `.out` / `.txt` files are listed, newest first. The `file`
+  parameter is a **name**, always matched against that listing, so no path
+  ever reaches the filesystem from a request (`poscs.common.LogFiles`).
+- The view shows the last N lines (100–2000) of the selected file with an
+  optional keyword filter; reads are capped at the last 512 KB so a huge
+  `catalina.out` cannot be pulled into memory.
+- Gated by `AccessControl.requireAdmin(...)` on every action, the download
+  included — it returns a file without going through a JSP, so it needs its
+  own check. See [PERMISSIONS.md](PERMISSIONS.md).
+
 ## Security
 
 - **CSRF protection:** every state-changing `POST` (including login)

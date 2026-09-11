@@ -35,6 +35,7 @@ any role — every single action (including list/view) requires Admin.
 | Product (`products`) | Full | View only | Full | View only |
 | Ticket (`technicalrequests`) | Full | View only | View only* | Full |
 | Employee (`users`) | Full | No access | No access | No access |
+| System log (`/systemLog`) | Full | No access | No access | No access |
 
 \* **Exception:** `Kỹ thuật` may update the `status` and `resolutionSummary`
 of a ticket currently assigned to them (`assigned_technician_id` matches
@@ -76,3 +77,11 @@ status") without giving them Full CRUD. Enforced in
   save and no way in.
 - `Employee` (user account management) has no "View only" tier for
   non-Admin roles — it's Admin-only end to end.
+- **System log** (`/systemLog`, viewing and downloading the server's log
+  files) is not a business resource, so it is not in `Resource` and not
+  governed by `requireFullAccess`. It is gated by
+  `AccessControl.requireAdmin(...)` instead, which every action calls —
+  including the download, which returns a file without going through a JSP.
+  Server logs carry error messages with business context (contract codes,
+  emails, the username of whoever acted) plus stack traces, so they stay
+  Admin-only with no "View only" tier.

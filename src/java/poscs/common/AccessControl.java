@@ -25,6 +25,9 @@ public final class AccessControl {
         CUSTOMER, CONTRACT, PRODUCT, TICKET, EMPLOYEE
     }
 
+    /** role_name của quản trị viên trong bảng roles -- xem db/migrations/V2. */
+    private static final String ROLE_ADMIN = "Admin";
+
     // role_name nào được Full (tạo/sửa/xoá) cho từng Resource -- role không có
     // trong danh sách coi như chỉ View only (hoặc No access, với EMPLOYEE).
     // Khớp đúng bảng "Access matrix" trong PERMISSIONS.md.
@@ -66,6 +69,29 @@ public final class AccessControl {
         }
         response.sendError(HttpServletResponse.SC_FORBIDDEN,
                 "Bạn không có quyền thực hiện thao tác này.");
+        return false;
+    }
+
+    /** true nếu người đang đăng nhập giữ vai trò Admin. */
+    public static boolean isAdmin(HttpServletRequest request) {
+        User user = currentUser(request);
+        return user != null && user.getRole() != null && ROLE_ADMIN.equals(user.getRole().getRoleName());
+    }
+
+    /**
+     * Chặn mọi vai trò trừ Admin -- trả về 403 và false.
+     *
+     * Khác requireFullAccess(...) ở chỗ nó không gắn với tài nguyên nghiệp vụ
+     * nào trong ma trận: dùng cho các chức năng quản trị hệ thống (nhật ký máy
+     * chủ chẳng hạn) vốn không phải Customer/Contract/Product/Ticket/Employee,
+     * và không có bậc "View only" cho ai khác.
+     */
+    public static boolean requireAdmin(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        if (isAdmin(request)) {
+            return true;
+        }
+        response.sendError(HttpServletResponse.SC_FORBIDDEN,
+                "Chức năng này chỉ dành cho quản trị viên.");
         return false;
     }
 
