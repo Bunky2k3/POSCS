@@ -1,5 +1,6 @@
 package poscs.integration;
 
+import java.util.List;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -9,6 +10,8 @@ import poscs.dao.NotificationDAO;
 import poscs.dao.TechnicalSupportTicketDAO;
 import poscs.model.Address;
 import poscs.model.Enterprise;
+import poscs.model.TechnicalRequest;
+import poscs.model.TechnicalRequestHistory;
 import poscs.model.User;
 
 import static org.junit.Assert.*;
@@ -215,6 +218,70 @@ public class WriteAndTransactionIntegrationTest {
         assertEquals(0, ticketDAO.findAll(1, 50, null, null, null).size());
         assertNull(ticketDAO.findById(Fixtures.TICKET_ID));
         assertEquals(1, IntegrationDb.count("technicalrequests", "is_deleted = 1"));
+    }
+
+    // ------------------------------------------------------------------
+    // Lịch sử đổi trạng thái phiếu hỗ trợ
+    // ------------------------------------------------------------------
+
+    /**
+     * Chỉ CSDL thật mới trả lời được: câu INSERT có đúng tên cột không, khoá
+     * ngoại changed_by có thoả không, changed_at có được tự điền không. Mock
+     * trả "thành công" cho mọi executeUpdate nên mù với cả ba.
+     */
+    @Test
+    public void ticketStatusChange_writesHistoryRowReadableBack() throws Exception {
+        IntegrationDb.assumeAvailable();
+        Fixtures.seedContract();
+        Fixtures.seedTicket(); // đang ở trạng thái "Đang xử lý"
+
+        TechnicalRequest t = ticketDAO.findById(Fixtures.TICKET_ID);
+        t.setStatus(TechnicalSupportTicketDAO.STATUS_CLOSED);
+        t.setResolutionSummary("Đã thay bộ nguồn");
+        assertTrue(ticketDAO.update(t, Fixtures.USER_ID, "Khách xác nhận hoạt động lại"));
+
+        List<TechnicalRequestHistory> history = ticketDAO.findHistoryByTicketId(Fixtures.TICKET_ID);
+        assertEquals(1, history.size());
+        TechnicalRequestHistory h = history.get(0);
+        assertEquals("Đang xử lý", h.getFromStatus());
+        assertEquals(TechnicalSupportTicketDAO.STATUS_CLOSED, h.getToStatus());
+        assertEquals(Fixtures.USER_ID, h.getChangedBy());
+        assertEquals("Khách xác nhận hoạt động lại", h.getInternalNote());
+        assertNotNull("changed_at phải do CSDL tự điền", h.getChangedAt());
+        assertNotNull("Phải join được tên người đổi", h.getChangedByUser().getFullName());
+    }
+
+    @Test
+    public void ticketUpdateWithoutStatusChange_writesNoHistoryRow() throws Exception {
+        IntegrationDb.assumeAvailable();
+        Fixtures.seedContract();
+        Fixtures.seedTicket();
+
+        TechnicalRequest t = ticketDAO.findById(Fixtures.TICKET_ID);
+        t.setDescription("Mô tả đã sửa lại, trạng thái giữ nguyên");
+        assertTrue(ticketDAO.update(t, Fixtures.USER_ID, "ghi chú này không đi kèm bước chuyển nào"));
+
+        assertEquals(0, IntegrationDb.count("technicalrequesthistory", null));
+    }
+
+    /**
+     * Xoá phiếu phải kéo theo lịch sử của nó (ON DELETE CASCADE trong schema).
+     * Ở đây xoá CỨNG bằng SQL, không phải softDelete, để kiểm đúng ràng buộc đó.
+     */
+    @Test
+    public void ticketHardDelete_cascadesToHistory() throws Exception {
+        IntegrationDb.assumeAvailable();
+        Fixtures.seedContract();
+        Fixtures.seedTicket();
+
+        TechnicalRequest t = ticketDAO.findById(Fixtures.TICKET_ID);
+        t.setStatus(TechnicalSupportTicketDAO.STATUS_CLOSED);
+        assertTrue(ticketDAO.update(t, Fixtures.USER_ID, null));
+        assertEquals(1, IntegrationDb.count("technicalrequesthistory", null));
+
+        IntegrationDb.exec("DELETE FROM technicalrequests WHERE ticket_id = " + Fixtures.TICKET_ID);
+
+        assertEquals(0, IntegrationDb.count("technicalrequesthistory", null));
     }
 
     private Enterprise newEnterprise(String code, String taxCode, String email, String phone) {

@@ -79,6 +79,21 @@
         .field-row .view-value a:hover { text-decoration: underline; }
         .field-row .view-value.text-block { min-height: 80px; align-items: flex-start; white-space: pre-wrap; }
 
+        /* Lịch sử đổi trạng thái: mốc thời gian dọc, mới nhất trên cùng. */
+        .history-list { list-style: none; margin: 0; padding: 0; }
+        .history-item { position: relative; padding: 0 0 18px 22px; border-left: 2px solid #eef2f6; }
+        .history-item:last-child { padding-bottom: 0; border-left-color: transparent; }
+        .history-item::before {
+            content: ''; position: absolute; left: -6px; top: 4px; width: 10px; height: 10px;
+            border-radius: 50%; background: var(--primary); border: 2px solid #fff;
+        }
+        .history-transition { font-size: 0.92rem; font-weight: 600; color: #111827; }
+        .history-transition .arrow { color: #9ca3af; margin: 0 6px; }
+        .history-meta { font-size: 0.8rem; color: #6b7280; margin-top: 2px; }
+        .history-note { font-size: 0.88rem; color: #374151; margin-top: 6px; white-space: pre-wrap;
+            background: #f9fafb; border: 1px solid #eef2f6; border-radius: 8px; padding: 8px 12px; }
+        .history-empty { font-size: 0.9rem; color: #6b7280; }
+
         @media (max-width: 768px) { .info-card, .detail-header { padding: 16px; } }
     </style>
 </head>
@@ -211,6 +226,45 @@
                     <c:otherwise>Chưa xử lý xong.</c:otherwise>
                 </c:choose>
             </div>
+        </div>
+
+        <!-- ===== Lịch sử xử lý ===== -->
+        <div class="info-card card-box">
+            <div class="section-header"><h5>Lịch sử xử lý</h5></div>
+            <c:choose>
+                <c:when test="${empty ticketHistory}">
+                    <%-- Phiếu tạo xong mà chưa ai đổi trạng thái thì chưa có dòng nào --
+                         nói rõ là "chưa có", đừng để khoảng trắng khiến người xem tưởng lỗi. --%>
+                    <div class="history-empty">Phiếu chưa đổi trạng thái lần nào kể từ lúc tạo.</div>
+                </c:when>
+                <c:otherwise>
+                    <ul class="history-list">
+                        <c:forEach var="h" items="${ticketHistory}">
+                            <li class="history-item">
+                                <%--
+                                  from_status rỗng = dòng đánh dấu lúc lập phiếu
+                                  (dữ liệu mẫu có sẵn kiểu này). Hiện "Tạo phiếu"
+                                  thay vì để mũi tên mọc ra từ khoảng trắng.
+                                --%>
+                                <div class="history-transition">
+                                    <c:choose>
+                                        <c:when test="${empty h.fromStatus}">Tạo phiếu</c:when>
+                                        <c:otherwise><c:out value="${h.fromStatus}"/></c:otherwise>
+                                    </c:choose>
+                                    <span class="arrow">&rarr;</span><c:out value="${h.toStatus}"/>
+                                </div>
+                                <div class="history-meta">
+                                    <fmt:formatDate value="${h.changedAt}" pattern="dd/MM/yyyy HH:mm"/>
+                                    &middot; <c:out value="${h.changedByUser.fullName}"/>
+                                </div>
+                                <c:if test="${not empty h.internalNote}">
+                                    <div class="history-note">${fn:escapeXml(h.internalNote)}</div>
+                                </c:if>
+                            </li>
+                        </c:forEach>
+                    </ul>
+                </c:otherwise>
+            </c:choose>
         </div>
     </div>
 

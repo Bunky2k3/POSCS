@@ -33,6 +33,7 @@ import poscs.model.Contract;
 import poscs.model.Enterprise;
 import poscs.model.Role;
 import poscs.model.TechnicalRequest;
+import poscs.model.TechnicalRequestHistory;
 import poscs.model.User;
 
 import static org.junit.Assert.*;
@@ -214,7 +215,7 @@ public class TechnicalSupportTicketControllerTest {
 
         controller.doPost(request, response);
 
-        verify(ticketDAO, never()).update(any());
+        verify(ticketDAO, never()).update(any(), anyInt(), any());
         verify(response).sendRedirect(CONTEXT_PATH + "/ticket?error=notfound");
     }
 
@@ -228,7 +229,7 @@ public class TechnicalSupportTicketControllerTest {
         controller.doPost(request, response);
 
         verify(response).sendError(eq(HttpServletResponse.SC_FORBIDDEN), anyString());
-        verify(ticketDAO, never()).update(any());
+        verify(ticketDAO, never()).update(any(), anyInt(), any());
     }
 
     @Test
@@ -240,13 +241,65 @@ public class TechnicalSupportTicketControllerTest {
         when(request.getParameter("resolutionSummary")).thenReturn("Đã thay nguồn");
         TechnicalRequest existing = fullyValidExistingTicket(); // status ban đầu "Đang xử lý", resolvedAt=null
         when(ticketDAO.findById(3)).thenReturn(existing);
-        when(ticketDAO.update(any())).thenReturn(true);
+        when(ticketDAO.update(any(), anyInt(), any())).thenReturn(true);
 
         controller.doPost(request, response);
 
         verify(ticketDAO).update(argThat((TechnicalRequest t) ->
-                TechnicalSupportTicketDAO.STATUS_CLOSED.equals(t.getStatus()) && t.getResolvedAt() != null));
+                TechnicalSupportTicketDAO.STATUS_CLOSED.equals(t.getStatus()) && t.getResolvedAt() != null),
+                anyInt(), any());
         verify(response).sendRedirect(CONTEXT_PATH + "/ticket?action=view&id=3");
+    }
+
+    /**
+     * changed_by phải lấy từ SESSION, không phải từ form: đây là cột dùng để
+     * quy trách nhiệm "ai đổi trạng thái", mà form thì ai cũng sửa được.
+     */
+    @Test
+    public void update_passesLoggedInUserAndInternalNoteToDao() throws Exception {
+        loginAs("CSKH", 99);
+        stubValidUpdateParams();
+        when(request.getParameter("status")).thenReturn(TechnicalSupportTicketDAO.STATUS_CLOSED);
+        when(request.getParameter("internalNote")).thenReturn("Khách xác nhận đã ổn");
+        when(ticketDAO.findById(3)).thenReturn(fullyValidExistingTicket());
+
+        controller.doPost(request, response);
+
+        verify(ticketDAO).update(any(TechnicalRequest.class), eq(99), eq("Khách xác nhận đã ổn"));
+    }
+
+    /** Ô ghi chú để trống thì lưu NULL, đừng lưu chuỗi rỗng cho lịch sử lấm tấm ô trắng. */
+    @Test
+    public void update_blankInternalNote_isStoredAsNull() throws Exception {
+        loginAs("CSKH", 99);
+        stubValidUpdateParams();
+        when(request.getParameter("status")).thenReturn(TechnicalSupportTicketDAO.STATUS_CLOSED);
+        when(request.getParameter("internalNote")).thenReturn("   ");
+        when(ticketDAO.findById(3)).thenReturn(fullyValidExistingTicket());
+
+        controller.doPost(request, response);
+
+        verify(ticketDAO).update(any(TechnicalRequest.class), eq(99), isNull());
+    }
+
+    /** Trang chi tiết phải bơm sẵn lịch sử cho JSP, không thì phần "Lịch sử xử lý" luôn trống. */
+    @Test
+    public void view_putsTicketHistoryIntoRequest() throws Exception {
+        when(request.getParameter("action")).thenReturn("view");
+        when(request.getParameter("id")).thenReturn("3");
+        when(ticketDAO.findById(3)).thenReturn(fullyValidExistingTicket());
+        TechnicalRequestHistory h = new TechnicalRequestHistory();
+        h.setFromStatus("Mới tiếp nhận");
+        h.setToStatus("Đang xử lý");
+        when(ticketDAO.findHistoryByTicketId(3)).thenReturn(java.util.List.of(h));
+        RequestDispatcher dispatcher = mock(RequestDispatcher.class);
+        when(request.getRequestDispatcher("/jsp/customersupport/viewdetailTicket.jsp")).thenReturn(dispatcher);
+
+        controller.doGet(request, response);
+
+        ArgumentCaptor<Object> history = ArgumentCaptor.forClass(Object.class);
+        verify(request).setAttribute(eq("ticketHistory"), history.capture());
+        assertEquals(1, ((java.util.List<?>) history.getValue()).size());
     }
 
     @Test
@@ -268,11 +321,11 @@ public class TechnicalSupportTicketControllerTest {
         Timestamp originalResolvedAt = new Timestamp(1000L);
         existing.setResolvedAt(originalResolvedAt);
         when(ticketDAO.findById(3)).thenReturn(existing);
-        when(ticketDAO.update(any())).thenReturn(true);
+        when(ticketDAO.update(any(), anyInt(), any())).thenReturn(true);
 
         controller.doPost(request, response);
 
-        verify(ticketDAO).update(argThat((TechnicalRequest t) -> t.getResolvedAt() == originalResolvedAt));
+        verify(ticketDAO).update(argThat((TechnicalRequest t) -> t.getResolvedAt() == originalResolvedAt), anyInt(), any());
     }
 
     // ------------------------------------------------------------------
@@ -451,7 +504,7 @@ public class TechnicalSupportTicketControllerTest {
         controller.doPost(request, response);
 
         ArgumentCaptor<TechnicalRequest> saved = ArgumentCaptor.forClass(TechnicalRequest.class);
-        verify(ticketDAO).update(saved.capture());
+        verify(ticketDAO).update(saved.capture(), anyInt(), any());
         assertEquals("Hạn SLA cũ phải được giữ nguyên", stored, saved.getValue().getSlaDeadline());
     }
 
@@ -466,7 +519,7 @@ public class TechnicalSupportTicketControllerTest {
         controller.doPost(request, response);
 
         ArgumentCaptor<TechnicalRequest> saved = ArgumentCaptor.forClass(TechnicalRequest.class);
-        verify(ticketDAO).update(saved.capture());
+        verify(ticketDAO).update(saved.capture(), anyInt(), any());
         assertEquals(Timestamp.valueOf("2026-09-30 17:30:00"), saved.getValue().getSlaDeadline());
     }
 
@@ -484,7 +537,7 @@ public class TechnicalSupportTicketControllerTest {
         controller.doPost(request, response);
 
         ArgumentCaptor<TechnicalRequest> saved = ArgumentCaptor.forClass(TechnicalRequest.class);
-        verify(ticketDAO).update(saved.capture());
+        verify(ticketDAO).update(saved.capture(), anyInt(), any());
         assertEquals(stored, saved.getValue().getSlaDeadline());
     }
 
@@ -521,7 +574,7 @@ public class TechnicalSupportTicketControllerTest {
         when(request.getParameter("assignedTechnicianId")).thenReturn("50");
         when(request.getParameter("description")).thenReturn("Thiết bị lỗi nguồn");
         when(request.getParameter("status")).thenReturn("Đang xử lý");
-        when(ticketDAO.update(any(TechnicalRequest.class))).thenReturn(true);
+        when(ticketDAO.update(any(TechnicalRequest.class), anyInt(), any())).thenReturn(true);
     }
 
     // ------------------------------------------------------------------
@@ -549,7 +602,7 @@ public class TechnicalSupportTicketControllerTest {
 
         controller.doPost(request, response);
 
-        verify(ticketDAO, never()).update(any(TechnicalRequest.class));
+        verify(ticketDAO, never()).update(any(TechnicalRequest.class), anyInt(), any());
         verify(response).sendRedirect(CONTEXT_PATH + "/ticket?action=edit&id=3&error=contract_mismatch");
     }
 
@@ -563,7 +616,7 @@ public class TechnicalSupportTicketControllerTest {
 
         controller.doPost(request, response);
 
-        verify(ticketDAO).update(any(TechnicalRequest.class));
+        verify(ticketDAO).update(any(TechnicalRequest.class), anyInt(), any());
     }
 
     @Test
@@ -582,7 +635,7 @@ public class TechnicalSupportTicketControllerTest {
         controller.doPost(request, response);
 
         ArgumentCaptor<TechnicalRequest> saved = ArgumentCaptor.forClass(TechnicalRequest.class);
-        verify(ticketDAO).update(saved.capture());
+        verify(ticketDAO).update(saved.capture(), anyInt(), any());
         assertEquals(Integer.valueOf(55), saved.getValue().getContractId());
     }
 
@@ -602,7 +655,7 @@ public class TechnicalSupportTicketControllerTest {
         controller.doPost(request, response);
 
         ArgumentCaptor<TechnicalRequest> saved = ArgumentCaptor.forClass(TechnicalRequest.class);
-        verify(ticketDAO).update(saved.capture());
+        verify(ticketDAO).update(saved.capture(), anyInt(), any());
         assertNull("Phải gỡ hẳn hợp đồng, không được giữ lại của khách hàng cũ",
                 saved.getValue().getContractId());
     }
@@ -636,7 +689,7 @@ public class TechnicalSupportTicketControllerTest {
 
         controller.doPost(request, response);
 
-        verify(ticketDAO, never()).update(any(TechnicalRequest.class));
+        verify(ticketDAO, never()).update(any(TechnicalRequest.class), anyInt(), any());
         verify(response).sendRedirect(CONTEXT_PATH + "/ticket?action=edit&id=3&error=contract_mismatch");
     }
 

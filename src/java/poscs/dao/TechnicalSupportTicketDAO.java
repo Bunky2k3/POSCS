@@ -16,13 +16,14 @@ import org.slf4j.LoggerFactory;
 import poscs.model.Contract;
 import poscs.model.Enterprise;
 import poscs.model.TechnicalRequest;
+import poscs.model.TechnicalRequestHistory;
 import poscs.model.User;
 
 /**
- * DAO cho phiếu hỗ trợ kỹ thuật (bảng technicalrequests). Chưa xử lý
- * technicalrequestdevices (thiết bị lỗi) và technicalrequesthistory (lịch
- * sử đổi trạng thái) -- 2 bảng con đó chưa có model/DAO nào, thuộc phạm vi
- * khác.
+ * DAO cho phiếu hỗ trợ kỹ thuật (bảng technicalrequests), kèm lịch sử đổi
+ * trạng thái ở bảng con technicalrequesthistory -- xem {@link #update} và
+ * {@link #findHistoryByTicketId}. Chưa xử lý technicalrequestdevices (thiết
+ * bị lỗi): bảng đó chưa có model/DAO nào, thuộc phạm vi khác.
  */
 public class TechnicalSupportTicketDAO {
 
@@ -323,35 +324,158 @@ public class TechnicalSupportTicketDAO {
         return -1;
     }
 
-    /** Cập nhật phiếu hỗ trợ đang có (gồm cả đổi trạng thái xử lý). Trả về true nếu cập nhật thành công. */
-    public boolean update(TechnicalRequest t) {
+    /**
+     * Cập nhật phiếu hỗ trợ đang có, và nếu trạng thái đổi thì ghi kèm 1 dòng
+     * vào technicalrequesthistory -- TRONG CÙNG MỘT TRANSACTION.
+     *
+     * Cùng transaction chứ không phải hai lời gọi rời nhau, vì hai thứ đó phải
+     * đúng hoặc sai cùng nhau: phiếu đã sang "Đã đóng" mà dòng lịch sử ghi hụt
+     * thì dòng thời gian xử lý nói dối, và không ai phát hiện ra.
+     *
+     * Trạng thái cũ đọc NGAY TRONG transaction (SELECT ... FOR UPDATE) thay vì
+     * nhận từ bên gọi: controller đọc phiếu ở một thời điểm trước đó, nên nếu
+     * hai người cùng sửa một phiếu thì "trạng thái cũ" mà controller biết có
+     * thể đã lỗi thời, và lịch sử sẽ ghi lại một bước chuyển chưa từng xảy ra.
+     *
+     * @param changedBy    user_id người đang thao tác -- khoá ngoại sang users.
+     * @param internalNote ghi chú nội bộ cho lần đổi trạng thái này, có thể null.
+     * @return true nếu cập nhật thành công (và lịch sử, nếu có, đã ghi xong).
+     */
+    public boolean update(TechnicalRequest t, int changedBy, String internalNote) {
         String sql = "UPDATE technicalrequests SET " +
                 "enterprise_id = ?, contract_id = ?, ticket_type = ?, priority = ?, reception_channel = ?, sla_deadline = ?, " +
                 "assigned_technician_id = ?, description = ?, is_warranty = ?, status = ?, " +
                 "resolution_summary = ?, resolved_at = ? " +
                 "WHERE ticket_id = ? AND is_deleted = 0";
 
-        try (Connection conn = DBContext.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, t.getEnterpriseId());
-            setNullableInt(ps, 2, t.getContractId());
-            ps.setString(3, t.getTicketType());
-            ps.setString(4, t.getPriority());
-            ps.setString(5, t.getReceptionChannel());
-            setNullableTimestamp(ps, 6, t.getSlaDeadline());
-            ps.setInt(7, t.getAssignedTechnicianId());
-            ps.setString(8, t.getDescription());
-            ps.setBoolean(9, t.isWarranty());
-            ps.setString(10, t.getStatus());
-            ps.setString(11, t.getResolutionSummary());
-            setNullableTimestamp(ps, 12, t.getResolvedAt());
-            ps.setInt(13, t.getTicketId());
-            return ps.executeUpdate() > 0;
+        try (Connection conn = DBContext.getConnection()) {
+            conn.setAutoCommit(false);
+            // Xem ContractDAO.insertProducts để hiểu vì sao dùng cờ committed
+            // thay vì 2 khối catch tách rời.
+            boolean committed = false;
+            try {
+                String previousStatus = lockAndReadStatus(conn, t.getTicketId());
+                if (previousStatus == null) {
+                    return false; // phiếu không còn: id sai, hoặc vừa bị xoá mềm
+                }
+
+                int affected;
+                try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                    ps.setInt(1, t.getEnterpriseId());
+                    setNullableInt(ps, 2, t.getContractId());
+                    ps.setString(3, t.getTicketType());
+                    ps.setString(4, t.getPriority());
+                    ps.setString(5, t.getReceptionChannel());
+                    setNullableTimestamp(ps, 6, t.getSlaDeadline());
+                    ps.setInt(7, t.getAssignedTechnicianId());
+                    ps.setString(8, t.getDescription());
+                    ps.setBoolean(9, t.isWarranty());
+                    ps.setString(10, t.getStatus());
+                    ps.setString(11, t.getResolutionSummary());
+                    setNullableTimestamp(ps, 12, t.getResolvedAt());
+                    ps.setInt(13, t.getTicketId());
+                    affected = ps.executeUpdate();
+                }
+                if (affected == 0) {
+                    return false;
+                }
+
+                if (!previousStatus.equals(t.getStatus())) {
+                    insertStatusChange(conn, t.getTicketId(), previousStatus, t.getStatus(), changedBy, internalNote);
+                }
+
+                conn.commit();
+                committed = true;
+                return true;
+            } finally {
+                if (!committed) {
+                    try {
+                        conn.rollback();
+                    } catch (SQLException rollbackEx) {
+                        LOG.error("Loi rollback khi cap nhat phieu ho tro (ticketId={})", t.getTicketId(), rollbackEx);
+                    }
+                }
+                try {
+                    conn.setAutoCommit(true);
+                } catch (SQLException autoCommitEx) {
+                    LOG.error("Loi reset autocommit sau khi cap nhat phieu ho tro (ticketId={})",
+                            t.getTicketId(), autoCommitEx);
+                }
+            }
         } catch (SQLException ex) {
             LOG.error("Loi cap nhat phieu ho tro (ticketId={}, ticketCode={})",
                     t.getTicketId(), t.getTicketCode(), ex);
             return false;
         }
+    }
+
+    /**
+     * Đọc trạng thái hiện tại và giữ khoá dòng đó tới hết transaction. Trả về
+     * null nếu phiếu không tồn tại hoặc đã bị xoá mềm.
+     */
+    private String lockAndReadStatus(Connection conn, int ticketId) throws SQLException {
+        String sql = "SELECT status FROM technicalrequests WHERE ticket_id = ? AND is_deleted = 0 FOR UPDATE";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, ticketId);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next() ? rs.getString("status") : null;
+            }
+        }
+    }
+
+    /** Ghi 1 dòng lịch sử đổi trạng thái. Ném ngoại lệ ra ngoài để transaction rollback. */
+    private void insertStatusChange(Connection conn, int ticketId, String fromStatus, String toStatus,
+            int changedBy, String internalNote) throws SQLException {
+        String sql = "INSERT INTO technicalrequesthistory " +
+                "(ticket_id, from_status, to_status, changed_by, internal_note) VALUES (?, ?, ?, ?, ?)";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, ticketId);
+            ps.setString(2, fromStatus);
+            ps.setString(3, toStatus);
+            ps.setInt(4, changedBy);
+            ps.setString(5, internalNote);
+            ps.executeUpdate();
+        }
+    }
+
+    /** Lịch sử đổi trạng thái của 1 phiếu, mới nhất trước, kèm tên người đổi. */
+    public List<TechnicalRequestHistory> findHistoryByTicketId(int ticketId) {
+        List<TechnicalRequestHistory> result = new ArrayList<>();
+        String sql = "SELECT h.history_id, h.ticket_id, h.from_status, h.to_status, h.changed_by, " +
+                "       h.changed_at, h.internal_note, " +
+                "       u.last_name AS changer_last_name, u.middle_name AS changer_middle_name, " +
+                "       u.first_name AS changer_first_name " +
+                "FROM technicalrequesthistory h " +
+                "JOIN users u ON u.user_id = h.changed_by " +
+                "WHERE h.ticket_id = ? " +
+                "ORDER BY h.changed_at DESC, h.history_id DESC";
+        try (Connection conn = DBContext.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, ticketId);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    TechnicalRequestHistory h = new TechnicalRequestHistory();
+                    h.setHistoryId(rs.getInt("history_id"));
+                    h.setTicketId(rs.getInt("ticket_id"));
+                    h.setFromStatus(rs.getString("from_status"));
+                    h.setToStatus(rs.getString("to_status"));
+                    h.setChangedBy(rs.getInt("changed_by"));
+                    h.setChangedAt(rs.getTimestamp("changed_at"));
+                    h.setInternalNote(rs.getString("internal_note"));
+
+                    User changer = new User();
+                    changer.setLastName(rs.getString("changer_last_name"));
+                    changer.setMiddleName(rs.getString("changer_middle_name"));
+                    changer.setFirstName(rs.getString("changer_first_name"));
+                    h.setChangedByUser(changer);
+
+                    result.add(h);
+                }
+            }
+        } catch (SQLException ex) {
+            LOG.error("Loi doc lich su trang thai phieu ho tro (ticketId={})", ticketId, ex);
+        }
+        return result;
     }
 
     /** Chỉ cho xoá phiếu chưa có ai xử lý dở dang (khác trạng thái "Đang xử lý"). */
