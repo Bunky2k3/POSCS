@@ -57,6 +57,37 @@ jobs:
           sys.exit(1 if failed else 0)
           PY
 
+      # build-impl.xml do NetBeans SINH RA từ project.xml, nhưng cả hai đều được
+      # commit -- nên nếu ai đó thêm jar vào project.xml mà không mở IDE cho nó
+      # sinh lại (hoặc sinh lại rồi quên commit), jar sẽ nằm trong classpath biên
+      # dịch nhưng KHÔNG được chép vào WEB-INF/lib. Code vẫn biên dịch được, test
+      # vẫn xanh, và chỉ chết lúc chạy thật bằng NoClassDefFoundError.
+      #
+      # Đã dính đúng như vậy: 8 jar phụ thuộc của POI và PDFBox (log4j-api,
+      # fontbox, pdfbox-io, commons-collections4...) nằm trong project.xml từ lúc
+      # thêm chức năng xuất Excel/PDF nhưng chưa bao giờ vào WAR, nên toàn bộ
+      # chức năng xuất file trả 500.
+      - name: Check every declared library is copied into the WAR
+        run: |
+          python3 - <<'PYCHECK'
+          import re, sys
+          pat = re.compile(r"file[.]reference[.]([^}]+)")
+          declared = set(pat.findall(open("nbproject/project.xml", encoding="utf-8").read()))
+          copied = set()
+          for line in open("nbproject/build-impl.xml", encoding="utf-8"):
+              if "copyfiles" in line and "WEB-INF/lib" in line:
+                  copied.update(pat.findall(line))
+          missing = sorted(declared - copied)
+          if missing:
+              print("project.xml khai bao nhung build-impl.xml KHONG chep vao WAR:")
+              for jar in missing:
+                  print("  -", jar)
+              print("")
+              print("Mo project trong NetBeans de sinh lai build-impl.xml, roi commit ca hai file.")
+              sys.exit(1)
+          print("OK   %d thu vien deu duoc chep vao WEB-INF/lib" % len(declared))
+          PYCHECK
+
       # Đây là dự án NetBeans Ant, nên build-impl.xml mong đợi hai thứ mà IDE
       # thường tự cấp: classpath của Tomcat đã đăng ký, và jar CopyLibs nằm
       # trong thư mục cài NetBeans. Trên runner không có cái nào -- cả hai được
