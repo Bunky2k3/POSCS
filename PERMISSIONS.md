@@ -54,5 +54,18 @@ status") without giving them Full CRUD. Enforced in
   of defense.
 - "View only" still requires being logged in; there is no anonymous/
   public access to any of these resources.
+- **Exporting a list to Excel counts as reading, not managing.** The
+  "Xuất Excel" button on the Customer/Contract/Ticket list screens is
+  visible to every role that can open that list, and `?action=exportExcel`
+  is deliberately *not* gated by `AccessControl.requireFullAccess`. The
+  file contains exactly the rows the role can already read on screen — a
+  different container for the same data, not extra access. Contrast with
+  Contract's "Nhập PDF" (`?action=importForm` / `importPdf`), which
+  *creates* contracts and stays Full-access only.
+- Buttons for Full-access actions (create/update/delete/import) are hidden
+  from "View only" roles via the `canManage` request attribute the
+  controllers set from `AccessControl.hasFullAccess(...)`. That is a
+  presentation convenience so nobody clicks into a 403 — never the
+  enforcement itself, which stays in the controller.
 - `Employee` (user account management) has no "View only" tier for
   non-Admin roles — it's Admin-only end to end.

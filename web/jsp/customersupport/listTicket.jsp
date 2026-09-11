@@ -37,6 +37,16 @@
         }
         .btn-add:hover { background: linear-gradient(120deg, var(--primary-dark), var(--primary)); color: #fff; }
 
+        /* Thanh nút hành động ở đầu trang -- cùng bộ style với listcontract.jsp
+           và listcustomer.jsp để ba màn hình danh sách nhìn giống nhau. */
+        .header-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+        .btn-outline-action {
+            background: #fff; color: var(--primary); border: 1.5px solid #e5e7eb; border-radius: 10px;
+            padding: 9px 18px; font-weight: 600; font-size: 0.87rem; text-decoration: none;
+            display: inline-flex; align-items: center; gap: 8px; white-space: nowrap;
+        }
+        .btn-outline-action:hover { background: #eaf6ff; color: var(--primary-dark); border-color: var(--primary-light); }
+
         .status-strip { display: flex; gap: 14px; margin-bottom: 20px; flex-wrap: wrap; }
         .status-chip { flex: 1 1 200px; padding: 12px 15px; display: flex; align-items: center; gap: 12px; }
         .status-chip .dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
@@ -140,9 +150,16 @@
                 <h2>Danh sách phiếu hỗ trợ kỹ thuật</h2>
                 <p>Theo dõi và xử lý các yêu cầu hỗ trợ kỹ thuật từ khách hàng</p>
             </div>
-            <c:if test="${canManage}">
-                <a href="${pageContext.request.contextPath}/ticket?action=new" class="btn-add"><i class="fa-solid fa-plus"></i> Tạo phiếu hỗ trợ</a>
-            </c:if>
+            <div class="header-actions">
+                <%-- Giữ nguyên bộ lọc đang áp để file xuất ra khớp đúng những gì đang thấy trên màn hình. --%>
+                <%-- Xuất Excel là thao tác ĐỌC: chỉ lấy đúng dữ liệu vai trò này vốn đã
+                     xem được trên màn hình, đổi sang dạng file. Nên KHÔNG khoá theo
+                     canManage -- xem PERMISSIONS.md. --%>
+                <a href="${pageContext.request.contextPath}/ticket?action=exportExcel&keyword=${fn:escapeXml(keyword)}&status=${fn:escapeXml(statusFilter)}&priority=${fn:escapeXml(priorityFilter)}" class="btn-outline-action"><i class="fa-solid fa-file-excel"></i> Xuất Excel</a>
+                <c:if test="${canManage}">
+                    <a href="${pageContext.request.contextPath}/ticket?action=new" class="btn-add"><i class="fa-solid fa-plus"></i> Tạo phiếu hỗ trợ</a>
+                </c:if>
+            </div>
         </div>
 
         <!-- ===== Dải trạng thái tổng quan ===== -->

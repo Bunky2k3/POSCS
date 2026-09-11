@@ -3,6 +3,7 @@ package poscs.controller;
 import java.io.IOException;
 import java.sql.Date;
 import java.sql.Timestamp;
+import java.util.ArrayList;
 import java.util.List;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.WebServlet;
@@ -17,6 +18,7 @@ import org.apache.pdfbox.pdmodel.PDPageContentStream;
 import org.apache.pdfbox.pdmodel.common.PDRectangle;
 import org.apache.pdfbox.pdmodel.font.PDFont;
 import poscs.common.AccessControl;
+import poscs.common.ExcelUtil;
 import poscs.common.PdfUtil;
 import poscs.dao.CustomerDAO;
 import poscs.dao.EmployeeDAO;
@@ -75,6 +77,9 @@ public class TechnicalSupportTicketController extends HttpServlet {
                 break;
             case "exportPdf":
                 exportPdf(request, response);
+                break;
+            case "exportExcel":
+                exportExcel(request, response);
                 break;
             case "list":
             default:
@@ -165,6 +170,51 @@ public class TechnicalSupportTicketController extends HttpServlet {
      * Font tiếng Việt lấy từ PdfUtil.loadVietnameseFont (font mặc định của
      * PDFBox không có glyph tiếng Việt, xuất ra sẽ mất dấu hết).
      */
+    /**
+     * Xuất danh sách phiếu hỗ trợ ra Excel -- nút "Xuất Excel" ở listTicket.jsp.
+     *
+     * Xuất theo ĐÚNG bộ lọc đang áp trên màn hình (từ khoá/trạng thái/độ ưu
+     * tiên) nhưng bỏ phân trang: người dùng lọc ra cái họ cần rồi muốn cả tập
+     * đó, không phải đúng 10 dòng của trang đang mở. Cùng cách làm với xuất
+     * Excel của khách hàng và hợp đồng.
+     *
+     * Nhiều cột hơn bảng trên màn hình (thêm kênh tiếp nhận, hạn SLA, thời
+     * điểm đóng, bảo hành, mô tả, kết quả xử lý) -- file Excel là để đem đi
+     * lọc/thống kê ngoại tuyến, không bị giới hạn bề ngang như bảng HTML.
+     */
+    private void exportExcel(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        String keyword = request.getParameter("keyword");
+        String statusFilter = request.getParameter("status");
+        String priorityFilter = request.getParameter("priority");
+
+        List<TechnicalRequest> all = ticketDAO.findAll(1, Integer.MAX_VALUE, keyword, statusFilter, priorityFilter);
+        String[] headers = {"Mã phiếu", "Loại phiếu", "Khách hàng", "Hợp đồng liên quan",
+            "Mức ưu tiên", "Kênh tiếp nhận", "Trạng thái", "Người xử lý", "Người tạo",
+            "Ngày tạo", "Hạn xử lý (SLA)", "Thời điểm đóng", "Bảo hành",
+            "Mô tả sự cố", "Kết quả xử lý"};
+        List<Object[]> rows = new ArrayList<>();
+        for (TechnicalRequest t : all) {
+            rows.add(new Object[]{
+                t.getTicketCode(),
+                t.getTicketType(),
+                t.getEnterprise() != null ? t.getEnterprise().getEnterpriseName() : "",
+                t.getContract() != null ? t.getContract().getContractCode() : "",
+                t.getPriority(),
+                t.getReceptionChannel(),
+                t.getStatus(),
+                t.getAssignedTechnician() != null ? t.getAssignedTechnician().getFullName() : "",
+                t.getCreatedByUser() != null ? t.getCreatedByUser().getFullName() : "",
+                formatDate(t.getCreatedDate()),
+                formatDateTime(t.getSlaDeadline()),
+                formatDateTime(t.getResolvedAt()),
+                t.isWarranty() ? "Có" : "Không",
+                t.getDescription(),
+                t.getResolutionSummary()
+            });
+        }
+        ExcelUtil.writeWorkbook(response, "phieu_ho_tro", headers, rows);
+    }
+
     private void exportPdf(HttpServletRequest request, HttpServletResponse response) throws IOException {
         Integer id = parseIntOrNull(request.getParameter("id"));
         TechnicalRequest t = id != null ? ticketDAO.findById(id) : null;
