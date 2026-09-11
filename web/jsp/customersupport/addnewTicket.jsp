@@ -101,6 +101,20 @@
             <form id="createTicketForm" action="${pageContext.request.contextPath}/ticket" method="POST" onsubmit="return validateForm();">
                 <input type="hidden" name="csrfToken" value="${csrfToken}">
                 <input type="hidden" name="action" value="create">
+                <%-- Trước đây form này không hiển thị lỗi server trả về, nên mọi
+                     redirect kèm ?error=... đều im lặng: người dùng thấy lại
+                     đúng cái form và không hiểu vì sao không lưu được. --%>
+                <c:if test="${not empty param.error}">
+                    <div class="alert alert-danger py-2 px-3 mb-3" style="font-size: 0.9rem; border-radius: 12px;">
+                        <c:choose>
+                            <c:when test="${param.error == 'contract_mismatch'}">Hợp đồng đã chọn không thuộc về khách hàng của phiếu này. Vui lòng chọn lại hợp đồng, hoặc bỏ gắn hợp đồng.</c:when>
+                            <c:when test="${param.error == 'invalid'}">Vui lòng nhập đầy đủ các trường bắt buộc.</c:when>
+                            <c:when test="${param.error == 'update_failed'}">Không lưu được thay đổi. Vui lòng thử lại.</c:when>
+                            <c:when test="${param.error == 'create_failed'}">Không tạo được phiếu hỗ trợ. Vui lòng thử lại.</c:when>
+                            <c:otherwise>Đã có lỗi xảy ra. Vui lòng thử lại.</c:otherwise>
+                        </c:choose>
+                    </div>
+                </c:if>
 
                 <div class="section-header"><h5>Thông tin chung</h5></div>
                 <div class="row">
@@ -120,6 +134,9 @@
                             <i class="fa-solid fa-magnifying-glass"></i>
                         </div>
                         <input type="hidden" id="contract" name="contractId" value="">
+                        <%-- Đánh dấu ô chọn hợp đồng đã thật sự dùng được. Controller cần
+                             biết "để trống vì AJAX chưa xong" khác "cố ý bỏ liên kết". --%>
+                        <input type="hidden" id="contractLoaded" name="contractLoaded" value="">
                     </div>
 
                     <div class="col-md-4 field-row">
@@ -329,10 +346,12 @@
         function selectContract(id, code) {
             contractHiddenInput.value = id;
             contractPickerText.textContent = code;
-            contractPickerText.classList.remove('picker-placeholder');
+            // id rỗng = mục "Không gắn hợp đồng": hiện lại như chưa chọn gì.
+            contractPickerText.classList.toggle('picker-placeholder', !id);
         }
 
         function loadContracts(enterpriseId) {
+            document.getElementById('contractLoaded').value = '';
             contractPickerField.classList.add('disabled');
             contractPickerText.textContent = 'Đang tải...';
             contractPickerText.classList.add('picker-placeholder');
@@ -341,6 +360,21 @@
                 .then(function (res) { return res.json(); })
                 .then(function (contracts) {
                     contractPickerList.innerHTML = '';
+
+                    // Phiếu hỗ trợ không bắt buộc gắn hợp đồng. Không có mục này
+                    // thì một khi đã chọn, người dùng chỉ đổi được sang hợp đồng
+                    // khác chứ không gỡ ra được.
+                    var none = document.createElement('div');
+                    none.className = 'picker-item';
+                    none.dataset.id = '';
+                    none.dataset.name = '-- Không gắn hợp đồng --';
+                    none.dataset.search = 'khong gan hop dong';
+                    var noneTitle = document.createElement('div');
+                    noneTitle.className = 'picker-item-title';
+                    noneTitle.textContent = '-- Không gắn hợp đồng --';
+                    none.appendChild(noneTitle);
+                    contractPickerList.appendChild(none);
+
                     contracts.forEach(function (c) {
                         var item = document.createElement('div');
                         item.className = 'picker-item';
@@ -373,6 +407,7 @@
                         ? '-- Không có hợp đồng liên quan --'
                         : '-- Chọn hợp đồng --';
                     contractPickerField.classList.remove('disabled');
+                    document.getElementById('contractLoaded').value = '1';
                 })
                 .catch(function () {
                     contractPickerText.textContent = 'Không tải được danh sách hợp đồng';

@@ -187,14 +187,23 @@
                      link thật sự trỏ tới file Drive. Link nội bộ công ty cũng
                      lưu được (isSafeHttpUrl chỉ đòi http/https), nên nói "trên
                      Drive" cho mọi link là sai sự thật. --%>
-                <c:if test="${not empty contract.attachmentUrl}">
-                    <a href="${fn:escapeXml(contract.attachmentUrl)}" target="_blank" rel="noopener noreferrer"
+                <%-- Dùng ${attachmentUrl} (đã được ContractController kiểm lại scheme)
+                     chứ KHÔNG dùng thẳng ${contract.attachmentUrl}: fn:escapeXml
+                     không vô hiệu hoá được "javascript:" trong href. --%>
+                <c:if test="${not empty attachmentUrl}">
+                    <a href="${fn:escapeXml(attachmentUrl)}" target="_blank" rel="noopener noreferrer"
                        class="btn-delete-detail" style="cursor:pointer; color:var(--primary); border-color:#e5e7eb;">
                         <c:choose>
                             <c:when test="${not empty drivePreviewUrl}"><i class="fa-brands fa-google-drive"></i> Mở PDF trên Drive</c:when>
                             <c:otherwise><i class="fa-solid fa-up-right-from-square"></i> Mở file PDF</c:otherwise>
                         </c:choose>
                     </a>
+                </c:if>
+                <c:if test="${attachmentUnsafe}">
+                    <span class="btn-delete-detail" style="color:var(--danger); border-color:var(--danger); cursor:default;"
+                          title="Link đính kèm của hợp đồng này không phải http/https nên đã bị chặn hiển thị. Vào Sửa thông tin để nhập lại.">
+                        <i class="fa-solid fa-triangle-exclamation"></i> Link đính kèm không hợp lệ
+                    </span>
                 </c:if>
                 <a href="${pageContext.request.contextPath}/contract?action=exportPdf&id=${contract.contractId}" class="btn-delete-detail" style="cursor:pointer; color:var(--primary); border-color:#e5e7eb;"><i class="fa-solid fa-file-pdf"></i> Xuất PDF</a>
                 <c:if test="${canManage}">
@@ -258,7 +267,7 @@
             <div class="info-card card-box">
                 <div class="section-header">
                     <h5>Bản PDF đã ký</h5>
-                    <a href="${fn:escapeXml(contract.attachmentUrl)}" target="_blank" rel="noopener noreferrer"
+                    <a href="${fn:escapeXml(attachmentUrl)}" target="_blank" rel="noopener noreferrer"
                        style="font-size:0.85rem; color:var(--primary); font-weight:600; text-decoration:none;">
                         Mở trên Drive <i class="fa-solid fa-arrow-up-right-from-square"></i>
                     </a>

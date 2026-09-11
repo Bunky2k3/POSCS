@@ -192,7 +192,21 @@ public class ContractController extends HttpServlet {
         }
 
         request.setAttribute("contract", contract);
-        request.setAttribute("drivePreviewUrl", drivePreviewUrl(contract.getAttachmentUrl()));
+        // Link đính kèm được kiểm scheme LẠI ở đây, không chỉ lúc ghi.
+        //
+        // viewcontractdetail.jsp đổ giá trị này thẳng vào href; fn:escapeXml
+        // chặn được dấu ngoặc kép nhưng KHÔNG vô hiệu hoá scheme, nên một giá
+        // trị dạng "javascript:..." vẫn chạy trên origin của ứng dụng khi người
+        // dùng bấm vào. handleCreate/handleUpdate đã chặn, nhưng cột
+        // attachment_url không có ràng buộc nào ở CSDL và dữ liệu vẫn vào cột
+        // này ngoài hai đường đó (schema.sql seed thẳng, hoặc chạy tay câu
+        // UPDATE) -- view không nên phụ thuộc vào việc MỌI đường ghi từ trước
+        // tới nay đều đã đúng.
+        String attachmentUrl = contract.getAttachmentUrl();
+        boolean attachmentIsSafe = TextRules.isSafeHttpUrl(attachmentUrl);
+        request.setAttribute("attachmentUrl", attachmentIsSafe ? attachmentUrl : null);
+        request.setAttribute("attachmentUnsafe", attachmentUrl != null && !attachmentIsSafe);
+        request.setAttribute("drivePreviewUrl", attachmentIsSafe ? drivePreviewUrl(attachmentUrl) : null);
         request.setAttribute("canDelete", contractDAO.canDelete(id));
         request.setAttribute("contractProducts", contractDAO.findProductsByContractId(id));
         // Danh sách sản phẩm còn hoạt động, phục vụ dropdown "Thêm sản phẩm" bên dưới bảng hạng mục.

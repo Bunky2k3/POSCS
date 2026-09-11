@@ -22,9 +22,11 @@ import org.apache.pdfbox.pdmodel.font.PDFont;
 import poscs.common.AccessControl;
 import poscs.common.ExcelUtil;
 import poscs.common.PdfUtil;
+import poscs.dao.ContractDAO;
 import poscs.dao.CustomerDAO;
 import poscs.dao.EmployeeDAO;
 import poscs.dao.TechnicalSupportTicketDAO;
+import poscs.model.Contract;
 import poscs.model.TechnicalRequest;
 import poscs.model.User;
 
@@ -52,6 +54,8 @@ public class TechnicalSupportTicketController extends HttpServlet {
 
     private final TechnicalSupportTicketDAO ticketDAO = new TechnicalSupportTicketDAO();
     private final CustomerDAO customerDAO = new CustomerDAO();
+    // Dùng để kiểm hợp đồng được chọn có đúng của khách hàng trên phiếu không.
+    private final ContractDAO contractDAO = new ContractDAO();
     private final EmployeeDAO employeeDAO = new EmployeeDAO();
 
     @Override
@@ -351,6 +355,10 @@ public class TechnicalSupportTicketController extends HttpServlet {
             response.sendRedirect(request.getContextPath() + "/ticket?action=new&error=invalid");
             return;
         }
+        if (!contractMatchesEnterprise(t)) {
+            response.sendRedirect(request.getContextPath() + "/ticket?action=new&error=contract_mismatch");
+            return;
+        }
         t.setTicketCode(ticketDAO.generateNextTicketCode());
 
         int newId = ticketDAO.insert(t);
@@ -391,7 +399,18 @@ public class TechnicalSupportTicketController extends HttpServlet {
         // xử lý, nên bỏ qua toàn bộ các trường khác dù form có gửi lên hay không.
         TechnicalRequest t = fullAccess ? buildTicketFromRequest(request, new TechnicalRequest()) : existing;
         t.setTicketId(id);
-        if (t.getContractId() == null) {
+        // contractId trống có HAI nghĩa khác hẳn nhau, phải phân biệt:
+        //
+        //  - Ô chọn hợp đồng mặc định bị khoá, chỉ mở sau khi AJAX loadContracts()
+        //    chạy xong. Form gửi đi trước lúc đó (mạng chậm, lỗi, hoặc tắt JS)
+        //    thì trường này không có giá trị -- phải GIỮ hợp đồng cũ.
+        //  - Người dùng đổi sang khách hàng khác: JS chủ động xoá trắng ô này.
+        //    Lúc đó giữ hợp đồng cũ là SAI, vì hợp đồng đó thuộc khách hàng cũ.
+        //
+        // JS đặt contractLoaded=1 ngay khi danh sách hợp đồng đã tải xong, nên
+        // có marker nghĩa là người dùng thật sự nhìn thấy ô chọn và để trống.
+        boolean contractPickerWasUsable = "1".equals(request.getParameter("contractLoaded"));
+        if (t.getContractId() == null && !contractPickerWasUsable) {
             t.setContractId(existing.getContractId());
         }
         // Hạn SLA không có ô nhập trên form sửa, nên buildTicketFromRequest
@@ -426,6 +445,10 @@ public class TechnicalSupportTicketController extends HttpServlet {
 
         if (!isValid(t) || t.getStatus() == null) {
             response.sendRedirect(request.getContextPath() + "/ticket?action=edit&id=" + id + "&error=invalid");
+            return;
+        }
+        if (!contractMatchesEnterprise(t)) {
+            response.sendRedirect(request.getContextPath() + "/ticket?action=edit&id=" + id + "&error=contract_mismatch");
             return;
         }
 
@@ -496,6 +519,25 @@ public class TechnicalSupportTicketController extends HttpServlet {
             }
         }
         return fallbackUserId;
+    }
+
+    /**
+     * Hợp đồng gắn vào phiếu phải thuộc đúng khách hàng của phiếu đó.
+     *
+     * Không có ràng buộc nào ở CSDL cho cặp (enterprise_id, contract_id), và
+     * isValid() cũng không đối chiếu -- nên nếu chỉ dựa vào JS thì một request
+     * tự dựng (hoặc một lỗi JS) là ghi được phiếu "khách hàng B, hợp đồng của
+     * A". Trang chi tiết, file PDF và file Excel đều sẽ hiện hợp đồng của công
+     * ty khác mà không ai biết.
+     *
+     * @return true nếu hợp lệ (kể cả khi phiếu không gắn hợp đồng nào).
+     */
+    private boolean contractMatchesEnterprise(TechnicalRequest t) {
+        if (t.getContractId() == null) {
+            return true;
+        }
+        Contract contract = contractDAO.findById(t.getContractId());
+        return contract != null && contract.getEnterpriseId() == t.getEnterpriseId();
     }
 
     /** Các trường bắt buộc phải có khi tạo/sửa phiếu hỗ trợ. */
