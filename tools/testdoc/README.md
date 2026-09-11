@@ -251,3 +251,59 @@ Không chạy được trong lượt tự động thường; dựng thêm rồi 
   `ref_type='contract_expiring'`, khởi động lại Tomcat rồi chờ ~70 giây
   (`NotificationScheduler` chạy lần đầu sau 1 phút, sau đó mỗi 60 phút). Khởi
   động lại lần nữa để xác nhận không sinh bản ghi trùng.
+
+---
+
+# Report 5.3 - System Test
+
+Kiểm các **luồng nghiệp vụ end-to-end** — thứ chỉ hỏng khi ghép các chức năng
+lại với nhau, khác Report 5.2 vốn kiểm từng chức năng độc lập.
+
+```bash
+mysql -h127.0.0.1 -uroot -p poscs_bbtest < tools/testdoc/blackbox/fixtures.sql
+python tools/testdoc/run_systemtest.py --log <đường dẫn catalina stdout>
+python tools/testdoc/gen_system_test.py
+```
+
+Kết quả mặc định: `%USERPROFILE%\Documents\POSCS_SystemTest.xlsx`
+
+Nội dung ở `systemtest/*.json`, kết quả chạy ở `systemtest_results.json`.
+Mẫu 5.3 có **ba vòng chạy**; script chỉ điền vòng 1.
+
+## Các bước trong một luồng phụ thuộc nhau
+
+Tài khoản tạo ở bước 1 được dùng để đăng nhập ở bước 4; hợp đồng tạo ở luồng
+khách hàng được dùng lại ở luồng phiếu hỗ trợ và luồng sản phẩm. Hỏng một bước
+thì các bước sau mất chỗ dựa, nên mỗi luồng tự dừng và ghi "N/A" kèm lý do cho
+phần còn lại thay vì báo trượt hàng loạt (`skip_rest`).
+
+## Hai ca cần khởi động lại máy chủ
+
+`NotificationScheduler` chạy lần đầu 1 phút sau khi khởi động rồi lặp mỗi 60
+phút, nên không chạy được trong cùng một lượt:
+
+```bash
+mysql ... -e "DELETE FROM notifications WHERE ref_type='contract_expiring'"
+# khởi động lại Tomcat, chờ ~70 giây
+python tools/testdoc/run_systemtest.py --part scheduler  --log <...>
+# khởi động lại lần nữa, chờ ~70 giây
+python tools/testdoc/run_systemtest.py --part scheduler2 --log <...>
+```
+
+## Cạm bẫy riêng của lượt này
+
+- **Sửa hợp đồng về quá khứ phải lùi cả ngày ký.** `isValid()` đòi ngày ký ≤
+  ngày hiệu lực ≤ ngày kết thúc; giữ ngày ký hôm nay mà lùi ngày hiệu lực thì
+  bản cập nhật bị từ chối và trạng thái không đổi — rất dễ tưởng nhầm là lỗi
+  tính trạng thái hợp đồng.
+- **Lịch sử đổi trạng thái phiếu là `<ul class="history-list">`**, không phải
+  `<table>`; đếm `<tr>` sẽ luôn ra 0.
+- **Ô thống kê trên Dashboard phải đọc theo `.kpi-label` / `.kpi-value`.** Bắt
+  số theo chữ "khách hàng" trong toàn trang sẽ dính menu bên trái.
+- **Đừng so sánh chuỗi tiếng Việt qua tham số `-e` của mysql** — vướng cả mã
+  hoá lẫn collation. Dùng cột khác tương đương (`resolved_at IS NULL` thay cho
+  `status <> 'Đã đóng'`).
+- **Từ khoá tìm kiếm phải là chuỗi con thật sự của dữ liệu.** Tạo phiếu mô tả
+  "SLA qua 160255" rồi tìm "SLA 160255" sẽ không ra dòng nào.
+- Hai lần tạo dữ liệu trong cùng lượt không được trùng số điện thoại hay mã số
+  thuế — các cột đó UNIQUE.

@@ -1,0 +1,97 @@
+{
+  "name": "Quản lý danh mục sản phẩm",
+  "sheet": "WF_SanPham",
+  "prefix": "ST_PRD",
+  "description": "Kỹ thuật dựng sản phẩm mới kèm ảnh và catalogue, sản phẩm được bán qua hợp đồng rồi bị ràng buộc không xoá được, tới khi gỡ khỏi hợp đồng mới xoá được",
+  "precondition": "Đăng nhập được bằng Kỹ thuật và Sales; cây danh mục sản phẩm đã có dữ liệu",
+  "roles": "Kỹ thuật (toàn quyền), Sales (chỉ được xem)",
+  "sections": [
+    {
+      "name": "Bước 1 — Tạo sản phẩm kèm tệp đính kèm",
+      "cases": [
+        {"d": "Tạo sản phẩm mới với ảnh và catalogue hợp lệ",
+         "s": ["Đăng nhập bằng Kỹ thuật", "Mở Sản phẩm > Thêm sản phẩm",
+               "Nhập tên, chọn danh mục, nhập đơn giá và mô tả",
+               "Chọn hai file ảnh .jpg/.png", "Chọn một file catalogue .pdf",
+               "Bấm Lưu"],
+         "e": "Lưu thành công; trang chi tiết hiện đủ hai ảnh và file catalogue; mã sản phẩm sinh tự động"},
+        {"d": "Mã sản phẩm sinh liên tiếp và giữ số 0 đệm",
+         "s": ["Tạo thêm một sản phẩm nữa", "So sánh mã của hai sản phẩm"],
+         "e": "Mã sau tăng đúng một đơn vị so với mã trước và giữ nguyên độ dài"},
+        {"d": "Ảnh định dạng SVG bị từ chối",
+         "s": ["Tạo sản phẩm mới, chọn file .svg ở ô ảnh", "Bấm Lưu"],
+         "e": "Bị từ chối kèm thông báo chỉ nhận JPG/PNG/GIF/WEBP; sản phẩm chưa được tạo",
+         "n": "SVG có thể chứa script chạy trên cùng tên miền ứng dụng"},
+        {"d": "Catalogue không phải PDF bị từ chối",
+         "s": ["Chọn file .docx ở ô Catalogue", "Bấm Lưu"],
+         "e": "Bị từ chối kèm thông báo catalogue chỉ nhận file PDF"},
+        {"d": "File tải lên được phục vụ an toàn",
+         "s": ["Mở trang chi tiết sản phẩm", "Mở đường dẫn của một ảnh đã tải lên",
+               "Xem header phản hồi ở tab Network"],
+         "e": "Ảnh hiển thị đúng, phản hồi có header X-Content-Type-Options: nosniff"}
+      ]
+    },
+    {
+      "name": "Bước 2 — Sửa sản phẩm và bộ ảnh",
+      "cases": [
+        {"d": "Form sửa điền sẵn dữ liệu hiện tại",
+         "s": ["Mở chi tiết sản phẩm", "Bấm Sửa"],
+         "e": "Các ô điền sẵn đúng giá trị đang lưu; danh mục chọn sẵn đúng; các ảnh hiện có đều hiển thị"},
+        {"d": "Sửa tên và đơn giá",
+         "s": ["Đổi tên và đơn giá", "Bấm Lưu"],
+         "e": "Trang chi tiết hiện giá trị mới"},
+        {"d": "Gỡ một ảnh và thêm ảnh khác trong cùng một lần lưu",
+         "s": ["Bấm dấu x trên một ảnh", "Chọn thêm một file ảnh mới", "Bấm Lưu"],
+         "e": "Ảnh bị gỡ biến mất, ảnh mới xuất hiện, các ảnh còn lại giữ nguyên"},
+        {"d": "Lưu mà không chọn file nào thì không mất ảnh cũ",
+         "s": ["Chỉ sửa mô tả, không chọn ảnh hay catalogue", "Bấm Lưu"],
+         "e": "Bộ ảnh và catalogue hiện có được giữ nguyên"},
+        {"d": "Không gỡ được ảnh thuộc sản phẩm khác",
+         "s": ["Lấy id ảnh của sản phẩm B",
+               "Sửa ô ẩn khi đang sửa sản phẩm A thành id đó", "Bấm Lưu"],
+         "e": "Ảnh của sản phẩm B không bị xoá — thao tác chỉ tác động trong phạm vi sản phẩm đang sửa"}
+      ]
+    },
+    {
+      "name": "Bước 3 — Sản phẩm được bán rồi bị ràng buộc",
+      "cases": [
+        {"d": "Sales tìm thấy sản phẩm khi lập hợp đồng",
+         "s": ["Đăng nhập bằng Sales", "Mở một hợp đồng",
+               "Mở dropdown sản phẩm"],
+         "e": "Sản phẩm vừa tạo có trong danh sách chọn"},
+        {"d": "Sales chỉ được xem, không sửa được danh mục sản phẩm",
+         "s": ["Mở danh sách sản phẩm bằng tài khoản Sales",
+               "Gửi yêu cầu tạo và yêu cầu xoá sản phẩm"],
+         "e": "Xem được danh sách nhưng cả hai yêu cầu đều trả về 403"},
+        {"d": "Gắn sản phẩm vào hợp đồng",
+         "s": ["Chọn sản phẩm vừa tạo, nhập số lượng hợp lệ", "Bấm Thêm"],
+         "e": "Dòng sản phẩm xuất hiện trong bảng của hợp đồng"},
+        {"d": "Trang chi tiết sản phẩm hiện hợp đồng đang dùng nó",
+         "s": ["Đăng nhập bằng Kỹ thuật", "Mở chi tiết sản phẩm"],
+         "e": "Khối hợp đồng liệt kê đúng hợp đồng vừa gắn"},
+        {"d": "Không xoá được sản phẩm đang nằm trong hợp đồng",
+         "s": ["Bấm Xoá ở trang chi tiết sản phẩm", "Xác nhận"],
+         "e": "Bị chặn kèm thông báo sản phẩm đang được dùng trong hợp đồng"}
+      ]
+    },
+    {
+      "name": "Bước 4 — Gỡ ràng buộc rồi xoá",
+      "cases": [
+        {"d": "Gỡ dòng sản phẩm khỏi hợp đồng",
+         "s": ["Đăng nhập bằng Sales", "Mở chi tiết hợp đồng",
+               "Bấm Gỡ ở dòng sản phẩm đó", "Xác nhận"],
+         "e": "Dòng biến mất khỏi bảng sản phẩm của hợp đồng"},
+        {"d": "Sau khi gỡ thì xoá được sản phẩm",
+         "s": ["Đăng nhập bằng Kỹ thuật", "Mở chi tiết sản phẩm",
+               "Bấm Xoá", "Xác nhận"],
+         "e": "Xoá thành công, quay về danh sách và sản phẩm biến mất"},
+        {"d": "Mở lại sản phẩm đã xoá bằng đường dẫn cũ",
+         "s": ["Gõ lại URL chi tiết của sản phẩm vừa xoá"],
+         "e": "Chuyển về danh sách kèm thông báo không tìm thấy"},
+        {"d": "Hợp đồng cũ không bị ảnh hưởng sau khi sản phẩm bị xoá",
+         "s": ["Mở lại chi tiết hợp đồng đã từng chứa sản phẩm đó"],
+         "e": "Trang mở bình thường, không báo lỗi, các dòng sản phẩm còn lại vẫn đúng"}
+      ]
+    }
+  ]
+}
