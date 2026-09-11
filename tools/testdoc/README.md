@@ -76,3 +76,51 @@ nguồn.
 
 Chỉ gồm unit test. Ba lớp trong `poscs.integration` bị loại ra
 (`EXCLUDED_TEST_CLASSES`) vì thuộc Report 5.2.
+
+---
+
+# Report 5.2 - Integration Test (Blackbox)
+
+`gen_integration_blackbox.py` dựng tài liệu kiểm thử tích hợp hộp đen.
+
+```
+python tools/testdoc/gen_integration_blackbox.py
+```
+
+Kết quả mặc định: `%USERPROFILE%\Documents\POSCS_IntegrationTest_Blackbox.xlsx`
+
+Khác tài liệu Unit Test, đây là kiểm thử **chạy tay trên giao diện** nên không
+sinh được từ mã nguồn. Nội dung test case nằm ở `blackbox/*.json`, script chỉ
+lo trình bày ra đúng mẫu. Sửa test case thì sửa file JSON rồi chạy lại.
+
+## Cột kết quả để trống có chủ đích
+
+Cột "Kết quả thực tế" và "Trạng thái" đặt là **Chưa chạy** cho mọi test case,
+vì chưa có ai thực sự bấm thử. Sau mỗi vòng chạy tay, người test điền tay vào
+file .xlsx (đừng sinh lại file, sẽ mất kết quả đã điền). Nếu cần sinh lại thì
+chép cột kết quả sang file mới.
+
+## Thêm chức năng mới
+
+Thêm một phần tử vào mảng `functions` của file JSON tương ứng:
+
+```json
+{
+  "name": "Tên chức năng tiếng Việt",
+  "sheet": "TenSheet",            // <= 31 ký tự, không trùng
+  "prefix": "TC_XXX",             // mã test case thành TC_XXX_001, _002...
+  "screen": "/POSCS/...",
+  "description": "...",
+  "precondition": "...",
+  "cases": [
+    {"d": "mô tả", "s": ["bước 1", "bước 2"], "e": "kết quả mong đợi",
+     "t": "dữ liệu kiểm thử", "p": "tiền điều kiện riêng", "o": "hậu điều kiện",
+     "n": "ghi chú"}
+  ]
+}
+```
+
+Bắt buộc: `d`, `s`, `e`. Script tự kiểm tên sheet quá dài, trùng tên sheet,
+trùng mã test case và thiếu trường bắt buộc — có lỗi thì dừng, không ghi file.
+
+Thứ tự module trong tài liệu do `SPEC_ORDER` trong script quy định.
