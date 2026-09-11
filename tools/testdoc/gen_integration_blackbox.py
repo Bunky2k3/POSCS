@@ -25,6 +25,7 @@ from openpyxl.utils import get_column_letter
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 SPEC_DIR = pathlib.Path(__file__).with_name("blackbox")
+RESULTS = pathlib.Path(__file__).with_name("blackbox_results.json")
 DEFAULT_OUT = (pathlib.Path.home() / "Documents"
                / "POSCS_IntegrationTest_Blackbox.xlsx")
 
@@ -70,6 +71,17 @@ CASE_HEADERS = [
     ("Trạng thái", 13),
     ("Người thực thi", 15),
 ]
+
+
+def load_results():
+    """Kết quả chạy thật do run_blackbox.py ghi lại. Không có thì để trống."""
+    if not RESULTS.is_file():
+        print("  Chua co %s -- moi test case de trang thai \"%s\""
+              % (RESULTS.name, NOT_RUN))
+        return {}
+    data = json.loads(RESULTS.read_text(encoding="utf-8"))
+    print("  Doc %d ket qua chay that tu %s" % (len(data), RESULTS.name))
+    return data
 
 
 def load_specs():
@@ -187,7 +199,16 @@ def build_index(wb, functions):
     return ws
 
 
-def build_statistics(wb, functions):
+def tally(fn, results):
+    """(đạt, trượt, chưa chạy, n/a) của một chức năng theo kết quả thật."""
+    counts = collections.Counter()
+    for i in range(1, len(fn["cases"]) + 1):
+        cid = "%s_%03d" % (fn["prefix"], i)
+        counts[results.get(cid, {}).get("status", NOT_RUN)] += 1
+    return (counts["Đạt"], counts["Trượt"], counts[NOT_RUN], counts["N/A"])
+
+
+def build_statistics(wb, functions, results):
     ws = wb.create_sheet("Thống kê")
     for col, width in zip("ABCDEFGH", (7, 24, 36, 11, 11, 13, 9, 18)):
         ws.column_dimensions[col].width = width
@@ -202,18 +223,24 @@ def build_statistics(wb, functions):
         put(ws, i, 5, label2, font=BOLD, fill=LBL_FILL)
         put(ws, i, 7, value2)
     put(ws, 6, 2, "Ghi chú", font=BOLD, fill=LBL_FILL)
-    put(ws, 6, 3, "Toàn bộ test case đang ở trạng thái \"%s\" - "
-                  "điền kết quả sau mỗi vòng chạy tay." % NOT_RUN, align=WRAP)
+    ran = sum(1 for v in results.values() if v.get("status") != NOT_RUN)
+    put(ws, 6, 3,
+        ("Vòng 1: %d test case đã chạy thật trên bản triển khai Tomcat + MySQL "
+         "(lượt tự động qua HTTP). Số còn lại ở trạng thái \"%s\", cần chạy tay "
+         "trên giao diện rồi điền kết quả." % (ran, NOT_RUN)) if results else
+        ("Toàn bộ test case đang ở trạng thái \"%s\" - điền kết quả sau mỗi "
+         "vòng chạy tay." % NOT_RUN), align=WRAP)
     for j, head in enumerate(["STT", "Module", "Chức năng", "Đạt", "Trượt",
                               NOT_RUN, "N/A", "Tổng số test case"], 2):
         put(ws, 9, j, head, font=BOLD, fill=HDR_FILL, align=CENTER)
     row = 10
     for no, fn in enumerate(functions, start=1):
         n = len(fn["cases"])
+        passed, failed, notrun, na = tally(fn, results)
         put(ws, row, 2, no, align=CENTER)
         put(ws, row, 3, fn["module"], align=WRAP)
         put(ws, row, 4, fn["name"], align=WRAP)
-        for j, value in enumerate([0, 0, n, 0, n], start=5):
+        for j, value in enumerate([passed, failed, notrun, na, n], start=5):
             put(ws, row, j, value, align=CENTER)
         row += 1
     put(ws, row, 4, "Tổng cộng", font=BOLD, fill=LBL_FILL)
@@ -232,7 +259,7 @@ def build_statistics(wb, functions):
     return ws
 
 
-def build_function_sheet(wb, fn):
+def build_function_sheet(wb, fn, results):
     ws = wb.create_sheet(fn["sheet"])
     for j, (_, width) in enumerate(CASE_HEADERS, start=1):
         ws.column_dimensions[get_column_letter(j)].width = width
@@ -256,14 +283,17 @@ def build_function_sheet(wb, fn):
         put(ws, r, 3, None)
         ws.merge_cells(start_row=r, start_column=2, end_row=r, end_column=3)
 
+    passed, failed, notrun, na = tally(fn, results)
     res = len(info) + 2
     put(ws, res, 1, "Kết quả chạy", font=BOLD, fill=HDR_FILL, align=CENTER)
     for j, head in enumerate(["Đạt", "Trượt", NOT_RUN, "N/A"], start=2):
         put(ws, res, j, head, font=BOLD, fill=HDR_FILL, align=CENTER)
-    for k, label in enumerate(["Vòng 1", "Vòng 2"], start=1):
-        put(ws, res + k, 1, label, font=BOLD, fill=LBL_FILL)
-        for j, value in enumerate([0, 0, n, 0], start=2):
-            put(ws, res + k, j, value, align=CENTER)
+    put(ws, res + 1, 1, "Vòng 1", font=BOLD, fill=LBL_FILL)
+    for j, value in enumerate([passed, failed, notrun, na], start=2):
+        put(ws, res + 1, j, value, align=CENTER)
+    put(ws, res + 2, 1, "Vòng 2", font=BOLD, fill=LBL_FILL)
+    for j, value in enumerate([0, 0, n, 0], start=2):
+        put(ws, res + 2, j, value, align=CENTER)
 
     head = res + 4
     for j, (label, _) in enumerate(CASE_HEADERS, start=1):
@@ -274,15 +304,24 @@ def build_function_sheet(wb, fn):
         steps = case["s"]
         steps = "\n".join("%d. %s" % (k, t) for k, t in enumerate(steps, 1)) \
             if isinstance(steps, list) else steps
+        cid = "%s_%03d" % (fn["prefix"], i)
+        got = results.get(cid)
+        note = case.get("n", "")
+        if got and got.get("note"):
+            note = (note + " | " if note else "") + got["note"]
         values = [
-            "%s_%03d" % (fn["prefix"], i),
+            cid,
             case["d"],
             steps,
             case.get("p", fn.get("precondition", "")),
             case.get("t", "-"),
             case.get("o", "-"),
             case["e"],
-            "", NOT_RUN, "", "", case.get("n", ""), "", NOT_RUN, "",
+            got["actual"] if got else "",
+            got["status"] if got else NOT_RUN,
+            "Tự động (run_blackbox.py)" if got else "",
+            ISSUE_DATE if got else "",
+            note, "", NOT_RUN, "",
         ]
         for j, value in enumerate(values, start=1):
             put(ws, r, j, value,
@@ -317,6 +356,7 @@ def parse_out_path(argv):
 def main(argv=()):
     out = parse_out_path(list(argv))
     functions = load_specs()
+    results = load_results()
     problems = check(functions)
     if problems:
         print("DAC TA CO LOI - chua ghi file:")
@@ -328,9 +368,9 @@ def main(argv=()):
     wb.remove(wb.active)
     build_cover(wb)
     build_index(wb, functions)
-    build_statistics(wb, functions)
+    build_statistics(wb, functions, results)
     for fn in functions:
-        build_function_sheet(wb, fn)
+        build_function_sheet(wb, fn, results)
     apply_font(wb)
     out.parent.mkdir(parents=True, exist_ok=True)
     wb.save(out)
@@ -338,8 +378,15 @@ def main(argv=()):
     by_module = collections.Counter()
     for fn in functions:
         by_module[fn["module"]] += len(fn["cases"])
+    status_counts = collections.Counter()
+    for fn in functions:
+        p_, f_, n_, a_ = tally(fn, results)
+        status_counts.update({"Đạt": p_, "Trượt": f_, NOT_RUN: n_, "N/A": a_})
     print("Da ghi: %s" % out)
     print("  %d chuc nang, %d test case" % (len(functions), sum(by_module.values())))
+    print("  Vong 1: Dat %d | Truot %d | %s %d | N/A %d"
+          % (status_counts["Đạt"], status_counts["Trượt"], NOT_RUN,
+             status_counts[NOT_RUN], status_counts["N/A"]))
     for module, count in by_module.items():
         print("    %-28s %3d" % (module, count))
 

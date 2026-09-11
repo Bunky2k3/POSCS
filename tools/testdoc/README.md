@@ -124,3 +124,48 @@ Bắt buộc: `d`, `s`, `e`. Script tự kiểm tên sheet quá dài, trùng tê
 trùng mã test case và thiếu trường bắt buộc — có lỗi thì dừng, không ghi file.
 
 Thứ tự module trong tài liệu do `SPEC_ORDER` trong script quy định.
+
+## Chạy thật một phần test case
+
+`run_blackbox.py` tự động hoá các test case kiểm được bằng request/phản hồi:
+đăng nhập, kiểm tra dữ liệu đầu vào, phân quyền 403, endpoint JSON, chống path
+traversal. Những ca phải nhìn giao diện (bố cục, dropdown, hộp thoại xác nhận,
+nội dung file Excel/PDF) vẫn phải chạy tay.
+
+Dựng môi trường một lần:
+
+```bash
+mysql -h127.0.0.1 -uroot -p -e "CREATE DATABASE poscs_bbtest CHARACTER SET utf8mb4"
+mysql -h127.0.0.1 -uroot -p poscs_bbtest < db/schema.sql
+```
+
+`db/schema.sql` có sẵn khách hàng/hợp đồng/sản phẩm/phiếu mẫu nhưng **bảng
+users rỗng**, phải thêm tài khoản cho đủ 4 vai trò (mật khẩu băm bằng jbcrypt
+trong `lib/`). Các id 1, 15, 16, 17 đang bị dữ liệu mẫu tham chiếu nên tài khoản
+phải mang đúng các id đó.
+
+Triển khai WAR lên Tomcat với biến môi trường `DB_URL` trỏ vào `poscs_bbtest`,
+rồi:
+
+```bash
+python tools/testdoc/run_blackbox.py http://localhost:8099/POSCS
+python tools/testdoc/gen_integration_blackbox.py
+```
+
+Bước 1 ghi `blackbox_results.json`, bước 2 nối kết quả vào cột "Kết quả thực
+tế"/"Trạng thái" của vòng 1. Test case không có trong file kết quả vẫn giữ
+trạng thái "Chưa chạy".
+
+Lưu ý khi viết thêm ca tự động:
+
+- POST tới `/customer`, `/product`, `/contract` phải gửi **multipart** — các
+  controller này khai báo `@MultipartConfig` và gọi `request.getPart(...)`,
+  gửi urlencoded sẽ thành HTTP 500.
+- Mọi POST cần tham số `csrfToken` lấy từ một trang có render ô ẩn đó
+  (`/changePassword.jsp` hợp với mọi vai trò).
+- Tên tham số id khác nhau giữa các handler: `customerId`, `contractId`,
+  `productId`, `ticketId`, `userId` khi cập nhật nhưng đều là `id` khi xoá.
+  Dùng sai tên thì request dừng ở nhánh "không tìm thấy" **trước** bước kiểm
+  quyền, và ca kiểm phân quyền sẽ đạt vì lý do sai.
+- Luôn có một ca đối chứng đường đi đúng cho mỗi module. Không có nó thì một
+  payload sai toàn tập vẫn làm mọi ca "thiếu trường X" đều đạt.
