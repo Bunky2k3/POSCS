@@ -3499,25 +3499,22 @@ CREATE TABLE `users` (
   CONSTRAINT `users_department_fk` FOREIGN KEY (`department_id`) REFERENCES `departments` (`department_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- 13 tài khoản nhân viên phục vụ dev/test (giữ đồng bộ với
+-- 12 tài khoản nhân viên phục vụ dev/test (giữ đồng bộ với
 -- db/migrations/V12__seed_test_user_accounts__ndat2003.sql).
 --
+-- Cố ý KHÔNG seed tài khoản Admin nào: repository này công khai và cả 12 tài
+-- khoản dùng chung một mật khẩu, seed thêm Admin là công bố luôn một lối vào
+-- quản trị. Tài khoản Admin phải tạo tay.
+--
 -- !!! CHỈ DÙNG CHO DEV/TEST !!!
--- Cả 13 tài khoản dùng chung mật khẩu "Poscs@123" và file này là công khai.
--- Đừng bao giờ nạp phần này lên máy chủ chạy thật -- nó tặng không một tài
--- khoản đăng nhập (có cả Admin) cho bất kỳ ai đọc được repository.
+-- Cả 12 tài khoản dùng chung mật khẩu "Poscs@123". Đừng bao giờ nạp phần này
+-- lên máy chủ chạy thật -- nó tặng không một lối đăng nhập cho bất kỳ ai đọc
+-- được repository.
 INSERT IGNORE INTO users
   (username, email, password_hash, role_id, last_name, middle_name, first_name,
    gender, date_of_birth, citizen_id, phone, personal_email, address_id,
    department_id, hire_date, is_deleted)
 VALUES
--- ===== Admin =====
-('admin2', 'admin2@postef.com.vn', '$2a$10$9ZvWybpzDcEd578l5Nrjj.DeX8ruiWR91yU5r7ACJ7Y2OxSEz3.PW',
- (SELECT role_id FROM roles WHERE role_name = 'Admin'),
- 'Nguyễn', 'Văn', 'Khánh', 'Nam', '1985-04-12', '001085012345', '0912340001',
- 'admin2.test@example.com', NULL,
- (SELECT department_id FROM departments WHERE department_name = 'Ban giám đốc'), '2021-03-01', 0),
-
 -- ===== Sales =====
 ('sales2', 'sales2@postef.com.vn', '$2a$10$1mygDKbqiqYHkJ0OX.vHBu4oSMPVlOZiD/UOE./KJe30DcikN1MQm',
  (SELECT role_id FROM roles WHERE role_name = 'Sales'),

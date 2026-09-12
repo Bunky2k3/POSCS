@@ -1,10 +1,13 @@
--- Seeds 13 employee accounts spread across the 4 roles, so a fresh setup has enough users to exercise things a single account per role cannot: assignee/owner dropdowns and filters, ticket assignment, the employee list's pagination (PAGE_SIZE = 10 -> 2 pages), the role filter, and the Active/Inactive status filter. `sales6` is seeded Inactive on purpose to cover the Inactive filter, the Unban flow (UC-29), and the "account locked" message on the login screen.
+-- Seeds 12 employee accounts across the three non-Admin roles, so a fresh setup has enough users to exercise things a single account per role cannot: assignee/owner dropdowns and filters, ticket assignment, the employee list's pagination (PAGE_SIZE = 10 -> 2 pages), the role filter, and the Active/Inactive status filter. `sales6` is seeded Inactive on purpose to cover the Inactive filter, the Unban flow (UC-29), and the "account locked" message on the login screen.
+--
+-- No Admin account is seeded here, deliberately: this repository is public and
+-- every account below shares one password, so seeding one would publish a
+-- working administrator login. Create Admin accounts by hand instead.
 --
 -- !!! DEV/TEST DATA ONLY !!!
--- Every account below shares the password "Poscs@123", and this file is
--- public. Never apply this migration to an internet-facing deployment --
--- it would hand anyone reading this repository a working login, including
--- an Admin one. It belongs on local dev databases and CI only.
+-- Every account below shares the password "Poscs@123". Never apply this
+-- migration to an internet-facing deployment -- it would hand anyone reading
+-- this repository a working login. Local dev databases and CI only.
 
 INSERT INTO schema_migrations (version) VALUES ('V12__seed_test_user_accounts__ndat2003');
 
@@ -25,13 +28,6 @@ INSERT IGNORE INTO users
    gender, date_of_birth, citizen_id, phone, personal_email, address_id,
    department_id, hire_date, is_deleted)
 VALUES
--- ===== Admin =====
-('admin2', 'admin2@postef.com.vn', '$2a$10$9ZvWybpzDcEd578l5Nrjj.DeX8ruiWR91yU5r7ACJ7Y2OxSEz3.PW',
- (SELECT role_id FROM roles WHERE role_name = 'Admin'),
- 'Nguyễn', 'Văn', 'Khánh', 'Nam', '1985-04-12', '001085012345', '0912340001',
- 'admin2.test@example.com', NULL,
- (SELECT department_id FROM departments WHERE department_name = 'Ban giám đốc'), '2021-03-01', 0),
-
 -- ===== Sales =====
 ('sales2', 'sales2@postef.com.vn', '$2a$10$1mygDKbqiqYHkJ0OX.vHBu4oSMPVlOZiD/UOE./KJe30DcikN1MQm',
  (SELECT role_id FROM roles WHERE role_name = 'Sales'),
