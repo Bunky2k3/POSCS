@@ -57,10 +57,10 @@ public class DashboardControllerTest {
 
         // Stub chung cho mọi test -- không phải trọng tâm nhưng bắt buộc để
         // tránh NPE khi controller đọc qua các map/list này.
-        when(contractDAO.countStatusSummary()).thenReturn(Collections.emptyMap());
-        when(ticketDAO.countStatusSummary()).thenReturn(Collections.emptyMap());
-        when(contractDAO.findExpiringSoon(anyInt())).thenReturn(Collections.emptyList());
-        when(ticketDAO.findNeedingAttention(anyInt())).thenReturn(Collections.emptyList());
+        when(contractDAO.countStatusSummary(nullable(Integer.class))).thenReturn(Collections.emptyMap());
+        when(ticketDAO.countStatusSummary(nullable(Integer.class))).thenReturn(Collections.emptyMap());
+        when(contractDAO.findExpiringSoon(anyInt(), nullable(Integer.class))).thenReturn(Collections.emptyList());
+        when(ticketDAO.findNeedingAttention(anyInt(), nullable(Integer.class))).thenReturn(Collections.emptyList());
         // doGet luôn forward /dashboard.jsp ở cuối -- không stub thì
         // getRequestDispatcher trả null và .forward() ném NPE ở MỌI test.
         RequestDispatcher defaultDispatcher = mock(RequestDispatcher.class);
@@ -76,10 +76,10 @@ public class DashboardControllerTest {
     @Test
     public void revenueGrewFromLastMonth_computesPositiveTrendPercent() throws Exception {
         LocalDate today = LocalDate.now();
-        when(paymentDAO.sumInvoiceAmountByMonth(today.getYear(), today.getMonthValue()))
+        when(paymentDAO.sumInvoiceAmountByMonth(eq(today.getYear()), eq(today.getMonthValue()), nullable(Integer.class)))
                 .thenReturn(BigDecimal.valueOf(1_500_000));
         LocalDate lastMonth = today.minusMonths(1);
-        when(paymentDAO.sumInvoiceAmountByMonth(lastMonth.getYear(), lastMonth.getMonthValue()))
+        when(paymentDAO.sumInvoiceAmountByMonth(eq(lastMonth.getYear()), eq(lastMonth.getMonthValue()), nullable(Integer.class)))
                 .thenReturn(BigDecimal.valueOf(1_000_000));
 
         controller.doGet(request, response);
@@ -91,7 +91,7 @@ public class DashboardControllerTest {
     @Test
     public void noRevenueLastMonth_skipsTrendPercentToAvoidDivisionByZero() throws Exception {
         LocalDate today = LocalDate.now();
-        when(paymentDAO.sumInvoiceAmountByMonth(anyInt(), anyInt())).thenReturn(BigDecimal.ZERO);
+        when(paymentDAO.sumInvoiceAmountByMonth(anyInt(), anyInt(), nullable(Integer.class))).thenReturn(BigDecimal.ZERO);
 
         controller.doGet(request, response);
 
@@ -105,9 +105,9 @@ public class DashboardControllerTest {
         c.setContractId(9);
         c.setEndDate(Date.valueOf(today.plusDays(10)));
         List<Contract> expiring = Arrays.asList(c);
-        when(contractDAO.findExpiringSoon(anyInt())).thenReturn(expiring);
+        when(contractDAO.findExpiringSoon(anyInt(), nullable(Integer.class))).thenReturn(expiring);
         when(paymentDAO.sumInvoiceAmountByContractId(9)).thenReturn(BigDecimal.valueOf(5_000_000));
-        when(paymentDAO.sumInvoiceAmountByMonth(anyInt(), anyInt())).thenReturn(BigDecimal.ZERO);
+        when(paymentDAO.sumInvoiceAmountByMonth(anyInt(), anyInt(), nullable(Integer.class))).thenReturn(BigDecimal.ZERO);
 
         controller.doGet(request, response);
 
@@ -120,12 +120,56 @@ public class DashboardControllerTest {
 
     @Test
     public void alwaysForwardsToDashboardJsp() throws Exception {
-        when(paymentDAO.sumInvoiceAmountByMonth(anyInt(), anyInt())).thenReturn(BigDecimal.ZERO);
+        when(paymentDAO.sumInvoiceAmountByMonth(anyInt(), anyInt(), nullable(Integer.class))).thenReturn(BigDecimal.ZERO);
         RequestDispatcher dispatcher = mock(RequestDispatcher.class);
         when(request.getRequestDispatcher("/dashboard.jsp")).thenReturn(dispatcher);
 
         controller.doGet(request, response);
 
         verify(dispatcher).forward(request, response);
+    }
+
+    // ------------------------------------------------------------------
+    // Lọc theo tỉnh
+    // ------------------------------------------------------------------
+
+    /**
+     * Lọc tỉnh phải xuống TỚI MỌI truy vấn của trang. Bỏ sót một chỗ là trang
+     * trộn hai phạm vi: ô KPI đếm cả nước nằm ngay cạnh bảng chỉ có dữ liệu
+     * một tỉnh -- sai lệch kiểu đó người dùng không có cách nào tự nhận ra.
+     */
+    @Test
+    public void provinceSelected_narrowsEveryQueryOnThePage() throws Exception {
+        when(request.getParameter("provinceId")).thenReturn("3");
+        when(customerDAO.countAll(any(), any(), any(), eq(3))).thenReturn(2);
+        when(paymentDAO.sumInvoiceAmountByMonth(anyInt(), anyInt(), eq(3))).thenReturn(BigDecimal.ZERO);
+        when(contractDAO.countStatusSummary(3)).thenReturn(Collections.emptyMap());
+        when(ticketDAO.countStatusSummary(3)).thenReturn(Collections.emptyMap());
+        when(contractDAO.findExpiringSoon(anyInt(), eq(3))).thenReturn(Collections.emptyList());
+        when(ticketDAO.findNeedingAttention(anyInt(), eq(3))).thenReturn(Collections.emptyList());
+
+        controller.doGet(request, response);
+
+        verify(customerDAO).countAll(any(), any(), any(), eq(3));
+        verify(customerDAO).countNewThisMonth(3);
+        verify(contractDAO).countStatusSummary(3);
+        verify(contractDAO).findExpiringSoon(anyInt(), eq(3));
+        verify(ticketDAO).countStatusSummary(3);
+        verify(ticketDAO).countOverdueOrDueSoon(3);
+        verify(ticketDAO).findNeedingAttention(anyInt(), eq(3));
+        verify(paymentDAO, times(2)).sumInvoiceAmountByMonth(anyInt(), anyInt(), eq(3));
+        verify(request).setAttribute("provinceFilter", 3);
+    }
+
+    /** Tham số rác trên URL không được làm trang vỡ -- coi như không lọc. */
+    @Test
+    public void invalidProvinceParam_fallsBackToNationwide() throws Exception {
+        when(request.getParameter("provinceId")).thenReturn("khong-phai-so");
+        when(paymentDAO.sumInvoiceAmountByMonth(anyInt(), anyInt(), nullable(Integer.class))).thenReturn(BigDecimal.ZERO);
+
+        controller.doGet(request, response);
+
+        verify(contractDAO).countStatusSummary(null);
+        verify(request).setAttribute("provinceFilter", null);
     }
 }

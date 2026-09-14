@@ -182,6 +182,11 @@ public class ContractDAO {
 
     /** Đếm số hợp đồng theo từng nhóm trạng thái (BR-17), phục vụ dải KPI ở đầu trang danh sách. */
     public Map<String, Integer> countStatusSummary() {
+        return countStatusSummary(null);
+    }
+
+    /** Như {@link #countStatusSummary()} nhưng chỉ đếm hợp đồng thuộc 1 tỉnh (null = toàn quốc). */
+    public Map<String, Integer> countStatusSummary(Integer provinceId) {
         Map<String, Integer> summary = new HashMap<>();
         summary.put(STATUS_ACTIVE, 0);
         summary.put(STATUS_SOON, 0);
@@ -190,22 +195,29 @@ public class ContractDAO {
 
         String sql =
             "SELECT " +
-            "  SUM(CASE WHEN CURDATE() < effective_date THEN 1 ELSE 0 END) AS draft_count, " +
-            "  SUM(CASE WHEN CURDATE() > end_date THEN 1 ELSE 0 END) AS expired_count, " +
-            "  SUM(CASE WHEN CURDATE() BETWEEN effective_date AND end_date AND DATEDIFF(end_date, CURDATE()) <= " +
+            "  SUM(CASE WHEN CURDATE() < c.effective_date THEN 1 ELSE 0 END) AS draft_count, " +
+            "  SUM(CASE WHEN CURDATE() > c.end_date THEN 1 ELSE 0 END) AS expired_count, " +
+            "  SUM(CASE WHEN CURDATE() BETWEEN c.effective_date AND c.end_date AND DATEDIFF(c.end_date, CURDATE()) <= " +
                  SOON_THRESHOLD_DAYS + " THEN 1 ELSE 0 END) AS soon_count, " +
-            "  SUM(CASE WHEN CURDATE() BETWEEN effective_date AND end_date AND DATEDIFF(end_date, CURDATE()) > " +
+            "  SUM(CASE WHEN CURDATE() BETWEEN c.effective_date AND c.end_date AND DATEDIFF(c.end_date, CURDATE()) > " +
                  SOON_THRESHOLD_DAYS + " THEN 1 ELSE 0 END) AS active_count " +
-            "FROM contracts WHERE is_deleted = 0";
+            "FROM contracts c " +
+            "LEFT JOIN enterprises e ON c.enterprise_id = e.enterprise_id " +
+            JOIN_PROVINCE_OF_ENTERPRISE +
+            "WHERE c.is_deleted = 0" + (provinceId != null ? " AND d.province_id = ?" : "");
 
         try (Connection conn = DBContext.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql);
-             ResultSet rs = ps.executeQuery()) {
-            if (rs.next()) {
-                summary.put(STATUS_DRAFT, rs.getInt("draft_count"));
-                summary.put(STATUS_EXPIRED, rs.getInt("expired_count"));
-                summary.put(STATUS_SOON, rs.getInt("soon_count"));
-                summary.put(STATUS_ACTIVE, rs.getInt("active_count"));
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            if (provinceId != null) {
+                ps.setInt(1, provinceId);
+            }
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    summary.put(STATUS_DRAFT, rs.getInt("draft_count"));
+                    summary.put(STATUS_EXPIRED, rs.getInt("expired_count"));
+                    summary.put(STATUS_SOON, rs.getInt("soon_count"));
+                    summary.put(STATUS_ACTIVE, rs.getInt("active_count"));
+                }
             }
         } catch (SQLException ex) {
             LOG.error("Loi thong ke trang thai hop dong", ex);
@@ -215,14 +227,24 @@ public class ContractDAO {
 
     /** Lấy top N hợp đồng "Sắp hết hạn" (BR-17), sắp theo ngày hết hạn gần nhất trước -- phục vụ dashboard. */
     public List<Contract> findExpiringSoon(int limit) {
+        return findExpiringSoon(limit, null);
+    }
+
+    /** Như {@link #findExpiringSoon(int)} nhưng chỉ lấy hợp đồng thuộc 1 tỉnh (null = toàn quốc). */
+    public List<Contract> findExpiringSoon(int limit, Integer provinceId) {
         List<Contract> result = new ArrayList<>();
         String sql = SELECT_BASE +
             "WHERE c.is_deleted = 0 AND CURDATE() BETWEEN c.effective_date AND c.end_date " +
             "AND DATEDIFF(c.end_date, CURDATE()) <= " + SOON_THRESHOLD_DAYS + " " +
+            (provinceId != null ? "AND d.province_id = ? " : "") +
             "ORDER BY c.end_date ASC LIMIT ?";
         try (Connection conn = DBContext.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, limit);
+            int param = 1;
+            if (provinceId != null) {
+                ps.setInt(param++, provinceId);
+            }
+            ps.setInt(param, limit);
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
                     result.add(mapRow(rs));

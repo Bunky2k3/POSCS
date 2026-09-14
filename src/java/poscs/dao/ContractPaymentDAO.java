@@ -23,12 +23,30 @@ public class ContractPaymentDAO {
 
     /** Tổng tiền đã thu trong 1 tháng cụ thể. Trả về 0 nếu không có khoản thu nào. */
     public BigDecimal sumInvoiceAmountByMonth(int year, int month) {
-        String sql = "SELECT COALESCE(SUM(invoice_amount), 0) FROM contract_payments " +
-                     "WHERE paid_date IS NOT NULL AND YEAR(paid_date) = ? AND MONTH(paid_date) = ?";
+        return sumInvoiceAmountByMonth(year, month, null);
+    }
+
+    /**
+     * Như {@link #sumInvoiceAmountByMonth(int, int)} nhưng chỉ tính các khoản
+     * thu của hợp đồng thuộc 1 tỉnh (null = toàn quốc). Khoản thu không mang
+     * địa bàn riêng -- nó thừa hưởng tỉnh của khách hàng đứng tên hợp đồng, nên
+     * phải đi qua contracts -> enterprises -> addresses -> districts.
+     */
+    public BigDecimal sumInvoiceAmountByMonth(int year, int month, Integer provinceId) {
+        String sql = "SELECT COALESCE(SUM(p.invoice_amount), 0) FROM contract_payments p " +
+                     "LEFT JOIN contracts c ON p.contract_id = c.contract_id " +
+                     "LEFT JOIN enterprises e ON c.enterprise_id = e.enterprise_id " +
+                     "LEFT JOIN addresses a ON e.address_id = a.address_id " +
+                     "LEFT JOIN districts d ON a.districts_id = d.districts_id " +
+                     "WHERE p.paid_date IS NOT NULL AND YEAR(p.paid_date) = ? AND MONTH(p.paid_date) = ?" +
+                     (provinceId != null ? " AND d.province_id = ?" : "");
         try (Connection conn = DBContext.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, year);
             ps.setInt(2, month);
+            if (provinceId != null) {
+                ps.setInt(3, provinceId);
+            }
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
                     return rs.getBigDecimal(1);

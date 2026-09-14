@@ -13,6 +13,7 @@ import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import poscs.dao.AddressDAO;
 import poscs.dao.ContractDAO;
 import poscs.dao.ContractPaymentDAO;
 import poscs.dao.CustomerDAO;
@@ -26,6 +27,11 @@ import poscs.model.TechnicalRequest;
  * tiền lệ nào trong CustomerController/ContractController/
  * TechnicalSupportTicketController lọc theo owner hiện tại, và
  * PERMISSIONS.md cũng không quy định việc này.
+ *
+ * Có duy nhất một bộ lọc, và là bộ lọc do người dùng tự chọn chứ không phải
+ * phạm vi quyền: tham số "provinceId" thu hẹp mọi con số trên trang về một
+ * tỉnh, phục vụ việc giao khách hàng/hợp đồng theo địa bàn. Bỏ trống thì
+ * trang hoạt động y như trước.
  */
 @WebServlet(name = "DashboardController", urlPatterns = {"/dashboard"})
 public class DashboardController extends HttpServlet {
@@ -40,24 +46,34 @@ public class DashboardController extends HttpServlet {
     private final ContractDAO contractDAO = new ContractDAO();
     private final TechnicalSupportTicketDAO ticketDAO = new TechnicalSupportTicketDAO();
     private final ContractPaymentDAO paymentDAO = new ContractPaymentDAO();
+    private final AddressDAO addressDAO = new AddressDAO();
 
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
         LocalDate today = LocalDate.now();
 
+        // Bộ lọc địa bàn: null = toàn bộ 34 tỉnh. Lọc áp cho TẤT CẢ số liệu
+        // trên trang, không riêng vài ô -- nửa lọc nửa không thì KPI "15 hợp
+        // đồng" nằm cạnh bảng chỉ có 4 dòng, người đọc không biết tin số nào.
+        Integer provinceFilter = parseIntOrNull(request.getParameter("provinceId"));
+        request.setAttribute("provinceList", addressDAO.findAllProvinces());
+        request.setAttribute("provinceFilter", provinceFilter);
+
         // ===== KPI: khách hàng =====
-        request.setAttribute("totalCustomers", customerDAO.countAll(null, null, null));
-        request.setAttribute("newCustomersThisMonth", customerDAO.countNewThisMonth());
+        request.setAttribute("totalCustomers", customerDAO.countAll(null, null, null, provinceFilter));
+        request.setAttribute("newCustomersThisMonth", customerDAO.countNewThisMonth(provinceFilter));
 
         // ===== KPI: hợp đồng =====
-        Map<String, Integer> contractStatusSummary = contractDAO.countStatusSummary();
+        Map<String, Integer> contractStatusSummary = contractDAO.countStatusSummary(provinceFilter);
         request.setAttribute("contractStatusSummary", contractStatusSummary);
 
         // ===== KPI: doanh thu =====
-        BigDecimal revenueThisMonth = paymentDAO.sumInvoiceAmountByMonth(today.getYear(), today.getMonthValue());
+        BigDecimal revenueThisMonth = paymentDAO.sumInvoiceAmountByMonth(
+                today.getYear(), today.getMonthValue(), provinceFilter);
         LocalDate lastMonth = today.minusMonths(1);
-        BigDecimal revenueLastMonth = paymentDAO.sumInvoiceAmountByMonth(lastMonth.getYear(), lastMonth.getMonthValue());
+        BigDecimal revenueLastMonth = paymentDAO.sumInvoiceAmountByMonth(
+                lastMonth.getYear(), lastMonth.getMonthValue(), provinceFilter);
         request.setAttribute("revenueThisMonth", revenueThisMonth);
         if (revenueLastMonth.compareTo(BigDecimal.ZERO) > 0) {
             double trendPercent = revenueThisMonth.subtract(revenueLastMonth)
@@ -67,9 +83,9 @@ public class DashboardController extends HttpServlet {
         }
 
         // ===== KPI: phiếu hỗ trợ =====
-        Map<String, Integer> ticketStatusSummary = ticketDAO.countStatusSummary();
+        Map<String, Integer> ticketStatusSummary = ticketDAO.countStatusSummary(provinceFilter);
         request.setAttribute("ticketStatusSummary", ticketStatusSummary);
-        request.setAttribute("overdueOrDueSoonCount", ticketDAO.countOverdueOrDueSoon());
+        request.setAttribute("overdueOrDueSoonCount", ticketDAO.countOverdueOrDueSoon(provinceFilter));
 
         request.setAttribute("currentMonthNumber", today.getMonthValue());
 
@@ -80,7 +96,7 @@ public class DashboardController extends HttpServlet {
                 today.getDayOfMonth(), today.getMonthValue(), today.getYear()));
 
         // ===== Bảng hợp đồng sắp hết hạn =====
-        List<Contract> expiringContracts = contractDAO.findExpiringSoon(EXPIRING_CONTRACTS_LIMIT);
+        List<Contract> expiringContracts = contractDAO.findExpiringSoon(EXPIRING_CONTRACTS_LIMIT, provinceFilter);
         Map<Integer, BigDecimal> contractValues = new HashMap<>();
         Map<Integer, Long> daysRemaining = new HashMap<>();
         for (Contract c : expiringContracts) {
@@ -93,9 +109,20 @@ public class DashboardController extends HttpServlet {
         request.setAttribute("daysRemaining", daysRemaining);
 
         // ===== Bảng phiếu hỗ trợ cần xử lý =====
-        List<TechnicalRequest> attentionTickets = ticketDAO.findNeedingAttention(ATTENTION_TICKETS_LIMIT);
+        List<TechnicalRequest> attentionTickets = ticketDAO.findNeedingAttention(ATTENTION_TICKETS_LIMIT, provinceFilter);
         request.setAttribute("attentionTickets", attentionTickets);
 
         request.getRequestDispatcher("/dashboard.jsp").forward(request, response);
+    }
+
+    private static Integer parseIntOrNull(String value) {
+        if (value == null || value.trim().isEmpty()) {
+            return null;
+        }
+        try {
+            return Integer.parseInt(value.trim());
+        } catch (NumberFormatException ex) {
+            return null;
+        }
     }
 }

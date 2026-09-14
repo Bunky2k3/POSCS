@@ -28,6 +28,22 @@
         }
         .today-badge i { color: var(--primary); margin-right: 6px; }
 
+        .welcome-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+        .province-filter {
+            background: #fff; border: 1px solid #eef2f6; border-radius: 10px;
+            padding: 8px 14px; font-size: 0.85rem; color: #374151; font-weight: 500;
+            box-shadow: 0 4px 12px rgba(0,40,80,0.06); min-width: 190px;
+        }
+        .province-filter:focus { outline: none; border-color: var(--primary-light); }
+        .scope-note {
+            display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+            background: #eaf6ff; border: 1px solid #cfe8fb; border-radius: 10px;
+            padding: 10px 16px; margin-bottom: 18px;
+            font-size: 0.84rem; color: var(--primary-dark);
+        }
+        .scope-note i { color: var(--primary); }
+        .scope-note a { color: var(--primary); font-weight: 600; }
+
         /* ===== KPI cards ===== */
         .kpi-card { padding: 18px 18px 16px; display: flex; flex-direction: column; gap: 10px; height: 100%; }
         .kpi-top { display: flex; justify-content: space-between; align-items: flex-start; }
@@ -102,8 +118,26 @@
                 <h2>Chào mừng trở lại, <c:out value="${sessionScope.currentUser.fullName}"/> 👋</h2>
                 <p>Đây là tổng quan hoạt động kinh doanh và hỗ trợ kỹ thuật của bạn</p>
             </div>
-            <div class="today-badge"><i class="fa-regular fa-calendar"></i>${todayLabel}</div>
+            <div class="welcome-actions">
+                <form method="GET" action="${pageContext.request.contextPath}/dashboard" id="provinceFilterForm">
+                    <select id="filterProvince" name="provinceId" class="province-filter">
+                        <option value="">Toàn bộ 34 tỉnh/thành</option>
+                        <c:forEach var="province" items="${provinceList}">
+                            <option value="${province.provinceId}" ${provinceFilter == province.provinceId ? 'selected' : ''}>${fn:escapeXml(province.shortName)}</option>
+                        </c:forEach>
+                    </select>
+                </form>
+                <div class="today-badge"><i class="fa-regular fa-calendar"></i>${todayLabel}</div>
+            </div>
         </div>
+
+        <c:if test="${not empty provinceFilter}">
+            <div class="scope-note">
+                <i class="fa-solid fa-location-dot"></i>
+                Mọi số liệu dưới đây chỉ tính riêng địa bàn đang chọn.
+                <a href="${pageContext.request.contextPath}/dashboard">Xem toàn quốc</a>
+            </div>
+        </c:if>
 
         <!-- ===== KPI cards ===== -->
         <div class="row g-4 mb-4">
@@ -193,11 +227,11 @@
                         <a href="${pageContext.request.contextPath}/contract">Xem tất cả</a>
                     </div>
                     <table class="mini-table">
-                        <thead><tr><th>Mã HĐ</th><th>Khách hàng</th><th>Giá trị</th><th>Còn lại</th></tr></thead>
+                        <thead><tr><th>Mã HĐ</th><th>Khách hàng</th><th>Người phụ trách</th><th>Giá trị</th><th>Còn lại</th></tr></thead>
                         <tbody>
                             <c:choose>
                                 <c:when test="${empty expiringContracts}">
-                                    <tr><td colspan="4" style="text-align:center; color:#9ca3af; padding:20px 8px;">Không có hợp đồng nào sắp hết hạn.</td></tr>
+                                    <tr><td colspan="5" style="text-align:center; color:#9ca3af; padding:20px 8px;">Không có hợp đồng nào sắp hết hạn.</td></tr>
                                 </c:when>
                                 <c:otherwise>
                                     <c:forEach var="ct" items="${expiringContracts}">
@@ -207,6 +241,12 @@
                                             <td>
                                                 <c:choose>
                                                     <c:when test="${ct.enterprise != null}">${fn:escapeXml(ct.enterprise.enterpriseName)}</c:when>
+                                                    <c:otherwise>&mdash;</c:otherwise>
+                                                </c:choose>
+                                            </td>
+                                            <td>
+                                                <c:choose>
+                                                    <c:when test="${ct.owner != null}">${fn:escapeXml(ct.owner.fullName)}</c:when>
                                                     <c:otherwise>&mdash;</c:otherwise>
                                                 </c:choose>
                                             </td>
@@ -226,11 +266,11 @@
                         <a href="${pageContext.request.contextPath}/ticket">Xem tất cả</a>
                     </div>
                     <table class="mini-table">
-                        <thead><tr><th>Mã phiếu</th><th>Khách hàng</th><th>Ưu tiên</th><th>Trạng thái</th></tr></thead>
+                        <thead><tr><th>Mã phiếu</th><th>Khách hàng</th><th>Người phụ trách</th><th>Ưu tiên</th><th>Trạng thái</th></tr></thead>
                         <tbody>
                             <c:choose>
                                 <c:when test="${empty attentionTickets}">
-                                    <tr><td colspan="4" style="text-align:center; color:#9ca3af; padding:20px 8px;">Không có phiếu nào cần xử lý.</td></tr>
+                                    <tr><td colspan="5" style="text-align:center; color:#9ca3af; padding:20px 8px;">Không có phiếu nào cần xử lý.</td></tr>
                                 </c:when>
                                 <c:otherwise>
                                     <c:forEach var="tk" items="${attentionTickets}">
@@ -239,6 +279,12 @@
                                             <td>
                                                 <c:choose>
                                                     <c:when test="${tk.enterprise != null}">${fn:escapeXml(tk.enterprise.enterpriseName)}</c:when>
+                                                    <c:otherwise>&mdash;</c:otherwise>
+                                                </c:choose>
+                                            </td>
+                                            <td>
+                                                <c:choose>
+                                                    <c:when test="${tk.assignedTechnician != null}">${fn:escapeXml(tk.assignedTechnician.fullName)}</c:when>
                                                     <c:otherwise>&mdash;</c:otherwise>
                                                 </c:choose>
                                             </td>
@@ -274,6 +320,12 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script>
+        // Chọn tỉnh là nạp lại trang ngay, không cần nút "Lọc" -- giống bộ lọc
+        // ở danh sách khách hàng/hợp đồng.
+        document.getElementById('filterProvince').addEventListener('change', function () {
+            document.getElementById('provinceFilterForm').submit();
+        });
+
         // ===== Định dạng tiền tệ rút gọn (tỷ / triệu đ) =====
         function formatCompactVND(n) {
             if (isNaN(n)) return '0 đ';

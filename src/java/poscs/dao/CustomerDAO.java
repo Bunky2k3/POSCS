@@ -119,13 +119,26 @@ public class CustomerDAO {
 
     /** Đếm số khách hàng có ngày tham gia (join_date) rơi vào tháng hiện tại, phục vụ KPI dashboard. */
     public int countNewThisMonth() {
-        String sql = "SELECT COUNT(*) FROM enterprises WHERE is_deleted = 0 " +
-                     "AND YEAR(join_date) = YEAR(CURDATE()) AND MONTH(join_date) = MONTH(CURDATE())";
+        return countNewThisMonth(null);
+    }
+
+    /** Như {@link #countNewThisMonth()} nhưng chỉ đếm khách thuộc 1 tỉnh (null = toàn quốc). */
+    public int countNewThisMonth(Integer provinceId) {
+        String sql = "SELECT COUNT(*) FROM enterprises e " +
+                     "LEFT JOIN addresses a ON e.address_id = a.address_id " +
+                     "LEFT JOIN districts d ON a.districts_id = d.districts_id " +
+                     "WHERE e.is_deleted = 0 " +
+                     "AND YEAR(e.join_date) = YEAR(CURDATE()) AND MONTH(e.join_date) = MONTH(CURDATE())" +
+                     (provinceId != null ? " AND d.province_id = ?" : "");
         try (Connection conn = DBContext.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql);
-             ResultSet rs = ps.executeQuery()) {
-            if (rs.next()) {
-                return rs.getInt(1);
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            if (provinceId != null) {
+                ps.setInt(1, provinceId);
+            }
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt(1);
+                }
             }
         } catch (SQLException ex) {
             LOG.error("Loi dem khach hang moi trong thang", ex);
