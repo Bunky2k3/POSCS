@@ -54,6 +54,46 @@ handler keeps the row it read from the database and overwrites only these
 four fields, so widening the exception means adding a `set...` call there and
 nowhere else.
 
+## Planned: hierarchy-based write access for Customer/Contract
+
+**Decided with the customer on 2026-09-14. NOT implemented — the matrix
+above is still exactly what the code enforces today.** Kept here so the
+rule is written down where permissions are reviewed, but deliberately
+outside the matrix: `users` has no manager column yet, and
+`FULL_ACCESS_ROLES` still grants `Sales` Full access on both Customer and
+Contract. Do not cite this section as current behaviour.
+
+The agreed rule, on top of the role matrix rather than replacing it:
+
+- The **manager** (`quản lý vùng`, upper tier) is the one who touches data
+  — including data owned by their subordinates.
+- The **subordinate** (`nhân viên cầm tỉnh`, leaf tier, one province each)
+  is **read-only**, create included. To change anything they submit a
+  **change request** to their manager, who approves or rejects it.
+
+Scope and consequences worth knowing before implementing:
+
+- **Customer and Contract only.** Ticket and Product are untouched — in
+  particular the `Kỹ thuật` exception documented above still stands, so an
+  assigned technician keeps writing `status`, `resolutionSummary`,
+  `rootCause` and `causeCategory` on their own ticket. A technician being
+  somebody's subordinate does not make them read-only on tickets.
+- **This moves permissions onto a second axis.** Today the only question is
+  *which role*; this adds *who owns the row* (`contracts.owner_id`) and
+  *who manages whom*, so the checks become row-level rather than a lookup
+  in `FULL_ACCESS_ROLES`. The existing `canUpdateAssignedTicket` is the
+  closest precedent in shape, though much narrower in reach.
+- **Change requests must carry an intent, not a diff.** Because creation is
+  gated too, a request to add a customer has no existing row to point at —
+  the record it proposes has to live in the request itself. Model it as
+  `CREATE` / `UPDATE` / `DELETE` intent; a diff-only design cannot express
+  the create case and would have to be rebuilt.
+- **Safe by default at rollout.** With no manager recorded, nobody is a
+  subordinate and nobody loses access — the restriction only takes effect
+  for users who actually get a manager assigned. Filling in the real org
+  chart is what switches it on, and that data is still pending from the
+  customer.
+
 ## Notes for implementation
 
 - Enforce this per-controller (e.g. `CustomerController` checks the
