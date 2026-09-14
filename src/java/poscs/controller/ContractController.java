@@ -991,7 +991,12 @@ public class ContractController extends HttpServlet {
      */
     static void setPeriodAttributes(HttpServletRequest request, Period period) {
         request.setAttribute("yearList", Period.availableYears());
-        request.setAttribute("yearFilter", request.getParameter("year"));
+        // Đổ ra năm ĐÃ PHÂN TÍCH (số), không phải chuỗi thô trên URL: JSP so
+        // ${yearFilter == y} với từng số năm trong dropdown, mà EL gặp chuỗi
+        // không phải số thì ném luôn ELException lúc ép kiểu -- gõ tay
+        // ?year=abcd là cả trang danh sách trắng thành trang lỗi. Không phân
+        // tích được thì coi như không lọc, đúng như Period.parse đã làm.
+        request.setAttribute("yearFilter", period != null ? period.getYear() : null);
         request.setAttribute("periodFilter", request.getParameter("period"));
         request.setAttribute("periodLabel", period != null ? period.getLabel() : null);
     }

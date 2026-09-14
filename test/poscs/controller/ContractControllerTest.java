@@ -10,6 +10,7 @@ import jakarta.servlet.http.HttpSession;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.ArgumentCaptor;
+import poscs.common.Period;
 import poscs.dao.AddressDAO;
 import poscs.dao.ContractDAO;
 import poscs.dao.CustomerDAO;
@@ -452,6 +453,33 @@ public class ContractControllerTest {
 
         verify(contractDAO, never()).update(any(Contract.class));
         verify(response).sendRedirect(CONTEXT_PATH + "/contract?error=notfound");
+    }
+
+    // ------------------------------------------------------------------
+    // Bộ lọc kỳ -- giá trị đổ ra JSP
+    // ------------------------------------------------------------------
+
+    /**
+     * yearFilter phải là SỐ (hoặc null), không được là chuỗi thô trên URL. JSP
+     * so ${yearFilter == y} với từng số năm trong dropdown; EL gặp chuỗi không
+     * phải số thì ném ELException ngay lúc ép kiểu và cả trang danh sách biến
+     * thành trang lỗi -- chỉ cần ai đó gõ tay ?year=abcd. Đã dính thật khi rà
+     * lại bộ lọc trên bản chạy.
+     */
+    @Test
+    public void periodAttributes_garbageYear_exposesNullInsteadOfRawString() {
+        ContractController.setPeriodAttributes(request, Period.parse("abcd", "q2"));
+
+        verify(request).setAttribute("yearFilter", null);
+        verify(request).setAttribute("periodLabel", null);
+    }
+
+    @Test
+    public void periodAttributes_validYear_exposesItAsNumber() {
+        ContractController.setPeriodAttributes(request, Period.parse("2026", "q2"));
+
+        verify(request).setAttribute("yearFilter", 2026);
+        verify(request).setAttribute("periodLabel", "Quý 2/2026");
     }
 
 }
