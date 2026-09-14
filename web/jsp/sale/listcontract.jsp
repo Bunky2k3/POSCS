@@ -115,14 +115,6 @@
         .custom-table th:nth-child(7), .custom-table td:nth-child(7) { width: 12%; }  /* Thao tác */
         .custom-table td.cell-wrap { white-space: normal; }
         .cell-2line { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
-        /* Bảng rộng hơn khung thì phải kéo ngang -- ghim cột Thao tác dính bên
-           phải để lúc nào cũng bấm được, không phải kéo đi kéo lại từng dòng. */
-        .custom-table th:last-child, .custom-table td:last-child {
-            position: sticky; right: 0; background: #fff;
-            box-shadow: -6px 0 8px -6px rgba(0, 40, 80, 0.16);
-        }
-        .custom-table thead th:last-child { background: #f8fafc; }
-        .custom-table tbody tr:hover td:last-child { background: #f9fdff; }
         .cell-sub { font-size: 0.74rem; color: #6b7280; line-height: 1.35; }
         .prov-tag { font-weight: 700; color: var(--primary-dark); }
         .term-cell { font-variant-numeric: tabular-nums; color: #4b5563; font-size: 0.76rem; }
