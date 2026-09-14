@@ -266,6 +266,15 @@
                 <c:if test="${canManage}">
                     <a href="${pageContext.request.contextPath}/customer?action=new" class="btn-add"><i class="fa-solid fa-plus"></i> Thêm khách hàng</a>
                 </c:if>
+                <%-- Cấp dưới không có nút "Thêm" vì không được ghi (V16), nhưng
+                     không được để họ cụt đường: đây là lối gửi yêu cầu lên cấp
+                     trên. Điều kiện là CÓ CẤP TRÊN chứ không phải "không có
+                     canManage" -- người chỉ View only vì vai trò (Kỹ thuật,
+                     CSKH) thì vốn không dính gì tới cây tổ chức, hiện nút này
+                     ra chỉ làm họ bối rối. --%>
+                <c:if test="${!canManage && sessionScope.currentUser.subordinate}">
+                    <a href="${pageContext.request.contextPath}/changerequest?action=new&resourceType=Khách hàng&intent=Tạo mới" class="btn-outline-action"><i class="fa-solid fa-paper-plane"></i> Gửi yêu cầu</a>
+                </c:if>
             </div>
         </div>
 

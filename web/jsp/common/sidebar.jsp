@@ -17,6 +17,11 @@
     <a href="${pageContext.request.contextPath}/product" class="sidebar-link ${activeNav == 'product' ? 'active' : ''}"><i class="fa-solid fa-box"></i><span>Sản phẩm</span></a>
     <a href="${pageContext.request.contextPath}/ticket" class="sidebar-link ${activeNav == 'ticket' ? 'active' : ''}"><i class="fa-solid fa-headset"></i><span>Phiếu hỗ trợ</span></a>
     <c:if test="${sessionScope.currentUser.role.roleName == 'Admin'}"><a href="${pageContext.request.contextPath}/employee" class="sidebar-link ${activeNav == 'employee' ? 'active' : ''}"><i class="fa-solid fa-user-tie"></i><span>Nhân viên</span></a></c:if>
+    <%-- Yêu cầu thay đổi: hiện cho MỌI vai, vì cùng một trang phục vụ hai
+         phía -- cấp dưới theo dõi yêu cầu mình gửi, cấp trên duyệt yêu cầu của
+         cấp dưới. Người chưa xếp vào cây tổ chức mở ra thấy danh sách rỗng,
+         đúng chứ không phải lỗi. --%>
+    <a href="${pageContext.request.contextPath}/changerequest" class="sidebar-link ${activeNav == 'changerequest' ? 'active' : ''}"><i class="fa-solid fa-inbox"></i><span>Yêu cầu thay đổi</span></a>
     <%-- Nhật ký hệ thống: chỉ Admin. Ẩn ở đây chỉ là cho gọn menu -- chặn thật
          nằm ở AccessControl.requireAdmin trong SystemLogController. --%>
     <c:if test="${sessionScope.currentUser.role.roleName == 'Admin'}"><a href="${pageContext.request.contextPath}/systemLog" class="sidebar-link ${activeNav == 'systemLog' ? 'active' : ''}"><i class="fa-solid fa-file-lines"></i><span>Nhật ký</span></a></c:if>
