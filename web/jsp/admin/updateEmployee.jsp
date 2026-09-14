@@ -134,6 +134,26 @@
                                 </c:forEach>
                             </select>
                         </div>
+                        <%--
+                          Địa bàn phụ trách: những tỉnh người này trực tiếp cầm.
+                          Danh sách đã lọc sẵn tỉnh chưa ai cầm (cộng tỉnh của
+                          chính họ), vì khách hàng chốt "một tỉnh một người" và
+                          CSDL cũng ràng buộc bằng UNIQUE -- không lọc thì ô chọn
+                          mời người dùng cướp tỉnh của đồng nghiệp rồi ăn lỗi.
+
+                          CHỈ điền cho tầng lá. Địa bàn của quản lý vùng không
+                          nhập tay mà suy ra bằng cách gộp địa bàn của cấp dưới
+                          (xem TerritoryDAO.findProvincesManagedBy) -- nhập cả
+                          hai tầng là tạo hai nguồn sự thật rồi có ngày lệch nhau.
+                        --%>
+                        <div class="col-12 field-row">
+                            <label for="provinceIds">Địa bàn phụ trách <span class="text-muted" style="text-transform: none; font-weight: 400;">(giữ Ctrl để chọn nhiều tỉnh)</span></label>
+                            <select class="form-select" id="provinceIds" name="provinceIds" multiple size="6">
+                                <c:forEach var="p" items="${selectableProvinces}">
+                                    <option value="${p.provinceId}" <c:forEach var="ap" items="${assignedProvinces}">${ap.provinceId == p.provinceId ? 'selected' : ''}</c:forEach>>${fn:escapeXml(p.provinceName)}</option>
+                                </c:forEach>
+                            </select>
+                        </div>
                     </div>
 
                     <!-- ===== Thông tin cá nhân ===== -->

@@ -54,6 +54,7 @@ public class CustomerController extends HttpServlet {
 
     private final CustomerDAO customerDAO = new CustomerDAO();
     private final EmployeeDAO employeeDAO = new EmployeeDAO();
+    private final poscs.dao.TerritoryDAO territoryDAO = new poscs.dao.TerritoryDAO();
     private final AddressDAO addressDAO = new AddressDAO();
     private final ContractDAO contractDAO = new ContractDAO();
     private final TechnicalSupportTicketDAO ticketDAO = new TechnicalSupportTicketDAO();
@@ -182,6 +183,10 @@ public class CustomerController extends HttpServlet {
         }
         request.setAttribute("userList", employeeDAO.findAllActive());
         request.setAttribute("provinceList", addressDAO.findBranchProvinces());
+        // Phân công địa bàn, để form tự điền sẵn người phụ trách khi chọn tỉnh.
+        // Nhúng cả bảng (34 tỉnh) một lần thay vì gọi AJAX mỗi lần đổi ô tỉnh
+        // -- dữ liệu nhỏ, và đỡ hẳn một endpoint phải gác quyền riêng.
+        request.setAttribute("territoryAssignments", territoryDAO.findAllAssignments());
         request.getRequestDispatcher(CREATE_VIEW).forward(request, response);
     }
 

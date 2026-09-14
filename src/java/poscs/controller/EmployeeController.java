@@ -50,6 +50,7 @@ public class EmployeeController extends HttpServlet {
             "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
 
     private final EmployeeDAO employeeDAO = new EmployeeDAO();
+    private final poscs.dao.TerritoryDAO territoryDAO = new poscs.dao.TerritoryDAO();
     private final AddressDAO addressDAO = new AddressDAO();
 
     @Override
@@ -151,6 +152,11 @@ public class EmployeeController extends HttpServlet {
         // JSTL format sai với java.sql.Date (luôn ra "yyyy-MM-dd" bất kể pattern).
         request.setAttribute("dateOfBirthText", formatDate(employee.getDateOfBirth()));
         request.setAttribute("hireDateText", formatDate(employee.getHireDate()));
+        // Địa bàn trực tiếp cầm, và -- nếu người này là cấp trên -- địa bàn
+        // suy ra từ cấp dưới. Hai thứ khác nhau nên hiện tách bạch: tầng lá
+        // cầm tỉnh, quản lý vùng KHÔNG nhập tay mà bao phủ theo cấp dưới.
+        request.setAttribute("assignedProvinces", territoryDAO.findProvincesOf(id));
+        request.setAttribute("managedProvinces", territoryDAO.findProvincesManagedBy(id));
         request.getRequestDispatcher(DETAIL_VIEW).forward(request, response);
     }
 
@@ -163,6 +169,7 @@ public class EmployeeController extends HttpServlet {
     private void showCreateForm(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
         request.setAttribute("managerList", employeeDAO.findEligibleManagers(null));
+        request.setAttribute("selectableProvinces", territoryDAO.findSelectableProvinces(null));
         request.setAttribute("roleList", employeeDAO.findAllRoles());
         request.setAttribute("departmentList", employeeDAO.findAllDepartments());
         request.setAttribute("provinceList", addressDAO.findAllProvinces());
@@ -179,6 +186,8 @@ public class EmployeeController extends HttpServlet {
         }
         request.setAttribute("employee", employee);
         request.setAttribute("managerList", employeeDAO.findEligibleManagers(id));
+        request.setAttribute("selectableProvinces", territoryDAO.findSelectableProvinces(id));
+        request.setAttribute("assignedProvinces", territoryDAO.findProvincesOf(id));
         request.setAttribute("roleList", employeeDAO.findAllRoles());
         request.setAttribute("departmentList", employeeDAO.findAllDepartments());
         request.setAttribute("provinceList", addressDAO.findAllProvinces());
@@ -223,6 +232,9 @@ public class EmployeeController extends HttpServlet {
         u.setPasswordHash(BCrypt.hashpw(generateTempPassword(), BCrypt.gensalt()));
 
         int newId = employeeDAO.insert(u);
+        if (newId > 0) {
+            territoryDAO.replaceProvincesOf(newId, parseIntList(request.getParameterValues("provinceIds")));
+        }
         if (newId <= 0) {
             LOG.warn("Tao nhan vien that bai (actor={}, username={})", Logs.actor(request), u.getUsername());
             response.sendRedirect(request.getContextPath() + "/employee?action=new&error=create_failed");
@@ -310,6 +322,10 @@ public class EmployeeController extends HttpServlet {
         }
 
         boolean ok = employeeDAO.update(u);
+        if (ok) {
+            // Địa bàn lưu ở bảng riêng nên phải ghi tách khỏi hồ sơ nhân viên.
+            territoryDAO.replaceProvincesOf(id, parseIntList(request.getParameterValues("provinceIds")));
+        }
         if (!ok) {
             LOG.warn("Cap nhat nhan vien that bai (actor={}, userId={})", Logs.actor(request), id);
             response.sendRedirect(request.getContextPath() + "/employee?action=edit&id=" + id + "&error=update_failed");
@@ -464,6 +480,21 @@ public class EmployeeController extends HttpServlet {
 
     private boolean isValidEmail(String email) {
         return email.matches("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$");
+    }
+
+    /** Danh sách id từ ô chọn nhiều; bỏ qua giá trị rỗng/không phải số. */
+    private java.util.List<Integer> parseIntList(String[] values) {
+        java.util.List<Integer> result = new java.util.ArrayList<>();
+        if (values == null) {
+            return result;
+        }
+        for (String value : values) {
+            Integer parsed = parseIntOrNull(value);
+            if (parsed != null) {
+                result.add(parsed);
+            }
+        }
+        return result;
     }
 
     private Integer parseIntOrNull(String value) {
