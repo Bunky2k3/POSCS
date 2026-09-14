@@ -181,7 +181,7 @@ public class ContractController extends HttpServlet {
 
         request.setAttribute("contractList", contractList);
         request.setAttribute("statusSummary", statusSummary);
-        request.setAttribute("provinceList", addressDAO.findAllProvinces());
+        request.setAttribute("provinceList", addressDAO.findBranchProvinces());
         request.setAttribute("currentPage", page);
         request.setAttribute("totalPages", totalPages);
         request.setAttribute("totalCount", totalCount);

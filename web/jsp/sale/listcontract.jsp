@@ -7,7 +7,7 @@
       - contractList  : List<poscs.model.Contract> (mỗi Contract có sẵn .enterprise và .owner đã join,
                          .status đã được tính lại theo BR-17)
       - statusSummary : Map<String,Integer> đếm số hợp đồng theo từng trạng thái, phục vụ dải KPI
-      - provinceList  : List<poscs.model.Province> (34 tỉnh/thành, để đổ dropdown lọc "Tỉnh/Thành")
+      - provinceList  : List<poscs.model.Province> (18 tỉnh địa bàn chi nhánh, để đổ dropdown lọc "Tỉnh/Thành")
       - currentPage, totalPages, totalCount : thông tin phân trang
       - keyword, statusFilter, typeFilter, provinceFilter : giá trị filter hiện tại (để giữ lại lúc submit lại form)
 --%>
@@ -192,7 +192,7 @@
                 <option value="Bảo trì bảo dưỡng" ${typeFilter == 'Bảo trì bảo dưỡng' ? 'selected' : ''}>Bảo trì bảo dưỡng</option>
             </select>
             <select id="filterProvince" name="provinceId">
-                <option value="">Tất cả tỉnh/thành</option>
+                <option value="">Tất cả tỉnh địa bàn</option>
                 <c:forEach var="province" items="${provinceList}">
                     <option value="${province.provinceId}" ${provinceFilter == province.provinceId ? 'selected' : ''}>${fn:escapeXml(province.shortName)}</option>
                 </c:forEach>

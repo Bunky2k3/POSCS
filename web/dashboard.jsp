@@ -122,7 +122,7 @@
             <div class="welcome-actions">
                 <form method="GET" action="${pageContext.request.contextPath}/dashboard" id="provinceFilterForm">
                     <select id="filterProvince" name="provinceId" class="province-filter">
-                        <option value="">Toàn bộ 34 tỉnh/thành</option>
+                        <option value="">Toàn bộ 18 tỉnh địa bàn</option>
                         <c:forEach var="province" items="${provinceList}">
                             <option value="${province.provinceId}" ${provinceFilter == province.provinceId ? 'selected' : ''}>${fn:escapeXml(province.shortName)}</option>
                         </c:forEach>

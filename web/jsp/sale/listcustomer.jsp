@@ -6,7 +6,7 @@
     Servlet cần đặt các request attribute sau trước khi forward tới trang này:
       - customerList : List<poscs.model.Enterprise>  (mỗi Enterprise nên có sẵn .address.district.province và .accountOwner đã join)
       - userList      : List<poscs.model.User>        (toàn bộ nhân viên, để đổ dropdown lọc "Người phụ trách")
-      - provinceList  : List<poscs.model.Province>    (34 tỉnh/thành, để đổ dropdown lọc "Tỉnh/Thành")
+      - provinceList  : List<poscs.model.Province>    (18 tỉnh địa bàn chi nhánh, để đổ dropdown lọc "Tỉnh/Thành")
       - currentPage, totalPages, totalCount : thông tin phân trang (BR-12)
       - keyword, typeFilter, assigneeFilter, provinceFilter : giá trị filter hiện tại (để giữ lại lúc submit lại form tìm kiếm)
 --%>
@@ -243,7 +243,7 @@
                 </c:forEach>
             </select>
             <select id="filterProvince" name="provinceId">
-                <option value="">Tất cả tỉnh/thành</option>
+                <option value="">Tất cả tỉnh địa bàn</option>
                 <c:forEach var="province" items="${provinceList}">
                     <option value="${province.provinceId}" ${provinceFilter == province.provinceId ? 'selected' : ''}>${fn:escapeXml(province.shortName)}</option>
                 </c:forEach>

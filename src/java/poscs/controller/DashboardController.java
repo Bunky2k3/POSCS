@@ -59,11 +59,11 @@ public class DashboardController extends HttpServlet {
             throws ServletException, IOException {
         LocalDate today = LocalDate.now();
 
-        // Bộ lọc địa bàn: null = toàn bộ 34 tỉnh. Lọc áp cho TẤT CẢ số liệu
-        // trên trang, không riêng vài ô -- nửa lọc nửa không thì KPI "15 hợp
-        // đồng" nằm cạnh bảng chỉ có 4 dòng, người đọc không biết tin số nào.
+        // Bộ lọc địa bàn: null = toàn bộ 18 tỉnh của chi nhánh. Lọc áp cho TẤT
+        // CẢ số liệu trên trang, không riêng vài ô -- nửa lọc nửa không thì KPI
+        // "15 hợp đồng" nằm cạnh bảng chỉ có 4 dòng, không biết tin số nào.
         Integer provinceFilter = parseIntOrNull(request.getParameter("provinceId"));
-        request.setAttribute("provinceList", addressDAO.findAllProvinces());
+        request.setAttribute("provinceList", addressDAO.findBranchProvinces());
         request.setAttribute("provinceFilter", provinceFilter);
 
         // Bộ lọc kỳ (tháng/quý). Mỗi ô lấy mốc ngày riêng của loại dữ liệu đó:

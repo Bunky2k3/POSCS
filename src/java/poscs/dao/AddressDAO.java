@@ -5,8 +5,11 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -68,6 +71,67 @@ public class AddressDAO {
             return result;
         }
         provincesCache = result;
+        return result;
+    }
+
+    /**
+     * 18 tỉnh/thành thuộc địa bàn Chi nhánh Miền Bắc -- từ Hà Tĩnh trở ra,
+     * theo đúng danh sách 34 tỉnh sau sáp nhập 1/7/2025 (xem V3).
+     *
+     * Ghi bằng TÊN chứ không phải province_id: id phụ thuộc thứ tự chèn của
+     * file seed, đọc "Tỉnh Hà Tĩnh" thì biết ngay đúng sai còn đọc "16" thì
+     * không. Đây cũng là chỗ duy nhất phải sửa nếu địa bàn chi nhánh đổi.
+     */
+    private static final Set<String> BRANCH_PROVINCE_NAMES = new LinkedHashSet<>(Arrays.asList(
+            "Thành phố Hà Nội", "Thành phố Hải Phòng",
+            "Tỉnh Bắc Ninh", "Tỉnh Cao Bằng", "Tỉnh Điện Biên", "Tỉnh Hà Tĩnh", "Tỉnh Hưng Yên",
+            "Tỉnh Lai Châu", "Tỉnh Lạng Sơn", "Tỉnh Lào Cai", "Tỉnh Nghệ An", "Tỉnh Ninh Bình",
+            "Tỉnh Phú Thọ", "Tỉnh Quảng Ninh", "Tỉnh Sơn La", "Tỉnh Thái Nguyên",
+            "Tỉnh Thanh Hóa", "Tỉnh Tuyên Quang"));
+
+    /**
+     * Danh sách tỉnh cho MỌI dropdown liên quan tới khách hàng/hợp đồng/báo
+     * cáo: chỉ 18 tỉnh địa bàn chi nhánh, không phải cả 34 tỉnh toàn quốc.
+     *
+     * Địa chỉ cá nhân của nhân viên (hồ sơ, quản lý nhân sự) vẫn dùng
+     * findAllProvinces() -- nhân viên chi nhánh miền Bắc vẫn có thể có hộ khẩu
+     * ở bất kỳ đâu, đó là dữ liệu nhân sự chứ không phải địa bàn kinh doanh.
+     */
+    public List<Province> findBranchProvinces() {
+        List<Province> result = new ArrayList<>();
+        for (Province p : findAllProvinces()) {
+            if (BRANCH_PROVINCE_NAMES.contains(p.getProvinceName())) {
+                result.add(p);
+            }
+        }
+        return result;
+    }
+
+    /**
+     * Như {@link #findBranchProvinces()} nhưng giữ thêm tỉnh đang được bản ghi
+     * sử dụng dù nằm ngoài địa bàn -- dùng cho form SỬA.
+     *
+     * Lý do: dữ liệu tạo từ trước khi giới hạn địa bàn (hoặc nhập nhầm) có thể
+     * trỏ tới tỉnh ngoài miền Bắc. Nếu dropdown không có tỉnh đó thì mở form
+     * sửa lên, ô tỉnh hiện trống, bấm lưu là ghi đè mất địa chỉ cũ dù người
+     * dùng chỉ định sửa số điện thoại.
+     */
+    public List<Province> findBranchProvincesIncluding(Integer provinceId) {
+        List<Province> result = findBranchProvinces();
+        if (provinceId == null) {
+            return result;
+        }
+        for (Province p : result) {
+            if (p.getProvinceId() == provinceId) {
+                return result;
+            }
+        }
+        for (Province p : findAllProvinces()) {
+            if (p.getProvinceId() == provinceId) {
+                result.add(p);
+                break;
+            }
+        }
         return result;
     }
 

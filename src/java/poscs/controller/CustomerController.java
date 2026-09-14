@@ -140,7 +140,7 @@ public class CustomerController extends HttpServlet {
 
         request.setAttribute("customerList", customerList);
         request.setAttribute("userList", employeeDAO.findAllActive());
-        request.setAttribute("provinceList", addressDAO.findAllProvinces());
+        request.setAttribute("provinceList", addressDAO.findBranchProvinces());
         request.setAttribute("currentPage", page);
         request.setAttribute("totalPages", totalPages);
         request.setAttribute("totalCount", totalCount);
@@ -181,7 +181,7 @@ public class CustomerController extends HttpServlet {
             return;
         }
         request.setAttribute("userList", employeeDAO.findAllActive());
-        request.setAttribute("provinceList", addressDAO.findAllProvinces());
+        request.setAttribute("provinceList", addressDAO.findBranchProvinces());
         request.getRequestDispatcher(CREATE_VIEW).forward(request, response);
     }
 
@@ -201,7 +201,13 @@ public class CustomerController extends HttpServlet {
 
         request.setAttribute("customer", customer);
         request.setAttribute("userList", employeeDAO.findAllActive());
-        request.setAttribute("provinceList", addressDAO.findAllProvinces());
+        // Khách cũ có thể nằm ngoài 18 tỉnh địa bàn -- giữ tỉnh đó trong danh
+        // sách, nếu không thì mở form sửa lên ô tỉnh trống và bấm lưu là mất
+        // địa chỉ dù người dùng chỉ định sửa số điện thoại.
+        Integer currentProvinceId = customer.getAddress() != null && customer.getAddress().getDistrict() != null
+                ? customer.getAddress().getDistrict().getProvinceId()
+                : null;
+        request.setAttribute("provinceList", addressDAO.findBranchProvincesIncluding(currentProvinceId));
         request.getRequestDispatcher(UPDATE_VIEW).forward(request, response);
     }
 
