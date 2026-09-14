@@ -146,10 +146,10 @@ public final class AccessControl {
      *
      * Hàm này chỉ trả lời "có phải kỹ thuật viên của đúng phiếu này không";
      * DANH SÁCH CỘT được sửa nằm ở TechnicalSupportTicketController.
-     * handleUpdate (hiện là status, resolution_summary, root_cause,
-     * cause_category -- xem PERMISSIONS.md). Hai cột nguyên nhân nằm trong
-     * danh sách đó vì theo yêu cầu khách hàng, nguyên nhân sự cố là phần do
-     * chính nhân viên kỹ thuật đánh giá.
+     * handleUpdate (hiện là status, root_cause, cause_category, handling_plan,
+     * resolution_summary -- xem PERMISSIONS.md). Ba cột nguyên nhân/phương
+     * hướng nằm trong danh sách đó vì theo yêu cầu khách hàng, cả mạch chẩn
+     * đoán lẫn hướng xử lý đều là phần do chính nhân viên kỹ thuật đánh giá.
      */
     public static boolean canUpdateAssignedTicket(HttpServletRequest request, TechnicalRequest ticket) {
         User user = currentUser(request);

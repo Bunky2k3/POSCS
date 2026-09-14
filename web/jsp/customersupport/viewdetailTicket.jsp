@@ -285,10 +285,13 @@
                     </c:choose>
                 </span>
             </div>
-            <%-- Nguyên nhân đứng TRƯỚC kết quả: khách yêu cầu phiếu đọc được
-                 thành mạch hiện tượng -> nguyên nhân -> kết quả. Nhóm nguyên
-                 nhân là giá trị ngắn chọn từ danh sách nên bám vào nhãn, cho
-                 nó xuống dòng riêng chỉ tốn một khoảng trống. --%>
+            <%-- Ba mục theo đúng mạch khách yêu cầu: nguyên nhân -> phương
+                 hướng xử lý -> kết quả. Mỗi mục một ô riêng, KHÔNG gộp vào
+                 nhau và cũng không kể lại trong "Lịch sử xử lý" bên dưới --
+                 lịch sử chỉ trả lời "vì sao lúc đó đổi trạng thái".
+
+                 Nhóm nguyên nhân là giá trị ngắn chọn từ danh sách nên bám
+                 vào nhãn, cho nó xuống dòng riêng chỉ tốn một khoảng trống. --%>
             <%-- Giá trị viết thẳng bằng EL, KHÔNG tách <c:choose> ra nhiều
                  dòng: ô này để white-space: pre-wrap (cần thiết, để giữ xuống
                  dòng người dùng gõ), nên chính khoảng trắng thụt lề của mã
@@ -297,6 +300,10 @@
             <div class="field-row">
                 <label>Nguyên nhân sự cố<c:if test="${not empty ticket.causeCategory}"><span class="cause-tag">${fn:escapeXml(ticket.causeCategory)}</span></c:if></label>
                 <div class="view-value text-block">${not empty ticket.rootCause ? fn:escapeXml(ticket.rootCause) : 'Kỹ thuật viên chưa đánh giá nguyên nhân.'}</div>
+            </div>
+            <div class="field-row">
+                <label>Phương hướng xử lý</label>
+                <div class="view-value text-block">${not empty ticket.handlingPlan ? fn:escapeXml(ticket.handlingPlan) : 'Kỹ thuật viên chưa đưa ra phương hướng xử lý.'}</div>
             </div>
             <div class="field-row" style="margin-bottom: 0;">
                 <label>Kết quả xử lý</label>

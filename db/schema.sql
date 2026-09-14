@@ -4397,6 +4397,7 @@ CREATE TABLE `technicalrequests` (
   `description` text COLLATE utf8mb4_unicode_ci,
   `root_cause` text COLLATE utf8mb4_unicode_ci,
   `cause_category` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `handling_plan` text COLLATE utf8mb4_unicode_ci,
   `is_warranty` tinyint(1) NOT NULL DEFAULT '1',
   `status` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'Mới tiếp nhận',
   `resolution_summary` text COLLATE utf8mb4_unicode_ci,
@@ -4815,6 +4816,43 @@ INSERT INTO technicalrequests (ticket_code, enterprise_id, contract_id, ticket_t
 INSERT INTO technicalrequests (ticket_code, enterprise_id, contract_id, ticket_type, priority, reception_channel, sla_deadline, assigned_technician_id, created_by, created_date, description, root_cause, cause_category, is_warranty, status, resolution_summary, resolved_at) VALUES
 ('TK-0016', (SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0012'), (SELECT contract_id FROM contracts WHERE contract_code = 'HD-0014'), 'Bảo trì', 'Bình thường', 'Email', '2026-08-31 17:00:00', (SELECT user_id FROM users WHERE username = 'kythuat5'), (SELECT user_id FROM users WHERE username = 'cskh2'), '2026-08-24', 'Kiểm tra hệ thống nguồn sau sự cố mất điện lưới diện rộng toàn khu vực.', 'Mất điện lưới kéo dài 11 giờ, vượt mức dự phòng 8 giờ mà hệ thống ắc quy được thiết kế để gánh.', 'Khác', 0, 'Đã đóng', 'Đã nạp lại toàn bộ ắc quy, đo dung lượng còn 94 phần trăm và khuyến nghị bổ sung thêm 2 bình.', '2026-08-28 17:00:00');
 
+-- ===== 2. Điền phương hướng xử lý cho dữ liệu demo =====
+-- Chỉ những phiếu đã có nguyên nhân mới có phương hướng: chưa biết vì sao
+-- hỏng thì cũng chưa định được làm gì.
+UPDATE technicalrequests SET handling_plan =
+  'Thay ngăn ắc quy bị nứt, nạp cân bằng lại cả khối rồi đo kiểm tải 2 giờ trước khi bàn giao.'
+  WHERE ticket_code = 'TK-0001';
+UPDATE technicalrequests SET handling_plan =
+  'Tháo toàn bộ hộp đấu nối tại 12 điểm, lắp lại gioăng đúng chiều và thử kín nước trước khi đóng điện.'
+  WHERE ticket_code = 'TK-0003';
+UPDATE technicalrequests SET handling_plan =
+  'Đặt quạt tản nhiệt thay thế theo đúng mã, thay trong khung giờ thấp điểm để không phải ngắt tải.'
+  WHERE ticket_code = 'TK-0005';
+UPDATE technicalrequests SET handling_plan =
+  'Thay mới cả 4 bình cùng lúc để tránh lệch nội trở giữa bình cũ và bình mới, sau đó cân bằng điện áp.'
+  WHERE ticket_code = 'TK-0006';
+UPDATE technicalrequests SET handling_plan =
+  'Hạ cáp tại 2 điểm treo sai, nắn lại theo đúng bán kính uốn cho phép rồi đo OTDR nghiệm thu.'
+  WHERE ticket_code = 'TK-0007';
+UPDATE technicalrequests SET handling_plan =
+  'Đổi bộ chia quang mới theo chính sách bảo hành vận chuyển, đồng thời siết lại quy cách chèn lót cho lô sau.'
+  WHERE ticket_code = 'TK-0010';
+UPDATE technicalrequests SET handling_plan =
+  'Chỉnh khung đỡ về đúng 25 độ và dịch giàn pin 1,5 mét ra khỏi vùng bóng cột anten.'
+  WHERE ticket_code = 'TK-0011';
+UPDATE technicalrequests SET handling_plan =
+  'Thay module rectifier mới từ kho dự phòng, gửi module lỗi về hãng đổi bảo hành và theo dõi các module cùng lô.'
+  WHERE ticket_code = 'TK-0012';
+UPDATE technicalrequests SET handling_plan =
+  'Đổi cuộn cáp mới cho đại lý, phổ biến lại giới hạn xếp chồng 4 tầng cho đơn vị vận chuyển.'
+  WHERE ticket_code = 'TK-0014';
+UPDATE technicalrequests SET handling_plan =
+  'Vệ sinh và thay tiếp điểm contactor, bổ sung gioăng kín tủ; đề xuất khách chuyển sang thiết bị có cấp bảo vệ cao hơn.'
+  WHERE ticket_code = 'TK-0015';
+UPDATE technicalrequests SET handling_plan =
+  'Nạp lại toàn bộ ắc quy và đo dung lượng thực tế, lập báo cáo khuyến nghị bổ sung số bình còn thiếu.'
+  WHERE ticket_code = 'TK-0016';
+
 -- ===== Lịch sử đổi trạng thái =====
 -- Dòng đầu mỗi phiếu có from_status rỗng = mốc lập phiếu, đúng quy ước mà
 -- viewdetailTicket.jsp đang dựa vào để hiện chữ "Tạo phiếu".
@@ -4823,7 +4861,7 @@ INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_
 INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_by, changed_at, internal_note) VALUES
 ((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0001'), 'Mới tiếp nhận', 'Đang xử lý', (SELECT user_id FROM users WHERE username = 'kythuat2'), '2026-09-10 13:30:00', 'Kỹ thuật viên lên trạm kiểm tra.');
 INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_by, changed_at, internal_note) VALUES
-((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0001'), 'Đang xử lý', 'Đã đóng', (SELECT user_id FROM users WHERE username = 'kythuat2'), '2026-09-12 16:30:00', 'Xác định do va đập khi vận chuyển, đã thay ngăn hỏng và nghiệm thu.');
+((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0001'), 'Đang xử lý', 'Đã đóng', (SELECT user_id FROM users WHERE username = 'kythuat2'), '2026-09-12 16:30:00', 'Đã xử lý xong, khách nghiệm thu và đồng ý đóng phiếu.');
 INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_by, changed_at, internal_note) VALUES
 ((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0002'), '', 'Mới tiếp nhận', (SELECT user_id FROM users WHERE username = 'cskh4'), '2026-09-05 09:00:00', 'Tiếp nhận phiếu.');
 INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_by, changed_at, internal_note) VALUES
@@ -4833,7 +4871,7 @@ INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_
 INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_by, changed_at, internal_note) VALUES
 ((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0003'), '', 'Mới tiếp nhận', (SELECT user_id FROM users WHERE username = 'cskh2'), '2026-09-11 09:00:00', 'Khách báo sự cố diện rộng sau bão.');
 INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_by, changed_at, internal_note) VALUES
-((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0003'), 'Mới tiếp nhận', 'Đang xử lý', (SELECT user_id FROM users WHERE username = 'kythuat3'), '2026-09-11 10:15:00', 'Đã khảo sát 12 điểm, xác định nguyên nhân do lắp sai gioăng.');
+((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0003'), 'Mới tiếp nhận', 'Đang xử lý', (SELECT user_id FROM users WHERE username = 'kythuat3'), '2026-09-11 10:15:00', 'Kỹ thuật viên nhận phiếu và bắt đầu xử lý.');
 INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_by, changed_at, internal_note) VALUES
 ((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0004'), '', 'Mới tiếp nhận', (SELECT user_id FROM users WHERE username = 'sales4'), '2026-09-02 09:00:00', 'Yêu cầu tư vấn từ website.');
 INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_by, changed_at, internal_note) VALUES
@@ -4843,17 +4881,17 @@ INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_
 INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_by, changed_at, internal_note) VALUES
 ((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0005'), '', 'Mới tiếp nhận', (SELECT user_id FROM users WHERE username = 'cskh3'), '2026-09-09 09:00:00', 'Tiếp nhận phiếu.');
 INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_by, changed_at, internal_note) VALUES
-((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0005'), 'Mới tiếp nhận', 'Đang xử lý', (SELECT user_id FROM users WHERE username = 'kythuat4'), '2026-09-09 14:00:00', 'Đo kiểm tại chỗ, nghi quạt tản nhiệt hỏng bạc đạn.');
+((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0005'), 'Mới tiếp nhận', 'Đang xử lý', (SELECT user_id FROM users WHERE username = 'kythuat4'), '2026-09-09 14:00:00', 'Kỹ thuật viên nhận phiếu và bắt đầu xử lý.');
 INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_by, changed_at, internal_note) VALUES
 ((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0006'), '', 'Mới tiếp nhận', (SELECT user_id FROM users WHERE username = 'cskh3'), '2026-08-25 09:00:00', 'Tiếp nhận phiếu.');
 INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_by, changed_at, internal_note) VALUES
 ((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0006'), 'Mới tiếp nhận', 'Đang xử lý', (SELECT user_id FROM users WHERE username = 'kythuat4'), '2026-08-26 08:00:00', 'Kiểm tra dung lượng ắc quy.');
 INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_by, changed_at, internal_note) VALUES
-((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0006'), 'Đang xử lý', 'Đã đóng', (SELECT user_id FROM users WHERE username = 'kythuat4'), '2026-08-29 15:00:00', 'Ắc quy hết tuổi thọ, đã thay mới và bàn giao.');
+((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0006'), 'Đang xử lý', 'Đã đóng', (SELECT user_id FROM users WHERE username = 'kythuat4'), '2026-08-29 15:00:00', 'Đã xử lý xong, khách nghiệm thu và đồng ý đóng phiếu.');
 INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_by, changed_at, internal_note) VALUES
 ((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0007'), '', 'Mới tiếp nhận', (SELECT user_id FROM users WHERE username = 'cskh2'), '2026-09-12 09:00:00', 'Tiếp nhận phiếu.');
 INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_by, changed_at, internal_note) VALUES
-((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0007'), 'Mới tiếp nhận', 'Đang xử lý', (SELECT user_id FROM users WHERE username = 'kythuat5'), '2026-09-12 15:00:00', 'Đo OTDR, khoanh vùng 2 điểm treo nghi vấn.');
+((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0007'), 'Mới tiếp nhận', 'Đang xử lý', (SELECT user_id FROM users WHERE username = 'kythuat5'), '2026-09-12 15:00:00', 'Kỹ thuật viên nhận phiếu và bắt đầu xử lý.');
 INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_by, changed_at, internal_note) VALUES
 ((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0008'), '', 'Mới tiếp nhận', (SELECT user_id FROM users WHERE username = 'cskh4'), '2026-09-13 09:00:00', 'Tiếp nhận yêu cầu bảo trì định kỳ.');
 INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_by, changed_at, internal_note) VALUES
@@ -4861,39 +4899,39 @@ INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_
 INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_by, changed_at, internal_note) VALUES
 ((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0010'), '', 'Mới tiếp nhận', (SELECT user_id FROM users WHERE username = 'cskh3'), '2026-08-28 09:00:00', 'Phát hiện hàng hỏng khi nghiệm thu tại kho.');
 INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_by, changed_at, internal_note) VALUES
-((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0010'), 'Mới tiếp nhận', 'Đang xử lý', (SELECT user_id FROM users WHERE username = 'kythuat3'), '2026-08-29 09:00:00', 'Lập biên bản hàng hỏng, đối chiếu quy cách đóng gói.');
+((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0010'), 'Mới tiếp nhận', 'Đang xử lý', (SELECT user_id FROM users WHERE username = 'kythuat3'), '2026-08-29 09:00:00', 'Kỹ thuật viên nhận phiếu và bắt đầu xử lý.');
 INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_by, changed_at, internal_note) VALUES
-((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0010'), 'Đang xử lý', 'Đã đóng', (SELECT user_id FROM users WHERE username = 'kythuat3'), '2026-09-02 11:00:00', 'Do vận chuyển, đã đổi hàng mới và siết lại quy cách đóng gói.');
+((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0010'), 'Đang xử lý', 'Đã đóng', (SELECT user_id FROM users WHERE username = 'kythuat3'), '2026-09-02 11:00:00', 'Đã xử lý xong, khách nghiệm thu và đồng ý đóng phiếu.');
 INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_by, changed_at, internal_note) VALUES
 ((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0011'), '', 'Mới tiếp nhận', (SELECT user_id FROM users WHERE username = 'cskh4'), '2026-09-08 09:00:00', 'Tiếp nhận phiếu.');
 INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_by, changed_at, internal_note) VALUES
-((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0011'), 'Mới tiếp nhận', 'Đang xử lý', (SELECT user_id FROM users WHERE username = 'kythuat4'), '2026-09-09 08:30:00', 'Khảo sát góc nghiêng và vùng bóng che.');
+((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0011'), 'Mới tiếp nhận', 'Đang xử lý', (SELECT user_id FROM users WHERE username = 'kythuat4'), '2026-09-09 08:30:00', 'Kỹ thuật viên nhận phiếu và bắt đầu xử lý.');
 INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_by, changed_at, internal_note) VALUES
-((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0011'), 'Đang xử lý', 'Đã đóng', (SELECT user_id FROM users WHERE username = 'kythuat4'), '2026-09-11 16:00:00', 'Lỗi do lắp đặt sai thiết kế, đã chỉnh lại và nghiệm thu.');
+((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0011'), 'Đang xử lý', 'Đã đóng', (SELECT user_id FROM users WHERE username = 'kythuat4'), '2026-09-11 16:00:00', 'Đã xử lý xong, khách nghiệm thu và đồng ý đóng phiếu.');
 INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_by, changed_at, internal_note) VALUES
 ((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0012'), '', 'Mới tiếp nhận', (SELECT user_id FROM users WHERE username = 'cskh2'), '2026-08-15 09:00:00', 'Tiếp nhận phiếu.');
 INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_by, changed_at, internal_note) VALUES
-((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0012'), 'Mới tiếp nhận', 'Đang xử lý', (SELECT user_id FROM users WHERE username = 'kythuat5'), '2026-08-16 09:00:00', 'Thay thử module dự phòng để khoanh vùng lỗi.');
+((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0012'), 'Mới tiếp nhận', 'Đang xử lý', (SELECT user_id FROM users WHERE username = 'kythuat5'), '2026-08-16 09:00:00', 'Kỹ thuật viên nhận phiếu và bắt đầu xử lý.');
 INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_by, changed_at, internal_note) VALUES
-((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0012'), 'Đang xử lý', 'Đã đóng', (SELECT user_id FROM users WHERE username = 'kythuat5'), '2026-08-19 14:30:00', 'Lỗi linh kiện từ nhà sản xuất, đã đổi bảo hành.');
+((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0012'), 'Đang xử lý', 'Đã đóng', (SELECT user_id FROM users WHERE username = 'kythuat5'), '2026-08-19 14:30:00', 'Đã xử lý xong, khách nghiệm thu và đồng ý đóng phiếu.');
 INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_by, changed_at, internal_note) VALUES
 ((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0013'), '', 'Mới tiếp nhận', (SELECT user_id FROM users WHERE username = 'cskh4'), '2026-09-13 10:00:00', 'Đại lý gửi câu hỏi qua website.');
 INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_by, changed_at, internal_note) VALUES
 ((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0014'), '', 'Mới tiếp nhận', (SELECT user_id FROM users WHERE username = 'cskh3'), '2026-08-26 09:00:00', 'Đại lý báo tỉ lệ đứt lõi bất thường.');
 INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_by, changed_at, internal_note) VALUES
-((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0014'), 'Mới tiếp nhận', 'Đang xử lý', (SELECT user_id FROM users WHERE username = 'kythuat3'), '2026-08-27 09:00:00', 'Kiểm tra mẫu và truy lại lộ trình vận chuyển.');
+((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0014'), 'Mới tiếp nhận', 'Đang xử lý', (SELECT user_id FROM users WHERE username = 'kythuat3'), '2026-08-27 09:00:00', 'Kỹ thuật viên nhận phiếu và bắt đầu xử lý.');
 INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_by, changed_at, internal_note) VALUES
-((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0014'), 'Đang xử lý', 'Đã đóng', (SELECT user_id FROM users WHERE username = 'kythuat3'), '2026-09-01 10:00:00', 'Do xếp chồng quá tầng khi vận chuyển, đã đổi hàng.');
+((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0014'), 'Đang xử lý', 'Đã đóng', (SELECT user_id FROM users WHERE username = 'kythuat3'), '2026-09-01 10:00:00', 'Đã xử lý xong, khách nghiệm thu và đồng ý đóng phiếu.');
 INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_by, changed_at, internal_note) VALUES
 ((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0015'), '', 'Mới tiếp nhận', (SELECT user_id FROM users WHERE username = 'cskh4'), '2026-09-10 09:00:00', 'Tiếp nhận phiếu.');
 INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_by, changed_at, internal_note) VALUES
-((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0015'), 'Mới tiếp nhận', 'Đang xử lý', (SELECT user_id FROM users WHERE username = 'kythuat4'), '2026-09-10 15:30:00', 'Mở máy kiểm tra, thấy tiếp điểm contactor bị oxy hoá.');
+((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0015'), 'Mới tiếp nhận', 'Đang xử lý', (SELECT user_id FROM users WHERE username = 'kythuat4'), '2026-09-10 15:30:00', 'Kỹ thuật viên nhận phiếu và bắt đầu xử lý.');
 INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_by, changed_at, internal_note) VALUES
 ((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0016'), '', 'Mới tiếp nhận', (SELECT user_id FROM users WHERE username = 'cskh2'), '2026-08-24 09:00:00', 'Tiếp nhận sau sự cố mất điện diện rộng.');
 INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_by, changed_at, internal_note) VALUES
-((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0016'), 'Mới tiếp nhận', 'Đang xử lý', (SELECT user_id FROM users WHERE username = 'kythuat5'), '2026-08-25 08:00:00', 'Kiểm tra dung lượng ắc quy sau khi mất điện kéo dài.');
+((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0016'), 'Mới tiếp nhận', 'Đang xử lý', (SELECT user_id FROM users WHERE username = 'kythuat5'), '2026-08-25 08:00:00', 'Kỹ thuật viên nhận phiếu và bắt đầu xử lý.');
 INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_by, changed_at, internal_note) VALUES
-((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0016'), 'Đang xử lý', 'Đã đóng', (SELECT user_id FROM users WHERE username = 'kythuat5'), '2026-08-28 17:00:00', 'Nguyên nhân ngoài thiết kế dự phòng, đã khuyến nghị bổ sung ắc quy.');
+((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0016'), 'Đang xử lý', 'Đã đóng', (SELECT user_id FROM users WHERE username = 'kythuat5'), '2026-08-28 17:00:00', 'Đã xử lý xong, khách nghiệm thu và đồng ý đóng phiếu.');
 
 -- ===== Thiết bị lỗi kèm phiếu =====
 -- Chưa có model/DAO nào đọc bảng này (xem ghi chú đầu TechnicalSupportTicketDAO)

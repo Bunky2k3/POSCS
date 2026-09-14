@@ -222,10 +222,11 @@
                   trang chi tiết phiếu: một khối là lời người tiếp nhận, một
                   khối là đánh giá của kỹ thuật viên.
 
-                  Ở form thì cách chia này còn nói thêm một điều: đúng bốn
+                  Ở form thì cách chia này còn nói thêm một điều: đúng năm
                   trường trong khối "Nhân viên kỹ thuật xử lý" (trạng thái,
-                  nguyên nhân, nhóm nguyên nhân, kết quả xử lý) là bốn trường
-                  role Kỹ thuật được sửa trên phiếu giao cho mình -- xem
+                  nhóm nguyên nhân, nguyên nhân, phương hướng xử lý, kết quả
+                  xử lý) là năm trường role Kỹ thuật được sửa trên phiếu giao
+                  cho mình -- xem
                   PERMISSIONS.md. Người ở role đó mở form ra là thấy ngay phần
                   nào của mình, không phải thử rồi ăn 403.
                 --%>
@@ -286,6 +287,10 @@
                         <textarea class="form-control" id="rootCause" name="rootCause" rows="3" placeholder="Kỹ thuật viên đánh giá vì sao xảy ra sự cố">${fn:escapeXml(ticket.rootCause)}</textarea>
                     </div>
                     <div class="col-12 field-row">
+                        <label>Phương hướng xử lý</label>
+                        <textarea class="form-control" id="handlingPlan" name="handlingPlan" rows="3" placeholder="Định làm gì để khắc phục (điền khi đã xác định được nguyên nhân)">${fn:escapeXml(ticket.handlingPlan)}</textarea>
+                    </div>
+                    <div class="col-12 field-row">
                         <label>Kết quả xử lý</label>
                         <textarea class="form-control" id="resolutionSummary" name="resolutionSummary" rows="3" placeholder="Ghi chú kết quả xử lý (điền khi đóng phiếu)">${fn:escapeXml(ticket.resolutionSummary)}</textarea>
                     </div>
@@ -294,7 +299,9 @@
                 <%--
                   Ghi chú nội bộ đứng riêng, không nằm trong hai khối trên: nó
                   KHÔNG lưu vào phiếu mà đi kèm dòng lịch sử của lần đổi trạng
-                  thái này. Cùng lý do mà trang chi tiết để "Lịch sử xử lý"
+                  thái này. Chỉ viết về BƯỚC CHUYỂN -- nguyên nhân, phương
+                  hướng và kết quả đều đã có ô riêng ở khối trên, kể lại ở đây
+                  là lặp và làm lịch sử khó đọc. Cùng lý do mà trang chi tiết để "Lịch sử xử lý"
                   tách khỏi hai khối nội dung. Ô luôn để trống khi mở form
                   (không đổ giá trị cũ vào); không đổi trạng thái thì bị bỏ qua.
                 --%>
@@ -305,7 +312,7 @@
                 <div class="row">
                     <div class="col-12 field-row">
                         <label>Ghi chú nội bộ <span class="text-muted" style="text-transform: none; font-weight: 400;">(không bắt buộc, chỉ hiện ở lịch sử xử lý)</span></label>
-                        <textarea class="form-control" id="internalNote" name="internalNote" rows="2" placeholder="Vì sao đổi trạng thái lần này?"></textarea>
+                        <textarea class="form-control" id="internalNote" name="internalNote" rows="2" placeholder="Vì sao đổi trạng thái lần này? (nguyên nhân và kết quả đã có ô riêng ở trên)"></textarea>
                     </div>
                 </div>
 

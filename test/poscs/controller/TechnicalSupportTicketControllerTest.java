@@ -390,6 +390,71 @@ public class TechnicalSupportTicketControllerTest {
                 anyInt(), any());
     }
 
+    /**
+     * Phương hướng xử lý là trường THỨ NĂM mà kỹ thuật viên được giao phiếu
+     * sửa được. Trước khi có cột này, phương hướng bị ghi nhờ vào ghi chú nội
+     * bộ của dòng lịch sử -- chỗ chỉ để trả lời "vì sao lúc đó đổi trạng
+     * thái", nên lịch sử vừa lặp nội dung vừa sai mục đích.
+     */
+    @Test
+    public void update_assignedTechnician_canWriteHandlingPlan() throws Exception {
+        loginAs("Kỹ thuật", 50);
+        when(request.getParameter("action")).thenReturn("update");
+        when(request.getParameter("ticketId")).thenReturn("3");
+        when(request.getParameter("status")).thenReturn(TechnicalSupportTicketDAO.STATUS_IN_PROGRESS);
+        when(request.getParameter("rootCause")).thenReturn("Quạt tản nhiệt hỏng bạc đạn");
+        when(request.getParameter("causeCategory")).thenReturn("Do thiết bị");
+        when(request.getParameter("handlingPlan")).thenReturn("Đặt quạt thay thế, thay trong khung giờ thấp điểm");
+        when(ticketDAO.findById(3)).thenReturn(fullyValidExistingTicket());
+        when(ticketDAO.update(any(), anyInt(), any())).thenReturn(true);
+
+        controller.doPost(request, response);
+
+        verify(ticketDAO).update(argThat((TechnicalRequest t) ->
+                "Đặt quạt thay thế, thay trong khung giờ thấp điểm".equals(t.getHandlingPlan())),
+                anyInt(), any());
+        verify(response, never()).sendError(eq(HttpServletResponse.SC_FORBIDDEN), anyString());
+    }
+
+    /**
+     * Ba mục nguyên nhân / phương hướng / kết quả ĐỘC LẬP nhau: phiếu đang xử
+     * lý thì đã có nguyên nhân và phương hướng nhưng chưa có kết quả. Gộp
+     * chúng làm một là mất đúng trạng thái này.
+     */
+    @Test
+    public void update_dangXuLy_coNguyenNhanVaPhuongHuongNhungChuaCoKetQua() throws Exception {
+        loginAs("Kỹ thuật", 50);
+        when(request.getParameter("action")).thenReturn("update");
+        when(request.getParameter("ticketId")).thenReturn("3");
+        when(request.getParameter("status")).thenReturn(TechnicalSupportTicketDAO.STATUS_IN_PROGRESS);
+        when(request.getParameter("rootCause")).thenReturn("Nứt vỏ cell do va đập");
+        when(request.getParameter("handlingPlan")).thenReturn("Thay ngăn hỏng rồi đo kiểm tải");
+        when(request.getParameter("resolutionSummary")).thenReturn(null);
+        when(ticketDAO.findById(3)).thenReturn(fullyValidExistingTicket());
+        when(ticketDAO.update(any(), anyInt(), any())).thenReturn(true);
+
+        controller.doPost(request, response);
+
+        verify(ticketDAO).update(argThat((TechnicalRequest t) ->
+                t.getRootCause() != null && t.getHandlingPlan() != null
+                        && t.getResolutionSummary() == null && t.getResolvedAt() == null),
+                anyInt(), any());
+    }
+
+    /** Chưa có phương hướng thì lưu NULL, không lưu chuỗi rỗng. */
+    @Test
+    public void update_blankHandlingPlan_isStoredAsNull() throws Exception {
+        loginAs("CSKH", 99);
+        stubValidUpdateParams();
+        when(request.getParameter("handlingPlan")).thenReturn("   ");
+        when(ticketDAO.findById(3)).thenReturn(fullyValidExistingTicket());
+
+        controller.doPost(request, response);
+
+        verify(ticketDAO).update(argThat((TechnicalRequest t) -> t.getHandlingPlan() == null),
+                anyInt(), any());
+    }
+
     /** Role có Full access (CSKH/Admin) cũng ghi được nguyên nhân như bình thường. */
     @Test
     public void update_fullAccessRole_alsoWritesRootCauseAndCategory() throws Exception {
@@ -550,7 +615,8 @@ public class TechnicalSupportTicketControllerTest {
             assertEquals("Mô tả sự cố", sheet.getRow(0).getCell(13).getStringCellValue());
             assertEquals("Nguyên nhân sự cố", sheet.getRow(0).getCell(14).getStringCellValue());
             assertEquals("Nhóm nguyên nhân", sheet.getRow(0).getCell(15).getStringCellValue());
-            assertEquals("Kết quả xử lý", sheet.getRow(0).getCell(16).getStringCellValue());
+            assertEquals("Phương hướng xử lý", sheet.getRow(0).getCell(16).getStringCellValue());
+            assertEquals("Kết quả xử lý", sheet.getRow(0).getCell(17).getStringCellValue());
         }
     }
 
