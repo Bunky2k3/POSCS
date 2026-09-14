@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import poscs.common.Period;
 import poscs.model.Contract;
 import poscs.model.Enterprise;
 import poscs.model.TechnicalRequest;
@@ -104,10 +105,20 @@ public class TechnicalSupportTicketDAO {
 
     /** Lấy danh sách phiếu hỗ trợ có phân trang + lọc, phục vụ listTicket.jsp. */
     public List<TechnicalRequest> findAll(int page, int pageSize, String keyword, String statusFilter, String priorityFilter) {
+        return findAll(page, pageSize, keyword, statusFilter, priorityFilter, null);
+    }
+
+    /**
+     * Như trên, kèm lọc theo kỳ: chỉ lấy phiếu có NGÀY TẠO rơi vào kỳ đó
+     * (null = mọi thời điểm). Lấy ngày tạo chứ không phải ngày đóng vì phiếu
+     * được tính vào kỳ nó phát sinh, kể cả khi còn đang xử lý sang kỳ sau.
+     */
+    public List<TechnicalRequest> findAll(int page, int pageSize, String keyword, String statusFilter,
+            String priorityFilter, Period period) {
         List<TechnicalRequest> result = new ArrayList<>();
         StringBuilder sql = new StringBuilder(SELECT_BASE);
         List<Object> params = new ArrayList<>();
-        appendFilters(sql, params, keyword, statusFilter, priorityFilter);
+        appendFilters(sql, params, keyword, statusFilter, priorityFilter, period);
         sql.append(" ORDER BY t.ticket_id DESC LIMIT ? OFFSET ?");
         params.add(pageSize);
         params.add(Math.max(0, (page - 1) * pageSize));
@@ -128,10 +139,15 @@ public class TechnicalSupportTicketDAO {
 
     /** Đếm tổng số phiếu hỗ trợ thoả điều kiện lọc, phục vụ phân trang. */
     public int countAll(String keyword, String statusFilter, String priorityFilter) {
+        return countAll(keyword, statusFilter, priorityFilter, null);
+    }
+
+    /** Như trên, kèm lọc theo kỳ (ngày tạo phiếu). */
+    public int countAll(String keyword, String statusFilter, String priorityFilter, Period period) {
         StringBuilder sql = new StringBuilder(
             "SELECT COUNT(*) FROM technicalrequests t LEFT JOIN enterprises e ON t.enterprise_id = e.enterprise_id ");
         List<Object> params = new ArrayList<>();
-        appendFilters(sql, params, keyword, statusFilter, priorityFilter);
+        appendFilters(sql, params, keyword, statusFilter, priorityFilter, period);
 
         try (Connection conn = DBContext.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql.toString())) {
@@ -154,6 +170,11 @@ public class TechnicalSupportTicketDAO {
 
     /** Như {@link #countStatusSummary()} nhưng chỉ đếm phiếu của khách thuộc 1 tỉnh (null = toàn quốc). */
     public Map<String, Integer> countStatusSummary(Integer provinceId) {
+        return countStatusSummary(provinceId, null);
+    }
+
+    /** Như trên, kèm lọc theo kỳ (ngày tạo phiếu). */
+    public Map<String, Integer> countStatusSummary(Integer provinceId, Period period) {
         Map<String, Integer> summary = new HashMap<>();
         summary.put(STATUS_NEW, 0);
         summary.put(STATUS_IN_PROGRESS, 0);
@@ -167,15 +188,21 @@ public class TechnicalSupportTicketDAO {
             "  SUM(CASE WHEN t.status = ? THEN 1 ELSE 0 END) AS closed_count, " +
             "  SUM(CASE WHEN t.priority = 'Khẩn cấp' THEN 1 ELSE 0 END) AS urgent_count " +
             "FROM technicalrequests t " + JOIN_ENTERPRISE + JOIN_PROVINCE_OF_ENTERPRISE +
-            "WHERE t.is_deleted = 0" + (provinceId != null ? " AND d.province_id = ?" : "");
+            "WHERE t.is_deleted = 0" + (provinceId != null ? " AND d.province_id = ?" : "")
+            + (period != null ? " AND t.created_date BETWEEN ? AND ?" : "");
 
         try (Connection conn = DBContext.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, STATUS_NEW);
             ps.setString(2, STATUS_IN_PROGRESS);
             ps.setString(3, STATUS_CLOSED);
+            int param = 4;
             if (provinceId != null) {
-                ps.setInt(4, provinceId);
+                ps.setInt(param++, provinceId);
+            }
+            if (period != null) {
+                ps.setDate(param++, period.getFrom());
+                ps.setDate(param, period.getTo());
             }
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
@@ -554,7 +581,8 @@ public class TechnicalSupportTicketDAO {
     // Helpers riêng
     // ------------------------------------------------------------------
 
-    private void appendFilters(StringBuilder sql, List<Object> params, String keyword, String statusFilter, String priorityFilter) {
+    private void appendFilters(StringBuilder sql, List<Object> params, String keyword, String statusFilter,
+            String priorityFilter, Period period) {
         List<String> conditions = new ArrayList<>();
         conditions.add("t.is_deleted = 0");
 
@@ -572,6 +600,12 @@ public class TechnicalSupportTicketDAO {
         if (priorityFilter != null && !priorityFilter.trim().isEmpty()) {
             conditions.add("t.priority = ?");
             params.add(priorityFilter);
+        }
+
+        if (period != null) {
+            conditions.add("t.created_date BETWEEN ? AND ?");
+            params.add(period.getFrom());
+            params.add(period.getTo());
         }
 
         sql.append("WHERE ").append(String.join(" AND ", conditions));

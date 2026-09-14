@@ -235,7 +235,9 @@
                 <option value="Đại lý phân phối" ${typeFilter == 'Đại lý phân phối' ? 'selected' : ''}>Đại lý phân phối</option>
             </select>
             <select id="filterAssignee" name="assigneeId">
-                <option value="">Tất cả người phụ trách</option>
+                <%-- Nhãn nói rõ "chính": bộ lọc chỉ soi cột phụ trách chính,
+                     chọn một người sẽ KHÔNG kéo theo khách họ chỉ đứng hỗ trợ. --%>
+                <option value="">Tất cả người phụ trách chính</option>
                 <c:forEach var="staff" items="${userList}">
                     <option value="${staff.userId}" ${assigneeFilter == staff.userId ? 'selected' : ''}>${fn:escapeXml(staff.fullName)}</option>
                 </c:forEach>

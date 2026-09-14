@@ -154,7 +154,7 @@
                 <%-- Xuất Excel là thao tác ĐỌC: chỉ lấy đúng dữ liệu vai trò này vốn đã
                      xem được trên màn hình, đổi sang dạng file. Nên KHÔNG khoá theo
                      canManage -- xem PERMISSIONS.md. --%>
-                <a href="${pageContext.request.contextPath}/contract?action=exportExcel&keyword=${fn:escapeXml(keyword)}&status=${fn:escapeXml(statusFilter)}&type=${fn:escapeXml(typeFilter)}&provinceId=${provinceFilter}" class="btn-outline-action"><i class="fa-solid fa-file-excel"></i> Xuất Excel</a>
+                <a href="${pageContext.request.contextPath}/contract?action=exportExcel&keyword=${fn:escapeXml(keyword)}&status=${fn:escapeXml(statusFilter)}&type=${fn:escapeXml(typeFilter)}&provinceId=${provinceFilter}&year=${yearFilter}&period=${periodFilter}" class="btn-outline-action"><i class="fa-solid fa-file-excel"></i> Xuất Excel</a>
                 <%-- Nhập PDF thì ngược lại: nó TẠO hợp đồng mới, nên vẫn khoá. --%>
                 <c:if test="${canManage}">
                     <a href="${pageContext.request.contextPath}/contract?action=importForm" class="btn-outline-action"><i class="fa-solid fa-file-pdf"></i> Nhập PDF</a>
@@ -195,6 +195,23 @@
                 <option value="">Tất cả tỉnh/thành</option>
                 <c:forEach var="province" items="${provinceList}">
                     <option value="${province.provinceId}" ${provinceFilter == province.provinceId ? 'selected' : ''}>${fn:escapeXml(province.shortName)}</option>
+                </c:forEach>
+            </select>
+            <select id="filterYear" name="year">
+                <option value="">Mọi thời điểm</option>
+                <c:forEach var="y" items="${yearList}">
+                    <option value="${y}" ${yearFilter == y ? 'selected' : ''}>Năm ${y}</option>
+                </c:forEach>
+            </select>
+            <select id="filterPeriod" name="period">
+                <option value="">Cả năm</option>
+                <c:forEach var="q" begin="1" end="4">
+                    <c:set var="qVal" value="q${q}"/>
+                    <option value="${qVal}" ${periodFilter == qVal ? 'selected' : ''}>Quý ${q}</option>
+                </c:forEach>
+                <c:forEach var="m" begin="1" end="12">
+                    <c:set var="mVal" value="m${m}"/>
+                    <option value="${mVal}" ${periodFilter == mVal ? 'selected' : ''}>Tháng ${m}</option>
                 </c:forEach>
             </select>
         </form>
@@ -278,11 +295,11 @@
                 <span class="pagination-info">Hiển thị ${fn:length(contractList)} trong tổng số ${totalCount} hợp đồng</span>
                 <nav>
                     <ul class="pagination pagination-sm mb-0">
-                        <li class="page-item ${currentPage <= 1 ? 'disabled' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/contract?action=list&page=${currentPage - 1}&keyword=${fn:escapeXml(keyword)}&status=${fn:escapeXml(statusFilter)}&type=${fn:escapeXml(typeFilter)}&provinceId=${provinceFilter}">Trước</a></li>
+                        <li class="page-item ${currentPage <= 1 ? 'disabled' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/contract?action=list&page=${currentPage - 1}&keyword=${fn:escapeXml(keyword)}&status=${fn:escapeXml(statusFilter)}&type=${fn:escapeXml(typeFilter)}&provinceId=${provinceFilter}&year=${yearFilter}&period=${periodFilter}">Trước</a></li>
                         <c:forEach begin="1" end="${totalPages}" var="p">
-                            <li class="page-item ${p == currentPage ? 'active' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/contract?action=list&page=${p}&keyword=${fn:escapeXml(keyword)}&status=${fn:escapeXml(statusFilter)}&type=${fn:escapeXml(typeFilter)}&provinceId=${provinceFilter}">${p}</a></li>
+                            <li class="page-item ${p == currentPage ? 'active' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/contract?action=list&page=${p}&keyword=${fn:escapeXml(keyword)}&status=${fn:escapeXml(statusFilter)}&type=${fn:escapeXml(typeFilter)}&provinceId=${provinceFilter}&year=${yearFilter}&period=${periodFilter}">${p}</a></li>
                         </c:forEach>
-                        <li class="page-item ${currentPage >= totalPages ? 'disabled' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/contract?action=list&page=${currentPage + 1}&keyword=${fn:escapeXml(keyword)}&status=${fn:escapeXml(statusFilter)}&type=${fn:escapeXml(typeFilter)}&provinceId=${provinceFilter}">Sau</a></li>
+                        <li class="page-item ${currentPage >= totalPages ? 'disabled' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/contract?action=list&page=${currentPage + 1}&keyword=${fn:escapeXml(keyword)}&status=${fn:escapeXml(statusFilter)}&type=${fn:escapeXml(typeFilter)}&provinceId=${provinceFilter}&year=${yearFilter}&period=${periodFilter}">Sau</a></li>
                     </ul>
                 </nav>
             </div>
@@ -341,6 +358,8 @@
         document.getElementById('filterStatus').addEventListener('change', function () { document.getElementById('filterForm').submit(); });
         document.getElementById('filterType').addEventListener('change', function () { document.getElementById('filterForm').submit(); });
         document.getElementById('filterProvince').addEventListener('change', function () { document.getElementById('filterForm').submit(); });
+        document.getElementById('filterYear').addEventListener('change', function () { document.getElementById('filterForm').submit(); });
+        document.getElementById('filterPeriod').addEventListener('change', function () { document.getElementById('filterForm').submit(); });
     </script>
 
     <script src="${pageContext.request.contextPath}/js/appshell.js"></script>

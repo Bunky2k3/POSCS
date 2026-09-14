@@ -191,11 +191,12 @@ public class CustomerDAOTest {
     }
 
     /**
-     * Lọc "người phụ trách" phải soi cả hai vai. Chỉ so cột chính thì người hỗ
-     * trợ chọn tên mình sẽ thấy danh sách rỗng, dù họ đang cùng chăm khách đó.
+     * Lọc "người phụ trách" chỉ soi vai CHÍNH, cố ý không khớp sang cột người
+     * hỗ trợ: mỗi khách quy về đúng một người chịu trách nhiệm, lọc tên ai thì
+     * ra đúng phần của người đó, không lẫn phần họ chỉ đứng hỗ trợ.
      */
     @Test
-    public void findAll_filterByOwner_matchesBothMainAndSupportRole() throws Exception {
+    public void findAll_filterByOwner_matchesMainRoleOnly() throws Exception {
         PreparedStatement ps = statementReturning(emptyResultSet());
         Connection conn = connectionReturning(ps);
 
@@ -204,9 +205,10 @@ public class CustomerDAOTest {
 
             dao.findAll(1, 10, null, null, 7, null, false);
 
-            assertTrue(capturedSql(conn).contains("(e.account_owner_id = ? OR e.support_owner_id = ?)"));
+            String sql = capturedSql(conn);
+            assertTrue(sql.contains("e.account_owner_id = ?"));
+            assertFalse(sql.contains("support_owner_id = ?"));
             verify(ps).setObject(1, 7);
-            verify(ps).setObject(2, 7);
         }
     }
 

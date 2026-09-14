@@ -13,6 +13,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.junit.Before;
 import org.junit.Test;
+import poscs.common.Period;
 import poscs.dao.ContractDAO;
 import poscs.dao.ContractPaymentDAO;
 import poscs.dao.CustomerDAO;
@@ -57,8 +58,8 @@ public class DashboardControllerTest {
 
         // Stub chung cho mọi test -- không phải trọng tâm nhưng bắt buộc để
         // tránh NPE khi controller đọc qua các map/list này.
-        when(contractDAO.countStatusSummary(nullable(Integer.class))).thenReturn(Collections.emptyMap());
-        when(ticketDAO.countStatusSummary(nullable(Integer.class))).thenReturn(Collections.emptyMap());
+        when(contractDAO.countStatusSummary(nullable(Integer.class), nullable(Period.class))).thenReturn(Collections.emptyMap());
+        when(ticketDAO.countStatusSummary(nullable(Integer.class), nullable(Period.class))).thenReturn(Collections.emptyMap());
         when(contractDAO.findExpiringSoon(anyInt(), nullable(Integer.class))).thenReturn(Collections.emptyList());
         when(ticketDAO.findNeedingAttention(anyInt(), nullable(Integer.class))).thenReturn(Collections.emptyList());
         // doGet luôn forward /dashboard.jsp ở cuối -- không stub thì
@@ -141,24 +142,73 @@ public class DashboardControllerTest {
     @Test
     public void provinceSelected_narrowsEveryQueryOnThePage() throws Exception {
         when(request.getParameter("provinceId")).thenReturn("3");
-        when(customerDAO.countAll(any(), any(), any(), eq(3))).thenReturn(2);
+        when(customerDAO.countUpToEndOfPeriod(eq(3), nullable(Period.class))).thenReturn(2);
         when(paymentDAO.sumInvoiceAmountByMonth(anyInt(), anyInt(), eq(3))).thenReturn(BigDecimal.ZERO);
-        when(contractDAO.countStatusSummary(3)).thenReturn(Collections.emptyMap());
-        when(ticketDAO.countStatusSummary(3)).thenReturn(Collections.emptyMap());
+        when(contractDAO.countStatusSummary(eq(3), nullable(Period.class))).thenReturn(Collections.emptyMap());
+        when(ticketDAO.countStatusSummary(eq(3), nullable(Period.class))).thenReturn(Collections.emptyMap());
         when(contractDAO.findExpiringSoon(anyInt(), eq(3))).thenReturn(Collections.emptyList());
         when(ticketDAO.findNeedingAttention(anyInt(), eq(3))).thenReturn(Collections.emptyList());
 
         controller.doGet(request, response);
 
-        verify(customerDAO).countAll(any(), any(), any(), eq(3));
-        verify(customerDAO).countNewThisMonth(3);
-        verify(contractDAO).countStatusSummary(3);
+        verify(customerDAO).countUpToEndOfPeriod(eq(3), nullable(Period.class));
+        verify(customerDAO).countNewInPeriod(eq(3), nullable(Period.class));
+        verify(contractDAO).countStatusSummary(eq(3), nullable(Period.class));
         verify(contractDAO).findExpiringSoon(anyInt(), eq(3));
-        verify(ticketDAO).countStatusSummary(3);
+        verify(ticketDAO).countStatusSummary(eq(3), nullable(Period.class));
         verify(ticketDAO).countOverdueOrDueSoon(3);
         verify(ticketDAO).findNeedingAttention(anyInt(), eq(3));
         verify(paymentDAO, times(2)).sumInvoiceAmountByMonth(anyInt(), anyInt(), eq(3));
         verify(request).setAttribute("provinceFilter", 3);
+    }
+
+    // ------------------------------------------------------------------
+    // Lọc theo kỳ (tháng/quý)
+    // ------------------------------------------------------------------
+
+    /**
+     * Chọn quý thì mọi truy vấn "phát sinh trong kỳ" phải nhận đúng khoảng ngày
+     * của quý đó. Doanh thu gọi hai lần: kỳ đang xem và kỳ liền trước, để tính
+     * % tăng trưởng -- so với tháng trước như cũ thì con số vô nghĩa khi người
+     * dùng đang xem theo quý.
+     */
+    @Test
+    public void quarterSelected_passesThatDateRangeToEveryPeriodQuery() throws Exception {
+        when(request.getParameter("year")).thenReturn("2026");
+        when(request.getParameter("period")).thenReturn("q3");
+        when(paymentDAO.sumInvoiceAmountInPeriod(any(Period.class), nullable(Integer.class)))
+                .thenReturn(BigDecimal.ZERO);
+
+        controller.doGet(request, response);
+
+        // Quý 3/2026 = 01/07/2026 -> 30/09/2026
+        verify(customerDAO).countUpToEndOfPeriod(isNull(),
+                argThat(p -> "2026-07-01".equals(p.getFrom().toString())
+                        && "2026-09-30".equals(p.getTo().toString())));
+        verify(customerDAO).countNewInPeriod(isNull(), any(Period.class));
+        verify(contractDAO).countStatusSummary(isNull(), any(Period.class));
+        verify(ticketDAO).countStatusSummary(isNull(), any(Period.class));
+        verify(paymentDAO, times(2)).sumInvoiceAmountInPeriod(any(Period.class), nullable(Integer.class));
+        // Có kỳ thì không được rơi về nhánh "tháng hiện tại" nữa.
+        verify(paymentDAO, never()).sumInvoiceAmountByMonth(anyInt(), anyInt(), nullable(Integer.class));
+        verify(request).setAttribute("periodLabel", "Quý 3/2026");
+    }
+
+    /**
+     * Hai bảng cuối trang là cảnh báo tính theo hôm nay, cố ý KHÔNG theo kỳ:
+     * "hợp đồng sắp hết hạn trong quý 1 năm ngoái" là câu vô nghĩa.
+     */
+    @Test
+    public void periodSelected_doesNotNarrowTheAsOfTodayTables() throws Exception {
+        when(request.getParameter("year")).thenReturn("2026");
+        when(request.getParameter("period")).thenReturn("q3");
+        when(paymentDAO.sumInvoiceAmountInPeriod(any(Period.class), nullable(Integer.class)))
+                .thenReturn(BigDecimal.ZERO);
+
+        controller.doGet(request, response);
+
+        verify(contractDAO).findExpiringSoon(anyInt(), isNull());
+        verify(ticketDAO).findNeedingAttention(anyInt(), isNull());
     }
 
     /** Tham số rác trên URL không được làm trang vỡ -- coi như không lọc. */
@@ -169,7 +219,7 @@ public class DashboardControllerTest {
 
         controller.doGet(request, response);
 
-        verify(contractDAO).countStatusSummary(null);
+        verify(contractDAO).countStatusSummary(isNull(), isNull());
         verify(request).setAttribute("provinceFilter", null);
     }
 }

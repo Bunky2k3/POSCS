@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import poscs.common.Period;
 import poscs.model.Address;
 import poscs.model.District;
 import poscs.model.Enterprise;
@@ -127,16 +128,53 @@ public class CustomerDAO {
 
     /** Như {@link #countNewThisMonth()} nhưng chỉ đếm khách thuộc 1 tỉnh (null = toàn quốc). */
     public int countNewThisMonth(Integer provinceId) {
+        return countJoined(provinceId, null, false);
+    }
+
+    /**
+     * Đếm khách hàng MỚI trong kỳ (join_date nằm trong kỳ). period null thì
+     * quay về nghĩa cũ "trong tháng hiện tại".
+     */
+    public int countNewInPeriod(Integer provinceId, Period period) {
+        return countJoined(provinceId, period, false);
+    }
+
+    /**
+     * Đếm LUỸ KẾ số khách hàng tính tới hết kỳ (join_date <= ngày cuối kỳ).
+     * Khác countNewInPeriod: "tổng khách hàng" là con số tích luỹ, chọn quý 2
+     * mà chỉ đếm khách gia nhập trong quý 2 thì ô đó thành "khách mới" thứ hai
+     * trên cùng một trang. period null = đếm toàn bộ, không giới hạn thời gian.
+     */
+    public int countUpToEndOfPeriod(Integer provinceId, Period period) {
+        return countJoined(provinceId, period, true);
+    }
+
+    private int countJoined(Integer provinceId, Period period, boolean cumulative) {
+        String dateCondition;
+        if (period == null) {
+            // Không chọn kỳ: luỹ kế = toàn bộ; "mới" = trong tháng hiện tại.
+            dateCondition = cumulative
+                    ? ""
+                    : " AND YEAR(e.join_date) = YEAR(CURDATE()) AND MONTH(e.join_date) = MONTH(CURDATE())";
+        } else {
+            dateCondition = cumulative ? " AND e.join_date <= ?" : " AND e.join_date BETWEEN ? AND ?";
+        }
         String sql = "SELECT COUNT(*) FROM enterprises e " +
                      "LEFT JOIN addresses a ON e.address_id = a.address_id " +
                      "LEFT JOIN districts d ON a.districts_id = d.districts_id " +
-                     "WHERE e.is_deleted = 0 " +
-                     "AND YEAR(e.join_date) = YEAR(CURDATE()) AND MONTH(e.join_date) = MONTH(CURDATE())" +
+                     "WHERE e.is_deleted = 0" + dateCondition +
                      (provinceId != null ? " AND d.province_id = ?" : "");
         try (Connection conn = DBContext.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
+            int param = 1;
+            if (period != null) {
+                if (!cumulative) {
+                    ps.setDate(param++, period.getFrom());
+                }
+                ps.setDate(param++, period.getTo());
+            }
             if (provinceId != null) {
-                ps.setInt(1, provinceId);
+                ps.setInt(param, provinceId);
             }
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
@@ -144,7 +182,7 @@ public class CustomerDAO {
                 }
             }
         } catch (SQLException ex) {
-            LOG.error("Loi dem khach hang moi trong thang", ex);
+            LOG.error("Loi dem khach hang theo ky", ex);
         }
         return 0;
     }
@@ -444,11 +482,11 @@ public class CustomerDAO {
             params.add(customerType);
         }
         if (accountOwnerId != null) {
-            // Khớp cả hai vai: lọc "người phụ trách" mà chỉ soi cột chính thì
-            // người hỗ trợ chọn tên mình sẽ ra danh sách rỗng, dù họ đang cùng
-            // chăm những khách đó.
-            conditions.add("(e.account_owner_id = ? OR e.support_owner_id = ?)");
-            params.add(accountOwnerId);
+            // CHỈ soi vai phụ trách chính (cấp trên), cố ý không khớp sang cột
+            // người hỗ trợ: mỗi khách hàng quy về đúng một người, nên lọc theo
+            // tên ai thì ra đúng phần khách người đó chịu trách nhiệm, không
+            // lẫn phần họ chỉ đứng hỗ trợ cho người khác.
+            conditions.add("e.account_owner_id = ?");
             params.add(accountOwnerId);
         }
         if (provinceId != null) {

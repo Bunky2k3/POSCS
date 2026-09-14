@@ -13,6 +13,7 @@ import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import poscs.common.Period;
 import poscs.dao.AddressDAO;
 import poscs.dao.ContractDAO;
 import poscs.dao.ContractPaymentDAO;
@@ -28,10 +29,15 @@ import poscs.model.TechnicalRequest;
  * TechnicalSupportTicketController lọc theo owner hiện tại, và
  * PERMISSIONS.md cũng không quy định việc này.
  *
- * Có duy nhất một bộ lọc, và là bộ lọc do người dùng tự chọn chứ không phải
- * phạm vi quyền: tham số "provinceId" thu hẹp mọi con số trên trang về một
- * tỉnh, phục vụ việc giao khách hàng/hợp đồng theo địa bàn. Bỏ trống thì
- * trang hoạt động y như trước.
+ * Hai bộ lọc, đều do người dùng tự chọn chứ không phải phạm vi quyền:
+ * "provinceId" thu hẹp về một tỉnh, "year"+"period" thu hẹp về một tháng/quý.
+ * Bỏ trống cả hai thì trang hoạt động y như trước.
+ *
+ * Lọc kỳ KHÔNG áp cho hai bảng cuối trang ("Hợp đồng sắp hết hạn", "Phiếu cần
+ * xử lý"): đó là cảnh báo tính theo NGÀY HÔM NAY, không phải số liệu phát
+ * sinh trong kỳ -- hỏi "hợp đồng nào sắp hết hạn trong quý 1 năm ngoái" là
+ * câu vô nghĩa. Tiêu đề hai bảng đó ghi rõ "tính tới hôm nay" để không ai
+ * đọc nhầm là chúng đã theo kỳ đang chọn.
  */
 @WebServlet(name = "DashboardController", urlPatterns = {"/dashboard"})
 public class DashboardController extends HttpServlet {
@@ -60,20 +66,37 @@ public class DashboardController extends HttpServlet {
         request.setAttribute("provinceList", addressDAO.findAllProvinces());
         request.setAttribute("provinceFilter", provinceFilter);
 
+        // Bộ lọc kỳ (tháng/quý). Mỗi ô lấy mốc ngày riêng của loại dữ liệu đó:
+        // khách theo ngày tham gia, hợp đồng theo ngày ký, doanh thu theo ngày
+        // thanh toán, phiếu theo ngày tạo -- không có một "ngày" chung cho cả
+        // trang. Không chọn kỳ thì trang giữ nguyên nghĩa cũ (tháng hiện tại).
+        Period period = Period.parse(request.getParameter("year"), request.getParameter("period"));
+        ContractController.setPeriodAttributes(request, period);
+
         // ===== KPI: khách hàng =====
-        request.setAttribute("totalCustomers", customerDAO.countAll(null, null, null, provinceFilter));
-        request.setAttribute("newCustomersThisMonth", customerDAO.countNewThisMonth(provinceFilter));
+        // Tổng khách hàng là số LUỸ KẾ tới hết kỳ, không phải số phát sinh
+        // trong kỳ -- nếu không thì ô này trùng nghĩa với ô "khách hàng mới"
+        // ngay bên dưới nó.
+        request.setAttribute("totalCustomers", customerDAO.countUpToEndOfPeriod(provinceFilter, period));
+        request.setAttribute("newCustomersThisMonth", customerDAO.countNewInPeriod(provinceFilter, period));
 
         // ===== KPI: hợp đồng =====
-        Map<String, Integer> contractStatusSummary = contractDAO.countStatusSummary(provinceFilter);
+        Map<String, Integer> contractStatusSummary = contractDAO.countStatusSummary(provinceFilter, period);
         request.setAttribute("contractStatusSummary", contractStatusSummary);
 
         // ===== KPI: doanh thu =====
-        BigDecimal revenueThisMonth = paymentDAO.sumInvoiceAmountByMonth(
-                today.getYear(), today.getMonthValue(), provinceFilter);
-        LocalDate lastMonth = today.minusMonths(1);
-        BigDecimal revenueLastMonth = paymentDAO.sumInvoiceAmountByMonth(
-                lastMonth.getYear(), lastMonth.getMonthValue(), provinceFilter);
+        BigDecimal revenueThisMonth;
+        BigDecimal revenueLastMonth;
+        if (period != null) {
+            revenueThisMonth = paymentDAO.sumInvoiceAmountInPeriod(period, provinceFilter);
+            revenueLastMonth = paymentDAO.sumInvoiceAmountInPeriod(period.previous(), provinceFilter);
+        } else {
+            revenueThisMonth = paymentDAO.sumInvoiceAmountByMonth(
+                    today.getYear(), today.getMonthValue(), provinceFilter);
+            LocalDate lastMonth = today.minusMonths(1);
+            revenueLastMonth = paymentDAO.sumInvoiceAmountByMonth(
+                    lastMonth.getYear(), lastMonth.getMonthValue(), provinceFilter);
+        }
         request.setAttribute("revenueThisMonth", revenueThisMonth);
         if (revenueLastMonth.compareTo(BigDecimal.ZERO) > 0) {
             double trendPercent = revenueThisMonth.subtract(revenueLastMonth)
@@ -83,7 +106,7 @@ public class DashboardController extends HttpServlet {
         }
 
         // ===== KPI: phiếu hỗ trợ =====
-        Map<String, Integer> ticketStatusSummary = ticketDAO.countStatusSummary(provinceFilter);
+        Map<String, Integer> ticketStatusSummary = ticketDAO.countStatusSummary(provinceFilter, period);
         request.setAttribute("ticketStatusSummary", ticketStatusSummary);
         request.setAttribute("overdueOrDueSoonCount", ticketDAO.countOverdueOrDueSoon(provinceFilter));
 

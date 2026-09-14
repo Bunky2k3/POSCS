@@ -25,6 +25,7 @@ import poscs.common.AccessControl;
 import poscs.common.ExcelUtil;
 import poscs.common.Logs;
 import poscs.common.PdfUtil;
+import poscs.common.Period;
 import poscs.dao.ContractDAO;
 import poscs.dao.CustomerDAO;
 import poscs.dao.EmployeeDAO;
@@ -137,19 +138,24 @@ public class TechnicalSupportTicketController extends HttpServlet {
         String keyword = request.getParameter("keyword");
         String statusFilter = request.getParameter("status");
         String priorityFilter = request.getParameter("priority");
+        Period period = Period.parse(request.getParameter("year"), request.getParameter("period"));
 
-        List<TechnicalRequest> ticketList = ticketDAO.findAll(page, PAGE_SIZE, keyword, statusFilter, priorityFilter);
-        int totalCount = ticketDAO.countAll(keyword, statusFilter, priorityFilter);
+        List<TechnicalRequest> ticketList = ticketDAO.findAll(page, PAGE_SIZE, keyword, statusFilter,
+                priorityFilter, period);
+        int totalCount = ticketDAO.countAll(keyword, statusFilter, priorityFilter, period);
         int totalPages = Math.max(1, (int) Math.ceil(totalCount / (double) PAGE_SIZE));
 
         request.setAttribute("ticketList", ticketList);
-        request.setAttribute("statusSummary", ticketDAO.countStatusSummary());
+        // Dải KPI ở đầu trang cũng thu theo kỳ, nếu không thì con số tổng nằm
+        // ngay trên một bảng đã lọc -- hai phạm vi khác nhau trên cùng màn hình.
+        request.setAttribute("statusSummary", ticketDAO.countStatusSummary(null, period));
         request.setAttribute("currentPage", page);
         request.setAttribute("totalPages", totalPages);
         request.setAttribute("totalCount", totalCount);
         request.setAttribute("keyword", keyword);
         request.setAttribute("statusFilter", statusFilter);
         request.setAttribute("priorityFilter", priorityFilter);
+        ContractController.setPeriodAttributes(request, period);
 
         request.getRequestDispatcher(LIST_VIEW).forward(request, response);
     }

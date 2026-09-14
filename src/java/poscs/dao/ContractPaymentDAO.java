@@ -10,6 +10,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import poscs.common.Period;
 
 /**
  * DAO cho bảng contract_payments -- phục vụ tính doanh thu (dựa trên
@@ -20,6 +21,40 @@ import org.slf4j.LoggerFactory;
 public class ContractPaymentDAO {
 
     private static final Logger LOG = LoggerFactory.getLogger(ContractPaymentDAO.class);
+
+    /**
+     * Tổng tiền đã thu trong một kỳ (theo ngày thanh toán), lọc thêm theo tỉnh
+     * của khách hàng đứng tên hợp đồng. period null = trả về 0 phần tiền chưa
+     * xác định kỳ -- bên gọi tự quyết định dùng hàm theo tháng bên dưới.
+     */
+    public BigDecimal sumInvoiceAmountInPeriod(Period period, Integer provinceId) {
+        if (period == null) {
+            return BigDecimal.ZERO;
+        }
+        String sql = "SELECT COALESCE(SUM(p.invoice_amount), 0) FROM contract_payments p " +
+                     "LEFT JOIN contracts c ON p.contract_id = c.contract_id " +
+                     "LEFT JOIN enterprises e ON c.enterprise_id = e.enterprise_id " +
+                     "LEFT JOIN addresses a ON e.address_id = a.address_id " +
+                     "LEFT JOIN districts d ON a.districts_id = d.districts_id " +
+                     "WHERE p.paid_date IS NOT NULL AND p.paid_date BETWEEN ? AND ?" +
+                     (provinceId != null ? " AND d.province_id = ?" : "");
+        try (Connection conn = DBContext.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setDate(1, period.getFrom());
+            ps.setDate(2, period.getTo());
+            if (provinceId != null) {
+                ps.setInt(3, provinceId);
+            }
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getBigDecimal(1);
+                }
+            }
+        } catch (SQLException ex) {
+            LOG.error("Loi tinh doanh thu theo ky", ex);
+        }
+        return BigDecimal.ZERO;
+    }
 
     /** Tổng tiền đã thu trong 1 tháng cụ thể. Trả về 0 nếu không có khoản thu nào. */
     public BigDecimal sumInvoiceAmountByMonth(int year, int month) {

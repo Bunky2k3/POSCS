@@ -42,7 +42,8 @@
             font-size: 0.84rem; color: var(--primary-dark);
         }
         .scope-note i { color: var(--primary); }
-        .scope-note a { color: var(--primary); font-weight: 600; }
+        .scope-note a { color: var(--primary); font-weight: 600; margin-left: auto; }
+        .as-of-today { font-weight: 500; font-size: 0.74rem; color: #9ca3af; text-transform: none; letter-spacing: 0; }
 
         /* ===== KPI cards ===== */
         .kpi-card { padding: 18px 18px 16px; display: flex; flex-direction: column; gap: 10px; height: 100%; }
@@ -126,16 +127,36 @@
                             <option value="${province.provinceId}" ${provinceFilter == province.provinceId ? 'selected' : ''}>${fn:escapeXml(province.shortName)}</option>
                         </c:forEach>
                     </select>
+                    <select id="filterYear" name="year" class="province-filter">
+                        <option value="">Mọi thời điểm</option>
+                        <c:forEach var="y" items="${yearList}">
+                            <option value="${y}" ${yearFilter == y ? 'selected' : ''}>Năm ${y}</option>
+                        </c:forEach>
+                    </select>
+                    <select id="filterPeriod" name="period" class="province-filter">
+                        <option value="">Cả năm</option>
+                        <c:forEach var="q" begin="1" end="4">
+                            <c:set var="qVal" value="q${q}"/>
+                            <option value="${qVal}" ${periodFilter == qVal ? 'selected' : ''}>Quý ${q}</option>
+                        </c:forEach>
+                        <c:forEach var="m" begin="1" end="12">
+                            <c:set var="mVal" value="m${m}"/>
+                            <option value="${mVal}" ${periodFilter == mVal ? 'selected' : ''}>Tháng ${m}</option>
+                        </c:forEach>
+                    </select>
                 </form>
                 <div class="today-badge"><i class="fa-regular fa-calendar"></i>${todayLabel}</div>
             </div>
         </div>
 
-        <c:if test="${not empty provinceFilter}">
+        <c:if test="${not empty provinceFilter or not empty periodLabel}">
             <div class="scope-note">
-                <i class="fa-solid fa-location-dot"></i>
-                Mọi số liệu dưới đây chỉ tính riêng địa bàn đang chọn.
-                <a href="${pageContext.request.contextPath}/dashboard">Xem toàn quốc</a>
+                <i class="fa-solid fa-filter"></i>
+                <span>
+                    Số liệu đang thu hẹp theo<c:if test="${not empty provinceFilter}"> <strong>địa bàn đang chọn</strong></c:if><c:if test="${not empty provinceFilter and not empty periodLabel}"> và</c:if><c:if test="${not empty periodLabel}"> <strong>${fn:escapeXml(periodLabel)}</strong></c:if>.
+                    Riêng hai bảng cuối trang luôn tính tới hôm nay.
+                </span>
+                <a href="${pageContext.request.contextPath}/dashboard">Bỏ lọc</a>
             </div>
         </c:if>
 
@@ -150,7 +171,7 @@
                         </div>
                         <div class="kpi-icon bg-blue"><i class="fa-solid fa-building"></i></div>
                     </div>
-                    <span class="kpi-trend up"><i class="fa-solid fa-arrow-trend-up"></i> +${newCustomersThisMonth} khách hàng mới tháng này</span>
+                    <span class="kpi-trend up"><i class="fa-solid fa-arrow-trend-up"></i> +${newCustomersThisMonth} khách hàng mới <c:choose><c:when test="${not empty periodLabel}">trong kỳ</c:when><c:otherwise>tháng này</c:otherwise></c:choose></span>
                 </div>
             </div>
             <div class="col-6 col-lg-3">
@@ -169,17 +190,17 @@
                 <div class="card-box kpi-card">
                     <div class="kpi-top">
                         <div>
-                            <div class="kpi-label">Doanh thu hợp đồng (tháng ${currentMonthNumber})</div>
+                            <div class="kpi-label">Doanh thu hợp đồng (<c:choose><c:when test="${not empty periodLabel}">${fn:escapeXml(periodLabel)}</c:when><c:otherwise>tháng ${currentMonthNumber}</c:otherwise></c:choose>)</div>
                             <div class="kpi-value" id="revenueKpiValue" data-vnd="${revenueThisMonth}">&mdash;</div>
                         </div>
                         <div class="kpi-icon bg-green"><i class="fa-solid fa-sack-dollar"></i></div>
                     </div>
                     <c:choose>
                         <c:when test="${not empty revenueTrendPercent}">
-                            <span class="kpi-trend ${revenueTrendPercent >= 0 ? 'up' : 'down'}"><i class="fa-solid fa-arrow-trend-${revenueTrendPercent >= 0 ? 'up' : 'down'}"></i> ${revenueTrendPercent >= 0 ? '+' : ''}${revenueTrendPercent}% so với tháng trước</span>
+                            <span class="kpi-trend ${revenueTrendPercent >= 0 ? 'up' : 'down'}"><i class="fa-solid fa-arrow-trend-${revenueTrendPercent >= 0 ? 'up' : 'down'}"></i> ${revenueTrendPercent >= 0 ? '+' : ''}${revenueTrendPercent}% so với <c:choose><c:when test="${not empty periodLabel}">kỳ trước</c:when><c:otherwise>tháng trước</c:otherwise></c:choose></span>
                         </c:when>
                         <c:otherwise>
-                            <span class="kpi-trend"><i class="fa-regular fa-circle-question"></i> Chưa đủ dữ liệu tháng trước để so sánh</span>
+                            <span class="kpi-trend"><i class="fa-regular fa-circle-question"></i> Chưa đủ dữ liệu <c:choose><c:when test="${not empty periodLabel}">kỳ trước</c:when><c:otherwise>tháng trước</c:otherwise></c:choose> để so sánh</span>
                         </c:otherwise>
                     </c:choose>
                 </div>
@@ -223,7 +244,7 @@
             <div class="col-lg-8 d-flex flex-column gap-4">
                 <div class="card-box table-section">
                     <div class="table-section-header">
-                        <h6>Hợp đồng sắp hết hạn</h6>
+                        <h6>Hợp đồng sắp hết hạn <span class="as-of-today">tính tới hôm nay</span></h6>
                         <a href="${pageContext.request.contextPath}/contract">Xem tất cả</a>
                     </div>
                     <table class="mini-table">
@@ -262,7 +283,7 @@
 
                 <div class="card-box table-section">
                     <div class="table-section-header">
-                        <h6>Phiếu hỗ trợ cần xử lý</h6>
+                        <h6>Phiếu hỗ trợ cần xử lý <span class="as-of-today">tính tới hôm nay</span></h6>
                         <a href="${pageContext.request.contextPath}/ticket">Xem tất cả</a>
                     </div>
                     <table class="mini-table">
@@ -322,8 +343,10 @@
     <script>
         // Chọn tỉnh là nạp lại trang ngay, không cần nút "Lọc" -- giống bộ lọc
         // ở danh sách khách hàng/hợp đồng.
-        document.getElementById('filterProvince').addEventListener('change', function () {
-            document.getElementById('provinceFilterForm').submit();
+        ['filterProvince', 'filterYear', 'filterPeriod'].forEach(function (id) {
+            document.getElementById(id).addEventListener('change', function () {
+                document.getElementById('provinceFilterForm').submit();
+            });
         });
 
         // ===== Định dạng tiền tệ rút gọn (tỷ / triệu đ) =====

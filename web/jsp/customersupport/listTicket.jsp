@@ -160,7 +160,7 @@
                 <%-- Xuất Excel là thao tác ĐỌC: chỉ lấy đúng dữ liệu vai trò này vốn đã
                      xem được trên màn hình, đổi sang dạng file. Nên KHÔNG khoá theo
                      canManage -- xem PERMISSIONS.md. --%>
-                <a href="${pageContext.request.contextPath}/ticket?action=exportExcel&keyword=${fn:escapeXml(keyword)}&status=${fn:escapeXml(statusFilter)}&priority=${fn:escapeXml(priorityFilter)}" class="btn-outline-action"><i class="fa-solid fa-file-excel"></i> Xuất Excel</a>
+                <a href="${pageContext.request.contextPath}/ticket?action=exportExcel&keyword=${fn:escapeXml(keyword)}&status=${fn:escapeXml(statusFilter)}&priority=${fn:escapeXml(priorityFilter)}&year=${yearFilter}&period=${periodFilter}" class="btn-outline-action"><i class="fa-solid fa-file-excel"></i> Xuất Excel</a>
                 <c:if test="${canManage}">
                     <a href="${pageContext.request.contextPath}/ticket?action=new" class="btn-add"><i class="fa-solid fa-plus"></i> Tạo phiếu hỗ trợ</a>
                 </c:if>
@@ -194,6 +194,23 @@
                 <option value="Cao" ${priorityFilter == 'Cao' ? 'selected' : ''}>Cao</option>
                 <option value="Bình thường" ${priorityFilter == 'Bình thường' ? 'selected' : ''}>Bình thường</option>
                 <option value="Thấp" ${priorityFilter == 'Thấp' ? 'selected' : ''}>Thấp</option>
+            </select>
+            <select id="filterYear" name="year">
+                <option value="">Mọi thời điểm</option>
+                <c:forEach var="y" items="${yearList}">
+                    <option value="${y}" ${yearFilter == y ? 'selected' : ''}>Năm ${y}</option>
+                </c:forEach>
+            </select>
+            <select id="filterPeriod" name="period">
+                <option value="">Cả năm</option>
+                <c:forEach var="q" begin="1" end="4">
+                    <c:set var="qVal" value="q${q}"/>
+                    <option value="${qVal}" ${periodFilter == qVal ? 'selected' : ''}>Quý ${q}</option>
+                </c:forEach>
+                <c:forEach var="m" begin="1" end="12">
+                    <c:set var="mVal" value="m${m}"/>
+                    <option value="${mVal}" ${periodFilter == mVal ? 'selected' : ''}>Tháng ${m}</option>
+                </c:forEach>
             </select>
         </form>
 
@@ -281,11 +298,11 @@
                 <span class="pagination-info" id="paginationInfo">Hiển thị ${fn:length(ticketList)} trong tổng số ${totalCount} phiếu hỗ trợ</span>
                 <nav>
                     <ul class="pagination pagination-sm mb-0">
-                        <li class="page-item ${currentPage <= 1 ? 'disabled' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/ticket?action=list&page=${currentPage - 1}&keyword=${fn:escapeXml(keyword)}&status=${fn:escapeXml(statusFilter)}&priority=${fn:escapeXml(priorityFilter)}">Trước</a></li>
+                        <li class="page-item ${currentPage <= 1 ? 'disabled' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/ticket?action=list&page=${currentPage - 1}&keyword=${fn:escapeXml(keyword)}&status=${fn:escapeXml(statusFilter)}&priority=${fn:escapeXml(priorityFilter)}&year=${yearFilter}&period=${periodFilter}">Trước</a></li>
                         <c:forEach begin="1" end="${totalPages}" var="p">
-                            <li class="page-item ${p == currentPage ? 'active' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/ticket?action=list&page=${p}&keyword=${fn:escapeXml(keyword)}&status=${fn:escapeXml(statusFilter)}&priority=${fn:escapeXml(priorityFilter)}">${p}</a></li>
+                            <li class="page-item ${p == currentPage ? 'active' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/ticket?action=list&page=${p}&keyword=${fn:escapeXml(keyword)}&status=${fn:escapeXml(statusFilter)}&priority=${fn:escapeXml(priorityFilter)}&year=${yearFilter}&period=${periodFilter}">${p}</a></li>
                         </c:forEach>
-                        <li class="page-item ${currentPage >= totalPages ? 'disabled' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/ticket?action=list&page=${currentPage + 1}&keyword=${fn:escapeXml(keyword)}&status=${fn:escapeXml(statusFilter)}&priority=${fn:escapeXml(priorityFilter)}">Sau</a></li>
+                        <li class="page-item ${currentPage >= totalPages ? 'disabled' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/ticket?action=list&page=${currentPage + 1}&keyword=${fn:escapeXml(keyword)}&status=${fn:escapeXml(statusFilter)}&priority=${fn:escapeXml(priorityFilter)}&year=${yearFilter}&period=${periodFilter}">Sau</a></li>
                     </ul>
                 </nav>
             </div>
@@ -341,6 +358,8 @@
         // Tự động submit lại form lọc khi đổi trạng thái / mức ưu tiên
         document.getElementById('filterStatus').addEventListener('change', function () { document.getElementById('filterForm').submit(); });
         document.getElementById('filterPriority').addEventListener('change', function () { document.getElementById('filterForm').submit(); });
+        document.getElementById('filterYear').addEventListener('change', function () { document.getElementById('filterForm').submit(); });
+        document.getElementById('filterPeriod').addEventListener('change', function () { document.getElementById('filterForm').submit(); });
     </script>
 
     <script src="${pageContext.request.contextPath}/js/appshell.js"></script>

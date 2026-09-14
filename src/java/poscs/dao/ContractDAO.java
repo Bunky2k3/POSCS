@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import poscs.common.Period;
 import poscs.model.Address;
 import poscs.model.Contract;
 import poscs.model.ContractProduct;
@@ -128,10 +129,21 @@ public class ContractDAO {
      */
     public List<Contract> findAll(int page, int pageSize, String keyword, String statusFilter, String typeFilter,
             Integer provinceId, boolean sortByProvince) {
+        return findAll(page, pageSize, keyword, statusFilter, typeFilter, provinceId, sortByProvince, null);
+    }
+
+    /**
+     * Như trên, kèm lọc theo kỳ: chỉ lấy hợp đồng có NGÀY KÝ rơi vào kỳ đó
+     * (null = mọi thời điểm). Chọn ngày ký chứ không phải ngày hiệu lực vì
+     * "quý này phòng kinh doanh ký được bao nhiêu hợp đồng" mới là con số
+     * người ta theo dõi -- ngày hiệu lực có thể rơi sang kỳ sau.
+     */
+    public List<Contract> findAll(int page, int pageSize, String keyword, String statusFilter, String typeFilter,
+            Integer provinceId, boolean sortByProvince, Period period) {
         List<Contract> result = new ArrayList<>();
         StringBuilder sql = new StringBuilder(SELECT_BASE);
         List<Object> params = new ArrayList<>();
-        appendFilters(sql, params, keyword, statusFilter, typeFilter, provinceId);
+        appendFilters(sql, params, keyword, statusFilter, typeFilter, provinceId, period);
         sql.append(sortByProvince
                 ? " ORDER BY p.province_name IS NULL, " + AddressDAO.PROVINCE_SHORT_NAME_ORDER
                         + ", c.contract_id DESC LIMIT ? OFFSET ?"
@@ -160,11 +172,16 @@ public class ContractDAO {
 
     /** Như {@link #countAll(String, String, String)} nhưng lọc thêm theo tỉnh/thành. */
     public int countAll(String keyword, String statusFilter, String typeFilter, Integer provinceId) {
+        return countAll(keyword, statusFilter, typeFilter, provinceId, null);
+    }
+
+    /** Như trên, kèm lọc theo kỳ (ngày ký). */
+    public int countAll(String keyword, String statusFilter, String typeFilter, Integer provinceId, Period period) {
         StringBuilder sql = new StringBuilder(
             "SELECT COUNT(*) FROM contracts c LEFT JOIN enterprises e ON c.enterprise_id = e.enterprise_id "
             + JOIN_PROVINCE_OF_ENTERPRISE);
         List<Object> params = new ArrayList<>();
-        appendFilters(sql, params, keyword, statusFilter, typeFilter, provinceId);
+        appendFilters(sql, params, keyword, statusFilter, typeFilter, provinceId, period);
 
         try (Connection conn = DBContext.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql.toString())) {
@@ -187,6 +204,11 @@ public class ContractDAO {
 
     /** Như {@link #countStatusSummary()} nhưng chỉ đếm hợp đồng thuộc 1 tỉnh (null = toàn quốc). */
     public Map<String, Integer> countStatusSummary(Integer provinceId) {
+        return countStatusSummary(provinceId, null);
+    }
+
+    /** Như trên, kèm lọc theo kỳ (ngày ký) -- null = mọi thời điểm. */
+    public Map<String, Integer> countStatusSummary(Integer provinceId, Period period) {
         Map<String, Integer> summary = new HashMap<>();
         summary.put(STATUS_ACTIVE, 0);
         summary.put(STATUS_SOON, 0);
@@ -204,12 +226,18 @@ public class ContractDAO {
             "FROM contracts c " +
             "LEFT JOIN enterprises e ON c.enterprise_id = e.enterprise_id " +
             JOIN_PROVINCE_OF_ENTERPRISE +
-            "WHERE c.is_deleted = 0" + (provinceId != null ? " AND d.province_id = ?" : "");
+            "WHERE c.is_deleted = 0" + (provinceId != null ? " AND d.province_id = ?" : "")
+            + (period != null ? " AND c.signing_date BETWEEN ? AND ?" : "");
 
         try (Connection conn = DBContext.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
+            int param = 1;
             if (provinceId != null) {
-                ps.setInt(1, provinceId);
+                ps.setInt(param++, provinceId);
+            }
+            if (period != null) {
+                ps.setDate(param++, period.getFrom());
+                ps.setDate(param, period.getTo());
             }
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
@@ -523,7 +551,7 @@ public class ContractDAO {
     // ------------------------------------------------------------------
 
     private void appendFilters(StringBuilder sql, List<Object> params, String keyword, String statusFilter,
-            String typeFilter, Integer provinceId) {
+            String typeFilter, Integer provinceId, Period period) {
         List<String> conditions = new ArrayList<>();
         conditions.add("c.is_deleted = 0");
 
@@ -545,6 +573,11 @@ public class ContractDAO {
         if (provinceId != null) {
             conditions.add("d.province_id = ?");
             params.add(provinceId);
+        }
+        if (period != null) {
+            conditions.add("c.signing_date BETWEEN ? AND ?");
+            params.add(period.getFrom());
+            params.add(period.getTo());
         }
 
         sql.append("WHERE ").append(String.join(" AND ", conditions));
