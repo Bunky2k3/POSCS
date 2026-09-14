@@ -4514,340 +4514,379 @@ CREATE TABLE `customer_lifecycle_events` (
   CONSTRAINT `fk_lifecycle_user` FOREIGN KEY (`recorded_by`) REFERENCES `users` (`user_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Khách hàng demo + hợp đồng (gắn sản phẩm POSTEF thật) + phiếu hỗ trợ,
--- xem chi tiết nguồn gốc ở
--- db/migrations/V9__reseed_demo_customers_contracts_tickets__ndat2003.sql.
--- ===== Địa chỉ (12) =====
-INSERT INTO addresses (street_and_local_name, districts_id) VALUES ('Số 15 Phố Duy Tân', 14);
-INSERT INTO addresses (street_and_local_name, districts_id) VALUES ('145 Đường Nguyễn Văn Cừ', 721);
-INSERT INTO addresses (street_and_local_name, districts_id) VALUES ('27 Đại lộ Hùng Vương', 874);
-INSERT INTO addresses (street_and_local_name, districts_id) VALUES ('45 Phố Tây Sơn', 20);
-INSERT INTO addresses (street_and_local_name, districts_id) VALUES ('68 Đường Bắc Kạn', 564);
+-- Khách hàng demo + hợp đồng (gắn sản phẩm POSTEF thật) + phiếu hỗ trợ kèm
+-- nguyên nhân sự cố, xem chi tiết nguồn gốc ở
+-- db/migrations/V15__reseed_demo_data_with_root_cause__ndat2003.sql.
+-- ===== Địa chỉ (12 tỉnh miền Bắc) =====
+INSERT INTO addresses (street_and_local_name, districts_id) VALUES ('Số 15 Phố Duy Tân', 1);
 INSERT INTO addresses (street_and_local_name, districts_id) VALUES ('12 Đường Lạch Tray', 1022);
 INSERT INTO addresses (street_and_local_name, districts_id) VALUES ('56 Đường Kinh Dương Vương', 775);
-INSERT INTO addresses (street_and_local_name, districts_id) VALUES ('92 Đường Điện Biên', 1136);
-INSERT INTO addresses (street_and_local_name, districts_id) VALUES ('41 Đường Lê Công Thanh', 1240);
-INSERT INTO addresses (street_and_local_name, districts_id) VALUES ('15 Đường Trần Đăng Ninh', 656);
-INSERT INTO addresses (street_and_local_name, districts_id) VALUES ('18 Đường Lê Lợi', 1369);
+INSERT INTO addresses (street_and_local_name, districts_id) VALUES ('88 Đường Trần Hưng Đạo', 721);
+INSERT INTO addresses (street_and_local_name, districts_id) VALUES ('Lô A2 Khu công nghiệp Phố Nối A', 1136);
+INSERT INTO addresses (street_and_local_name, districts_id) VALUES ('27 Đường Đinh Tiên Hoàng', 1240);
+INSERT INTO addresses (street_and_local_name, districts_id) VALUES ('140 Đại lộ Hùng Vương', 874);
+INSERT INTO addresses (street_and_local_name, districts_id) VALUES ('9 Đường Cách Mạng Tháng Tám', 564);
+INSERT INTO addresses (street_and_local_name, districts_id) VALUES ('31 Đường Lê Lợi', 656);
+INSERT INTO addresses (street_and_local_name, districts_id) VALUES ('76 Đường Nguyễn Huệ', 465);
+INSERT INTO addresses (street_and_local_name, districts_id) VALUES ('18 Đường Nguyễn Du', 1369);
 INSERT INTO addresses (street_and_local_name, districts_id) VALUES ('63 Đường Lê Duẩn', 1535);
 
--- ===== Khách hàng doanh nghiệp (12) =====
-INSERT INTO enterprises (enterprise_code, enterprise_name, customer_type, customer_group, tax_code, email, phone, website, address_id, account_owner_id, support_owner_id, legal_representative, current_relationship_rating, join_date) VALUES
-('KH-0001', 'Công ty Cổ phần Viễn thông Sông Hồng', 'Nhà mạng viễn thông', 'VIP', '0101234501', 'contact@songhongtelecom.vn', '0243826001', 'https://songhongtelecom.vn', (SELECT address_id FROM addresses WHERE street_and_local_name = 'Số 15 Phố Duy Tân' ORDER BY address_id DESC LIMIT 1), (SELECT user_id FROM users WHERE username = 'sales2'), (SELECT user_id FROM users WHERE username = 'sales3'), 'Trần Văn Hùng', 'Tốt', '2022-03-10');
-INSERT INTO enterprises (enterprise_code, enterprise_name, customer_type, customer_group, tax_code, email, phone, website, address_id, account_owner_id, support_owner_id, legal_representative, current_relationship_rating, join_date) VALUES
-('KH-0002', 'Công ty TNHH Viễn thông Hạ Long Phát', 'Nhà mạng viễn thông', 'Thân thiết', '0301234502', 'info@halongphat.vn', '0203922002', 'https://halongphat.vn', (SELECT address_id FROM addresses WHERE street_and_local_name = '145 Đường Nguyễn Văn Cừ' ORDER BY address_id DESC LIMIT 1), (SELECT user_id FROM users WHERE username = 'sales3'), (SELECT user_id FROM users WHERE username = 'sales4'), 'Lê Thị Mai', 'Tốt', '2021-11-05');
-INSERT INTO enterprises (enterprise_code, enterprise_name, customer_type, customer_group, tax_code, email, phone, website, address_id, account_owner_id, support_owner_id, legal_representative, current_relationship_rating, join_date) VALUES
-('KH-0003', 'Công ty Cổ phần Hạ tầng Mạng Việt Á', 'Nhà mạng viễn thông', 'Tiềm năng', '0401234503', 'contact@vietanetwork.vn', '0210377003', 'https://vietanetwork.vn', (SELECT address_id FROM addresses WHERE street_and_local_name = '27 Đại lộ Hùng Vương' ORDER BY address_id DESC LIMIT 1), (SELECT user_id FROM users WHERE username = 'sales4'), (SELECT user_id FROM users WHERE username = 'sales5'), 'Phạm Quốc Bảo', 'Cần theo dõi', '2024-06-20');
-INSERT INTO enterprises (enterprise_code, enterprise_name, customer_type, customer_group, tax_code, email, phone, website, address_id, account_owner_id, support_owner_id, legal_representative, current_relationship_rating, join_date) VALUES
-('KH-0004', 'Công ty TNHH Xây dựng Viễn thông Thăng Long', 'Nhà thầu thi công', 'VIP', '0101234504', 'contact@thanglongtelecom.vn', '0243662004', 'https://thanglongtelecom.vn', (SELECT address_id FROM addresses WHERE street_and_local_name = '45 Phố Tây Sơn' ORDER BY address_id DESC LIMIT 1), (SELECT user_id FROM users WHERE username = 'sales5'), NULL, 'Nguyễn Đức Thắng', 'Tốt', '2020-08-15');
-INSERT INTO enterprises (enterprise_code, enterprise_name, customer_type, customer_group, tax_code, email, phone, website, address_id, account_owner_id, support_owner_id, legal_representative, current_relationship_rating, join_date) VALUES
-('KH-0005', 'Công ty Cổ phần Xây lắp Điện & Viễn thông Phương Bắc', 'Nhà thầu thi công', 'Thân thiết', '0301234505', 'info@phuongbacelectric.vn', '0208998005', 'https://phuongbacelectric.vn', (SELECT address_id FROM addresses WHERE street_and_local_name = '68 Đường Bắc Kạn' ORDER BY address_id DESC LIMIT 1), (SELECT user_id FROM users WHERE username = 'sales6'), (SELECT user_id FROM users WHERE username = 'sales2'), 'Võ Thành Nam', 'Tốt', '2022-01-25');
-INSERT INTO enterprises (enterprise_code, enterprise_name, customer_type, customer_group, tax_code, email, phone, website, address_id, account_owner_id, support_owner_id, legal_representative, current_relationship_rating, join_date) VALUES
-('KH-0006', 'Công ty TNHH Thi công Cơ điện Hải Phòng', 'Nhà thầu thi công', 'Thường', '0201234506', 'lienhe@codienhaiphong.vn', '0225382006', NULL, (SELECT address_id FROM addresses WHERE street_and_local_name = '12 Đường Lạch Tray' ORDER BY address_id DESC LIMIT 1), (SELECT user_id FROM users WHERE username = 'sales2'), (SELECT user_id FROM users WHERE username = 'sales3'), 'Đỗ Văn Kiên', 'Cần theo dõi', '2023-09-12');
-INSERT INTO enterprises (enterprise_code, enterprise_name, customer_type, customer_group, tax_code, email, phone, website, address_id, account_owner_id, support_owner_id, legal_representative, current_relationship_rating, join_date) VALUES
-('KH-0007', 'Công ty Cổ phần Đầu tư Xây dựng Bắc Ninh', 'Nhà thầu thi công', 'Tiềm năng', '0231234507', 'info@xaydungbacninh.vn', '0222371007', 'https://xaydungbacninh.vn', (SELECT address_id FROM addresses WHERE street_and_local_name = '56 Đường Kinh Dương Vương' ORDER BY address_id DESC LIMIT 1), (SELECT user_id FROM users WHERE username = 'sales3'), (SELECT user_id FROM users WHERE username = 'sales4'), 'Nguyễn Thị Hòa', 'Cần theo dõi', '2025-02-18');
-INSERT INTO enterprises (enterprise_code, enterprise_name, customer_type, customer_group, tax_code, email, phone, website, address_id, account_owner_id, support_owner_id, legal_representative, current_relationship_rating, join_date) VALUES
-('KH-0008', 'Công ty TNHH Phân phối Thiết bị Viễn thông An Phát', 'Đại lý phân phối', 'VIP', '0301234508', 'sales@anphatdistribution.vn', '0221845008', 'https://anphatdistribution.vn', (SELECT address_id FROM addresses WHERE street_and_local_name = '92 Đường Điện Biên' ORDER BY address_id DESC LIMIT 1), (SELECT user_id FROM users WHERE username = 'sales4'), NULL, 'Trịnh Minh Tuấn', 'Tốt', '2019-05-30');
-INSERT INTO enterprises (enterprise_code, enterprise_name, customer_type, customer_group, tax_code, email, phone, website, address_id, account_owner_id, support_owner_id, legal_representative, current_relationship_rating, join_date) VALUES
-('KH-0009', 'Công ty Cổ phần Thương mại Thiết bị Công nghệ Ninh Bình', 'Đại lý phân phối', 'Thân thiết', '0361234509', 'contact@nbcntech.vn', '0229389009', 'https://nbcntech.vn', (SELECT address_id FROM addresses WHERE street_and_local_name = '41 Đường Lê Công Thanh' ORDER BY address_id DESC LIMIT 1), (SELECT user_id FROM users WHERE username = 'sales5'), (SELECT user_id FROM users WHERE username = 'sales6'), 'Hoàng Văn Phúc', 'Tốt', '2021-07-08');
-INSERT INTO enterprises (enterprise_code, enterprise_name, customer_type, customer_group, tax_code, email, phone, website, address_id, account_owner_id, support_owner_id, legal_representative, current_relationship_rating, join_date) VALUES
-('KH-0010', 'Công ty TNHH Đại lý Thiết bị Viễn thông Lạng Sơn', 'Đại lý phân phối', 'Thường', '0421234510', 'info@langsontelecom.vn', '0205356010', NULL, (SELECT address_id FROM addresses WHERE street_and_local_name = '15 Đường Trần Đăng Ninh' ORDER BY address_id DESC LIMIT 1), (SELECT user_id FROM users WHERE username = 'sales6'), (SELECT user_id FROM users WHERE username = 'sales2'), 'Lâm Thị Kim Ngân', 'Cần theo dõi', '2023-12-01');
-INSERT INTO enterprises (enterprise_code, enterprise_name, customer_type, customer_group, tax_code, email, phone, website, address_id, account_owner_id, support_owner_id, legal_representative, current_relationship_rating, join_date) VALUES
-('KH-0011', 'Công ty Cổ phần Vật tư Viễn thông Thanh Hóa', 'Đại lý phân phối', 'Tiềm năng', '0381234511', 'lienhe@vattuthanhhoa.vn', '0237372011', 'https://vattuthanhhoa.vn', (SELECT address_id FROM addresses WHERE street_and_local_name = '18 Đường Lê Lợi' ORDER BY address_id DESC LIMIT 1), (SELECT user_id FROM users WHERE username = 'sales2'), (SELECT user_id FROM users WHERE username = 'sales3'), 'Bùi Xuân Trường', 'Tốt', '2024-10-14');
-INSERT INTO enterprises (enterprise_code, enterprise_name, customer_type, customer_group, tax_code, email, phone, website, address_id, account_owner_id, support_owner_id, legal_representative, current_relationship_rating, join_date) VALUES
-('KH-0012', 'Công ty TNHH Xây dựng Hạ tầng Viễn thông Nghệ An', 'Nhà thầu thi công', 'Thường', '0291234512', 'info@hatangnghean.vn', '0238381012', NULL, (SELECT address_id FROM addresses WHERE street_and_local_name = '63 Đường Lê Duẩn' ORDER BY address_id DESC LIMIT 1), (SELECT user_id FROM users WHERE username = 'sales3'), NULL, 'Cao Văn Đạt', 'Có nguy cơ rời bỏ', '2020-02-28');
+-- ===== Khách hàng (12) =====
+-- account_owner_id = người phụ trách chính, support_owner_id = người hỗ trợ
+-- (V13). Hai vai luôn khác người -- tầng ứng dụng chặn trùng, dữ liệu demo
+-- không được phép vi phạm chính quy tắc đó.
+INSERT INTO enterprises (enterprise_code, enterprise_name, customer_type, customer_group, tax_code, email, phone, website, address_id, account_owner_id, support_owner_id, legal_representative, status, current_relationship_rating, join_date) VALUES
+('KH-0001', 'Công ty Cổ phần Viễn thông Sông Hồng', 'Nhà mạng viễn thông', 'VIP', '0101234567', 'lienhe@songhong.example.com', '0243801001', 'https://songhong.example.com', (SELECT address_id FROM addresses WHERE street_and_local_name = 'Số 15 Phố Duy Tân' AND districts_id = 1 LIMIT 1), (SELECT user_id FROM users WHERE username = 'sales4'), (SELECT user_id FROM users WHERE username = 'sales2'), 'Nguyễn Văn Sơn', 'Active', 'Tốt', '2023-03-15');
+INSERT INTO enterprises (enterprise_code, enterprise_name, customer_type, customer_group, tax_code, email, phone, website, address_id, account_owner_id, support_owner_id, legal_representative, status, current_relationship_rating, join_date) VALUES
+('KH-0002', 'Công ty TNHH Hạ tầng số Hải Phòng', 'Nhà mạng viễn thông', 'Thân thiết', '0201234568', 'lienhe@htshp.example.com', '0225801002', 'https://htshp.example.com', (SELECT address_id FROM addresses WHERE street_and_local_name = '12 Đường Lạch Tray' AND districts_id = 1022 LIMIT 1), (SELECT user_id FROM users WHERE username = 'sales2'), (SELECT user_id FROM users WHERE username = 'sales3'), 'Trần Quốc Hải', 'Active', 'Tốt', '2023-07-02');
+INSERT INTO enterprises (enterprise_code, enterprise_name, customer_type, customer_group, tax_code, email, phone, website, address_id, account_owner_id, support_owner_id, legal_representative, status, current_relationship_rating, join_date) VALUES
+('KH-0003', 'Công ty Cổ phần Điện tử Kinh Bắc', 'Nhà thầu thi công', 'Thân thiết', '2301234569', 'lienhe@dtkb.example.com', '0222801003', 'https://dtkb.example.com', (SELECT address_id FROM addresses WHERE street_and_local_name = '56 Đường Kinh Dương Vương' AND districts_id = 775 LIMIT 1), (SELECT user_id FROM users WHERE username = 'sales3'), (SELECT user_id FROM users WHERE username = 'sales4'), 'Lê Đình Kiên', 'Active', 'Tốt', '2024-01-20');
+INSERT INTO enterprises (enterprise_code, enterprise_name, customer_type, customer_group, tax_code, email, phone, website, address_id, account_owner_id, support_owner_id, legal_representative, status, current_relationship_rating, join_date) VALUES
+('KH-0004', 'Công ty TNHH Truyền hình cáp Hạ Long', 'Nhà mạng viễn thông', 'Thường', '5701234570', 'lienhe@thchl.example.com', '0203801004', 'https://thchl.example.com', (SELECT address_id FROM addresses WHERE street_and_local_name = '88 Đường Trần Hưng Đạo' AND districts_id = 721 LIMIT 1), (SELECT user_id FROM users WHERE username = 'sales4'), (SELECT user_id FROM users WHERE username = 'sales5'), 'Phạm Thu Trang', 'Active', 'Cần theo dõi', '2024-05-11');
+INSERT INTO enterprises (enterprise_code, enterprise_name, customer_type, customer_group, tax_code, email, phone, website, address_id, account_owner_id, support_owner_id, legal_representative, status, current_relationship_rating, join_date) VALUES
+('KH-0005', 'Công ty Cổ phần Khu công nghiệp Phố Nối', 'Nhà thầu thi công', 'VIP', '0901234571', 'lienhe@kcnphonoi.example.com', '0221801005', 'https://kcnphonoi.example.com', (SELECT address_id FROM addresses WHERE street_and_local_name = 'Lô A2 Khu công nghiệp Phố Nối A' AND districts_id = 1136 LIMIT 1), (SELECT user_id FROM users WHERE username = 'sales5'), (SELECT user_id FROM users WHERE username = 'sales6'), 'Hoàng Minh Tuấn', 'Active', 'Tốt', '2022-11-08');
+INSERT INTO enterprises (enterprise_code, enterprise_name, customer_type, customer_group, tax_code, email, phone, website, address_id, account_owner_id, support_owner_id, legal_representative, status, current_relationship_rating, join_date) VALUES
+('KH-0006', 'Công ty TNHH Viễn thông Tràng An', 'Nhà mạng viễn thông', 'Thường', '2701234572', 'lienhe@vttrangan.example.com', '0229801006', 'https://vttrangan.example.com', (SELECT address_id FROM addresses WHERE street_and_local_name = '27 Đường Đinh Tiên Hoàng' AND districts_id = 1240 LIMIT 1), (SELECT user_id FROM users WHERE username = 'sales6'), (SELECT user_id FROM users WHERE username = 'sales4'), 'Vũ Thị Hằng', 'Active', 'Tốt', '2024-09-19');
+INSERT INTO enterprises (enterprise_code, enterprise_name, customer_type, customer_group, tax_code, email, phone, website, address_id, account_owner_id, support_owner_id, legal_representative, status, current_relationship_rating, join_date) VALUES
+('KH-0007', 'Công ty Cổ phần Đầu tư Hạ tầng Đất Tổ', 'Nhà thầu thi công', 'Thường', '2601234573', 'lienhe@dattho.example.com', '0210801007', 'https://dattho.example.com', (SELECT address_id FROM addresses WHERE street_and_local_name = '140 Đại lộ Hùng Vương' AND districts_id = 874 LIMIT 1), (SELECT user_id FROM users WHERE username = 'sales4'), (SELECT user_id FROM users WHERE username = 'sales3'), 'Đỗ Văn Phúc', 'Active', 'Cần theo dõi', '2025-02-27');
+INSERT INTO enterprises (enterprise_code, enterprise_name, customer_type, customer_group, tax_code, email, phone, website, address_id, account_owner_id, support_owner_id, legal_representative, status, current_relationship_rating, join_date) VALUES
+('KH-0008', 'Công ty TNHH Công nghệ Gang Thép', 'Nhà thầu thi công', 'Thân thiết', '4601234574', 'lienhe@cngangthep.example.com', '0208801008', 'https://cngangthep.example.com', (SELECT address_id FROM addresses WHERE street_and_local_name = '9 Đường Cách Mạng Tháng Tám' AND districts_id = 564 LIMIT 1), (SELECT user_id FROM users WHERE username = 'sales2'), (SELECT user_id FROM users WHERE username = 'sales4'), 'Bùi Xuân Thành', 'Active', 'Tốt', '2023-12-05');
+INSERT INTO enterprises (enterprise_code, enterprise_name, customer_type, customer_group, tax_code, email, phone, website, address_id, account_owner_id, support_owner_id, legal_representative, status, current_relationship_rating, join_date) VALUES
+('KH-0009', 'Công ty Cổ phần Thương mại Xứ Lạng', 'Đại lý phân phối', 'Thường', '2401234575', 'lienhe@xulang.example.com', '0205801009', 'https://xulang.example.com', (SELECT address_id FROM addresses WHERE street_and_local_name = '31 Đường Lê Lợi' AND districts_id = 656 LIMIT 1), (SELECT user_id FROM users WHERE username = 'sales3'), (SELECT user_id FROM users WHERE username = 'sales5'), 'Ngô Thị Quyên', 'Active', 'Tốt', '2025-04-16');
+INSERT INTO enterprises (enterprise_code, enterprise_name, customer_type, customer_group, tax_code, email, phone, website, address_id, account_owner_id, support_owner_id, legal_representative, status, current_relationship_rating, join_date) VALUES
+('KH-0010', 'Công ty TNHH Cửa khẩu số Lào Cai', 'Đại lý phân phối', 'Tiềm năng', '5301234576', 'lienhe@ckslaocai.example.com', '0214801010', 'https://ckslaocai.example.com', (SELECT address_id FROM addresses WHERE street_and_local_name = '76 Đường Nguyễn Huệ' AND districts_id = 465 LIMIT 1), (SELECT user_id FROM users WHERE username = 'sales4'), (SELECT user_id FROM users WHERE username = 'sales6'), 'Lý Văn Đức', 'Active', 'Cần theo dõi', '2025-08-01');
+INSERT INTO enterprises (enterprise_code, enterprise_name, customer_type, customer_group, tax_code, email, phone, website, address_id, account_owner_id, support_owner_id, legal_representative, status, current_relationship_rating, join_date) VALUES
+('KH-0011', 'Công ty Cổ phần Hạ tầng mạng Sầm Sơn', 'Nhà thầu thi công', 'Thân thiết', '2801234577', 'lienhe@htmsamson.example.com', '0237801011', 'https://htmsamson.example.com', (SELECT address_id FROM addresses WHERE street_and_local_name = '18 Đường Nguyễn Du' AND districts_id = 1369 LIMIT 1), (SELECT user_id FROM users WHERE username = 'sales5'), (SELECT user_id FROM users WHERE username = 'sales4'), 'Trịnh Bá Long', 'Active', 'Có nguy cơ rời bỏ', '2023-06-21');
+INSERT INTO enterprises (enterprise_code, enterprise_name, customer_type, customer_group, tax_code, email, phone, website, address_id, account_owner_id, support_owner_id, legal_representative, status, current_relationship_rating, join_date) VALUES
+('KH-0012', 'Công ty TNHH Giải pháp mạng Xứ Nghệ', 'Nhà mạng viễn thông', 'Thường', '2901234578', 'lienhe@gpmxunghe.example.com', '0238801012', 'https://gpmxunghe.example.com', (SELECT address_id FROM addresses WHERE street_and_local_name = '63 Đường Lê Duẩn' AND districts_id = 1535 LIMIT 1), (SELECT user_id FROM users WHERE username = 'sales6'), (SELECT user_id FROM users WHERE username = 'sales2'), 'Đặng Quang Vinh', 'Active', 'Tốt', '2024-10-30');
 
--- ===== Người liên hệ (16) =====
+-- ===== Người liên hệ =====
 INSERT INTO enterprisecontacts (enterprise_id, contact_last_name, contact_middle_name, contact_first_name, contact_phone, contact_email, position) VALUES
-((SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0001'), 'Trần', 'Văn', 'Hùng', '0912345601', 'hung.tran@songhongtelecom.vn', 'Giám đốc');
+((SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0001'), 'Nguyễn', 'Văn', 'An', '0912000001', 'an.nv@songhong.example.com', 'Trưởng phòng Kỹ thuật');
 INSERT INTO enterprisecontacts (enterprise_id, contact_last_name, contact_middle_name, contact_first_name, contact_phone, contact_email, position) VALUES
-((SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0001'), 'Nguyễn', 'Thị', 'Lan', '0912345602', 'lan.nguyen@songhongtelecom.vn', 'Trưởng phòng Kỹ thuật');
+((SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0002'), 'Trần', 'Thị', 'Bình', '0912000002', 'binh.tt@htshp.example.com', 'Giám đốc Hạ tầng');
 INSERT INTO enterprisecontacts (enterprise_id, contact_last_name, contact_middle_name, contact_first_name, contact_phone, contact_email, position) VALUES
-((SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0002'), 'Lê', 'Thị', 'Mai', '0912345603', 'mai.le@halongphat.vn', 'Giám đốc kinh doanh');
+((SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0003'), 'Lê', 'Hoàng', 'Cường', '0912000003', 'cuong.lh@dtkb.example.com', 'Chỉ huy trưởng công trình');
 INSERT INTO enterprisecontacts (enterprise_id, contact_last_name, contact_middle_name, contact_first_name, contact_phone, contact_email, position) VALUES
-((SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0003'), 'Phạm', 'Quốc', 'Bảo', '0912345604', 'bao.pham@vietanetwork.vn', 'Trưởng phòng Kỹ thuật');
+((SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0004'), 'Phạm', 'Thị', 'Dung', '0912000004', 'dung.pt@thchl.example.com', 'Phụ trách mua hàng');
 INSERT INTO enterprisecontacts (enterprise_id, contact_last_name, contact_middle_name, contact_first_name, contact_phone, contact_email, position) VALUES
-((SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0004'), 'Nguyễn', 'Đức', 'Thắng', '0912345605', 'thang.nguyen@thanglongtelecom.vn', 'Giám đốc');
+((SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0005'), 'Hoàng', 'Văn', 'Em', '0912000005', 'em.hv@kcnphonoi.example.com', 'Trưởng ban Quản lý dự án');
 INSERT INTO enterprisecontacts (enterprise_id, contact_last_name, contact_middle_name, contact_first_name, contact_phone, contact_email, position) VALUES
-((SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0004'), 'Vũ', 'Thị', 'Hạnh', '0912345606', 'hanh.vu@thanglongtelecom.vn', 'Kế toán trưởng');
+((SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0006'), 'Vũ', 'Thị', 'Giang', '0912000006', 'giang.vt@vttrangan.example.com', 'Trưởng phòng Vận hành');
 INSERT INTO enterprisecontacts (enterprise_id, contact_last_name, contact_middle_name, contact_first_name, contact_phone, contact_email, position) VALUES
-((SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0005'), 'Võ', 'Thành', 'Nam', '0912345607', 'nam.vo@phuongbacelectric.vn', 'Giám đốc điều hành');
+((SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0007'), 'Đỗ', 'Minh', 'Hải', '0912000007', 'hai.dm@dattho.example.com', 'Phó Giám đốc');
 INSERT INTO enterprisecontacts (enterprise_id, contact_last_name, contact_middle_name, contact_first_name, contact_phone, contact_email, position) VALUES
-((SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0006'), 'Đỗ', 'Văn', 'Kiên', '0912345608', 'kien.do@codienhaiphong.vn', 'Trưởng phòng Kỹ thuật');
+((SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0008'), 'Bùi', 'Thị', 'Hoa', '0912000008', 'hoa.bt@cngangthep.example.com', 'Trưởng phòng Vật tư');
 INSERT INTO enterprisecontacts (enterprise_id, contact_last_name, contact_middle_name, contact_first_name, contact_phone, contact_email, position) VALUES
-((SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0007'), 'Nguyễn', 'Thị', 'Hòa', '0912345609', 'hoa.nguyen@xaydungbacninh.vn', 'Giám đốc');
+((SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0009'), 'Ngô', 'Văn', 'Khánh', '0912000009', 'khanh.nv@xulang.example.com', 'Chủ cửa hàng');
 INSERT INTO enterprisecontacts (enterprise_id, contact_last_name, contact_middle_name, contact_first_name, contact_phone, contact_email, position) VALUES
-((SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0008'), 'Trịnh', 'Minh', 'Tuấn', '0912345610', 'tuan.trinh@anphatdistribution.vn', 'Giám đốc');
+((SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0010'), 'Lý', 'Thị', 'Lan', '0912000010', 'lan.lt@ckslaocai.example.com', 'Quản lý kinh doanh');
 INSERT INTO enterprisecontacts (enterprise_id, contact_last_name, contact_middle_name, contact_first_name, contact_phone, contact_email, position) VALUES
-((SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0008'), 'Phan', 'Thị', 'Ngọc', '0912345611', 'ngoc.phan@anphatdistribution.vn', 'Nhân viên mua hàng');
+((SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0011'), 'Trịnh', 'Văn', 'Minh', '0912000011', 'minh.tv@htmsamson.example.com', 'Trưởng phòng Kỹ thuật');
 INSERT INTO enterprisecontacts (enterprise_id, contact_last_name, contact_middle_name, contact_first_name, contact_phone, contact_email, position) VALUES
-((SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0009'), 'Hoàng', 'Văn', 'Phúc', '0912345612', 'phuc.hoang@nbcntech.vn', 'Giám đốc kinh doanh');
-INSERT INTO enterprisecontacts (enterprise_id, contact_last_name, contact_middle_name, contact_first_name, contact_phone, contact_email, position) VALUES
-((SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0010'), 'Lâm', 'Thị Kim', 'Ngân', '0912345613', 'ngan.lam@langsontelecom.vn', 'Chủ đại lý');
-INSERT INTO enterprisecontacts (enterprise_id, contact_last_name, contact_middle_name, contact_first_name, contact_phone, contact_email, position) VALUES
-((SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0011'), 'Bùi', 'Xuân', 'Trường', '0912345614', 'truong.bui@vattuthanhhoa.vn', 'Giám đốc');
-INSERT INTO enterprisecontacts (enterprise_id, contact_last_name, contact_middle_name, contact_first_name, contact_phone, contact_email, position) VALUES
-((SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0012'), 'Cao', 'Văn', 'Đạt', '0912345615', 'dat.cao@hatangnghean.vn', 'Giám đốc');
-INSERT INTO enterprisecontacts (enterprise_id, contact_last_name, contact_middle_name, contact_first_name, contact_phone, contact_email, position) VALUES
-((SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0012'), 'Ngô', 'Thị', 'Thu', '0912345616', 'thu.ngo@hatangnghean.vn', 'Kế toán');
+((SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0012'), 'Đặng', 'Thị', 'Nga', '0912000012', 'nga.dt@gpmxunghe.example.com', 'Giám đốc Chi nhánh');
 
 -- ===== Hợp đồng (15) =====
-INSERT INTO contracts (contract_code, title, contract_type, signing_date, effective_date, end_date, enterprise_id, owner_id) VALUES
-('HD-0001', 'Cung cấp thiết bị nguồn trạm BTS đợt 1', 'Cung cấp thiết bị', '2025-01-10', '2025-01-15', '2027-01-14', (SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0001'), (SELECT account_owner_id FROM enterprises WHERE enterprise_code = 'KH-0001'));
-INSERT INTO contracts (contract_code, title, contract_type, signing_date, effective_date, end_date, enterprise_id, owner_id) VALUES
-('HD-0002', 'Bảo trì hệ thống cắt lọc sét năm 2026', 'Bảo trì bảo dưỡng', '2026-01-05', '2026-01-10', '2026-09-09', (SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0001'), (SELECT account_owner_id FROM enterprises WHERE enterprise_code = 'KH-0001'));
-INSERT INTO contracts (contract_code, title, contract_type, signing_date, effective_date, end_date, enterprise_id, owner_id) VALUES
-('HD-0003', 'Cung cấp thiết bị 5G CPE/MiFi đợt 1', 'Cung cấp thiết bị', '2024-05-01', '2024-05-10', '2025-05-09', (SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0002'), (SELECT account_owner_id FROM enterprises WHERE enterprise_code = 'KH-0002'));
-INSERT INTO contracts (contract_code, title, contract_type, signing_date, effective_date, end_date, enterprise_id, owner_id) VALUES
-('HD-0004', 'Thi công tuyến cáp quang kéo cống mở rộng vùng phủ', 'Thi công lắp đặt', '2026-07-01', '2026-09-01', '2027-08-31', (SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0002'), (SELECT account_owner_id FROM enterprises WHERE enterprise_code = 'KH-0002'));
-INSERT INTO contracts (contract_code, title, contract_type, signing_date, effective_date, end_date, enterprise_id, owner_id) VALUES
-('HD-0005', 'Cung cấp router wifi 6/7 cho hạ tầng mạng', 'Cung cấp thiết bị', '2026-03-15', '2026-03-20', '2027-03-19', (SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0003'), (SELECT account_owner_id FROM enterprises WHERE enterprise_code = 'KH-0003'));
-INSERT INTO contracts (contract_code, title, contract_type, signing_date, effective_date, end_date, enterprise_id, owner_id) VALUES
-('HD-0006', 'Thi công lắp đặt ăng ten và tủ nguồn trạm BTS', 'Thi công lắp đặt', '2025-06-01', '2025-06-10', '2026-06-09', (SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0004'), (SELECT account_owner_id FROM enterprises WHERE enterprise_code = 'KH-0004'));
-INSERT INTO contracts (contract_code, title, contract_type, signing_date, effective_date, end_date, enterprise_id, owner_id) VALUES
-('HD-0007', 'Bảo trì thiết bị cắt lọc sét năm 2026', 'Bảo trì bảo dưỡng', '2026-06-01', '2026-06-05', '2027-06-04', (SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0004'), (SELECT account_owner_id FROM enterprises WHERE enterprise_code = 'KH-0004'));
-INSERT INTO contracts (contract_code, title, contract_type, signing_date, effective_date, end_date, enterprise_id, owner_id) VALUES
-('HD-0008', 'Thi công lắp đặt tủ nguồn công trình mới', 'Thi công lắp đặt', '2026-02-01', '2026-02-10', '2026-09-15', (SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0005'), (SELECT account_owner_id FROM enterprises WHERE enterprise_code = 'KH-0005'));
-INSERT INTO contracts (contract_code, title, contract_type, signing_date, effective_date, end_date, enterprise_id, owner_id) VALUES
-('HD-0009', 'Cung cấp ắc quy Gel dự phòng công trình', 'Cung cấp thiết bị', '2026-04-10', '2026-04-15', '2027-04-14', (SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0006'), (SELECT account_owner_id FROM enterprises WHERE enterprise_code = 'KH-0006'));
-INSERT INTO contracts (contract_code, title, contract_type, signing_date, effective_date, end_date, enterprise_id, owner_id) VALUES
-('HD-0010', 'Thi công tuyến cáp quang treo khu công nghiệp', 'Thi công lắp đặt', '2026-08-01', '2026-09-20', '2027-09-19', (SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0007'), (SELECT account_owner_id FROM enterprises WHERE enterprise_code = 'KH-0007'));
-INSERT INTO contracts (contract_code, title, contract_type, signing_date, effective_date, end_date, enterprise_id, owner_id) VALUES
-('HD-0011', 'Cung cấp thiết bị phân phối đợt 1', 'Cung cấp thiết bị', '2025-09-01', '2025-09-05', '2026-09-04', (SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0008'), (SELECT account_owner_id FROM enterprises WHERE enterprise_code = 'KH-0008'));
-INSERT INTO contracts (contract_code, title, contract_type, signing_date, effective_date, end_date, enterprise_id, owner_id) VALUES
-('HD-0012', 'Cung cấp cảm biến IoT LoRa cho đại lý', 'Cung cấp thiết bị', '2024-11-01', '2024-11-10', '2025-11-09', (SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0009'), (SELECT account_owner_id FROM enterprises WHERE enterprise_code = 'KH-0009'));
-INSERT INTO contracts (contract_code, title, contract_type, signing_date, effective_date, end_date, enterprise_id, owner_id) VALUES
-('HD-0013', 'Cung cấp điện thoại di động Raisecom cho đại lý', 'Cung cấp thiết bị', '2026-05-15', '2026-05-20', '2027-05-19', (SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0010'), (SELECT account_owner_id FROM enterprises WHERE enterprise_code = 'KH-0010'));
-INSERT INTO contracts (contract_code, title, contract_type, signing_date, effective_date, end_date, enterprise_id, owner_id) VALUES
-('HD-0014', 'Thi công lắp đặt tủ phân phối điện trạm viễn thông', 'Thi công lắp đặt', '2025-03-01', '2025-03-10', '2026-03-09', (SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0012'), (SELECT account_owner_id FROM enterprises WHERE enterprise_code = 'KH-0012'));
-INSERT INTO contracts (contract_code, title, contract_type, signing_date, effective_date, end_date, enterprise_id, owner_id) VALUES
-('HD-0015', 'Cung cấp sợi quang G657A1 cho đại lý', 'Cung cấp thiết bị', '2026-08-10', '2026-08-15', '2027-08-14', (SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0011'), (SELECT account_owner_id FROM enterprises WHERE enterprise_code = 'KH-0011'));
+-- Ngày tháng trải ra có chủ đích: tính tại thời điểm gieo (14/09/2026) thì
+-- HD-0005, HD-0009 và HD-0014 nằm trong vùng sắp hết hạn (dưới 90 ngày), 12
+-- hợp đồng còn lại đang chạy -- để ContractDAO.computeStatus có cái mà phân
+-- loại, thay vì cả bảng cùng một màu.
+--
+-- Cố ý KHÔNG gieo hợp đồng đã hết hạn: trạng thái là hàm thuần của ngày tháng
+-- nên chỉ cần để yên, vài tháng nữa nhóm sắp hết hạn sẽ tự trôi sang hết hạn
+-- mà không phải sửa dữ liệu. Gieo sẵn một hợp đồng "chết" chỉ để đủ màu thì
+-- ngày mai nó vẫn chết, chẳng minh hoạ được chuyển biến nào.
+-- HD-0015 giữ nguyên link Drive demo cho khách.
+INSERT INTO contracts (contract_code, title, contract_type, signing_date, effective_date, end_date, enterprise_id, owner_id, attachment_url, status) VALUES
+('HD-0001', 'Cung cấp ắc quy lithium cho 45 trạm BTS', 'Cung cấp thiết bị', '2026-01-15', '2026-02-01', '2027-01-31', (SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0001'), (SELECT user_id FROM users WHERE username = 'sales4'), NULL, 'Đang hiệu lực');
+INSERT INTO contracts (contract_code, title, contract_type, signing_date, effective_date, end_date, enterprise_id, owner_id, attachment_url, status) VALUES
+('HD-0002', 'Bảo trì hệ thống nguồn năm 2026', 'Bảo trì bảo dưỡng', '2026-02-20', '2026-03-01', '2026-12-31', (SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0001'), (SELECT user_id FROM users WHERE username = 'sales4'), NULL, 'Đang hiệu lực');
+INSERT INTO contracts (contract_code, title, contract_type, signing_date, effective_date, end_date, enterprise_id, owner_id, attachment_url, status) VALUES
+('HD-0003', 'Cung cấp thiết bị 5G CPE cho vùng phủ mới', 'Cung cấp thiết bị', '2026-03-10', '2026-03-15', '2027-03-14', (SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0002'), (SELECT user_id FROM users WHERE username = 'sales2'), NULL, 'Đang hiệu lực');
+INSERT INTO contracts (contract_code, title, contract_type, signing_date, effective_date, end_date, enterprise_id, owner_id, attachment_url, status) VALUES
+('HD-0004', 'Cung cấp tủ nguồn POSTEF cho nhà máy', 'Cung cấp thiết bị', '2026-04-05', '2026-04-15', '2027-04-14', (SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0003'), (SELECT user_id FROM users WHERE username = 'sales3'), NULL, 'Đang hiệu lực');
+INSERT INTO contracts (contract_code, title, contract_type, signing_date, effective_date, end_date, enterprise_id, owner_id, attachment_url, status) VALUES
+('HD-0005', 'Thi công tuyến cáp quang ADSS Hạ Long - Cẩm Phả', 'Thi công lắp đặt', '2026-05-12', '2026-06-01', '2026-11-30', (SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0004'), (SELECT user_id FROM users WHERE username = 'sales4'), NULL, 'Đang hiệu lực');
+INSERT INTO contracts (contract_code, title, contract_type, signing_date, effective_date, end_date, enterprise_id, owner_id, attachment_url, status) VALUES
+('HD-0006', 'Bảo trì hệ thống UPS 2026-2027', 'Bảo trì bảo dưỡng', '2026-06-01', '2026-06-15', '2027-06-14', (SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0004'), (SELECT user_id FROM users WHERE username = 'sales4'), NULL, 'Đang hiệu lực');
+INSERT INTO contracts (contract_code, title, contract_type, signing_date, effective_date, end_date, enterprise_id, owner_id, attachment_url, status) VALUES
+('HD-0007', 'Cung cấp hệ thống nguồn cho KCN Phố Nối', 'Cung cấp thiết bị', '2026-02-28', '2026-03-10', '2027-03-09', (SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0005'), (SELECT user_id FROM users WHERE username = 'sales5'), NULL, 'Đang hiệu lực');
+INSERT INTO contracts (contract_code, title, contract_type, signing_date, effective_date, end_date, enterprise_id, owner_id, attachment_url, status) VALUES
+('HD-0008', 'Cung cấp phụ kiện quang cho mạng truy nhập', 'Cung cấp thiết bị', '2026-07-01', '2026-07-10', '2027-07-09', (SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0006'), (SELECT user_id FROM users WHERE username = 'sales6'), NULL, 'Đang hiệu lực');
+INSERT INTO contracts (contract_code, title, contract_type, signing_date, effective_date, end_date, enterprise_id, owner_id, attachment_url, status) VALUES
+('HD-0009', 'Thi công hệ thống pin mặt trời trạm Việt Trì', 'Thi công lắp đặt', '2026-03-20', '2026-04-01', '2026-09-30', (SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0007'), (SELECT user_id FROM users WHERE username = 'sales4'), NULL, 'Đang hiệu lực');
+INSERT INTO contracts (contract_code, title, contract_type, signing_date, effective_date, end_date, enterprise_id, owner_id, attachment_url, status) VALUES
+('HD-0010', 'Cung cấp nguồn UNIPOWER cho khu sản xuất', 'Cung cấp thiết bị', '2025-12-10', '2026-01-01', '2026-12-31', (SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0008'), (SELECT user_id FROM users WHERE username = 'sales2'), NULL, 'Đang hiệu lực');
+INSERT INTO contracts (contract_code, title, contract_type, signing_date, effective_date, end_date, enterprise_id, owner_id, attachment_url, status) VALUES
+('HD-0011', 'Phân phối cáp quang khu vực Lạng Sơn', 'Cung cấp thiết bị', '2026-06-18', '2026-07-01', '2027-06-30', (SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0009'), (SELECT user_id FROM users WHERE username = 'sales3'), NULL, 'Đang hiệu lực');
+INSERT INTO contracts (contract_code, title, contract_type, signing_date, effective_date, end_date, enterprise_id, owner_id, attachment_url, status) VALUES
+('HD-0012', 'Phân phối dây thuê bao khu vực Lào Cai', 'Cung cấp thiết bị', '2026-05-05', '2026-05-15', '2027-05-14', (SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0010'), (SELECT user_id FROM users WHERE username = 'sales4'), NULL, 'Đang hiệu lực');
+INSERT INTO contracts (contract_code, title, contract_type, signing_date, effective_date, end_date, enterprise_id, owner_id, attachment_url, status) VALUES
+('HD-0013', 'Cung cấp UPS EATON cho hệ thống ven biển', 'Cung cấp thiết bị', '2026-04-22', '2026-05-01', '2027-04-30', (SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0011'), (SELECT user_id FROM users WHERE username = 'sales5'), NULL, 'Đang hiệu lực');
+INSERT INTO contracts (contract_code, title, contract_type, signing_date, effective_date, end_date, enterprise_id, owner_id, attachment_url, status) VALUES
+('HD-0014', 'Bảo trì hệ thống nguồn khu vực Nghệ An', 'Bảo trì bảo dưỡng', '2026-01-08', '2026-02-01', '2026-10-31', (SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0012'), (SELECT user_id FROM users WHERE username = 'sales6'), NULL, 'Đang hiệu lực');
+INSERT INTO contracts (contract_code, title, contract_type, signing_date, effective_date, end_date, enterprise_id, owner_id, attachment_url, status) VALUES
+('HD-0015', 'Cung cấp sợi quang G657A1 cho đại lý', 'Cung cấp thiết bị', '2026-08-01', '2026-08-15', '2027-08-14', (SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0009'), (SELECT user_id FROM users WHERE username = 'sales3'), 'https://drive.google.com/file/d/1lAoND44iEzSuLYnXEj7DfHNGJfHMDcBD/view?usp=sharing', 'Đang hiệu lực');
 
--- ===== Sản phẩm trong hợp đồng (26) =====
+-- ===== Hàng hoá trong hợp đồng =====
 INSERT INTO contractproducts (contract_id, product_id, quantity, unit, notes) VALUES
-((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0001'), (SELECT product_id FROM products WHERE product_code = 'SP-0001'), 20, 'Bộ', NULL);
+((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0001'), 1, 45, 'Bình', 'Mỗi trạm BTS một bình');
 INSERT INTO contractproducts (contract_id, product_id, quantity, unit, notes) VALUES
-((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0001'), (SELECT product_id FROM products WHERE product_code = 'SP-0033'), 5, 'Tủ', NULL);
+((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0001'), 6, 8, 'Tủ', 'Tủ nguồn đi kèm');
 INSERT INTO contractproducts (contract_id, product_id, quantity, unit, notes) VALUES
-((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0001'), (SELECT product_id FROM products WHERE product_code = 'SP-0006'), 10, 'Bộ', NULL);
+((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0002'), 6, 12, 'Tủ', 'Thiết bị trong phạm vi bảo trì');
 INSERT INTO contractproducts (contract_id, product_id, quantity, unit, notes) VALUES
-((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0002'), (SELECT product_id FROM products WHERE product_code = 'SP-0040'), 8, 'Bộ', 'Kèm bảo trì định kỳ 6 tháng/lần');
+((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0003'), 10, 4200, 'Mét', 'Cáp ADSS phục vụ đấu nối');
 INSERT INTO contractproducts (contract_id, product_id, quantity, unit, notes) VALUES
-((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0003'), (SELECT product_id FROM products WHERE product_code = 'SP-0049'), 50, 'Cái', NULL);
+((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0004'), 6, 15, 'Tủ', 'Tủ nguồn POSTEF');
 INSERT INTO contractproducts (contract_id, product_id, quantity, unit, notes) VALUES
-((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0003'), (SELECT product_id FROM products WHERE product_code = 'SP-0053'), 30, 'Cái', NULL);
+((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0004'), 4, 30, 'Bình', 'Ắc quy acid chì kín');
 INSERT INTO contractproducts (contract_id, product_id, quantity, unit, notes) VALUES
-((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0004'), (SELECT product_id FROM products WHERE product_code = 'SP-0012'), 2000, 'Mét', 'Cáp kéo cống 48FO');
+((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0005'), 10, 12500, 'Mét', 'Cáp ADSS tuyến chính');
 INSERT INTO contractproducts (contract_id, product_id, quantity, unit, notes) VALUES
-((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0004'), (SELECT product_id FROM products WHERE product_code = 'SP-0023'), 40, 'Cái', NULL);
+((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0006'), 8, 6, 'Bộ', 'UPS trong phạm vi bảo trì');
 INSERT INTO contractproducts (contract_id, product_id, quantity, unit, notes) VALUES
-((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0005'), (SELECT product_id FROM products WHERE product_code = 'SP-0078'), 15, 'Cái', NULL);
+((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0007'), 6, 8, 'Tủ', 'Tủ nguồn khu công nghiệp');
 INSERT INTO contractproducts (contract_id, product_id, quantity, unit, notes) VALUES
-((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0005'), (SELECT product_id FROM products WHERE product_code = 'SP-0080'), 20, 'Cái', NULL);
+((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0007'), 2, 16, 'Bình', 'Ắc quy lưu động');
 INSERT INTO contractproducts (contract_id, product_id, quantity, unit, notes) VALUES
-((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0006'), (SELECT product_id FROM products WHERE product_code = 'SP-0028'), 6, 'Bộ', NULL);
+((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0008'), 11, 6800, 'Mét', 'Cáp quang bọc chặt');
 INSERT INTO contractproducts (contract_id, product_id, quantity, unit, notes) VALUES
-((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0006'), (SELECT product_id FROM products WHERE product_code = 'SP-0036'), 6, 'Tủ', NULL);
+((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0009'), 9, 120, 'Cái', 'Tấm pin mặt trời');
 INSERT INTO contractproducts (contract_id, product_id, quantity, unit, notes) VALUES
-((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0007'), (SELECT product_id FROM products WHERE product_code = 'SP-0040'), 12, 'Bộ', NULL);
+((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0010'), 7, 10, 'Tủ', 'Nguồn UNIPOWER');
 INSERT INTO contractproducts (contract_id, product_id, quantity, unit, notes) VALUES
-((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0008'), (SELECT product_id FROM products WHERE product_code = 'SP-0035'), 4, 'Tủ', NULL);
+((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0011'), 12, 15000, 'Mét', 'Cáp quang kéo cống');
 INSERT INTO contractproducts (contract_id, product_id, quantity, unit, notes) VALUES
-((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0008'), (SELECT product_id FROM products WHERE product_code = 'SP-0032'), 4, 'Bộ', NULL);
+((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0012'), 14, 9000, 'Mét', 'Dây thuê bao đệm chặt');
 INSERT INTO contractproducts (contract_id, product_id, quantity, unit, notes) VALUES
-((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0009'), (SELECT product_id FROM products WHERE product_code = 'SP-0003'), 30, 'Bình', NULL);
+((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0013'), 8, 4, 'Bộ', 'UPS EATON');
 INSERT INTO contractproducts (contract_id, product_id, quantity, unit, notes) VALUES
-((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0010'), (SELECT product_id FROM products WHERE product_code = 'SP-0013'), 1500, 'Mét', 'Cáp treo 96FO');
+((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0014'), 6, 9, 'Tủ', 'Tủ nguồn trong phạm vi bảo trì');
 INSERT INTO contractproducts (contract_id, product_id, quantity, unit, notes) VALUES
-((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0011'), (SELECT product_id FROM products WHERE product_code = 'SP-0001'), 40, 'Bộ', 'Giao theo đợt, đợt 1: 20 bộ');
-INSERT INTO contractproducts (contract_id, product_id, quantity, unit, notes) VALUES
-((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0011'), (SELECT product_id FROM products WHERE product_code = 'SP-0086'), 20, 'Cái', NULL);
-INSERT INTO contractproducts (contract_id, product_id, quantity, unit, notes) VALUES
-((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0011'), (SELECT product_id FROM products WHERE product_code = 'SP-0088'), 15, 'Cái', NULL);
-INSERT INTO contractproducts (contract_id, product_id, quantity, unit, notes) VALUES
-((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0012'), (SELECT product_id FROM products WHERE product_code = 'SP-0074'), 100, 'Cái', NULL);
-INSERT INTO contractproducts (contract_id, product_id, quantity, unit, notes) VALUES
-((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0012'), (SELECT product_id FROM products WHERE product_code = 'SP-0077'), 60, 'Cái', NULL);
-INSERT INTO contractproducts (contract_id, product_id, quantity, unit, notes) VALUES
-((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0013'), (SELECT product_id FROM products WHERE product_code = 'SP-0048'), 50, 'Cái', NULL);
-INSERT INTO contractproducts (contract_id, product_id, quantity, unit, notes) VALUES
-((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0013'), (SELECT product_id FROM products WHERE product_code = 'SP-0047'), 30, 'Cái', NULL);
-INSERT INTO contractproducts (contract_id, product_id, quantity, unit, notes) VALUES
-((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0014'), (SELECT product_id FROM products WHERE product_code = 'SP-0038'), 5, 'Tủ', NULL);
-INSERT INTO contractproducts (contract_id, product_id, quantity, unit, notes) VALUES
-((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0015'), (SELECT product_id FROM products WHERE product_code = 'SP-0016'), 2000, 'Mét', NULL);
+((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0015'), 13, 20000, 'Mét', 'Sợi quang G657A1');
 
--- ===== Thanh toán hợp đồng (17) =====
+-- ===== Thanh toán =====
+-- Có cả kỳ đã trả và kỳ chưa tới hạn để Dashboard doanh thu và cảnh báo công
+-- nợ đều có dữ liệu.
 INSERT INTO contract_payments (contract_id, invoice_amount, due_date, paid_date) VALUES
-((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0001'), 450000000.00, '2025-02-15', '2025-02-10');
+((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0001'), 850000000, '2026-03-01', '2026-02-26');
 INSERT INTO contract_payments (contract_id, invoice_amount, due_date, paid_date) VALUES
-((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0001'), 320000000.00, '2026-09-15', NULL);
+((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0001'), 850000000, '2026-09-01', NULL);
 INSERT INTO contract_payments (contract_id, invoice_amount, due_date, paid_date) VALUES
-((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0002'), 85000000.00, '2026-08-30', NULL);
+((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0003'), 1200000000, '2026-04-15', '2026-04-12');
 INSERT INTO contract_payments (contract_id, invoice_amount, due_date, paid_date) VALUES
-((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0003'), 620000000.00, '2024-06-01', '2024-06-08');
+((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0004'), 640000000, '2026-05-15', '2026-05-10');
 INSERT INTO contract_payments (contract_id, invoice_amount, due_date, paid_date) VALUES
-((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0003'), 300000000.00, '2024-12-01', '2024-11-27');
+((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0005'), 2100000000, '2026-07-01', '2026-06-28');
 INSERT INTO contract_payments (contract_id, invoice_amount, due_date, paid_date) VALUES
-((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0005'), 210000000.00, '2026-04-20', '2026-04-18');
+((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0005'), 2100000000, '2026-10-01', NULL);
 INSERT INTO contract_payments (contract_id, invoice_amount, due_date, paid_date) VALUES
-((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0006'), 180000000.00, '2025-07-01', '2025-07-01');
+((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0007'), 1750000000, '2026-04-10', '2026-04-05');
 INSERT INTO contract_payments (contract_id, invoice_amount, due_date, paid_date) VALUES
-((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0006'), 150000000.00, '2026-01-01', '2026-01-10');
+((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0008'), 430000000, '2026-08-10', NULL);
 INSERT INTO contract_payments (contract_id, invoice_amount, due_date, paid_date) VALUES
-((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0007'), 95000000.00, '2026-07-01', '2026-06-25');
+((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0009'), 980000000, '2026-05-01', '2026-04-28');
 INSERT INTO contract_payments (contract_id, invoice_amount, due_date, paid_date) VALUES
-((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0008'), 130000000.00, '2026-09-01', NULL);
+((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0010'), 720000000, '2026-02-01', '2026-01-29');
 INSERT INTO contract_payments (contract_id, invoice_amount, due_date, paid_date) VALUES
-((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0009'), 260000000.00, '2026-05-15', '2026-05-20');
+((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0011'), 560000000, '2026-08-01', '2026-07-30');
 INSERT INTO contract_payments (contract_id, invoice_amount, due_date, paid_date) VALUES
-((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0011'), 500000000.00, '2025-10-01', '2025-09-28');
+((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0012'), 380000000, '2026-06-15', NULL);
 INSERT INTO contract_payments (contract_id, invoice_amount, due_date, paid_date) VALUES
-((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0011'), 400000000.00, '2026-09-01', NULL);
+((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0013'), 890000000, '2026-06-01', '2026-05-27');
 INSERT INTO contract_payments (contract_id, invoice_amount, due_date, paid_date) VALUES
-((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0012'), 340000000.00, '2025-01-01', '2025-01-15');
-INSERT INTO contract_payments (contract_id, invoice_amount, due_date, paid_date) VALUES
-((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0013'), 175000000.00, '2026-06-20', '2026-06-19');
-INSERT INTO contract_payments (contract_id, invoice_amount, due_date, paid_date) VALUES
-((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0014'), 220000000.00, '2025-04-01', NULL);
-INSERT INTO contract_payments (contract_id, invoice_amount, due_date, paid_date) VALUES
-((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0015'), 260000000.00, '2026-09-10', NULL);
+((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0015'), 1450000000, '2026-09-15', NULL);
 
--- ===== Lịch sử vòng đời khách hàng (12) =====
+-- ===== Diễn biến quan hệ khách hàng =====
 INSERT INTO customer_lifecycle_events (enterprise_id, event_type, relationship_rating, is_auto_generated, description, event_date, recorded_by) VALUES
-((SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0001'), 'Ký hợp đồng mới', 'Tốt', 0, 'Ký hợp đồng cung cấp thiết bị nguồn trạm BTS đợt 1, giá trị lớn, thanh toán đúng hạn.', '2025-01-10', 15);
+((SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0001'), 'Khách hàng mới', 'Tốt', 0, 'Tiếp nhận khách hàng mới, bàn giao cho đội kinh doanh.', '2023-03-15', (SELECT user_id FROM users WHERE username = 'sales4'));
 INSERT INTO customer_lifecycle_events (enterprise_id, event_type, relationship_rating, is_auto_generated, description, event_date, recorded_by) VALUES
-((SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0002'), 'Đánh giá định kỳ', 'Tốt', 1, 'Mua nhiều, thanh toán sớm hầu hết các đợt, đánh giá quan hệ tốt.', '2026-06-30', 1);
+((SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0001'), 'Ký hợp đồng mới', 'Tốt', 0, 'Ký hợp đồng cung cấp ắc quy lithium cho 45 trạm BTS.', '2026-01-15', (SELECT user_id FROM users WHERE username = 'sales4'));
 INSERT INTO customer_lifecycle_events (enterprise_id, event_type, relationship_rating, is_auto_generated, description, event_date, recorded_by) VALUES
-((SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0003'), 'Khách hàng mới', 'Cần theo dõi', 0, 'Khách hàng mới ký hợp đồng đầu tiên, cần theo dõi tiến độ thanh toán các kỳ tới.', '2026-03-20', 1);
+((SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0002'), 'Khách hàng mới', 'Tốt', 0, 'Tiếp nhận khách hàng mới khu vực Hải Phòng.', '2023-07-02', (SELECT user_id FROM users WHERE username = 'sales2'));
 INSERT INTO customer_lifecycle_events (enterprise_id, event_type, relationship_rating, is_auto_generated, description, event_date, recorded_by) VALUES
-((SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0004'), 'Gia hạn hợp đồng', 'Tốt', 0, 'Khách hàng lâu năm, tiếp tục ký hợp đồng bảo trì mới sau khi hợp đồng thi công kết thúc.', '2026-06-01', 15);
+((SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0002'), 'Gia hạn hợp đồng', 'Tốt', 0, 'Khách gia hạn và mở rộng phạm vi thiết bị 5G CPE.', '2026-03-10', (SELECT user_id FROM users WHERE username = 'sales2'));
 INSERT INTO customer_lifecycle_events (enterprise_id, event_type, relationship_rating, is_auto_generated, description, event_date, recorded_by) VALUES
-((SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0005'), 'Đánh giá định kỳ', 'Tốt', 1, 'Thanh toán đúng/sớm hạn, hợp tác tốt trong quá trình thi công.', '2026-05-01', 1);
+((SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0003'), 'Khách hàng mới', 'Tốt', 0, 'Nhà thầu thi công khu vực Bắc Ninh.', '2024-01-20', (SELECT user_id FROM users WHERE username = 'sales3'));
 INSERT INTO customer_lifecycle_events (enterprise_id, event_type, relationship_rating, is_auto_generated, description, event_date, recorded_by) VALUES
-((SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0006'), 'Phản hồi về SLA', 'Cần theo dõi', 0, 'Từng phản hồi về thời gian xử lý phiếu bảo hành ắc quy hơi chậm, đã cải thiện sau đó.', '2026-06-15', 17);
+((SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0004'), 'Đánh giá định kỳ', 'Cần theo dõi', 0, 'Đánh giá quý 3, khách phàn nàn về thời gian xử lý sự cố.', '2026-08-01', (SELECT user_id FROM users WHERE username = 'sales4'));
 INSERT INTO customer_lifecycle_events (enterprise_id, event_type, relationship_rating, is_auto_generated, description, event_date, recorded_by) VALUES
-((SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0007'), 'Khách hàng mới', 'Cần theo dõi', 0, 'Khách hàng mới, đang trong giai đoạn thi công hợp đồng đầu tiên, chưa có lịch sử thanh toán.', '2025-02-18', 1);
+((SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0004'), 'Phản hồi về SLA', 'Cần theo dõi', 0, 'Khách phản ánh phiếu sự cố sau bão xử lý chậm so với cam kết.', '2026-09-12', (SELECT user_id FROM users WHERE username = 'sales4'));
 INSERT INTO customer_lifecycle_events (enterprise_id, event_type, relationship_rating, is_auto_generated, description, event_date, recorded_by) VALUES
-((SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0008'), 'Đánh giá định kỳ', 'Tốt', 1, 'Đại lý VIP, khối lượng mua lớn, thanh toán sớm hạn.', '2026-01-15', 1);
+((SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0005'), 'Khách hàng mới', 'Tốt', 0, 'Khách hàng lớn khu công nghiệp, xếp nhóm VIP.', '2022-11-08', (SELECT user_id FROM users WHERE username = 'sales5'));
 INSERT INTO customer_lifecycle_events (enterprise_id, event_type, relationship_rating, is_auto_generated, description, event_date, recorded_by) VALUES
-((SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0009'), 'Chậm thanh toán', 'Tốt', 1, 'Có 1 lần thanh toán trễ 14 ngày nhưng đã khắc phục, tổng thể vẫn là khách hàng tốt.', '2025-01-20', 1);
+((SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0005'), 'Ký hợp đồng mới', 'Tốt', 0, 'Ký hợp đồng hệ thống nguồn cho toàn khu công nghiệp.', '2026-02-28', (SELECT user_id FROM users WHERE username = 'sales5'));
 INSERT INTO customer_lifecycle_events (enterprise_id, event_type, relationship_rating, is_auto_generated, description, event_date, recorded_by) VALUES
-((SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0010'), 'Đánh giá định kỳ', 'Cần theo dõi', 1, 'Khối lượng mua ở mức trung bình, cần thêm chương trình thúc đẩy doanh số.', '2026-07-01', 1);
+((SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0006'), 'Khách hàng mới', 'Tốt', 0, 'Tiếp nhận khách hàng khu vực Ninh Bình.', '2024-09-19', (SELECT user_id FROM users WHERE username = 'sales6'));
 INSERT INTO customer_lifecycle_events (enterprise_id, event_type, relationship_rating, is_auto_generated, description, event_date, recorded_by) VALUES
-((SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0011'), 'Khách hàng mới', 'Tốt', 0, 'Đại lý mới, đơn hàng đầu tiên khởi đầu thuận lợi.', '2026-08-15', 1);
+((SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0007'), 'Đánh giá định kỳ', 'Cần theo dõi', 0, 'Hợp đồng thi công sắp kết thúc, chưa có kế hoạch tiếp theo.', '2026-07-15', (SELECT user_id FROM users WHERE username = 'sales4'));
 INSERT INTO customer_lifecycle_events (enterprise_id, event_type, relationship_rating, is_auto_generated, description, event_date, recorded_by) VALUES
-((SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0012'), 'Nguy cơ rời bỏ', 'Có nguy cơ rời bỏ', 1, 'Hợp đồng đã hết hạn nhưng còn khoản thanh toán 220 triệu đồng quá hạn chưa thu hồi được, khách hàng không phản hồi liên hệ gần đây.', '2026-08-01', 15);
+((SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0008'), 'Khách hàng mới', 'Tốt', 0, 'Nhà thầu khu vực Thái Nguyên.', '2023-12-05', (SELECT user_id FROM users WHERE username = 'sales2'));
+INSERT INTO customer_lifecycle_events (enterprise_id, event_type, relationship_rating, is_auto_generated, description, event_date, recorded_by) VALUES
+((SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0009'), 'Khách hàng mới', 'Tốt', 0, 'Đại lý phân phối khu vực Lạng Sơn.', '2025-04-16', (SELECT user_id FROM users WHERE username = 'sales3'));
+INSERT INTO customer_lifecycle_events (enterprise_id, event_type, relationship_rating, is_auto_generated, description, event_date, recorded_by) VALUES
+((SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0010'), 'Đánh giá định kỳ', 'Cần theo dõi', 0, 'Đại lý mới, sản lượng chưa ổn định.', '2026-08-20', (SELECT user_id FROM users WHERE username = 'sales4'));
+INSERT INTO customer_lifecycle_events (enterprise_id, event_type, relationship_rating, is_auto_generated, description, event_date, recorded_by) VALUES
+((SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0011'), 'Chậm thanh toán', 'Có nguy cơ rời bỏ', 0, 'Chậm thanh toán kỳ tháng 6 quá 30 ngày.', '2026-07-05', (SELECT user_id FROM users WHERE username = 'sales5'));
+INSERT INTO customer_lifecycle_events (enterprise_id, event_type, relationship_rating, is_auto_generated, description, event_date, recorded_by) VALUES
+((SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0011'), 'Nguy cơ rời bỏ', 'Có nguy cơ rời bỏ', 0, 'Khách đang so sánh báo giá của nhà cung cấp khác.', '2026-08-30', (SELECT user_id FROM users WHERE username = 'sales5'));
+INSERT INTO customer_lifecycle_events (enterprise_id, event_type, relationship_rating, is_auto_generated, description, event_date, recorded_by) VALUES
+((SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0012'), 'Khách hàng mới', 'Tốt', 0, 'Tiếp nhận khách hàng khu vực Nghệ An.', '2024-10-30', (SELECT user_id FROM users WHERE username = 'sales6'));
 
--- ===== Phiếu hỗ trợ kỹ thuật (14) =====
-INSERT INTO technicalrequests (ticket_code, enterprise_id, contract_id, ticket_type, priority, reception_channel, sla_deadline, assigned_technician_id, created_by, created_date, description, is_warranty, status, resolution_summary, resolved_at) VALUES
-('TK-0001', (SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0001'), (SELECT contract_id FROM contracts WHERE contract_code = 'HD-0001'), 'Bảo hành', 'Cao', 'Điện thoại', '2026-08-27 10:00:00', (SELECT user_id FROM users WHERE username = 'kythuat2'), (SELECT user_id FROM users WHERE username = 'cskh2'), '2026-08-20', 'Ắc quy lithium tại trạm BTS Cầu Giấy báo lỗi không sạc đầy, cần kiểm tra gấp.', 1, 'Đang xử lý', NULL, NULL);
-INSERT INTO technicalrequests (ticket_code, enterprise_id, contract_id, ticket_type, priority, reception_channel, sla_deadline, assigned_technician_id, created_by, created_date, description, is_warranty, status, resolution_summary, resolved_at) VALUES
-('TK-0002', (SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0001'), NULL, 'Bảo trì', 'Bình thường', 'Email', '2026-07-22 17:00:00', (SELECT user_id FROM users WHERE username = 'kythuat3'), (SELECT user_id FROM users WHERE username = 'cskh2'), '2026-07-15', 'Bảo trì định kỳ hệ thống nguồn quý 3.', 0, 'Đã đóng', 'Đã kiểm tra, vệ sinh, thay thế 2 quạt tản nhiệt tủ nguồn.', '2026-07-20 16:30:00');
-INSERT INTO technicalrequests (ticket_code, enterprise_id, contract_id, ticket_type, priority, reception_channel, sla_deadline, assigned_technician_id, created_by, created_date, description, is_warranty, status, resolution_summary, resolved_at) VALUES
-('TK-0003', (SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0002'), (SELECT contract_id FROM contracts WHERE contract_code = 'HD-0003'), 'Sửa chữa', 'Khẩn cấp', 'Điện thoại', '2026-08-25 09:00:00', (SELECT user_id FROM users WHERE username = 'kythuat4'), (SELECT user_id FROM users WHERE username = 'cskh2'), '2026-08-22', '5G CPE C150 mất kết nối hoàn toàn tại 12 điểm lắp đặt sau cơn bão.', 1, 'Mới tiếp nhận', NULL, NULL);
-INSERT INTO technicalrequests (ticket_code, enterprise_id, contract_id, ticket_type, priority, reception_channel, sla_deadline, assigned_technician_id, created_by, created_date, description, is_warranty, status, resolution_summary, resolved_at) VALUES
-('TK-0004', (SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0002'), NULL, 'Tư vấn', 'Thấp', 'Website', '2026-08-17 17:00:00', (SELECT user_id FROM users WHERE username = 'kythuat5'), (SELECT account_owner_id FROM enterprises WHERE enterprise_code = 'KH-0002'), '2026-08-10', 'Khách hàng hỏi về giải pháp mở rộng vùng phủ 5G cho khu công nghiệp mới.', 0, 'Đã đóng', 'Đã tư vấn giải pháp 5G Outdoor O022 kết hợp router mesh, gửi báo giá.', '2026-08-12 14:00:00');
-INSERT INTO technicalrequests (ticket_code, enterprise_id, contract_id, ticket_type, priority, reception_channel, sla_deadline, assigned_technician_id, created_by, created_date, description, is_warranty, status, resolution_summary, resolved_at) VALUES
-('TK-0005', (SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0003'), NULL, 'Bảo hành', 'Cao', 'Trực tiếp', '2026-08-28 17:00:00', (SELECT user_id FROM users WHERE username = 'kythuat2'), (SELECT user_id FROM users WHERE username = 'cskh2'), '2026-08-05', 'Router MI10 tại văn phòng bị mất sóng mesh chập chờn.', 1, 'Đang xử lý', NULL, NULL);
-INSERT INTO technicalrequests (ticket_code, enterprise_id, contract_id, ticket_type, priority, reception_channel, sla_deadline, assigned_technician_id, created_by, created_date, description, is_warranty, status, resolution_summary, resolved_at) VALUES
-('TK-0006', (SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0004'), (SELECT contract_id FROM contracts WHERE contract_code = 'HD-0006'), 'Sửa chữa', 'Bình thường', 'Điện thoại', '2025-08-08 17:00:00', (SELECT user_id FROM users WHERE username = 'kythuat3'), (SELECT user_id FROM users WHERE username = 'cskh2'), '2025-08-01', 'Ăng ten POSTEF lắp đặt bị lệch hướng sau thi công, tín hiệu yếu.', 1, 'Đã đóng', 'Đã hiệu chỉnh lại góc ăng ten, đo kiểm tín hiệu đạt chuẩn.', '2025-08-05 11:00:00');
-INSERT INTO technicalrequests (ticket_code, enterprise_id, contract_id, ticket_type, priority, reception_channel, sla_deadline, assigned_technician_id, created_by, created_date, description, is_warranty, status, resolution_summary, resolved_at) VALUES
-('TK-0007', (SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0004'), (SELECT contract_id FROM contracts WHERE contract_code = 'HD-0007'), 'Bảo trì', 'Thấp', 'Email', '2026-09-05 09:00:00', (SELECT user_id FROM users WHERE username = 'kythuat4'), (SELECT account_owner_id FROM enterprises WHERE enterprise_code = 'KH-0004'), '2026-08-18', 'Đề nghị lên lịch bảo trì định kỳ thiết bị cắt lọc sét quý 4.', 0, 'Mới tiếp nhận', NULL, NULL);
-INSERT INTO technicalrequests (ticket_code, enterprise_id, contract_id, ticket_type, priority, reception_channel, sla_deadline, assigned_technician_id, created_by, created_date, description, is_warranty, status, resolution_summary, resolved_at) VALUES
-('TK-0008', (SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0005'), (SELECT contract_id FROM contracts WHERE contract_code = 'HD-0008'), 'Sửa chữa', 'Khẩn cấp', 'Điện thoại', '2026-08-25 08:00:00', (SELECT user_id FROM users WHERE username = 'kythuat5'), (SELECT user_id FROM users WHERE username = 'cskh2'), '2026-08-23', 'Tủ nguồn PP/RU tại công trình báo lỗi ngắt điện đột ngột, ảnh hưởng tiến độ thi công.', 1, 'Đang xử lý', NULL, NULL);
-INSERT INTO technicalrequests (ticket_code, enterprise_id, contract_id, ticket_type, priority, reception_channel, sla_deadline, assigned_technician_id, created_by, created_date, description, is_warranty, status, resolution_summary, resolved_at) VALUES
-('TK-0009', (SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0006'), (SELECT contract_id FROM contracts WHERE contract_code = 'HD-0009'), 'Bảo hành', 'Bình thường', 'Email', '2026-06-08 17:00:00', (SELECT user_id FROM users WHERE username = 'kythuat2'), (SELECT user_id FROM users WHERE username = 'cskh2'), '2026-06-01', '3 bình ắc quy Gel phồng vỏ sau 2 tháng sử dụng.', 1, 'Đã đóng', 'Xác nhận lỗi nhà sản xuất, đã đổi mới 3 bình ắc quy.', '2026-06-10 15:00:00');
-INSERT INTO technicalrequests (ticket_code, enterprise_id, contract_id, ticket_type, priority, reception_channel, sla_deadline, assigned_technician_id, created_by, created_date, description, is_warranty, status, resolution_summary, resolved_at) VALUES
-('TK-0010', (SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0007'), NULL, 'Tư vấn', 'Thấp', 'Trực tiếp', '2026-09-10 17:00:00', (SELECT user_id FROM users WHERE username = 'kythuat3'), (SELECT account_owner_id FROM enterprises WHERE enterprise_code = 'KH-0007'), '2026-08-21', 'Khách hàng tham quan nhà máy, hỏi thông tin giá cáp quang treo cho dự án mới.', 0, 'Mới tiếp nhận', NULL, NULL);
-INSERT INTO technicalrequests (ticket_code, enterprise_id, contract_id, ticket_type, priority, reception_channel, sla_deadline, assigned_technician_id, created_by, created_date, description, is_warranty, status, resolution_summary, resolved_at) VALUES
-('TK-0011', (SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0008'), (SELECT contract_id FROM contracts WHERE contract_code = 'HD-0011'), 'Sửa chữa', 'Cao', 'Điện thoại', '2026-08-26 17:00:00', (SELECT user_id FROM users WHERE username = 'kythuat4'), (SELECT user_id FROM users WHERE username = 'cskh2'), '2026-08-19', 'Lô hàng loa nén 25W giao cho đại lý có 5 cái không lên nguồn.', 1, 'Đang xử lý', NULL, NULL);
-INSERT INTO technicalrequests (ticket_code, enterprise_id, contract_id, ticket_type, priority, reception_channel, sla_deadline, assigned_technician_id, created_by, created_date, description, is_warranty, status, resolution_summary, resolved_at) VALUES
-('TK-0012', (SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0009'), (SELECT contract_id FROM contracts WHERE contract_code = 'HD-0012'), 'Bảo hành', 'Bình thường', 'Website', '2025-11-22 17:00:00', (SELECT user_id FROM users WHERE username = 'kythuat5'), (SELECT user_id FROM users WHERE username = 'cskh2'), '2025-11-15', 'Cảm biến Object Locator không lên được kết nối LoRaWAN.', 1, 'Đã đóng', 'Cấu hình lại tần số EU868, hoạt động bình thường.', '2025-11-20 10:00:00');
-INSERT INTO technicalrequests (ticket_code, enterprise_id, contract_id, ticket_type, priority, reception_channel, sla_deadline, assigned_technician_id, created_by, created_date, description, is_warranty, status, resolution_summary, resolved_at) VALUES
-('TK-0013', (SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0010'), NULL, 'Bảo trì', 'Thấp', 'Email', '2026-09-01 17:00:00', (SELECT user_id FROM users WHERE username = 'kythuat2'), (SELECT account_owner_id FROM enterprises WHERE enterprise_code = 'KH-0010'), '2026-08-15', 'Đề nghị bảo trì kho hàng đại lý định kỳ.', 0, 'Mới tiếp nhận', NULL, NULL);
-INSERT INTO technicalrequests (ticket_code, enterprise_id, contract_id, ticket_type, priority, reception_channel, sla_deadline, assigned_technician_id, created_by, created_date, description, is_warranty, status, resolution_summary, resolved_at) VALUES
-('TK-0014', (SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0012'), (SELECT contract_id FROM contracts WHERE contract_code = 'HD-0014'), 'Sửa chữa', 'Cao', 'Điện thoại', '2026-02-08 17:00:00', (SELECT user_id FROM users WHERE username = 'kythuat3'), (SELECT user_id FROM users WHERE username = 'cskh2'), '2026-02-01', 'Tủ phân phối điện DB1 bị chập, cần kiểm tra gấp trước khi bàn giao.', 1, 'Đã đóng', 'Đã sửa chữa, thay cầu dao, bàn giao lại nhưng khách hàng chưa thanh toán phí sửa chữa.', '2026-02-10 09:00:00');
+-- ===== Phiếu hỗ trợ kỹ thuật (16) =====
+--
+-- Phân bố nhóm nguyên nhân (cột thống kê được):
+--   Do vận chuyển : TK-0001, TK-0010, TK-0014            (3)
+--   Do lắp đặt    : TK-0003, TK-0007, TK-0011            (3)
+--   Do thiết bị   : TK-0005, TK-0006, TK-0012            (3)
+--   Khác          : TK-0015, TK-0016                     (2)
+--   Chưa đánh giá : TK-0002, TK-0004, TK-0008, TK-0009, TK-0013  (5)
+--
+-- Năm phiếu cuối để NULL có chủ đích, gồm hai kiểu:
+--   * phiếu "Mới tiếp nhận" (TK-0008, TK-0009, TK-0013) -- chưa ai xuống hiện
+--     trường thì chưa thể biết vì sao hỏng;
+--   * phiếu bảo trì định kỳ và tư vấn (TK-0002, TK-0004) -- không có sự cố nào
+--     để mà truy nguyên nhân.
+-- Cả hai kiểu đều là dữ liệu đúng, không phải dữ liệu thiếu.
+--
+-- Hạn SLA cũng trải ra: TK-0003 đã quá hạn, TK-0005 và TK-0009 sắp tới hạn,
+-- còn lại trong hạn -- để ô "sắp/đã quá hạn" trên dashboard và lịch nhắc của
+-- NotificationScheduler có việc mà làm.
+INSERT INTO technicalrequests (ticket_code, enterprise_id, contract_id, ticket_type, priority, reception_channel, sla_deadline, assigned_technician_id, created_by, created_date, description, root_cause, cause_category, is_warranty, status, resolution_summary, resolved_at) VALUES
+('TK-0001', (SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0001'), (SELECT contract_id FROM contracts WHERE contract_code = 'HD-0001'), 'Bảo hành', 'Cao', 'Điện thoại', '2026-09-20 10:00:00', (SELECT user_id FROM users WHERE username = 'kythuat2'), (SELECT user_id FROM users WHERE username = 'cskh4'), '2026-09-10', 'Ắc quy lithium tại trạm BTS Cầu Giấy báo lỗi không sạc đầy, dừng ở mức 80 phần trăm.', 'Vỏ cell ngăn số 3 nứt do va đập trong quá trình vận chuyển lên trạm, rò điện giải khiến mạch BMS chủ động ngắt sạc.', 'Do vận chuyển', 1, 'Đã đóng', 'Đã thay ngăn ắc quy bị nứt, nạp đầy và đo kiểm tải trong 2 giờ, trạm hoạt động bình thường.', '2026-09-12 16:30:00');
+INSERT INTO technicalrequests (ticket_code, enterprise_id, contract_id, ticket_type, priority, reception_channel, sla_deadline, assigned_technician_id, created_by, created_date, description, root_cause, cause_category, is_warranty, status, resolution_summary, resolved_at) VALUES
+('TK-0002', (SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0001'), (SELECT contract_id FROM contracts WHERE contract_code = 'HD-0002'), 'Bảo trì', 'Bình thường', 'Email', '2026-09-25 17:00:00', (SELECT user_id FROM users WHERE username = 'kythuat2'), (SELECT user_id FROM users WHERE username = 'cskh4'), '2026-09-05', 'Bảo trì định kỳ hệ thống nguồn quý 3 theo hợp đồng.', NULL, NULL, 0, 'Đã đóng', 'Đã vệ sinh tủ nguồn, thay 2 quạt tản nhiệt và siết lại toàn bộ đầu cốt.', '2026-09-08 16:00:00');
+INSERT INTO technicalrequests (ticket_code, enterprise_id, contract_id, ticket_type, priority, reception_channel, sla_deadline, assigned_technician_id, created_by, created_date, description, root_cause, cause_category, is_warranty, status, resolution_summary, resolved_at) VALUES
+('TK-0003', (SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0002'), (SELECT contract_id FROM contracts WHERE contract_code = 'HD-0003'), 'Sửa chữa', 'Khẩn cấp', 'Điện thoại', '2026-09-13 09:00:00', (SELECT user_id FROM users WHERE username = 'kythuat3'), (SELECT user_id FROM users WHERE username = 'cskh2'), '2026-09-11', 'Thiết bị 5G CPE mất kết nối hoàn toàn tại 12 điểm lắp đặt sau cơn bão.', 'Nước mưa tràn vào hộp đấu nối do gioăng chống nước bị lắp ngược chiều tại cả 12 điểm.', 'Do lắp đặt', 1, 'Đang xử lý', NULL, NULL);
+INSERT INTO technicalrequests (ticket_code, enterprise_id, contract_id, ticket_type, priority, reception_channel, sla_deadline, assigned_technician_id, created_by, created_date, description, root_cause, cause_category, is_warranty, status, resolution_summary, resolved_at) VALUES
+('TK-0004', (SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0002'), NULL, 'Tư vấn', 'Thấp', 'Website', '2026-09-30 17:00:00', (SELECT user_id FROM users WHERE username = 'kythuat2'), (SELECT user_id FROM users WHERE username = 'sales4'), '2026-09-02', 'Khách hàng hỏi giải pháp mở rộng vùng phủ 5G cho khu công nghiệp mới.', NULL, NULL, 0, 'Đã đóng', 'Đã tư vấn giải pháp 5G Outdoor kết hợp router mesh và gửi báo giá sơ bộ.', '2026-09-04 14:00:00');
+INSERT INTO technicalrequests (ticket_code, enterprise_id, contract_id, ticket_type, priority, reception_channel, sla_deadline, assigned_technician_id, created_by, created_date, description, root_cause, cause_category, is_warranty, status, resolution_summary, resolved_at) VALUES
+('TK-0005', (SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0003'), (SELECT contract_id FROM contracts WHERE contract_code = 'HD-0004'), 'Bảo hành', 'Cao', 'Điện thoại', '2026-09-15 12:00:00', (SELECT user_id FROM users WHERE username = 'kythuat4'), (SELECT user_id FROM users WHERE username = 'cskh3'), '2026-09-09', 'Tủ nguồn POSTEF báo lỗi quá nhiệt và tự ngắt 3 lần trong một tuần.', 'Quạt tản nhiệt hỏng bạc đạn sau 26 tháng chạy liên tục, lưu lượng gió đo được chỉ còn khoảng 40 phần trăm so với thiết kế.', 'Do thiết bị', 1, 'Đang xử lý', NULL, NULL);
+INSERT INTO technicalrequests (ticket_code, enterprise_id, contract_id, ticket_type, priority, reception_channel, sla_deadline, assigned_technician_id, created_by, created_date, description, root_cause, cause_category, is_warranty, status, resolution_summary, resolved_at) VALUES
+('TK-0006', (SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0003'), NULL, 'Sửa chữa', 'Bình thường', 'Trực tiếp', '2026-08-30 17:00:00', (SELECT user_id FROM users WHERE username = 'kythuat4'), (SELECT user_id FROM users WHERE username = 'cskh3'), '2026-08-25', 'Ắc quy Gel tại trạm Yên Phong sụt áp nhanh khi mất điện lưới.', 'Ắc quy đã hết tuổi thọ thiết kế 5 năm, dung lượng đo được còn 62 phần trăm so với danh định.', 'Do thiết bị', 0, 'Đã đóng', 'Đã thay mới toàn bộ 4 bình ắc quy Gel, cân bằng điện áp và bàn giao cho khách.', '2026-08-29 15:00:00');
+INSERT INTO technicalrequests (ticket_code, enterprise_id, contract_id, ticket_type, priority, reception_channel, sla_deadline, assigned_technician_id, created_by, created_date, description, root_cause, cause_category, is_warranty, status, resolution_summary, resolved_at) VALUES
+('TK-0007', (SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0004'), (SELECT contract_id FROM contracts WHERE contract_code = 'HD-0005'), 'Sửa chữa', 'Cao', 'Điện thoại', '2026-09-18 09:00:00', (SELECT user_id FROM users WHERE username = 'kythuat5'), (SELECT user_id FROM users WHERE username = 'cskh2'), '2026-09-12', 'Tuyến cáp quang ADSS Hạ Long - Cẩm Phả suy hao vượt ngưỡng cho phép.', 'Cáp bị uốn quá bán kính cho phép tại 2 điểm treo trong lúc kéo cáp, sợi bị vi uốn gây suy hao cục bộ.', 'Do lắp đặt', 1, 'Đang xử lý', NULL, NULL);
+INSERT INTO technicalrequests (ticket_code, enterprise_id, contract_id, ticket_type, priority, reception_channel, sla_deadline, assigned_technician_id, created_by, created_date, description, root_cause, cause_category, is_warranty, status, resolution_summary, resolved_at) VALUES
+('TK-0008', (SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0004'), (SELECT contract_id FROM contracts WHERE contract_code = 'HD-0006'), 'Bảo trì', 'Thấp', 'Email', '2026-10-05 17:00:00', (SELECT user_id FROM users WHERE username = 'kythuat5'), (SELECT user_id FROM users WHERE username = 'cskh4'), '2026-09-13', 'Khách đề nghị kiểm tra định kỳ hệ thống UPS theo chu kỳ 6 tháng.', NULL, NULL, 0, 'Mới tiếp nhận', NULL, NULL);
+INSERT INTO technicalrequests (ticket_code, enterprise_id, contract_id, ticket_type, priority, reception_channel, sla_deadline, assigned_technician_id, created_by, created_date, description, root_cause, cause_category, is_warranty, status, resolution_summary, resolved_at) VALUES
+('TK-0009', (SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0005'), (SELECT contract_id FROM contracts WHERE contract_code = 'HD-0007'), 'Bảo hành', 'Khẩn cấp', 'Điện thoại', '2026-09-14 18:00:00', (SELECT user_id FROM users WHERE username = 'kythuat2'), (SELECT user_id FROM users WHERE username = 'cskh4'), '2026-09-13', 'Toàn bộ 8 tủ nguồn tại khu công nghiệp Phố Nối mất điện DC lúc 2 giờ sáng.', NULL, NULL, 1, 'Mới tiếp nhận', NULL, NULL);
+INSERT INTO technicalrequests (ticket_code, enterprise_id, contract_id, ticket_type, priority, reception_channel, sla_deadline, assigned_technician_id, created_by, created_date, description, root_cause, cause_category, is_warranty, status, resolution_summary, resolved_at) VALUES
+('TK-0010', (SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0006'), (SELECT contract_id FROM contracts WHERE contract_code = 'HD-0008'), 'Sửa chữa', 'Bình thường', 'Trực tiếp', '2026-09-05 17:00:00', (SELECT user_id FROM users WHERE username = 'kythuat3'), (SELECT user_id FROM users WHERE username = 'cskh3'), '2026-08-28', 'Bộ chia quang bị vỡ vỏ, phát hiện ngay khi nhận hàng tại kho Ninh Bình.', 'Thùng hàng bị rơi trong lúc bốc dỡ, lớp xốp chèn không đủ dày so với quy cách đóng gói đã ban hành.', 'Do vận chuyển', 1, 'Đã đóng', 'Đã đổi bộ chia quang mới theo chính sách bảo hành vận chuyển và cập nhật quy cách đóng gói cho các lô sau.', '2026-09-02 11:00:00');
+INSERT INTO technicalrequests (ticket_code, enterprise_id, contract_id, ticket_type, priority, reception_channel, sla_deadline, assigned_technician_id, created_by, created_date, description, root_cause, cause_category, is_warranty, status, resolution_summary, resolved_at) VALUES
+('TK-0011', (SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0007'), (SELECT contract_id FROM contracts WHERE contract_code = 'HD-0009'), 'Bảo hành', 'Cao', 'Email', '2026-09-19 17:00:00', (SELECT user_id FROM users WHERE username = 'kythuat4'), (SELECT user_id FROM users WHERE username = 'cskh4'), '2026-09-08', 'Hệ thống pin mặt trời tại trạm Việt Trì sụt hiệu suất khoảng 30 phần trăm.', 'Tấm pin được lắp nghiêng 12 độ thay vì 25 độ theo thiết kế, lại nằm trong vùng bóng cột anten che khoảng 3 giờ mỗi ngày.', 'Do lắp đặt', 1, 'Đã đóng', 'Đã chỉnh khung đỡ về đúng 25 độ và dịch vị trí 1,5 mét ra khỏi vùng bóng, hiệu suất phục hồi.', '2026-09-11 16:00:00');
+INSERT INTO technicalrequests (ticket_code, enterprise_id, contract_id, ticket_type, priority, reception_channel, sla_deadline, assigned_technician_id, created_by, created_date, description, root_cause, cause_category, is_warranty, status, resolution_summary, resolved_at) VALUES
+('TK-0012', (SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0008'), (SELECT contract_id FROM contracts WHERE contract_code = 'HD-0010'), 'Sửa chữa', 'Cao', 'Điện thoại', '2026-08-20 09:00:00', (SELECT user_id FROM users WHERE username = 'kythuat5'), (SELECT user_id FROM users WHERE username = 'cskh2'), '2026-08-15', 'Nguồn UNIPOWER báo lỗi module rectifier số 2, hệ thống chạy thiếu dự phòng.', 'Module rectifier lỗi tụ đầu vào ngay từ nhà sản xuất, cùng lô với 3 ca đã ghi nhận trước đó.', 'Do thiết bị', 1, 'Đã đóng', 'Đã thay module rectifier mới và gửi module lỗi về hãng để đổi bảo hành.', '2026-08-19 14:30:00');
+INSERT INTO technicalrequests (ticket_code, enterprise_id, contract_id, ticket_type, priority, reception_channel, sla_deadline, assigned_technician_id, created_by, created_date, description, root_cause, cause_category, is_warranty, status, resolution_summary, resolved_at) VALUES
+('TK-0013', (SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0009'), (SELECT contract_id FROM contracts WHERE contract_code = 'HD-0011'), 'Tư vấn', 'Thấp', 'Website', '2026-10-10 17:00:00', (SELECT user_id FROM users WHERE username = 'kythuat2'), (SELECT user_id FROM users WHERE username = 'cskh4'), '2026-09-13', 'Đại lý hỏi quy cách đóng gói cáp quang cho đơn hàng đi Cao Bằng.', NULL, NULL, 0, 'Mới tiếp nhận', NULL, NULL);
+INSERT INTO technicalrequests (ticket_code, enterprise_id, contract_id, ticket_type, priority, reception_channel, sla_deadline, assigned_technician_id, created_by, created_date, description, root_cause, cause_category, is_warranty, status, resolution_summary, resolved_at) VALUES
+('TK-0014', (SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0010'), (SELECT contract_id FROM contracts WHERE contract_code = 'HD-0012'), 'Bảo hành', 'Bình thường', 'Điện thoại', '2026-09-02 17:00:00', (SELECT user_id FROM users WHERE username = 'kythuat3'), (SELECT user_id FROM users WHERE username = 'cskh3'), '2026-08-26', 'Dây thuê bao đệm chặt bị đứt lõi khi bóc vỏ, tỉ lệ hỏng khoảng 8 phần trăm.', 'Cuộn cáp bị ép biến dạng do xếp chồng quá 4 tầng trên xe tải, lõi gãy ngầm bên trong mà nhìn ngoài không thấy.', 'Do vận chuyển', 1, 'Đã đóng', 'Đã thu hồi và đổi cuộn cáp mới, đồng thời phổ biến lại giới hạn xếp chồng cho đơn vị vận chuyển.', '2026-09-01 10:00:00');
+INSERT INTO technicalrequests (ticket_code, enterprise_id, contract_id, ticket_type, priority, reception_channel, sla_deadline, assigned_technician_id, created_by, created_date, description, root_cause, cause_category, is_warranty, status, resolution_summary, resolved_at) VALUES
+('TK-0015', (SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0011'), (SELECT contract_id FROM contracts WHERE contract_code = 'HD-0013'), 'Sửa chữa', 'Cao', 'Trực tiếp', '2026-09-16 09:00:00', (SELECT user_id FROM users WHERE username = 'kythuat4'), (SELECT user_id FROM users WHERE username = 'cskh4'), '2026-09-10', 'UPS EATON tại Sầm Sơn liên tục chuyển sang chế độ bypass.', 'Hơi muối biển và độ ẩm cao gây oxy hoá tiếp điểm contactor. Môi trường lắp đặt ven biển nằm ngoài điều kiện vận hành khuyến cáo của thiết bị.', 'Khác', 0, 'Đang xử lý', NULL, NULL);
+INSERT INTO technicalrequests (ticket_code, enterprise_id, contract_id, ticket_type, priority, reception_channel, sla_deadline, assigned_technician_id, created_by, created_date, description, root_cause, cause_category, is_warranty, status, resolution_summary, resolved_at) VALUES
+('TK-0016', (SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0012'), (SELECT contract_id FROM contracts WHERE contract_code = 'HD-0014'), 'Bảo trì', 'Bình thường', 'Email', '2026-08-31 17:00:00', (SELECT user_id FROM users WHERE username = 'kythuat5'), (SELECT user_id FROM users WHERE username = 'cskh2'), '2026-08-24', 'Kiểm tra hệ thống nguồn sau sự cố mất điện lưới diện rộng toàn khu vực.', 'Mất điện lưới kéo dài 11 giờ, vượt mức dự phòng 8 giờ mà hệ thống ắc quy được thiết kế để gánh.', 'Khác', 0, 'Đã đóng', 'Đã nạp lại toàn bộ ắc quy, đo dung lượng còn 94 phần trăm và khuyến nghị bổ sung thêm 2 bình.', '2026-08-28 17:00:00');
 
--- ===== Thiết bị trong phiếu hỗ trợ (8) =====
-INSERT INTO technicalrequestdevices (ticket_id, product_id, device_name, serial_number, fault_notes) VALUES
-((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0001'), (SELECT product_id FROM products WHERE product_code = 'SP-0001'), (SELECT product_name FROM products WHERE product_code = 'SP-0001'), 'PDA10-2026-0088', 'Không sạc đầy, tự ngắt sau 70%');
-INSERT INTO technicalrequestdevices (ticket_id, product_id, device_name, serial_number, fault_notes) VALUES
-((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0002'), (SELECT product_id FROM products WHERE product_code = 'SP-0006'), (SELECT product_name FROM products WHERE product_code = 'SP-0006'), NULL, 'Bảo trì định kỳ, không có lỗi phát sinh');
-INSERT INTO technicalrequestdevices (ticket_id, product_id, device_name, serial_number, fault_notes) VALUES
-((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0005'), (SELECT product_id FROM products WHERE product_code = 'SP-0078'), (SELECT product_name FROM products WHERE product_code = 'SP-0078'), 'MI10-2026-0014', 'Mesh chập chờn, rớt kết nối nhiều lần trong ngày');
-INSERT INTO technicalrequestdevices (ticket_id, product_id, device_name, serial_number, fault_notes) VALUES
-((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0008'), (SELECT product_id FROM products WHERE product_code = 'SP-0035'), (SELECT product_name FROM products WHERE product_code = 'SP-0035'), 'PPRU-2026-0021', 'Ngắt điện đột ngột không rõ nguyên nhân');
-INSERT INTO technicalrequestdevices (ticket_id, product_id, device_name, serial_number, fault_notes) VALUES
-((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0009'), (SELECT product_id FROM products WHERE product_code = 'SP-0003'), (SELECT product_name FROM products WHERE product_code = 'SP-0003'), NULL, '3 bình phồng vỏ, không giữ được điện áp');
-INSERT INTO technicalrequestdevices (ticket_id, product_id, device_name, serial_number, fault_notes) VALUES
-((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0011'), (SELECT product_id FROM products WHERE product_code = 'SP-0086'), (SELECT product_name FROM products WHERE product_code = 'SP-0086'), NULL, '5 loa trong lô không lên nguồn khi cấp điện');
-INSERT INTO technicalrequestdevices (ticket_id, product_id, device_name, serial_number, fault_notes) VALUES
-((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0012'), (SELECT product_id FROM products WHERE product_code = 'SP-0074'), (SELECT product_name FROM products WHERE product_code = 'SP-0074'), 'OBL-2025-0033', 'Không kết nối được mạng LoRaWAN EU868');
-INSERT INTO technicalrequestdevices (ticket_id, product_id, device_name, serial_number, fault_notes) VALUES
-((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0014'), (SELECT product_id FROM products WHERE product_code = 'SP-0038'), (SELECT product_name FROM products WHERE product_code = 'SP-0038'), 'DB1-2025-0007', 'Chập cầu dao tổng, có mùi khét');
+-- ===== Lịch sử đổi trạng thái =====
+-- Dòng đầu mỗi phiếu có from_status rỗng = mốc lập phiếu, đúng quy ước mà
+-- viewdetailTicket.jsp đang dựa vào để hiện chữ "Tạo phiếu".
+INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_by, changed_at, internal_note) VALUES
+((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0001'), '', 'Mới tiếp nhận', (SELECT user_id FROM users WHERE username = 'cskh4'), '2026-09-10 09:00:00', 'Tiếp nhận phiếu từ khách hàng.');
+INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_by, changed_at, internal_note) VALUES
+((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0001'), 'Mới tiếp nhận', 'Đang xử lý', (SELECT user_id FROM users WHERE username = 'kythuat2'), '2026-09-10 13:30:00', 'Kỹ thuật viên lên trạm kiểm tra.');
+INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_by, changed_at, internal_note) VALUES
+((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0001'), 'Đang xử lý', 'Đã đóng', (SELECT user_id FROM users WHERE username = 'kythuat2'), '2026-09-12 16:30:00', 'Xác định do va đập khi vận chuyển, đã thay ngăn hỏng và nghiệm thu.');
+INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_by, changed_at, internal_note) VALUES
+((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0002'), '', 'Mới tiếp nhận', (SELECT user_id FROM users WHERE username = 'cskh4'), '2026-09-05 09:00:00', 'Tiếp nhận phiếu.');
+INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_by, changed_at, internal_note) VALUES
+((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0002'), 'Mới tiếp nhận', 'Đang xử lý', (SELECT user_id FROM users WHERE username = 'kythuat2'), '2026-09-06 08:30:00', 'Lên lịch bảo trì định kỳ.');
+INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_by, changed_at, internal_note) VALUES
+((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0002'), 'Đang xử lý', 'Đã đóng', (SELECT user_id FROM users WHERE username = 'kythuat2'), '2026-09-08 16:00:00', 'Bảo trì xong, khách ký biên bản.');
+INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_by, changed_at, internal_note) VALUES
+((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0003'), '', 'Mới tiếp nhận', (SELECT user_id FROM users WHERE username = 'cskh2'), '2026-09-11 09:00:00', 'Khách báo sự cố diện rộng sau bão.');
+INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_by, changed_at, internal_note) VALUES
+((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0003'), 'Mới tiếp nhận', 'Đang xử lý', (SELECT user_id FROM users WHERE username = 'kythuat3'), '2026-09-11 10:15:00', 'Đã khảo sát 12 điểm, xác định nguyên nhân do lắp sai gioăng.');
+INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_by, changed_at, internal_note) VALUES
+((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0004'), '', 'Mới tiếp nhận', (SELECT user_id FROM users WHERE username = 'sales4'), '2026-09-02 09:00:00', 'Yêu cầu tư vấn từ website.');
+INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_by, changed_at, internal_note) VALUES
+((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0004'), 'Mới tiếp nhận', 'Đang xử lý', (SELECT user_id FROM users WHERE username = 'kythuat2'), '2026-09-03 09:00:00', 'Chuẩn bị phương án và báo giá.');
+INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_by, changed_at, internal_note) VALUES
+((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0004'), 'Đang xử lý', 'Đã đóng', (SELECT user_id FROM users WHERE username = 'kythuat2'), '2026-09-04 14:00:00', 'Đã gửi báo giá, khách xác nhận đủ thông tin.');
+INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_by, changed_at, internal_note) VALUES
+((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0005'), '', 'Mới tiếp nhận', (SELECT user_id FROM users WHERE username = 'cskh3'), '2026-09-09 09:00:00', 'Tiếp nhận phiếu.');
+INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_by, changed_at, internal_note) VALUES
+((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0005'), 'Mới tiếp nhận', 'Đang xử lý', (SELECT user_id FROM users WHERE username = 'kythuat4'), '2026-09-09 14:00:00', 'Đo kiểm tại chỗ, nghi quạt tản nhiệt hỏng bạc đạn.');
+INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_by, changed_at, internal_note) VALUES
+((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0006'), '', 'Mới tiếp nhận', (SELECT user_id FROM users WHERE username = 'cskh3'), '2026-08-25 09:00:00', 'Tiếp nhận phiếu.');
+INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_by, changed_at, internal_note) VALUES
+((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0006'), 'Mới tiếp nhận', 'Đang xử lý', (SELECT user_id FROM users WHERE username = 'kythuat4'), '2026-08-26 08:00:00', 'Kiểm tra dung lượng ắc quy.');
+INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_by, changed_at, internal_note) VALUES
+((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0006'), 'Đang xử lý', 'Đã đóng', (SELECT user_id FROM users WHERE username = 'kythuat4'), '2026-08-29 15:00:00', 'Ắc quy hết tuổi thọ, đã thay mới và bàn giao.');
+INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_by, changed_at, internal_note) VALUES
+((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0007'), '', 'Mới tiếp nhận', (SELECT user_id FROM users WHERE username = 'cskh2'), '2026-09-12 09:00:00', 'Tiếp nhận phiếu.');
+INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_by, changed_at, internal_note) VALUES
+((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0007'), 'Mới tiếp nhận', 'Đang xử lý', (SELECT user_id FROM users WHERE username = 'kythuat5'), '2026-09-12 15:00:00', 'Đo OTDR, khoanh vùng 2 điểm treo nghi vấn.');
+INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_by, changed_at, internal_note) VALUES
+((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0008'), '', 'Mới tiếp nhận', (SELECT user_id FROM users WHERE username = 'cskh4'), '2026-09-13 09:00:00', 'Tiếp nhận yêu cầu bảo trì định kỳ.');
+INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_by, changed_at, internal_note) VALUES
+((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0009'), '', 'Mới tiếp nhận', (SELECT user_id FROM users WHERE username = 'cskh4'), '2026-09-13 03:20:00', 'Khách gọi báo sự cố khẩn lúc rạng sáng.');
+INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_by, changed_at, internal_note) VALUES
+((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0010'), '', 'Mới tiếp nhận', (SELECT user_id FROM users WHERE username = 'cskh3'), '2026-08-28 09:00:00', 'Phát hiện hàng hỏng khi nghiệm thu tại kho.');
+INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_by, changed_at, internal_note) VALUES
+((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0010'), 'Mới tiếp nhận', 'Đang xử lý', (SELECT user_id FROM users WHERE username = 'kythuat3'), '2026-08-29 09:00:00', 'Lập biên bản hàng hỏng, đối chiếu quy cách đóng gói.');
+INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_by, changed_at, internal_note) VALUES
+((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0010'), 'Đang xử lý', 'Đã đóng', (SELECT user_id FROM users WHERE username = 'kythuat3'), '2026-09-02 11:00:00', 'Do vận chuyển, đã đổi hàng mới và siết lại quy cách đóng gói.');
+INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_by, changed_at, internal_note) VALUES
+((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0011'), '', 'Mới tiếp nhận', (SELECT user_id FROM users WHERE username = 'cskh4'), '2026-09-08 09:00:00', 'Tiếp nhận phiếu.');
+INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_by, changed_at, internal_note) VALUES
+((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0011'), 'Mới tiếp nhận', 'Đang xử lý', (SELECT user_id FROM users WHERE username = 'kythuat4'), '2026-09-09 08:30:00', 'Khảo sát góc nghiêng và vùng bóng che.');
+INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_by, changed_at, internal_note) VALUES
+((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0011'), 'Đang xử lý', 'Đã đóng', (SELECT user_id FROM users WHERE username = 'kythuat4'), '2026-09-11 16:00:00', 'Lỗi do lắp đặt sai thiết kế, đã chỉnh lại và nghiệm thu.');
+INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_by, changed_at, internal_note) VALUES
+((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0012'), '', 'Mới tiếp nhận', (SELECT user_id FROM users WHERE username = 'cskh2'), '2026-08-15 09:00:00', 'Tiếp nhận phiếu.');
+INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_by, changed_at, internal_note) VALUES
+((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0012'), 'Mới tiếp nhận', 'Đang xử lý', (SELECT user_id FROM users WHERE username = 'kythuat5'), '2026-08-16 09:00:00', 'Thay thử module dự phòng để khoanh vùng lỗi.');
+INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_by, changed_at, internal_note) VALUES
+((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0012'), 'Đang xử lý', 'Đã đóng', (SELECT user_id FROM users WHERE username = 'kythuat5'), '2026-08-19 14:30:00', 'Lỗi linh kiện từ nhà sản xuất, đã đổi bảo hành.');
+INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_by, changed_at, internal_note) VALUES
+((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0013'), '', 'Mới tiếp nhận', (SELECT user_id FROM users WHERE username = 'cskh4'), '2026-09-13 10:00:00', 'Đại lý gửi câu hỏi qua website.');
+INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_by, changed_at, internal_note) VALUES
+((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0014'), '', 'Mới tiếp nhận', (SELECT user_id FROM users WHERE username = 'cskh3'), '2026-08-26 09:00:00', 'Đại lý báo tỉ lệ đứt lõi bất thường.');
+INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_by, changed_at, internal_note) VALUES
+((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0014'), 'Mới tiếp nhận', 'Đang xử lý', (SELECT user_id FROM users WHERE username = 'kythuat3'), '2026-08-27 09:00:00', 'Kiểm tra mẫu và truy lại lộ trình vận chuyển.');
+INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_by, changed_at, internal_note) VALUES
+((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0014'), 'Đang xử lý', 'Đã đóng', (SELECT user_id FROM users WHERE username = 'kythuat3'), '2026-09-01 10:00:00', 'Do xếp chồng quá tầng khi vận chuyển, đã đổi hàng.');
+INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_by, changed_at, internal_note) VALUES
+((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0015'), '', 'Mới tiếp nhận', (SELECT user_id FROM users WHERE username = 'cskh4'), '2026-09-10 09:00:00', 'Tiếp nhận phiếu.');
+INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_by, changed_at, internal_note) VALUES
+((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0015'), 'Mới tiếp nhận', 'Đang xử lý', (SELECT user_id FROM users WHERE username = 'kythuat4'), '2026-09-10 15:30:00', 'Mở máy kiểm tra, thấy tiếp điểm contactor bị oxy hoá.');
+INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_by, changed_at, internal_note) VALUES
+((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0016'), '', 'Mới tiếp nhận', (SELECT user_id FROM users WHERE username = 'cskh2'), '2026-08-24 09:00:00', 'Tiếp nhận sau sự cố mất điện diện rộng.');
+INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_by, changed_at, internal_note) VALUES
+((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0016'), 'Mới tiếp nhận', 'Đang xử lý', (SELECT user_id FROM users WHERE username = 'kythuat5'), '2026-08-25 08:00:00', 'Kiểm tra dung lượng ắc quy sau khi mất điện kéo dài.');
+INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_by, changed_at, internal_note) VALUES
+((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0016'), 'Đang xử lý', 'Đã đóng', (SELECT user_id FROM users WHERE username = 'kythuat5'), '2026-08-28 17:00:00', 'Nguyên nhân ngoài thiết kế dự phòng, đã khuyến nghị bổ sung ắc quy.');
 
--- ===== Lịch sử trạng thái phiếu hỗ trợ =====
-INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_by, changed_at, internal_note) VALUES
-((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0001'), '', 'Mới tiếp nhận', 17, '2026-08-20 09:00:00', 'Tiếp nhận phiếu.');
-INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_by, changed_at, internal_note) VALUES
-((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0001'), 'Mới tiếp nhận', 'Đang xử lý', 16, '2026-08-20 09:30:00', 'Kỹ thuật viên tiếp nhận xử lý.');
-INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_by, changed_at, internal_note) VALUES
-((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0002'), '', 'Mới tiếp nhận', 17, '2026-07-15 09:00:00', 'Tiếp nhận phiếu.');
-INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_by, changed_at, internal_note) VALUES
-((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0002'), 'Mới tiếp nhận', 'Đang xử lý', 16, '2026-07-15 09:30:00', 'Kỹ thuật viên tiếp nhận xử lý.');
-INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_by, changed_at, internal_note) VALUES
-((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0002'), 'Đang xử lý', 'Đã đóng', 16, '2026-07-20 16:30:00', 'Đã xử lý xong, đóng phiếu.');
-INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_by, changed_at, internal_note) VALUES
-((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0003'), '', 'Mới tiếp nhận', 17, '2026-08-22 09:00:00', 'Tiếp nhận phiếu.');
-INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_by, changed_at, internal_note) VALUES
-((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0004'), '', 'Mới tiếp nhận', 15, '2026-08-10 09:00:00', 'Tiếp nhận phiếu.');
-INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_by, changed_at, internal_note) VALUES
-((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0004'), 'Mới tiếp nhận', 'Đang xử lý', 16, '2026-08-10 09:30:00', 'Kỹ thuật viên tiếp nhận xử lý.');
-INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_by, changed_at, internal_note) VALUES
-((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0004'), 'Đang xử lý', 'Đã đóng', 16, '2026-08-12 14:00:00', 'Đã xử lý xong, đóng phiếu.');
-INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_by, changed_at, internal_note) VALUES
-((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0005'), '', 'Mới tiếp nhận', 17, '2026-08-05 09:00:00', 'Tiếp nhận phiếu.');
-INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_by, changed_at, internal_note) VALUES
-((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0005'), 'Mới tiếp nhận', 'Đang xử lý', 16, '2026-08-05 09:30:00', 'Kỹ thuật viên tiếp nhận xử lý.');
-INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_by, changed_at, internal_note) VALUES
-((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0006'), '', 'Mới tiếp nhận', 17, '2025-08-01 09:00:00', 'Tiếp nhận phiếu.');
-INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_by, changed_at, internal_note) VALUES
-((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0006'), 'Mới tiếp nhận', 'Đang xử lý', 16, '2025-08-01 09:30:00', 'Kỹ thuật viên tiếp nhận xử lý.');
-INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_by, changed_at, internal_note) VALUES
-((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0006'), 'Đang xử lý', 'Đã đóng', 16, '2025-08-05 11:00:00', 'Đã xử lý xong, đóng phiếu.');
-INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_by, changed_at, internal_note) VALUES
-((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0007'), '', 'Mới tiếp nhận', 15, '2026-08-18 09:00:00', 'Tiếp nhận phiếu.');
-INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_by, changed_at, internal_note) VALUES
-((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0008'), '', 'Mới tiếp nhận', 17, '2026-08-23 09:00:00', 'Tiếp nhận phiếu.');
-INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_by, changed_at, internal_note) VALUES
-((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0008'), 'Mới tiếp nhận', 'Đang xử lý', 16, '2026-08-23 09:30:00', 'Kỹ thuật viên tiếp nhận xử lý.');
-INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_by, changed_at, internal_note) VALUES
-((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0009'), '', 'Mới tiếp nhận', 17, '2026-06-01 09:00:00', 'Tiếp nhận phiếu.');
-INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_by, changed_at, internal_note) VALUES
-((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0009'), 'Mới tiếp nhận', 'Đang xử lý', 16, '2026-06-01 09:30:00', 'Kỹ thuật viên tiếp nhận xử lý.');
-INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_by, changed_at, internal_note) VALUES
-((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0009'), 'Đang xử lý', 'Đã đóng', 16, '2026-06-10 15:00:00', 'Đã xử lý xong, đóng phiếu.');
-INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_by, changed_at, internal_note) VALUES
-((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0010'), '', 'Mới tiếp nhận', 15, '2026-08-21 09:00:00', 'Tiếp nhận phiếu.');
-INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_by, changed_at, internal_note) VALUES
-((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0011'), '', 'Mới tiếp nhận', 17, '2026-08-19 09:00:00', 'Tiếp nhận phiếu.');
-INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_by, changed_at, internal_note) VALUES
-((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0011'), 'Mới tiếp nhận', 'Đang xử lý', 16, '2026-08-19 09:30:00', 'Kỹ thuật viên tiếp nhận xử lý.');
-INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_by, changed_at, internal_note) VALUES
-((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0012'), '', 'Mới tiếp nhận', 17, '2025-11-15 09:00:00', 'Tiếp nhận phiếu.');
-INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_by, changed_at, internal_note) VALUES
-((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0012'), 'Mới tiếp nhận', 'Đang xử lý', 16, '2025-11-15 09:30:00', 'Kỹ thuật viên tiếp nhận xử lý.');
-INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_by, changed_at, internal_note) VALUES
-((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0012'), 'Đang xử lý', 'Đã đóng', 16, '2025-11-20 10:00:00', 'Đã xử lý xong, đóng phiếu.');
-INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_by, changed_at, internal_note) VALUES
-((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0013'), '', 'Mới tiếp nhận', 15, '2026-08-15 09:00:00', 'Tiếp nhận phiếu.');
-INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_by, changed_at, internal_note) VALUES
-((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0014'), '', 'Mới tiếp nhận', 17, '2026-02-01 09:00:00', 'Tiếp nhận phiếu.');
-INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_by, changed_at, internal_note) VALUES
-((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0014'), 'Mới tiếp nhận', 'Đang xử lý', 16, '2026-02-01 09:30:00', 'Kỹ thuật viên tiếp nhận xử lý.');
-INSERT INTO technicalrequesthistory (ticket_id, from_status, to_status, changed_by, changed_at, internal_note) VALUES
-((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0014'), 'Đang xử lý', 'Đã đóng', 16, '2026-02-10 09:00:00', 'Đã xử lý xong, đóng phiếu.');
+-- ===== Thiết bị lỗi kèm phiếu =====
+-- Chưa có model/DAO nào đọc bảng này (xem ghi chú đầu TechnicalSupportTicketDAO)
+-- nên không màn hình nào hiện ra, nhưng bộ demo cũ có dữ liệu ở đây -- gieo lại
+-- để bộ mới không nghèo hơn bộ cũ, và để khi nào làm tới phần thiết bị lỗi thì
+-- đã có sẵn cái mà hiển thị.
+INSERT INTO technicalrequestdevices (ticket_id, product_id, device_name, serial_number, fault_notes) VALUES
+((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0001'), (SELECT product_id FROM products WHERE product_code = 'SP-0001'), (SELECT product_name FROM products WHERE product_code = 'SP-0001'), 'PDA10-2026-0088', 'Ngăn số 3 nứt vỏ, rò điện giải, BMS ngắt sạc ở 80 phần trăm');
+INSERT INTO technicalrequestdevices (ticket_id, product_id, device_name, serial_number, fault_notes) VALUES
+((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0005'), (SELECT product_id FROM products WHERE product_code = 'SP-0006'), (SELECT product_name FROM products WHERE product_code = 'SP-0006'), 'PSU-2024-0412', 'Quạt tản nhiệt hỏng bạc đạn, tủ tự ngắt do quá nhiệt');
+INSERT INTO technicalrequestdevices (ticket_id, product_id, device_name, serial_number, fault_notes) VALUES
+((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0006'), (SELECT product_id FROM products WHERE product_code = 'SP-0003'), (SELECT product_name FROM products WHERE product_code = 'SP-0003'), 'GEL-2021-1177', 'Dung lượng còn 62 phần trăm so với danh định');
+INSERT INTO technicalrequestdevices (ticket_id, product_id, device_name, serial_number, fault_notes) VALUES
+((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0010'), (SELECT product_id FROM products WHERE product_code = 'SP-0011'), (SELECT product_name FROM products WHERE product_code = 'SP-0011'), NULL, 'Vỡ vỏ bộ chia quang, phát hiện khi nghiệm thu tại kho');
+INSERT INTO technicalrequestdevices (ticket_id, product_id, device_name, serial_number, fault_notes) VALUES
+((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0011'), (SELECT product_id FROM products WHERE product_code = 'SP-0009'), (SELECT product_name FROM products WHERE product_code = 'SP-0009'), 'SOL-2026-0031', 'Hiệu suất giảm khoảng 30 phần trăm do lắp sai góc nghiêng');
+INSERT INTO technicalrequestdevices (ticket_id, product_id, device_name, serial_number, fault_notes) VALUES
+((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0012'), (SELECT product_id FROM products WHERE product_code = 'SP-0007'), (SELECT product_name FROM products WHERE product_code = 'SP-0007'), 'UNI-2025-0903', 'Module rectifier số 2 lỗi tụ đầu vào');
+INSERT INTO technicalrequestdevices (ticket_id, product_id, device_name, serial_number, fault_notes) VALUES
+((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0014'), (SELECT product_id FROM products WHERE product_code = 'SP-0014'), (SELECT product_name FROM products WHERE product_code = 'SP-0014'), NULL, 'Đứt lõi ngầm khi bóc vỏ, tỉ lệ khoảng 8 phần trăm');
+INSERT INTO technicalrequestdevices (ticket_id, product_id, device_name, serial_number, fault_notes) VALUES
+((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0015'), (SELECT product_id FROM products WHERE product_code = 'SP-0008'), (SELECT product_name FROM products WHERE product_code = 'SP-0008'), 'EAT-2026-0550', 'Tiếp điểm contactor oxy hoá, máy liên tục nhảy bypass');
 
 
 SET FOREIGN_KEY_CHECKS = 1;
