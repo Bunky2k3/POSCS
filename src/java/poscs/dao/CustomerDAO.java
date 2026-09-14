@@ -28,18 +28,21 @@ public class CustomerDAO {
 
     private static final String SELECT_ENTERPRISE_BASE =
         "SELECT e.enterprise_id, e.enterprise_code, e.enterprise_name, e.customer_type, e.customer_group, " +
-        "       e.tax_code, e.email AS ent_email, e.phone AS ent_phone, e.website, e.address_id, e.account_owner_id, " +
+        "       e.tax_code, e.email AS ent_email, e.phone AS ent_phone, e.website, e.address_id, " +
+        "       e.account_owner_id, e.support_owner_id, " +
         "       e.legal_representative, e.logo_url, e.business_license_url, e.status, e.join_date, " +
         "       e.current_relationship_rating, e.created_at, e.updated_at, e.is_deleted, " +
         "       a.street_and_local_name, a.districts_id AS addr_districts_id, " +
         "       d.districts_name, d.province_id AS dist_province_id, " +
         "       p.province_name, " +
-        "       u.last_name AS owner_last_name, u.middle_name AS owner_middle_name, u.first_name AS owner_first_name " +
+        "       u.last_name AS owner_last_name, u.middle_name AS owner_middle_name, u.first_name AS owner_first_name, " +
+        "       s.last_name AS support_last_name, s.middle_name AS support_middle_name, s.first_name AS support_first_name " +
         "FROM enterprises e " +
         "LEFT JOIN addresses a ON e.address_id = a.address_id " +
         "LEFT JOIN districts d ON a.districts_id = d.districts_id " +
         "LEFT JOIN provinces p ON d.province_id = p.province_id " +
-        "LEFT JOIN users u ON e.account_owner_id = u.user_id ";
+        "LEFT JOIN users u ON e.account_owner_id = u.user_id " +
+        "LEFT JOIN users s ON e.support_owner_id = s.user_id ";
 
     /**
      * Lấy danh sách khách hàng có phân trang + lọc, phục vụ listcustomer.jsp.
@@ -232,9 +235,9 @@ public class CustomerDAO {
     public int insert(Enterprise enterprise) {
         String sql = "INSERT INTO enterprises " +
                 "(enterprise_code, enterprise_name, customer_type, customer_group, tax_code, email, phone, " +
-                " website, address_id, account_owner_id, legal_representative, logo_url, business_license_url, " +
-                " status, join_date) " +
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                " website, address_id, account_owner_id, support_owner_id, legal_representative, logo_url, " +
+                " business_license_url, status, join_date) " +
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
         // enterprise_code sinh từ generateNextEnterpriseCode() (đọc mã lớn nhất
         // hiện có rồi +1) có thể trùng nếu 2 request tạo khách hàng gần như đồng
@@ -271,11 +274,12 @@ public class CustomerDAO {
                         ps.setString(8, enterprise.getWebsite());
                         setNullableInt(ps, 9, addressId);
                         ps.setInt(10, enterprise.getAccountOwnerId());
-                        ps.setString(11, enterprise.getLegalRepresentative());
-                        ps.setString(12, enterprise.getLogoUrl());
-                        ps.setString(13, enterprise.getBusinessLicenseUrl());
-                        ps.setString(14, enterprise.getStatus() != null ? enterprise.getStatus() : "Active");
-                        ps.setDate(15, enterprise.getJoinDate());
+                        setNullableInt(ps, 11, enterprise.getSupportOwnerId());
+                        ps.setString(12, enterprise.getLegalRepresentative());
+                        ps.setString(13, enterprise.getLogoUrl());
+                        ps.setString(14, enterprise.getBusinessLicenseUrl());
+                        ps.setString(15, enterprise.getStatus() != null ? enterprise.getStatus() : "Active");
+                        ps.setDate(16, enterprise.getJoinDate());
 
                         int affected = ps.executeUpdate();
                         if (affected == 0) {
@@ -314,7 +318,7 @@ public class CustomerDAO {
     public boolean update(Enterprise enterprise) {
         String sql = "UPDATE enterprises SET " +
                 "enterprise_name = ?, customer_type = ?, customer_group = ?, email = ?, phone = ?, " +
-                "website = ?, address_id = ?, account_owner_id = ?, join_date = ?, logo_url = ? " +
+                "website = ?, address_id = ?, account_owner_id = ?, support_owner_id = ?, join_date = ?, logo_url = ? " +
                 "WHERE enterprise_id = ? AND is_deleted = 0";
 
         try (Connection conn = DBContext.getConnection()) {
@@ -342,9 +346,10 @@ public class CustomerDAO {
                     ps.setString(6, enterprise.getWebsite());
                     setNullableInt(ps, 7, addressId);
                     ps.setInt(8, enterprise.getAccountOwnerId());
-                    ps.setDate(9, enterprise.getJoinDate());
-                    ps.setString(10, enterprise.getLogoUrl());
-                    ps.setInt(11, enterprise.getEnterpriseId());
+                    setNullableInt(ps, 9, enterprise.getSupportOwnerId());
+                    ps.setDate(10, enterprise.getJoinDate());
+                    ps.setString(11, enterprise.getLogoUrl());
+                    ps.setInt(12, enterprise.getEnterpriseId());
                     boolean ok = ps.executeUpdate() > 0;
                     if (ok) {
                         conn.commit();
@@ -439,7 +444,11 @@ public class CustomerDAO {
             params.add(customerType);
         }
         if (accountOwnerId != null) {
-            conditions.add("e.account_owner_id = ?");
+            // Khớp cả hai vai: lọc "người phụ trách" mà chỉ soi cột chính thì
+            // người hỗ trợ chọn tên mình sẽ ra danh sách rỗng, dù họ đang cùng
+            // chăm những khách đó.
+            conditions.add("(e.account_owner_id = ? OR e.support_owner_id = ?)");
+            params.add(accountOwnerId);
             params.add(accountOwnerId);
         }
         if (provinceId != null) {
@@ -515,6 +524,8 @@ public class CustomerDAO {
         e.setAddressId(rs.wasNull() ? null : addressId);
 
         e.setAccountOwnerId(rs.getInt("account_owner_id"));
+        int supportOwnerId = rs.getInt("support_owner_id");
+        e.setSupportOwnerId(rs.wasNull() ? null : supportOwnerId);
         e.setLegalRepresentative(rs.getString("legal_representative"));
         e.setLogoUrl(rs.getString("logo_url"));
         e.setBusinessLicenseUrl(rs.getString("business_license_url"));
@@ -566,6 +577,16 @@ public class CustomerDAO {
             owner.setMiddleName(rs.getString("owner_middle_name"));
             owner.setFirstName(rs.getString("owner_first_name"));
             e.setAccountOwner(owner);
+        }
+
+        String supportLastName = rs.getString("support_last_name");
+        if (supportLastName != null) {
+            User support = new User();
+            support.setUserId(e.getSupportOwnerId() != null ? e.getSupportOwnerId() : 0);
+            support.setLastName(supportLastName);
+            support.setMiddleName(rs.getString("support_middle_name"));
+            support.setFirstName(rs.getString("support_first_name"));
+            e.setSupportOwner(support);
         }
 
         return e;

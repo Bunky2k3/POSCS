@@ -183,6 +183,8 @@ public class ContractController extends HttpServlet {
         request.setAttribute("currentPage", page);
         request.setAttribute("totalPages", totalPages);
         request.setAttribute("totalCount", totalCount);
+        // JSP cần pageSize để đánh STT liên tục qua các trang (trang 2 bắt đầu từ 11).
+        request.setAttribute("pageSize", PAGE_SIZE);
         request.setAttribute("keyword", keyword);
         request.setAttribute("statusFilter", statusFilter);
         request.setAttribute("typeFilter", typeFilter);
@@ -236,11 +238,15 @@ public class ContractController extends HttpServlet {
         // phải gom các hợp đồng cùng tỉnh lại với nhau.
         List<Contract> all = contractDAO.findAll(1, Integer.MAX_VALUE, keyword, statusFilter, typeFilter,
                 provinceFilter, true);
-        String[] headers = {"Mã HĐ", "Tiêu đề", "Loại HĐ", "Tỉnh/Thành phố", "Khách hàng", "Người phụ trách",
+        // Giữ cột "Mã HĐ" trong file dù danh sách trên màn hình đã bỏ -- xem lý do
+        // ở CustomerController.exportExcel: STT chỉ đúng trong phạm vi một file.
+        String[] headers = {"STT", "Mã HĐ", "Tiêu đề", "Loại HĐ", "Tỉnh/Thành phố", "Khách hàng", "Người phụ trách",
             "Ngày ký", "Ngày hiệu lực", "Ngày kết thúc", "Trạng thái"};
         List<Object[]> rows = new ArrayList<>();
+        int stt = 1;
         for (Contract c : all) {
             rows.add(new Object[]{
+                stt++,
                 c.getContractCode(),
                 c.getTitle(),
                 c.getContractType(),

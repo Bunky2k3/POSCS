@@ -246,11 +246,20 @@
                     <div class="view-value">${fn:escapeXml(customer.customerGroup)}</div>
                 </div>
                 <div class="col-md-6 field-row">
-                    <label>Người phụ trách</label>
+                    <label>Người phụ trách chính</label>
                     <div class="view-value">
                         <c:choose>
                             <c:when test="${customer.accountOwner != null}">${fn:escapeXml(customer.accountOwner.fullName)}</c:when>
                             <c:otherwise>&mdash;</c:otherwise>
+                        </c:choose>
+                    </div>
+                </div>
+                <div class="col-md-6 field-row">
+                    <label>Người hỗ trợ</label>
+                    <div class="view-value">
+                        <c:choose>
+                            <c:when test="${customer.supportOwner != null}">${fn:escapeXml(customer.supportOwner.fullName)}</c:when>
+                            <c:otherwise>Chưa bố trí</c:otherwise>
                         </c:choose>
                     </div>
                 </div>

@@ -241,6 +241,23 @@ public class CustomerControllerTest {
         verify(response).sendRedirect(CONTEXT_PATH + "/customer?action=new&error=invalid");
     }
 
+    /**
+     * Hai vai phải là hai người khác nhau: chọn trùng thì cột "Người hỗ trợ"
+     * chỉ lặp lại tên ở cột bên cạnh, và thống kê theo người đếm người đó hai
+     * lần cho cùng một khách.
+     */
+    @Test
+    public void create_supportOwnerSameAsMainOwner_redirectsWithoutInserting() throws Exception {
+        when(request.getParameter("action")).thenReturn("create");
+        stubValidCreateFields();
+        when(request.getParameter("supportOwnerId")).thenReturn("9"); // trùng accountOwnerId
+
+        controller.doPost(request, response);
+
+        verify(customerDAO, never()).insert(any());
+        verify(response).sendRedirect(CONTEXT_PATH + "/customer?action=new&error=invalid");
+    }
+
     @Test
     public void create_invalidPhone_redirectsWithoutInserting() throws Exception {
         when(request.getParameter("action")).thenReturn("create");

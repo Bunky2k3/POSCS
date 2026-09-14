@@ -16,11 +16,13 @@ public class Enterprise {
 
     // Thuộc tính lưu trữ ID khóa ngoại
     private Integer addressId; // Dùng Integer thay vì int vì DB cho phép NULL
-    private int accountOwnerId;
+    private int accountOwnerId; // Người phụ trách CHÍNH (cấp trên) -- bắt buộc
+    private Integer supportOwnerId; // Người HỖ TRỢ (cấp dưới) -- Integer vì DB cho phép NULL
 
     // Thuộc tính Object để chứa dữ liệu join từ bảng khác
     private Address address;
     private User accountOwner;
+    private User supportOwner;
 
     private String legalRepresentative;
     private String logoUrl;
@@ -105,6 +107,12 @@ public class Enterprise {
 
     public User getAccountOwner() { return accountOwner; }
     public void setAccountOwner(User accountOwner) { this.accountOwner = accountOwner; }
+
+    public Integer getSupportOwnerId() { return supportOwnerId; }
+    public void setSupportOwnerId(Integer supportOwnerId) { this.supportOwnerId = supportOwnerId; }
+
+    public User getSupportOwner() { return supportOwner; }
+    public void setSupportOwner(User supportOwner) { this.supportOwner = supportOwner; }
 
     public String getLegalRepresentative() { return legalRepresentative; }
     public void setLegalRepresentative(String legalRepresentative) { this.legalRepresentative = legalRepresentative; }

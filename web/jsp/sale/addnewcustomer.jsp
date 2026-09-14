@@ -171,14 +171,24 @@
                         <span class="error-text" id="err-customerGroup">Vui lòng chọn nhóm khách hàng.</span>
                     </div>
                     <div class="col-md-6 field-row">
-                        <label>Nhân viên phụ trách <span class="req">*</span></label>
+                        <label>Người phụ trách chính <span class="req">*</span></label>
                         <select class="form-select" id="assignee" name="accountOwnerId">
                             <option value="">-- Chọn nhân viên --</option>
                             <c:forEach var="staff" items="${userList}">
                                 <option value="${staff.userId}">${fn:escapeXml(staff.fullName)}</option>
                             </c:forEach>
                         </select>
-                        <span class="error-text" id="err-assignee">Vui lòng chọn nhân viên phụ trách.</span>
+                        <span class="error-text" id="err-assignee">Vui lòng chọn người phụ trách chính.</span>
+                    </div>
+                    <div class="col-md-6 field-row">
+                        <label>Người hỗ trợ</label>
+                        <select class="form-select" id="supportAssignee" name="supportOwnerId">
+                            <option value="">-- Chưa bố trí --</option>
+                            <c:forEach var="staff" items="${userList}">
+                                <option value="${staff.userId}">${fn:escapeXml(staff.fullName)}</option>
+                            </c:forEach>
+                        </select>
+                        <span class="error-text" id="err-supportAssignee">Người hỗ trợ phải khác người phụ trách chính.</span>
                     </div>
 
                     <div class="col-md-6 field-row">
@@ -318,6 +328,14 @@
 
             var addressDetail = document.getElementById('addressDetail');
             if (!addressDetail.value.trim()) { document.getElementById('err-addressDetail').style.display = 'block'; valid = false; }
+
+            // Hai vai phải là hai người: trùng nhau thì cột "Người hỗ trợ" chỉ
+            // lặp lại tên ở cột bên cạnh (server cũng chặn lại lần nữa).
+            var support = document.getElementById('supportAssignee');
+            var mainOwner = document.getElementById('assignee');
+            if (support.value && support.value === mainOwner.value) {
+                document.getElementById('err-supportAssignee').style.display = 'block'; valid = false;
+            }
 
             var phone = document.getElementById('phone');
             if (!isValidPhone(phone.value)) { document.getElementById('err-phone').style.display = 'block'; valid = false; }

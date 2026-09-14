@@ -144,6 +144,8 @@ public class CustomerController extends HttpServlet {
         request.setAttribute("currentPage", page);
         request.setAttribute("totalPages", totalPages);
         request.setAttribute("totalCount", totalCount);
+        // JSP cần pageSize để đánh STT liên tục qua các trang (trang 2 bắt đầu từ 11).
+        request.setAttribute("pageSize", PAGE_SIZE);
         request.setAttribute("keyword", keyword);
         request.setAttribute("typeFilter", typeFilter);
         request.setAttribute("assigneeFilter", assigneeFilter);
@@ -215,11 +217,18 @@ public class CustomerController extends HttpServlet {
         // mới-nhất-trước như danh sách trên màn hình.
         List<Enterprise> all = customerDAO.findAll(1, Integer.MAX_VALUE, keyword, typeFilter, assigneeFilter,
                 provinceFilter, true);
-        String[] headers = {"Mã KH", "Tên doanh nghiệp", "Loại KH", "Nhóm KH", "MST", "Email", "SĐT", "Website",
-            "Tỉnh/Thành phố", "Địa chỉ", "Người phụ trách", "Ngày tham gia", "Xếp hạng quan hệ"};
+        // File Excel vẫn giữ cột "Mã KH" dù danh sách trên màn hình đã bỏ: STT chỉ
+        // là số thứ tự dòng trong chính file này, hai người mở hai file xuất ở hai
+        // thời điểm sẽ có STT khác nhau cho cùng một khách -- cần một cột để đối
+        // chiếu ngược lại hệ thống thì mã là thứ duy nhất không đổi.
+        String[] headers = {"STT", "Mã KH", "Tên doanh nghiệp", "Loại KH", "Nhóm KH", "MST", "Email", "SĐT",
+            "Website", "Tỉnh/Thành phố", "Địa chỉ", "Người phụ trách chính", "Người hỗ trợ",
+            "Ngày tham gia", "Xếp hạng quan hệ"};
         List<Object[]> rows = new ArrayList<>();
+        int stt = 1;
         for (Enterprise e : all) {
             rows.add(new Object[]{
+                stt++,
                 e.getEnterpriseCode(),
                 e.getEnterpriseName(),
                 e.getCustomerType(),
@@ -231,6 +240,7 @@ public class CustomerController extends HttpServlet {
                 provinceNameOf(e),
                 e.getAddress() != null ? e.getAddress().getFullAddress() : "",
                 e.getAccountOwner() != null ? e.getAccountOwner().getFullName() : "",
+                e.getSupportOwner() != null ? e.getSupportOwner().getFullName() : "",
                 e.getJoinDate() != null ? e.getJoinDate().toString() : "",
                 e.getCurrentRelationshipRating() != null ? e.getCurrentRelationshipRating().toString() : ""
             });
@@ -266,6 +276,7 @@ public class CustomerController extends HttpServlet {
         if (accountOwnerId != null) {
             e.setAccountOwnerId(accountOwnerId);
         }
+        e.setSupportOwnerId(parseIntOrNull(request.getParameter("supportOwnerId")));
 
         setAddressFromRequest(e, request, null);
 
@@ -324,6 +335,7 @@ public class CustomerController extends HttpServlet {
         if (accountOwnerId != null) {
             e.setAccountOwnerId(accountOwnerId);
         }
+        e.setSupportOwnerId(parseIntOrNull(request.getParameter("supportOwnerId")));
 
         setAddressFromRequest(e, request, existing.getAddressId());
 
@@ -480,6 +492,12 @@ public class CustomerController extends HttpServlet {
             return false;
         }
         if (e.getAccountOwnerId() <= 0) {
+            return false;
+        }
+        // Người hỗ trợ là vai thứ hai, không phải bản sao của vai thứ nhất:
+        // để trùng một người thì cột "Người hỗ trợ" chỉ lặp lại tên đã có ở
+        // cột bên cạnh, và mọi thống kê theo người sẽ đếm người đó hai lần.
+        if (e.getSupportOwnerId() != null && e.getSupportOwnerId() == e.getAccountOwnerId()) {
             return false;
         }
         if (!isValidPhone(e.getPhone())) {

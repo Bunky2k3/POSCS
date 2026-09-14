@@ -152,6 +152,64 @@ public class CustomerDAOTest {
         }
     }
 
+    /** Khách chưa bố trí người hỗ trợ: cột phải là NULL, không phải 0 (0 vi phạm khoá ngoại). */
+    @Test
+    public void insert_noSupportOwner_bindsSqlNull() throws Exception {
+        ResultSet keys = singleRow(row("id", 88));
+        PreparedStatement ps = mock(PreparedStatement.class);
+        when(ps.executeUpdate()).thenReturn(1);
+        when(ps.getGeneratedKeys()).thenReturn(keys);
+        Connection conn = connectionReturning(ps);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            dao.insert(enterprise("KH-0001")); // chỉ có người phụ trách chính
+
+            verify(ps).setNull(11, java.sql.Types.INTEGER);
+        }
+    }
+
+    @Test
+    public void insert_withSupportOwner_bindsItAfterMainOwner() throws Exception {
+        ResultSet keys = singleRow(row("id", 88));
+        PreparedStatement ps = mock(PreparedStatement.class);
+        when(ps.executeUpdate()).thenReturn(1);
+        when(ps.getGeneratedKeys()).thenReturn(keys);
+        Connection conn = connectionReturning(ps);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            Enterprise e = enterprise("KH-0001");
+            e.setSupportOwnerId(7);
+            dao.insert(e);
+
+            verify(ps).setInt(10, 5); // phụ trách chính
+            verify(ps).setInt(11, 7); // người hỗ trợ
+        }
+    }
+
+    /**
+     * Lọc "người phụ trách" phải soi cả hai vai. Chỉ so cột chính thì người hỗ
+     * trợ chọn tên mình sẽ thấy danh sách rỗng, dù họ đang cùng chăm khách đó.
+     */
+    @Test
+    public void findAll_filterByOwner_matchesBothMainAndSupportRole() throws Exception {
+        PreparedStatement ps = statementReturning(emptyResultSet());
+        Connection conn = connectionReturning(ps);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            dao.findAll(1, 10, null, null, 7, null, false);
+
+            assertTrue(capturedSql(conn).contains("(e.account_owner_id = ? OR e.support_owner_id = ?)"));
+            verify(ps).setObject(1, 7);
+            verify(ps).setObject(2, 7);
+        }
+    }
+
     @Test
     public void insert_noStatusGiven_defaultsToActive() throws Exception {
         ResultSet keys = singleRow(row("id", 88));
@@ -165,7 +223,7 @@ public class CustomerDAOTest {
 
             dao.insert(enterprise("KH-0001")); // status để null
 
-            verify(ps).setString(14, "Active");
+            verify(ps).setString(15, "Active");
         }
     }
 
@@ -184,7 +242,7 @@ public class CustomerDAOTest {
             e.setStatus("Inactive");
             dao.insert(e);
 
-            verify(ps).setString(14, "Inactive");
+            verify(ps).setString(15, "Inactive");
         }
     }
 

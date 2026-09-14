@@ -98,6 +98,7 @@
         .custom-table tbody tr:last-child td { border-bottom: none; }
         .custom-table tbody tr:hover { background: #f9fdff; }
 
+        .stt-cell { color: #6b7280; font-weight: 600; font-size: 0.83rem; width: 48px; }
         .customer-code {
             font-weight: 700; color: var(--primary); font-size: 0.85rem;
         }
@@ -253,21 +254,23 @@
                 <table class="table custom-table" id="customerTable">
                     <thead>
                         <tr>
-                            <th>Mã KH</th>
+                            <th>STT</th>
                             <th>Tên khách hàng</th>
                             <th>Loại KH</th>
                             <th>Email</th>
                             <th>Số điện thoại</th>
                             <th>Tỉnh/Thành</th>
-                            <th>Địa chỉ</th>
-                            <th>Người phụ trách</th>
+                            <th>Phụ trách chính</th>
+                            <th>Người hỗ trợ</th>
                             <th class="text-end">Thao tác</th>
                         </tr>
                     </thead>
                     <tbody id="customerTableBody">
-                        <c:forEach var="customer" items="${customerList}">
+                        <c:forEach var="customer" items="${customerList}" varStatus="row">
                             <tr>
-                                <td class="customer-code"><a href="${pageContext.request.contextPath}/customer?action=view&id=${customer.enterpriseId}" class="code-link">${fn:escapeXml(customer.enterpriseCode)}</a></td>
+                                <%-- STT tính theo vị trí toàn danh sách, không phải trong trang:
+                                     trang 2 phải bắt đầu từ 11 chứ không quay lại 1. --%>
+                                <td class="stt-cell">${(currentPage - 1) * pageSize + row.index + 1}</td>
                                 <td>
                                     <div class="customer-name-cell">
                                         <div class="customer-logo">
@@ -290,13 +293,13 @@
                                 </td>
                                 <td>
                                     <c:choose>
-                                        <c:when test="${customer.address != null}">${fn:escapeXml(customer.address.fullAddress)}</c:when>
+                                        <c:when test="${customer.accountOwner != null}">${fn:escapeXml(customer.accountOwner.fullName)}</c:when>
                                         <c:otherwise>&mdash;</c:otherwise>
                                     </c:choose>
                                 </td>
                                 <td>
                                     <c:choose>
-                                        <c:when test="${customer.accountOwner != null}">${fn:escapeXml(customer.accountOwner.fullName)}</c:when>
+                                        <c:when test="${customer.supportOwner != null}">${fn:escapeXml(customer.supportOwner.fullName)}</c:when>
                                         <c:otherwise>&mdash;</c:otherwise>
                                     </c:choose>
                                 </td>

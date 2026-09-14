@@ -78,6 +78,7 @@
         .custom-table tbody tr:last-child td { border-bottom: none; }
         .custom-table tbody tr:hover { background: #f9fdff; }
 
+        .stt-cell { color: #6b7280; font-weight: 600; font-size: 0.83rem; width: 48px; }
         .contract-code { font-weight: 700; color: var(--primary); font-size: 0.85rem; }
         .code-link { color: inherit; text-decoration: none; }
         .code-link:hover { text-decoration: underline; }
@@ -204,7 +205,7 @@
                 <table class="table custom-table" id="contractTable">
                     <thead>
                         <tr>
-                            <th>Mã HĐ</th>
+                            <th>STT</th>
                             <th>Tiêu đề</th>
                             <th>Khách hàng</th>
                             <th>Tỉnh/Thành</th>
@@ -216,9 +217,10 @@
                         </tr>
                     </thead>
                     <tbody id="contractTableBody">
-                        <c:forEach var="contract" items="${contractList}">
+                        <c:forEach var="contract" items="${contractList}" varStatus="row">
                             <tr>
-                                <td class="contract-code"><a href="${pageContext.request.contextPath}/contract?action=view&id=${contract.contractId}" class="code-link">${fn:escapeXml(contract.contractCode)}</a></td>
+                                <%-- STT theo vị trí toàn danh sách: trang 2 bắt đầu từ 11, không quay lại 1. --%>
+                                <td class="stt-cell">${(currentPage - 1) * pageSize + row.index + 1}</td>
                                 <td><a href="${pageContext.request.contextPath}/contract?action=view&id=${contract.contractId}" class="contract-title-link">${fn:escapeXml(contract.title)}</a></td>
                                 <td>
                                     <c:choose>
