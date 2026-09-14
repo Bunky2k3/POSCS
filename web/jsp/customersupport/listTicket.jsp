@@ -25,7 +25,7 @@
     <link rel="stylesheet" href="${pageContext.request.contextPath}/css/appshell.css">
 
     <style>
-        .page-container { max-width: 1280px; margin: 28px auto; padding: 0 24px 32px; }
+        .page-container { max-width: 1440px; margin: 28px auto; padding: 0 24px 32px; }
         .page-header-row { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 22px; flex-wrap: wrap; gap: 14px; }
         .page-header-row h2 { font-weight: 700; color: var(--primary-dark); font-size: 1.4rem; margin-bottom: 4px; }
         .page-header-row p { color: #6b7280; font-size: 0.9rem; }
@@ -53,23 +53,45 @@
         .status-chip .num { font-weight: 700; font-size: 1.15rem; color: #111827; }
         .status-chip .lbl { font-size: 0.78rem; color: #6b7280; }
 
-        .filter-bar { padding: 18px 20px; margin-bottom: 20px; display: flex; flex-wrap: wrap; gap: 14px; align-items: center; }
-        .search-input-wrap { position: relative; flex: 1 1 260px; min-width: 200px; }
+        .filter-bar { padding: 18px 20px; margin-bottom: 20px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+        .search-input-wrap { position: relative; flex: 1 1 170px; min-width: 160px; }
         .search-input-wrap i { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: #9ca3af; font-size: 0.9rem; }
         .search-input-wrap input { width: 100%; padding: 10px 14px 10px 38px; border-radius: 10px; border: 1px solid #e5e7eb; background: #f9fafb; font-size: 0.88rem; }
         .search-input-wrap input:focus { outline: none; background: #fff; border-color: var(--primary-light); box-shadow: 0 0 0 4px rgba(15, 158, 219, 0.15); }
-        .filter-bar select { padding: 10px 14px; border-radius: 10px; border: 1px solid #e5e7eb; background: #f9fafb; font-size: 0.88rem; min-width: 160px; }
+        /* min-width 180px x nhiều ô là tràn hàng ngay ở màn hình 1366px --
+           thu về 150px và cho phép co lại thì cả thanh lọc nằm gọn một hàng. */
+        .filter-bar select { padding: 9px 10px; border-radius: 10px; border: 1px solid #e5e7eb; background: #f9fafb; font-size: 0.84rem; flex: 0 1 auto; min-width: 124px; max-width: 148px; }
+        #filterYear { min-width: 104px; max-width: 118px; }
+        #filterPeriod { min-width: 110px; max-width: 124px; }
         .filter-bar select:focus { outline: none; border-color: var(--primary-light); }
 
         .table-card { overflow: hidden; }
         .custom-table { margin-bottom: 0; }
         .custom-table thead th {
             background: #f8fafc; color: #6b7280; font-size: 0.74rem; text-transform: uppercase; letter-spacing: .3px;
-            font-weight: 700; padding: 12px 16px; border-bottom: 1.5px solid #eef2f6; white-space: nowrap;
+            font-weight: 700; padding: 11px 8px; border-bottom: 1.5px solid #eef2f6; white-space: nowrap;
         }
-        .custom-table tbody td { padding: 12px 16px; font-size: 0.86rem; color: #111827; vertical-align: middle; border-bottom: 1px solid #f3f4f6; }
+        .custom-table tbody td { padding: 11px 8px; font-size: 0.85rem; color: #111827; vertical-align: middle; border-bottom: 1px solid #f3f4f6; }
         .custom-table tbody tr:last-child td { border-bottom: none; }
         .custom-table tbody tr:hover { background: #f9fdff; }
+        /* Bảng nhiều cột + chữ tiếng Việt dài thì trình duyệt bóp cột rồi ngắt
+           chữ, mỗi dòng cao 3-4 hàng. Cho bảng một bề rộng tối thiểu rồi để
+           khung ngoài (.table-responsive) cuộn ngang -- thà cuộn còn hơn đọc
+           bảng vỡ. Ô dài cắt bằng "..." và giữ nguyên văn ở tooltip. */
+        /* Xem ghi chú ở listcustomer.jsp: table-layout:fixed + chia % để bảng vừa
+           đúng khung, mỗi dòng đúng một hàng chữ, phần thừa cắt bằng "...". */
+        .custom-table { table-layout: fixed; min-width: 900px; }
+        .custom-table th, .custom-table td { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .custom-table th:nth-child(1), .custom-table td:nth-child(1) { width: 8%; }  /* Mã phiếu */
+        .custom-table th:nth-child(2), .custom-table td:nth-child(2) { width: 9%; }  /* Loại phiếu */
+        .custom-table th:nth-child(3), .custom-table td:nth-child(3) { width: 18%; }  /* Khách hàng */
+        .custom-table th:nth-child(4), .custom-table td:nth-child(4) { width: 9%; }  /* Hợp đồng */
+        .custom-table th:nth-child(5), .custom-table td:nth-child(5) { width: 10%; }  /* Ưu tiên */
+        .custom-table th:nth-child(6), .custom-table td:nth-child(6) { width: 13%; }  /* Trạng thái */
+        .custom-table th:nth-child(7), .custom-table td:nth-child(7) { width: 12%; }  /* Người xử lý */
+        .custom-table th:nth-child(8), .custom-table td:nth-child(8) { width: 9%; }  /* Ngày tạo */
+        .custom-table th:nth-child(9), .custom-table td:nth-child(9) { width: 12%; }  /* Thao tác */
+        .cell-clip { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
         .ticket-code { font-weight: 700; color: var(--primary); font-size: 0.85rem; }
         .code-link { color: inherit; text-decoration: none; }
@@ -98,7 +120,7 @@
 
         .action-icons { display: flex; gap: 6px; justify-content: flex-end; }
         .action-icons button {
-            width: 32px; height: 32px; border-radius: 8px; border: none; background: #f3f4f6; color: #6b7280; cursor: pointer;
+            width: 28px; height: 28px; border-radius: 8px; border: none; background: #f3f4f6; color: #6b7280; cursor: pointer;
             display: flex; align-items: center; justify-content: center; font-size: 0.82rem; transition: all 0.15s;
         }
         .action-icons .act-view:hover { background: #eaf6ff; color: var(--primary); }
@@ -238,7 +260,7 @@
                                 <td><a href="${pageContext.request.contextPath}/ticket?action=view&id=${ticket.ticketId}" class="ticket-title-link">${fn:escapeXml(ticket.ticketType)}</a></td>
                                 <td>
                                     <c:choose>
-                                        <c:when test="${ticket.enterprise != null}">${fn:escapeXml(ticket.enterprise.enterpriseName)}</c:when>
+                                        <c:when test="${ticket.enterprise != null}"><span class="cell-clip cust-cell" title="${fn:escapeXml(ticket.enterprise.enterpriseName)}">${fn:escapeXml(ticket.enterprise.enterpriseName)}</span></c:when>
                                         <c:otherwise>&mdash;</c:otherwise>
                                     </c:choose>
                                 </td>
@@ -271,7 +293,7 @@
                                         <c:otherwise>&mdash;</c:otherwise>
                                     </c:choose>
                                 </td>
-                                <td><fmt:formatDate value="${ticket.createdDate}" pattern="dd/MM/yyyy"/></td>
+                                <td><fmt:formatDate value="${ticket.createdDate}" pattern="dd/MM/yy"/></td>
                                 <td>
                                     <div class="action-icons">
                                         <button class="act-view" title="Xem chi tiết" onclick="location.href='${pageContext.request.contextPath}/ticket?action=view&id=${ticket.ticketId}'"><i class="fa-regular fa-eye"></i></button>

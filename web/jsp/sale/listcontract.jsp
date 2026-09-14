@@ -26,7 +26,7 @@
     <link rel="stylesheet" href="${pageContext.request.contextPath}/css/appshell.css">
 
     <style>
-        .page-container { max-width: 1280px; margin: 28px auto; padding: 0 24px 32px; }
+        .page-container { max-width: 1440px; margin: 28px auto; padding: 0 24px 32px; }
 
         .page-header-row { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 22px; flex-wrap: wrap; gap: 14px; }
         .page-header-row h2 { font-weight: 700; color: var(--primary-dark); font-size: 1.4rem; margin-bottom: 4px; }
@@ -59,12 +59,16 @@
         .status-chip .lbl { font-size: 0.78rem; color: #6b7280; }
 
         /* ===== Filter bar ===== */
-        .filter-bar { padding: 18px 20px; margin-bottom: 20px; display: flex; flex-wrap: wrap; gap: 14px; align-items: center; }
-        .search-input-wrap { position: relative; flex: 1 1 280px; min-width: 220px; }
+        .filter-bar { padding: 18px 20px; margin-bottom: 20px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+        .search-input-wrap { position: relative; flex: 1 1 170px; min-width: 160px; }
         .search-input-wrap i { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: #9ca3af; font-size: 0.9rem; }
         .search-input-wrap input { width: 100%; padding: 10px 14px 10px 38px; border-radius: 10px; border: 1px solid #e5e7eb; background: #f9fafb; font-size: 0.88rem; }
         .search-input-wrap input:focus { outline: none; background: #fff; border-color: var(--primary-light); box-shadow: 0 0 0 4px rgba(15, 158, 219, 0.15); }
-        .filter-bar select { padding: 10px 14px; border-radius: 10px; border: 1px solid #e5e7eb; background: #f9fafb; font-size: 0.88rem; min-width: 180px; }
+        /* min-width 180px x nhiều ô là tràn hàng ngay ở màn hình 1366px --
+           thu về 150px và cho phép co lại thì cả thanh lọc nằm gọn một hàng. */
+        .filter-bar select { padding: 9px 10px; border-radius: 10px; border: 1px solid #e5e7eb; background: #f9fafb; font-size: 0.84rem; flex: 0 1 auto; min-width: 124px; max-width: 148px; }
+        #filterYear { min-width: 104px; max-width: 118px; }
+        #filterPeriod { min-width: 110px; max-width: 124px; }
         .filter-bar select:focus { outline: none; border-color: var(--primary-light); }
 
         /* ===== Table ===== */
@@ -72,11 +76,29 @@
         .custom-table { margin-bottom: 0; }
         .custom-table thead th {
             background: #f8fafc; color: #6b7280; font-size: 0.74rem; text-transform: uppercase; letter-spacing: .3px;
-            font-weight: 700; padding: 12px 16px; border-bottom: 1.5px solid #eef2f6; white-space: nowrap;
+            font-weight: 700; padding: 11px 8px; border-bottom: 1.5px solid #eef2f6; white-space: nowrap;
         }
-        .custom-table tbody td { padding: 12px 16px; font-size: 0.86rem; color: #111827; vertical-align: middle; border-bottom: 1px solid #f3f4f6; }
+        .custom-table tbody td { padding: 11px 8px; font-size: 0.85rem; color: #111827; vertical-align: middle; border-bottom: 1px solid #f3f4f6; }
         .custom-table tbody tr:last-child td { border-bottom: none; }
         .custom-table tbody tr:hover { background: #f9fdff; }
+        /* Bảng nhiều cột + chữ tiếng Việt dài thì trình duyệt bóp cột rồi ngắt
+           chữ, mỗi dòng cao 3-4 hàng. Cho bảng một bề rộng tối thiểu rồi để
+           khung ngoài (.table-responsive) cuộn ngang -- thà cuộn còn hơn đọc
+           bảng vỡ. Ô dài cắt bằng "..." và giữ nguyên văn ở tooltip. */
+        /* Xem ghi chú ở listcustomer.jsp: table-layout:fixed + chia % để bảng vừa
+           đúng khung, mỗi dòng đúng một hàng chữ, phần thừa cắt bằng "...". */
+        .custom-table { table-layout: fixed; min-width: 900px; }
+        .custom-table th, .custom-table td { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .custom-table th:nth-child(1), .custom-table td:nth-child(1) { width: 5%; }  /* STT */
+        .custom-table th:nth-child(2), .custom-table td:nth-child(2) { width: 16%; }  /* Tiêu đề */
+        .custom-table th:nth-child(3), .custom-table td:nth-child(3) { width: 20%; }  /* Khách hàng + tỉnh */
+        .custom-table th:nth-child(4), .custom-table td:nth-child(4) { width: 14%; }  /* Loại HĐ */
+        .custom-table th:nth-child(5), .custom-table td:nth-child(5) { width: 18%; }  /* Thời hạn */
+        .custom-table th:nth-child(6), .custom-table td:nth-child(6) { width: 15%; }  /* Trạng thái */
+        .custom-table th:nth-child(7), .custom-table td:nth-child(7) { width: 12%; }  /* Thao tác */
+        .prov-tag { font-weight: 700; color: var(--primary-dark); }
+        .term-cell { font-variant-numeric: tabular-nums; color: #4b5563; font-size: 0.76rem; }
+        .cell-clip { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
         .stt-cell { color: #6b7280; font-weight: 600; font-size: 0.83rem; width: 48px; }
         .contract-code { font-weight: 700; color: var(--primary); font-size: 0.85rem; }
@@ -85,9 +107,9 @@
         .contract-title-link { color: #111827; font-weight: 600; text-decoration: none; }
         .contract-title-link:hover { color: var(--primary); text-decoration: underline; }
 
-        .type-badge { display: inline-block; padding: 3px 11px; border-radius: 20px; font-size: 0.72rem; font-weight: 600; background: #f3f4f6; color: #4b5563; }
+        .type-badge { display: inline-block; padding: 3px 9px; border-radius: 20px; font-size: 0.68rem; font-weight: 600; background: #f3f4f6; color: #4b5563; }
 
-        .status-pill { display: inline-flex; align-items: center; gap: 5px; padding: 3px 11px; border-radius: 20px; font-size: 0.72rem; font-weight: 600; white-space: nowrap; }
+        .status-pill { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 20px; font-size: 0.72rem; font-weight: 600; white-space: nowrap; }
         .status-pill .dot { width: 6px; height: 6px; border-radius: 50%; }
         .status-active { background: #e8faf3; color: var(--success); }
         .status-active .dot { background: var(--success); }
@@ -100,7 +122,7 @@
 
         .action-icons { display: flex; gap: 6px; justify-content: flex-end; }
         .action-icons button {
-            width: 32px; height: 32px; border-radius: 8px; border: none;
+            width: 28px; height: 28px; border-radius: 8px; border: none;
             background: #f3f4f6; color: #6b7280; cursor: pointer;
             display: flex; align-items: center; justify-content: center; font-size: 0.82rem; transition: all 0.15s;
         }
@@ -225,10 +247,8 @@
                             <th>STT</th>
                             <th>Tiêu đề</th>
                             <th>Khách hàng</th>
-                            <th>Tỉnh/Thành</th>
                             <th>Loại HĐ</th>
-                            <th>Ngày ký</th>
-                            <th>Ngày kết thúc</th>
+                            <th>Thời hạn</th>
                             <th>Trạng thái</th>
                             <th class="text-end">Thao tác</th>
                         </tr>
@@ -238,22 +258,22 @@
                             <tr>
                                 <%-- STT theo vị trí toàn danh sách: trang 2 bắt đầu từ 11, không quay lại 1. --%>
                                 <td class="stt-cell">${(currentPage - 1) * pageSize + row.index + 1}</td>
-                                <td><a href="${pageContext.request.contextPath}/contract?action=view&id=${contract.contractId}" class="contract-title-link">${fn:escapeXml(contract.title)}</a></td>
+                                <td><a href="${pageContext.request.contextPath}/contract?action=view&id=${contract.contractId}" class="contract-title-link cell-clip title-cell" title="${fn:escapeXml(contract.title)}">${fn:escapeXml(contract.title)}</a></td>
+                                <%-- Tỉnh gộp vào ô khách hàng (in đậm, đứng trước) thay vì một cột
+                                     riêng: 9 cột trong ~950px thì cột nào cũng bị cắt cụt, gộp lại
+                                     thì cả tỉnh lẫn tên khách đều đọc được. --%>
                                 <td>
                                     <c:choose>
-                                        <c:when test="${contract.enterprise != null}">${fn:escapeXml(contract.enterprise.enterpriseName)}</c:when>
-                                        <c:otherwise>&mdash;</c:otherwise>
-                                    </c:choose>
-                                </td>
-                                <td>
-                                    <c:choose>
-                                        <c:when test="${contract.enterprise.address.district.province != null}">${fn:escapeXml(contract.enterprise.address.district.province.shortName)}</c:when>
+                                        <c:when test="${contract.enterprise != null}">
+                                            <span class="cell-clip" title="${fn:escapeXml(contract.enterprise.enterpriseName)}"><c:if test="${contract.enterprise.address.district.province != null}"><span class="prov-tag">${fn:escapeXml(contract.enterprise.address.district.province.shortName)}</span> &middot; </c:if>${fn:escapeXml(contract.enterprise.enterpriseName)}</span>
+                                        </c:when>
                                         <c:otherwise>&mdash;</c:otherwise>
                                     </c:choose>
                                 </td>
                                 <td><span class="type-badge">${fn:escapeXml(contract.contractType)}</span></td>
-                                <td><fmt:formatDate value="${contract.signingDate}" pattern="dd/MM/yyyy"/></td>
-                                <td><fmt:formatDate value="${contract.endDate}" pattern="dd/MM/yyyy"/></td>
+                                <%-- Hai cột ngày gộp thành một khoảng thời hạn, năm rút về 2 chữ số:
+                                     "10/08/26 → 14/08/27" vừa một dòng mà vẫn đủ nghĩa. --%>
+                                <td class="term-cell"><fmt:formatDate value="${contract.signingDate}" pattern="dd/MM/yy"/> &rarr; <fmt:formatDate value="${contract.endDate}" pattern="dd/MM/yy"/></td>
                                 <td>
                                     <c:choose>
                                         <c:when test="${contract.status == 'Đang hiệu lực'}"><span class="status-pill status-active"><span class="dot"></span>Đang hiệu lực</span></c:when>

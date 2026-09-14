@@ -26,7 +26,7 @@
 
     <style>
         .page-container {
-            max-width: 1240px;
+            max-width: 1440px;
             margin: 28px auto;
             padding: 0 24px 32px;
         }
@@ -59,10 +59,10 @@
         /* ===== Filter bar ===== */
         .filter-bar {
             padding: 18px 20px; margin-bottom: 20px;
-            display: flex; flex-wrap: wrap; gap: 14px; align-items: center;
+            display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
         }
         .search-input-wrap {
-            position: relative; flex: 1 1 280px; min-width: 220px;
+            position: relative; flex: 1 1 220px; min-width: 190px;
         }
         .search-input-wrap i {
             position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
@@ -77,9 +77,12 @@
             outline: none; background: #fff; border-color: var(--primary-light);
             box-shadow: 0 0 0 4px rgba(15, 158, 219, 0.15);
         }
+        /* min-width 180px x nhiều ô là tràn hàng ngay ở màn hình 1366px --
+           thu về 150px và cho phép co lại thì cả thanh lọc nằm gọn một hàng. */
         .filter-bar select {
-            padding: 10px 14px; border-radius: 10px; border: 1px solid #e5e7eb;
-            background: #f9fafb; font-size: 0.88rem; min-width: 180px;
+            padding: 10px 12px; border-radius: 10px; border: 1px solid #e5e7eb;
+            background: #f9fafb; font-size: 0.86rem;
+            flex: 0 1 auto; min-width: 150px; max-width: 200px;
         }
         .filter-bar select:focus { outline: none; border-color: var(--primary-light); }
 
@@ -89,14 +92,36 @@
         .custom-table thead th {
             background: #f8fafc; color: #6b7280; font-size: 0.74rem;
             text-transform: uppercase; letter-spacing: .3px; font-weight: 700;
-            padding: 12px 16px; border-bottom: 1.5px solid #eef2f6; white-space: nowrap;
+            padding: 11px 8px; border-bottom: 1.5px solid #eef2f6; white-space: nowrap;
         }
         .custom-table tbody td {
-            padding: 12px 16px; font-size: 0.87rem; color: #111827;
+            padding: 11px 8px; font-size: 0.85rem; color: #111827;
             vertical-align: middle; border-bottom: 1px solid #f3f4f6;
         }
         .custom-table tbody tr:last-child td { border-bottom: none; }
         .custom-table tbody tr:hover { background: #f9fdff; }
+
+        /* 9 cột chữ tiếng Việt trong ~980px: để trình duyệt tự chia thì nó bóp
+           cột rồi ngắt chữ, mỗi dòng cao 3-4 hàng. table-layout:fixed + chia %
+           cho bảng vừa đúng bề ngang khung, mỗi dòng đúng một hàng chữ, phần
+           thừa cắt bằng "..." (nguyên văn vẫn còn ở tooltip). Dưới 900px thì
+           khung ngoài cuộn ngang thay vì bóp tiếp. */
+        .custom-table { table-layout: fixed; min-width: 900px; }
+        .custom-table th, .custom-table td {
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .custom-table th:nth-child(1), .custom-table td:nth-child(1) { width: 5%; }  /* STT */
+        .custom-table th:nth-child(2), .custom-table td:nth-child(2) { width: 20%; }  /* Tên KH */
+        .custom-table th:nth-child(3), .custom-table td:nth-child(3) { width: 15%; }  /* Loại KH */
+        .custom-table th:nth-child(4), .custom-table td:nth-child(4) { width: 9%; }  /* Email */
+        .custom-table th:nth-child(5), .custom-table td:nth-child(5) { width: 11%; }  /* SĐT */
+        .custom-table th:nth-child(6), .custom-table td:nth-child(6) { width: 16%; }  /* Địa bàn */
+        .custom-table th:nth-child(7), .custom-table td:nth-child(7) { width: 12%; }  /* Phụ trách */
+        .custom-table th:nth-child(8), .custom-table td:nth-child(8) { width: 12%; }  /* Thao tác */
+        .prov-tag { font-weight: 700; color: var(--primary-dark); }
+        .cell-clip {
+            display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
 
         .stt-cell { color: #6b7280; font-weight: 600; font-size: 0.83rem; width: 48px; }
         .customer-code {
@@ -104,7 +129,7 @@
         }
         .code-link { color: inherit; text-decoration: none; }
         .code-link:hover { text-decoration: underline; }
-        .customer-name-cell { display: flex; align-items: center; gap: 10px; }
+        .customer-name-cell { display: flex; align-items: center; gap: 10px; min-width: 0; }
         .customer-logo {
             width: 32px; height: 32px; border-radius: 8px; overflow: hidden; flex-shrink: 0;
             background: linear-gradient(120deg, var(--primary-dark), var(--primary-light));
@@ -113,18 +138,20 @@
         .customer-logo img { width: 100%; height: 100%; object-fit: cover; }
         .customer-name-link {
             color: #111827; font-weight: 600; text-decoration: none;
+            display: block; min-width: 0;
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
         }
         .customer-name-link:hover { color: var(--primary); text-decoration: underline; }
 
         .type-badge {
-            display: inline-block; padding: 3px 11px; border-radius: 20px;
-            font-size: 0.72rem; font-weight: 600;
+            display: inline-block; padding: 3px 9px; border-radius: 20px;
+            font-size: 0.68rem; font-weight: 600;
             background: #eaf6ff; color: var(--primary-dark);
         }
 
         .action-icons { display: flex; gap: 6px; justify-content: flex-end; }
         .action-icons button {
-            width: 32px; height: 32px; border-radius: 8px; border: none;
+            width: 28px; height: 28px; border-radius: 8px; border: none;
             background: #f3f4f6; color: #6b7280; cursor: pointer;
             display: flex; align-items: center; justify-content: center;
             font-size: 0.82rem; transition: all 0.15s;
@@ -261,9 +288,8 @@
                             <th>Loại KH</th>
                             <th>Email</th>
                             <th>Số điện thoại</th>
-                            <th>Tỉnh/Thành</th>
+                            <th>Địa bàn</th>
                             <th>Phụ trách chính</th>
-                            <th>Người hỗ trợ</th>
                             <th class="text-end">Thao tác</th>
                         </tr>
                     </thead>
@@ -281,27 +307,27 @@
                                                 <c:otherwise><i class="fa-solid fa-building"></i></c:otherwise>
                                             </c:choose>
                                         </div>
-                                        <a href="${pageContext.request.contextPath}/customer?action=view&id=${customer.enterpriseId}" class="customer-name-link">${fn:escapeXml(customer.enterpriseName)}</a>
+                                        <a href="${pageContext.request.contextPath}/customer?action=view&id=${customer.enterpriseId}" class="customer-name-link" title="${fn:escapeXml(customer.enterpriseName)}">${fn:escapeXml(customer.enterpriseName)}</a>
                                     </div>
                                 </td>
                                 <td><span class="type-badge">${fn:escapeXml(customer.customerType)}</span></td>
-                                <td>${fn:escapeXml(customer.email)}</td>
-                                <td>${fn:escapeXml(customer.phone)}</td>
+                                <td><span class="cell-clip email-cell" title="${fn:escapeXml(customer.email)}">${fn:escapeXml(customer.email)}</span></td>
+                                <td class="nowrap">${fn:escapeXml(customer.phone)}</td>
+                                <%-- Tỉnh đứng đầu ô và in đậm: đó là thứ người dùng quét mắt
+                                     khi quản lý theo địa bàn, phần địa chỉ chi tiết đi kèm phía
+                                     sau. Gộp một cột thay vì hai để cả hai cùng đủ chỗ hiển thị;
+                                     địa chỉ đầy đủ vẫn còn nguyên ở tooltip. --%>
                                 <td>
                                     <c:choose>
-                                        <c:when test="${customer.address.district.province != null}">${fn:escapeXml(customer.address.district.province.shortName)}</c:when>
+                                        <c:when test="${customer.address != null}">
+                                            <span class="cell-clip" title="${fn:escapeXml(customer.address.fullAddress)}"><c:if test="${customer.address.district.province != null}"><span class="prov-tag">${fn:escapeXml(customer.address.district.province.shortName)}</span> &middot; </c:if>${fn:escapeXml(customer.address.streetAndLocalName)}<c:if test="${customer.address.district != null}">, ${fn:escapeXml(customer.address.district.shortName)}</c:if></span>
+                                        </c:when>
                                         <c:otherwise>&mdash;</c:otherwise>
                                     </c:choose>
                                 </td>
-                                <td>
+                                <td class="nowrap">
                                     <c:choose>
                                         <c:when test="${customer.accountOwner != null}">${fn:escapeXml(customer.accountOwner.fullName)}</c:when>
-                                        <c:otherwise>&mdash;</c:otherwise>
-                                    </c:choose>
-                                </td>
-                                <td>
-                                    <c:choose>
-                                        <c:when test="${customer.supportOwner != null}">${fn:escapeXml(customer.supportOwner.fullName)}</c:when>
                                         <c:otherwise>&mdash;</c:otherwise>
                                     </c:choose>
                                 </td>
