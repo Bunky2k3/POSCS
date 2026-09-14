@@ -4516,6 +4516,33 @@ CREATE TABLE `customer_lifecycle_events` (
   CONSTRAINT `fk_lifecycle_user` FOREIGN KEY (`recorded_by`) REFERENCES `users` (`user_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+DROP TABLE IF EXISTS `change_requests`;
+CREATE TABLE `change_requests` (
+  `request_id` int NOT NULL AUTO_INCREMENT,
+  -- 'Khách hàng' | 'Hợp đồng' -- đúng hai tài nguyên mà cây tổ chức siết.
+  `resource_type` varchar(30) COLLATE utf8mb4_unicode_ci NOT NULL,
+  -- 'Tạo mới' | 'Sửa' | 'Xoá'
+  `intent` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
+  -- NULL khi intent = 'Tạo mới': chưa có dòng nào để trỏ tới.
+  -- Không đặt khoá ngoại vì cột này trỏ sang HAI bảng khác nhau tuỳ
+  -- resource_type; chỗ đọc tự tra đúng bảng theo resource_type.
+  `target_id` int DEFAULT NULL,
+  `proposed_content` text COLLATE utf8mb4_unicode_ci NOT NULL,
+  `reason` text COLLATE utf8mb4_unicode_ci,
+  `requested_by` int NOT NULL,
+  `status` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'Chờ duyệt',
+  `reviewed_by` int DEFAULT NULL,
+  `review_note` text COLLATE utf8mb4_unicode_ci,
+  `reviewed_at` datetime DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`request_id`),
+  KEY `requested_by` (`requested_by`),
+  KEY `reviewed_by` (`reviewed_by`),
+  KEY `status` (`status`),
+  CONSTRAINT `fk_change_requests_requester` FOREIGN KEY (`requested_by`) REFERENCES `users` (`user_id`),
+  CONSTRAINT `fk_change_requests_reviewer` FOREIGN KEY (`reviewed_by`) REFERENCES `users` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- Khách hàng demo + hợp đồng (gắn sản phẩm POSTEF thật) + phiếu hỗ trợ kèm
 -- nguyên nhân sự cố, xem chi tiết nguồn gốc ở
 -- db/migrations/V15__reseed_demo_data_with_root_cause__ndat2003.sql.

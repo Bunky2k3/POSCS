@@ -6,9 +6,9 @@ reviewing a controller's access checks.
 
 **Status: the whole matrix below is enforced in code**, including the two `†`
 cells — the `Sales` manager/staff split agreed with the customer on
-2026-09-14. What is *not* built yet is the other half of that agreement: a
-subordinate has no in-system way to **request** a change, so today the split
-only takes access away. See
+2026-09-14. The other half of that agreement is in place too: a subordinate
+submits a change request at `/changerequest` and their manager approves or
+rejects it. See
 [Hierarchy-based write access](#hierarchy-based-write-access-for-customercontract).
 
 The `roles` table is seeded (see
@@ -80,20 +80,26 @@ also feeds the `canManage` flag the JSPs use to hide buttons.
 
 ## Hierarchy-based write access for Customer/Contract
 
-**Decided with the customer on 2026-09-14. The read-only half is implemented
-(the two `†` cells above are live); the change-request half is not.**
+**Decided with the customer on 2026-09-14, and now fully implemented.**
 
 | | |
 |---|---|
 | `users.manager_id` + two-tier org chart | **done** (V16) |
 | Subordinate read-only on Customer/Contract | **done** (`AccessControl.hasFullAccess`) |
 | Admin picks a manager on the employee form | **done** |
-| Subordinate submits a change request, manager approves | **not built** |
+| Subordinate submits a change request, manager approves | **done** (V17, `/changerequest`) |
 
-The gap matters: right now a subordinate who needs a customer edited has no
-button for it and must ask their manager outside the system. That is a
-deliberate interim state, not an oversight — but do not describe the feature
-to the customer as finished until the request flow exists.
+What is still pending is **data, not code**: the real org chart (who manages
+whom) has not been supplied by the customer, so `manager_id` is empty
+everywhere and nobody is restricted yet.
+
+**Approving does not apply the change.** The manager reads the proposal, then
+makes the edit on the normal Customer/Contract screen — the request detail page
+links straight to it. Replaying a stored payload would overwrite whatever
+somebody else changed while the request sat waiting, with nobody the wiser, and
+would duplicate every validation rule those screens already carry. The cost is
+that the manager retypes; that is cheaper than a silent overwrite, and requests
+are far rarer than direct edits.
 
 The agreed rule, on top of the role matrix rather than replacing it:
 
