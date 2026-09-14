@@ -25,6 +25,10 @@ public class TechnicalRequest {
     private Timestamp slaDeadline;
     private Date createdDate;
     private String description;
+    /** Nguyên nhân sự cố, do kỹ thuật viên đánh giá sau khi xử lý (root_cause). */
+    private String rootCause;
+    /** Nhóm nguyên nhân để thống kê: do vận chuyển / lắp đặt / thiết bị / khác (cause_category). */
+    private String causeCategory;
     private boolean warranty; // Ánh xạ với is_warranty (tinyint(1))
     private String status;
     private String resolutionSummary;
@@ -139,6 +143,12 @@ public class TechnicalRequest {
 
     public String getDescription() { return description; }
     public void setDescription(String description) { this.description = description; }
+
+    public String getRootCause() { return rootCause; }
+    public void setRootCause(String rootCause) { this.rootCause = rootCause; }
+
+    public String getCauseCategory() { return causeCategory; }
+    public void setCauseCategory(String causeCategory) { this.causeCategory = causeCategory; }
 
     public boolean isWarranty() { return warranty; }
     public void setWarranty(boolean warranty) { this.warranty = warranty; }

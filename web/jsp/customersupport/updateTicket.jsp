@@ -216,6 +216,31 @@
                         <textarea class="form-control" id="description" name="description" rows="4">${fn:escapeXml(ticket.description)}</textarea>
                         <span class="error-text" id="err-description">Vui lòng mô tả sự cố.</span>
                     </div>
+                    <%--
+                      Nguyên nhân đặt GIỮA mô tả và kết quả, theo đúng mạch
+                      khách yêu cầu: hiện tượng -> nguyên nhân -> kết quả.
+                      Chỉ có ở form SỬA, không có ở form tạo phiếu: lúc tiếp
+                      nhận chưa ai xuống hiện trường thì chưa biết vì sao hỏng,
+                      và đây là phần do kỹ thuật viên đánh giá.
+
+                      Hai ô này cũng là hai ô DUY NHẤT (cùng với trạng thái và
+                      kết quả xử lý) mà role Kỹ thuật được sửa trên phiếu giao
+                      cho mình -- xem PERMISSIONS.md.
+                    --%>
+                    <div class="col-md-4 field-row">
+                        <label>Nhóm nguyên nhân</label>
+                        <select class="form-select" id="causeCategory" name="causeCategory">
+                            <option value="">-- Chưa xác định --</option>
+                            <option value="Do vận chuyển" ${ticket.causeCategory == 'Do vận chuyển' ? 'selected' : ''}>Do vận chuyển</option>
+                            <option value="Do lắp đặt" ${ticket.causeCategory == 'Do lắp đặt' ? 'selected' : ''}>Do lắp đặt</option>
+                            <option value="Do thiết bị" ${ticket.causeCategory == 'Do thiết bị' ? 'selected' : ''}>Do thiết bị</option>
+                            <option value="Khác" ${ticket.causeCategory == 'Khác' ? 'selected' : ''}>Khác</option>
+                        </select>
+                    </div>
+                    <div class="col-md-8 field-row">
+                        <label>Nguyên nhân sự cố</label>
+                        <textarea class="form-control" id="rootCause" name="rootCause" rows="3" placeholder="Kỹ thuật viên đánh giá vì sao xảy ra sự cố">${fn:escapeXml(ticket.rootCause)}</textarea>
+                    </div>
                     <div class="col-12 field-row">
                         <label>Kết quả xử lý</label>
                         <textarea class="form-control" id="resolutionSummary" name="resolutionSummary" rows="3" placeholder="Ghi chú kết quả xử lý (điền khi đóng phiếu)">${fn:escapeXml(ticket.resolutionSummary)}</textarea>

@@ -236,6 +236,57 @@ public class TechnicalSupportTicketDAOTest {
         }
     }
 
+    /**
+     * Hai cột nguyên nhân phải được bind vào câu UPDATE, ở ĐÚNG vị trí 13/14 --
+     * ngay trước ticket_id ở 15.
+     *
+     * Chốt cả chỉ số chứ không chỉ chốt "có gọi setString": JDBC đánh tham số
+     * theo thứ tự, nên chèn cột mới vào giữa câu SET mà quên dịch các chỉ số
+     * sau nó là kiểu lỗi ghi đè nhầm cột (nguyên nhân đè lên kết quả xử lý,
+     * ticket_id lệch thành một giá trị khác) mà JdbcStub không thể phát hiện
+     * bằng cách nào khác. Đây cũng là lý do hai cột mới được nối vào CUỐI danh
+     * sách SET thay vì chèn cạnh resolution_summary cho đẹp mắt.
+     */
+    @Test
+    public void update_bindsRootCauseAndCategoryAtTheirOwnPlaceholders() throws Exception {
+        Connection conn = transactionalConnection(TechnicalSupportTicketDAO.STATUS_IN_PROGRESS, 1);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            TechnicalRequest t = ticket();
+            t.setRootCause("Siết nhầm cực nguồn khi lắp đặt");
+            t.setCauseCategory("Do lắp đặt");
+
+            assertTrue(dao.update(t, CHANGED_BY, null));
+
+            verify(updatePs).setString(13, "Siết nhầm cực nguồn khi lắp đặt");
+            verify(updatePs).setString(14, "Do lắp đặt");
+            verify(updatePs).setInt(15, t.getTicketId());
+            // Kết quả xử lý vẫn ở chỗ cũ -- không bị hai cột mới đẩy đi.
+            verify(updatePs).setString(11, t.getResolutionSummary());
+        }
+    }
+
+    /**
+     * Phiếu chưa được đánh giá nguyên nhân thì hai cột đó ghi NULL. Không cần
+     * setNull() riêng như resolved_at: setString(null) đã sinh SQL NULL cho
+     * cột chữ, khác với setTimestamp vốn cần biết kiểu.
+     */
+    @Test
+    public void update_ticketWithoutCause_bindsNullForBothCauseColumns() throws Exception {
+        Connection conn = transactionalConnection(TechnicalSupportTicketDAO.STATUS_IN_PROGRESS, 1);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            assertTrue(dao.update(ticket(), CHANGED_BY, null)); // rootCause/causeCategory để null
+
+            verify(updatePs).setString(13, null);
+            verify(updatePs).setString(14, null);
+        }
+    }
+
     @Test
     public void update_nullContractId_bindsSqlNullInsteadOfZero() throws Exception {
         Connection conn = transactionalConnection(TechnicalSupportTicketDAO.STATUS_IN_PROGRESS, 1);
@@ -414,6 +465,93 @@ public class TechnicalSupportTicketDAOTest {
 
             assertNotNull(dao.findAll(1, 10, null, null, null));
             assertTrue(dao.findAll(1, 10, null, null, null).isEmpty());
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // insert / đọc lại -- nguyên nhân sự cố
+    // ------------------------------------------------------------------
+
+    /**
+     * insert() cũng bind hai cột nguyên nhân (14/15). Form tạo phiếu không có
+     * hai ô này nên trên thực tế luôn là NULL, nhưng câu INSERT mà không nhắc
+     * tới cột thì chỗ nào gọi DAO trực tiếp (test tích hợp, nhập liệu hàng
+     * loạt sau này) sẽ mất dữ liệu mà không báo gì.
+     */
+    @Test
+    public void insert_bindsRootCauseAndCategory() throws Exception {
+        // Dựng sẵn ResultSet TRƯỚC khi vào when(...): singleRow() tự stub mock
+        // bên trong, gọi lồng vào giữa một when() đang dở sẽ làm Mockito nổ
+        // UnfinishedStubbingException.
+        java.sql.ResultSet generatedKeys = singleRow(row("GENERATED_KEY", 42));
+        PreparedStatement ps = mock(PreparedStatement.class);
+        when(ps.executeUpdate()).thenReturn(1);
+        when(ps.getGeneratedKeys()).thenReturn(generatedKeys);
+        Connection conn = connectionReturning(ps);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            TechnicalRequest t = ticket();
+            t.setTicketCode("TK-0042");
+            t.setCreatedDate(java.sql.Date.valueOf("2026-09-14"));
+            t.setRootCause("Bo mạch nguồn lỗi từ nhà sản xuất");
+            t.setCauseCategory("Do thiết bị");
+
+            assertEquals(42, dao.insert(t));
+
+            verify(ps).setString(14, "Bo mạch nguồn lỗi từ nhà sản xuất");
+            verify(ps).setString(15, "Do thiết bị");
+        }
+    }
+
+    /**
+     * mapRow đọc được hai cột mới từ ResultSet -- thiếu dòng này thì trang chi
+     * tiết luôn hiện "chưa đánh giá nguyên nhân" dù trong CSDL đã có, và tệ
+     * hơn: form sửa mở ra với ô trống, lưu lại là xoá luôn nguyên nhân cũ.
+     */
+    @Test
+    public void findById_readsRootCauseAndCategoryFromTheRow() throws Exception {
+        PreparedStatement ps = statementReturning(singleRow(row(
+                "ticket_id", 9,
+                "ticket_code", "TK-0009",
+                "enterprise_id", 3,
+                "description", "Mất tín hiệu",
+                "root_cause", "Đứt cáp tín hiệu do kéo căng khi lắp",
+                "cause_category", "Do lắp đặt",
+                "status", TechnicalSupportTicketDAO.STATUS_CLOSED,
+                "resolution_summary", "Thay đoạn cáp mới")));
+        Connection conn = connectionReturning(ps);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            TechnicalRequest t = dao.findById(9);
+
+            assertNotNull(t);
+            assertEquals("Đứt cáp tín hiệu do kéo căng khi lắp", t.getRootCause());
+            assertEquals("Do lắp đặt", t.getCauseCategory());
+        }
+    }
+
+    /** Phiếu chưa ai đánh giá: hai cột về null chứ không phải chuỗi rỗng. */
+    @Test
+    public void findById_rowWithoutCause_leavesBothFieldsNull() throws Exception {
+        PreparedStatement ps = statementReturning(singleRow(row(
+                "ticket_id", 9,
+                "ticket_code", "TK-0009",
+                "description", "Mất tín hiệu",
+                "status", TechnicalSupportTicketDAO.STATUS_NEW)));
+        Connection conn = connectionReturning(ps);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            TechnicalRequest t = dao.findById(9);
+
+            assertNotNull(t);
+            assertNull(t.getRootCause());
+            assertNull(t.getCauseCategory());
         }
     }
 }

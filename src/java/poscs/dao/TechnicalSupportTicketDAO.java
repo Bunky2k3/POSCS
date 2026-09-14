@@ -51,7 +51,7 @@ public class TechnicalSupportTicketDAO {
     private static final String SELECT_BASE =
         "SELECT t.ticket_id, t.ticket_code, t.enterprise_id, t.contract_id, t.ticket_type, t.priority, " +
         "       t.reception_channel, t.sla_deadline, t.assigned_technician_id, t.created_by, t.created_date, " +
-        "       t.description, t.is_warranty, t.status, t.resolution_summary, t.resolved_at, " +
+        "       t.description, t.root_cause, t.cause_category, t.is_warranty, t.status, t.resolution_summary, t.resolved_at, " +
         "       t.created_at, t.updated_at, t.is_deleted, " +
         "       e.enterprise_name, " +
         "       c.contract_code, " +
@@ -346,8 +346,9 @@ public class TechnicalSupportTicketDAO {
     public int insert(TechnicalRequest t) {
         String sql = "INSERT INTO technicalrequests " +
                 "(ticket_code, enterprise_id, contract_id, ticket_type, priority, reception_channel, sla_deadline, " +
-                " assigned_technician_id, created_by, created_date, description, is_warranty, status) " +
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                " assigned_technician_id, created_by, created_date, description, is_warranty, status, " +
+                " root_cause, cause_category) " +
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
         // ticket_code sinh từ generateNextTicketCode() (đọc mã lớn nhất hiện có rồi
         // +1) có thể trùng nếu 2 request tạo phiếu gần như đồng thời cùng đọc được
@@ -371,6 +372,12 @@ public class TechnicalSupportTicketDAO {
                 ps.setString(11, t.getDescription());
                 ps.setBoolean(12, t.isWarranty());
                 ps.setString(13, t.getStatus());
+                // Phiếu vừa tiếp nhận thì chưa ai đánh giá nguyên nhân -- form
+                // tạo phiếu không có 2 ô này nên thực tế luôn ghi NULL. Vẫn bind
+                // ở đây để insert() không phải là con đường duy nhất bỏ sót cột
+                // nếu sau này có chỗ tạo phiếu kèm sẵn nguyên nhân.
+                ps.setString(14, t.getRootCause());
+                ps.setString(15, t.getCauseCategory());
 
                 int affected = ps.executeUpdate();
                 if (affected == 0) {
@@ -414,7 +421,7 @@ public class TechnicalSupportTicketDAO {
         String sql = "UPDATE technicalrequests SET " +
                 "enterprise_id = ?, contract_id = ?, ticket_type = ?, priority = ?, reception_channel = ?, sla_deadline = ?, " +
                 "assigned_technician_id = ?, description = ?, is_warranty = ?, status = ?, " +
-                "resolution_summary = ?, resolved_at = ? " +
+                "resolution_summary = ?, resolved_at = ?, root_cause = ?, cause_category = ? " +
                 "WHERE ticket_id = ? AND is_deleted = 0";
 
         try (Connection conn = DBContext.getConnection()) {
@@ -442,7 +449,9 @@ public class TechnicalSupportTicketDAO {
                     ps.setString(10, t.getStatus());
                     ps.setString(11, t.getResolutionSummary());
                     setNullableTimestamp(ps, 12, t.getResolvedAt());
-                    ps.setInt(13, t.getTicketId());
+                    ps.setString(13, t.getRootCause());
+                    ps.setString(14, t.getCauseCategory());
+                    ps.setInt(15, t.getTicketId());
                     affected = ps.executeUpdate();
                 }
                 if (affected == 0) {
@@ -653,6 +662,8 @@ public class TechnicalSupportTicketDAO {
         t.setCreatedBy(rs.getInt("created_by"));
         t.setCreatedDate(rs.getDate("created_date"));
         t.setDescription(rs.getString("description"));
+        t.setRootCause(rs.getString("root_cause"));
+        t.setCauseCategory(rs.getString("cause_category"));
         t.setWarranty(rs.getBoolean("is_warranty"));
         t.setStatus(rs.getString("status"));
         t.setResolutionSummary(rs.getString("resolution_summary"));
