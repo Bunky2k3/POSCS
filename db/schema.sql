@@ -4517,6 +4517,19 @@ CREATE TABLE `customer_lifecycle_events` (
   CONSTRAINT `fk_lifecycle_user` FOREIGN KEY (`recorded_by`) REFERENCES `users` (`user_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+DROP TABLE IF EXISTS `user_provinces`;
+CREATE TABLE `user_provinces` (
+  `assignment_id` int NOT NULL AUTO_INCREMENT,
+  `province_id` int NOT NULL,
+  `user_id` int NOT NULL,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`assignment_id`),
+  UNIQUE KEY `uq_user_provinces_province` (`province_id`),
+  KEY `user_id` (`user_id`),
+  CONSTRAINT `fk_user_provinces_province` FOREIGN KEY (`province_id`) REFERENCES `provinces` (`province_id`),
+  CONSTRAINT `fk_user_provinces_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 DROP TABLE IF EXISTS `change_requests`;
 CREATE TABLE `change_requests` (
   `request_id` int NOT NULL AUTO_INCREMENT,

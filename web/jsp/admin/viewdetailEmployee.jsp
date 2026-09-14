@@ -143,6 +143,33 @@
                         <label>Ngày vào làm</label>
                         <div class="view-value"><c:out value="${hireDateText}"/></div>
                     </div>
+                    <%--
+                      Hai dòng địa bàn nói hai chuyện khác nhau, cố ý tách:
+
+                        - "Địa bàn phụ trách" là tỉnh người này TRỰC TIẾP cầm,
+                          nhập tay ở form sửa.
+                        - "Địa bàn quản lý" chỉ hiện với người có cấp dưới, và
+                          KHÔNG nhập tay -- nó gộp địa bàn của cấp dưới. Đổi
+                          cấp trên của một nhân viên là dòng này tự đúng theo.
+
+                      Nhập tay cả hai là tạo hai nguồn sự thật rồi có ngày
+                      lệch nhau; đó là mô hình đã chốt với khách hàng.
+                    --%>
+                    <div class="col-12 field-row">
+                        <label>Địa bàn phụ trách</label>
+                        <div class="view-value">
+                            <c:choose>
+                                <c:when test="${not empty assignedProvinces}"><c:forEach var="p" items="${assignedProvinces}" varStatus="st">${fn:escapeXml(p.provinceName)}<c:if test="${!st.last}">, </c:if></c:forEach></c:when>
+                                <c:otherwise>Chưa được giao địa bàn nào.</c:otherwise>
+                            </c:choose>
+                        </div>
+                    </div>
+                    <c:if test="${not empty managedProvinces}">
+                        <div class="col-12 field-row">
+                            <label>Địa bàn quản lý <span class="text-muted" style="text-transform: none; font-weight: 400;">(suy ra từ cấp dưới, không nhập tay)</span></label>
+                            <div class="view-value"><c:forEach var="p" items="${managedProvinces}" varStatus="st">${fn:escapeXml(p.provinceName)}<c:if test="${!st.last}">, </c:if></c:forEach></div>
+                        </div>
+                    </c:if>
                 </div>
 
                 <div class="section-header"><h5>Thông tin cá nhân</h5></div>

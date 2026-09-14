@@ -178,6 +178,7 @@
                                 <option value="${staff.userId}">${fn:escapeXml(staff.fullName)}</option>
                             </c:forEach>
                         </select>
+                        <div id="goiYDiaBan" class="text-muted" style="display:none; font-size: 0.8rem; margin-top: 6px; text-transform: none; font-weight: 400;"></div>
                         <span class="error-text" id="err-assignee">Vui lòng chọn người phụ trách chính.</span>
                     </div>
                     <div class="col-md-6 field-row">
@@ -303,8 +304,39 @@
             reader.readAsDataURL(input.files[0]);
         }
 
+        // ===== Điền sẵn người phụ trách theo địa bàn =====
+        //
+        // Bảng phân công tỉnh -> người, nhúng sẵn từ server (34 tỉnh, nhỏ).
+        // ĐIỀN SẴN chứ KHÔNG khoá: khách hàng chưa chốt hệ thống có phải tự
+        // gán người phụ trách theo tỉnh hay không (xem ghi chú đầu V19). Làm
+        // dạng gợi ý thì cả hai hướng đều sống được -- muốn tự gán thì chỉ
+        // việc bấm lưu, muốn tự chọn thì đổi lại như thường, không ai bị chặn.
+        var phanCongDiaBan = {
+            <c:forEach var="e" items="${territoryAssignments}" varStatus="st">'${e.key}': ${e.value}<c:if test="${!st.last}">,</c:if></c:forEach>
+        };
+        var oNguoiPhuTrach = document.getElementById('assignee');
+        var goiYDiaBan = document.getElementById('goiYDiaBan');
+
+        function dienSanNguoiPhuTrach(provinceId) {
+            goiYDiaBan.style.display = 'none';
+            if (!provinceId) { return; }
+            var userId = phanCongDiaBan[provinceId];
+            if (!userId) { return; }
+            // Người dùng đã tự chọn ai đó rồi thì tôn trọng lựa chọn của họ,
+            // chỉ điền khi ô đang trống.
+            if (oNguoiPhuTrach.value) { return; }
+            var opt = Array.prototype.find.call(oNguoiPhuTrach.options, function (o) {
+                return o.value === String(userId);
+            });
+            if (!opt) { return; }
+            oNguoiPhuTrach.value = opt.value;
+            goiYDiaBan.textContent = 'Đã điền sẵn theo người phụ trách địa bàn. Đổi lại được nếu cần.';
+            goiYDiaBan.style.display = 'block';
+        }
+
         document.getElementById('province').addEventListener('change', function () {
             loadWards(this.value);
+            dienSanNguoiPhuTrach(this.value);
         });
 
         function validateForm() {
