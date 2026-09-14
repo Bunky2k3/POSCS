@@ -329,6 +329,123 @@ public class TechnicalSupportTicketControllerTest {
     }
 
     // ------------------------------------------------------------------
+    // POST ?action=update -- nguyên nhân sự cố (root_cause/cause_category)
+    // ------------------------------------------------------------------
+
+    /**
+     * Ngoại lệ của role Kỹ thuật được nới thêm ĐÚNG hai cột nguyên nhân: theo
+     * yêu cầu khách hàng, nguyên nhân là phần do chính kỹ thuật viên đánh giá,
+     * nên nếu họ không ghi được thì trường mới coi như vô dụng -- người duy
+     * nhất biết câu trả lời lại là người không có quyền điền.
+     */
+    @Test
+    public void update_assignedTechnician_canWriteRootCauseAndCategory() throws Exception {
+        loginAs("Kỹ thuật", 50); // đúng người được giao phiếu
+        when(request.getParameter("action")).thenReturn("update");
+        when(request.getParameter("ticketId")).thenReturn("3");
+        when(request.getParameter("status")).thenReturn(TechnicalSupportTicketDAO.STATUS_CLOSED);
+        when(request.getParameter("resolutionSummary")).thenReturn("Đã thay nguồn");
+        when(request.getParameter("rootCause")).thenReturn("Gãy chân cắm nguồn do va đập khi vận chuyển");
+        when(request.getParameter("causeCategory")).thenReturn("Do vận chuyển");
+        when(ticketDAO.findById(3)).thenReturn(fullyValidExistingTicket());
+        when(ticketDAO.update(any(), anyInt(), any())).thenReturn(true);
+
+        controller.doPost(request, response);
+
+        verify(ticketDAO).update(argThat((TechnicalRequest t) ->
+                "Gãy chân cắm nguồn do va đập khi vận chuyển".equals(t.getRootCause())
+                        && "Do vận chuyển".equals(t.getCauseCategory())),
+                anyInt(), any());
+        verify(response, never()).sendError(eq(HttpServletResponse.SC_FORBIDDEN), anyString());
+    }
+
+    /**
+     * Nới quyền cho kỹ thuật viên phải dừng đúng ở hai cột nguyên nhân. Ca này
+     * gửi lên một form đã bị sửa tay (đổi khách hàng, độ ưu tiên, người xử lý
+     * -- những trường form thật KHÔNG cho họ đụng tới): phiếu lưu xuống phải
+     * giữ nguyên giá trị cũ, chỉ nguyên nhân là mới.
+     */
+    @Test
+    public void update_assignedTechnician_cannotUseCauseFieldsToSmuggleOtherChanges() throws Exception {
+        loginAs("Kỹ thuật", 50);
+        when(request.getParameter("action")).thenReturn("update");
+        when(request.getParameter("ticketId")).thenReturn("3");
+        when(request.getParameter("status")).thenReturn(TechnicalSupportTicketDAO.STATUS_IN_PROGRESS);
+        when(request.getParameter("rootCause")).thenReturn("Lắp sai cực nguồn");
+        when(request.getParameter("causeCategory")).thenReturn("Do lắp đặt");
+        // Các tham số dưới đây được nhét thêm vào request, không có trên form.
+        when(request.getParameter("enterpriseId")).thenReturn("777");
+        when(request.getParameter("priority")).thenReturn("Thấp");
+        when(request.getParameter("assignedTechnicianId")).thenReturn("999");
+        when(ticketDAO.findById(3)).thenReturn(fullyValidExistingTicket());
+        when(ticketDAO.update(any(), anyInt(), any())).thenReturn(true);
+
+        controller.doPost(request, response);
+
+        verify(ticketDAO).update(argThat((TechnicalRequest t) ->
+                "Lắp sai cực nguồn".equals(t.getRootCause())
+                        && t.getEnterpriseId() == 10      // giữ khách hàng cũ
+                        && "Cao".equals(t.getPriority())  // giữ độ ưu tiên cũ
+                        && t.getAssignedTechnicianId() == 50), // giữ người xử lý cũ
+                anyInt(), any());
+    }
+
+    /** Role có Full access (CSKH/Admin) cũng ghi được nguyên nhân như bình thường. */
+    @Test
+    public void update_fullAccessRole_alsoWritesRootCauseAndCategory() throws Exception {
+        loginAs("CSKH", 99);
+        stubValidUpdateParams();
+        when(request.getParameter("rootCause")).thenReturn("Bo mạch nguồn lỗi từ nhà sản xuất");
+        when(request.getParameter("causeCategory")).thenReturn("Do thiết bị");
+        when(ticketDAO.findById(3)).thenReturn(fullyValidExistingTicket());
+
+        controller.doPost(request, response);
+
+        verify(ticketDAO).update(argThat((TechnicalRequest t) ->
+                "Bo mạch nguồn lỗi từ nhà sản xuất".equals(t.getRootCause())
+                        && "Do thiết bị".equals(t.getCauseCategory())),
+                anyInt(), any());
+    }
+
+    /**
+     * Chưa đánh giá nguyên nhân thì lưu NULL, không lưu chuỗi rỗng: cột
+     * cause_category sinh ra để đếm "bao nhiêu ca lỗi do lắp đặt", mà một
+     * nhóm rỗng "" lẫn vào sẽ thành một hàng vô nghĩa trong mọi bảng thống kê
+     * GROUP BY sau này.
+     */
+    @Test
+    public void update_blankCauseFields_areStoredAsNullNotEmptyString() throws Exception {
+        loginAs("CSKH", 99);
+        stubValidUpdateParams();
+        when(request.getParameter("rootCause")).thenReturn("   ");
+        when(request.getParameter("causeCategory")).thenReturn("");
+        when(ticketDAO.findById(3)).thenReturn(fullyValidExistingTicket());
+
+        controller.doPost(request, response);
+
+        verify(ticketDAO).update(argThat((TechnicalRequest t) ->
+                t.getRootCause() == null && t.getCauseCategory() == null),
+                anyInt(), any());
+    }
+
+    /**
+     * Nguyên nhân KHÔNG phải trường bắt buộc: lúc tiếp nhận chưa ai xuống hiện
+     * trường thì chưa biết vì sao hỏng, bắt buộc điền sẽ chặn cả những lần lưu
+     * chỉ để đổi trạng thái sang "Đang xử lý".
+     */
+    @Test
+    public void update_withoutAnyCause_stillSaves() throws Exception {
+        loginAs("CSKH", 99);
+        stubValidUpdateParams();
+        when(ticketDAO.findById(3)).thenReturn(fullyValidExistingTicket());
+
+        controller.doPost(request, response);
+
+        verify(ticketDAO).update(any(TechnicalRequest.class), anyInt(), any());
+        verify(response).sendRedirect(CONTEXT_PATH + "/ticket?action=view&id=3");
+    }
+
+    // ------------------------------------------------------------------
     // POST ?action=delete
     // ------------------------------------------------------------------
 
@@ -427,6 +544,13 @@ public class TechnicalSupportTicketControllerTest {
             assertEquals("Công ty Cổ phần Viễn thông Sông Hồng",
                     sheet.getRow(1).getCell(2).getStringCellValue());
             assertEquals("HD-0001", sheet.getRow(1).getCell(3).getStringCellValue());
+            // Nguyên nhân xen giữa "Mô tả sự cố" (13) và "Kết quả xử lý" (15) --
+            // file Excel là đường thống kê ngoại tuyến duy nhất hiện có cho
+            // cause_category, bỏ sót cột là bỏ luôn mục đích của cột đó.
+            assertEquals("Mô tả sự cố", sheet.getRow(0).getCell(13).getStringCellValue());
+            assertEquals("Nguyên nhân sự cố", sheet.getRow(0).getCell(14).getStringCellValue());
+            assertEquals("Nhóm nguyên nhân", sheet.getRow(0).getCell(15).getStringCellValue());
+            assertEquals("Kết quả xử lý", sheet.getRow(0).getCell(16).getStringCellValue());
         }
     }
 
@@ -761,6 +885,29 @@ public class TechnicalSupportTicketControllerTest {
     public void exportPdf_shortTicket_fitsOnASinglePage() throws Exception {
         try (PDDocument pdf = exportPdfAndReopen(ticketForExport())) {
             assertEquals(1, pdf.getNumberOfPages());
+        }
+    }
+
+    /**
+     * Bản in phải kể đủ mạch hiện tượng -> nguyên nhân -> kết quả. Nhóm
+     * nguyên nhân ghép vào cùng đoạn với diễn giải (dạng "[Do lắp đặt] ...")
+     * vì trên giấy không có nhãn phụ nào để treo nó lên.
+     */
+    @Test
+    public void exportPdf_includesRootCauseWithItsCategory() throws Exception {
+        TechnicalRequest t = ticketForExport();
+        t.setRootCause("Siet nham cuc nguon khi lap dat");
+        t.setCauseCategory("Do lap dat");
+
+        // Khẳng định trên nội dung ASCII, giống các test PDF sẵn có: nhãn
+        // tiếng Việt đọc ngược ra từ file phụ thuộc vào cách font đánh dấu,
+        // không phải thứ đáng đem ra chốt.
+        try (PDDocument pdf = exportPdfAndReopen(t)) {
+            String text = new PDFTextStripper().getText(pdf);
+            assertTrue("Diễn giải nguyên nhân phải có trong bản in",
+                    text.contains("Siet nham cuc nguon khi lap dat"));
+            assertTrue("Nhóm nguyên nhân phải đi kèm diễn giải",
+                    text.contains("[Do lap dat]"));
         }
     }
 

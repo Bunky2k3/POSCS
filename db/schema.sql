@@ -4393,6 +4393,8 @@ CREATE TABLE `technicalrequests` (
   `created_by` int NOT NULL,
   `created_date` date NOT NULL,
   `description` text COLLATE utf8mb4_unicode_ci,
+  `root_cause` text COLLATE utf8mb4_unicode_ci,
+  `cause_category` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `is_warranty` tinyint(1) NOT NULL DEFAULT '1',
   `status` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'Mới tiếp nhận',
   `resolution_summary` text COLLATE utf8mb4_unicode_ci,

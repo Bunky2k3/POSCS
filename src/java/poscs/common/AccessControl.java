@@ -102,6 +102,13 @@ public final class AccessControl {
      * cầu nghiệp vụ (vai trò Technical: "Handling assigned technical
      * requests, updating progress and status"). Không cấp Full access vì họ
      * không được đổi khách hàng/hợp đồng/độ ưu tiên/người xử lý của ticket.
+     *
+     * Hàm này chỉ trả lời "có phải kỹ thuật viên của đúng phiếu này không";
+     * DANH SÁCH CỘT được sửa nằm ở TechnicalSupportTicketController.
+     * handleUpdate (hiện là status, resolution_summary, root_cause,
+     * cause_category -- xem PERMISSIONS.md). Hai cột nguyên nhân nằm trong
+     * danh sách đó vì theo yêu cầu khách hàng, nguyên nhân sự cố là phần do
+     * chính nhân viên kỹ thuật đánh giá.
      */
     public static boolean canUpdateAssignedTicket(HttpServletRequest request, TechnicalRequest ticket) {
         User user = currentUser(request);

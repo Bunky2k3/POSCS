@@ -203,7 +203,7 @@ public class TechnicalSupportTicketController extends HttpServlet {
         String[] headers = {"Mã phiếu", "Loại phiếu", "Khách hàng", "Hợp đồng liên quan",
             "Mức ưu tiên", "Kênh tiếp nhận", "Trạng thái", "Người xử lý", "Người tạo",
             "Ngày tạo", "Hạn xử lý (SLA)", "Thời điểm đóng", "Bảo hành",
-            "Mô tả sự cố", "Kết quả xử lý"};
+            "Mô tả sự cố", "Nguyên nhân sự cố", "Nhóm nguyên nhân", "Kết quả xử lý"};
         List<Object[]> rows = new ArrayList<>();
         for (TechnicalRequest t : all) {
             rows.add(new Object[]{
@@ -221,6 +221,8 @@ public class TechnicalSupportTicketController extends HttpServlet {
                 formatDateTime(t.getResolvedAt()),
                 t.isWarranty() ? "Có" : "Không",
                 t.getDescription(),
+                t.getRootCause(),
+                t.getCauseCategory(),
                 t.getResolutionSummary()
             });
         }
@@ -276,6 +278,10 @@ public class TechnicalSupportTicketController extends HttpServlet {
             addPair(lines, "Thời điểm đóng", formatDateTime(t.getResolvedAt()));
 
             addParagraph(lines, font, contentWidth, "Mô tả sự cố", t.getDescription());
+            // Mạch phiếu in ra phải đúng thứ tự hiện tượng -> nguyên nhân ->
+            // kết quả như khách yêu cầu; bỏ nguyên nhân ở đây thì bản in mâu
+            // thuẫn với trang chi tiết trên màn hình.
+            addParagraph(lines, font, contentWidth, "Nguyên nhân sự cố", causeForPrint(t));
             addParagraph(lines, font, contentWidth, "Kết quả xử lý", t.getResolutionSummary());
 
             renderPaginated(document, font, lines);
@@ -343,6 +349,26 @@ public class TechnicalSupportTicketController extends HttpServlet {
                 }
             }
         }
+    }
+
+    /**
+     * Phần "Nguyên nhân sự cố" cho bản in: ghép nhóm nguyên nhân vào trước
+     * diễn giải, vì trên giấy không có cách nào khác để thấy cả hai.
+     *
+     * Nhóm đứng riêng một đoạn thì người đọc phải tự nối hai chỗ lại; gộp
+     * thành "[Do vận chuyển] Gãy chân cắm nguồn..." là đọc một mạch. Chưa
+     * đánh giá gì thì trả null để nz() in dấu gạch như các trường trống khác.
+     */
+    private String causeForPrint(TechnicalRequest t) {
+        String category = t.getCauseCategory();
+        String detail = t.getRootCause();
+        if (category == null || category.trim().isEmpty()) {
+            return detail;
+        }
+        if (detail == null || detail.trim().isEmpty()) {
+            return "[" + category + "]";
+        }
+        return "[" + category + "] " + detail;
     }
 
     /** Giá trị trống hiện dấu gạch thay vì để trắng, cho người đọc biết là "chưa có" chứ không phải lỗi in. */
@@ -465,9 +491,10 @@ public class TechnicalSupportTicketController extends HttpServlet {
             return;
         }
 
-        // Kỹ thuật viên được giao chỉ được đổi trạng thái/ghi chú xử lý của đúng
-        // phiếu của mình -- không được sửa khách hàng/hợp đồng/độ ưu tiên/người
-        // xử lý, nên bỏ qua toàn bộ các trường khác dù form có gửi lên hay không.
+        // Kỹ thuật viên được giao chỉ được đổi trạng thái/nguyên nhân/ghi chú xử
+        // lý của đúng phiếu của mình -- không được sửa khách hàng/hợp đồng/độ ưu
+        // tiên/người xử lý, nên bỏ qua toàn bộ các trường khác dù form có gửi
+        // lên hay không.
         TechnicalRequest t = fullAccess ? buildTicketFromRequest(request, new TechnicalRequest()) : existing;
         t.setTicketId(id);
         // contractId trống có HAI nghĩa khác hẳn nhau, phải phân biệt:
@@ -503,6 +530,14 @@ public class TechnicalSupportTicketController extends HttpServlet {
         Timestamp previousResolvedAt = existing.getResolvedAt();
         t.setStatus(emptyToNull(request.getParameter("status")));
         t.setResolutionSummary(emptyToNull(request.getParameter("resolutionSummary")));
+        // Nguyên nhân sự cố nằm cùng nhóm với kết quả xử lý: set ở ĐÂY, ngoài
+        // nhánh fullAccess, nên kỹ thuật viên được giao phiếu cũng ghi được --
+        // đúng yêu cầu nghiệp vụ "nguyên nhân do nhân viên kỹ thuật đánh giá"
+        // (xem phần ngoại lệ của role Kỹ thuật trong PERMISSIONS.md). Đây là
+        // hai cột DUY NHẤT được nới thêm; mọi trường khác vẫn chỉ Full access
+        // mới đụng tới được, vì ở nhánh kia t chính là bản ghi đọc từ DB.
+        t.setRootCause(emptyToNull(request.getParameter("rootCause")));
+        t.setCauseCategory(emptyToNull(request.getParameter("causeCategory")));
         if (TechnicalSupportTicketDAO.STATUS_CLOSED.equals(t.getStatus())) {
             // Chỉ stamp resolved_at = bây giờ ở lần đầu tiên chuyển sang "Đã đóng"
             // -- nếu phiếu đã đóng từ trước (sửa lại resolutionSummary chẳng hạn),

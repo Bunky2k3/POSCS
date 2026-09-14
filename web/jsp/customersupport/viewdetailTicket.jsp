@@ -217,6 +217,26 @@
             <div class="view-value text-block">${fn:escapeXml(ticket.description)}</div>
         </div>
 
+        <!-- ===== Nguyên nhân sự cố =====
+             Xen giữa mô tả và kết quả để đọc đúng mạch hiện tượng -> nguyên
+             nhân -> kết quả. Nhóm nguyên nhân hiện thành nhãn nhỏ cạnh tiêu
+             đề: nó là giá trị ngắn chọn từ danh sách, cho xuống dòng riêng
+             chỉ tốn một khối trống. -->
+        <div class="info-card card-box">
+            <div class="section-header">
+                <h5>Nguyên nhân sự cố</h5>
+                <c:if test="${not empty ticket.causeCategory}">
+                    <span class="badge bg-secondary">${fn:escapeXml(ticket.causeCategory)}</span>
+                </c:if>
+            </div>
+            <div class="view-value text-block">
+                <c:choose>
+                    <c:when test="${not empty ticket.rootCause}">${fn:escapeXml(ticket.rootCause)}</c:when>
+                    <c:otherwise>Kỹ thuật viên chưa đánh giá nguyên nhân.</c:otherwise>
+                </c:choose>
+            </div>
+        </div>
+
         <!-- ===== Kết quả xử lý ===== -->
         <div class="info-card card-box">
             <div class="section-header"><h5>Kết quả xử lý</h5></div>

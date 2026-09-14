@@ -37,15 +37,22 @@ any role — every single action (including list/view) requires Admin.
 | Employee (`users`) | Full | No access | No access | No access |
 | System log (`/systemLog`) | Full | No access | No access | No access |
 
-\* **Exception:** `Kỹ thuật` may update the `status` and `resolutionSummary`
-of a ticket currently assigned to them (`assigned_technician_id` matches
-their own user id) — everything else about Ticket stays View only for that
-role (can't create, delete, reassign, or touch any other field, including on
-tickets assigned to someone else). This reflects the Technical role's real
-responsibility ("handling assigned technical requests, updating progress and
-status") without giving them Full CRUD. Enforced in
+\* **Exception:** `Kỹ thuật` may update the `status`, `resolutionSummary`,
+`rootCause` and `causeCategory` of a ticket currently assigned to them
+(`assigned_technician_id` matches their own user id) — everything else about
+Ticket stays View only for that role (can't create, delete, reassign, or
+touch any other field, including on tickets assigned to someone else). This
+reflects the Technical role's real responsibility ("handling assigned
+technical requests, updating progress and status") without giving them Full
+CRUD. The two cause fields belong on that list for the same reason: the
+customer asked that a ticket read as symptom → cause → result, and the cause
+is **the technician's own assessment** — nobody else on the ticket is in a
+position to fill it in. Enforced in
 `TechnicalSupportTicketController.handleUpdate` via
-`AccessControl.canUpdateAssignedTicket(...)`.
+`AccessControl.canUpdateAssignedTicket(...)`: for a non-Full-access actor the
+handler keeps the row it read from the database and overwrites only these
+four fields, so widening the exception means adding a `set...` call there and
+nowhere else.
 
 ## Notes for implementation
 
