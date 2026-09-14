@@ -29,6 +29,15 @@ public class TechnicalRequest {
     private String rootCause;
     /** Nhóm nguyên nhân để thống kê: do vận chuyển / lắp đặt / thiết bị / khác (cause_category). */
     private String causeCategory;
+    /**
+     * Phương hướng xử lý (handling_plan): định làm gì để khắc phục.
+     *
+     * Đứng giữa nguyên nhân và kết quả -- biết vì sao hỏng rồi, định hướng
+     * xong, nhưng chưa chắc đã làm xong. Trước khi có cột này, khúc đó bị ghi
+     * nhờ vào ghi chú nội bộ của dòng lịch sử, làm lịch sử vừa lặp nội dung
+     * vừa sai mục đích.
+     */
+    private String handlingPlan;
     private boolean warranty; // Ánh xạ với is_warranty (tinyint(1))
     private String status;
     private String resolutionSummary;
@@ -149,6 +158,9 @@ public class TechnicalRequest {
 
     public String getCauseCategory() { return causeCategory; }
     public void setCauseCategory(String causeCategory) { this.causeCategory = causeCategory; }
+
+    public String getHandlingPlan() { return handlingPlan; }
+    public void setHandlingPlan(String handlingPlan) { this.handlingPlan = handlingPlan; }
 
     public boolean isWarranty() { return warranty; }
     public void setWarranty(boolean warranty) { this.warranty = warranty; }

@@ -48,8 +48,8 @@ manager changes nothing about their access.
 | Employee (`users`) | Full | No access | No access | No access | No access |
 | System log (`/systemLog`) | Full | No access | No access | No access | No access |
 
-\* **Exception:** `Kỹ thuật` may update the `status`, `resolutionSummary`,
-`rootCause` and `causeCategory` of a ticket currently assigned to them
+\* **Exception:** `Kỹ thuật` may update the `status`, `rootCause`,
+`causeCategory`, `handlingPlan` and `resolutionSummary` of a ticket assigned to them
 (`assigned_technician_id` matches their own user id) — everything else about
 Ticket stays View only for that role (can't create, delete, reassign, or
 touch any other field, including on tickets assigned to someone else). This
@@ -62,8 +62,15 @@ position to fill it in. Enforced in
 `TechnicalSupportTicketController.handleUpdate` via
 `AccessControl.canUpdateAssignedTicket(...)`: for a non-Full-access actor the
 handler keeps the row it read from the database and overwrites only these
-four fields, so widening the exception means adding a `set...` call there and
+five fields, so widening the exception means adding a `set...` call there and
 nowhere else.
+
+Those five are the whole of what a technician records on a ticket: the status,
+then the diagnosis narrative — cause, its category, the plan, the outcome. Each
+has its own column on purpose. Before `handlingPlan` existed the plan was being
+written into the status-change note instead, which left the history repeating
+what the ticket already said and answering a question it was never meant to
+answer.
 
 † **Decided by `users.manager_id`, not by role.** A user with a manager is
 "staff" and is read-only on these two resources — **create included**; a user

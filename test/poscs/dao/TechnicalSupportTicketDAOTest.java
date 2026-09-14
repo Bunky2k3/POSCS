@@ -237,18 +237,19 @@ public class TechnicalSupportTicketDAOTest {
     }
 
     /**
-     * Hai cột nguyên nhân phải được bind vào câu UPDATE, ở ĐÚNG vị trí 13/14 --
-     * ngay trước ticket_id ở 15.
+     * Ba cột chẩn đoán phải được bind vào câu UPDATE ở ĐÚNG vị trí 13/14/15 --
+     * ngay trước ticket_id ở 16.
      *
      * Chốt cả chỉ số chứ không chỉ chốt "có gọi setString": JDBC đánh tham số
      * theo thứ tự, nên chèn cột mới vào giữa câu SET mà quên dịch các chỉ số
      * sau nó là kiểu lỗi ghi đè nhầm cột (nguyên nhân đè lên kết quả xử lý,
      * ticket_id lệch thành một giá trị khác) mà JdbcStub không thể phát hiện
-     * bằng cách nào khác. Đây cũng là lý do hai cột mới được nối vào CUỐI danh
-     * sách SET thay vì chèn cạnh resolution_summary cho đẹp mắt.
+     * bằng cách nào khác. Các cột mới đều nối vào CUỐI danh sách SET thay vì
+     * chèn cạnh resolution_summary cho đẹp mắt, để hạn chế đúng chuyện dịch
+     * chỉ số này -- và test này đã bắt được nó thật khi thêm handling_plan.
      */
     @Test
-    public void update_bindsRootCauseAndCategoryAtTheirOwnPlaceholders() throws Exception {
+    public void update_bindsDiagnosisColumnsAtTheirOwnPlaceholders() throws Exception {
         Connection conn = transactionalConnection(TechnicalSupportTicketDAO.STATUS_IN_PROGRESS, 1);
 
         try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
@@ -257,13 +258,15 @@ public class TechnicalSupportTicketDAOTest {
             TechnicalRequest t = ticket();
             t.setRootCause("Siết nhầm cực nguồn khi lắp đặt");
             t.setCauseCategory("Do lắp đặt");
+            t.setHandlingPlan("Siết lại đúng lực, đo kiểm rồi bàn giao");
 
             assertTrue(dao.update(t, CHANGED_BY, null));
 
             verify(updatePs).setString(13, "Siết nhầm cực nguồn khi lắp đặt");
             verify(updatePs).setString(14, "Do lắp đặt");
-            verify(updatePs).setInt(15, t.getTicketId());
-            // Kết quả xử lý vẫn ở chỗ cũ -- không bị hai cột mới đẩy đi.
+            verify(updatePs).setString(15, "Siết lại đúng lực, đo kiểm rồi bàn giao");
+            verify(updatePs).setInt(16, t.getTicketId());
+            // Kết quả xử lý vẫn ở chỗ cũ -- không bị các cột mới đẩy đi.
             verify(updatePs).setString(11, t.getResolutionSummary());
         }
     }
@@ -280,10 +283,11 @@ public class TechnicalSupportTicketDAOTest {
         try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
             db.when(DBContext::getConnection).thenReturn(conn);
 
-            assertTrue(dao.update(ticket(), CHANGED_BY, null)); // rootCause/causeCategory để null
+            assertTrue(dao.update(ticket(), CHANGED_BY, null)); // cả ba cột chẩn đoán để null
 
             verify(updatePs).setString(13, null);
             verify(updatePs).setString(14, null);
+            verify(updatePs).setString(15, null);
         }
     }
 
@@ -502,6 +506,7 @@ public class TechnicalSupportTicketDAOTest {
 
             verify(ps).setString(14, "Bo mạch nguồn lỗi từ nhà sản xuất");
             verify(ps).setString(15, "Do thiết bị");
+            verify(ps).setString(16, t.getHandlingPlan());
         }
     }
 

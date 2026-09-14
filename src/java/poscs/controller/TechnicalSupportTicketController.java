@@ -203,7 +203,7 @@ public class TechnicalSupportTicketController extends HttpServlet {
         String[] headers = {"Mã phiếu", "Loại phiếu", "Khách hàng", "Hợp đồng liên quan",
             "Mức ưu tiên", "Kênh tiếp nhận", "Trạng thái", "Người xử lý", "Người tạo",
             "Ngày tạo", "Hạn xử lý (SLA)", "Thời điểm đóng", "Bảo hành",
-            "Mô tả sự cố", "Nguyên nhân sự cố", "Nhóm nguyên nhân", "Kết quả xử lý"};
+            "Mô tả sự cố", "Nguyên nhân sự cố", "Nhóm nguyên nhân", "Phương hướng xử lý", "Kết quả xử lý"};
         List<Object[]> rows = new ArrayList<>();
         for (TechnicalRequest t : all) {
             rows.add(new Object[]{
@@ -223,6 +223,7 @@ public class TechnicalSupportTicketController extends HttpServlet {
                 t.getDescription(),
                 t.getRootCause(),
                 t.getCauseCategory(),
+                t.getHandlingPlan(),
                 t.getResolutionSummary()
             });
         }
@@ -279,9 +280,10 @@ public class TechnicalSupportTicketController extends HttpServlet {
 
             addParagraph(lines, font, contentWidth, "Mô tả sự cố", t.getDescription());
             // Mạch phiếu in ra phải đúng thứ tự hiện tượng -> nguyên nhân ->
-            // kết quả như khách yêu cầu; bỏ nguyên nhân ở đây thì bản in mâu
-            // thuẫn với trang chi tiết trên màn hình.
+            // phương hướng -> kết quả như khách yêu cầu; thiếu mục nào thì bản
+            // in mâu thuẫn với trang chi tiết trên màn hình.
             addParagraph(lines, font, contentWidth, "Nguyên nhân sự cố", causeForPrint(t));
+            addParagraph(lines, font, contentWidth, "Phương hướng xử lý", t.getHandlingPlan());
             addParagraph(lines, font, contentWidth, "Kết quả xử lý", t.getResolutionSummary());
 
             renderPaginated(document, font, lines);
@@ -530,14 +532,15 @@ public class TechnicalSupportTicketController extends HttpServlet {
         Timestamp previousResolvedAt = existing.getResolvedAt();
         t.setStatus(emptyToNull(request.getParameter("status")));
         t.setResolutionSummary(emptyToNull(request.getParameter("resolutionSummary")));
-        // Nguyên nhân sự cố nằm cùng nhóm với kết quả xử lý: set ở ĐÂY, ngoài
+        // Nguyên nhân và phương hướng xử lý nằm cùng nhóm với kết quả: set ở ĐÂY, ngoài
         // nhánh fullAccess, nên kỹ thuật viên được giao phiếu cũng ghi được --
         // đúng yêu cầu nghiệp vụ "nguyên nhân do nhân viên kỹ thuật đánh giá"
         // (xem phần ngoại lệ của role Kỹ thuật trong PERMISSIONS.md). Đây là
-        // hai cột DUY NHẤT được nới thêm; mọi trường khác vẫn chỉ Full access
+        // ba cột DUY NHẤT được nới thêm; mọi trường khác vẫn chỉ Full access
         // mới đụng tới được, vì ở nhánh kia t chính là bản ghi đọc từ DB.
         t.setRootCause(emptyToNull(request.getParameter("rootCause")));
         t.setCauseCategory(emptyToNull(request.getParameter("causeCategory")));
+        t.setHandlingPlan(emptyToNull(request.getParameter("handlingPlan")));
         if (TechnicalSupportTicketDAO.STATUS_CLOSED.equals(t.getStatus())) {
             // Chỉ stamp resolved_at = bây giờ ở lần đầu tiên chuyển sang "Đã đóng"
             // -- nếu phiếu đã đóng từ trước (sửa lại resolutionSummary chẳng hạn),
