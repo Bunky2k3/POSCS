@@ -33,7 +33,7 @@ public class EmployeeDAO {
     public User findByUsernameOrEmail(String identifier) {
         // JOIN sẵn bảng roles để lấy luôn role_name, tránh phải query thêm lần 2.
         String sql = "SELECT u.user_id, u.username, u.email, u.password_hash, u.role_id, " +
-                     "u.last_name, u.middle_name, u.first_name, u.department_id, u.avatar_url, u.is_deleted, r.role_name " +
+                     "u.last_name, u.middle_name, u.first_name, u.department_id, u.manager_id, u.avatar_url, u.is_deleted, r.role_name " +
                      "FROM users u JOIN roles r ON u.role_id = r.role_id " +
                      "WHERE (u.username = ? OR u.email = ?)";
         try (Connection conn = DBContext.getConnection();
@@ -55,6 +55,14 @@ public class EmployeeDAO {
                     u.setMiddleName(rs.getString("middle_name"));
                     u.setFirstName(rs.getString("first_name"));
                     u.setDepartmentId(rs.getInt("department_id"));
+                    // Vị trí trong cây tổ chức PHẢI đi cùng User vào session:
+                    // AccessControl đọc thẳng từ đó để biết người này là cấp
+                    // trên hay cấp dưới. Quên map ở đây thì managerId luôn null,
+                    // ai cũng thành cấp trên, và toàn bộ phần siết quyền im
+                    // lặng không chạy -- không lỗi, không log, chỉ là không có
+                    // tác dụng gì.
+                    int managerId = rs.getInt("manager_id");
+                    u.setManagerId(rs.wasNull() ? null : managerId);
                     u.setAvatarUrl(rs.getString("avatar_url")); // topbar doc anh dai dien tu session
                     u.setDeleted(rs.getBoolean("is_deleted"));
                     u.setRole(new Role(rs.getInt("role_id"), rs.getString("role_name")));
@@ -434,6 +442,61 @@ public class EmployeeDAO {
         return null;
     }
 
+    /** Bind Integer có thể null: null phải thành SQL NULL, không phải 0 (0 sẽ vi phạm khoá ngoại). */
+    private static void setNullableInt(PreparedStatement ps, int index, Integer value) throws SQLException {
+        if (value != null) {
+            ps.setInt(index, value);
+        } else {
+            ps.setNull(index, Types.INTEGER);
+        }
+    }
+
+    /**
+     * Những người có thể chọn làm CẤP TRÊN cho nhân viên {@code excludeUserId}
+     * (truyền null khi đang tạo nhân viên mới).
+     *
+     * Lọc sẵn ở đây hai điều kiện giữ cây đúng 2 tầng, thay vì đổ hết danh
+     * sách ra rồi trông chờ người dùng chọn đúng:
+     *
+     *  - {@code manager_id IS NULL}: người đã là cấp dưới thì không được làm
+     *    cấp trên của ai nữa -- nếu không sẽ mọc ra tầng thứ ba, mà mô hình
+     *    chốt với khách chỉ có hai.
+     *  - bỏ chính mình: tự làm cấp trên của mình là vô nghĩa, và CSDL cũng
+     *    chặn bằng chk_users_manager_not_self.
+     *
+     * Đây chỉ là lọc cho ô chọn dễ dùng; chốt chặn thật vẫn nằm ở
+     * EmployeeController trước khi ghi, vì form thì ai cũng sửa được.
+     */
+    public List<User> findEligibleManagers(Integer excludeUserId) {
+        List<User> result = new ArrayList<>();
+        String sql = "SELECT u.user_id, u.username, u.last_name, u.middle_name, u.first_name, r.role_name " +
+                     "FROM users u JOIN roles r ON u.role_id = r.role_id " +
+                     "WHERE u.is_deleted = 0 AND u.manager_id IS NULL " +
+                     (excludeUserId != null ? "AND u.user_id <> ? " : "") +
+                     "ORDER BY u.last_name, u.first_name";
+        try (Connection conn = DBContext.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            if (excludeUserId != null) {
+                ps.setInt(1, excludeUserId);
+            }
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    User u = new User();
+                    u.setUserId(rs.getInt("user_id"));
+                    u.setUsername(rs.getString("username"));
+                    u.setLastName(rs.getString("last_name"));
+                    u.setMiddleName(rs.getString("middle_name"));
+                    u.setFirstName(rs.getString("first_name"));
+                    u.setRole(new Role(0, rs.getString("role_name")));
+                    result.add(u);
+                }
+            }
+        } catch (SQLException ex) {
+            LOG.error("Loi truy van danh sach cap tren (excludeUserId={})", excludeUserId, ex);
+        }
+        return result;
+    }
+
     private User mapRow(ResultSet rs) throws SQLException {
         User u = new User();
         u.setUserId(rs.getInt("user_id"));
@@ -452,6 +515,8 @@ public class EmployeeDAO {
         u.setAvatarUrl(rs.getString("avatar_url"));
         u.setDepartmentId(rs.getInt("department_id"));
         u.setDepartment(new Department(rs.getInt("department_id"), rs.getString("department_name")));
+        int managerId = rs.getInt("manager_id");
+        u.setManagerId(rs.wasNull() ? null : managerId);
         u.setHireDate(rs.getDate("hire_date"));
         u.setCreatedAt(rs.getTimestamp("created_at"));
         u.setDeleted(rs.getBoolean("is_deleted"));
@@ -546,7 +611,7 @@ public class EmployeeDAO {
     public int insert(User user) {
         String sql = "INSERT INTO users (username, email, password_hash, role_id, last_name, middle_name, " +
                      "first_name, gender, date_of_birth, citizen_id, phone, personal_email, address_id, " +
-                     "department_id, hire_date, is_deleted) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)";
+                     "department_id, hire_date, manager_id, is_deleted) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)";
         try (Connection conn = DBContext.getConnection()) {
             conn.setAutoCommit(false);
             try {
@@ -571,6 +636,7 @@ public class EmployeeDAO {
                     }
                     ps.setInt(14, user.getDepartmentId());
                     ps.setDate(15, user.getHireDate());
+                    setNullableInt(ps, 16, user.getManagerId());
                     int affected = ps.executeUpdate();
                     if (affected == 0) {
                         conn.rollback();
@@ -604,7 +670,7 @@ public class EmployeeDAO {
     public boolean update(User user) {
         String sql = "UPDATE users SET role_id = ?, last_name = ?, middle_name = ?, first_name = ?, " +
                      "gender = ?, date_of_birth = ?, citizen_id = ?, phone = ?, personal_email = ?, address_id = ?, " +
-                     "department_id = ?, hire_date = ? WHERE user_id = ?";
+                     "department_id = ?, hire_date = ?, manager_id = ? WHERE user_id = ?";
         try (Connection conn = DBContext.getConnection()) {
             conn.setAutoCommit(false);
             try {
@@ -626,7 +692,8 @@ public class EmployeeDAO {
                     }
                     ps.setInt(11, user.getDepartmentId());
                     ps.setDate(12, user.getHireDate());
-                    ps.setInt(13, user.getUserId());
+                    setNullableInt(ps, 13, user.getManagerId());
+                    ps.setInt(14, user.getUserId());
                     boolean ok = ps.executeUpdate() > 0;
                     if (ok) {
                         conn.commit();

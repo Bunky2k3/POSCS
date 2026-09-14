@@ -12,11 +12,21 @@ public class User {
     // Thuộc tính lưu trữ ID khóa ngoại
     private int roleId;
     private int departmentId;
+    /**
+     * Cấp trên trực tiếp (users.manager_id), null nếu không có.
+     *
+     * Cây tổ chức chốt với khách hàng chỉ có HAI tầng, nên cột này vừa là
+     * quan hệ vừa là thứ phân tầng: null = tầng trên (quản lý vùng) hoặc
+     * chưa xếp vào cây, khác null = tầng lá (nhân viên cầm tỉnh).
+     */
+    private Integer managerId;
     private Integer addressId; // Dùng Integer thay vì int vì DB cho phép NULL
 
     // Thuộc tính Object để chứa dữ liệu join từ các bảng khác
     private Role role;
     private Department department;
+    /** Cấp trên đã join sẵn (chỉ điền ở những truy vấn cần hiện tên). */
+    private User manager;
     private Address address;
 
     private String lastName;
@@ -128,6 +138,25 @@ public class User {
 
     public int getDepartmentId() { return departmentId; }
     public void setDepartmentId(int departmentId) { this.departmentId = departmentId; }
+
+    public Integer getManagerId() { return managerId; }
+    public void setManagerId(Integer managerId) { this.managerId = managerId; }
+
+    public User getManager() { return manager; }
+    public void setManager(User manager) { this.manager = manager; }
+
+    /**
+     * true nếu người này là CẤP DƯỚI trong cây tổ chức, tức có cấp trên.
+     *
+     * Đây là thứ quyết định quyền ghi trên Khách hàng và Hợp đồng: theo yêu
+     * cầu khách hàng, cấp dưới chỉ xem, muốn đổi gì thì gửi yêu cầu lên cấp
+     * trên (xem AccessControl.hasFullAccess và PERMISSIONS.md).
+     *
+     * Chưa xếp vào cây tổ chức thì manager_id null -> KHÔNG phải cấp dưới ->
+     * không bị siết. Đó là chốt an toàn cố ý: bật tính năng lên không cướp
+     * quyền của ai cho tới khi cây tổ chức thật được nhập.
+     */
+    public boolean isSubordinate() { return managerId != null; }
 
     public Department getDepartment() { return department; }
     public void setDepartment(Department department) { this.department = department; }

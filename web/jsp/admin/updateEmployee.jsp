@@ -72,6 +72,7 @@
                             <c:when test="${param.error == 'invalid'}">Vui lòng nhập đầy đủ và đúng định dạng các trường bắt buộc.</c:when>
                             <c:when test="${param.error == 'duplicate_phone'}">Số điện thoại này đã được sử dụng bởi tài khoản khác.</c:when>
                             <c:when test="${param.error == 'duplicate_citizen'}">Số CCCD/CMND này đã được sử dụng bởi tài khoản khác.</c:when>
+                            <c:when test="${param.error == 'invalid_manager'}">Người được chọn làm cấp trên không hợp lệ. Cấp trên phải là người chưa có cấp trên của riêng mình, và không thể là chính nhân viên này.</c:when>
                             <c:when test="${param.error == 'update_failed'}">Không thể cập nhật nhân viên. Vui lòng thử lại.</c:when>
                             <c:otherwise>Đã có lỗi xảy ra. Vui lòng thử lại.</c:otherwise>
                         </c:choose>
@@ -112,6 +113,26 @@
                             <label for="hireDate">Ngày vào làm</label>
                             <input type="date" class="form-control" id="hireDate" name="hireDate" value="${employee.hireDate}">
                             <span class="error-text" id="err-hireDate">Vui lòng chọn ngày vào làm.</span>
+                        </div>
+                        <%--
+                          Cấp trên trong cây tổ chức 2 tầng. Để trống = người
+                          này thuộc tầng trên (quản lý vùng); chọn một người =
+                          thành cấp dưới của họ.
+
+                          Không phải chuyện hành chính suông: trên Khách hàng
+                          và Hợp đồng, ai có cấp trên thì chỉ còn quyền XEM,
+                          muốn đổi gì phải gửi yêu cầu lên (PERMISSIONS.md).
+                          Danh sách đã lọc sẵn những người bản thân chưa có cấp
+                          trên, để cây không mọc thêm tầng thứ ba.
+                        --%>
+                        <div class="col-md-6 field-row">
+                            <label for="managerId">Cấp trên</label>
+                            <select class="form-select" id="managerId" name="managerId">
+                                <option value="">-- Không có (thuộc tầng quản lý) --</option>
+                                <c:forEach var="m" items="${managerList}">
+                                    <option value="${m.userId}" ${m.userId == employee.managerId ? 'selected' : ''}>${fn:escapeXml(m.fullName)} (${fn:escapeXml(m.role.roleName)})</option>
+                                </c:forEach>
+                            </select>
                         </div>
                     </div>
 
