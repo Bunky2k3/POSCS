@@ -4,8 +4,14 @@ POSCS uses role-based access control. This document is the source of
 truth for who can do what — refer to it whenever implementing or
 reviewing a controller's access checks.
 
-**Status: enforced for Customer/Contract/Product/Ticket/Employee.** The
-`roles` table is seeded (see
+**Status: everything below is enforced in code EXCEPT the two `†` cells**
+(`Sales` staff on Customer and Contract), which is the model agreed with the
+customer on 2026-09-14 and is **not built yet** — see
+[Hierarchy-based write access](#hierarchy-based-write-access-for-customercontract)
+for what is missing and why the matrix already carries it. Everything
+unmarked describes current behaviour and can be relied on.
+
+The `roles` table is seeded (see
 [`db/migrations/V2__seed_default_roles__ndat2003.sql`](db/migrations/V2__seed_default_roles__ndat2003.sql)),
 login/session is implemented in `AuthenticationController`, and
 `CustomerController`/`ContractController`/`ProductController`/
@@ -28,14 +34,19 @@ any role — every single action (including list/view) requires Admin.
 
 `Full` = create, read, update, delete. `View only` = list + detail views, no create/update/delete.
 
-| Resource | Admin | Sales | Kỹ thuật | CSKH |
-|---|---|---|---|---|
-| Customer (`enterprises`) | Full | Full | View only | View only |
-| Contract (`contracts`) | Full | Full | View only | View only |
-| Product (`products`) | Full | View only | Full | View only |
-| Ticket (`technicalrequests`) | Full | View only | View only* | Full |
-| Employee (`users`) | Full | No access | No access | No access |
-| System log (`/systemLog`) | Full | No access | No access | No access |
+`Sales` is split into the two tiers of the org chart: a **manager** (`quản lý
+vùng`) and the **staff** under them (`nhân viên cầm tỉnh`, one province each).
+Every other role is a single tier — a `Kỹ thuật` or `CSKH` user having a
+manager changes nothing about their access.
+
+| Resource | Admin | Sales — manager | Sales — staff | Kỹ thuật | CSKH |
+|---|---|---|---|---|---|
+| Customer (`enterprises`) | Full | Full | View only † | View only | View only |
+| Contract (`contracts`) | Full | Full | View only † | View only | View only |
+| Product (`products`) | Full | View only | View only | Full | View only |
+| Ticket (`technicalrequests`) | Full | View only | View only | View only* | Full |
+| Employee (`users`) | Full | No access | No access | No access | No access |
+| System log (`/systemLog`) | Full | No access | No access | No access | No access |
 
 \* **Exception:** `Kỹ thuật` may update the `status`, `resolutionSummary`,
 `rootCause` and `causeCategory` of a ticket currently assigned to them
@@ -53,6 +64,60 @@ position to fill it in. Enforced in
 handler keeps the row it read from the database and overwrites only these
 four fields, so widening the exception means adding a `set...` call there and
 nowhere else.
+
+† **Not built yet.** These two cells describe the agreed target, not today's
+code: `AccessControl.FULL_ACCESS_ROLES` currently grants *every* `Sales` user
+Full access on Customer and Contract, and `users` has no column saying who
+reports to whom, so the two tiers cannot be told apart at runtime. Until that
+lands, a `Sales` staff member really has **Full** access on both — which is
+also why the manager row needs no mark: `Full` is already true for them today
+and stays true afterwards, so the hierarchy only ever *removes* access, never
+grants any.
+
+In the target model, by contrast, a `Sales` staff member is read-only on these
+two resources — create included — and gets changes made through a change
+request their manager approves; see
+[Hierarchy-based write access](#hierarchy-based-write-access-for-customercontract).
+
+## Hierarchy-based write access for Customer/Contract
+
+**Decided with the customer on 2026-09-14. Carried in the matrix above as the
+two `†` cells, and NOT implemented yet** — `users` has no manager column, and
+`FULL_ACCESS_ROLES` still grants every `Sales` user Full access on both
+resources. Anyone reading the matrix to predict what the running system does
+today must read `†` as Full; anyone implementing should build what this
+section describes.
+
+The agreed rule, on top of the role matrix rather than replacing it:
+
+- The **manager** (`quản lý vùng`, upper tier) is the one who touches data
+  — including data owned by their subordinates.
+- The **subordinate** (`nhân viên cầm tỉnh`, leaf tier, one province each)
+  is **read-only**, create included. To change anything they submit a
+  **change request** to their manager, who approves or rejects it.
+
+Scope and consequences worth knowing before implementing:
+
+- **Customer and Contract only.** Ticket and Product are untouched — in
+  particular the `Kỹ thuật` exception documented above still stands, so an
+  assigned technician keeps writing `status`, `resolutionSummary`,
+  `rootCause` and `causeCategory` on their own ticket. A technician being
+  somebody's subordinate does not make them read-only on tickets.
+- **This moves permissions onto a second axis.** Today the only question is
+  *which role*; this adds *who owns the row* (`contracts.owner_id`) and
+  *who manages whom*, so the checks become row-level rather than a lookup
+  in `FULL_ACCESS_ROLES`. The existing `canUpdateAssignedTicket` is the
+  closest precedent in shape, though much narrower in reach.
+- **Change requests must carry an intent, not a diff.** Because creation is
+  gated too, a request to add a customer has no existing row to point at —
+  the record it proposes has to live in the request itself. Model it as
+  `CREATE` / `UPDATE` / `DELETE` intent; a diff-only design cannot express
+  the create case and would have to be rebuilt.
+- **Safe by default at rollout.** With no manager recorded, nobody is a
+  subordinate and nobody loses access — the restriction only takes effect
+  for users who actually get a manager assigned. Filling in the real org
+  chart is what switches it on, and that data is still pending from the
+  customer.
 
 ## Notes for implementation
 
