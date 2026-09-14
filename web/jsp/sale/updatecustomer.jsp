@@ -174,14 +174,24 @@
                         <span class="error-text" id="err-customerGroup">Vui lòng chọn nhóm khách hàng.</span>
                     </div>
                     <div class="col-md-6 field-row">
-                        <label>Nhân viên phụ trách <span class="req">*</span></label>
+                        <label>Người phụ trách chính <span class="req">*</span></label>
                         <select class="form-select" id="assignee" name="accountOwnerId">
                             <option value="">-- Chọn nhân viên --</option>
                             <c:forEach var="staff" items="${userList}">
                                 <option value="${staff.userId}" ${staff.userId == customer.accountOwnerId ? 'selected' : ''}>${fn:escapeXml(staff.fullName)}</option>
                             </c:forEach>
                         </select>
-                        <span class="error-text" id="err-assignee">Vui lòng chọn nhân viên phụ trách.</span>
+                        <span class="error-text" id="err-assignee">Vui lòng chọn người phụ trách chính.</span>
+                    </div>
+                    <div class="col-md-6 field-row">
+                        <label>Người hỗ trợ</label>
+                        <select class="form-select" id="supportAssignee" name="supportOwnerId">
+                            <option value="">-- Chưa bố trí --</option>
+                            <c:forEach var="staff" items="${userList}">
+                                <option value="${staff.userId}" ${staff.userId == customer.supportOwnerId ? 'selected' : ''}>${fn:escapeXml(staff.fullName)}</option>
+                            </c:forEach>
+                        </select>
+                        <span class="error-text" id="err-supportAssignee">Người hỗ trợ phải khác người phụ trách chính.</span>
                     </div>
 
                     <div class="col-md-6 field-row">
@@ -209,16 +219,17 @@
                 <div class="section-header"><h5>Địa chỉ</h5></div>
                 <div class="row">
                     <div class="col-md-6 field-row">
-                        <label>Tỉnh / Thành phố</label>
+                        <label>Tỉnh / Thành phố <span class="req">*</span></label>
                         <select class="form-select" id="province" name="provinceId">
                             <option value="">-- Chọn tỉnh / thành phố --</option>
                             <c:forEach var="prov" items="${provinceList}">
                                 <option value="${prov.provinceId}" ${customer.address != null && customer.address.district != null && prov.provinceId == customer.address.district.provinceId ? 'selected' : ''}>${fn:escapeXml(prov.shortName)}</option>
                             </c:forEach>
                         </select>
+                        <span class="error-text" id="err-province">Vui lòng chọn tỉnh / thành phố.</span>
                     </div>
                     <div class="col-md-6 field-row">
-                        <label>Xã / Phường</label>
+                        <label>Xã / Phường <span class="req">*</span></label>
                         <select class="form-select" id="district" name="districtId">
                             <c:choose>
                                 <c:when test="${customer.address != null && customer.address.district != null}">
@@ -229,11 +240,13 @@
                                 </c:otherwise>
                             </c:choose>
                         </select>
+                        <span class="error-text" id="err-district">Vui lòng chọn xã / phường.</span>
                     </div>
                     <div class="col-12 field-row">
-                        <label>Địa chỉ chi tiết</label>
+                        <label>Địa chỉ chi tiết <span class="req">*</span></label>
                         <input type="text" class="form-control" id="addressDetail" name="addressDetail"
                                value="${fn:escapeXml(customer.address != null ? customer.address.streetAndLocalName : '')}">
+                        <span class="error-text" id="err-addressDetail">Vui lòng nhập địa chỉ chi tiết.</span>
                     </div>
                 </div>
 
@@ -314,7 +327,9 @@
             var valid = true;
             document.querySelectorAll('.error-text').forEach(function (el) { el.style.display = 'none'; });
 
-            var requiredSelects = ['customerType', 'customerGroup', 'assignee'];
+            // Xem ghi chú ở addnewcustomer.jsp: tỉnh là căn cứ chia địa bàn nên
+            // bắt buộc như các trường nghiệp vụ khác, server chặn lại lần nữa.
+            var requiredSelects = ['customerType', 'customerGroup', 'assignee', 'province', 'district'];
             requiredSelects.forEach(function (id) {
                 var el = document.getElementById(id);
                 if (!el.value) { document.getElementById('err-' + id).style.display = 'block'; valid = false; }
@@ -322,6 +337,17 @@
 
             var name = document.getElementById('customerName');
             if (!name.value.trim()) { document.getElementById('err-customerName').style.display = 'block'; valid = false; }
+
+            var addressDetail = document.getElementById('addressDetail');
+            if (!addressDetail.value.trim()) { document.getElementById('err-addressDetail').style.display = 'block'; valid = false; }
+
+            // Hai vai phải là hai người: trùng nhau thì cột "Người hỗ trợ" chỉ
+            // lặp lại tên ở cột bên cạnh (server cũng chặn lại lần nữa).
+            var support = document.getElementById('supportAssignee');
+            var mainOwner = document.getElementById('assignee');
+            if (support.value && support.value === mainOwner.value) {
+                document.getElementById('err-supportAssignee').style.display = 'block'; valid = false;
+            }
 
             var phone = document.getElementById('phone');
             if (!isValidPhone(phone.value)) { document.getElementById('err-phone').style.display = 'block'; valid = false; }

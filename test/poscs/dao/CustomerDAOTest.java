@@ -5,6 +5,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import org.junit.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.mockito.MockedStatic;
 import poscs.model.Address;
@@ -151,6 +152,66 @@ public class CustomerDAOTest {
         }
     }
 
+    /** Khách chưa bố trí người hỗ trợ: cột phải là NULL, không phải 0 (0 vi phạm khoá ngoại). */
+    @Test
+    public void insert_noSupportOwner_bindsSqlNull() throws Exception {
+        ResultSet keys = singleRow(row("id", 88));
+        PreparedStatement ps = mock(PreparedStatement.class);
+        when(ps.executeUpdate()).thenReturn(1);
+        when(ps.getGeneratedKeys()).thenReturn(keys);
+        Connection conn = connectionReturning(ps);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            dao.insert(enterprise("KH-0001")); // chỉ có người phụ trách chính
+
+            verify(ps).setNull(11, java.sql.Types.INTEGER);
+        }
+    }
+
+    @Test
+    public void insert_withSupportOwner_bindsItAfterMainOwner() throws Exception {
+        ResultSet keys = singleRow(row("id", 88));
+        PreparedStatement ps = mock(PreparedStatement.class);
+        when(ps.executeUpdate()).thenReturn(1);
+        when(ps.getGeneratedKeys()).thenReturn(keys);
+        Connection conn = connectionReturning(ps);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            Enterprise e = enterprise("KH-0001");
+            e.setSupportOwnerId(7);
+            dao.insert(e);
+
+            verify(ps).setInt(10, 5); // phụ trách chính
+            verify(ps).setInt(11, 7); // người hỗ trợ
+        }
+    }
+
+    /**
+     * Lọc "người phụ trách" chỉ soi vai CHÍNH, cố ý không khớp sang cột người
+     * hỗ trợ: mỗi khách quy về đúng một người chịu trách nhiệm, lọc tên ai thì
+     * ra đúng phần của người đó, không lẫn phần họ chỉ đứng hỗ trợ.
+     */
+    @Test
+    public void findAll_filterByOwner_matchesMainRoleOnly() throws Exception {
+        PreparedStatement ps = statementReturning(emptyResultSet());
+        Connection conn = connectionReturning(ps);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            dao.findAll(1, 10, null, null, 7, null, false);
+
+            String sql = capturedSql(conn);
+            assertTrue(sql.contains("e.account_owner_id = ?"));
+            assertFalse(sql.contains("support_owner_id = ?"));
+            verify(ps).setObject(1, 7);
+        }
+    }
+
     @Test
     public void insert_noStatusGiven_defaultsToActive() throws Exception {
         ResultSet keys = singleRow(row("id", 88));
@@ -164,7 +225,7 @@ public class CustomerDAOTest {
 
             dao.insert(enterprise("KH-0001")); // status để null
 
-            verify(ps).setString(14, "Active");
+            verify(ps).setString(15, "Active");
         }
     }
 
@@ -183,7 +244,7 @@ public class CustomerDAOTest {
             e.setStatus("Inactive");
             dao.insert(e);
 
-            verify(ps).setString(14, "Inactive");
+            verify(ps).setString(15, "Inactive");
         }
     }
 
@@ -299,6 +360,89 @@ public class CustomerDAOTest {
             // nên phải ghi đè đúng dòng đang có.
             verify(conn, never()).prepareStatement(anyString(), anyInt());
             verify(ps).setInt(7, 77); // address_id giữ nguyên
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // Lọc/sắp xếp theo tỉnh (quản lý khách hàng theo địa bàn)
+    // ------------------------------------------------------------------
+
+    /** Câu SQL của lần prepareStatement duy nhất trong một lời gọi DAO đọc dữ liệu. */
+    private static String capturedSql(Connection conn) throws SQLException {
+        ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+        verify(conn).prepareStatement(sql.capture());
+        return sql.getValue();
+    }
+
+    @Test
+    public void findAll_withProvinceFilter_bindsProvinceIdOfDistrict() throws Exception {
+        PreparedStatement ps = statementReturning(emptyResultSet());
+        Connection conn = connectionReturning(ps);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            dao.findAll(1, 10, null, null, null, 3, false);
+
+            // Tỉnh nằm ở districts.province_id chứ không phải trên enterprises.
+            assertTrue(capturedSql(conn).contains("d.province_id = ?"));
+            verify(ps).setObject(1, 3);
+        }
+    }
+
+    /**
+     * countAll phải join đúng những bảng mà điều kiện lọc tỉnh tham chiếu tới.
+     * Query đếm vốn không join addresses/districts; thiếu chỗ này thì lọc tỉnh
+     * chạy được ở danh sách nhưng bộ đếm ném SQLException rồi trả 0 -- hỏng
+     * lặng lẽ, bảng có dữ liệu mà vẫn hiện "0 khách hàng".
+     */
+    @Test
+    public void countAll_withProvinceFilter_joinsTablesTheFilterNeeds() throws Exception {
+        PreparedStatement ps = statementReturning(singleRow(row("total", 4)));
+        Connection conn = connectionReturning(ps);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            assertEquals(4, dao.countAll(null, null, null, 3));
+
+            String sql = capturedSql(conn);
+            assertTrue(sql.contains("LEFT JOIN addresses a"));
+            assertTrue(sql.contains("LEFT JOIN districts d"));
+            assertTrue(sql.contains("d.province_id = ?"));
+        }
+    }
+
+    @Test
+    public void findAll_sortByProvince_ordersByProvinceAndPushesMissingAddressLast() throws Exception {
+        PreparedStatement ps = statementReturning(emptyResultSet());
+        Connection conn = connectionReturning(ps);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            dao.findAll(1, 10, null, null, null, null, true);
+
+            String sql = capturedSql(conn);
+            assertTrue(sql.contains("ORDER BY p.province_name IS NULL"));
+            assertTrue(sql.contains(AddressDAO.PROVINCE_SHORT_NAME_ORDER));
+        }
+    }
+
+    /** Màn hình danh sách vẫn giữ thứ tự mới nhất trước, không đổi theo tỉnh. */
+    @Test
+    public void findAll_withoutSortFlag_keepsNewestFirst() throws Exception {
+        PreparedStatement ps = statementReturning(emptyResultSet());
+        Connection conn = connectionReturning(ps);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            dao.findAll(1, 10, null, null, null, null, false);
+
+            String sql = capturedSql(conn);
+            assertTrue(sql.contains("ORDER BY e.enterprise_id DESC"));
+            assertFalse(sql.contains("province_name IS NULL"));
         }
     }
 

@@ -25,7 +25,7 @@
     <link rel="stylesheet" href="${pageContext.request.contextPath}/css/appshell.css">
 
     <style>
-        .page-container { max-width: 1280px; margin: 28px auto; padding: 0 24px 32px; }
+        .page-container { max-width: 1440px; margin: 28px auto; padding: 0 24px 32px; }
         .page-header-row { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 22px; flex-wrap: wrap; gap: 14px; }
         .page-header-row h2 { font-weight: 700; color: var(--primary-dark); font-size: 1.4rem; margin-bottom: 4px; }
         .page-header-row p { color: #6b7280; font-size: 0.9rem; }
@@ -53,23 +53,66 @@
         .status-chip .num { font-weight: 700; font-size: 1.15rem; color: #111827; }
         .status-chip .lbl { font-size: 0.78rem; color: #6b7280; }
 
-        .filter-bar { padding: 18px 20px; margin-bottom: 20px; display: flex; flex-wrap: wrap; gap: 14px; align-items: center; }
-        .search-input-wrap { position: relative; flex: 1 1 260px; min-width: 200px; }
+        .filter-bar { padding: 18px 20px; margin-bottom: 20px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+        .search-input-wrap { position: relative; flex: 1 1 170px; min-width: 160px; }
         .search-input-wrap i { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: #9ca3af; font-size: 0.9rem; }
         .search-input-wrap input { width: 100%; padding: 10px 14px 10px 38px; border-radius: 10px; border: 1px solid #e5e7eb; background: #f9fafb; font-size: 0.88rem; }
         .search-input-wrap input:focus { outline: none; background: #fff; border-color: var(--primary-light); box-shadow: 0 0 0 4px rgba(15, 158, 219, 0.15); }
-        .filter-bar select { padding: 10px 14px; border-radius: 10px; border: 1px solid #e5e7eb; background: #f9fafb; font-size: 0.88rem; min-width: 160px; }
+        /* min-width 180px x nhiều ô là tràn hàng ngay ở màn hình 1366px --
+           thu về 150px và cho phép co lại thì cả thanh lọc nằm gọn một hàng. */
+        .filter-bar select { padding: 9px 10px; border-radius: 10px; border: 1px solid #e5e7eb; background: #f9fafb; font-size: 0.84rem; flex: 0 1 auto; min-width: 124px; max-width: 148px; }
+        #filterYear { min-width: 104px; max-width: 118px; }
+        #filterPeriod { min-width: 110px; max-width: 124px; }
         .filter-bar select:focus { outline: none; border-color: var(--primary-light); }
 
         .table-card { overflow: hidden; }
+        /* Thanh cuộn ngang: để mặc định thì Windows ẩn nó đi tới khi cuộn, người
+           dùng không biết là bảng còn phần bên phải. Cho nó dày lên và luôn hiện,
+           kèm con trỏ bàn tay -- nhìn là biết kéo được. */
+        .table-responsive {
+            overflow-x: auto; cursor: grab;
+            scrollbar-width: thin; scrollbar-color: #cbd5e1 #f1f5f9;
+        }
+        .table-responsive.is-dragging { cursor: grabbing; user-select: none; }
+        .table-responsive::-webkit-scrollbar { height: 11px; }
+        .table-responsive::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 8px; }
+        .table-responsive::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 8px; }
+        .table-responsive::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
         .custom-table { margin-bottom: 0; }
         .custom-table thead th {
             background: #f8fafc; color: #6b7280; font-size: 0.74rem; text-transform: uppercase; letter-spacing: .3px;
-            font-weight: 700; padding: 12px 16px; border-bottom: 1.5px solid #eef2f6; white-space: nowrap;
+            font-weight: 700; padding: 11px 8px; border-bottom: 1.5px solid #eef2f6; white-space: nowrap;
         }
-        .custom-table tbody td { padding: 12px 16px; font-size: 0.86rem; color: #111827; vertical-align: middle; border-bottom: 1px solid #f3f4f6; }
+        .custom-table tbody td { padding: 11px 8px; font-size: 0.85rem; color: #111827; vertical-align: middle; border-bottom: 1px solid #f3f4f6; }
         .custom-table tbody tr:last-child td { border-bottom: none; }
         .custom-table tbody tr:hover { background: #f9fdff; }
+        /* Bảng nhiều cột + chữ tiếng Việt dài thì trình duyệt bóp cột rồi ngắt
+           chữ, mỗi dòng cao 3-4 hàng. Cho bảng một bề rộng tối thiểu rồi để
+           khung ngoài (.table-responsive) cuộn ngang -- thà cuộn còn hơn đọc
+           bảng vỡ. Ô dài cắt bằng "..." và giữ nguyên văn ở tooltip. */
+        /* Xem ghi chú ở listcustomer.jsp: table-layout:fixed + chia % để bảng vừa
+           đúng khung, mỗi dòng đúng một hàng chữ, phần thừa cắt bằng "...". */
+        .custom-table { table-layout: fixed; min-width: 1460px; }
+        /* min-width lớn hơn bề ngang khung: mỗi cột được rộng thoải mái,
+           tên/tiêu đề dài phần lớn nằm gọn một dòng. Màn hình hẹp thì
+           khung ngoài (.table-responsive) cho kéo ngang -- đổi lại lấy
+           được khoảng thở cho chữ. */
+        .custom-table th, .custom-table td { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .custom-table th:nth-child(1), .custom-table td:nth-child(1) { width: 9%; }   /* Mã phiếu */
+        .custom-table th:nth-child(2), .custom-table td:nth-child(2) { width: 10%; }  /* Loại phiếu */
+        .custom-table th:nth-child(3), .custom-table td:nth-child(3) { width: 24%; }  /* Khách hàng + HĐ */
+        .custom-table th:nth-child(4), .custom-table td:nth-child(4) { width: 11%; }  /* Ưu tiên */
+        .custom-table th:nth-child(5), .custom-table td:nth-child(5) { width: 15%; }  /* Trạng thái */
+        .custom-table th:nth-child(6), .custom-table td:nth-child(6) { width: 13%; }  /* Người xử lý */
+        .custom-table th:nth-child(7), .custom-table td:nth-child(7) { width: 9%; }   /* Ngày tạo */
+        .custom-table th:nth-child(8), .custom-table td:nth-child(8) { width: 9%; }   /* Thao tác */
+        .custom-table td.cell-wrap { white-space: normal; }
+        .cell-2line { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+        .cell-sub { font-size: 0.74rem; color: #6b7280; line-height: 1.35; }
+        .cust-name { font-weight: 600; color: #111827; line-height: 1.3; }
+        .status-cell { line-height: 1.9; }
+        .cell-clip { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
         .ticket-code { font-weight: 700; color: var(--primary); font-size: 0.85rem; }
         .code-link { color: inherit; text-decoration: none; }
@@ -98,7 +141,7 @@
 
         .action-icons { display: flex; gap: 6px; justify-content: flex-end; }
         .action-icons button {
-            width: 32px; height: 32px; border-radius: 8px; border: none; background: #f3f4f6; color: #6b7280; cursor: pointer;
+            width: 28px; height: 28px; border-radius: 8px; border: none; background: #f3f4f6; color: #6b7280; cursor: pointer;
             display: flex; align-items: center; justify-content: center; font-size: 0.82rem; transition: all 0.15s;
         }
         .action-icons .act-view:hover { background: #eaf6ff; color: var(--primary); }
@@ -160,7 +203,7 @@
                 <%-- Xuất Excel là thao tác ĐỌC: chỉ lấy đúng dữ liệu vai trò này vốn đã
                      xem được trên màn hình, đổi sang dạng file. Nên KHÔNG khoá theo
                      canManage -- xem PERMISSIONS.md. --%>
-                <a href="${pageContext.request.contextPath}/ticket?action=exportExcel&keyword=${fn:escapeXml(keyword)}&status=${fn:escapeXml(statusFilter)}&priority=${fn:escapeXml(priorityFilter)}" class="btn-outline-action"><i class="fa-solid fa-file-excel"></i> Xuất Excel</a>
+                <a href="${pageContext.request.contextPath}/ticket?action=exportExcel&keyword=${fn:escapeXml(keyword)}&status=${fn:escapeXml(statusFilter)}&priority=${fn:escapeXml(priorityFilter)}&year=${yearFilter}&period=${periodFilter}" class="btn-outline-action"><i class="fa-solid fa-file-excel"></i> Xuất Excel</a>
                 <c:if test="${canManage}">
                     <a href="${pageContext.request.contextPath}/ticket?action=new" class="btn-add"><i class="fa-solid fa-plus"></i> Tạo phiếu hỗ trợ</a>
                 </c:if>
@@ -195,6 +238,23 @@
                 <option value="Bình thường" ${priorityFilter == 'Bình thường' ? 'selected' : ''}>Bình thường</option>
                 <option value="Thấp" ${priorityFilter == 'Thấp' ? 'selected' : ''}>Thấp</option>
             </select>
+            <select id="filterYear" name="year">
+                <option value="">Mọi thời điểm</option>
+                <c:forEach var="y" items="${yearList}">
+                    <option value="${y}" ${yearFilter == y ? 'selected' : ''}>Năm ${y}</option>
+                </c:forEach>
+            </select>
+            <select id="filterPeriod" name="period">
+                <option value="">Cả năm</option>
+                <c:forEach var="q" begin="1" end="4">
+                    <c:set var="qVal" value="q${q}"/>
+                    <option value="${qVal}" ${periodFilter == qVal ? 'selected' : ''}>Quý ${q}</option>
+                </c:forEach>
+                <c:forEach var="m" begin="1" end="12">
+                    <c:set var="mVal" value="m${m}"/>
+                    <option value="${mVal}" ${periodFilter == mVal ? 'selected' : ''}>Tháng ${m}</option>
+                </c:forEach>
+            </select>
         </form>
 
         <!-- ===== Bảng danh sách ===== -->
@@ -206,7 +266,6 @@
                             <th>Mã phiếu</th>
                             <th>Loại phiếu</th>
                             <th>Khách hàng</th>
-                            <th>Hợp đồng liên quan</th>
                             <th>Ưu tiên</th>
                             <th>Trạng thái</th>
                             <th>Người xử lý</th>
@@ -219,17 +278,18 @@
                             <tr>
                                 <td class="ticket-code"><a href="${pageContext.request.contextPath}/ticket?action=view&id=${ticket.ticketId}" class="code-link">${fn:escapeXml(ticket.ticketCode)}</a></td>
                                 <td><a href="${pageContext.request.contextPath}/ticket?action=view&id=${ticket.ticketId}" class="ticket-title-link">${fn:escapeXml(ticket.ticketType)}</a></td>
-                                <td>
-                                    <c:choose>
-                                        <c:when test="${ticket.enterprise != null}">${fn:escapeXml(ticket.enterprise.enterpriseName)}</c:when>
-                                        <c:otherwise>&mdash;</c:otherwise>
-                                    </c:choose>
-                                </td>
-                                <td>
-                                    <c:choose>
-                                        <c:when test="${ticket.contract != null}"><a href="${pageContext.request.contextPath}/contract?action=view&id=${ticket.contractId}" class="contract-link">${fn:escapeXml(ticket.contract.contractCode)}</a></c:when>
-                                        <c:otherwise><span class="no-contract">Không có</span></c:otherwise>
-                                    </c:choose>
+                                <%-- Ô hai dòng: tên khách đậm ở trên, hợp đồng liên quan chữ nhỏ
+                                     ở dưới -- gộp lại để tên khách đủ chỗ hiện trọn vẹn. --%>
+                                <td class="cell-wrap">
+                                    <div class="cell-2line">
+                                        <span class="cust-name"><c:choose><c:when test="${ticket.enterprise != null}">${fn:escapeXml(ticket.enterprise.enterpriseName)}</c:when><c:otherwise>&mdash;</c:otherwise></c:choose></span>
+                                        <span class="cell-sub">
+                                            <c:choose>
+                                                <c:when test="${ticket.contract != null}"><a href="${pageContext.request.contextPath}/contract?action=view&id=${ticket.contractId}" class="contract-link">${fn:escapeXml(ticket.contract.contractCode)}</a></c:when>
+                                                <c:otherwise>Không gắn hợp đồng</c:otherwise>
+                                            </c:choose>
+                                        </span>
+                                    </div>
                                 </td>
                                 <td>
                                     <c:choose>
@@ -239,7 +299,10 @@
                                         <c:otherwise><span class="pill priority-normal"><span class="dot"></span>Bình thường</span></c:otherwise>
                                     </c:choose>
                                 </td>
-                                <td>
+                                <%-- Ô này có thể chứa 2 thẻ (trạng thái + cảnh báo SLA) nên cho
+                                     phép xuống dòng: hai thẻ xếp chồng vẫn đọc được, ép một dòng
+                                     thì thẻ thứ hai bị cắt mất. --%>
+                                <td class="cell-wrap status-cell">
                                     <c:choose>
                                         <c:when test="${ticket.status == 'Đang xử lý'}"><span class="pill status-progress"><span class="dot"></span>Đang xử lý</span></c:when>
                                         <c:when test="${ticket.status == 'Đã đóng'}"><span class="pill status-closed"><span class="dot"></span>Đã đóng</span></c:when>
@@ -254,7 +317,7 @@
                                         <c:otherwise>&mdash;</c:otherwise>
                                     </c:choose>
                                 </td>
-                                <td><fmt:formatDate value="${ticket.createdDate}" pattern="dd/MM/yyyy"/></td>
+                                <td><fmt:formatDate value="${ticket.createdDate}" pattern="dd/MM/yy"/></td>
                                 <td>
                                     <div class="action-icons">
                                         <button class="act-view" title="Xem chi tiết" onclick="location.href='${pageContext.request.contextPath}/ticket?action=view&id=${ticket.ticketId}'"><i class="fa-regular fa-eye"></i></button>
@@ -281,11 +344,11 @@
                 <span class="pagination-info" id="paginationInfo">Hiển thị ${fn:length(ticketList)} trong tổng số ${totalCount} phiếu hỗ trợ</span>
                 <nav>
                     <ul class="pagination pagination-sm mb-0">
-                        <li class="page-item ${currentPage <= 1 ? 'disabled' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/ticket?action=list&page=${currentPage - 1}&keyword=${fn:escapeXml(keyword)}&status=${fn:escapeXml(statusFilter)}&priority=${fn:escapeXml(priorityFilter)}">Trước</a></li>
+                        <li class="page-item ${currentPage <= 1 ? 'disabled' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/ticket?action=list&page=${currentPage - 1}&keyword=${fn:escapeXml(keyword)}&status=${fn:escapeXml(statusFilter)}&priority=${fn:escapeXml(priorityFilter)}&year=${yearFilter}&period=${periodFilter}">Trước</a></li>
                         <c:forEach begin="1" end="${totalPages}" var="p">
-                            <li class="page-item ${p == currentPage ? 'active' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/ticket?action=list&page=${p}&keyword=${fn:escapeXml(keyword)}&status=${fn:escapeXml(statusFilter)}&priority=${fn:escapeXml(priorityFilter)}">${p}</a></li>
+                            <li class="page-item ${p == currentPage ? 'active' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/ticket?action=list&page=${p}&keyword=${fn:escapeXml(keyword)}&status=${fn:escapeXml(statusFilter)}&priority=${fn:escapeXml(priorityFilter)}&year=${yearFilter}&period=${periodFilter}">${p}</a></li>
                         </c:forEach>
-                        <li class="page-item ${currentPage >= totalPages ? 'disabled' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/ticket?action=list&page=${currentPage + 1}&keyword=${fn:escapeXml(keyword)}&status=${fn:escapeXml(statusFilter)}&priority=${fn:escapeXml(priorityFilter)}">Sau</a></li>
+                        <li class="page-item ${currentPage >= totalPages ? 'disabled' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/ticket?action=list&page=${currentPage + 1}&keyword=${fn:escapeXml(keyword)}&status=${fn:escapeXml(statusFilter)}&priority=${fn:escapeXml(priorityFilter)}&year=${yearFilter}&period=${periodFilter}">Sau</a></li>
                     </ul>
                 </nav>
             </div>
@@ -321,6 +384,46 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+        // Kéo chuột ngay trên bảng để cuộn ngang, không cần rê xuống tận thanh
+        // cuộn ở cuối bảng. Bỏ qua khi điểm bắt đầu là link/nút/ô nhập -- nếu
+        // không thì bấm "Xem chi tiết" cũng bị tính là kéo.
+        (function enableDragScroll() {
+            var wrap = document.querySelector('.table-responsive');
+            if (!wrap) { return; }
+            var dragging = false, startX = 0, startScroll = 0, moved = false;
+
+            wrap.addEventListener('mousedown', function (e) {
+                if (e.button !== 0 || e.target.closest('a, button, input, select, label')) { return; }
+                dragging = true;
+                moved = false;
+                startX = e.pageX;
+                startScroll = wrap.scrollLeft;
+                wrap.classList.add('is-dragging');
+            });
+            wrap.addEventListener('mousemove', function (e) {
+                if (!dragging) { return; }
+                var dx = e.pageX - startX;
+                if (Math.abs(dx) > 3) { moved = true; }
+                if (moved) {
+                    wrap.scrollLeft = startScroll - dx;
+                    e.preventDefault();
+                }
+            });
+            // Bắt mouseup ở window: thả chuột ngoài bảng vẫn phải kết thúc kéo,
+            // không thì bảng dính theo con trỏ.
+            window.addEventListener('mouseup', function () {
+                dragging = false;
+                wrap.classList.remove('is-dragging');
+            });
+            // Lăn chuột ngang (trackpad / Shift+lăn) cuộn bảng thay vì cuộn trang.
+            wrap.addEventListener('wheel', function (e) {
+                if (e.deltaX === 0 && !e.shiftKey) { return; }
+                var before = wrap.scrollLeft;
+                wrap.scrollLeft += (e.deltaX !== 0 ? e.deltaX : e.deltaY);
+                if (wrap.scrollLeft !== before) { e.preventDefault(); }
+            }, { passive: false });
+        })();
+
         var deleteModal = new bootstrap.Modal(document.getElementById('deleteModal'));
         var ticketIdToDelete = null;
 
@@ -341,6 +444,8 @@
         // Tự động submit lại form lọc khi đổi trạng thái / mức ưu tiên
         document.getElementById('filterStatus').addEventListener('change', function () { document.getElementById('filterForm').submit(); });
         document.getElementById('filterPriority').addEventListener('change', function () { document.getElementById('filterForm').submit(); });
+        document.getElementById('filterYear').addEventListener('change', function () { document.getElementById('filterForm').submit(); });
+        document.getElementById('filterPeriod').addEventListener('change', function () { document.getElementById('filterForm').submit(); });
     </script>
 
     <script src="${pageContext.request.contextPath}/js/appshell.js"></script>

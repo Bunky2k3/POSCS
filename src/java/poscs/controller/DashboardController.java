@@ -13,6 +13,8 @@ import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import poscs.common.Period;
+import poscs.dao.AddressDAO;
 import poscs.dao.ContractDAO;
 import poscs.dao.ContractPaymentDAO;
 import poscs.dao.CustomerDAO;
@@ -26,6 +28,16 @@ import poscs.model.TechnicalRequest;
  * tiền lệ nào trong CustomerController/ContractController/
  * TechnicalSupportTicketController lọc theo owner hiện tại, và
  * PERMISSIONS.md cũng không quy định việc này.
+ *
+ * Hai bộ lọc, đều do người dùng tự chọn chứ không phải phạm vi quyền:
+ * "provinceId" thu hẹp về một tỉnh, "year"+"period" thu hẹp về một tháng/quý.
+ * Bỏ trống cả hai thì trang hoạt động y như trước.
+ *
+ * Lọc kỳ KHÔNG áp cho hai bảng cuối trang ("Hợp đồng sắp hết hạn", "Phiếu cần
+ * xử lý"): đó là cảnh báo tính theo NGÀY HÔM NAY, không phải số liệu phát
+ * sinh trong kỳ -- hỏi "hợp đồng nào sắp hết hạn trong quý 1 năm ngoái" là
+ * câu vô nghĩa. Tiêu đề hai bảng đó ghi rõ "tính tới hôm nay" để không ai
+ * đọc nhầm là chúng đã theo kỳ đang chọn.
  */
 @WebServlet(name = "DashboardController", urlPatterns = {"/dashboard"})
 public class DashboardController extends HttpServlet {
@@ -40,24 +52,51 @@ public class DashboardController extends HttpServlet {
     private final ContractDAO contractDAO = new ContractDAO();
     private final TechnicalSupportTicketDAO ticketDAO = new TechnicalSupportTicketDAO();
     private final ContractPaymentDAO paymentDAO = new ContractPaymentDAO();
+    private final AddressDAO addressDAO = new AddressDAO();
 
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
         LocalDate today = LocalDate.now();
 
+        // Bộ lọc địa bàn: null = toàn bộ 18 tỉnh của chi nhánh. Lọc áp cho TẤT
+        // CẢ số liệu trên trang, không riêng vài ô -- nửa lọc nửa không thì KPI
+        // "15 hợp đồng" nằm cạnh bảng chỉ có 4 dòng, không biết tin số nào.
+        Integer provinceFilter = parseIntOrNull(request.getParameter("provinceId"));
+        request.setAttribute("provinceList", addressDAO.findBranchProvinces());
+        request.setAttribute("provinceFilter", provinceFilter);
+
+        // Bộ lọc kỳ (tháng/quý). Mỗi ô lấy mốc ngày riêng của loại dữ liệu đó:
+        // khách theo ngày tham gia, hợp đồng theo ngày ký, doanh thu theo ngày
+        // thanh toán, phiếu theo ngày tạo -- không có một "ngày" chung cho cả
+        // trang. Không chọn kỳ thì trang giữ nguyên nghĩa cũ (tháng hiện tại).
+        Period period = Period.parse(request.getParameter("year"), request.getParameter("period"));
+        ContractController.setPeriodAttributes(request, period);
+
         // ===== KPI: khách hàng =====
-        request.setAttribute("totalCustomers", customerDAO.countAll(null, null, null));
-        request.setAttribute("newCustomersThisMonth", customerDAO.countNewThisMonth());
+        // Tổng khách hàng là số LUỸ KẾ tới hết kỳ, không phải số phát sinh
+        // trong kỳ -- nếu không thì ô này trùng nghĩa với ô "khách hàng mới"
+        // ngay bên dưới nó.
+        request.setAttribute("totalCustomers", customerDAO.countUpToEndOfPeriod(provinceFilter, period));
+        request.setAttribute("newCustomersThisMonth", customerDAO.countNewInPeriod(provinceFilter, period));
 
         // ===== KPI: hợp đồng =====
-        Map<String, Integer> contractStatusSummary = contractDAO.countStatusSummary();
+        Map<String, Integer> contractStatusSummary = contractDAO.countStatusSummary(provinceFilter, period);
         request.setAttribute("contractStatusSummary", contractStatusSummary);
 
         // ===== KPI: doanh thu =====
-        BigDecimal revenueThisMonth = paymentDAO.sumInvoiceAmountByMonth(today.getYear(), today.getMonthValue());
-        LocalDate lastMonth = today.minusMonths(1);
-        BigDecimal revenueLastMonth = paymentDAO.sumInvoiceAmountByMonth(lastMonth.getYear(), lastMonth.getMonthValue());
+        BigDecimal revenueThisMonth;
+        BigDecimal revenueLastMonth;
+        if (period != null) {
+            revenueThisMonth = paymentDAO.sumInvoiceAmountInPeriod(period, provinceFilter);
+            revenueLastMonth = paymentDAO.sumInvoiceAmountInPeriod(period.previous(), provinceFilter);
+        } else {
+            revenueThisMonth = paymentDAO.sumInvoiceAmountByMonth(
+                    today.getYear(), today.getMonthValue(), provinceFilter);
+            LocalDate lastMonth = today.minusMonths(1);
+            revenueLastMonth = paymentDAO.sumInvoiceAmountByMonth(
+                    lastMonth.getYear(), lastMonth.getMonthValue(), provinceFilter);
+        }
         request.setAttribute("revenueThisMonth", revenueThisMonth);
         if (revenueLastMonth.compareTo(BigDecimal.ZERO) > 0) {
             double trendPercent = revenueThisMonth.subtract(revenueLastMonth)
@@ -67,9 +106,9 @@ public class DashboardController extends HttpServlet {
         }
 
         // ===== KPI: phiếu hỗ trợ =====
-        Map<String, Integer> ticketStatusSummary = ticketDAO.countStatusSummary();
+        Map<String, Integer> ticketStatusSummary = ticketDAO.countStatusSummary(provinceFilter, period);
         request.setAttribute("ticketStatusSummary", ticketStatusSummary);
-        request.setAttribute("overdueOrDueSoonCount", ticketDAO.countOverdueOrDueSoon());
+        request.setAttribute("overdueOrDueSoonCount", ticketDAO.countOverdueOrDueSoon(provinceFilter));
 
         request.setAttribute("currentMonthNumber", today.getMonthValue());
 
@@ -80,7 +119,7 @@ public class DashboardController extends HttpServlet {
                 today.getDayOfMonth(), today.getMonthValue(), today.getYear()));
 
         // ===== Bảng hợp đồng sắp hết hạn =====
-        List<Contract> expiringContracts = contractDAO.findExpiringSoon(EXPIRING_CONTRACTS_LIMIT);
+        List<Contract> expiringContracts = contractDAO.findExpiringSoon(EXPIRING_CONTRACTS_LIMIT, provinceFilter);
         Map<Integer, BigDecimal> contractValues = new HashMap<>();
         Map<Integer, Long> daysRemaining = new HashMap<>();
         for (Contract c : expiringContracts) {
@@ -93,9 +132,20 @@ public class DashboardController extends HttpServlet {
         request.setAttribute("daysRemaining", daysRemaining);
 
         // ===== Bảng phiếu hỗ trợ cần xử lý =====
-        List<TechnicalRequest> attentionTickets = ticketDAO.findNeedingAttention(ATTENTION_TICKETS_LIMIT);
+        List<TechnicalRequest> attentionTickets = ticketDAO.findNeedingAttention(ATTENTION_TICKETS_LIMIT, provinceFilter);
         request.setAttribute("attentionTickets", attentionTickets);
 
         request.getRequestDispatcher("/dashboard.jsp").forward(request, response);
+    }
+
+    private static Integer parseIntOrNull(String value) {
+        if (value == null || value.trim().isEmpty()) {
+            return null;
+        }
+        try {
+            return Integer.parseInt(value.trim());
+        } catch (NumberFormatException ex) {
+            return null;
+        }
     }
 }

@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import poscs.common.Period;
 import poscs.model.Address;
 import poscs.model.District;
 import poscs.model.Enterprise;
@@ -28,29 +29,52 @@ public class CustomerDAO {
 
     private static final String SELECT_ENTERPRISE_BASE =
         "SELECT e.enterprise_id, e.enterprise_code, e.enterprise_name, e.customer_type, e.customer_group, " +
-        "       e.tax_code, e.email AS ent_email, e.phone AS ent_phone, e.website, e.address_id, e.account_owner_id, " +
+        "       e.tax_code, e.email AS ent_email, e.phone AS ent_phone, e.website, e.address_id, " +
+        "       e.account_owner_id, e.support_owner_id, " +
         "       e.legal_representative, e.logo_url, e.business_license_url, e.status, e.join_date, " +
         "       e.current_relationship_rating, e.created_at, e.updated_at, e.is_deleted, " +
         "       a.street_and_local_name, a.districts_id AS addr_districts_id, " +
         "       d.districts_name, d.province_id AS dist_province_id, " +
         "       p.province_name, " +
-        "       u.last_name AS owner_last_name, u.middle_name AS owner_middle_name, u.first_name AS owner_first_name " +
+        "       u.last_name AS owner_last_name, u.middle_name AS owner_middle_name, u.first_name AS owner_first_name, " +
+        "       s.last_name AS support_last_name, s.middle_name AS support_middle_name, s.first_name AS support_first_name " +
         "FROM enterprises e " +
         "LEFT JOIN addresses a ON e.address_id = a.address_id " +
         "LEFT JOIN districts d ON a.districts_id = d.districts_id " +
         "LEFT JOIN provinces p ON d.province_id = p.province_id " +
-        "LEFT JOIN users u ON e.account_owner_id = u.user_id ";
+        "LEFT JOIN users u ON e.account_owner_id = u.user_id " +
+        "LEFT JOIN users s ON e.support_owner_id = s.user_id ";
 
     /**
      * Lấy danh sách khách hàng có phân trang + lọc, phục vụ listcustomer.jsp.
      * @param page 1-indexed
      */
     public List<Enterprise> findAll(int page, int pageSize, String keyword, String customerType, Integer accountOwnerId) {
+        return findAll(page, pageSize, keyword, customerType, accountOwnerId, null, false);
+    }
+
+    /**
+     * Như {@link #findAll(int, int, String, String, Integer)} nhưng lọc thêm theo
+     * tỉnh/thành và cho phép sắp xếp theo tỉnh -- phục vụ quản lý khách hàng theo
+     * địa bàn.
+     *
+     * @param provinceId     lọc theo tỉnh của địa chỉ khách hàng, null = mọi tỉnh
+     * @param sortByProvince true thì sắp theo tên tỉnh (khách chưa có địa chỉ dồn
+     *                       xuống cuối) thay vì mới nhất trước; dùng khi xuất Excel
+     *                       để các dòng cùng tỉnh nằm liền nhau
+     */
+    public List<Enterprise> findAll(int page, int pageSize, String keyword, String customerType,
+            Integer accountOwnerId, Integer provinceId, boolean sortByProvince) {
         List<Enterprise> result = new ArrayList<>();
         StringBuilder sql = new StringBuilder(SELECT_ENTERPRISE_BASE);
         List<Object> params = new ArrayList<>();
-        appendFilters(sql, params, keyword, customerType, accountOwnerId);
-        sql.append(" ORDER BY e.enterprise_id DESC LIMIT ? OFFSET ?");
+        appendFilters(sql, params, keyword, customerType, accountOwnerId, provinceId);
+        // "p.province_name IS NULL" đứng đầu để dồn khách chưa có địa chỉ xuống
+        // cuối file -- mặc định MySQL xếp NULL lên đầu khi ORDER BY tăng dần.
+        sql.append(sortByProvince
+                ? " ORDER BY p.province_name IS NULL, " + AddressDAO.PROVINCE_SHORT_NAME_ORDER
+                        + ", e.enterprise_id DESC LIMIT ? OFFSET ?"
+                : " ORDER BY e.enterprise_id DESC LIMIT ? OFFSET ?");
         params.add(pageSize);
         params.add(Math.max(0, (page - 1) * pageSize));
 
@@ -70,9 +94,18 @@ public class CustomerDAO {
 
     /** Đếm tổng số khách hàng thoả điều kiện lọc, phục vụ phân trang (BR-12). */
     public int countAll(String keyword, String customerType, Integer accountOwnerId) {
-        StringBuilder sql = new StringBuilder("SELECT COUNT(*) FROM enterprises e ");
+        return countAll(keyword, customerType, accountOwnerId, null);
+    }
+
+    /** Như {@link #countAll(String, String, Integer)} nhưng lọc thêm theo tỉnh/thành. */
+    public int countAll(String keyword, String customerType, Integer accountOwnerId, Integer provinceId) {
+        // Phải JOIN tới districts thì mới lọc được theo tỉnh; districts đã có sẵn
+        // province_id nên không cần join thêm bảng provinces chỉ để đếm.
+        StringBuilder sql = new StringBuilder("SELECT COUNT(*) FROM enterprises e "
+                + "LEFT JOIN addresses a ON e.address_id = a.address_id "
+                + "LEFT JOIN districts d ON a.districts_id = d.districts_id ");
         List<Object> params = new ArrayList<>();
-        appendFilters(sql, params, keyword, customerType, accountOwnerId);
+        appendFilters(sql, params, keyword, customerType, accountOwnerId, provinceId);
 
         try (Connection conn = DBContext.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql.toString())) {
@@ -90,16 +123,66 @@ public class CustomerDAO {
 
     /** Đếm số khách hàng có ngày tham gia (join_date) rơi vào tháng hiện tại, phục vụ KPI dashboard. */
     public int countNewThisMonth() {
-        String sql = "SELECT COUNT(*) FROM enterprises WHERE is_deleted = 0 " +
-                     "AND YEAR(join_date) = YEAR(CURDATE()) AND MONTH(join_date) = MONTH(CURDATE())";
+        return countNewThisMonth(null);
+    }
+
+    /** Như {@link #countNewThisMonth()} nhưng chỉ đếm khách thuộc 1 tỉnh (null = toàn quốc). */
+    public int countNewThisMonth(Integer provinceId) {
+        return countJoined(provinceId, null, false);
+    }
+
+    /**
+     * Đếm khách hàng MỚI trong kỳ (join_date nằm trong kỳ). period null thì
+     * quay về nghĩa cũ "trong tháng hiện tại".
+     */
+    public int countNewInPeriod(Integer provinceId, Period period) {
+        return countJoined(provinceId, period, false);
+    }
+
+    /**
+     * Đếm LUỸ KẾ số khách hàng tính tới hết kỳ (join_date <= ngày cuối kỳ).
+     * Khác countNewInPeriod: "tổng khách hàng" là con số tích luỹ, chọn quý 2
+     * mà chỉ đếm khách gia nhập trong quý 2 thì ô đó thành "khách mới" thứ hai
+     * trên cùng một trang. period null = đếm toàn bộ, không giới hạn thời gian.
+     */
+    public int countUpToEndOfPeriod(Integer provinceId, Period period) {
+        return countJoined(provinceId, period, true);
+    }
+
+    private int countJoined(Integer provinceId, Period period, boolean cumulative) {
+        String dateCondition;
+        if (period == null) {
+            // Không chọn kỳ: luỹ kế = toàn bộ; "mới" = trong tháng hiện tại.
+            dateCondition = cumulative
+                    ? ""
+                    : " AND YEAR(e.join_date) = YEAR(CURDATE()) AND MONTH(e.join_date) = MONTH(CURDATE())";
+        } else {
+            dateCondition = cumulative ? " AND e.join_date <= ?" : " AND e.join_date BETWEEN ? AND ?";
+        }
+        String sql = "SELECT COUNT(*) FROM enterprises e " +
+                     "LEFT JOIN addresses a ON e.address_id = a.address_id " +
+                     "LEFT JOIN districts d ON a.districts_id = d.districts_id " +
+                     "WHERE e.is_deleted = 0" + dateCondition +
+                     (provinceId != null ? " AND d.province_id = ?" : "");
         try (Connection conn = DBContext.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql);
-             ResultSet rs = ps.executeQuery()) {
-            if (rs.next()) {
-                return rs.getInt(1);
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            int param = 1;
+            if (period != null) {
+                if (!cumulative) {
+                    ps.setDate(param++, period.getFrom());
+                }
+                ps.setDate(param++, period.getTo());
+            }
+            if (provinceId != null) {
+                ps.setInt(param, provinceId);
+            }
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt(1);
+                }
             }
         } catch (SQLException ex) {
-            LOG.error("Loi dem khach hang moi trong thang", ex);
+            LOG.error("Loi dem khach hang theo ky", ex);
         }
         return 0;
     }
@@ -190,9 +273,9 @@ public class CustomerDAO {
     public int insert(Enterprise enterprise) {
         String sql = "INSERT INTO enterprises " +
                 "(enterprise_code, enterprise_name, customer_type, customer_group, tax_code, email, phone, " +
-                " website, address_id, account_owner_id, legal_representative, logo_url, business_license_url, " +
-                " status, join_date) " +
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                " website, address_id, account_owner_id, support_owner_id, legal_representative, logo_url, " +
+                " business_license_url, status, join_date) " +
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
         // enterprise_code sinh từ generateNextEnterpriseCode() (đọc mã lớn nhất
         // hiện có rồi +1) có thể trùng nếu 2 request tạo khách hàng gần như đồng
@@ -229,11 +312,12 @@ public class CustomerDAO {
                         ps.setString(8, enterprise.getWebsite());
                         setNullableInt(ps, 9, addressId);
                         ps.setInt(10, enterprise.getAccountOwnerId());
-                        ps.setString(11, enterprise.getLegalRepresentative());
-                        ps.setString(12, enterprise.getLogoUrl());
-                        ps.setString(13, enterprise.getBusinessLicenseUrl());
-                        ps.setString(14, enterprise.getStatus() != null ? enterprise.getStatus() : "Active");
-                        ps.setDate(15, enterprise.getJoinDate());
+                        setNullableInt(ps, 11, enterprise.getSupportOwnerId());
+                        ps.setString(12, enterprise.getLegalRepresentative());
+                        ps.setString(13, enterprise.getLogoUrl());
+                        ps.setString(14, enterprise.getBusinessLicenseUrl());
+                        ps.setString(15, enterprise.getStatus() != null ? enterprise.getStatus() : "Active");
+                        ps.setDate(16, enterprise.getJoinDate());
 
                         int affected = ps.executeUpdate();
                         if (affected == 0) {
@@ -272,7 +356,7 @@ public class CustomerDAO {
     public boolean update(Enterprise enterprise) {
         String sql = "UPDATE enterprises SET " +
                 "enterprise_name = ?, customer_type = ?, customer_group = ?, email = ?, phone = ?, " +
-                "website = ?, address_id = ?, account_owner_id = ?, join_date = ?, logo_url = ? " +
+                "website = ?, address_id = ?, account_owner_id = ?, support_owner_id = ?, join_date = ?, logo_url = ? " +
                 "WHERE enterprise_id = ? AND is_deleted = 0";
 
         try (Connection conn = DBContext.getConnection()) {
@@ -300,9 +384,10 @@ public class CustomerDAO {
                     ps.setString(6, enterprise.getWebsite());
                     setNullableInt(ps, 7, addressId);
                     ps.setInt(8, enterprise.getAccountOwnerId());
-                    ps.setDate(9, enterprise.getJoinDate());
-                    ps.setString(10, enterprise.getLogoUrl());
-                    ps.setInt(11, enterprise.getEnterpriseId());
+                    setNullableInt(ps, 9, enterprise.getSupportOwnerId());
+                    ps.setDate(10, enterprise.getJoinDate());
+                    ps.setString(11, enterprise.getLogoUrl());
+                    ps.setInt(12, enterprise.getEnterpriseId());
                     boolean ok = ps.executeUpdate() > 0;
                     if (ok) {
                         conn.commit();
@@ -380,7 +465,8 @@ public class CustomerDAO {
     // Helpers riêng
     // ------------------------------------------------------------------
 
-    private void appendFilters(StringBuilder sql, List<Object> params, String keyword, String customerType, Integer accountOwnerId) {
+    private void appendFilters(StringBuilder sql, List<Object> params, String keyword, String customerType,
+            Integer accountOwnerId, Integer provinceId) {
         List<String> conditions = new ArrayList<>();
         conditions.add("e.is_deleted = 0");
 
@@ -396,8 +482,16 @@ public class CustomerDAO {
             params.add(customerType);
         }
         if (accountOwnerId != null) {
+            // CHỈ soi vai phụ trách chính (cấp trên), cố ý không khớp sang cột
+            // người hỗ trợ: mỗi khách hàng quy về đúng một người, nên lọc theo
+            // tên ai thì ra đúng phần khách người đó chịu trách nhiệm, không
+            // lẫn phần họ chỉ đứng hỗ trợ cho người khác.
             conditions.add("e.account_owner_id = ?");
             params.add(accountOwnerId);
+        }
+        if (provinceId != null) {
+            conditions.add("d.province_id = ?");
+            params.add(provinceId);
         }
 
         sql.append("WHERE ").append(String.join(" AND ", conditions));
@@ -468,6 +562,8 @@ public class CustomerDAO {
         e.setAddressId(rs.wasNull() ? null : addressId);
 
         e.setAccountOwnerId(rs.getInt("account_owner_id"));
+        int supportOwnerId = rs.getInt("support_owner_id");
+        e.setSupportOwnerId(rs.wasNull() ? null : supportOwnerId);
         e.setLegalRepresentative(rs.getString("legal_representative"));
         e.setLogoUrl(rs.getString("logo_url"));
         e.setBusinessLicenseUrl(rs.getString("business_license_url"));
@@ -519,6 +615,16 @@ public class CustomerDAO {
             owner.setMiddleName(rs.getString("owner_middle_name"));
             owner.setFirstName(rs.getString("owner_first_name"));
             e.setAccountOwner(owner);
+        }
+
+        String supportLastName = rs.getString("support_last_name");
+        if (supportLastName != null) {
+            User support = new User();
+            support.setUserId(e.getSupportOwnerId() != null ? e.getSupportOwnerId() : 0);
+            support.setLastName(supportLastName);
+            support.setMiddleName(rs.getString("support_middle_name"));
+            support.setFirstName(rs.getString("support_first_name"));
+            e.setSupportOwner(support);
         }
 
         return e;

@@ -11,6 +11,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import org.junit.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.mockito.MockedStatic;
 import poscs.model.Contract;
@@ -335,6 +336,66 @@ public class ContractDAOTest {
         PreparedStatement ps = captureStatusFor(null, null);
 
         verify(ps).setString(10, ContractDAO.STATUS_DRAFT);
+    }
+
+    // ------------------------------------------------------------------
+    // Lọc/sắp xếp theo tỉnh (hợp đồng lấy địa bàn từ khách hàng đứng tên)
+    // ------------------------------------------------------------------
+
+    private static String capturedSql(Connection conn) throws SQLException {
+        ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+        verify(conn).prepareStatement(sql.capture());
+        return sql.getValue();
+    }
+
+    @Test
+    public void findAll_withProvinceFilter_joinsFromEnterpriseToProvince() throws Exception {
+        PreparedStatement ps = statementReturning(emptyResultSet());
+        Connection conn = connectionReturning(ps);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            dao.findAll(1, 10, null, null, null, 3, false);
+
+            // contracts không có cột tỉnh: phải đi qua khách hàng -> địa chỉ ->
+            // xã/phường mới tới được province_id.
+            String sql = capturedSql(conn);
+            assertTrue(sql.contains("LEFT JOIN addresses a ON e.address_id = a.address_id"));
+            assertTrue(sql.contains("d.province_id = ?"));
+            verify(ps).setObject(1, 3);
+        }
+    }
+
+    /** Xem ghi chú cùng tên ở CustomerDAOTest: lệch join là bộ đếm trả 0 trong im lặng. */
+    @Test
+    public void countAll_withProvinceFilter_joinsTablesTheFilterNeeds() throws Exception {
+        PreparedStatement ps = statementReturning(singleRow(row("total", 7)));
+        Connection conn = connectionReturning(ps);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            assertEquals(7, dao.countAll(null, null, null, 3));
+
+            String sql = capturedSql(conn);
+            assertTrue(sql.contains("LEFT JOIN districts d"));
+            assertTrue(sql.contains("d.province_id = ?"));
+        }
+    }
+
+    @Test
+    public void findAll_sortByProvince_ordersByProvinceInsteadOfNewestFirst() throws Exception {
+        PreparedStatement ps = statementReturning(emptyResultSet());
+        Connection conn = connectionReturning(ps);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            dao.findAll(1, 10, null, null, null, null, true);
+
+            assertTrue(capturedSql(conn).contains("ORDER BY p.province_name IS NULL"));
+        }
     }
 
     /** Chạy insert() với cặp ngày cho trước rồi trả về statement để soi tham số đã bind. */

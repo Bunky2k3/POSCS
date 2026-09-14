@@ -28,6 +28,23 @@
         }
         .today-badge i { color: var(--primary); margin-right: 6px; }
 
+        .welcome-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+        .province-filter {
+            background: #fff; border: 1px solid #eef2f6; border-radius: 10px;
+            padding: 8px 14px; font-size: 0.85rem; color: #374151; font-weight: 500;
+            box-shadow: 0 4px 12px rgba(0,40,80,0.06); min-width: 190px;
+        }
+        .province-filter:focus { outline: none; border-color: var(--primary-light); }
+        .scope-note {
+            display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+            background: #eaf6ff; border: 1px solid #cfe8fb; border-radius: 10px;
+            padding: 10px 16px; margin-bottom: 18px;
+            font-size: 0.84rem; color: var(--primary-dark);
+        }
+        .scope-note i { color: var(--primary); }
+        .scope-note a { color: var(--primary); font-weight: 600; margin-left: auto; }
+        .as-of-today { font-weight: 500; font-size: 0.74rem; color: #9ca3af; text-transform: none; letter-spacing: 0; }
+
         /* ===== KPI cards ===== */
         .kpi-card { padding: 18px 18px 16px; display: flex; flex-direction: column; gap: 10px; height: 100%; }
         .kpi-top { display: flex; justify-content: space-between; align-items: flex-start; }
@@ -102,8 +119,46 @@
                 <h2>Chào mừng trở lại, <c:out value="${sessionScope.currentUser.fullName}"/> 👋</h2>
                 <p>Đây là tổng quan hoạt động kinh doanh và hỗ trợ kỹ thuật của bạn</p>
             </div>
-            <div class="today-badge"><i class="fa-regular fa-calendar"></i>${todayLabel}</div>
+            <div class="welcome-actions">
+                <form method="GET" action="${pageContext.request.contextPath}/dashboard" id="provinceFilterForm">
+                    <select id="filterProvince" name="provinceId" class="province-filter">
+                        <option value="">Toàn bộ 18 tỉnh địa bàn</option>
+                        <c:forEach var="province" items="${provinceList}">
+                            <option value="${province.provinceId}" ${provinceFilter == province.provinceId ? 'selected' : ''}>${fn:escapeXml(province.shortName)}</option>
+                        </c:forEach>
+                    </select>
+                    <select id="filterYear" name="year" class="province-filter">
+                        <option value="">Mọi thời điểm</option>
+                        <c:forEach var="y" items="${yearList}">
+                            <option value="${y}" ${yearFilter == y ? 'selected' : ''}>Năm ${y}</option>
+                        </c:forEach>
+                    </select>
+                    <select id="filterPeriod" name="period" class="province-filter">
+                        <option value="">Cả năm</option>
+                        <c:forEach var="q" begin="1" end="4">
+                            <c:set var="qVal" value="q${q}"/>
+                            <option value="${qVal}" ${periodFilter == qVal ? 'selected' : ''}>Quý ${q}</option>
+                        </c:forEach>
+                        <c:forEach var="m" begin="1" end="12">
+                            <c:set var="mVal" value="m${m}"/>
+                            <option value="${mVal}" ${periodFilter == mVal ? 'selected' : ''}>Tháng ${m}</option>
+                        </c:forEach>
+                    </select>
+                </form>
+                <div class="today-badge"><i class="fa-regular fa-calendar"></i>${todayLabel}</div>
+            </div>
         </div>
+
+        <c:if test="${not empty provinceFilter or not empty periodLabel}">
+            <div class="scope-note">
+                <i class="fa-solid fa-filter"></i>
+                <span>
+                    Số liệu đang thu hẹp theo<c:if test="${not empty provinceFilter}"> <strong>địa bàn đang chọn</strong></c:if><c:if test="${not empty provinceFilter and not empty periodLabel}"> và</c:if><c:if test="${not empty periodLabel}"> <strong>${fn:escapeXml(periodLabel)}</strong></c:if>.
+                    Riêng hai bảng cuối trang luôn tính tới hôm nay.
+                </span>
+                <a href="${pageContext.request.contextPath}/dashboard">Bỏ lọc</a>
+            </div>
+        </c:if>
 
         <!-- ===== KPI cards ===== -->
         <div class="row g-4 mb-4">
@@ -116,7 +171,7 @@
                         </div>
                         <div class="kpi-icon bg-blue"><i class="fa-solid fa-building"></i></div>
                     </div>
-                    <span class="kpi-trend up"><i class="fa-solid fa-arrow-trend-up"></i> +${newCustomersThisMonth} khách hàng mới tháng này</span>
+                    <span class="kpi-trend up"><i class="fa-solid fa-arrow-trend-up"></i> +${newCustomersThisMonth} khách hàng mới <c:choose><c:when test="${not empty periodLabel}">trong kỳ</c:when><c:otherwise>tháng này</c:otherwise></c:choose></span>
                 </div>
             </div>
             <div class="col-6 col-lg-3">
@@ -135,17 +190,17 @@
                 <div class="card-box kpi-card">
                     <div class="kpi-top">
                         <div>
-                            <div class="kpi-label">Doanh thu hợp đồng (tháng ${currentMonthNumber})</div>
+                            <div class="kpi-label">Doanh thu hợp đồng (<c:choose><c:when test="${not empty periodLabel}">${fn:escapeXml(periodLabel)}</c:when><c:otherwise>tháng ${currentMonthNumber}</c:otherwise></c:choose>)</div>
                             <div class="kpi-value" id="revenueKpiValue" data-vnd="${revenueThisMonth}">&mdash;</div>
                         </div>
                         <div class="kpi-icon bg-green"><i class="fa-solid fa-sack-dollar"></i></div>
                     </div>
                     <c:choose>
                         <c:when test="${not empty revenueTrendPercent}">
-                            <span class="kpi-trend ${revenueTrendPercent >= 0 ? 'up' : 'down'}"><i class="fa-solid fa-arrow-trend-${revenueTrendPercent >= 0 ? 'up' : 'down'}"></i> ${revenueTrendPercent >= 0 ? '+' : ''}${revenueTrendPercent}% so với tháng trước</span>
+                            <span class="kpi-trend ${revenueTrendPercent >= 0 ? 'up' : 'down'}"><i class="fa-solid fa-arrow-trend-${revenueTrendPercent >= 0 ? 'up' : 'down'}"></i> ${revenueTrendPercent >= 0 ? '+' : ''}${revenueTrendPercent}% so với <c:choose><c:when test="${not empty periodLabel}">kỳ trước</c:when><c:otherwise>tháng trước</c:otherwise></c:choose></span>
                         </c:when>
                         <c:otherwise>
-                            <span class="kpi-trend"><i class="fa-regular fa-circle-question"></i> Chưa đủ dữ liệu tháng trước để so sánh</span>
+                            <span class="kpi-trend"><i class="fa-regular fa-circle-question"></i> Chưa đủ dữ liệu <c:choose><c:when test="${not empty periodLabel}">kỳ trước</c:when><c:otherwise>tháng trước</c:otherwise></c:choose> để so sánh</span>
                         </c:otherwise>
                     </c:choose>
                 </div>
@@ -189,15 +244,15 @@
             <div class="col-lg-8 d-flex flex-column gap-4">
                 <div class="card-box table-section">
                     <div class="table-section-header">
-                        <h6>Hợp đồng sắp hết hạn</h6>
+                        <h6>Hợp đồng sắp hết hạn <span class="as-of-today">tính tới hôm nay</span></h6>
                         <a href="${pageContext.request.contextPath}/contract">Xem tất cả</a>
                     </div>
                     <table class="mini-table">
-                        <thead><tr><th>Mã HĐ</th><th>Khách hàng</th><th>Giá trị</th><th>Còn lại</th></tr></thead>
+                        <thead><tr><th>Mã HĐ</th><th>Khách hàng</th><th>Người phụ trách</th><th>Giá trị</th><th>Còn lại</th></tr></thead>
                         <tbody>
                             <c:choose>
                                 <c:when test="${empty expiringContracts}">
-                                    <tr><td colspan="4" style="text-align:center; color:#9ca3af; padding:20px 8px;">Không có hợp đồng nào sắp hết hạn.</td></tr>
+                                    <tr><td colspan="5" style="text-align:center; color:#9ca3af; padding:20px 8px;">Không có hợp đồng nào sắp hết hạn.</td></tr>
                                 </c:when>
                                 <c:otherwise>
                                     <c:forEach var="ct" items="${expiringContracts}">
@@ -207,6 +262,12 @@
                                             <td>
                                                 <c:choose>
                                                     <c:when test="${ct.enterprise != null}">${fn:escapeXml(ct.enterprise.enterpriseName)}</c:when>
+                                                    <c:otherwise>&mdash;</c:otherwise>
+                                                </c:choose>
+                                            </td>
+                                            <td>
+                                                <c:choose>
+                                                    <c:when test="${ct.owner != null}">${fn:escapeXml(ct.owner.fullName)}</c:when>
                                                     <c:otherwise>&mdash;</c:otherwise>
                                                 </c:choose>
                                             </td>
@@ -222,15 +283,15 @@
 
                 <div class="card-box table-section">
                     <div class="table-section-header">
-                        <h6>Phiếu hỗ trợ cần xử lý</h6>
+                        <h6>Phiếu hỗ trợ cần xử lý <span class="as-of-today">tính tới hôm nay</span></h6>
                         <a href="${pageContext.request.contextPath}/ticket">Xem tất cả</a>
                     </div>
                     <table class="mini-table">
-                        <thead><tr><th>Mã phiếu</th><th>Khách hàng</th><th>Ưu tiên</th><th>Trạng thái</th></tr></thead>
+                        <thead><tr><th>Mã phiếu</th><th>Khách hàng</th><th>Người phụ trách</th><th>Ưu tiên</th><th>Trạng thái</th></tr></thead>
                         <tbody>
                             <c:choose>
                                 <c:when test="${empty attentionTickets}">
-                                    <tr><td colspan="4" style="text-align:center; color:#9ca3af; padding:20px 8px;">Không có phiếu nào cần xử lý.</td></tr>
+                                    <tr><td colspan="5" style="text-align:center; color:#9ca3af; padding:20px 8px;">Không có phiếu nào cần xử lý.</td></tr>
                                 </c:when>
                                 <c:otherwise>
                                     <c:forEach var="tk" items="${attentionTickets}">
@@ -239,6 +300,12 @@
                                             <td>
                                                 <c:choose>
                                                     <c:when test="${tk.enterprise != null}">${fn:escapeXml(tk.enterprise.enterpriseName)}</c:when>
+                                                    <c:otherwise>&mdash;</c:otherwise>
+                                                </c:choose>
+                                            </td>
+                                            <td>
+                                                <c:choose>
+                                                    <c:when test="${tk.assignedTechnician != null}">${fn:escapeXml(tk.assignedTechnician.fullName)}</c:when>
                                                     <c:otherwise>&mdash;</c:otherwise>
                                                 </c:choose>
                                             </td>
@@ -274,6 +341,14 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script>
+        // Chọn tỉnh là nạp lại trang ngay, không cần nút "Lọc" -- giống bộ lọc
+        // ở danh sách khách hàng/hợp đồng.
+        ['filterProvince', 'filterYear', 'filterPeriod'].forEach(function (id) {
+            document.getElementById(id).addEventListener('change', function () {
+                document.getElementById('provinceFilterForm').submit();
+            });
+        });
+
         // ===== Định dạng tiền tệ rút gọn (tỷ / triệu đ) =====
         function formatCompactVND(n) {
             if (isNaN(n)) return '0 đ';

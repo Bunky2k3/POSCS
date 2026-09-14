@@ -205,4 +205,92 @@ public class AddressDAOTest {
             assertTrue(found.isEmpty());
         }
     }
+
+    // ------------------------------------------------------------------
+    // findBranchProvinces -- địa bàn Chi nhánh Miền Bắc
+    // ------------------------------------------------------------------
+
+    /** Đủ 34 tỉnh sau sáp nhập 2025, đúng tên như trong db/schema.sql. */
+    private static List<Map<String, Object>> allThirtyFourProvinces() {
+        String[] names = {
+            "Thành phố Cần Thơ", "Thành phố Đà Nẵng", "Thành phố Hà Nội", "Thành phố Hải Phòng",
+            "Thành phố Hồ Chí Minh", "Thành phố Huế", "Tỉnh An Giang", "Tỉnh Bắc Ninh", "Tỉnh Cà Mau",
+            "Tỉnh Cao Bằng", "Tỉnh Đắk Lắk", "Tỉnh Điện Biên", "Tỉnh Đồng Nai", "Tỉnh Đồng Tháp",
+            "Tỉnh Gia Lai", "Tỉnh Hà Tĩnh", "Tỉnh Hưng Yên", "Tỉnh Khánh Hòa", "Tỉnh Lai Châu",
+            "Tỉnh Lạng Sơn", "Tỉnh Lào Cai", "Tỉnh Lâm Đồng", "Tỉnh Nghệ An", "Tỉnh Ninh Bình",
+            "Tỉnh Phú Thọ", "Tỉnh Quảng Ngãi", "Tỉnh Quảng Ninh", "Tỉnh Quảng Trị", "Tỉnh Sơn La",
+            "Tỉnh Tây Ninh", "Tỉnh Thái Nguyên", "Tỉnh Thanh Hóa", "Tỉnh Tuyên Quang", "Tỉnh Vĩnh Long"
+        };
+        List<Map<String, Object>> rows = new ArrayList<>();
+        for (int i = 0; i < names.length; i++) {
+            rows.add(row("province_id", i + 1, "province_name", names[i]));
+        }
+        return rows;
+    }
+
+    private List<Province> branchProvincesFromFullList() throws Exception {
+        PreparedStatement ps = statementReturning(resultSetOf(allThirtyFourProvinces()));
+        Connection conn = connectionReturning(ps);
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+            return dao.findBranchProvinces();
+        }
+    }
+
+    /**
+     * Chốt cứng danh sách địa bàn: đúng 18 tỉnh từ Hà Tĩnh trở ra. Gõ nhầm một
+     * tên trong AddressDAO thì tỉnh đó lặng lẽ biến mất khỏi mọi dropdown và
+     * mọi báo cáo theo tỉnh -- không có gì báo lỗi, chỉ là một tỉnh "không tồn
+     * tại" cho tới khi có người thắc mắc.
+     */
+    @Test
+    public void findBranchProvinces_returnsExactlyTheEighteenNorthernOnes() throws Exception {
+        List<Province> branch = branchProvincesFromFullList();
+
+        assertEquals(18, branch.size());
+        List<String> names = new ArrayList<>();
+        for (Province p : branch) {
+            names.add(p.getProvinceName());
+        }
+        assertTrue(names.contains("Thành phố Hà Nội"));
+        assertTrue(names.contains("Tỉnh Hà Tĩnh"));   // đầu mút phía nam của địa bàn
+        assertTrue(names.contains("Tỉnh Lạng Sơn"));
+        assertTrue(names.contains("Tỉnh Sơn La"));
+        // Ngoài địa bàn -- không được lọt vào
+        assertFalse(names.contains("Thành phố Hồ Chí Minh"));
+        assertFalse(names.contains("Thành phố Đà Nẵng"));
+        assertFalse(names.contains("Tỉnh Quảng Trị"));
+        assertFalse(names.contains("Tỉnh Khánh Hòa"));
+    }
+
+    /** Giữ nguyên thứ tự của nguồn (findAllProvinces đã sắp theo tên rút gọn). */
+    @Test
+    public void findBranchProvinces_keepsOrderOfTheSource() throws Exception {
+        List<Province> branch = branchProvincesFromFullList();
+
+        assertEquals("Thành phố Hà Nội", branch.get(0).getProvinceName());
+        assertEquals("Tỉnh Tuyên Quang", branch.get(branch.size() - 1).getProvinceName());
+    }
+
+    /**
+     * Form SỬA phải giữ được tỉnh ngoài địa bàn mà bản ghi đang dùng, nếu
+     * không thì mở form lên ô tỉnh trống và bấm lưu là mất địa chỉ cũ.
+     */
+    @Test
+    public void findBranchProvincesIncluding_keepsAnOutOfRegionProvinceAlreadyInUse() throws Exception {
+        PreparedStatement ps = statementReturning(resultSetOf(allThirtyFourProvinces()));
+        Connection conn = connectionReturning(ps);
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            List<Province> withHcm = dao.findBranchProvincesIncluding(5); // Thành phố Hồ Chí Minh
+            assertEquals(19, withHcm.size());
+            assertEquals("Thành phố Hồ Chí Minh", withHcm.get(withHcm.size() - 1).getProvinceName());
+
+            // Tỉnh đã nằm trong địa bàn thì không nhân đôi.
+            assertEquals(18, dao.findBranchProvincesIncluding(3).size());
+            // Không có tỉnh nào đang dùng (khách chưa có địa chỉ).
+            assertEquals(18, dao.findBranchProvincesIncluding(null).size());
+        }
+    }
 }

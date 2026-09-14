@@ -25,6 +25,7 @@ import poscs.common.AccessControl;
 import poscs.common.ExcelUtil;
 import poscs.common.Logs;
 import poscs.common.PdfUtil;
+import poscs.common.Period;
 import poscs.common.TextRules;
 import poscs.dao.AddressDAO;
 import poscs.dao.ContractDAO;
@@ -169,20 +170,28 @@ public class ContractController extends HttpServlet {
         String keyword = request.getParameter("keyword");
         String statusFilter = request.getParameter("status");
         String typeFilter = request.getParameter("type");
+        Integer provinceFilter = parseIntOrNull(request.getParameter("provinceId"));
+        Period period = Period.parse(request.getParameter("year"), request.getParameter("period"));
 
-        List<Contract> contractList = contractDAO.findAll(page, PAGE_SIZE, keyword, statusFilter, typeFilter);
-        int totalCount = contractDAO.countAll(keyword, statusFilter, typeFilter);
+        List<Contract> contractList = contractDAO.findAll(page, PAGE_SIZE, keyword, statusFilter, typeFilter,
+                provinceFilter, false, period);
+        int totalCount = contractDAO.countAll(keyword, statusFilter, typeFilter, provinceFilter, period);
         int totalPages = Math.max(1, (int) Math.ceil(totalCount / (double) PAGE_SIZE));
         Map<String, Integer> statusSummary = contractDAO.countStatusSummary();
 
         request.setAttribute("contractList", contractList);
         request.setAttribute("statusSummary", statusSummary);
+        request.setAttribute("provinceList", addressDAO.findBranchProvinces());
         request.setAttribute("currentPage", page);
         request.setAttribute("totalPages", totalPages);
         request.setAttribute("totalCount", totalCount);
+        // JSP cần pageSize để đánh STT liên tục qua các trang (trang 2 bắt đầu từ 11).
+        request.setAttribute("pageSize", PAGE_SIZE);
         request.setAttribute("keyword", keyword);
         request.setAttribute("statusFilter", statusFilter);
         request.setAttribute("typeFilter", typeFilter);
+        request.setAttribute("provinceFilter", provinceFilter);
+        setPeriodAttributes(request, period);
 
         request.getRequestDispatcher(LIST_VIEW).forward(request, response);
     }
@@ -226,16 +235,26 @@ public class ContractController extends HttpServlet {
         String keyword = request.getParameter("keyword");
         String statusFilter = request.getParameter("status");
         String typeFilter = request.getParameter("type");
+        Integer provinceFilter = parseIntOrNull(request.getParameter("provinceId"));
+        Period period = Period.parse(request.getParameter("year"), request.getParameter("period"));
 
-        List<Contract> all = contractDAO.findAll(1, Integer.MAX_VALUE, keyword, statusFilter, typeFilter);
-        String[] headers = {"Mã HĐ", "Tiêu đề", "Loại HĐ", "Khách hàng", "Người phụ trách",
+        // Sắp theo tỉnh: hợp đồng được giao việc theo địa bàn nên file xuất ra
+        // phải gom các hợp đồng cùng tỉnh lại với nhau.
+        List<Contract> all = contractDAO.findAll(1, Integer.MAX_VALUE, keyword, statusFilter, typeFilter,
+                provinceFilter, true, period);
+        // Giữ cột "Mã HĐ" trong file dù danh sách trên màn hình đã bỏ -- xem lý do
+        // ở CustomerController.exportExcel: STT chỉ đúng trong phạm vi một file.
+        String[] headers = {"STT", "Mã HĐ", "Tiêu đề", "Loại HĐ", "Tỉnh/Thành phố", "Khách hàng", "Người phụ trách",
             "Ngày ký", "Ngày hiệu lực", "Ngày kết thúc", "Trạng thái"};
         List<Object[]> rows = new ArrayList<>();
+        int stt = 1;
         for (Contract c : all) {
             rows.add(new Object[]{
+                stt++,
                 c.getContractCode(),
                 c.getTitle(),
                 c.getContractType(),
+                provinceNameOf(c),
                 c.getEnterprise() != null ? c.getEnterprise().getEnterpriseName() : "",
                 c.getOwner() != null ? c.getOwner().getFullName() : "",
                 c.getSigningDate() != null ? c.getSigningDate().toString() : "",
@@ -950,6 +969,36 @@ public class ContractController extends HttpServlet {
             return false;
         }
         return !c.getSigningDate().after(c.getEffectiveDate()) && !c.getEffectiveDate().after(c.getEndDate());
+    }
+
+    /**
+     * Tỉnh/thành của hợp đồng = tỉnh của khách hàng đứng tên (ContractDAO đã
+     * gắn sẵn khi map). Bỏ tiền tố "Tỉnh "/"Thành phố " cho khớp thứ tự đã sắp
+     * ở DAO; hợp đồng của khách chưa có địa chỉ ghi "Chưa xác định" thay vì để
+     * trống, để người đọc file phân biệt được thiếu dữ liệu với lỗi xuất.
+     */
+    private static String provinceNameOf(Contract contract) {
+        Enterprise enterprise = contract.getEnterprise();
+        Address address = enterprise != null ? enterprise.getAddress() : null;
+        District district = address != null ? address.getDistrict() : null;
+        Province province = district != null ? district.getProvince() : null;
+        return province != null ? province.getShortName() : "Chưa xác định";
+    }
+
+    /**
+     * Đổ các giá trị bộ lọc kỳ ra JSP: danh sách năm cho dropdown, giá trị đang
+     * chọn (để giữ lại khi submit/phân trang) và nhãn tiếng Việt của kỳ.
+     */
+    static void setPeriodAttributes(HttpServletRequest request, Period period) {
+        request.setAttribute("yearList", Period.availableYears());
+        // Đổ ra năm ĐÃ PHÂN TÍCH (số), không phải chuỗi thô trên URL: JSP so
+        // ${yearFilter == y} với từng số năm trong dropdown, mà EL gặp chuỗi
+        // không phải số thì ném luôn ELException lúc ép kiểu -- gõ tay
+        // ?year=abcd là cả trang danh sách trắng thành trang lỗi. Không phân
+        // tích được thì coi như không lọc, đúng như Period.parse đã làm.
+        request.setAttribute("yearFilter", period != null ? period.getYear() : null);
+        request.setAttribute("periodFilter", request.getParameter("period"));
+        request.setAttribute("periodLabel", period != null ? period.getLabel() : null);
     }
 
     private Integer parseIntOrNull(String value) {

@@ -6,8 +6,9 @@
     Servlet cần đặt các request attribute sau trước khi forward tới trang này:
       - customerList : List<poscs.model.Enterprise>  (mỗi Enterprise nên có sẵn .address.district.province và .accountOwner đã join)
       - userList      : List<poscs.model.User>        (toàn bộ nhân viên, để đổ dropdown lọc "Người phụ trách")
+      - provinceList  : List<poscs.model.Province>    (18 tỉnh địa bàn chi nhánh, để đổ dropdown lọc "Tỉnh/Thành")
       - currentPage, totalPages, totalCount : thông tin phân trang (BR-12)
-      - keyword, typeFilter, assigneeFilter : giá trị filter hiện tại (để giữ lại lúc submit lại form tìm kiếm)
+      - keyword, typeFilter, assigneeFilter, provinceFilter : giá trị filter hiện tại (để giữ lại lúc submit lại form tìm kiếm)
 --%>
 <!DOCTYPE html>
 <html lang="vi">
@@ -25,7 +26,7 @@
 
     <style>
         .page-container {
-            max-width: 1240px;
+            max-width: 1440px;
             margin: 28px auto;
             padding: 0 24px 32px;
         }
@@ -58,10 +59,10 @@
         /* ===== Filter bar ===== */
         .filter-bar {
             padding: 18px 20px; margin-bottom: 20px;
-            display: flex; flex-wrap: wrap; gap: 14px; align-items: center;
+            display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
         }
         .search-input-wrap {
-            position: relative; flex: 1 1 280px; min-width: 220px;
+            position: relative; flex: 1 1 220px; min-width: 190px;
         }
         .search-input-wrap i {
             position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
@@ -76,53 +77,102 @@
             outline: none; background: #fff; border-color: var(--primary-light);
             box-shadow: 0 0 0 4px rgba(15, 158, 219, 0.15);
         }
+        /* min-width 180px x nhiều ô là tràn hàng ngay ở màn hình 1366px --
+           thu về 150px và cho phép co lại thì cả thanh lọc nằm gọn một hàng. */
         .filter-bar select {
-            padding: 10px 14px; border-radius: 10px; border: 1px solid #e5e7eb;
-            background: #f9fafb; font-size: 0.88rem; min-width: 180px;
+            padding: 10px 12px; border-radius: 10px; border: 1px solid #e5e7eb;
+            background: #f9fafb; font-size: 0.86rem;
+            flex: 0 1 auto; min-width: 150px; max-width: 200px;
         }
         .filter-bar select:focus { outline: none; border-color: var(--primary-light); }
 
         /* ===== Table ===== */
         .table-card { overflow: hidden; }
+        /* Thanh cuộn ngang: để mặc định thì Windows ẩn nó đi tới khi cuộn, người
+           dùng không biết là bảng còn phần bên phải. Cho nó dày lên và luôn hiện,
+           kèm con trỏ bàn tay -- nhìn là biết kéo được. */
+        .table-responsive {
+            overflow-x: auto; cursor: grab;
+            scrollbar-width: thin; scrollbar-color: #cbd5e1 #f1f5f9;
+        }
+        .table-responsive.is-dragging { cursor: grabbing; user-select: none; }
+        .table-responsive::-webkit-scrollbar { height: 11px; }
+        .table-responsive::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 8px; }
+        .table-responsive::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 8px; }
+        .table-responsive::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
         .custom-table { margin-bottom: 0; }
         .custom-table thead th {
             background: #f8fafc; color: #6b7280; font-size: 0.74rem;
             text-transform: uppercase; letter-spacing: .3px; font-weight: 700;
-            padding: 12px 16px; border-bottom: 1.5px solid #eef2f6; white-space: nowrap;
+            padding: 11px 8px; border-bottom: 1.5px solid #eef2f6; white-space: nowrap;
         }
         .custom-table tbody td {
-            padding: 12px 16px; font-size: 0.87rem; color: #111827;
+            padding: 11px 8px; font-size: 0.85rem; color: #111827;
             vertical-align: middle; border-bottom: 1px solid #f3f4f6;
         }
         .custom-table tbody tr:last-child td { border-bottom: none; }
         .custom-table tbody tr:hover { background: #f9fdff; }
 
+        /* 9 cột chữ tiếng Việt trong ~980px: để trình duyệt tự chia thì nó bóp
+           cột rồi ngắt chữ, mỗi dòng cao 3-4 hàng. table-layout:fixed + chia %
+           cho bảng vừa đúng bề ngang khung, mỗi dòng đúng một hàng chữ, phần
+           thừa cắt bằng "..." (nguyên văn vẫn còn ở tooltip). Dưới 900px thì
+           khung ngoài cuộn ngang thay vì bóp tiếp. */
+        .custom-table { table-layout: fixed; min-width: 1440px; }
+        /* min-width lớn hơn bề ngang khung: mỗi cột được rộng thoải mái,
+           tên/tiêu đề dài phần lớn nằm gọn một dòng. Màn hình hẹp thì
+           khung ngoài (.table-responsive) cho kéo ngang -- đổi lại lấy
+           được khoảng thở cho chữ. */
+        .custom-table th, .custom-table td {
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .custom-table th:nth-child(1), .custom-table td:nth-child(1) { width: 5%; }   /* STT */
+        .custom-table th:nth-child(2), .custom-table td:nth-child(2) { width: 26%; }  /* Khách hàng + email */
+        .custom-table th:nth-child(3), .custom-table td:nth-child(3) { width: 14%; }  /* Loại KH */
+        .custom-table th:nth-child(4), .custom-table td:nth-child(4) { width: 10%; }  /* SĐT */
+        .custom-table th:nth-child(5), .custom-table td:nth-child(5) { width: 20%; }  /* Địa bàn */
+        .custom-table th:nth-child(6), .custom-table td:nth-child(6) { width: 14%; }  /* Phụ trách */
+        .custom-table th:nth-child(7), .custom-table td:nth-child(7) { width: 11%; }  /* Thao tác */
+        /* Ô hai dòng: dòng chính đậm, dòng phụ chữ nhỏ xám. Dòng chính được
+           phép xuống dòng để KHÔNG bao giờ phải cắt bằng "..."; chỉ dòng phụ
+           mới cắt, vì email/địa chỉ chi tiết không đáng chiếm thêm một hàng. */
+        .custom-table td.cell-wrap { white-space: normal; }
+        .cell-2line { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+        .cell-sub { font-size: 0.74rem; color: #6b7280; line-height: 1.35; }
+        .prov-tag { font-weight: 700; color: var(--primary-dark); }
+        .cell-clip {
+            display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
+
+        .stt-cell { color: #6b7280; font-weight: 600; font-size: 0.83rem; width: 48px; }
         .customer-code {
             font-weight: 700; color: var(--primary); font-size: 0.85rem;
         }
         .code-link { color: inherit; text-decoration: none; }
         .code-link:hover { text-decoration: underline; }
-        .customer-name-cell { display: flex; align-items: center; gap: 10px; }
+        .customer-name-cell { display: flex; align-items: center; gap: 9px; min-width: 0; }
         .customer-logo {
-            width: 32px; height: 32px; border-radius: 8px; overflow: hidden; flex-shrink: 0;
+            width: 28px; height: 28px; border-radius: 8px; overflow: hidden; flex-shrink: 0;
             background: linear-gradient(120deg, var(--primary-dark), var(--primary-light));
             color: #fff; display: flex; align-items: center; justify-content: center; font-size: 0.85rem;
         }
         .customer-logo img { width: 100%; height: 100%; object-fit: cover; }
         .customer-name-link {
             color: #111827; font-weight: 600; text-decoration: none;
+            display: block; min-width: 0; line-height: 1.3;
         }
         .customer-name-link:hover { color: var(--primary); text-decoration: underline; }
 
         .type-badge {
-            display: inline-block; padding: 3px 11px; border-radius: 20px;
-            font-size: 0.72rem; font-weight: 600;
+            display: inline-block; padding: 3px 9px; border-radius: 20px;
+            font-size: 0.68rem; font-weight: 600;
             background: #eaf6ff; color: var(--primary-dark);
         }
 
         .action-icons { display: flex; gap: 6px; justify-content: flex-end; }
         .action-icons button {
-            width: 32px; height: 32px; border-radius: 8px; border: none;
+            width: 28px; height: 28px; border-radius: 8px; border: none;
             background: #f3f4f6; color: #6b7280; cursor: pointer;
             display: flex; align-items: center; justify-content: center;
             font-size: 0.82rem; transition: all 0.15s;
@@ -212,7 +262,7 @@
                 <%-- Xuất Excel là thao tác ĐỌC: chỉ lấy đúng dữ liệu vai trò này vốn đã
                      xem được trên màn hình, đổi sang dạng file. Nên KHÔNG khoá theo
                      canManage -- xem PERMISSIONS.md. --%>
-                <a href="${pageContext.request.contextPath}/customer?action=exportExcel&keyword=${fn:escapeXml(keyword)}&type=${fn:escapeXml(typeFilter)}&assigneeId=${assigneeFilter}" class="btn-outline-action"><i class="fa-solid fa-file-excel"></i> Xuất Excel</a>
+                <a href="${pageContext.request.contextPath}/customer?action=exportExcel&keyword=${fn:escapeXml(keyword)}&type=${fn:escapeXml(typeFilter)}&assigneeId=${assigneeFilter}&provinceId=${provinceFilter}" class="btn-outline-action"><i class="fa-solid fa-file-excel"></i> Xuất Excel</a>
                 <c:if test="${canManage}">
                     <a href="${pageContext.request.contextPath}/customer?action=new" class="btn-add"><i class="fa-solid fa-plus"></i> Thêm khách hàng</a>
                 </c:if>
@@ -233,9 +283,17 @@
                 <option value="Đại lý phân phối" ${typeFilter == 'Đại lý phân phối' ? 'selected' : ''}>Đại lý phân phối</option>
             </select>
             <select id="filterAssignee" name="assigneeId">
-                <option value="">Tất cả người phụ trách</option>
+                <%-- Nhãn nói rõ "chính": bộ lọc chỉ soi cột phụ trách chính,
+                     chọn một người sẽ KHÔNG kéo theo khách họ chỉ đứng hỗ trợ. --%>
+                <option value="">Tất cả người phụ trách chính</option>
                 <c:forEach var="staff" items="${userList}">
                     <option value="${staff.userId}" ${assigneeFilter == staff.userId ? 'selected' : ''}>${fn:escapeXml(staff.fullName)}</option>
+                </c:forEach>
+            </select>
+            <select id="filterProvince" name="provinceId">
+                <option value="">Tất cả tỉnh địa bàn</option>
+                <c:forEach var="province" items="${provinceList}">
+                    <option value="${province.provinceId}" ${provinceFilter == province.provinceId ? 'selected' : ''}>${fn:escapeXml(province.shortName)}</option>
                 </c:forEach>
             </select>
         </form>
@@ -246,21 +304,25 @@
                 <table class="table custom-table" id="customerTable">
                     <thead>
                         <tr>
-                            <th>Mã KH</th>
-                            <th>Tên khách hàng</th>
+                            <th>STT</th>
+                            <th>Khách hàng</th>
                             <th>Loại KH</th>
-                            <th>Email</th>
                             <th>Số điện thoại</th>
-                            <th>Địa chỉ</th>
-                            <th>Người phụ trách</th>
+                            <th>Địa bàn</th>
+                            <th>Phụ trách chính</th>
                             <th class="text-end">Thao tác</th>
                         </tr>
                     </thead>
                     <tbody id="customerTableBody">
-                        <c:forEach var="customer" items="${customerList}">
+                        <c:forEach var="customer" items="${customerList}" varStatus="row">
                             <tr>
-                                <td class="customer-code"><a href="${pageContext.request.contextPath}/customer?action=view&id=${customer.enterpriseId}" class="code-link">${fn:escapeXml(customer.enterpriseCode)}</a></td>
-                                <td>
+                                <%-- STT tính theo vị trí toàn danh sách, không phải trong trang:
+                                     trang 2 phải bắt đầu từ 11 chứ không quay lại 1. --%>
+                                <td class="stt-cell">${(currentPage - 1) * pageSize + row.index + 1}</td>
+                                <%-- O hai dong: ten khach dam o tren, email chu nho xam o duoi.
+                                     Gop email vao day thi cot ten du cho hien tron ven, khong
+                                     phai cat bang "..." nhu khi email chiem mot cot rieng. --%>
+                                <td class="cell-wrap">
                                     <div class="customer-name-cell">
                                         <div class="customer-logo">
                                             <c:choose>
@@ -268,19 +330,28 @@
                                                 <c:otherwise><i class="fa-solid fa-building"></i></c:otherwise>
                                             </c:choose>
                                         </div>
-                                        <a href="${pageContext.request.contextPath}/customer?action=view&id=${customer.enterpriseId}" class="customer-name-link">${fn:escapeXml(customer.enterpriseName)}</a>
+                                        <div class="cell-2line">
+                                            <a href="${pageContext.request.contextPath}/customer?action=view&id=${customer.enterpriseId}" class="customer-name-link">${fn:escapeXml(customer.enterpriseName)}</a>
+                                            <span class="cell-sub">${fn:escapeXml(customer.email)}</span>
+                                        </div>
                                     </div>
                                 </td>
                                 <td><span class="type-badge">${fn:escapeXml(customer.customerType)}</span></td>
-                                <td>${fn:escapeXml(customer.email)}</td>
-                                <td>${fn:escapeXml(customer.phone)}</td>
-                                <td>
+                                <td class="nowrap">${fn:escapeXml(customer.phone)}</td>
+                                <%-- Cung hai dong: tinh in dam o tren (thu nguoi dung quet mat
+                                     khi quan ly theo dia ban), dia chi chi tiet chu nho o duoi. --%>
+                                <td class="cell-wrap">
                                     <c:choose>
-                                        <c:when test="${customer.address != null}">${fn:escapeXml(customer.address.fullAddress)}</c:when>
+                                        <c:when test="${customer.address != null}">
+                                            <div class="cell-2line">
+                                                <span class="prov-tag"><c:choose><c:when test="${customer.address.district.province != null}">${fn:escapeXml(customer.address.district.province.shortName)}</c:when><c:otherwise>Chưa xác định</c:otherwise></c:choose></span>
+                                                <span class="cell-sub" title="${fn:escapeXml(customer.address.fullAddress)}">${fn:escapeXml(customer.address.streetAndLocalName)}<c:if test="${customer.address.district != null}">, ${fn:escapeXml(customer.address.district.shortName)}</c:if></span>
+                                            </div>
+                                        </c:when>
                                         <c:otherwise>&mdash;</c:otherwise>
                                     </c:choose>
                                 </td>
-                                <td>
+                                <td class="nowrap">
                                     <c:choose>
                                         <c:when test="${customer.accountOwner != null}">${fn:escapeXml(customer.accountOwner.fullName)}</c:when>
                                         <c:otherwise>&mdash;</c:otherwise>
@@ -312,11 +383,11 @@
                 <span class="pagination-info" id="paginationInfo">Hiển thị ${fn:length(customerList)} trong tổng số ${totalCount} khách hàng</span>
                 <nav>
                     <ul class="pagination pagination-sm mb-0">
-                        <li class="page-item ${currentPage <= 1 ? 'disabled' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/customer?action=list&page=${currentPage - 1}&keyword=${fn:escapeXml(keyword)}&type=${fn:escapeXml(typeFilter)}&assigneeId=${assigneeFilter}">Trước</a></li>
+                        <li class="page-item ${currentPage <= 1 ? 'disabled' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/customer?action=list&page=${currentPage - 1}&keyword=${fn:escapeXml(keyword)}&type=${fn:escapeXml(typeFilter)}&assigneeId=${assigneeFilter}&provinceId=${provinceFilter}">Trước</a></li>
                         <c:forEach begin="1" end="${totalPages}" var="p">
-                            <li class="page-item ${p == currentPage ? 'active' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/customer?action=list&page=${p}&keyword=${fn:escapeXml(keyword)}&type=${fn:escapeXml(typeFilter)}&assigneeId=${assigneeFilter}">${p}</a></li>
+                            <li class="page-item ${p == currentPage ? 'active' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/customer?action=list&page=${p}&keyword=${fn:escapeXml(keyword)}&type=${fn:escapeXml(typeFilter)}&assigneeId=${assigneeFilter}&provinceId=${provinceFilter}">${p}</a></li>
                         </c:forEach>
-                        <li class="page-item ${currentPage >= totalPages ? 'disabled' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/customer?action=list&page=${currentPage + 1}&keyword=${fn:escapeXml(keyword)}&type=${fn:escapeXml(typeFilter)}&assigneeId=${assigneeFilter}">Sau</a></li>
+                        <li class="page-item ${currentPage >= totalPages ? 'disabled' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/customer?action=list&page=${currentPage + 1}&keyword=${fn:escapeXml(keyword)}&type=${fn:escapeXml(typeFilter)}&assigneeId=${assigneeFilter}&provinceId=${provinceFilter}">Sau</a></li>
                     </ul>
                 </nav>
             </div>
@@ -354,6 +425,46 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+        // Kéo chuột ngay trên bảng để cuộn ngang, không cần rê xuống tận thanh
+        // cuộn ở cuối bảng. Bỏ qua khi điểm bắt đầu là link/nút/ô nhập -- nếu
+        // không thì bấm "Xem chi tiết" cũng bị tính là kéo.
+        (function enableDragScroll() {
+            var wrap = document.querySelector('.table-responsive');
+            if (!wrap) { return; }
+            var dragging = false, startX = 0, startScroll = 0, moved = false;
+
+            wrap.addEventListener('mousedown', function (e) {
+                if (e.button !== 0 || e.target.closest('a, button, input, select, label')) { return; }
+                dragging = true;
+                moved = false;
+                startX = e.pageX;
+                startScroll = wrap.scrollLeft;
+                wrap.classList.add('is-dragging');
+            });
+            wrap.addEventListener('mousemove', function (e) {
+                if (!dragging) { return; }
+                var dx = e.pageX - startX;
+                if (Math.abs(dx) > 3) { moved = true; }
+                if (moved) {
+                    wrap.scrollLeft = startScroll - dx;
+                    e.preventDefault();
+                }
+            });
+            // Bắt mouseup ở window: thả chuột ngoài bảng vẫn phải kết thúc kéo,
+            // không thì bảng dính theo con trỏ.
+            window.addEventListener('mouseup', function () {
+                dragging = false;
+                wrap.classList.remove('is-dragging');
+            });
+            // Lăn chuột ngang (trackpad / Shift+lăn) cuộn bảng thay vì cuộn trang.
+            wrap.addEventListener('wheel', function (e) {
+                if (e.deltaX === 0 && !e.shiftKey) { return; }
+                var before = wrap.scrollLeft;
+                wrap.scrollLeft += (e.deltaX !== 0 ? e.deltaX : e.deltaY);
+                if (wrap.scrollLeft !== before) { e.preventDefault(); }
+            }, { passive: false });
+        })();
+
         var deleteModal = new bootstrap.Modal(document.getElementById('deleteModal'));
         var customerIdToDelete = null;
 
@@ -374,6 +485,7 @@
         // Tự động submit lại form lọc khi đổi loại KH / người phụ trách
         document.getElementById('filterType').addEventListener('change', function () { document.getElementById('filterForm').submit(); });
         document.getElementById('filterAssignee').addEventListener('change', function () { document.getElementById('filterForm').submit(); });
+        document.getElementById('filterProvince').addEventListener('change', function () { document.getElementById('filterForm').submit(); });
     </script>
 
     <script src="${pageContext.request.contextPath}/js/appshell.js"></script>

@@ -26,7 +26,9 @@ import poscs.dao.EmployeeDAO;
 import poscs.dao.TechnicalSupportTicketDAO;
 import poscs.model.Address;
 import poscs.model.CustomerLifecycleEvent;
+import poscs.model.District;
 import poscs.model.Enterprise;
+import poscs.model.Province;
 import poscs.model.RelationshipRating;
 import poscs.model.User;
 
@@ -129,19 +131,25 @@ public class CustomerController extends HttpServlet {
         String keyword = request.getParameter("keyword");
         String typeFilter = request.getParameter("type");
         Integer assigneeFilter = parseIntOrNull(request.getParameter("assigneeId"));
+        Integer provinceFilter = parseIntOrNull(request.getParameter("provinceId"));
 
-        List<Enterprise> customerList = customerDAO.findAll(page, PAGE_SIZE, keyword, typeFilter, assigneeFilter);
-        int totalCount = customerDAO.countAll(keyword, typeFilter, assigneeFilter);
+        List<Enterprise> customerList = customerDAO.findAll(page, PAGE_SIZE, keyword, typeFilter, assigneeFilter,
+                provinceFilter, false);
+        int totalCount = customerDAO.countAll(keyword, typeFilter, assigneeFilter, provinceFilter);
         int totalPages = Math.max(1, (int) Math.ceil(totalCount / (double) PAGE_SIZE));
 
         request.setAttribute("customerList", customerList);
         request.setAttribute("userList", employeeDAO.findAllActive());
+        request.setAttribute("provinceList", addressDAO.findBranchProvinces());
         request.setAttribute("currentPage", page);
         request.setAttribute("totalPages", totalPages);
         request.setAttribute("totalCount", totalCount);
+        // JSP cần pageSize để đánh STT liên tục qua các trang (trang 2 bắt đầu từ 11).
+        request.setAttribute("pageSize", PAGE_SIZE);
         request.setAttribute("keyword", keyword);
         request.setAttribute("typeFilter", typeFilter);
         request.setAttribute("assigneeFilter", assigneeFilter);
+        request.setAttribute("provinceFilter", provinceFilter);
 
         request.getRequestDispatcher(LIST_VIEW).forward(request, response);
     }
@@ -173,7 +181,7 @@ public class CustomerController extends HttpServlet {
             return;
         }
         request.setAttribute("userList", employeeDAO.findAllActive());
-        request.setAttribute("provinceList", addressDAO.findAllProvinces());
+        request.setAttribute("provinceList", addressDAO.findBranchProvinces());
         request.getRequestDispatcher(CREATE_VIEW).forward(request, response);
     }
 
@@ -193,7 +201,13 @@ public class CustomerController extends HttpServlet {
 
         request.setAttribute("customer", customer);
         request.setAttribute("userList", employeeDAO.findAllActive());
-        request.setAttribute("provinceList", addressDAO.findAllProvinces());
+        // Khách cũ có thể nằm ngoài 18 tỉnh địa bàn -- giữ tỉnh đó trong danh
+        // sách, nếu không thì mở form sửa lên ô tỉnh trống và bấm lưu là mất
+        // địa chỉ dù người dùng chỉ định sửa số điện thoại.
+        Integer currentProvinceId = customer.getAddress() != null && customer.getAddress().getDistrict() != null
+                ? customer.getAddress().getDistrict().getProvinceId()
+                : null;
+        request.setAttribute("provinceList", addressDAO.findBranchProvincesIncluding(currentProvinceId));
         request.getRequestDispatcher(UPDATE_VIEW).forward(request, response);
     }
 
@@ -202,13 +216,25 @@ public class CustomerController extends HttpServlet {
         String keyword = request.getParameter("keyword");
         String typeFilter = request.getParameter("type");
         Integer assigneeFilter = parseIntOrNull(request.getParameter("assigneeId"));
+        Integer provinceFilter = parseIntOrNull(request.getParameter("provinceId"));
 
-        List<Enterprise> all = customerDAO.findAll(1, Integer.MAX_VALUE, keyword, typeFilter, assigneeFilter);
-        String[] headers = {"Mã KH", "Tên doanh nghiệp", "Loại KH", "Nhóm KH", "MST", "Email", "SĐT", "Website",
-            "Địa chỉ", "Người phụ trách", "Ngày tham gia", "Xếp hạng quan hệ"};
+        // Sắp theo tỉnh (sortByProvince=true): quản lý khách hàng chia theo địa bàn
+        // nên file xuất ra phải gom các dòng cùng tỉnh lại với nhau, không phải
+        // mới-nhất-trước như danh sách trên màn hình.
+        List<Enterprise> all = customerDAO.findAll(1, Integer.MAX_VALUE, keyword, typeFilter, assigneeFilter,
+                provinceFilter, true);
+        // File Excel vẫn giữ cột "Mã KH" dù danh sách trên màn hình đã bỏ: STT chỉ
+        // là số thứ tự dòng trong chính file này, hai người mở hai file xuất ở hai
+        // thời điểm sẽ có STT khác nhau cho cùng một khách -- cần một cột để đối
+        // chiếu ngược lại hệ thống thì mã là thứ duy nhất không đổi.
+        String[] headers = {"STT", "Mã KH", "Tên doanh nghiệp", "Loại KH", "Nhóm KH", "MST", "Email", "SĐT",
+            "Website", "Tỉnh/Thành phố", "Địa chỉ", "Người phụ trách chính", "Người hỗ trợ",
+            "Ngày tham gia", "Xếp hạng quan hệ"};
         List<Object[]> rows = new ArrayList<>();
+        int stt = 1;
         for (Enterprise e : all) {
             rows.add(new Object[]{
+                stt++,
                 e.getEnterpriseCode(),
                 e.getEnterpriseName(),
                 e.getCustomerType(),
@@ -217,8 +243,10 @@ public class CustomerController extends HttpServlet {
                 e.getEmail(),
                 e.getPhone(),
                 e.getWebsite(),
+                provinceNameOf(e),
                 e.getAddress() != null ? e.getAddress().getFullAddress() : "",
                 e.getAccountOwner() != null ? e.getAccountOwner().getFullName() : "",
+                e.getSupportOwner() != null ? e.getSupportOwner().getFullName() : "",
                 e.getJoinDate() != null ? e.getJoinDate().toString() : "",
                 e.getCurrentRelationshipRating() != null ? e.getCurrentRelationshipRating().toString() : ""
             });
@@ -254,10 +282,16 @@ public class CustomerController extends HttpServlet {
         if (accountOwnerId != null) {
             e.setAccountOwnerId(accountOwnerId);
         }
+        e.setSupportOwnerId(parseIntOrNull(request.getParameter("supportOwnerId")));
 
         setAddressFromRequest(e, request, null);
 
-        if (!isValidCommonFields(e) || isBlank(e.getTaxCode())) {
+        // Địa chỉ giờ là bắt buộc: khách hàng được giao việc và báo cáo theo
+        // địa bàn tỉnh, mà tỉnh chỉ suy ra được qua xã/phường của địa chỉ --
+        // khách không có địa chỉ sẽ rơi khỏi mọi bộ lọc/thống kê theo tỉnh.
+        // Chỉ chặn ở tầng ứng dụng, cột address_id vẫn để NULL được cho dữ
+        // liệu cũ tạo trước thay đổi này.
+        if (!isValidCommonFields(e) || isBlank(e.getTaxCode()) || e.getAddress() == null) {
             response.sendRedirect(request.getContextPath() + "/customer?action=new&error=invalid");
             return;
         }
@@ -307,10 +341,15 @@ public class CustomerController extends HttpServlet {
         if (accountOwnerId != null) {
             e.setAccountOwnerId(accountOwnerId);
         }
+        e.setSupportOwnerId(parseIntOrNull(request.getParameter("supportOwnerId")));
 
         setAddressFromRequest(e, request, existing.getAddressId());
 
-        if (!isValidCommonFields(e)) {
+        // Như handleCreate: phải có địa bàn. Ở đây chấp nhận cả trường hợp
+        // request không gửi lên địa chỉ mới nhưng khách đã có sẵn address_id
+        // (DAO giữ nguyên địa chỉ cũ) -- sửa tên/SĐT của khách cũ không vì thế
+        // mà bị chặn.
+        if (!isValidCommonFields(e) || (e.getAddress() == null && existing.getAddressId() == null)) {
             response.sendRedirect(request.getContextPath() + "/customer?action=edit&id=" + id + "&error=invalid");
             return;
         }
@@ -461,6 +500,12 @@ public class CustomerController extends HttpServlet {
         if (e.getAccountOwnerId() <= 0) {
             return false;
         }
+        // Người hỗ trợ là vai thứ hai, không phải bản sao của vai thứ nhất:
+        // để trùng một người thì cột "Người hỗ trợ" chỉ lặp lại tên đã có ở
+        // cột bên cạnh, và mọi thống kê theo người sẽ đếm người đó hai lần.
+        if (e.getSupportOwnerId() != null && e.getSupportOwnerId() == e.getAccountOwnerId()) {
+            return false;
+        }
         if (!isValidPhone(e.getPhone())) {
             return false;
         }
@@ -485,6 +530,22 @@ public class CustomerController extends HttpServlet {
     /** BR-10 */
     private boolean isValidEmail(String email) {
         return email.matches("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$");
+    }
+
+    /**
+     * Tên tỉnh/thành của khách hàng cho cột riêng khi xuất Excel. Bỏ tiền tố
+     * "Tỉnh "/"Thành phố " để khớp với thứ tự đã sắp ở DAO, và để lọc/pivot
+     * trong Excel gõ đúng tên tỉnh là ra.
+     *
+     * Khách chưa có địa chỉ ghi rõ "Chưa xác định" chứ không để trống: quản lý
+     * theo địa bàn mà ô trống thì người đọc file không biết là thiếu dữ liệu
+     * hay lỗi xuất.
+     */
+    private static String provinceNameOf(Enterprise enterprise) {
+        Address address = enterprise.getAddress();
+        District district = address != null ? address.getDistrict() : null;
+        Province province = district != null ? district.getProvince() : null;
+        return province != null ? province.getShortName() : "Chưa xác định";
     }
 
     private Integer parseIntOrNull(String value) {
