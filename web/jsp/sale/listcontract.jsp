@@ -73,6 +73,19 @@
 
         /* ===== Table ===== */
         .table-card { overflow: hidden; }
+        /* Thanh cuộn ngang: để mặc định thì Windows ẩn nó đi tới khi cuộn, người
+           dùng không biết là bảng còn phần bên phải. Cho nó dày lên và luôn hiện,
+           kèm con trỏ bàn tay -- nhìn là biết kéo được. */
+        .table-responsive {
+            overflow-x: auto; cursor: grab;
+            scrollbar-width: thin; scrollbar-color: #cbd5e1 #f1f5f9;
+        }
+        .table-responsive.is-dragging { cursor: grabbing; user-select: none; }
+        .table-responsive::-webkit-scrollbar { height: 11px; }
+        .table-responsive::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 8px; }
+        .table-responsive::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 8px; }
+        .table-responsive::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
         .custom-table { margin-bottom: 0; }
         .custom-table thead th {
             background: #f8fafc; color: #6b7280; font-size: 0.74rem; text-transform: uppercase; letter-spacing: .3px;
@@ -87,7 +100,11 @@
            bảng vỡ. Ô dài cắt bằng "..." và giữ nguyên văn ở tooltip. */
         /* Xem ghi chú ở listcustomer.jsp: table-layout:fixed + chia % để bảng vừa
            đúng khung, mỗi dòng đúng một hàng chữ, phần thừa cắt bằng "...". */
-        .custom-table { table-layout: fixed; min-width: 900px; }
+        .custom-table { table-layout: fixed; min-width: 1440px; }
+        /* min-width lớn hơn bề ngang khung: mỗi cột được rộng thoải mái,
+           tên/tiêu đề dài phần lớn nằm gọn một dòng. Màn hình hẹp thì
+           khung ngoài (.table-responsive) cho kéo ngang -- đổi lại lấy
+           được khoảng thở cho chữ. */
         .custom-table th, .custom-table td { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .custom-table th:nth-child(1), .custom-table td:nth-child(1) { width: 5%; }   /* STT */
         .custom-table th:nth-child(2), .custom-table td:nth-child(2) { width: 25%; }  /* Hợp đồng + khách */
@@ -98,6 +115,14 @@
         .custom-table th:nth-child(7), .custom-table td:nth-child(7) { width: 12%; }  /* Thao tác */
         .custom-table td.cell-wrap { white-space: normal; }
         .cell-2line { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+        /* Bảng rộng hơn khung thì phải kéo ngang -- ghim cột Thao tác dính bên
+           phải để lúc nào cũng bấm được, không phải kéo đi kéo lại từng dòng. */
+        .custom-table th:last-child, .custom-table td:last-child {
+            position: sticky; right: 0; background: #fff;
+            box-shadow: -6px 0 8px -6px rgba(0, 40, 80, 0.16);
+        }
+        .custom-table thead th:last-child { background: #f8fafc; }
+        .custom-table tbody tr:hover td:last-child { background: #f9fdff; }
         .cell-sub { font-size: 0.74rem; color: #6b7280; line-height: 1.35; }
         .prov-tag { font-weight: 700; color: var(--primary-dark); }
         .term-cell { font-variant-numeric: tabular-nums; color: #4b5563; font-size: 0.76rem; }
@@ -368,6 +393,46 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+        // Kéo chuột ngay trên bảng để cuộn ngang, không cần rê xuống tận thanh
+        // cuộn ở cuối bảng. Bỏ qua khi điểm bắt đầu là link/nút/ô nhập -- nếu
+        // không thì bấm "Xem chi tiết" cũng bị tính là kéo.
+        (function enableDragScroll() {
+            var wrap = document.querySelector('.table-responsive');
+            if (!wrap) { return; }
+            var dragging = false, startX = 0, startScroll = 0, moved = false;
+
+            wrap.addEventListener('mousedown', function (e) {
+                if (e.button !== 0 || e.target.closest('a, button, input, select, label')) { return; }
+                dragging = true;
+                moved = false;
+                startX = e.pageX;
+                startScroll = wrap.scrollLeft;
+                wrap.classList.add('is-dragging');
+            });
+            wrap.addEventListener('mousemove', function (e) {
+                if (!dragging) { return; }
+                var dx = e.pageX - startX;
+                if (Math.abs(dx) > 3) { moved = true; }
+                if (moved) {
+                    wrap.scrollLeft = startScroll - dx;
+                    e.preventDefault();
+                }
+            });
+            // Bắt mouseup ở window: thả chuột ngoài bảng vẫn phải kết thúc kéo,
+            // không thì bảng dính theo con trỏ.
+            window.addEventListener('mouseup', function () {
+                dragging = false;
+                wrap.classList.remove('is-dragging');
+            });
+            // Lăn chuột ngang (trackpad / Shift+lăn) cuộn bảng thay vì cuộn trang.
+            wrap.addEventListener('wheel', function (e) {
+                if (e.deltaX === 0 && !e.shiftKey) { return; }
+                var before = wrap.scrollLeft;
+                wrap.scrollLeft += (e.deltaX !== 0 ? e.deltaX : e.deltaY);
+                if (wrap.scrollLeft !== before) { e.preventDefault(); }
+            }, { passive: false });
+        })();
+
         var deleteModal = new bootstrap.Modal(document.getElementById('deleteModal'));
         var contractIdToDelete = null;
 
