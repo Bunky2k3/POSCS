@@ -89,13 +89,15 @@
            đúng khung, mỗi dòng đúng một hàng chữ, phần thừa cắt bằng "...". */
         .custom-table { table-layout: fixed; min-width: 900px; }
         .custom-table th, .custom-table td { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .custom-table th:nth-child(1), .custom-table td:nth-child(1) { width: 5%; }  /* STT */
-        .custom-table th:nth-child(2), .custom-table td:nth-child(2) { width: 16%; }  /* Tiêu đề */
-        .custom-table th:nth-child(3), .custom-table td:nth-child(3) { width: 20%; }  /* Khách hàng + tỉnh */
-        .custom-table th:nth-child(4), .custom-table td:nth-child(4) { width: 14%; }  /* Loại HĐ */
-        .custom-table th:nth-child(5), .custom-table td:nth-child(5) { width: 18%; }  /* Thời hạn */
-        .custom-table th:nth-child(6), .custom-table td:nth-child(6) { width: 15%; }  /* Trạng thái */
-        .custom-table th:nth-child(7), .custom-table td:nth-child(7) { width: 12%; }  /* Thao tác */
+        .custom-table th:nth-child(1), .custom-table td:nth-child(1) { width: 5%; }   /* STT */
+        .custom-table th:nth-child(2), .custom-table td:nth-child(2) { width: 38%; }  /* Hợp đồng + khách */
+        .custom-table th:nth-child(3), .custom-table td:nth-child(3) { width: 14%; }  /* Loại HĐ */
+        .custom-table th:nth-child(4), .custom-table td:nth-child(4) { width: 16%; }  /* Thời hạn */
+        .custom-table th:nth-child(5), .custom-table td:nth-child(5) { width: 15%; }  /* Trạng thái */
+        .custom-table th:nth-child(6), .custom-table td:nth-child(6) { width: 12%; }  /* Thao tác */
+        .custom-table td.cell-wrap { white-space: normal; }
+        .cell-2line { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+        .cell-sub { font-size: 0.74rem; color: #6b7280; line-height: 1.35; }
         .prov-tag { font-weight: 700; color: var(--primary-dark); }
         .term-cell { font-variant-numeric: tabular-nums; color: #4b5563; font-size: 0.76rem; }
         .cell-clip { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -104,7 +106,7 @@
         .contract-code { font-weight: 700; color: var(--primary); font-size: 0.85rem; }
         .code-link { color: inherit; text-decoration: none; }
         .code-link:hover { text-decoration: underline; }
-        .contract-title-link { color: #111827; font-weight: 600; text-decoration: none; }
+        .contract-title-link { color: #111827; font-weight: 600; text-decoration: none; line-height: 1.3; }
         .contract-title-link:hover { color: var(--primary); text-decoration: underline; }
 
         .type-badge { display: inline-block; padding: 3px 9px; border-radius: 20px; font-size: 0.68rem; font-weight: 600; background: #f3f4f6; color: #4b5563; }
@@ -245,8 +247,7 @@
                     <thead>
                         <tr>
                             <th>STT</th>
-                            <th>Tiêu đề</th>
-                            <th>Khách hàng</th>
+                            <th>Hợp đồng</th>
                             <th>Loại HĐ</th>
                             <th>Thời hạn</th>
                             <th>Trạng thái</th>
@@ -258,17 +259,19 @@
                             <tr>
                                 <%-- STT theo vị trí toàn danh sách: trang 2 bắt đầu từ 11, không quay lại 1. --%>
                                 <td class="stt-cell">${(currentPage - 1) * pageSize + row.index + 1}</td>
-                                <td><a href="${pageContext.request.contextPath}/contract?action=view&id=${contract.contractId}" class="contract-title-link cell-clip title-cell" title="${fn:escapeXml(contract.title)}">${fn:escapeXml(contract.title)}</a></td>
-                                <%-- Tỉnh gộp vào ô khách hàng (in đậm, đứng trước) thay vì một cột
-                                     riêng: 9 cột trong ~950px thì cột nào cũng bị cắt cụt, gộp lại
-                                     thì cả tỉnh lẫn tên khách đều đọc được. --%>
-                                <td>
-                                    <c:choose>
-                                        <c:when test="${contract.enterprise != null}">
-                                            <span class="cell-clip" title="${fn:escapeXml(contract.enterprise.enterpriseName)}"><c:if test="${contract.enterprise.address.district.province != null}"><span class="prov-tag">${fn:escapeXml(contract.enterprise.address.district.province.shortName)}</span> &middot; </c:if>${fn:escapeXml(contract.enterprise.enterpriseName)}</span>
-                                        </c:when>
-                                        <c:otherwise>&mdash;</c:otherwise>
-                                    </c:choose>
+                                <%-- Ô hai dòng: tiêu đề hợp đồng đậm ở trên, "tỉnh · khách hàng"
+                                     chữ nhỏ ở dưới. Gộp lại thì tiêu đề đủ chỗ hiện trọn vẹn thay
+                                     vì ba cột cùng bị cắt cụt. --%>
+                                <td class="cell-wrap">
+                                    <div class="cell-2line">
+                                        <a href="${pageContext.request.contextPath}/contract?action=view&id=${contract.contractId}" class="contract-title-link">${fn:escapeXml(contract.title)}</a>
+                                        <span class="cell-sub">
+                                            <c:choose>
+                                                <c:when test="${contract.enterprise != null}"><c:if test="${contract.enterprise.address.district.province != null}"><span class="prov-tag">${fn:escapeXml(contract.enterprise.address.district.province.shortName)}</span> &middot; </c:if>${fn:escapeXml(contract.enterprise.enterpriseName)}</c:when>
+                                                <c:otherwise>&mdash;</c:otherwise>
+                                            </c:choose>
+                                        </span>
+                                    </div>
                                 </td>
                                 <td><span class="type-badge">${fn:escapeXml(contract.contractType)}</span></td>
                                 <%-- Hai cột ngày gộp thành một khoảng thời hạn, năm rút về 2 chữ số:

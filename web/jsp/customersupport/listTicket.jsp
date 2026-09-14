@@ -82,15 +82,19 @@
            đúng khung, mỗi dòng đúng một hàng chữ, phần thừa cắt bằng "...". */
         .custom-table { table-layout: fixed; min-width: 900px; }
         .custom-table th, .custom-table td { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .custom-table th:nth-child(1), .custom-table td:nth-child(1) { width: 8%; }  /* Mã phiếu */
-        .custom-table th:nth-child(2), .custom-table td:nth-child(2) { width: 9%; }  /* Loại phiếu */
-        .custom-table th:nth-child(3), .custom-table td:nth-child(3) { width: 18%; }  /* Khách hàng */
-        .custom-table th:nth-child(4), .custom-table td:nth-child(4) { width: 9%; }  /* Hợp đồng */
-        .custom-table th:nth-child(5), .custom-table td:nth-child(5) { width: 10%; }  /* Ưu tiên */
-        .custom-table th:nth-child(6), .custom-table td:nth-child(6) { width: 13%; }  /* Trạng thái */
-        .custom-table th:nth-child(7), .custom-table td:nth-child(7) { width: 12%; }  /* Người xử lý */
-        .custom-table th:nth-child(8), .custom-table td:nth-child(8) { width: 9%; }  /* Ngày tạo */
-        .custom-table th:nth-child(9), .custom-table td:nth-child(9) { width: 12%; }  /* Thao tác */
+        .custom-table th:nth-child(1), .custom-table td:nth-child(1) { width: 9%; }   /* Mã phiếu */
+        .custom-table th:nth-child(2), .custom-table td:nth-child(2) { width: 10%; }  /* Loại phiếu */
+        .custom-table th:nth-child(3), .custom-table td:nth-child(3) { width: 24%; }  /* Khách hàng + HĐ */
+        .custom-table th:nth-child(4), .custom-table td:nth-child(4) { width: 11%; }  /* Ưu tiên */
+        .custom-table th:nth-child(5), .custom-table td:nth-child(5) { width: 15%; }  /* Trạng thái */
+        .custom-table th:nth-child(6), .custom-table td:nth-child(6) { width: 13%; }  /* Người xử lý */
+        .custom-table th:nth-child(7), .custom-table td:nth-child(7) { width: 9%; }   /* Ngày tạo */
+        .custom-table th:nth-child(8), .custom-table td:nth-child(8) { width: 9%; }   /* Thao tác */
+        .custom-table td.cell-wrap { white-space: normal; }
+        .cell-2line { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+        .cell-sub { font-size: 0.74rem; color: #6b7280; line-height: 1.35; }
+        .cust-name { font-weight: 600; color: #111827; line-height: 1.3; }
+        .status-cell { line-height: 1.9; }
         .cell-clip { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
         .ticket-code { font-weight: 700; color: var(--primary); font-size: 0.85rem; }
@@ -245,7 +249,6 @@
                             <th>Mã phiếu</th>
                             <th>Loại phiếu</th>
                             <th>Khách hàng</th>
-                            <th>Hợp đồng liên quan</th>
                             <th>Ưu tiên</th>
                             <th>Trạng thái</th>
                             <th>Người xử lý</th>
@@ -258,17 +261,18 @@
                             <tr>
                                 <td class="ticket-code"><a href="${pageContext.request.contextPath}/ticket?action=view&id=${ticket.ticketId}" class="code-link">${fn:escapeXml(ticket.ticketCode)}</a></td>
                                 <td><a href="${pageContext.request.contextPath}/ticket?action=view&id=${ticket.ticketId}" class="ticket-title-link">${fn:escapeXml(ticket.ticketType)}</a></td>
-                                <td>
-                                    <c:choose>
-                                        <c:when test="${ticket.enterprise != null}"><span class="cell-clip cust-cell" title="${fn:escapeXml(ticket.enterprise.enterpriseName)}">${fn:escapeXml(ticket.enterprise.enterpriseName)}</span></c:when>
-                                        <c:otherwise>&mdash;</c:otherwise>
-                                    </c:choose>
-                                </td>
-                                <td>
-                                    <c:choose>
-                                        <c:when test="${ticket.contract != null}"><a href="${pageContext.request.contextPath}/contract?action=view&id=${ticket.contractId}" class="contract-link">${fn:escapeXml(ticket.contract.contractCode)}</a></c:when>
-                                        <c:otherwise><span class="no-contract">Không có</span></c:otherwise>
-                                    </c:choose>
+                                <%-- Ô hai dòng: tên khách đậm ở trên, hợp đồng liên quan chữ nhỏ
+                                     ở dưới -- gộp lại để tên khách đủ chỗ hiện trọn vẹn. --%>
+                                <td class="cell-wrap">
+                                    <div class="cell-2line">
+                                        <span class="cust-name"><c:choose><c:when test="${ticket.enterprise != null}">${fn:escapeXml(ticket.enterprise.enterpriseName)}</c:when><c:otherwise>&mdash;</c:otherwise></c:choose></span>
+                                        <span class="cell-sub">
+                                            <c:choose>
+                                                <c:when test="${ticket.contract != null}"><a href="${pageContext.request.contextPath}/contract?action=view&id=${ticket.contractId}" class="contract-link">${fn:escapeXml(ticket.contract.contractCode)}</a></c:when>
+                                                <c:otherwise>Không gắn hợp đồng</c:otherwise>
+                                            </c:choose>
+                                        </span>
+                                    </div>
                                 </td>
                                 <td>
                                     <c:choose>
@@ -278,7 +282,10 @@
                                         <c:otherwise><span class="pill priority-normal"><span class="dot"></span>Bình thường</span></c:otherwise>
                                     </c:choose>
                                 </td>
-                                <td>
+                                <%-- Ô này có thể chứa 2 thẻ (trạng thái + cảnh báo SLA) nên cho
+                                     phép xuống dòng: hai thẻ xếp chồng vẫn đọc được, ép một dòng
+                                     thì thẻ thứ hai bị cắt mất. --%>
+                                <td class="cell-wrap status-cell">
                                     <c:choose>
                                         <c:when test="${ticket.status == 'Đang xử lý'}"><span class="pill status-progress"><span class="dot"></span>Đang xử lý</span></c:when>
                                         <c:when test="${ticket.status == 'Đã đóng'}"><span class="pill status-closed"><span class="dot"></span>Đã đóng</span></c:when>

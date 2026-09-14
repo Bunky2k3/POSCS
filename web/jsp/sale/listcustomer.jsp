@@ -110,14 +110,19 @@
         .custom-table th, .custom-table td {
             white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
         }
-        .custom-table th:nth-child(1), .custom-table td:nth-child(1) { width: 5%; }  /* STT */
-        .custom-table th:nth-child(2), .custom-table td:nth-child(2) { width: 20%; }  /* Tên KH */
-        .custom-table th:nth-child(3), .custom-table td:nth-child(3) { width: 15%; }  /* Loại KH */
-        .custom-table th:nth-child(4), .custom-table td:nth-child(4) { width: 9%; }  /* Email */
-        .custom-table th:nth-child(5), .custom-table td:nth-child(5) { width: 11%; }  /* SĐT */
-        .custom-table th:nth-child(6), .custom-table td:nth-child(6) { width: 16%; }  /* Địa bàn */
-        .custom-table th:nth-child(7), .custom-table td:nth-child(7) { width: 12%; }  /* Phụ trách */
-        .custom-table th:nth-child(8), .custom-table td:nth-child(8) { width: 12%; }  /* Thao tác */
+        .custom-table th:nth-child(1), .custom-table td:nth-child(1) { width: 5%; }   /* STT */
+        .custom-table th:nth-child(2), .custom-table td:nth-child(2) { width: 26%; }  /* Khách hàng + email */
+        .custom-table th:nth-child(3), .custom-table td:nth-child(3) { width: 14%; }  /* Loại KH */
+        .custom-table th:nth-child(4), .custom-table td:nth-child(4) { width: 10%; }  /* SĐT */
+        .custom-table th:nth-child(5), .custom-table td:nth-child(5) { width: 20%; }  /* Địa bàn */
+        .custom-table th:nth-child(6), .custom-table td:nth-child(6) { width: 14%; }  /* Phụ trách */
+        .custom-table th:nth-child(7), .custom-table td:nth-child(7) { width: 11%; }  /* Thao tác */
+        /* Ô hai dòng: dòng chính đậm, dòng phụ chữ nhỏ xám. Dòng chính được
+           phép xuống dòng để KHÔNG bao giờ phải cắt bằng "..."; chỉ dòng phụ
+           mới cắt, vì email/địa chỉ chi tiết không đáng chiếm thêm một hàng. */
+        .custom-table td.cell-wrap { white-space: normal; }
+        .cell-2line { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+        .cell-sub { font-size: 0.74rem; color: #6b7280; line-height: 1.35; }
         .prov-tag { font-weight: 700; color: var(--primary-dark); }
         .cell-clip {
             display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
@@ -129,17 +134,16 @@
         }
         .code-link { color: inherit; text-decoration: none; }
         .code-link:hover { text-decoration: underline; }
-        .customer-name-cell { display: flex; align-items: center; gap: 10px; min-width: 0; }
+        .customer-name-cell { display: flex; align-items: center; gap: 9px; min-width: 0; }
         .customer-logo {
-            width: 32px; height: 32px; border-radius: 8px; overflow: hidden; flex-shrink: 0;
+            width: 28px; height: 28px; border-radius: 8px; overflow: hidden; flex-shrink: 0;
             background: linear-gradient(120deg, var(--primary-dark), var(--primary-light));
             color: #fff; display: flex; align-items: center; justify-content: center; font-size: 0.85rem;
         }
         .customer-logo img { width: 100%; height: 100%; object-fit: cover; }
         .customer-name-link {
             color: #111827; font-weight: 600; text-decoration: none;
-            display: block; min-width: 0;
-            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+            display: block; min-width: 0; line-height: 1.3;
         }
         .customer-name-link:hover { color: var(--primary); text-decoration: underline; }
 
@@ -284,9 +288,8 @@
                     <thead>
                         <tr>
                             <th>STT</th>
-                            <th>Tên khách hàng</th>
+                            <th>Khách hàng</th>
                             <th>Loại KH</th>
-                            <th>Email</th>
                             <th>Số điện thoại</th>
                             <th>Địa bàn</th>
                             <th>Phụ trách chính</th>
@@ -299,7 +302,10 @@
                                 <%-- STT tính theo vị trí toàn danh sách, không phải trong trang:
                                      trang 2 phải bắt đầu từ 11 chứ không quay lại 1. --%>
                                 <td class="stt-cell">${(currentPage - 1) * pageSize + row.index + 1}</td>
-                                <td>
+                                <%-- O hai dong: ten khach dam o tren, email chu nho xam o duoi.
+                                     Gop email vao day thi cot ten du cho hien tron ven, khong
+                                     phai cat bang "..." nhu khi email chiem mot cot rieng. --%>
+                                <td class="cell-wrap">
                                     <div class="customer-name-cell">
                                         <div class="customer-logo">
                                             <c:choose>
@@ -307,20 +313,23 @@
                                                 <c:otherwise><i class="fa-solid fa-building"></i></c:otherwise>
                                             </c:choose>
                                         </div>
-                                        <a href="${pageContext.request.contextPath}/customer?action=view&id=${customer.enterpriseId}" class="customer-name-link" title="${fn:escapeXml(customer.enterpriseName)}">${fn:escapeXml(customer.enterpriseName)}</a>
+                                        <div class="cell-2line">
+                                            <a href="${pageContext.request.contextPath}/customer?action=view&id=${customer.enterpriseId}" class="customer-name-link">${fn:escapeXml(customer.enterpriseName)}</a>
+                                            <span class="cell-sub">${fn:escapeXml(customer.email)}</span>
+                                        </div>
                                     </div>
                                 </td>
                                 <td><span class="type-badge">${fn:escapeXml(customer.customerType)}</span></td>
-                                <td><span class="cell-clip email-cell" title="${fn:escapeXml(customer.email)}">${fn:escapeXml(customer.email)}</span></td>
                                 <td class="nowrap">${fn:escapeXml(customer.phone)}</td>
-                                <%-- Tỉnh đứng đầu ô và in đậm: đó là thứ người dùng quét mắt
-                                     khi quản lý theo địa bàn, phần địa chỉ chi tiết đi kèm phía
-                                     sau. Gộp một cột thay vì hai để cả hai cùng đủ chỗ hiển thị;
-                                     địa chỉ đầy đủ vẫn còn nguyên ở tooltip. --%>
-                                <td>
+                                <%-- Cung hai dong: tinh in dam o tren (thu nguoi dung quet mat
+                                     khi quan ly theo dia ban), dia chi chi tiet chu nho o duoi. --%>
+                                <td class="cell-wrap">
                                     <c:choose>
                                         <c:when test="${customer.address != null}">
-                                            <span class="cell-clip" title="${fn:escapeXml(customer.address.fullAddress)}"><c:if test="${customer.address.district.province != null}"><span class="prov-tag">${fn:escapeXml(customer.address.district.province.shortName)}</span> &middot; </c:if>${fn:escapeXml(customer.address.streetAndLocalName)}<c:if test="${customer.address.district != null}">, ${fn:escapeXml(customer.address.district.shortName)}</c:if></span>
+                                            <div class="cell-2line">
+                                                <span class="prov-tag"><c:choose><c:when test="${customer.address.district.province != null}">${fn:escapeXml(customer.address.district.province.shortName)}</c:when><c:otherwise>Chưa xác định</c:otherwise></c:choose></span>
+                                                <span class="cell-sub" title="${fn:escapeXml(customer.address.fullAddress)}">${fn:escapeXml(customer.address.streetAndLocalName)}<c:if test="${customer.address.district != null}">, ${fn:escapeXml(customer.address.district.shortName)}</c:if></span>
+                                            </div>
                                         </c:when>
                                         <c:otherwise>&mdash;</c:otherwise>
                                     </c:choose>
