@@ -69,6 +69,23 @@
         .section-header { display: flex; justify-content: space-between; align-items: center; margin: 0 0 16px; padding-bottom: 10px; border-bottom: 1.5px solid #eef2f6; }
         .section-header h5 { font-weight: 700; color: var(--primary-dark); font-size: 0.98rem; margin: 0; }
 
+        /* Tên người viết ra nội dung của khối, nằm bên phải tiêu đề khối. */
+        .author-tag {
+            font-size: 0.78rem; font-weight: 600; color: #6b7280;
+            display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
+        }
+        .author-tag i { color: #9ca3af; }
+        /* Nhóm nguyên nhân bám vào nhãn "Nguyên nhân sự cố". Nhãn field-row
+           viết hoa toàn bộ, nên phải trả text-transform về none -- không thì
+           "Do lắp đặt" hiện thành "DO LẮP ĐẶT", lệch hẳn với chính giá trị
+           đang có trong ô chọn ở form sửa. */
+        .cause-tag {
+            display: inline-block; margin-left: 8px; padding: 2px 10px;
+            border-radius: 20px; font-size: 0.7rem; font-weight: 600;
+            background: #eef2ff; color: #4338ca;
+            text-transform: none; letter-spacing: 0;
+        }
+
         .field-row { margin-bottom: 18px; }
         .field-row label { font-size: 0.75rem; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: .3px; margin-bottom: 6px; display: block; }
         .field-row .view-value {
@@ -94,7 +111,13 @@
             background: #f9fafb; border: 1px solid #eef2f6; border-radius: 8px; padding: 8px 12px; }
         .history-empty { font-size: 0.9rem; color: #6b7280; }
 
-        @media (max-width: 768px) { .info-card, .detail-header { padding: 16px; } }
+        @media (max-width: 768px) {
+            .info-card, .detail-header { padding: 16px; }
+            /* Màn hẹp: tiêu đề khối và tên người viết không đủ chỗ nằm cùng
+               dòng, cho xuống hàng thay vì để tên bị đẩy tràn ra ngoài thẻ. */
+            .section-header { flex-wrap: wrap; gap: 6px; }
+            .author-tag { white-space: normal; }
+        }
     </style>
 </head>
 <body>
@@ -211,40 +234,73 @@
             </div>
         </div>
 
-        <!-- ===== Mô tả sự cố ===== -->
-        <div class="info-card card-box">
-            <div class="section-header"><h5>Mô tả sự cố</h5></div>
-            <div class="view-value text-block">${fn:escapeXml(ticket.description)}</div>
-        </div>
+        <%--
+          Nội dung của phiếu chia làm HAI khối theo NGƯỜI VIẾT RA NÓ, không
+          phải theo thứ tự thời gian:
 
-        <!-- ===== Nguyên nhân sự cố =====
-             Xen giữa mô tả và kết quả để đọc đúng mạch hiện tượng -> nguyên
-             nhân -> kết quả. Nhóm nguyên nhân hiện thành nhãn nhỏ cạnh tiêu
-             đề: nó là giá trị ngắn chọn từ danh sách, cho xuống dòng riêng
-             chỉ tốn một khối trống. -->
+            - Khối 1 là lời của người tiếp nhận: khách báo hỏng cái gì.
+            - Khối 2 là đánh giá của kỹ thuật viên: vì sao hỏng và đã làm gì.
+
+          Trước đây mô tả / nguyên nhân / kết quả nằm thành ba thẻ rời ngang
+          hàng nhau, đọc lướt không biết dòng nào do ai viết -- mà đây đúng là
+          câu hỏi người theo dõi phiếu cần trả lời đầu tiên. Gộp theo tác giả
+          cũng trùng khít với phân quyền: đúng những trường trong khối 2 là
+          những trường role Kỹ thuật được sửa trên phiếu của mình (xem
+          PERMISSIONS.md), khối 1 thì không.
+
+          Lịch sử xử lý vẫn đứng riêng bên dưới: nó do hệ thống ghi mỗi lần
+          đổi trạng thái, không phải do ai gõ vào, nên không thuộc khối nào.
+        --%>
+
+        <!-- ===== Khối 1: người tạo phiếu ghi nhận ===== -->
         <div class="info-card card-box">
             <div class="section-header">
-                <h5>Nguyên nhân sự cố</h5>
-                <c:if test="${not empty ticket.causeCategory}">
-                    <span class="badge bg-secondary">${fn:escapeXml(ticket.causeCategory)}</span>
-                </c:if>
+                <h5>Người tạo phiếu ghi nhận</h5>
+                <span class="author-tag">
+                    <i class="fa-regular fa-user"></i>
+                    <c:choose>
+                        <c:when test="${ticket.createdByUser != null}">${fn:escapeXml(ticket.createdByUser.fullName)}</c:when>
+                        <c:otherwise>Không rõ</c:otherwise>
+                    </c:choose>
+                    <c:if test="${ticket.createdDate != null}">
+                        &middot; <fmt:formatDate value="${ticket.createdDate}" pattern="dd/MM/yyyy"/>
+                    </c:if>
+                </span>
             </div>
-            <div class="view-value text-block">
-                <c:choose>
-                    <c:when test="${not empty ticket.rootCause}">${fn:escapeXml(ticket.rootCause)}</c:when>
-                    <c:otherwise>Kỹ thuật viên chưa đánh giá nguyên nhân.</c:otherwise>
-                </c:choose>
+            <div class="field-row" style="margin-bottom: 0;">
+                <label>Mô tả sự cố</label>
+                <div class="view-value text-block">${fn:escapeXml(ticket.description)}</div>
             </div>
         </div>
 
-        <!-- ===== Kết quả xử lý ===== -->
+        <!-- ===== Khối 2: kỹ thuật viên xử lý đánh giá ===== -->
         <div class="info-card card-box">
-            <div class="section-header"><h5>Kết quả xử lý</h5></div>
-            <div class="view-value text-block">
-                <c:choose>
-                    <c:when test="${not empty ticket.resolutionSummary}">${fn:escapeXml(ticket.resolutionSummary)}</c:when>
-                    <c:otherwise>Chưa xử lý xong.</c:otherwise>
-                </c:choose>
+            <div class="section-header">
+                <h5>Nhân viên kỹ thuật xử lý</h5>
+                <span class="author-tag">
+                    <i class="fa-solid fa-screwdriver-wrench"></i>
+                    <c:choose>
+                        <c:when test="${ticket.assignedTechnician != null}">${fn:escapeXml(ticket.assignedTechnician.fullName)}</c:when>
+                        <c:otherwise>Chưa phân công</c:otherwise>
+                    </c:choose>
+                </span>
+            </div>
+            <%-- Nguyên nhân đứng TRƯỚC kết quả: khách yêu cầu phiếu đọc được
+                 thành mạch hiện tượng -> nguyên nhân -> kết quả. Nhóm nguyên
+                 nhân là giá trị ngắn chọn từ danh sách nên bám vào nhãn, cho
+                 nó xuống dòng riêng chỉ tốn một khoảng trống. --%>
+            <%-- Giá trị viết thẳng bằng EL, KHÔNG tách <c:choose> ra nhiều
+                 dòng: ô này để white-space: pre-wrap (cần thiết, để giữ xuống
+                 dòng người dùng gõ), nên chính khoảng trắng thụt lề của mã
+                 JSP cũng bị hiển thị ra -- chữ tụt vào giữa ô như bị canh lề
+                 lung tung. Bản cũ đã dính đúng lỗi này. --%>
+            <div class="field-row">
+                <label>Nguyên nhân sự cố<c:if test="${not empty ticket.causeCategory}"><span class="cause-tag">${fn:escapeXml(ticket.causeCategory)}</span></c:if></label>
+                <div class="view-value text-block">${not empty ticket.rootCause ? fn:escapeXml(ticket.rootCause) : 'Kỹ thuật viên chưa đánh giá nguyên nhân.'}</div>
+            </div>
+            <div class="field-row" style="margin-bottom: 0;">
+                <label>Kết quả xử lý</label>
+                <div class="view-value text-block">${not empty ticket.resolutionSummary ? fn:escapeXml(ticket.resolutionSummary) : 'Chưa xử lý xong.'}</div>
             </div>
         </div>
 

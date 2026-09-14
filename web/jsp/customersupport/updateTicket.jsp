@@ -39,6 +39,12 @@
         .section-header { display: flex; justify-content: space-between; align-items: center; margin: 24px 0 16px; padding-bottom: 10px; border-bottom: 1.5px solid #eef2f6; }
         .section-header:first-child { margin-top: 0; }
         .section-header h5 { font-weight: 700; color: var(--primary-dark); font-size: 0.98rem; margin: 0; }
+        /* Dòng nhắc bên phải tiêu đề khối: ai viết phần này, hoặc phần này đi đâu. */
+        .section-hint {
+            font-size: 0.78rem; font-weight: 600; color: #6b7280;
+            display: inline-flex; align-items: center; gap: 6px;
+        }
+        .section-hint i { color: #9ca3af; }
 
         .field-row { margin-bottom: 18px; }
         .field-row label { font-size: 0.75rem; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: .3px; margin-bottom: 6px; display: block; }
@@ -78,7 +84,13 @@
         .btn-cancel { background: #fff; border: 1.5px solid #e5e7eb; color: #6b7280; border-radius: 10px; padding: 0.6rem 1.4rem; font-weight: 600; font-size: 0.9rem; text-decoration: none; display: inline-flex; align-items: center; }
         .btn-cancel:hover { background: #f3f4f6; color: #6b7280; }
 
-        @media (max-width: 768px) { .card-box { padding: 20px 18px 22px; } }
+        @media (max-width: 768px) {
+            .card-box { padding: 20px 18px 22px; }
+            /* Nhãn bên phải tiêu đề khối có thể chứa họ tên đầy đủ, tên dài
+               thì không đủ chỗ nằm cùng dòng -- cho xuống hàng thay vì đẩy
+               tràn ra ngoài thẻ. Giống trang chi tiết phiếu. */
+            .section-header { flex-wrap: wrap; gap: 6px; }
+        }
     </style>
 </head>
 <body>
@@ -195,14 +207,6 @@
                         </select>
                         <span class="error-text" id="err-technician">Vui lòng chọn kỹ thuật viên phụ trách.</span>
                     </div>
-                    <div class="col-md-6 field-row">
-                        <label>Trạng thái <span class="req">*</span></label>
-                        <select class="form-select" id="status" name="status">
-                            <option value="Mới tiếp nhận" ${ticket.status == 'Mới tiếp nhận' ? 'selected' : ''}>Mới tiếp nhận</option>
-                            <option value="Đang xử lý" ${ticket.status == 'Đang xử lý' ? 'selected' : ''}>Đang xử lý</option>
-                            <option value="Đã đóng" ${ticket.status == 'Đã đóng' ? 'selected' : ''}>Đã đóng</option>
-                        </select>
-                    </div>
 
                     <div class="col-md-6 field-row" style="display:flex; align-items:center;">
                         <div class="form-check">
@@ -211,22 +215,62 @@
                         </div>
                     </div>
 
+                </div>
+
+                <%--
+                  Từ đây xuống chia khối theo NGƯỜI VIẾT RA NỘI DUNG, khớp với
+                  trang chi tiết phiếu: một khối là lời người tiếp nhận, một
+                  khối là đánh giá của kỹ thuật viên.
+
+                  Ở form thì cách chia này còn nói thêm một điều: đúng bốn
+                  trường trong khối "Nhân viên kỹ thuật xử lý" (trạng thái,
+                  nguyên nhân, nhóm nguyên nhân, kết quả xử lý) là bốn trường
+                  role Kỹ thuật được sửa trên phiếu giao cho mình -- xem
+                  PERMISSIONS.md. Người ở role đó mở form ra là thấy ngay phần
+                  nào của mình, không phải thử rồi ăn 403.
+                --%>
+                <div class="section-header">
+                    <h5>Người tạo phiếu ghi nhận</h5>
+                    <c:if test="${ticket.createdByUser != null}">
+                        <span class="section-hint">
+                            <i class="fa-regular fa-user"></i> ${fn:escapeXml(ticket.createdByUser.fullName)}
+                            <c:if test="${ticket.createdDate != null}">
+                                &middot; <fmt:formatDate value="${ticket.createdDate}" pattern="dd/MM/yyyy"/>
+                            </c:if>
+                        </span>
+                    </c:if>
+                </div>
+                <div class="row">
                     <div class="col-12 field-row">
                         <label>Mô tả sự cố <span class="req">*</span></label>
                         <textarea class="form-control" id="description" name="description" rows="4">${fn:escapeXml(ticket.description)}</textarea>
                         <span class="error-text" id="err-description">Vui lòng mô tả sự cố.</span>
                     </div>
-                    <%--
-                      Nguyên nhân đặt GIỮA mô tả và kết quả, theo đúng mạch
-                      khách yêu cầu: hiện tượng -> nguyên nhân -> kết quả.
-                      Chỉ có ở form SỬA, không có ở form tạo phiếu: lúc tiếp
-                      nhận chưa ai xuống hiện trường thì chưa biết vì sao hỏng,
-                      và đây là phần do kỹ thuật viên đánh giá.
+                </div>
 
-                      Hai ô này cũng là hai ô DUY NHẤT (cùng với trạng thái và
-                      kết quả xử lý) mà role Kỹ thuật được sửa trên phiếu giao
-                      cho mình -- xem PERMISSIONS.md.
-                    --%>
+                <%--
+                  Không gắn TÊN kỹ thuật viên vào tiêu đề khối này như bên
+                  trang xem: ở form, người phụ trách là ô chọn sửa được ngay
+                  phía trên, gắn tên tĩnh vào đây thì đổi dropdown một cái là
+                  tiêu đề nói sai. Thay bằng một dòng nhắc vai trò.
+                --%>
+                <div class="section-header">
+                    <h5>Nhân viên kỹ thuật xử lý</h5>
+                    <span class="section-hint"><i class="fa-solid fa-screwdriver-wrench"></i> Phần do kỹ thuật viên đánh giá</span>
+                </div>
+                <div class="row">
+                    <div class="col-md-4 field-row">
+                        <label>Trạng thái <span class="req">*</span></label>
+                        <select class="form-select" id="status" name="status">
+                            <option value="Mới tiếp nhận" ${ticket.status == 'Mới tiếp nhận' ? 'selected' : ''}>Mới tiếp nhận</option>
+                            <option value="Đang xử lý" ${ticket.status == 'Đang xử lý' ? 'selected' : ''}>Đang xử lý</option>
+                            <option value="Đã đóng" ${ticket.status == 'Đã đóng' ? 'selected' : ''}>Đã đóng</option>
+                        </select>
+                    </div>
+                    <%-- Nguyên nhân đặt TRƯỚC kết quả, theo đúng mạch khách
+                         yêu cầu: hiện tượng -> nguyên nhân -> kết quả. Chỉ có
+                         ở form SỬA, không có ở form tạo phiếu: lúc tiếp nhận
+                         chưa ai xuống hiện trường thì chưa biết vì sao hỏng. --%>
                     <div class="col-md-4 field-row">
                         <label>Nhóm nguyên nhân</label>
                         <select class="form-select" id="causeCategory" name="causeCategory">
@@ -237,7 +281,7 @@
                             <option value="Khác" ${ticket.causeCategory == 'Khác' ? 'selected' : ''}>Khác</option>
                         </select>
                     </div>
-                    <div class="col-md-8 field-row">
+                    <div class="col-12 field-row">
                         <label>Nguyên nhân sự cố</label>
                         <textarea class="form-control" id="rootCause" name="rootCause" rows="3" placeholder="Kỹ thuật viên đánh giá vì sao xảy ra sự cố">${fn:escapeXml(ticket.rootCause)}</textarea>
                     </div>
@@ -245,12 +289,20 @@
                         <label>Kết quả xử lý</label>
                         <textarea class="form-control" id="resolutionSummary" name="resolutionSummary" rows="3" placeholder="Ghi chú kết quả xử lý (điền khi đóng phiếu)">${fn:escapeXml(ticket.resolutionSummary)}</textarea>
                     </div>
-                    <%--
-                      Ghi chú nội bộ KHÔNG lưu vào phiếu mà đi kèm dòng lịch sử
-                      của lần đổi trạng thái này, nên ô luôn để trống khi mở
-                      form (không đổ giá trị cũ vào). Không đổi trạng thái thì
-                      ô này bị bỏ qua.
-                    --%>
+                </div>
+
+                <%--
+                  Ghi chú nội bộ đứng riêng, không nằm trong hai khối trên: nó
+                  KHÔNG lưu vào phiếu mà đi kèm dòng lịch sử của lần đổi trạng
+                  thái này. Cùng lý do mà trang chi tiết để "Lịch sử xử lý"
+                  tách khỏi hai khối nội dung. Ô luôn để trống khi mở form
+                  (không đổ giá trị cũ vào); không đổi trạng thái thì bị bỏ qua.
+                --%>
+                <div class="section-header">
+                    <h5>Ghi cho lịch sử xử lý</h5>
+                    <span class="section-hint"><i class="fa-regular fa-clock"></i> Không lưu vào phiếu</span>
+                </div>
+                <div class="row">
                     <div class="col-12 field-row">
                         <label>Ghi chú nội bộ <span class="text-muted" style="text-transform: none; font-weight: 400;">(không bắt buộc, chỉ hiện ở lịch sử xử lý)</span></label>
                         <textarea class="form-control" id="internalNote" name="internalNote" rows="2" placeholder="Vì sao đổi trạng thái lần này?"></textarea>
