@@ -5,6 +5,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import org.junit.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.mockito.MockedStatic;
 import poscs.model.Address;
@@ -299,6 +300,89 @@ public class CustomerDAOTest {
             // nên phải ghi đè đúng dòng đang có.
             verify(conn, never()).prepareStatement(anyString(), anyInt());
             verify(ps).setInt(7, 77); // address_id giữ nguyên
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // Lọc/sắp xếp theo tỉnh (quản lý khách hàng theo địa bàn)
+    // ------------------------------------------------------------------
+
+    /** Câu SQL của lần prepareStatement duy nhất trong một lời gọi DAO đọc dữ liệu. */
+    private static String capturedSql(Connection conn) throws SQLException {
+        ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+        verify(conn).prepareStatement(sql.capture());
+        return sql.getValue();
+    }
+
+    @Test
+    public void findAll_withProvinceFilter_bindsProvinceIdOfDistrict() throws Exception {
+        PreparedStatement ps = statementReturning(emptyResultSet());
+        Connection conn = connectionReturning(ps);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            dao.findAll(1, 10, null, null, null, 3, false);
+
+            // Tỉnh nằm ở districts.province_id chứ không phải trên enterprises.
+            assertTrue(capturedSql(conn).contains("d.province_id = ?"));
+            verify(ps).setObject(1, 3);
+        }
+    }
+
+    /**
+     * countAll phải join đúng những bảng mà điều kiện lọc tỉnh tham chiếu tới.
+     * Query đếm vốn không join addresses/districts; thiếu chỗ này thì lọc tỉnh
+     * chạy được ở danh sách nhưng bộ đếm ném SQLException rồi trả 0 -- hỏng
+     * lặng lẽ, bảng có dữ liệu mà vẫn hiện "0 khách hàng".
+     */
+    @Test
+    public void countAll_withProvinceFilter_joinsTablesTheFilterNeeds() throws Exception {
+        PreparedStatement ps = statementReturning(singleRow(row("total", 4)));
+        Connection conn = connectionReturning(ps);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            assertEquals(4, dao.countAll(null, null, null, 3));
+
+            String sql = capturedSql(conn);
+            assertTrue(sql.contains("LEFT JOIN addresses a"));
+            assertTrue(sql.contains("LEFT JOIN districts d"));
+            assertTrue(sql.contains("d.province_id = ?"));
+        }
+    }
+
+    @Test
+    public void findAll_sortByProvince_ordersByProvinceAndPushesMissingAddressLast() throws Exception {
+        PreparedStatement ps = statementReturning(emptyResultSet());
+        Connection conn = connectionReturning(ps);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            dao.findAll(1, 10, null, null, null, null, true);
+
+            String sql = capturedSql(conn);
+            assertTrue(sql.contains("ORDER BY p.province_name IS NULL"));
+            assertTrue(sql.contains(AddressDAO.PROVINCE_SHORT_NAME_ORDER));
+        }
+    }
+
+    /** Màn hình danh sách vẫn giữ thứ tự mới nhất trước, không đổi theo tỉnh. */
+    @Test
+    public void findAll_withoutSortFlag_keepsNewestFirst() throws Exception {
+        PreparedStatement ps = statementReturning(emptyResultSet());
+        Connection conn = connectionReturning(ps);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            dao.findAll(1, 10, null, null, null, null, false);
+
+            String sql = capturedSql(conn);
+            assertTrue(sql.contains("ORDER BY e.enterprise_id DESC"));
+            assertFalse(sql.contains("province_name IS NULL"));
         }
     }
 

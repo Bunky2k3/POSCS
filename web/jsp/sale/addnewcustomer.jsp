@@ -206,23 +206,26 @@
                 <div class="section-header"><h5>Địa chỉ</h5></div>
                 <div class="row">
                     <div class="col-md-6 field-row">
-                        <label>Tỉnh / Thành phố</label>
+                        <label>Tỉnh / Thành phố <span class="req">*</span></label>
                         <select class="form-select" id="province" name="provinceId">
                             <option value="">-- Chọn tỉnh / thành phố --</option>
                             <c:forEach var="prov" items="${provinceList}">
                                 <option value="${prov.provinceId}">${fn:escapeXml(prov.shortName)}</option>
                             </c:forEach>
                         </select>
+                        <span class="error-text" id="err-province">Vui lòng chọn tỉnh / thành phố.</span>
                     </div>
                     <div class="col-md-6 field-row">
-                        <label>Xã / Phường</label>
+                        <label>Xã / Phường <span class="req">*</span></label>
                         <select class="form-select" id="district" name="districtId">
                             <option value="">-- Chọn tỉnh / thành phố trước --</option>
                         </select>
+                        <span class="error-text" id="err-district">Vui lòng chọn xã / phường.</span>
                     </div>
                     <div class="col-12 field-row">
-                        <label>Địa chỉ chi tiết</label>
+                        <label>Địa chỉ chi tiết <span class="req">*</span></label>
                         <input type="text" class="form-control" id="addressDetail" name="addressDetail" placeholder="Số nhà, tên đường...">
+                        <span class="error-text" id="err-addressDetail">Vui lòng nhập địa chỉ chi tiết.</span>
                     </div>
                 </div>
 
@@ -298,7 +301,10 @@
             var valid = true;
             document.querySelectorAll('.error-text').forEach(function (el) { el.style.display = 'none'; });
 
-            var requiredSelects = ['customerType', 'customerGroup', 'assignee'];
+            // province/district nằm trong danh sách này vì tỉnh là căn cứ chia
+            // địa bàn và lọc báo cáo -- khách không có tỉnh sẽ không xuất hiện
+            // ở bất kỳ thống kê theo tỉnh nào (server cũng chặn lại lần nữa).
+            var requiredSelects = ['customerType', 'customerGroup', 'assignee', 'province', 'district'];
             requiredSelects.forEach(function (id) {
                 var el = document.getElementById(id);
                 if (!el.value) { document.getElementById('err-' + id).style.display = 'block'; valid = false; }
@@ -309,6 +315,9 @@
 
             var taxCode = document.getElementById('taxCode');
             if (!taxCode.value.trim()) { document.getElementById('err-taxCode').style.display = 'block'; valid = false; }
+
+            var addressDetail = document.getElementById('addressDetail');
+            if (!addressDetail.value.trim()) { document.getElementById('err-addressDetail').style.display = 'block'; valid = false; }
 
             var phone = document.getElementById('phone');
             if (!isValidPhone(phone.value)) { document.getElementById('err-phone').style.display = 'block'; valid = false; }

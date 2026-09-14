@@ -46,11 +46,31 @@ public class CustomerDAO {
      * @param page 1-indexed
      */
     public List<Enterprise> findAll(int page, int pageSize, String keyword, String customerType, Integer accountOwnerId) {
+        return findAll(page, pageSize, keyword, customerType, accountOwnerId, null, false);
+    }
+
+    /**
+     * Như {@link #findAll(int, int, String, String, Integer)} nhưng lọc thêm theo
+     * tỉnh/thành và cho phép sắp xếp theo tỉnh -- phục vụ quản lý khách hàng theo
+     * địa bàn.
+     *
+     * @param provinceId     lọc theo tỉnh của địa chỉ khách hàng, null = mọi tỉnh
+     * @param sortByProvince true thì sắp theo tên tỉnh (khách chưa có địa chỉ dồn
+     *                       xuống cuối) thay vì mới nhất trước; dùng khi xuất Excel
+     *                       để các dòng cùng tỉnh nằm liền nhau
+     */
+    public List<Enterprise> findAll(int page, int pageSize, String keyword, String customerType,
+            Integer accountOwnerId, Integer provinceId, boolean sortByProvince) {
         List<Enterprise> result = new ArrayList<>();
         StringBuilder sql = new StringBuilder(SELECT_ENTERPRISE_BASE);
         List<Object> params = new ArrayList<>();
-        appendFilters(sql, params, keyword, customerType, accountOwnerId);
-        sql.append(" ORDER BY e.enterprise_id DESC LIMIT ? OFFSET ?");
+        appendFilters(sql, params, keyword, customerType, accountOwnerId, provinceId);
+        // "p.province_name IS NULL" đứng đầu để dồn khách chưa có địa chỉ xuống
+        // cuối file -- mặc định MySQL xếp NULL lên đầu khi ORDER BY tăng dần.
+        sql.append(sortByProvince
+                ? " ORDER BY p.province_name IS NULL, " + AddressDAO.PROVINCE_SHORT_NAME_ORDER
+                        + ", e.enterprise_id DESC LIMIT ? OFFSET ?"
+                : " ORDER BY e.enterprise_id DESC LIMIT ? OFFSET ?");
         params.add(pageSize);
         params.add(Math.max(0, (page - 1) * pageSize));
 
@@ -70,9 +90,18 @@ public class CustomerDAO {
 
     /** Đếm tổng số khách hàng thoả điều kiện lọc, phục vụ phân trang (BR-12). */
     public int countAll(String keyword, String customerType, Integer accountOwnerId) {
-        StringBuilder sql = new StringBuilder("SELECT COUNT(*) FROM enterprises e ");
+        return countAll(keyword, customerType, accountOwnerId, null);
+    }
+
+    /** Như {@link #countAll(String, String, Integer)} nhưng lọc thêm theo tỉnh/thành. */
+    public int countAll(String keyword, String customerType, Integer accountOwnerId, Integer provinceId) {
+        // Phải JOIN tới districts thì mới lọc được theo tỉnh; districts đã có sẵn
+        // province_id nên không cần join thêm bảng provinces chỉ để đếm.
+        StringBuilder sql = new StringBuilder("SELECT COUNT(*) FROM enterprises e "
+                + "LEFT JOIN addresses a ON e.address_id = a.address_id "
+                + "LEFT JOIN districts d ON a.districts_id = d.districts_id ");
         List<Object> params = new ArrayList<>();
-        appendFilters(sql, params, keyword, customerType, accountOwnerId);
+        appendFilters(sql, params, keyword, customerType, accountOwnerId, provinceId);
 
         try (Connection conn = DBContext.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql.toString())) {
@@ -380,7 +409,8 @@ public class CustomerDAO {
     // Helpers riêng
     // ------------------------------------------------------------------
 
-    private void appendFilters(StringBuilder sql, List<Object> params, String keyword, String customerType, Integer accountOwnerId) {
+    private void appendFilters(StringBuilder sql, List<Object> params, String keyword, String customerType,
+            Integer accountOwnerId, Integer provinceId) {
         List<String> conditions = new ArrayList<>();
         conditions.add("e.is_deleted = 0");
 
@@ -398,6 +428,10 @@ public class CustomerDAO {
         if (accountOwnerId != null) {
             conditions.add("e.account_owner_id = ?");
             params.add(accountOwnerId);
+        }
+        if (provinceId != null) {
+            conditions.add("d.province_id = ?");
+            params.add(provinceId);
         }
 
         sql.append("WHERE ").append(String.join(" AND ", conditions));

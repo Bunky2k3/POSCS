@@ -169,20 +169,24 @@ public class ContractController extends HttpServlet {
         String keyword = request.getParameter("keyword");
         String statusFilter = request.getParameter("status");
         String typeFilter = request.getParameter("type");
+        Integer provinceFilter = parseIntOrNull(request.getParameter("provinceId"));
 
-        List<Contract> contractList = contractDAO.findAll(page, PAGE_SIZE, keyword, statusFilter, typeFilter);
-        int totalCount = contractDAO.countAll(keyword, statusFilter, typeFilter);
+        List<Contract> contractList = contractDAO.findAll(page, PAGE_SIZE, keyword, statusFilter, typeFilter,
+                provinceFilter, false);
+        int totalCount = contractDAO.countAll(keyword, statusFilter, typeFilter, provinceFilter);
         int totalPages = Math.max(1, (int) Math.ceil(totalCount / (double) PAGE_SIZE));
         Map<String, Integer> statusSummary = contractDAO.countStatusSummary();
 
         request.setAttribute("contractList", contractList);
         request.setAttribute("statusSummary", statusSummary);
+        request.setAttribute("provinceList", addressDAO.findAllProvinces());
         request.setAttribute("currentPage", page);
         request.setAttribute("totalPages", totalPages);
         request.setAttribute("totalCount", totalCount);
         request.setAttribute("keyword", keyword);
         request.setAttribute("statusFilter", statusFilter);
         request.setAttribute("typeFilter", typeFilter);
+        request.setAttribute("provinceFilter", provinceFilter);
 
         request.getRequestDispatcher(LIST_VIEW).forward(request, response);
     }
@@ -226,9 +230,13 @@ public class ContractController extends HttpServlet {
         String keyword = request.getParameter("keyword");
         String statusFilter = request.getParameter("status");
         String typeFilter = request.getParameter("type");
+        Integer provinceFilter = parseIntOrNull(request.getParameter("provinceId"));
 
-        List<Contract> all = contractDAO.findAll(1, Integer.MAX_VALUE, keyword, statusFilter, typeFilter);
-        String[] headers = {"Mã HĐ", "Tiêu đề", "Loại HĐ", "Khách hàng", "Người phụ trách",
+        // Sắp theo tỉnh: hợp đồng được giao việc theo địa bàn nên file xuất ra
+        // phải gom các hợp đồng cùng tỉnh lại với nhau.
+        List<Contract> all = contractDAO.findAll(1, Integer.MAX_VALUE, keyword, statusFilter, typeFilter,
+                provinceFilter, true);
+        String[] headers = {"Mã HĐ", "Tiêu đề", "Loại HĐ", "Tỉnh/Thành phố", "Khách hàng", "Người phụ trách",
             "Ngày ký", "Ngày hiệu lực", "Ngày kết thúc", "Trạng thái"};
         List<Object[]> rows = new ArrayList<>();
         for (Contract c : all) {
@@ -236,6 +244,7 @@ public class ContractController extends HttpServlet {
                 c.getContractCode(),
                 c.getTitle(),
                 c.getContractType(),
+                provinceNameOf(c),
                 c.getEnterprise() != null ? c.getEnterprise().getEnterpriseName() : "",
                 c.getOwner() != null ? c.getOwner().getFullName() : "",
                 c.getSigningDate() != null ? c.getSigningDate().toString() : "",
@@ -950,6 +959,20 @@ public class ContractController extends HttpServlet {
             return false;
         }
         return !c.getSigningDate().after(c.getEffectiveDate()) && !c.getEffectiveDate().after(c.getEndDate());
+    }
+
+    /**
+     * Tỉnh/thành của hợp đồng = tỉnh của khách hàng đứng tên (ContractDAO đã
+     * gắn sẵn khi map). Bỏ tiền tố "Tỉnh "/"Thành phố " cho khớp thứ tự đã sắp
+     * ở DAO; hợp đồng của khách chưa có địa chỉ ghi "Chưa xác định" thay vì để
+     * trống, để người đọc file phân biệt được thiếu dữ liệu với lỗi xuất.
+     */
+    private static String provinceNameOf(Contract contract) {
+        Enterprise enterprise = contract.getEnterprise();
+        Address address = enterprise != null ? enterprise.getAddress() : null;
+        District district = address != null ? address.getDistrict() : null;
+        Province province = district != null ? district.getProvince() : null;
+        return province != null ? province.getShortName() : "Chưa xác định";
     }
 
     private Integer parseIntOrNull(String value) {

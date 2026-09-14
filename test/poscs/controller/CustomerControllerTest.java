@@ -217,6 +217,28 @@ public class CustomerControllerTest {
         when(request.getParameter("phone")).thenReturn("0912345678");
         when(request.getParameter("email")).thenReturn("abc@example.com");
         when(request.getParameter("accountOwnerId")).thenReturn("9");
+        // Địa chỉ là bắt buộc từ khi khách hàng được quản lý theo địa bàn tỉnh:
+        // tỉnh chỉ suy ra được qua xã/phường của địa chỉ.
+        when(request.getParameter("districtId")).thenReturn("10");
+        when(request.getParameter("addressDetail")).thenReturn("Số 1 Trần Phú");
+    }
+
+    /**
+     * Không có địa chỉ thì không suy ra được tỉnh, mà tỉnh là căn cứ chia địa
+     * bàn/lọc báo cáo -- khách như vậy sẽ vô hình với mọi thống kê theo tỉnh,
+     * nên chặn ngay từ lúc tạo thay vì để lọt rồi đi dọn sau.
+     */
+    @Test
+    public void create_missingAddress_redirectsWithoutInserting() throws Exception {
+        when(request.getParameter("action")).thenReturn("create");
+        stubValidCreateFields();
+        when(request.getParameter("districtId")).thenReturn(null);
+        when(request.getParameter("addressDetail")).thenReturn(null);
+
+        controller.doPost(request, response);
+
+        verify(customerDAO, never()).insert(any());
+        verify(response).sendRedirect(CONTEXT_PATH + "/customer?action=new&error=invalid");
     }
 
     @Test

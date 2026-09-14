@@ -14,9 +14,12 @@ import java.util.List;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import poscs.model.Address;
 import poscs.model.Contract;
 import poscs.model.ContractProduct;
+import poscs.model.District;
 import poscs.model.Enterprise;
+import poscs.model.Province;
 import poscs.model.User;
 
 /**
@@ -43,14 +46,27 @@ public class ContractDAO {
 
     private static final int SOON_THRESHOLD_DAYS = 30;
 
+    /**
+     * Hợp đồng không có cột tỉnh riêng -- địa bàn của nó là địa bàn của khách
+     * hàng đứng tên, nên phải đi qua 3 bảng: enterprises -> addresses ->
+     * districts (xã/phường) -> provinces. Tách ra hằng số vì cả SELECT_BASE và
+     * countAll đều cần đúng chuỗi join này, lệch nhau một chữ là danh sách và
+     * bộ đếm phân trang ra hai kết quả khác nhau.
+     */
+    private static final String JOIN_PROVINCE_OF_ENTERPRISE =
+        "LEFT JOIN addresses a ON e.address_id = a.address_id " +
+        "LEFT JOIN districts d ON a.districts_id = d.districts_id " +
+        "LEFT JOIN provinces p ON d.province_id = p.province_id ";
+
     private static final String SELECT_BASE =
         "SELECT c.contract_id, c.contract_code, c.title, c.contract_type, c.signing_date, " +
         "       c.effective_date, c.end_date, c.enterprise_id, c.owner_id, c.attachment_url, " +
         "       c.created_at, c.updated_at, c.is_deleted, " +
-        "       e.enterprise_name, " +
+        "       e.enterprise_name, p.province_id, p.province_name, " +
         "       u.last_name AS owner_last_name, u.middle_name AS owner_middle_name, u.first_name AS owner_first_name " +
         "FROM contracts c " +
         "LEFT JOIN enterprises e ON c.enterprise_id = e.enterprise_id " +
+        JOIN_PROVINCE_OF_ENTERPRISE +
         "LEFT JOIN users u ON c.owner_id = u.user_id ";
 
     private static final String STATUS_CASE_SQL =
@@ -98,11 +114,28 @@ public class ContractDAO {
 
     /** Lấy danh sách hợp đồng có phân trang + lọc, phục vụ listcontract.jsp. */
     public List<Contract> findAll(int page, int pageSize, String keyword, String statusFilter, String typeFilter) {
+        return findAll(page, pageSize, keyword, statusFilter, typeFilter, null, false);
+    }
+
+    /**
+     * Như {@link #findAll(int, int, String, String, String)} nhưng lọc thêm theo
+     * tỉnh/thành của khách hàng đứng tên hợp đồng, và cho phép sắp theo tỉnh.
+     *
+     * @param provinceId     null = mọi tỉnh
+     * @param sortByProvince true thì gom các hợp đồng cùng tỉnh nằm liền nhau
+     *                       (hợp đồng của khách chưa có địa chỉ dồn xuống cuối);
+     *                       dùng khi xuất Excel
+     */
+    public List<Contract> findAll(int page, int pageSize, String keyword, String statusFilter, String typeFilter,
+            Integer provinceId, boolean sortByProvince) {
         List<Contract> result = new ArrayList<>();
         StringBuilder sql = new StringBuilder(SELECT_BASE);
         List<Object> params = new ArrayList<>();
-        appendFilters(sql, params, keyword, statusFilter, typeFilter);
-        sql.append(" ORDER BY c.contract_id DESC LIMIT ? OFFSET ?");
+        appendFilters(sql, params, keyword, statusFilter, typeFilter, provinceId);
+        sql.append(sortByProvince
+                ? " ORDER BY p.province_name IS NULL, " + AddressDAO.PROVINCE_SHORT_NAME_ORDER
+                        + ", c.contract_id DESC LIMIT ? OFFSET ?"
+                : " ORDER BY c.contract_id DESC LIMIT ? OFFSET ?");
         params.add(pageSize);
         params.add(Math.max(0, (page - 1) * pageSize));
 
@@ -122,10 +155,16 @@ public class ContractDAO {
 
     /** Đếm tổng số hợp đồng thoả điều kiện lọc, phục vụ phân trang. */
     public int countAll(String keyword, String statusFilter, String typeFilter) {
+        return countAll(keyword, statusFilter, typeFilter, null);
+    }
+
+    /** Như {@link #countAll(String, String, String)} nhưng lọc thêm theo tỉnh/thành. */
+    public int countAll(String keyword, String statusFilter, String typeFilter, Integer provinceId) {
         StringBuilder sql = new StringBuilder(
-            "SELECT COUNT(*) FROM contracts c LEFT JOIN enterprises e ON c.enterprise_id = e.enterprise_id ");
+            "SELECT COUNT(*) FROM contracts c LEFT JOIN enterprises e ON c.enterprise_id = e.enterprise_id "
+            + JOIN_PROVINCE_OF_ENTERPRISE);
         List<Object> params = new ArrayList<>();
-        appendFilters(sql, params, keyword, statusFilter, typeFilter);
+        appendFilters(sql, params, keyword, statusFilter, typeFilter, provinceId);
 
         try (Connection conn = DBContext.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql.toString())) {
@@ -461,7 +500,8 @@ public class ContractDAO {
     // Helpers riêng
     // ------------------------------------------------------------------
 
-    private void appendFilters(StringBuilder sql, List<Object> params, String keyword, String statusFilter, String typeFilter) {
+    private void appendFilters(StringBuilder sql, List<Object> params, String keyword, String statusFilter,
+            String typeFilter, Integer provinceId) {
         List<String> conditions = new ArrayList<>();
         conditions.add("c.is_deleted = 0");
 
@@ -479,6 +519,10 @@ public class ContractDAO {
         if (statusFilter != null && !statusFilter.trim().isEmpty()) {
             conditions.add("(" + STATUS_CASE_SQL + ") = ?");
             params.add(statusFilter);
+        }
+        if (provinceId != null) {
+            conditions.add("d.province_id = ?");
+            params.add(provinceId);
         }
 
         sql.append("WHERE ").append(String.join(" AND ", conditions));
@@ -538,6 +582,21 @@ public class ContractDAO {
             Enterprise e = new Enterprise();
             e.setEnterpriseId(c.getEnterpriseId());
             e.setEnterpriseName(enterpriseName);
+            // Chỉ gắn tỉnh (địa bàn của hợp đồng), KHÔNG dựng địa chỉ đầy đủ:
+            // màn hình danh sách và file Excel hợp đồng chỉ cần tên tỉnh, còn
+            // số nhà/xã phường thì xem ở màn hình khách hàng.
+            String provinceName = rs.getString("province_name");
+            if (provinceName != null) {
+                Province province = new Province();
+                province.setProvinceId(rs.getInt("province_id"));
+                province.setProvinceName(provinceName);
+                District district = new District();
+                district.setProvinceId(province.getProvinceId());
+                district.setProvince(province);
+                Address address = new Address();
+                address.setDistrict(district);
+                e.setAddress(address);
+            }
             c.setEnterprise(e);
         }
 

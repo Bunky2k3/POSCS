@@ -6,8 +6,9 @@
     Servlet cần đặt các request attribute sau trước khi forward tới trang này:
       - customerList : List<poscs.model.Enterprise>  (mỗi Enterprise nên có sẵn .address.district.province và .accountOwner đã join)
       - userList      : List<poscs.model.User>        (toàn bộ nhân viên, để đổ dropdown lọc "Người phụ trách")
+      - provinceList  : List<poscs.model.Province>    (34 tỉnh/thành, để đổ dropdown lọc "Tỉnh/Thành")
       - currentPage, totalPages, totalCount : thông tin phân trang (BR-12)
-      - keyword, typeFilter, assigneeFilter : giá trị filter hiện tại (để giữ lại lúc submit lại form tìm kiếm)
+      - keyword, typeFilter, assigneeFilter, provinceFilter : giá trị filter hiện tại (để giữ lại lúc submit lại form tìm kiếm)
 --%>
 <!DOCTYPE html>
 <html lang="vi">
@@ -212,7 +213,7 @@
                 <%-- Xuất Excel là thao tác ĐỌC: chỉ lấy đúng dữ liệu vai trò này vốn đã
                      xem được trên màn hình, đổi sang dạng file. Nên KHÔNG khoá theo
                      canManage -- xem PERMISSIONS.md. --%>
-                <a href="${pageContext.request.contextPath}/customer?action=exportExcel&keyword=${fn:escapeXml(keyword)}&type=${fn:escapeXml(typeFilter)}&assigneeId=${assigneeFilter}" class="btn-outline-action"><i class="fa-solid fa-file-excel"></i> Xuất Excel</a>
+                <a href="${pageContext.request.contextPath}/customer?action=exportExcel&keyword=${fn:escapeXml(keyword)}&type=${fn:escapeXml(typeFilter)}&assigneeId=${assigneeFilter}&provinceId=${provinceFilter}" class="btn-outline-action"><i class="fa-solid fa-file-excel"></i> Xuất Excel</a>
                 <c:if test="${canManage}">
                     <a href="${pageContext.request.contextPath}/customer?action=new" class="btn-add"><i class="fa-solid fa-plus"></i> Thêm khách hàng</a>
                 </c:if>
@@ -238,6 +239,12 @@
                     <option value="${staff.userId}" ${assigneeFilter == staff.userId ? 'selected' : ''}>${fn:escapeXml(staff.fullName)}</option>
                 </c:forEach>
             </select>
+            <select id="filterProvince" name="provinceId">
+                <option value="">Tất cả tỉnh/thành</option>
+                <c:forEach var="province" items="${provinceList}">
+                    <option value="${province.provinceId}" ${provinceFilter == province.provinceId ? 'selected' : ''}>${fn:escapeXml(province.shortName)}</option>
+                </c:forEach>
+            </select>
         </form>
 
         <!-- ===== Bảng danh sách ===== -->
@@ -251,6 +258,7 @@
                             <th>Loại KH</th>
                             <th>Email</th>
                             <th>Số điện thoại</th>
+                            <th>Tỉnh/Thành</th>
                             <th>Địa chỉ</th>
                             <th>Người phụ trách</th>
                             <th class="text-end">Thao tác</th>
@@ -274,6 +282,12 @@
                                 <td><span class="type-badge">${fn:escapeXml(customer.customerType)}</span></td>
                                 <td>${fn:escapeXml(customer.email)}</td>
                                 <td>${fn:escapeXml(customer.phone)}</td>
+                                <td>
+                                    <c:choose>
+                                        <c:when test="${customer.address.district.province != null}">${fn:escapeXml(customer.address.district.province.shortName)}</c:when>
+                                        <c:otherwise>&mdash;</c:otherwise>
+                                    </c:choose>
+                                </td>
                                 <td>
                                     <c:choose>
                                         <c:when test="${customer.address != null}">${fn:escapeXml(customer.address.fullAddress)}</c:when>
@@ -312,11 +326,11 @@
                 <span class="pagination-info" id="paginationInfo">Hiển thị ${fn:length(customerList)} trong tổng số ${totalCount} khách hàng</span>
                 <nav>
                     <ul class="pagination pagination-sm mb-0">
-                        <li class="page-item ${currentPage <= 1 ? 'disabled' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/customer?action=list&page=${currentPage - 1}&keyword=${fn:escapeXml(keyword)}&type=${fn:escapeXml(typeFilter)}&assigneeId=${assigneeFilter}">Trước</a></li>
+                        <li class="page-item ${currentPage <= 1 ? 'disabled' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/customer?action=list&page=${currentPage - 1}&keyword=${fn:escapeXml(keyword)}&type=${fn:escapeXml(typeFilter)}&assigneeId=${assigneeFilter}&provinceId=${provinceFilter}">Trước</a></li>
                         <c:forEach begin="1" end="${totalPages}" var="p">
-                            <li class="page-item ${p == currentPage ? 'active' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/customer?action=list&page=${p}&keyword=${fn:escapeXml(keyword)}&type=${fn:escapeXml(typeFilter)}&assigneeId=${assigneeFilter}">${p}</a></li>
+                            <li class="page-item ${p == currentPage ? 'active' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/customer?action=list&page=${p}&keyword=${fn:escapeXml(keyword)}&type=${fn:escapeXml(typeFilter)}&assigneeId=${assigneeFilter}&provinceId=${provinceFilter}">${p}</a></li>
                         </c:forEach>
-                        <li class="page-item ${currentPage >= totalPages ? 'disabled' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/customer?action=list&page=${currentPage + 1}&keyword=${fn:escapeXml(keyword)}&type=${fn:escapeXml(typeFilter)}&assigneeId=${assigneeFilter}">Sau</a></li>
+                        <li class="page-item ${currentPage >= totalPages ? 'disabled' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/customer?action=list&page=${currentPage + 1}&keyword=${fn:escapeXml(keyword)}&type=${fn:escapeXml(typeFilter)}&assigneeId=${assigneeFilter}&provinceId=${provinceFilter}">Sau</a></li>
                     </ul>
                 </nav>
             </div>
@@ -374,6 +388,7 @@
         // Tự động submit lại form lọc khi đổi loại KH / người phụ trách
         document.getElementById('filterType').addEventListener('change', function () { document.getElementById('filterForm').submit(); });
         document.getElementById('filterAssignee').addEventListener('change', function () { document.getElementById('filterForm').submit(); });
+        document.getElementById('filterProvince').addEventListener('change', function () { document.getElementById('filterForm').submit(); });
     </script>
 
     <script src="${pageContext.request.contextPath}/js/appshell.js"></script>
