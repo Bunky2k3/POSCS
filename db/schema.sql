@@ -3482,6 +3482,7 @@ CREATE TABLE `users` (
   `address_id` int DEFAULT NULL,
   `avatar_url` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `department_id` int NOT NULL,
+  `manager_id` int DEFAULT NULL,
   `hire_date` date NOT NULL,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -3496,7 +3497,8 @@ CREATE TABLE `users` (
   KEY `department_id` (`department_id`),
   CONSTRAINT `users_ibfk_1` FOREIGN KEY (`role_id`) REFERENCES `roles` (`role_id`),
   CONSTRAINT `users_ibfk_2` FOREIGN KEY (`address_id`) REFERENCES `addresses` (`address_id`) ON DELETE SET NULL,
-  CONSTRAINT `users_department_fk` FOREIGN KEY (`department_id`) REFERENCES `departments` (`department_id`)
+  CONSTRAINT `users_department_fk` FOREIGN KEY (`department_id`) REFERENCES `departments` (`department_id`),
+  CONSTRAINT `fk_users_manager` FOREIGN KEY (`manager_id`) REFERENCES `users` (`user_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 12 tài khoản nhân viên phục vụ dev/test (giữ đồng bộ với

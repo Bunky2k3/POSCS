@@ -162,6 +162,7 @@ public class EmployeeController extends HttpServlet {
 
     private void showCreateForm(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
+        request.setAttribute("managerList", employeeDAO.findEligibleManagers(null));
         request.setAttribute("roleList", employeeDAO.findAllRoles());
         request.setAttribute("departmentList", employeeDAO.findAllDepartments());
         request.setAttribute("provinceList", addressDAO.findAllProvinces());
@@ -177,6 +178,7 @@ public class EmployeeController extends HttpServlet {
             return;
         }
         request.setAttribute("employee", employee);
+        request.setAttribute("managerList", employeeDAO.findEligibleManagers(id));
         request.setAttribute("roleList", employeeDAO.findAllRoles());
         request.setAttribute("departmentList", employeeDAO.findAllDepartments());
         request.setAttribute("provinceList", addressDAO.findAllProvinces());
@@ -208,6 +210,10 @@ public class EmployeeController extends HttpServlet {
         }
         if (employeeDAO.existsByCitizenId(u.getCitizenId(), null)) {
             response.sendRedirect(request.getContextPath() + "/employee?action=new&error=duplicate_citizen");
+            return;
+        }
+        if (!isValidManagerChoice(u)) {
+            response.sendRedirect(request.getContextPath() + "/employee?action=new&error=invalid_manager");
             return;
         }
 
@@ -298,6 +304,10 @@ public class EmployeeController extends HttpServlet {
             response.sendRedirect(request.getContextPath() + "/employee?action=edit&id=" + id + "&error=duplicate_citizen");
             return;
         }
+        if (!isValidManagerChoice(u)) {
+            response.sendRedirect(request.getContextPath() + "/employee?action=edit&id=" + id + "&error=invalid_manager");
+            return;
+        }
 
         boolean ok = employeeDAO.update(u);
         if (!ok) {
@@ -341,6 +351,35 @@ public class EmployeeController extends HttpServlet {
         return sb.toString();
     }
 
+    /**
+     * Người được chọn làm cấp trên có hợp lệ không.
+     *
+     * Danh sách trong ô chọn đã lọc sẵn (xem EmployeeDAO.findEligibleManagers)
+     * nhưng đó chỉ là tiện cho người dùng -- một request tự dựng gửi thẳng
+     * managerId nào cũng được, nên phải kiểm lại ở đây trước khi ghi.
+     *
+     * Hai điều kiện, đều để giữ cây đúng HAI tầng như đã chốt với khách:
+     *
+     *  - không tự làm cấp trên của chính mình (CSDL cũng chặn bằng
+     *    chk_users_manager_not_self, nhưng bắt ở đây thì báo lỗi tử tế được
+     *    thay vì ném SQLException lên);
+     *  - người làm cấp trên thì bản thân không được có cấp trên, nếu không
+     *    sẽ mọc ra tầng thứ ba.
+     *
+     * @return true nếu để trống (không có cấp trên -- hợp lệ) hoặc chọn đúng.
+     */
+    private boolean isValidManagerChoice(User u) {
+        Integer managerId = u.getManagerId();
+        if (managerId == null) {
+            return true;
+        }
+        if (u.getUserId() > 0 && managerId == u.getUserId()) {
+            return false;
+        }
+        User manager = employeeDAO.findById(managerId);
+        return manager != null && !manager.isDeleted() && !manager.isSubordinate();
+    }
+
     private User buildUserFromRequest(HttpServletRequest request, User u) {
         u.setLastName(emptyToNull(request.getParameter("lastName")));
         u.setMiddleName(emptyToNull(request.getParameter("middleName")));
@@ -360,6 +399,9 @@ public class EmployeeController extends HttpServlet {
         if (departmentId != null) {
             u.setDepartmentId(departmentId);
         }
+        // Để trống = không có cấp trên = tầng trên của cây tổ chức. Đây là
+        // trạng thái hợp lệ và là mặc định, không phải dữ liệu thiếu.
+        u.setManagerId(parseIntOrNull(request.getParameter("managerId")));
 
         Integer districtId = parseIntOrNull(request.getParameter("districtId"));
         String addressDetail = emptyToNull(request.getParameter("addressDetail"));

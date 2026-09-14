@@ -4,12 +4,12 @@ POSCS uses role-based access control. This document is the source of
 truth for who can do what — refer to it whenever implementing or
 reviewing a controller's access checks.
 
-**Status: everything below is enforced in code EXCEPT the two `†` cells**
-(`Sales` staff on Customer and Contract), which is the model agreed with the
-customer on 2026-09-14 and is **not built yet** — see
-[Hierarchy-based write access](#hierarchy-based-write-access-for-customercontract)
-for what is missing and why the matrix already carries it. Everything
-unmarked describes current behaviour and can be relied on.
+**Status: the whole matrix below is enforced in code**, including the two `†`
+cells — the `Sales` manager/staff split agreed with the customer on
+2026-09-14. What is *not* built yet is the other half of that agreement: a
+subordinate has no in-system way to **request** a change, so today the split
+only takes access away. See
+[Hierarchy-based write access](#hierarchy-based-write-access-for-customercontract).
 
 The `roles` table is seeded (see
 [`db/migrations/V2__seed_default_roles__ndat2003.sql`](db/migrations/V2__seed_default_roles__ndat2003.sql)),
@@ -65,28 +65,35 @@ handler keeps the row it read from the database and overwrites only these
 four fields, so widening the exception means adding a `set...` call there and
 nowhere else.
 
-† **Not built yet.** These two cells describe the agreed target, not today's
-code: `AccessControl.FULL_ACCESS_ROLES` currently grants *every* `Sales` user
-Full access on Customer and Contract, and `users` has no column saying who
-reports to whom, so the two tiers cannot be told apart at runtime. Until that
-lands, a `Sales` staff member really has **Full** access on both — which is
-also why the manager row needs no mark: `Full` is already true for them today
-and stays true afterwards, so the hierarchy only ever *removes* access, never
-grants any.
+† **Decided by `users.manager_id`, not by role.** A user with a manager is
+"staff" and is read-only on these two resources — **create included**; a user
+with no manager is "manager" and keeps Full access. Both tiers carry the same
+`Sales` role, which is exactly why the column exists. The manager row needs no
+mark because `Full` was already true for them before the hierarchy landed and
+stays true after: the hierarchy only ever *removes* access, never grants any.
 
-In the target model, by contrast, a `Sales` staff member is read-only on these
-two resources — create included — and gets changes made through a change
-request their manager approves; see
-[Hierarchy-based write access](#hierarchy-based-write-access-for-customercontract).
+Nobody is restricted until they are actually given a manager, so turning this
+on took no access away from anyone — the real org chart is still pending from
+the customer. Enforced in `AccessControl.hasFullAccess(...)`, which every
+create/update/delete path on both resources already goes through, and which
+also feeds the `canManage` flag the JSPs use to hide buttons.
 
 ## Hierarchy-based write access for Customer/Contract
 
-**Decided with the customer on 2026-09-14. Carried in the matrix above as the
-two `†` cells, and NOT implemented yet** — `users` has no manager column, and
-`FULL_ACCESS_ROLES` still grants every `Sales` user Full access on both
-resources. Anyone reading the matrix to predict what the running system does
-today must read `†` as Full; anyone implementing should build what this
-section describes.
+**Decided with the customer on 2026-09-14. The read-only half is implemented
+(the two `†` cells above are live); the change-request half is not.**
+
+| | |
+|---|---|
+| `users.manager_id` + two-tier org chart | **done** (V16) |
+| Subordinate read-only on Customer/Contract | **done** (`AccessControl.hasFullAccess`) |
+| Admin picks a manager on the employee form | **done** |
+| Subordinate submits a change request, manager approves | **not built** |
+
+The gap matters: right now a subordinate who needs a customer edited has no
+button for it and must ask their manager outside the system. That is a
+deliberate interim state, not an oversight — but do not describe the feature
+to the customer as finished until the request flow exists.
 
 The agreed rule, on top of the role matrix rather than replacing it:
 
@@ -118,6 +125,16 @@ Scope and consequences worth knowing before implementing:
   for users who actually get a manager assigned. Filling in the real org
   chart is what switches it on, and that data is still pending from the
   customer.
+- **The tree is kept to exactly two tiers** in three places, because one alone
+  is not enough: the DB refuses a user managing themselves
+  (`chk_users_manager_not_self`), `EmployeeDAO.findEligibleManagers` only
+  offers people who have no manager of their own, and
+  `EmployeeController.isValidManagerChoice` re-checks both before writing —
+  the dropdown is a convenience, a hand-made POST is not bound by it.
+- **`AccessControl` reads the tier off the session `User`**, so
+  `EmployeeDAO.findByUsernameOrEmail` must keep selecting `manager_id`. Drop
+  it there and every user silently looks like a manager: no error, no log,
+  the restriction just quietly stops applying.
 
 ## Notes for implementation
 

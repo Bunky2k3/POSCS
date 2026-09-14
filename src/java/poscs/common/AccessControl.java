@@ -46,6 +46,15 @@ public final class AccessControl {
         return attr instanceof User ? (User) attr : null;
     }
 
+    // Tài nguyên mà cây tổ chức có tiếng nói: cấp dưới chỉ được xem, dù vai
+    // trò của họ vốn có quyền Full. Khớp hai ô đánh dấu trong "Access matrix"
+    // của PERMISSIONS.md. Phiếu hỗ trợ và Sản phẩm KHÔNG nằm ở đây -- kỹ
+    // thuật viên là cấp dưới của ai đó không làm họ mất quyền ghi trên phiếu
+    // được giao cho mình.
+    private static final Set<Resource> HIERARCHY_RESTRICTED = Set.of(
+            Resource.CUSTOMER, Resource.CONTRACT
+    );
+
     /** true nếu user đang đăng nhập có quyền Full (tạo/sửa/xoá) trên resource này. */
     public static boolean hasFullAccess(HttpServletRequest request, Resource resource) {
         User user = currentUser(request);
@@ -53,7 +62,39 @@ public final class AccessControl {
             return false;
         }
         Set<String> allowedRoles = FULL_ACCESS_ROLES.get(resource);
-        return allowedRoles != null && allowedRoles.contains(user.getRole().getRoleName());
+        if (allowedRoles == null || !allowedRoles.contains(user.getRole().getRoleName())) {
+            return false;
+        }
+        return !isRestrictedBySubordinateRank(user, resource);
+    }
+
+    /**
+     * Tầng thứ hai của phân quyền: vai trò cho đủ quyền rồi, nhưng VỊ TRÍ
+     * trong cây tổ chức lấy bớt lại.
+     *
+     * Theo yêu cầu khách hàng (14/09/2026): trên Khách hàng và Hợp đồng, cấp
+     * trên là người tác động lên dữ liệu -- kể cả dữ liệu của cấp dưới -- còn
+     * cấp dưới chỉ xem, muốn đổi gì thì gửi yêu cầu lên. Xem PERMISSIONS.md.
+     *
+     * Ba điều cần biết khi đọc hàm này:
+     *
+     *  - Admin không bao giờ bị siết. Quản trị hệ thống mà bị cây tổ chức
+     *    chặn thì không còn ai gỡ được khi cây bị nhập sai.
+     *  - "Cấp dưới" = có manager_id, chứ không phải một role riêng. Nhân viên
+     *    cầm tỉnh và quản lý vùng cùng mang role Sales, chỉ khác nhau ở chỗ
+     *    đứng trong cây -- đó chính là lý do phải có cột manager_id.
+     *  - Chưa xếp vào cây (manager_id null) thì KHÔNG bị siết. Nhờ vậy bật
+     *    tính năng lên không cướp quyền của ai; việc siết chỉ bắt đầu với
+     *    từng người khi họ được gán cấp trên thật.
+     */
+    private static boolean isRestrictedBySubordinateRank(User user, Resource resource) {
+        if (!HIERARCHY_RESTRICTED.contains(resource)) {
+            return false;
+        }
+        if (ROLE_ADMIN.equals(user.getRole().getRoleName())) {
+            return false;
+        }
+        return user.isSubordinate();
     }
 
     /**
