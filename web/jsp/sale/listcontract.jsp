@@ -90,11 +90,12 @@
         .custom-table { table-layout: fixed; min-width: 900px; }
         .custom-table th, .custom-table td { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .custom-table th:nth-child(1), .custom-table td:nth-child(1) { width: 5%; }   /* STT */
-        .custom-table th:nth-child(2), .custom-table td:nth-child(2) { width: 38%; }  /* Hợp đồng + khách */
-        .custom-table th:nth-child(3), .custom-table td:nth-child(3) { width: 14%; }  /* Loại HĐ */
+        .custom-table th:nth-child(2), .custom-table td:nth-child(2) { width: 25%; }  /* Hợp đồng + khách */
+        .custom-table th:nth-child(3), .custom-table td:nth-child(3) { width: 13%; }  /* Loại HĐ */
         .custom-table th:nth-child(4), .custom-table td:nth-child(4) { width: 16%; }  /* Thời hạn */
-        .custom-table th:nth-child(5), .custom-table td:nth-child(5) { width: 15%; }  /* Trạng thái */
-        .custom-table th:nth-child(6), .custom-table td:nth-child(6) { width: 12%; }  /* Thao tác */
+        .custom-table th:nth-child(5), .custom-table td:nth-child(5) { width: 14%; }  /* Trạng thái */
+        .custom-table th:nth-child(6), .custom-table td:nth-child(6) { width: 15%; }  /* Phụ trách */
+        .custom-table th:nth-child(7), .custom-table td:nth-child(7) { width: 12%; }  /* Thao tác */
         .custom-table td.cell-wrap { white-space: normal; }
         .cell-2line { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
         .cell-sub { font-size: 0.74rem; color: #6b7280; line-height: 1.35; }
@@ -251,6 +252,7 @@
                             <th>Loại HĐ</th>
                             <th>Thời hạn</th>
                             <th>Trạng thái</th>
+                            <th>Phụ trách</th>
                             <th class="text-end">Thao tác</th>
                         </tr>
                     </thead>
@@ -283,6 +285,12 @@
                                         <c:when test="${contract.status == 'Sắp hết hạn'}"><span class="status-pill status-soon"><span class="dot"></span>Sắp hết hạn</span></c:when>
                                         <c:when test="${contract.status == 'Đã hết hạn'}"><span class="status-pill status-expired"><span class="dot"></span>Đã hết hạn</span></c:when>
                                         <c:otherwise><span class="status-pill status-draft"><span class="dot"></span>Chưa hiệu lực</span></c:otherwise>
+                                    </c:choose>
+                                </td>
+                                <td>
+                                    <c:choose>
+                                        <c:when test="${contract.owner != null}">${fn:escapeXml(contract.owner.fullName)}</c:when>
+                                        <c:otherwise>&mdash;</c:otherwise>
                                     </c:choose>
                                 </td>
                                 <td>
