@@ -397,8 +397,12 @@ public class CustomerControllerTest {
 
         controller.doPost(request, response);
 
+        // Tra theo xã/phường (10), và người được lưu là người của xã/phường
+        // đó -- không phải của tỉnh 99 mà request khai.
         verify(employeeDAO).findAssigneeOfWard(10);
-        verify(employeeDAO, never()).findAssigneeOf(anyInt());
+        ArgumentCaptor<Enterprise> saved = ArgumentCaptor.forClass(Enterprise.class);
+        verify(customerDAO).insert(saved.capture());
+        assertEquals(42, saved.getValue().getAccountOwnerId());
     }
 
     /**
