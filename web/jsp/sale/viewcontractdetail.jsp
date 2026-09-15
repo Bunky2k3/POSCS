@@ -510,6 +510,68 @@ Nhập lý do:', true)">
             </div>
         </c:if>
 
+        <!-- ===== Ký kết & giá trị ===== -->
+        <div class="info-card card-box">
+            <div class="section-header"><h5>Ký kết &amp; giá trị</h5></div>
+            <div class="row">
+                <div class="col-md-6 field-row">
+                    <label>Người ký bên mình</label>
+                    <div class="view-value">
+                        <c:choose>
+                            <c:when test="${not empty contract.signerName}">
+                                ${fn:escapeXml(contract.signerName)}<c:if test="${not empty contract.signerPosition}"><span style="color:#6b7280;">&nbsp;&middot;&nbsp;${fn:escapeXml(contract.signerPosition)}</span></c:if>
+                            </c:when>
+                            <c:otherwise><span style="color:#9ca3af;">chưa điền</span></c:otherwise>
+                        </c:choose>
+                    </div>
+                </div>
+                <div class="col-md-6 field-row">
+                    <label>Người ký bên đối tác</label>
+                    <div class="view-value">
+                        <c:choose>
+                            <c:when test="${not empty contract.counterpartySignerName}">
+                                ${fn:escapeXml(contract.counterpartySignerName)}<c:if test="${not empty contract.counterpartySignerPosition}"><span style="color:#6b7280;">&nbsp;&middot;&nbsp;${fn:escapeXml(contract.counterpartySignerPosition)}</span></c:if>
+                            </c:when>
+                            <c:otherwise><span style="color:#9ca3af;">chưa điền</span></c:otherwise>
+                        </c:choose>
+                    </div>
+                </div>
+                <%-- Căn cứ uỷ quyền chỉ hiện khi CÓ: chuyện uỷ quyền hiếm, để ô
+                     rỗng ở mọi hợp đồng thì nó thành nhiễu. --%>
+                <c:if test="${not empty contract.authorizationRef}">
+                    <div class="col-md-6 field-row">
+                        <label>Căn cứ uỷ quyền</label>
+                        <div class="view-value">${fn:escapeXml(contract.authorizationRef)}</div>
+                    </div>
+                </c:if>
+                <div class="col-md-6 field-row">
+                    <label>Nơi ký</label>
+                    <div class="view-value">
+                        <c:choose>
+                            <c:when test="${not empty contract.signingPlace}">${fn:escapeXml(contract.signingPlace)}</c:when>
+                            <c:otherwise><span style="color:#9ca3af;">chưa điền</span></c:otherwise>
+                        </c:choose>
+                    </div>
+                </div>
+                <div class="col-md-6 field-row">
+                    <label>Giá trị hợp đồng</label>
+                    <div class="view-value">
+                        <c:choose>
+                            <c:when test="${contract.contractValue != null}">
+                                <%-- fmt:formatNumber gom nhóm theo locale của request, mà
+                                     request không mang Accept-Language thì ra số trần
+                                     "1500000000.00". Định dạng ở client bằng vi-VN, giống
+                                     cách dashboard đang làm -- ở đó hiện dạng rút gọn
+                                     ("1,5 tỷ đ"), còn đây cần con số chính xác. --%>
+                                <strong class="money-vnd" data-vnd="${contract.contractValue}">&mdash;</strong>
+                            </c:when>
+                            <c:otherwise><span style="color:#9ca3af;">chưa chốt</span></c:otherwise>
+                        </c:choose>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- ===== Hạng mục sản phẩm / dịch vụ ===== -->
         <div class="info-card card-box">
             <div class="section-header"><h5>Hạng mục sản phẩm / dịch vụ</h5></div>
@@ -705,6 +767,14 @@ Nhập lý do:', true)">
         // hợp đồng vĩnh viễn, không có đường quay lại, nên phải biết căn cứ.
         // Ký thì chỉ cần xác nhận — ghi chú tuỳ chọn, để trống cũng ký được.
         // Server kiểm lại cả hai điều (ContractDAO.changeProgressStatus).
+        // Số tiền render ở client để dùng đúng cách gom nhóm của tiếng Việt
+        // (dấu chấm), thứ mà fmt:formatNumber không đảm bảo khi request không
+        // mang Accept-Language.
+        document.querySelectorAll('.money-vnd').forEach(function (el) {
+            var n = Number(el.dataset.vnd);
+            el.textContent = isNaN(n) ? '—' : n.toLocaleString('vi-VN', { maximumFractionDigits: 0 }) + ' ₫';
+        });
+
         function changeProgress(toStatus, message, requireNote) {
             var note = null;
             if (requireNote) {

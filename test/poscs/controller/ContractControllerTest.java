@@ -389,6 +389,53 @@ public class ContractControllerTest {
     }
 
     // ------------------------------------------------------------------
+    // Giá trị hợp đồng -- ô tiền người dùng gõ tay
+    // ------------------------------------------------------------------
+
+    /** Tạo hợp đồng với một chuỗi tiền cho trước, trả về giá trị đã parse. */
+    private java.math.BigDecimal contractValueFrom(String raw) throws Exception {
+        when(request.getParameter("action")).thenReturn("create");
+        when(request.getParameter("kind")).thenReturn("sell");
+        stubValidContractFields();
+        when(request.getParameter("contractValue")).thenReturn(raw);
+        // findRolesOf(10) đã được stubValidContractFields() gán 'Khách mua'.
+        when(contractDAO.generateNextContractCode()).thenReturn("HD-0001");
+        when(contractDAO.insert(any(Contract.class), anyInt())).thenReturn(5);
+
+        controller.doPost(request, response);
+
+        ArgumentCaptor<Contract> saved = ArgumentCaptor.forClass(Contract.class);
+        verify(contractDAO).insert(saved.capture(), anyInt());
+        return saved.getValue().getContractValue();
+    }
+
+    @Test
+    public void contractValue_acceptsVietnameseThousandSeparators() throws Exception {
+        // Người Việt gõ dấu chấm phân nhóm theo thói quen. Bắt gõ số trần chỉ
+        // tạo ra lỗi nhập liệu chứ không tạo ra dữ liệu sạch hơn.
+        assertEquals(new java.math.BigDecimal("1500000000"), contractValueFrom("1.500.000.000"));
+    }
+
+    @Test
+    public void contractValue_blankMeansNotAgreedYet() throws Exception {
+        // Bản nháp chưa chốt giá -- để trống là hợp lệ, không phải lỗi.
+        assertNull(contractValueFrom("   "));
+    }
+
+    @Test
+    public void contractValue_negativeIsRejectedRatherThanStored() throws Exception {
+        // Giá trị âm không có nghĩa, và nếu lọt vào thì nó âm thầm trừ đi
+        // trong mọi phép cộng sau này.
+        assertNull(contractValueFrom("-500000"));
+    }
+
+    @Test
+    public void contractValue_garbageDoesNotBreakTheWholeSave() throws Exception {
+        // Một ô tiền gõ sai không đáng làm hỏng cả lần lưu hợp đồng.
+        assertNull(contractValueFrom("một tỷ rưỡi"));
+    }
+
+    // ------------------------------------------------------------------
     // POST ?action=changeProgress -- trục tiến độ
     // ------------------------------------------------------------------
     //

@@ -35,6 +35,36 @@ public class Contract {
 
     private String attachmentUrl;
 
+    // ------------------------------------------------------------------
+    // Người ký của CHÍNH hợp đồng này (V27).
+    //
+    // Khác enterprises.legal_representative: cái kia là đại diện pháp luật ở
+    // cấp công ty, còn đây là người đặt bút ký trên đúng tờ hợp đồng này. Có
+    // uỷ quyền thì hai thứ khác nhau, và sửa đại diện pháp luật của công ty
+    // KHÔNG được làm đổi tên người đã ký một hợp đồng đã ký xong.
+    // ------------------------------------------------------------------
+
+    /** Người ký bên mình (POSTEF). */
+    private String signerName;
+    private String signerPosition;
+
+    /** Người ký bên đối tác. */
+    private String counterpartySignerName;
+    private String counterpartySignerPosition;
+
+    /** Số/ngày giấy uỷ quyền, khi người ký không phải đại diện pháp luật. */
+    private String authorizationRef;
+
+    private String signingPlace;
+
+    /**
+     * Giá trị hợp đồng theo ĐIỀU KHOẢN hai bên ký.
+     *
+     * <p>KHÁC tổng các kỳ thanh toán (contract_payments): cái kia là thực tế
+     * thu/chi. Chỗ lệch giữa hai con số chính là công nợ.
+     */
+    private java.math.BigDecimal contractValue;
+
     /**
      * Trục LỊCH: "Chưa hiệu lực"/"Đang hiệu lực"/"Sắp hết hạn"/"Đã hết hạn".
      * Tính lại từ effective_date/end_date mỗi lần đọc (BR-17), không ai đặt
@@ -119,6 +149,27 @@ public class Contract {
 
     public User getOwner() { return owner; }
     public void setOwner(User owner) { this.owner = owner; }
+
+    public String getSignerName() { return signerName; }
+    public void setSignerName(String signerName) { this.signerName = signerName; }
+
+    public String getSignerPosition() { return signerPosition; }
+    public void setSignerPosition(String signerPosition) { this.signerPosition = signerPosition; }
+
+    public String getCounterpartySignerName() { return counterpartySignerName; }
+    public void setCounterpartySignerName(String v) { this.counterpartySignerName = v; }
+
+    public String getCounterpartySignerPosition() { return counterpartySignerPosition; }
+    public void setCounterpartySignerPosition(String v) { this.counterpartySignerPosition = v; }
+
+    public String getAuthorizationRef() { return authorizationRef; }
+    public void setAuthorizationRef(String authorizationRef) { this.authorizationRef = authorizationRef; }
+
+    public String getSigningPlace() { return signingPlace; }
+    public void setSigningPlace(String signingPlace) { this.signingPlace = signingPlace; }
+
+    public java.math.BigDecimal getContractValue() { return contractValue; }
+    public void setContractValue(java.math.BigDecimal contractValue) { this.contractValue = contractValue; }
 
     public String getAttachmentUrl() { return attachmentUrl; }
     public void setAttachmentUrl(String attachmentUrl) { this.attachmentUrl = attachmentUrl; }

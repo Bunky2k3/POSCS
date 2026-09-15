@@ -4363,6 +4363,17 @@ CREATE TABLE `contracts` (
   `end_date` date DEFAULT NULL,
   `enterprise_id` int NOT NULL,
   `owner_id` int NOT NULL,
+  -- Người đặt bút ký, của TỪNG hợp đồng -- khác enterprises.legal_representative
+  -- vốn ở cấp công ty. Có uỷ quyền thì hai thứ đó khác nhau. Xem V27.
+  `signer_name` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `signer_position` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `counterparty_signer_name` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `counterparty_signer_position` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `authorization_ref` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `signing_place` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  -- Giá trị theo ĐIỀU KHOẢN. Khác tổng contract_payments (thực tế thu/chi) --
+  -- chỗ lệch giữa hai con số chính là công nợ, gộp lại là mất khái niệm đó.
+  `contract_value` decimal(15,2) DEFAULT NULL,
   `attachment_url` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   -- Trục LỊCH: hàm thuần của effective_date/end_date, không ai đặt được.
   `status` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'Đang hiệu lực',

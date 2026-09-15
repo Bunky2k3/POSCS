@@ -146,6 +146,54 @@
                          chưa ai đồng ý. Không ký được khi còn thiếu thời hạn
                          (ContractDAO.changeProgressStatus), nên bỏ ở đây không
                          mở ra đường nào cho dữ liệu thiếu đi tiếp. --%>
+                    <div class="col-12" style="margin-top:6px; margin-bottom:10px;">
+                        <div style="font-size:0.8rem; font-weight:700; color:var(--primary-dark); text-transform:uppercase; letter-spacing:.3px;">
+                            Thông tin ký kết
+                        </div>
+                        <div style="font-size:0.78rem; color:#9ca3af; margin-top:2px;">
+                            Không bắt buộc — điền khi đã chốt được người ký. Khác đại diện pháp luật
+                            của công ty khách: có uỷ quyền thì hai người này khác nhau.
+                        </div>
+                    </div>
+                    <div class="col-md-6 field-row">
+                        <label>Người ký bên mình</label>
+                        <input type="text" class="form-control" id="signerName" name="signerName" maxlength="100">
+                    </div>
+                    <div class="col-md-6 field-row">
+                        <label>Chức vụ</label>
+                        <input type="text" class="form-control" id="signerPosition" name="signerPosition"
+                               maxlength="100" placeholder="VD: Giám đốc chi nhánh">
+                    </div>
+                    <div class="col-md-6 field-row">
+                        <label>Người ký bên đối tác</label>
+                        <input type="text" class="form-control" id="counterpartySignerName" name="counterpartySignerName" maxlength="100">
+                    </div>
+                    <div class="col-md-6 field-row">
+                        <label>Chức vụ</label>
+                        <input type="text" class="form-control" id="counterpartySignerPosition" name="counterpartySignerPosition" maxlength="100">
+                    </div>
+                    <div class="col-md-6 field-row">
+                        <label>Căn cứ uỷ quyền</label>
+                        <input type="text" class="form-control" id="authorizationRef" name="authorizationRef"
+                               maxlength="255" placeholder="VD: GUQ số 05/2026 ngày 10/01/2026">
+                        <span style="font-size:0.78rem; color:#9ca3af; display:block; margin-top:6px;">
+                            Chỉ điền khi người ký không phải đại diện pháp luật.
+                        </span>
+                    </div>
+                    <div class="col-md-6 field-row">
+                        <label>Nơi ký</label>
+                        <input type="text" class="form-control" id="signingPlace" name="signingPlace"
+                               maxlength="255" placeholder="VD: Hà Nội">
+                    </div>
+                    <div class="col-md-6 field-row">
+                        <label>Giá trị hợp đồng (VNĐ)</label>
+                        <input type="text" class="form-control" id="contractValue" name="contractValue"
+                               inputmode="numeric" placeholder="VD: 1.500.000.000">
+                        <span style="font-size:0.78rem; color:#9ca3af; display:block; margin-top:6px;">
+                            Giá trị theo điều khoản. Số tiền thực thu ghi ở mục Kỳ thanh toán — hai
+                            con số lệch nhau chính là công nợ.
+                        </span>
+                    </div>
                     <div class="col-12 field-row">
                         <div style="background:#f8fafc; border:1px solid #eef2f6; border-radius:10px; padding:10px 14px; font-size:0.82rem; color:#6b7280;">
                             <i class="fa-solid fa-circle-info" style="color:var(--primary);"></i>

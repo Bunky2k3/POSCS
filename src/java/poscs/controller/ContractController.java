@@ -1255,10 +1255,43 @@ public class ContractController extends HttpServlet {
         // dùng tự tải lên rồi dán link vào đây (giống cách catalogue sản phẩm
         // đang lưu link Drive). Hệ thống không đụng tới file đó.
         c.setAttachmentUrl(emptyToNull(request.getParameter("attachmentUrl")));
+
+        c.setSignerName(emptyToNull(request.getParameter("signerName")));
+        c.setSignerPosition(emptyToNull(request.getParameter("signerPosition")));
+        c.setCounterpartySignerName(emptyToNull(request.getParameter("counterpartySignerName")));
+        c.setCounterpartySignerPosition(emptyToNull(request.getParameter("counterpartySignerPosition")));
+        c.setAuthorizationRef(emptyToNull(request.getParameter("authorizationRef")));
+        c.setSigningPlace(emptyToNull(request.getParameter("signingPlace")));
+        c.setContractValue(parseMoneyOrNull(request.getParameter("contractValue")));
         return c;
     }
 
     /** BR-44: các trường bắt buộc phải có, và Ngày ký ≤ Ngày hiệu lực ≤ Ngày kết thúc. */
+    /**
+     * Đọc số tiền người dùng gõ. Chấp nhận cả "1.500.000.000" lẫn "1500000000"
+     * -- người Việt gõ dấu chấm phân nhóm theo thói quen, và bắt họ gõ số trần
+     * chỉ tạo ra lỗi nhập liệu chứ không tạo ra dữ liệu sạch hơn.
+     *
+     * <p>Trả null khi để trống (bản nháp chưa chốt giá) HOẶC khi chuỗi không
+     * đọc được -- không ném ra ngoài: một ô tiền gõ sai không đáng làm hỏng cả
+     * lần lưu, và isValid() bên dưới sẽ bắt nếu giá trị đó là bắt buộc.
+     *
+     * <p>Số âm bị từ chối: giá trị hợp đồng âm không có nghĩa, và nếu lọt vào
+     * thì nó âm thầm trừ đi trong mọi phép cộng sau này.
+     */
+    private java.math.BigDecimal parseMoneyOrNull(String raw) {
+        if (isBlank(raw)) {
+            return null;
+        }
+        String digits = raw.replaceAll("[.,\\s]", "");
+        try {
+            java.math.BigDecimal value = new java.math.BigDecimal(digits);
+            return value.signum() < 0 ? null : value;
+        } catch (NumberFormatException ex) {
+            return null;
+        }
+    }
+
     private boolean isValid(Contract c) {
         if (c.getTitle() == null || c.getContractType() == null
                 || c.getEnterpriseId() <= 0 || c.getOwnerId() <= 0) {
