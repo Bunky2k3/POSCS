@@ -904,6 +904,17 @@ public class ContractController extends HttpServlet {
             return;
         }
 
+        // Kiểm trước ở đây chỉ để BÁO ĐÚNG LÝ DO. Chặn thật vẫn nằm trong
+        // transaction của DAO -- ở đây dữ liệu đã đọc từ trước nên có thể lỗi
+        // thời, còn ở đó nó được khoá lại.
+        Contract target = contractDAO.findById(id);
+        if (ContractDAO.PROGRESS_SIGNED.equals(toStatus)
+                && (target.getEffectiveDate() == null || target.getEndDate() == null)) {
+            response.sendRedirect(request.getContextPath()
+                    + "/contract?action=view&id=" + id + "&error=missing_term");
+            return;
+        }
+
         String note = request.getParameter("progressNote");
         if (!contractDAO.changeProgressStatus(id, toStatus, actorId(request), note)) {
             LOG.warn("Chuyen trang thai tien do hop dong that bai (actor={}, contractId={}, toStatus={})",
@@ -1250,18 +1261,23 @@ public class ContractController extends HttpServlet {
     /** BR-44: các trường bắt buộc phải có, và Ngày ký ≤ Ngày hiệu lực ≤ Ngày kết thúc. */
     private boolean isValid(Contract c) {
         if (c.getTitle() == null || c.getContractType() == null
-                || c.getEffectiveDate() == null || c.getEndDate() == null
                 || c.getEnterpriseId() <= 0 || c.getOwnerId() <= 0) {
             return false;
         }
+        // Thời hạn có thể TRỐNG ở bản nháp -- hai mốc đó là kết quả đàm phán,
+        // lúc mới soạn chưa chốt được. Không ký được khi còn thiếu, nên NULL
+        // chỉ sống trong quãng Nháp (xem ContractDAO.changeProgressStatus).
         // Ngày ký có thể TRỐNG: bản nháp chưa ký thì chưa có ngày ký, và ngày
         // đó được đóng dấu lúc bấm Ký (ContractDAO.changeProgressStatus đặt
         // CURDATE()) chứ không phải thứ người dùng gõ vào ô. Khi đã có thì vẫn
         // phải giữ BR-44: ký <= hiệu lực <= kết thúc.
-        if (c.getSigningDate() != null && c.getSigningDate().after(c.getEffectiveDate())) {
+        if (c.getSigningDate() != null && c.getEffectiveDate() != null
+                && c.getSigningDate().after(c.getEffectiveDate())) {
             return false;
         }
-        return !c.getEffectiveDate().after(c.getEndDate());
+        // Có cả hai thì vẫn giữ BR-44; thiếu một trong hai thì chưa có gì để so.
+        return c.getEffectiveDate() == null || c.getEndDate() == null
+                || !c.getEffectiveDate().after(c.getEndDate());
     }
 
     /**

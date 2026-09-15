@@ -337,7 +337,11 @@
                                         <c:when test="${contract.signingDate != null}"><fmt:formatDate value="${contract.signingDate}" pattern="dd/MM/yy"/></c:when>
                                         <c:otherwise><span style="color:#9ca3af;">chưa ký</span></c:otherwise>
                                     </c:choose>
-                                    &rarr; <fmt:formatDate value="${contract.endDate}" pattern="dd/MM/yy"/>
+                                    &rarr;
+                                    <c:choose>
+                                        <c:when test="${contract.endDate != null}"><fmt:formatDate value="${contract.endDate}" pattern="dd/MM/yy"/></c:when>
+                                        <c:otherwise><span style="color:#9ca3af;">chưa chốt</span></c:otherwise>
+                                    </c:choose>
                                 </td>
                                 <td>
                                     <c:choose>

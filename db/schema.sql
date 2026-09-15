@@ -4357,8 +4357,10 @@ CREATE TABLE `contracts` (
   -- Cặp đôi CHÉO -- xem ghi chú đầu V21.
   `direction` varchar(10) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'Bán',
   `signing_date` date DEFAULT NULL,
-  `effective_date` date NOT NULL,
-  `end_date` date NOT NULL,
+  -- Nullable: bản Nháp chưa chốt được thời hạn (là kết quả đàm phán).
+  -- NULL chỉ tồn tại trong quãng Nháp -- không ký được khi thiếu. Xem V26.
+  `effective_date` date DEFAULT NULL,
+  `end_date` date DEFAULT NULL,
   `enterprise_id` int NOT NULL,
   `owner_id` int NOT NULL,
   `attachment_url` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,

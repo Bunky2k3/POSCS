@@ -344,7 +344,7 @@ public class ContractDAOTest {
 
     @Test
     public void changeProgressStatus_illegalStep_rollsBackAndWritesNothing() throws Exception {
-        ResultSet current = singleRow(row("progress_status", ContractDAO.PROGRESS_LIQUIDATED));
+        ResultSet current = singleRow(contractRow(ContractDAO.PROGRESS_LIQUIDATED));
         PreparedStatement ps = mock(PreparedStatement.class);
         when(ps.executeQuery()).thenReturn(current);
         Connection conn = connectionReturning(ps);
@@ -363,7 +363,7 @@ public class ContractDAOTest {
 
     @Test
     public void changeProgressStatus_signing_stampsSigningDateAndLogsBothEnds() throws Exception {
-        ResultSet current = singleRow(row("progress_status", ContractDAO.PROGRESS_DRAFT));
+        ResultSet current = singleRow(contractRow(ContractDAO.PROGRESS_DRAFT));
         PreparedStatement historyPs = mock(PreparedStatement.class);
         PreparedStatement contractPs = mock(PreparedStatement.class);
         when(contractPs.executeQuery()).thenReturn(current);
@@ -391,7 +391,7 @@ public class ContractDAOTest {
 
     @Test
     public void changeProgressStatus_liquidating_doesNotTouchSigningDate() throws Exception {
-        ResultSet current = singleRow(row("progress_status", ContractDAO.PROGRESS_SIGNED));
+        ResultSet current = singleRow(contractRow(ContractDAO.PROGRESS_SIGNED));
         PreparedStatement historyPs = mock(PreparedStatement.class);
         PreparedStatement contractPs = mock(PreparedStatement.class);
         when(contractPs.executeQuery()).thenReturn(current);
@@ -416,6 +416,26 @@ public class ContractDAOTest {
      * không phụ thuộc ngược lên DAO. Hai bên lệch nhau một dấu là nút bấm trên
      * JSP biến mất mà không ai hiểu vì sao -- nên canh ở đây.
      */
+    @Test
+    public void changeProgressStatus_signingWithoutATerm_isRefused() throws Exception {
+        // Chỉ có trạng thái, hai mốc thời hạn để trống.
+        ResultSet current = singleRow(row("progress_status", ContractDAO.PROGRESS_DRAFT));
+        PreparedStatement ps = mock(PreparedStatement.class);
+        when(ps.executeQuery()).thenReturn(current);
+        Connection conn = connectionReturning(ps);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            // Hợp đồng không có thời hạn thì không phải hợp đồng. Đây là thứ
+            // giữ cho việc nới effective_date/end_date thành nullable ở V26 an
+            // toàn: NULL chỉ tồn tại trong quãng Nháp.
+            assertFalse(dao.changeProgressStatus(5, ContractDAO.PROGRESS_SIGNED, ACTOR, null));
+            verify(ps, never()).executeUpdate();
+            verify(conn).rollback();
+        }
+    }
+
     @Test
     public void progressConstants_matchTheOnesOnTheModel() {
         Contract c = new Contract();
@@ -690,6 +710,19 @@ public class ContractDAOTest {
 
             assertTrue(capturedSql(conn).contains("ORDER BY p.province_name IS NULL"));
         }
+    }
+
+    /**
+     * Một dòng hợp đồng đủ cột cho {@code changeProgressStatus}, vốn đọc cả
+     * bản ghi bằng SELECT ... FOR UPDATE chứ không chỉ đọc trạng thái.
+     *
+     * <p>Phải có đủ effective_date và end_date: từ V26 hai cột đó nullable, và
+     * hợp đồng thiếu thời hạn thì KHÔNG ký được.
+     */
+    private static java.util.Map<String, Object> contractRow(String progressStatus) {
+        return row("progress_status", progressStatus,
+                "effective_date", Date.valueOf(LocalDate.now()),
+                "end_date", Date.valueOf(LocalDate.now().plusYears(1)));
     }
 
     /**

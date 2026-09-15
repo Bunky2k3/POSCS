@@ -133,25 +133,25 @@
                         <span class="error-text" id="err-contractType">Vui lòng chọn loại hợp đồng.</span>
                     </div>
 
-                    <%-- KHÔNG có ô "Ngày ký" ở form tạo. Hợp đồng mới ra ở trạng
-                         thái Nháp; ngày ký được đóng dấu lúc bấm nút Ký ở trang
-                         chi tiết. Để ô này lại thì người dùng điền vào và sinh
-                         ra bản ghi tự mâu thuẫn -- tiến độ ghi "Nháp" mà vẫn có
-                         ngày ký -- đồng thời mở đường ký lùi ngày. --%>
-                    <div class="col-md-6 field-row">
-                        <label>Ngày hiệu lực dự kiến <span class="req">*</span></label>
-                        <input type="date" class="form-control" id="effectiveDate" name="effectiveDate">
-                        <span class="error-text" id="err-dates">Ngày hiệu lực phải trước hoặc bằng ngày kết thúc.</span>
-                    </div>
-                    <div class="col-md-6 field-row">
-                        <label>Ngày kết thúc dự kiến <span class="req">*</span></label>
-                        <input type="date" class="form-control" id="endDate" name="endDate">
-                    </div>
+                    <%-- KHÔNG có ô ngày nào ở form tạo. Cả ba mốc -- ngày ký,
+                         ngày hiệu lực, ngày kết thúc -- đều là KẾT QUẢ, không
+                         phải thứ biết trước lúc mở hồ sơ:
+
+                           * hiệu lực và kết thúc là kết quả đàm phán, điền ở
+                             form sửa khi hai bên đã thống nhất;
+                           * ngày ký do hệ thống đóng dấu lúc bấm nút Ký.
+
+                         Bắt nhập ở đây nghĩa là ép người dùng điền số tạm rồi
+                         sửa lại sau, và trong quãng đó CSDL mang một thời hạn
+                         chưa ai đồng ý. Không ký được khi còn thiếu thời hạn
+                         (ContractDAO.changeProgressStatus), nên bỏ ở đây không
+                         mở ra đường nào cho dữ liệu thiếu đi tiếp. --%>
                     <div class="col-12 field-row">
                         <div style="background:#f8fafc; border:1px solid #eef2f6; border-radius:10px; padding:10px 14px; font-size:0.82rem; color:#6b7280;">
                             <i class="fa-solid fa-circle-info" style="color:var(--primary);"></i>
                             Lưu xong, hợp đồng ở trạng thái <strong>Nháp</strong> — còn sửa và xoá thoải mái.
-                            Ngày ký được ghi vào lúc bấm <strong>Ký hợp đồng</strong> ở trang chi tiết.
+                            <strong>Thời hạn</strong> (ngày hiệu lực, ngày kết thúc) điền ở màn hình sửa khi đã
+                            chốt với khách; <strong>ngày ký</strong> được ghi vào lúc bấm Ký hợp đồng.
                         </div>
                     </div>
 
@@ -206,13 +206,7 @@
                 if (!el.value) { document.getElementById('err-' + id).style.display = 'block'; valid = false; }
             });
 
-
-            var effectiveDate = document.getElementById('effectiveDate').value;
-            var endDate = document.getElementById('endDate').value;
-            if (!effectiveDate || !endDate || !(effectiveDate <= endDate)) {
-                document.getElementById('err-dates').style.display = 'block';
-                valid = false;
-            }
+            // Không còn ô ngày nào ở form này -- xem ghi chú ở khối form trên.
 
             return valid;
         }

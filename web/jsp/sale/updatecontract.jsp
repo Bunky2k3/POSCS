@@ -141,14 +141,14 @@
                                 <c:otherwise>Ngày ký đã chốt, không sửa được.</c:otherwise>
                             </c:choose>
                         </span>
-                        <span class="error-text" id="err-dates">Ngày hiệu lực phải trước hoặc bằng ngày kết thúc.</span>
+                        <span class="error-text" id="err-dates">Điền cả hai mốc, và ngày hiệu lực phải trước hoặc bằng ngày kết thúc.</span>
                     </div>
                     <div class="col-md-4 field-row">
-                        <label>Ngày hiệu lực <span class="req">*</span></label>
+                        <label>Ngày hiệu lực</label>
                         <input type="date" class="form-control" id="effectiveDate" name="effectiveDate" value="<fmt:formatDate value="${contract.effectiveDate}" pattern="yyyy-MM-dd"/>">
                     </div>
                     <div class="col-md-4 field-row">
-                        <label>Ngày kết thúc <span class="req">*</span></label>
+                        <label>Ngày kết thúc</label>
                         <input type="date" class="form-control" id="endDate" name="endDate" value="<fmt:formatDate value="${contract.endDate}" pattern="yyyy-MM-dd"/>">
                     </div>
 
@@ -205,9 +205,11 @@
             });
 
 
+            // Để trống được: bản nháp chưa chốt thời hạn. Nhưng điền cả hai
+            // thì thứ tự phải đúng, và phải có đủ hai mốc mới ký được.
             var effectiveDate = document.getElementById('effectiveDate').value;
             var endDate = document.getElementById('endDate').value;
-            if (!effectiveDate || !endDate || !(effectiveDate <= endDate)) {
+            if ((effectiveDate || endDate) && !(effectiveDate && endDate && effectiveDate <= endDate)) {
                 document.getElementById('err-dates').style.display = 'block';
                 valid = false;
             }

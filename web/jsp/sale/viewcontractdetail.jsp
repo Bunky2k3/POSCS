@@ -223,6 +223,12 @@
             <span>Phải có lý do thì mới huỷ được bản ghi hợp đồng.</span>
         </div>
     </c:if>
+    <c:if test="${param.error == 'missing_term'}">
+        <div class="toast-msg blocked show">
+            <i class="fa-solid fa-circle-xmark"></i>
+            <span>Chưa ký được: hợp đồng còn thiếu ngày hiệu lực hoặc ngày kết thúc. Vào Sửa thông tin để điền thời hạn trước.</span>
+        </div>
+    </c:if>
     <c:if test="${param.error == 'progress_failed'}">
         <div class="toast-msg blocked show">
             <i class="fa-solid fa-circle-xmark"></i>
@@ -466,11 +472,17 @@ Nhập lý do:', true)">
                 </div>
                 <div class="col-md-4 field-row">
                     <label>Ngày hiệu lực</label>
-                    <div class="view-value"><fmt:formatDate value="${contract.effectiveDate}" pattern="dd/MM/yyyy"/></div>
+                    <div class="view-value"><c:choose>
+                        <c:when test="${contract.effectiveDate != null}"><fmt:formatDate value="${contract.effectiveDate}" pattern="dd/MM/yyyy"/></c:when>
+                        <c:otherwise><span style="color:#9ca3af;">chưa chốt</span></c:otherwise>
+                    </c:choose></div>
                 </div>
                 <div class="col-md-4 field-row">
                     <label>Ngày kết thúc</label>
-                    <div class="view-value"><fmt:formatDate value="${contract.endDate}" pattern="dd/MM/yyyy"/></div>
+                    <div class="view-value"><c:choose>
+                        <c:when test="${contract.endDate != null}"><fmt:formatDate value="${contract.endDate}" pattern="dd/MM/yyyy"/></c:when>
+                        <c:otherwise><span style="color:#9ca3af;">chưa chốt</span></c:otherwise>
+                    </c:choose></div>
                 </div>
             </div>
         </div>

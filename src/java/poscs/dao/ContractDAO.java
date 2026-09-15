@@ -122,6 +122,12 @@ public class ContractDAO {
 
     private static final String STATUS_CASE_SQL =
         "CASE " +
+        // Nhánh này phải đứng TRƯỚC: mọi so sánh với NULL đều ra NULL, nên
+        // không có nó thì bản nháp chưa chốt thời hạn rơi xuống ELSE và bị gán
+        // "Đang hiệu lực", trong khi computeStatus() bên Java trả "Chưa hiệu
+        // lực". Hai đường tính cùng một quy tắc lệch nhau đúng kiểu mà
+        // ContractStatusIntegrationTest sinh ra để canh.
+        "  WHEN c.effective_date IS NULL OR c.end_date IS NULL THEN '" + STATUS_DRAFT + "' " +
         "  WHEN CURDATE() < c.effective_date THEN '" + STATUS_DRAFT + "' " +
         "  WHEN CURDATE() > c.end_date THEN '" + STATUS_EXPIRED + "' " +
         "  WHEN DATEDIFF(c.end_date, CURDATE()) <= " + SOON_THRESHOLD_DAYS + " THEN '" + STATUS_SOON + "' " +
@@ -270,7 +276,10 @@ public class ContractDAO {
 
         String sql =
             "SELECT " +
-            "  SUM(CASE WHEN CURDATE() < c.effective_date THEN 1 ELSE 0 END) AS draft_count, " +
+            // Gộp cả hợp đồng chưa chốt thời hạn vào đây, nếu không bốn con số
+            // của dải KPI cộng lại không bằng tổng số hợp đồng.
+            "  SUM(CASE WHEN c.effective_date IS NULL OR c.end_date IS NULL " +
+            "           OR CURDATE() < c.effective_date THEN 1 ELSE 0 END) AS draft_count, " +
             "  SUM(CASE WHEN CURDATE() > c.end_date THEN 1 ELSE 0 END) AS expired_count, " +
             "  SUM(CASE WHEN CURDATE() BETWEEN c.effective_date AND c.end_date AND DATEDIFF(c.end_date, CURDATE()) <= " +
                  SOON_THRESHOLD_DAYS + " THEN 1 ELSE 0 END) AS soon_count, " +
@@ -760,11 +769,20 @@ public class ContractDAO {
             conn.setAutoCommit(false);
             boolean committed = false;
             try {
-                String fromStatus = lockProgressStatus(conn, contractId);
-                if (fromStatus == null) {
+                Contract current = lockForUpdate(conn, contractId);
+                if (current == null) {
                     return false;
                 }
+                String fromStatus = current.getProgressStatus();
                 if (!ALLOWED_TRANSITIONS.getOrDefault(fromStatus, Set.of()).contains(toStatus)) {
+                    return false;
+                }
+                // Hợp đồng không có thời hạn thì không phải hợp đồng. Đây là
+                // thứ giữ cho việc nới effective_date/end_date thành nullable ở
+                // V26 an toàn: NULL chỉ tồn tại trong quãng Nháp, không có
+                // đường nào đưa một hợp đồng thiếu thời hạn sang đã ký.
+                if (PROGRESS_SIGNED.equals(toStatus)
+                        && (current.getEffectiveDate() == null || current.getEndDate() == null)) {
                     return false;
                 }
 

@@ -96,10 +96,17 @@ public class ContractControllerTest {
         when(session.getAttribute("currentUser")).thenReturn(user);
     }
 
+    /**
+     * Hợp đồng đủ thời hạn -- từ V26 hai mốc đó nullable và ContractController
+     * chặn việc ký khi còn thiếu, nên thiếu chúng là mọi test về ký đều
+     * trượt sang nhánh missing_term.
+     */
     private static Contract contractWithProgress(String progressStatus) {
         Contract c = new Contract();
         c.setContractId(5);
         c.setProgressStatus(progressStatus);
+        c.setEffectiveDate(sqlDate(2026, 1, 15));
+        c.setEndDate(sqlDate(2026, 12, 31));
         return c;
     }
 
@@ -457,6 +464,24 @@ public class ContractControllerTest {
 
         verify(contractDAO).changeProgressStatus(eq(5), eq(ContractDAO.PROGRESS_LIQUIDATED), eq(99),
                 eq("Biên bản thanh lý số 12"));
+    }
+
+    @Test
+    public void sign_contractWithoutATerm_isRefusedWithItsOwnReason() throws Exception {
+        when(request.getParameter("action")).thenReturn("changeProgress");
+        when(request.getParameter("contractId")).thenReturn("5");
+        when(request.getParameter("toStatus")).thenReturn(ContractDAO.PROGRESS_SIGNED);
+        Contract noTerm = new Contract();
+        noTerm.setContractId(5);
+        noTerm.setProgressStatus(ContractDAO.PROGRESS_DRAFT);
+        when(contractDAO.findById(5)).thenReturn(noTerm);
+
+        controller.doPost(request, response);
+
+        // Báo đúng lý do chứ không phải "không chuyển được trạng thái"
+        // chung chung -- người dùng cần biết phải đi điền thời hạn trước.
+        verify(contractDAO, never()).changeProgressStatus(anyInt(), anyString(), anyInt(), any());
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=view&id=5&error=missing_term");
     }
 
     @Test
