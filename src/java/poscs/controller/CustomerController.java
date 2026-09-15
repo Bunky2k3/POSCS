@@ -21,7 +21,6 @@ import poscs.common.Logs;
 import poscs.dao.AddressDAO;
 import poscs.dao.ContractDAO;
 import poscs.dao.CustomerDAO;
-import poscs.dao.CustomerLifecycleEventDAO;
 import poscs.dao.EmployeeDAO;
 import poscs.dao.TechnicalSupportTicketDAO;
 import poscs.model.Address;
@@ -60,7 +59,6 @@ public class CustomerController extends HttpServlet {
     private final AddressDAO addressDAO = new AddressDAO();
     private final ContractDAO contractDAO = new ContractDAO();
     private final TechnicalSupportTicketDAO ticketDAO = new TechnicalSupportTicketDAO();
-    private final CustomerLifecycleEventDAO lifecycleEventDAO = new CustomerLifecycleEventDAO();
 
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
@@ -174,7 +172,7 @@ public class CustomerController extends HttpServlet {
         request.setAttribute("contactList", customerDAO.findContactsByEnterpriseId(id));
         request.setAttribute("contractList", contractDAO.findByEnterpriseId(id));
         request.setAttribute("ticketList", ticketDAO.findByEnterpriseId(id));
-        request.setAttribute("lifecycleEventList", lifecycleEventDAO.findByEnterpriseId(id));
+        request.setAttribute("lifecycleEventList", customerDAO.findLifecycleEventsByEnterpriseId(id));
 
         request.getRequestDispatcher(DETAIL_VIEW).forward(request, response);
     }
@@ -441,7 +439,7 @@ public class CustomerController extends HttpServlet {
         event.setDescription(emptyToNull(request.getParameter("description")));
         event.setEventDate(Date.valueOf(LocalDate.now()));
         event.setRecordedBy(currentUser.getUserId());
-        lifecycleEventDAO.insert(event);
+        customerDAO.insertLifecycleEvent(event);
 
         response.sendRedirect(request.getContextPath() + "/customer?action=view&id=" + id + "&evaluated=1");
     }
