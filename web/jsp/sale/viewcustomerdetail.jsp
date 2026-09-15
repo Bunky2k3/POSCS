@@ -195,10 +195,10 @@
         <c:set var="activeNav" value="customer" scope="request"/>
         <%-- Trang này không có tham số kind trên URL, nên suy mục con cần tô
              sáng từ chính vai của khách: chỉ khi khách CHỈ là bên bán mới sáng
-             "Khách hàng bán". Khách hai vai thì sáng "Khách hàng mua" -- phải
+             "Nhà cung cấp". Khách hai vai thì sáng "Khách hàng mua" -- phải
              chọn một, và đó là danh sách mặc định. --%>
         <c:set var="activeCustomerKind" scope="request"
-               value="${not empty customerRoles and customerRoles.contains('Khách bán') and not customerRoles.contains('Khách mua') ? 'supplier' : 'buyer'}"/>
+               value="${not empty customerRoles and customerRoles.contains('Nhà cung cấp') and not customerRoles.contains('Khách mua') ? 'supplier' : 'buyer'}"/>
         <%@ include file="/jsp/common/sidebar.jsp" %>
         <div class="main-content">
 
@@ -258,7 +258,7 @@
                     <div class="view-value">
                         <c:choose>
                             <c:when test="${not empty customerRoles}">
-                                <c:forEach var="r" items="${customerRoles}" varStatus="st">${r == 'Khách bán' ? 'Khách hàng bán' : 'Khách hàng mua'}<c:if test="${!st.last}">, </c:if></c:forEach>
+                                <c:forEach var="r" items="${customerRoles}" varStatus="st">${r == 'Nhà cung cấp' ? 'Nhà cung cấp' : 'Khách hàng mua'}<c:if test="${!st.last}">, </c:if></c:forEach>
                             </c:when>
                             <c:otherwise>&mdash;</c:otherwise>
                         </c:choose>

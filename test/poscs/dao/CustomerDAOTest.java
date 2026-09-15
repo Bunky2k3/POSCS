@@ -481,14 +481,14 @@ public class CustomerDAOTest {
         try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
             db.when(DBContext::getConnection).thenReturn(conn);
 
-            dao.findAll(1, 10, null, null, null, null, false, "Khách bán");
+            dao.findAll(1, 10, null, null, null, null, false, "Nhà cung cấp");
 
             String sql = capturedSql(conn);
             assertTrue("phải lọc bằng EXISTS", sql.contains("EXISTS"));
             assertFalse("không được JOIN enterprise_roles",
                     sql.contains("JOIN enterprise_roles"));
             // bindParams dùng setObject cho mọi tham số, không phải setString.
-            verify(ps).setObject(1, "Khách bán");
+            verify(ps).setObject(1, "Nhà cung cấp");
         }
     }
 
@@ -556,13 +556,13 @@ public class CustomerDAOTest {
     @Test
     public void findRolesOf_traVeDuCaHaiVai() throws Exception {
         PreparedStatement ps = statementReturning(resultSetOf(List.of(
-                row("role", "Khách bán"), row("role", "Khách mua"))));
+                row("role", "Nhà cung cấp"), row("role", "Khách mua"))));
         Connection conn = connectionReturning(ps);
 
         try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
             db.when(DBContext::getConnection).thenReturn(conn);
 
-            assertEquals(List.of("Khách bán", "Khách mua"), dao.findRolesOf(5));
+            assertEquals(List.of("Nhà cung cấp", "Khách mua"), dao.findRolesOf(5));
             verify(ps).setInt(1, 5);
         }
     }

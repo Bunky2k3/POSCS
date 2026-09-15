@@ -57,7 +57,7 @@ public class CustomerController extends HttpServlet {
      * chữ đó theo chiều ngược lại.
      */
     private static final String ROLE_BUYER = "Khách mua";
-    private static final String ROLE_SUPPLIER = "Khách bán";
+    private static final String ROLE_SUPPLIER = "Nhà cung cấp";
 
     private static final String LIST_VIEW = "/jsp/sale/listcustomer.jsp";
     private static final String DETAIL_VIEW = "/jsp/sale/viewcustomerdetail.jsp";
@@ -209,7 +209,7 @@ public class CustomerController extends HttpServlet {
         // riêng. Khoá thật nằm ở resolveAccountOwnerId, đây chỉ là tầng hiển thị.
         request.setAttribute("territoryAssignments", employeeDAO.findAllAssignments());
         // Tick sẵn vai ứng với danh sách người dùng vừa đứng: bấm "Thêm" từ
-        // trang Khách hàng bán mà form mặc định là khách mua thì lưu xong nó
+        // trang Nhà cung cấp mà form mặc định là khách mua thì lưu xong nó
         // rơi vào danh sách kia, và người nhập không hiểu vì sao.
         request.setAttribute("customerRoles",
                 List.of(roleFromKind(request.getParameter("kind"))));
@@ -260,7 +260,7 @@ public class CustomerController extends HttpServlet {
         // Sắp theo tỉnh (sortByProvince=true): quản lý khách hàng chia theo địa bàn
         // nên file xuất ra phải gom các dòng cùng tỉnh lại với nhau, không phải
         // mới-nhất-trước như danh sách trên màn hình.
-        // Xuất đúng danh sách đang xem: đứng ở "Khách hàng bán" mà bấm Xuất
+        // Xuất đúng danh sách đang xem: đứng ở "Nhà cung cấp" mà bấm Xuất
         // Excel lại ra khách mua thì người dùng không cách nào biết file sai.
         String roleFilter = roleFromKind(request.getParameter("kind"));
         List<Enterprise> all = customerDAO.findAll(1, Integer.MAX_VALUE, keyword, typeFilter, assigneeFilter,
@@ -294,7 +294,7 @@ public class CustomerController extends HttpServlet {
             });
         }
         ExcelUtil.writeWorkbook(response,
-                ROLE_SUPPLIER.equals(roleFilter) ? "khach_hang_ban" : "khach_hang_mua",
+                ROLE_SUPPLIER.equals(roleFilter) ? "nha_cung_cap" : "khach_hang_mua",
                 headers, rows);
     }
 
@@ -520,7 +520,7 @@ public class CustomerController extends HttpServlet {
     /**
      * Đổi tham số {@code kind} trên URL thành vai trong CSDL.
      *
-     * <p>Chỉ "supplier" mới ra khách bán; mọi giá trị khác -- kể cả thiếu hẳn
+     * <p>Chỉ "supplier" mới ra nhà cung cấp; mọi giá trị khác -- kể cả thiếu hẳn
      * -- đều ra khách mua. Cố ý KHÔNG trả null cho "xem tất cả": trộn hai
      * chiều vào một danh sách chính là cái chung chung mà việc tách này sinh
      * ra để bỏ, và một công ty giữ cả hai vai sẽ khó nói nó đang nằm ở đâu.

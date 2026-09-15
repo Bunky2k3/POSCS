@@ -61,6 +61,7 @@
     <%@ include file="/jsp/common/topbar.jsp" %>
     <div class="app-shell">
         <c:set var="activeNav" value="contract" scope="request"/>
+        <c:set var="activeContractKind" value="${kind}" scope="request"/>
         <%@ include file="/jsp/common/sidebar.jsp" %>
         <div class="main-content">
 

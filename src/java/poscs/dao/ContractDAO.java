@@ -61,7 +61,7 @@ public class ContractDAO {
         "LEFT JOIN provinces p ON d.province_id = p.province_id ";
 
     private static final String SELECT_BASE =
-        "SELECT c.contract_id, c.contract_code, c.title, c.contract_type, c.signing_date, " +
+        "SELECT c.contract_id, c.contract_code, c.title, c.contract_type, c.direction, c.signing_date, " +
         "       c.effective_date, c.end_date, c.enterprise_id, c.owner_id, c.attachment_url, " +
         "       c.created_at, c.updated_at, c.is_deleted, " +
         "       e.enterprise_name, p.province_id, p.province_name, " +
@@ -85,7 +85,7 @@ public class ContractDAO {
      */
     public List<Contract> findByEnterpriseId(int enterpriseId) {
         List<Contract> result = new ArrayList<>();
-        String sql = "SELECT contract_id, contract_code, title, contract_type, signing_date, " +
+        String sql = "SELECT contract_id, contract_code, title, contract_type, direction, signing_date, " +
                      "effective_date, end_date, enterprise_id, owner_id, attachment_url " +
                      "FROM contracts WHERE enterprise_id = ? AND is_deleted = 0 ORDER BY signing_date DESC";
         try (Connection conn = DBContext.getConnection();
@@ -98,6 +98,8 @@ public class ContractDAO {
                     c.setContractCode(rs.getString("contract_code"));
                     c.setTitle(rs.getString("title"));
                     c.setContractType(rs.getString("contract_type"));
+        c.setDirection(rs.getString("direction"));
+                    c.setDirection(rs.getString("direction"));
                     c.setSigningDate(rs.getDate("signing_date"));
                     c.setEffectiveDate(rs.getDate("effective_date"));
                     c.setEndDate(rs.getDate("end_date"));
@@ -130,7 +132,7 @@ public class ContractDAO {
      */
     public List<Contract> findAll(int page, int pageSize, String keyword, String statusFilter, String typeFilter,
             Integer provinceId, boolean sortByProvince) {
-        return findAll(page, pageSize, keyword, statusFilter, typeFilter, provinceId, sortByProvince, null);
+        return findAll(page, pageSize, keyword, statusFilter, typeFilter, provinceId, sortByProvince, null, null);
     }
 
     /**
@@ -140,11 +142,11 @@ public class ContractDAO {
      * người ta theo dõi -- ngày hiệu lực có thể rơi sang kỳ sau.
      */
     public List<Contract> findAll(int page, int pageSize, String keyword, String statusFilter, String typeFilter,
-            Integer provinceId, boolean sortByProvince, Period period) {
+            Integer provinceId, boolean sortByProvince, Period period, String direction) {
         List<Contract> result = new ArrayList<>();
         StringBuilder sql = new StringBuilder(SELECT_BASE);
         List<Object> params = new ArrayList<>();
-        appendFilters(sql, params, keyword, statusFilter, typeFilter, provinceId, period);
+        appendFilters(sql, params, keyword, statusFilter, typeFilter, provinceId, period, direction);
         sql.append(sortByProvince
                 ? " ORDER BY p.province_name IS NULL, " + AddressDAO.PROVINCE_SHORT_NAME_ORDER
                         + ", c.contract_id DESC LIMIT ? OFFSET ?"
@@ -173,16 +175,17 @@ public class ContractDAO {
 
     /** Như {@link #countAll(String, String, String)} nhưng lọc thêm theo tỉnh/thành. */
     public int countAll(String keyword, String statusFilter, String typeFilter, Integer provinceId) {
-        return countAll(keyword, statusFilter, typeFilter, provinceId, null);
+        return countAll(keyword, statusFilter, typeFilter, provinceId, null, null);
     }
 
     /** Như trên, kèm lọc theo kỳ (ngày ký). */
-    public int countAll(String keyword, String statusFilter, String typeFilter, Integer provinceId, Period period) {
+    public int countAll(String keyword, String statusFilter, String typeFilter, Integer provinceId, Period period,
+            String direction) {
         StringBuilder sql = new StringBuilder(
             "SELECT COUNT(*) FROM contracts c LEFT JOIN enterprises e ON c.enterprise_id = e.enterprise_id "
             + JOIN_PROVINCE_OF_ENTERPRISE);
         List<Object> params = new ArrayList<>();
-        appendFilters(sql, params, keyword, statusFilter, typeFilter, provinceId, period);
+        appendFilters(sql, params, keyword, statusFilter, typeFilter, provinceId, period, direction);
 
         try (Connection conn = DBContext.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql.toString())) {
@@ -205,11 +208,11 @@ public class ContractDAO {
 
     /** Như {@link #countStatusSummary()} nhưng chỉ đếm hợp đồng thuộc 1 tỉnh (null = toàn quốc). */
     public Map<String, Integer> countStatusSummary(Integer provinceId) {
-        return countStatusSummary(provinceId, null);
+        return countStatusSummary(provinceId, null, null);
     }
 
     /** Như trên, kèm lọc theo kỳ (ngày ký) -- null = mọi thời điểm. */
-    public Map<String, Integer> countStatusSummary(Integer provinceId, Period period) {
+    public Map<String, Integer> countStatusSummary(Integer provinceId, Period period, String direction) {
         Map<String, Integer> summary = new HashMap<>();
         summary.put(STATUS_ACTIVE, 0);
         summary.put(STATUS_SOON, 0);
@@ -385,9 +388,9 @@ public class ContractDAO {
     /** Thêm hợp đồng mới. Trả về contract_id vừa tạo, hoặc -1 nếu lỗi. */
     public int insert(Contract contract) {
         String sql = "INSERT INTO contracts " +
-                "(contract_code, title, contract_type, signing_date, effective_date, end_date, " +
+                "(contract_code, title, contract_type, direction, signing_date, effective_date, end_date, " +
                 " enterprise_id, owner_id, attachment_url, status) " +
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
         // contract_code sinh từ generateNextContractCode() (đọc mã lớn nhất hiện có
         // rồi +1) có thể trùng nếu 2 request tạo hợp đồng gần như đồng thời cùng
@@ -401,13 +404,14 @@ public class ContractDAO {
                 ps.setString(1, contract.getContractCode());
                 ps.setString(2, contract.getTitle());
                 ps.setString(3, contract.getContractType());
-                ps.setDate(4, contract.getSigningDate());
-                ps.setDate(5, contract.getEffectiveDate());
-                ps.setDate(6, contract.getEndDate());
-                ps.setInt(7, contract.getEnterpriseId());
-                ps.setInt(8, contract.getOwnerId());
-                ps.setString(9, contract.getAttachmentUrl());
-                ps.setString(10, computeStatus(contract.getEffectiveDate(), contract.getEndDate()));
+                ps.setString(4, contract.getDirection());
+                ps.setDate(5, contract.getSigningDate());
+                ps.setDate(6, contract.getEffectiveDate());
+                ps.setDate(7, contract.getEndDate());
+                ps.setInt(8, contract.getEnterpriseId());
+                ps.setInt(9, contract.getOwnerId());
+                ps.setString(10, contract.getAttachmentUrl());
+                ps.setString(11, computeStatus(contract.getEffectiveDate(), contract.getEndDate()));
 
                 int affected = ps.executeUpdate();
                 if (affected == 0) {
@@ -489,7 +493,14 @@ public class ContractDAO {
         }
     }
 
-    /** Cập nhật thông tin chung của hợp đồng đang có. Trả về true nếu cập nhật thành công. */
+    /**
+     * Cập nhật thông tin chung của hợp đồng đang có. Trả về true nếu thành công.
+     *
+     * <p>CỐ Ý KHÔNG đổi {@code direction}: chiều được chốt lúc tạo. Đổi chiều
+     * của một hợp đồng đã ký nghĩa là đối tác đang giữ sai vai, và mọi con số
+     * doanh thu đã báo cáo trước đó lặng lẽ đổi nghĩa. Cần đổi thì xoá và tạo
+     * lại, để có dấu vết.
+     */
     public boolean update(Contract contract) {
         String sql = "UPDATE contracts SET " +
                 "title = ?, contract_type = ?, signing_date = ?, effective_date = ?, end_date = ?, " +
@@ -552,7 +563,7 @@ public class ContractDAO {
     // ------------------------------------------------------------------
 
     private void appendFilters(StringBuilder sql, List<Object> params, String keyword, String statusFilter,
-            String typeFilter, Integer provinceId, Period period) {
+            String typeFilter, Integer provinceId, Period period, String direction) {
         List<String> conditions = new ArrayList<>();
         conditions.add("c.is_deleted = 0");
 
@@ -579,6 +590,12 @@ public class ContractDAO {
             conditions.add("c.signing_date BETWEEN ? AND ?");
             params.add(period.getFrom());
             params.add(period.getTo());
+        }
+        // Chiều đứng ĐỘC LẬP với kỳ: hai mục con Hợp đồng bán / Hợp đồng mua
+        // vẫn phải lọc được theo năm/quý/tháng như trước.
+        if (direction != null && !direction.trim().isEmpty()) {
+            conditions.add("c.direction = ?");
+            params.add(direction);
         }
 
         sql.append("WHERE ").append(String.join(" AND ", conditions));
@@ -694,7 +711,12 @@ public class ContractDAO {
                      "LEFT JOIN enterprises e ON c.enterprise_id = e.enterprise_id " +
                      "LEFT JOIN addresses a ON e.address_id = a.address_id " +
                      "LEFT JOIN districts d ON a.districts_id = d.districts_id " +
-                     "WHERE p.paid_date IS NOT NULL AND p.paid_date BETWEEN ? AND ?" +
+                     "WHERE p.paid_date IS NOT NULL AND p.paid_date BETWEEN ? AND ? " +
+                     // CHỈ hợp đồng BÁN RA. Doanh thu là tiền về, không phải
+                     // mọi khoản đi qua contract_payments -- thiếu điều kiện này
+                     // thì hợp đồng MUA đầu tiên nhập vào là KPI tự cộng cả tiền
+                     // mình đi trả, sai âm thầm cho tới lúc đối chiếu sổ sách.
+                     "AND c.direction = 'Bán' " +
                      (provinceId != null ? " AND d.province_id = ?" : "");
         try (Connection conn = DBContext.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -731,7 +753,12 @@ public class ContractDAO {
                      "LEFT JOIN enterprises e ON c.enterprise_id = e.enterprise_id " +
                      "LEFT JOIN addresses a ON e.address_id = a.address_id " +
                      "LEFT JOIN districts d ON a.districts_id = d.districts_id " +
-                     "WHERE p.paid_date IS NOT NULL AND YEAR(p.paid_date) = ? AND MONTH(p.paid_date) = ?" +
+                     "WHERE p.paid_date IS NOT NULL AND YEAR(p.paid_date) = ? AND MONTH(p.paid_date) = ? " +
+                     // CHỈ hợp đồng BÁN RA. Doanh thu là tiền về, không phải
+                     // mọi khoản đi qua contract_payments -- thiếu điều kiện này
+                     // thì hợp đồng MUA đầu tiên nhập vào là KPI tự cộng cả tiền
+                     // mình đi trả, sai âm thầm cho tới lúc đối chiếu sổ sách.
+                     "AND c.direction = 'Bán' " +
                      (provinceId != null ? " AND d.province_id = ?" : "");
         try (Connection conn = DBContext.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {

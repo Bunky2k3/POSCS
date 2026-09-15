@@ -10,6 +10,10 @@
     | changerequest | systemLog.
     Không set thì không mục nào được tô sáng (không lỗi, chỉ mất highlight).
 
+    Riêng "contract" cũng có hai mục con; trang set thêm
+        <c:set var="activeContractKind" value="${kind}" scope="request"/>
+    với giá trị sell | buy. Thiếu thì mặc định sáng "Hợp đồng bán".
+
     Riêng "customer" có hai mục con; trang cần set thêm
         <c:set var="activeCustomerKind" value="${kind}" scope="request"/>
     với giá trị buyer | supplier. Thiếu thì mặc định sáng mục "Khách hàng mua"
@@ -23,9 +27,15 @@
     <div class="sidebar-group-label"><i class="fa-solid fa-users"></i><span>Khách hàng</span></div>
     <div class="sidebar-sub">
         <a href="${pageContext.request.contextPath}/customer?kind=buyer" class="sidebar-link ${activeNav == 'customer' and activeCustomerKind != 'supplier' ? 'active' : ''}"><i class="fa-solid fa-cart-shopping"></i><span>Khách hàng mua</span></a>
-        <a href="${pageContext.request.contextPath}/customer?kind=supplier" class="sidebar-link ${activeNav == 'customer' and activeCustomerKind == 'supplier' ? 'active' : ''}"><i class="fa-solid fa-truck-field"></i><span>Khách hàng bán</span></a>
+        <a href="${pageContext.request.contextPath}/customer?kind=supplier" class="sidebar-link ${activeNav == 'customer' and activeCustomerKind == 'supplier' ? 'active' : ''}"><i class="fa-solid fa-truck-field"></i><span>Nhà cung cấp</span></a>
     </div>
-    <a href="${pageContext.request.contextPath}/contract" class="sidebar-link ${activeNav == 'contract' ? 'active' : ''}"><i class="fa-solid fa-file-contract"></i><span>Hợp đồng</span></a>
+    <%-- Hợp đồng tách hai mục con theo chiều (xem ghi chú đầu V21). Cặp đôi
+         với vai khách hàng bị CHÉO: hợp đồng BÁN ký với "Khách hàng mua". --%>
+    <div class="sidebar-group-label"><i class="fa-solid fa-file-contract"></i><span>Hợp đồng</span></div>
+    <div class="sidebar-sub">
+        <a href="${pageContext.request.contextPath}/contract?kind=sell" class="sidebar-link ${activeNav == 'contract' and activeContractKind != 'buy' ? 'active' : ''}"><i class="fa-solid fa-file-export"></i><span>Hợp đồng bán</span></a>
+        <a href="${pageContext.request.contextPath}/contract?kind=buy" class="sidebar-link ${activeNav == 'contract' and activeContractKind == 'buy' ? 'active' : ''}"><i class="fa-solid fa-file-import"></i><span>Hợp đồng mua</span></a>
+    </div>
     <a href="${pageContext.request.contextPath}/product" class="sidebar-link ${activeNav == 'product' ? 'active' : ''}"><i class="fa-solid fa-box"></i><span>Sản phẩm</span></a>
     <a href="${pageContext.request.contextPath}/ticket" class="sidebar-link ${activeNav == 'ticket' ? 'active' : ''}"><i class="fa-solid fa-headset"></i><span>Phiếu hỗ trợ</span></a>
     <c:if test="${sessionScope.currentUser.role.roleName == 'Admin'}"><a href="${pageContext.request.contextPath}/employee" class="sidebar-link ${activeNav == 'employee' ? 'active' : ''}"><i class="fa-solid fa-user-tie"></i><span>Nhân viên</span></a></c:if>

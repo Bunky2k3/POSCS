@@ -54,7 +54,8 @@ public class DashboardControllerTest {
 
         // Stub chung cho mọi test -- không phải trọng tâm nhưng bắt buộc để
         // tránh NPE khi controller đọc qua các map/list này.
-        when(contractDAO.countStatusSummary(nullable(Integer.class), nullable(Period.class))).thenReturn(Collections.emptyMap());
+        when(contractDAO.countStatusSummary(nullable(Integer.class), nullable(Period.class), nullable(String.class)))
+                .thenReturn(Collections.emptyMap());
         when(ticketDAO.countStatusSummary(nullable(Integer.class), nullable(Period.class))).thenReturn(Collections.emptyMap());
         when(contractDAO.findExpiringSoon(anyInt(), nullable(Integer.class))).thenReturn(Collections.emptyList());
         when(ticketDAO.findNeedingAttention(anyInt(), nullable(Integer.class))).thenReturn(Collections.emptyList());
@@ -140,7 +141,8 @@ public class DashboardControllerTest {
         when(request.getParameter("provinceId")).thenReturn("3");
         when(customerDAO.countUpToEndOfPeriod(eq(3), nullable(Period.class))).thenReturn(2);
         when(contractDAO.sumInvoiceAmountByMonth(anyInt(), anyInt(), eq(3))).thenReturn(BigDecimal.ZERO);
-        when(contractDAO.countStatusSummary(eq(3), nullable(Period.class))).thenReturn(Collections.emptyMap());
+        when(contractDAO.countStatusSummary(eq(3), nullable(Period.class), nullable(String.class)))
+                .thenReturn(Collections.emptyMap());
         when(ticketDAO.countStatusSummary(eq(3), nullable(Period.class))).thenReturn(Collections.emptyMap());
         when(contractDAO.findExpiringSoon(anyInt(), eq(3))).thenReturn(Collections.emptyList());
         when(ticketDAO.findNeedingAttention(anyInt(), eq(3))).thenReturn(Collections.emptyList());
@@ -149,7 +151,7 @@ public class DashboardControllerTest {
 
         verify(customerDAO).countUpToEndOfPeriod(eq(3), nullable(Period.class));
         verify(customerDAO).countNewInPeriod(eq(3), nullable(Period.class));
-        verify(contractDAO).countStatusSummary(eq(3), nullable(Period.class));
+        verify(contractDAO).countStatusSummary(eq(3), nullable(Period.class), nullable(String.class));
         verify(contractDAO).findExpiringSoon(anyInt(), eq(3));
         verify(ticketDAO).countStatusSummary(eq(3), nullable(Period.class));
         verify(ticketDAO).countOverdueOrDueSoon(3);
@@ -182,7 +184,7 @@ public class DashboardControllerTest {
                 argThat(p -> "2026-07-01".equals(p.getFrom().toString())
                         && "2026-09-30".equals(p.getTo().toString())));
         verify(customerDAO).countNewInPeriod(isNull(), any(Period.class));
-        verify(contractDAO).countStatusSummary(isNull(), any(Period.class));
+        verify(contractDAO).countStatusSummary(isNull(), any(Period.class), isNull());
         verify(ticketDAO).countStatusSummary(isNull(), any(Period.class));
         verify(contractDAO, times(2)).sumInvoiceAmountInPeriod(any(Period.class), nullable(Integer.class));
         // Có kỳ thì không được rơi về nhánh "tháng hiện tại" nữa.
@@ -215,7 +217,7 @@ public class DashboardControllerTest {
 
         controller.doGet(request, response);
 
-        verify(contractDAO).countStatusSummary(isNull(), isNull());
+        verify(contractDAO).countStatusSummary(isNull(), isNull(), isNull());
         verify(request).setAttribute("provinceFilter", null);
     }
 }

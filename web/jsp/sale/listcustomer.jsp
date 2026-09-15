@@ -252,7 +252,7 @@
              không thì bấm sang trang 2 hay bấm Xuất Excel là rơi về danh sách
              khách mua. --%>
         <c:set var="activeCustomerKind" value="${kind}" scope="request"/>
-        <c:set var="kindLabel" value="${kind == 'supplier' ? 'Khách hàng bán' : 'Khách hàng mua'}"/>
+        <c:set var="kindLabel" value="${kind == 'supplier' ? 'Nhà cung cấp' : 'Khách hàng mua'}"/>
         <%@ include file="/jsp/common/sidebar.jsp" %>
         <div class="main-content">
 

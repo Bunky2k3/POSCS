@@ -1,6 +1,7 @@
 package poscs.controller;
 
 import java.lang.reflect.Field;
+import java.util.List;
 import java.sql.Date;
 import java.time.LocalDate;
 import jakarta.servlet.RequestDispatcher;
@@ -180,6 +181,10 @@ public class ContractControllerTest {
         when(request.getParameter("endDate")).thenReturn("2026-12-31");
         when(request.getParameter("enterpriseId")).thenReturn("10");
         when(request.getParameter("ownerId")).thenReturn("99");
+        // Từ V21, đối tác phải giữ vai khớp chiều hợp đồng. Không có kind
+        // trên request nghĩa là hợp đồng BÁN, nên khách #10 phải là 'Khách mua'
+        // (cặp đôi CHÉO -- xem ghi chú đầu V21).
+        when(customerDAO.findRolesOf(10)).thenReturn(List.of("Khách mua"));
     }
 
     @Test
@@ -191,7 +196,9 @@ public class ContractControllerTest {
         controller.doPost(request, response);
 
         verify(contractDAO, never()).insert(any());
-        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=new&error=invalid");
+        // Redirect mang theo kind: mất nó là form tạo lại mở sai chiều, và ô
+        // "Khách hàng" liệt kê nhầm nhóm đối tác.
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=new&kind=sell&error=invalid");
     }
 
     @Test
@@ -205,7 +212,9 @@ public class ContractControllerTest {
         controller.doPost(request, response);
 
         verify(contractDAO, never()).insert(any());
-        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=new&error=invalid");
+        // Redirect mang theo kind: mất nó là form tạo lại mở sai chiều, và ô
+        // "Khách hàng" liệt kê nhầm nhóm đối tác.
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=new&kind=sell&error=invalid");
     }
 
     @Test
@@ -257,6 +266,101 @@ public class ContractControllerTest {
 
         verify(contractDAO).update(argThat((Contract c) -> c.getContractId() == 5));
         verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=view&id=5");
+    }
+
+    // ------------------------------------------------------------------
+    // Chiều hợp đồng: bán ra / mua vào (V21)
+    // ------------------------------------------------------------------
+    //
+    // Cặp đôi CHÉO: hợp đồng BÁN ký với bên giữ vai 'Khách mua', hợp đồng MUA
+    // ký với 'Nhà cung cấp'. CSDL không ép được (ràng buộc nằm ở enterprise_roles,
+    // CHECK không với tới), nên ContractController là chốt duy nhất.
+
+    /**
+     * Chiều lấy từ mục con đang đứng, KHÔNG từ một ô nào người dùng sửa được:
+     * nhận từ form là mở đường cho một request nặn tay đổi hợp đồng bán thành
+     * hợp đồng mua, và con số doanh thu đã báo cáo lặng lẽ đổi nghĩa.
+     */
+    @Test
+    public void create_kindBuy_luuChieuMuaVaDoiTacPhaiLaKhachBan() throws Exception {
+        when(request.getParameter("action")).thenReturn("create");
+        stubValidContractFields();
+        when(request.getParameter("kind")).thenReturn("buy");
+        when(customerDAO.findRolesOf(10)).thenReturn(List.of("Nhà cung cấp"));
+        when(contractDAO.generateNextContractCode()).thenReturn("HD-0001");
+        when(contractDAO.insert(any(Contract.class))).thenReturn(5);
+
+        controller.doPost(request, response);
+
+        ArgumentCaptor<Contract> saved = ArgumentCaptor.forClass(Contract.class);
+        verify(contractDAO).insert(saved.capture());
+        assertEquals("Mua", saved.getValue().getDirection());
+    }
+
+    /**
+     * Ô chọn khách hàng ở JSP đã lọc theo chiều, nhưng đó chỉ là khoá hình --
+     * ai mở devtools cũng POST được một enterprise_id bất kỳ. Không chặn ở đây
+     * thì hợp đồng BÁN gắn được vào nhà cung cấp, và khách đó hiện ở danh sách
+     * hợp đồng bán dù không hề giữ vai khách mua.
+     */
+    @Test
+    public void create_doiTacSaiVai_khongLuu() throws Exception {
+        when(request.getParameter("action")).thenReturn("create");
+        stubValidContractFields(); // không có kind -> hợp đồng BÁN
+        when(customerDAO.findRolesOf(10)).thenReturn(List.of("Nhà cung cấp")); // sai chiều
+
+        controller.doPost(request, response);
+
+        verify(contractDAO, never()).insert(any());
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=new&kind=sell&error=invalid");
+    }
+
+    /** Khách giữ CẢ HAI vai thì ký được cả hai chiều. */
+    @Test
+    public void create_doiTacGiuCaHaiVai_kyDuocChieuMua() throws Exception {
+        when(request.getParameter("action")).thenReturn("create");
+        stubValidContractFields();
+        when(request.getParameter("kind")).thenReturn("buy");
+        when(customerDAO.findRolesOf(10)).thenReturn(List.of("Khách mua", "Nhà cung cấp"));
+        when(contractDAO.generateNextContractCode()).thenReturn("HD-0001");
+        when(contractDAO.insert(any(Contract.class))).thenReturn(5);
+
+        controller.doPost(request, response);
+
+        verify(contractDAO).insert(any(Contract.class));
+    }
+
+    /**
+     * Chiều đứng ĐỘC LẬP với kỳ. Test này canh đúng cái người dùng dặn: tách
+     * hai mục con không được làm mất bộ lọc năm/quý/tháng.
+     */
+    @Test
+    public void list_locCaChieuLanKy_khongCaiNaoNuotCaiNao() throws Exception {
+        RequestDispatcher dispatcher = mock(RequestDispatcher.class);
+        when(request.getRequestDispatcher("/jsp/sale/listcontract.jsp")).thenReturn(dispatcher);
+        when(request.getParameter("kind")).thenReturn("buy");
+        when(request.getParameter("year")).thenReturn("2026");
+        when(request.getParameter("period")).thenReturn("q2");
+
+        controller.doGet(request, response);
+
+        ArgumentCaptor<Period> period = ArgumentCaptor.forClass(Period.class);
+        verify(contractDAO).findAll(anyInt(), anyInt(), any(), any(), any(), any(), eq(false),
+                period.capture(), eq("Mua"));
+        assertNotNull("kỳ phải còn nguyên khi lọc theo chiều", period.getValue());
+        assertEquals("Quý 2/2026", period.getValue().getLabel());
+    }
+
+    @Test
+    public void list_thieuKind_macDinhLaHopDongBan() throws Exception {
+        RequestDispatcher dispatcher = mock(RequestDispatcher.class);
+        when(request.getRequestDispatcher("/jsp/sale/listcontract.jsp")).thenReturn(dispatcher);
+
+        controller.doGet(request, response);
+
+        verify(contractDAO).findAll(anyInt(), anyInt(), any(), any(), any(), any(), eq(false),
+                nullable(Period.class), eq("Bán"));
+        verify(request).setAttribute("kind", "sell");
     }
 
     // ------------------------------------------------------------------

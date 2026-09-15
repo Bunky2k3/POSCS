@@ -59,6 +59,7 @@
     <%@ include file="/jsp/common/topbar.jsp" %>
     <div class="app-shell">
         <c:set var="activeNav" value="contract" scope="request"/>
+        <c:set var="activeContractKind" value="${kind}" scope="request"/>
         <%@ include file="/jsp/common/sidebar.jsp" %>
         <div class="main-content">
 
@@ -86,6 +87,10 @@
             <form id="createContractForm" action="${pageContext.request.contextPath}/contract" method="POST" onsubmit="return validateForm();">
                 <input type="hidden" name="csrfToken" value="${csrfToken}">
                 <input type="hidden" name="action" value="create">
+                <%-- Chiều hợp đồng đi theo mục con người dùng đang đứng.
+                     Server đọc chính tham số này chứ không đọc một ô nào
+                     người dùng sửa được -- xem buildContractFromRequest. --%>
+                <input type="hidden" name="kind" value="${kind}">
 
                 <div class="section-header"><h5>Thông tin chung</h5></div>
                 <div class="row">
