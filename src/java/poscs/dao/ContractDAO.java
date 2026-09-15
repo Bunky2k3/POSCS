@@ -403,7 +403,7 @@ public class ContractDAO {
             conn.setAutoCommit(false);
             boolean committed = false;
             try {
-                if (isFrozen(conn, contractId)) {
+                if (!isDraftContract(conn, contractId)) {
                     return false;
                 }
                 // Đọc TRƯỚC khi xoá: đây là DELETE cứng, sau lệnh dưới thì không
@@ -564,7 +564,7 @@ public class ContractDAO {
             conn.setAutoCommit(false);
             boolean committed = false;
             try {
-                if (isFrozen(conn, contractId)) {
+                if (!isDraftContract(conn, contractId)) {
                     return false;
                 }
                 try (PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -805,6 +805,20 @@ public class ContractDAO {
     private boolean isFrozen(Connection conn, int contractId) throws SQLException {
         String status = lockProgressStatus(conn, contractId);
         return PROGRESS_LIQUIDATED.equals(status) || PROGRESS_TERMINATED.equals(status);
+    }
+
+    /**
+     * true nếu hợp đồng còn là bản NHÁP -- điều kiện để được gắn/gỡ hàng hoá.
+     *
+     * <p>Hàng hoá là nội dung hợp đồng, không phải dữ liệu quản trị nội bộ: ký
+     * xong thì nó thành chứng cứ, đổi phải đi qua phụ lục chứ không sửa thẳng.
+     *
+     * <p>Điều kiện này chỉ áp được TỪ V24. Trước đó mọi hợp đồng đều "đã ký"
+     * (signing_date NOT NULL) nên khoá theo trạng thái ký nghĩa là khoá tất --
+     * đó là lý do đợt trước mới chỉ ghi vết chứ chưa chặn.
+     */
+    private boolean isDraftContract(Connection conn, int contractId) throws SQLException {
+        return PROGRESS_DRAFT.equals(lockProgressStatus(conn, contractId));
     }
 
     /** Đọc và khoá trạng thái tiến độ hiện tại; null nếu hợp đồng không tồn tại. */

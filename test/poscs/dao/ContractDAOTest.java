@@ -64,13 +64,14 @@ public class ContractDAOTest {
     }
 
     /**
-     * PreparedStatement dùng chung cho các test insertProducts: trả sẵn một
-     * dòng trạng thái tiến độ cho lần kiểm "hợp đồng đã đóng băng chưa" mà
-     * ContractDAO chạy trước khi ghi. Không có nó thì executeQuery() trả null
-     * và test chết vì NPE ở chỗ chẳng liên quan gì tới thứ nó đang kiểm.
+     * PreparedStatement dùng chung cho các test insertProducts: trả sẵn trạng
+     * thái tiến độ "Nháp" cho lần kiểm mà ContractDAO chạy trước khi ghi.
+     * Phải là Nháp: hàng hoá là nội dung hợp đồng nên ký xong là chốt.
+     * Không có dòng này thì executeQuery() trả null và test chết vì NPE ở chỗ
+     * chẳng liên quan gì tới thứ nó đang kiểm.
      */
     private static PreparedStatement statementForActiveContract() throws SQLException {
-        ResultSet progress = singleRow(row("progress_status", ContractDAO.PROGRESS_SIGNED));
+        ResultSet progress = singleRow(row("progress_status", ContractDAO.PROGRESS_DRAFT));
         PreparedStatement ps = mock(PreparedStatement.class);
         when(ps.executeQuery()).thenReturn(progress);
         return ps;
@@ -275,7 +276,7 @@ public class ContractDAOTest {
         // đóng băng chưa, rồi mới đọc dòng hàng hoá sắp xoá. Trả cùng một
         // ResultSet cho cả hai thì con trỏ của lần đầu đã chạy hết, lần sau đọc
         // ra rỗng.
-        ResultSet progress = singleRow(row("progress_status", ContractDAO.PROGRESS_SIGNED));
+        ResultSet progress = singleRow(row("progress_status", ContractDAO.PROGRESS_DRAFT));
         ResultSet line = singleRow(row("product_name", "Modem quang GPON", "quantity", 5, "unit", "cái"));
         PreparedStatement linePs = mock(PreparedStatement.class);
         when(linePs.executeQuery()).thenReturn(progress, line);
@@ -432,6 +433,25 @@ public class ContractDAOTest {
 
         c.setProgressStatus(ContractDAO.PROGRESS_TERMINATED);
         assertTrue(c.isFrozen());
+    }
+
+    @Test
+    public void products_cannotBeChangedOnceTheContractIsSigned() throws Exception {
+        ResultSet signed = singleRow(row("progress_status", ContractDAO.PROGRESS_SIGNED));
+        PreparedStatement ps = mock(PreparedStatement.class);
+        when(ps.executeQuery()).thenReturn(signed);
+        Connection conn = connectionReturning(ps);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            // Hàng hoá là NỘI DUNG hợp đồng, không phải dữ liệu quản trị nội
+            // bộ: ký xong là chốt, đổi phải đi qua phụ lục. Chặn ở DAO chứ
+            // không chỉ ẩn nút -- nút ẩn thì POST thẳng vào URL vẫn ghi được.
+            assertFalse(dao.insertProducts(7, Arrays.asList(item(10, 2)), ACTOR));
+            assertFalse(dao.deleteProductLine(3, 7, ACTOR));
+            verify(ps, never()).executeBatch();
+        }
     }
 
     @Test

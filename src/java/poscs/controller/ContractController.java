@@ -266,6 +266,10 @@ public class ContractController extends HttpServlet {
                 ContractDAO.PROGRESS_SIGNED.equals(contract.getProgressStatus())
                         && AccessControl.hasFullAccess(request, AccessControl.Resource.CONTRACT));
         request.setAttribute("contractProducts", contractDAO.findProductsByContractId(id));
+        // Gắn/gỡ hàng hoá chỉ khi hợp đồng còn là bản Nháp VÀ người xem quản
+        // được hợp đồng. Trước đây nút gỡ trên từng dòng không kiểm gì cả.
+        request.setAttribute("canEditProducts",
+                contract.isDraft() && AccessControl.hasFullAccess(request, AccessControl.Resource.CONTRACT));
         List<ContractHistory> history = contractDAO.findHistoryByContractId(id);
         request.setAttribute("contractHistory", history);
 

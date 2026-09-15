@@ -531,10 +531,16 @@ Nhập lý do:', true)">
                                     <td>${fn:escapeXml(cp.unit)}</td>
                                     <td>${not empty cp.notes ? fn:escapeXml(cp.notes) : '—'}</td>
                                     <td>
-                                        <button type="button" class="btn-remove-item" title="Gỡ sản phẩm này"
-                                                onclick="confirmRemoveProduct(${cp.contractProductId})">
-                                            <i class="fa-solid fa-xmark"></i>
-                                        </button>
+                                        <%-- Nút này TRƯỚC ĐÂY không hề kiểm quyền: vai chỉ-xem
+                                             (Kỹ thuật, CSKH) mở trang cũng thấy nút gỡ, bấm vào
+                                             mới nhận 403. Giờ dùng chung đúng một điều kiện với
+                                             form thêm bên dưới. --%>
+                                        <c:if test="${canEditProducts}">
+                                            <button type="button" class="btn-remove-item" title="Gỡ sản phẩm này"
+                                                    onclick="confirmRemoveProduct(${cp.contractProductId})">
+                                                <i class="fa-solid fa-xmark"></i>
+                                            </button>
+                                        </c:if>
                                     </td>
                                 </tr>
                             </c:forEach>
@@ -543,7 +549,19 @@ Nhập lý do:', true)">
                 </c:otherwise>
             </c:choose>
 
-            <c:if test="${canManage}">
+            <%-- Hàng hoá là NỘI DUNG hợp đồng, không phải dữ liệu quản trị nội
+                 bộ. Ký xong thì nó là chứng cứ, đổi phải đi qua phụ lục -- nên
+                 chỉ sửa được khi hợp đồng còn là bản Nháp. Chặn thật nằm ở
+                 ContractDAO.insertProducts/deleteProductLine. --%>
+            <c:if test="${not canEditProducts and canManage}">
+                <div style="margin-top:16px; padding-top:16px; border-top:1.5px solid #eef2f6;
+                            font-size:0.83rem; color:#6b7280; display:flex; align-items:flex-start; gap:8px;">
+                    <i class="fa-solid fa-lock" style="margin-top:3px; color:#9ca3af;"></i>
+                    <span>Hợp đồng đã ký nên hạng mục hàng hoá đã chốt — đây là nội dung hợp đồng,
+                        không sửa thẳng được. Thay đổi phát sinh phải lập phụ lục.</span>
+                </div>
+            </c:if>
+            <c:if test="${canEditProducts}">
                 <form class="add-product-form" method="POST" action="${pageContext.request.contextPath}/contract">
                     <input type="hidden" name="csrfToken" value="${csrfToken}">
                     <input type="hidden" name="action" value="addProduct">
