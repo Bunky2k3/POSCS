@@ -5,7 +5,7 @@
 <%--
     Servlet cần đặt các request attribute sau trước khi forward tới trang này:
       - customerList : List<poscs.model.Enterprise>  (mỗi Enterprise nên có sẵn .address.district.province và .accountOwner đã join)
-      - userList      : List<poscs.model.User>        (toàn bộ nhân viên, để đổ dropdown lọc "Người phụ trách")
+      - userList      : List<poscs.model.User>        (nhân viên vai Sales, để đổ dropdown lọc "Người phụ trách")
       - provinceList  : List<poscs.model.Province>    (18 tỉnh địa bàn chi nhánh, để đổ dropdown lọc "Tỉnh/Thành")
       - currentPage, totalPages, totalCount : thông tin phân trang (BR-12)
       - keyword, typeFilter, assigneeFilter, provinceFilter : giá trị filter hiện tại (để giữ lại lúc submit lại form tìm kiếm)

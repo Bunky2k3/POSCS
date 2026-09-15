@@ -58,6 +58,9 @@ public class ContractController extends HttpServlet {
     private static final Logger LOG = LoggerFactory.getLogger(ContractController.class);
 
     private static final int PAGE_SIZE = 10;
+    /** Vai được giao phụ trách hợp đồng -- khớp roles.role_name, xem AccessControl. */
+    private static final String SALES_ROLE = "Sales";
+
     private static final String LIST_VIEW = "/jsp/sale/listcontract.jsp";
     private static final String DETAIL_VIEW = "/jsp/sale/viewcontractdetail.jsp";
     private static final String CREATE_VIEW = "/jsp/sale/addnewcontract.jsp";
@@ -682,7 +685,7 @@ public class ContractController extends HttpServlet {
         if (!AccessControl.requireFullAccess(request, response, AccessControl.Resource.CONTRACT)) {
             return;
         }
-        setDropdownAttributes(request);
+        setDropdownAttributes(request, null);
         request.getRequestDispatcher(CREATE_VIEW).forward(request, response);
     }
 
@@ -701,7 +704,7 @@ public class ContractController extends HttpServlet {
         }
 
         request.setAttribute("contract", contract);
-        setDropdownAttributes(request);
+        setDropdownAttributes(request, contract.getOwnerId());
         request.getRequestDispatcher(UPDATE_VIEW).forward(request, response);
     }
 
@@ -850,10 +853,16 @@ public class ContractController extends HttpServlet {
     // Helpers
     // ------------------------------------------------------------------
 
-    private void setDropdownAttributes(HttpServletRequest request) {
+    /**
+     * @param keepUserId người đang phụ trách bản ghi đang sửa -- giữ trong
+     *        dropdown kể cả khi họ đã đổi vai, xem EmployeeDAO.findActiveByRole.
+     */
+    private void setDropdownAttributes(HttpServletRequest request, Integer keepUserId) {
         // Toàn bộ khách hàng chưa xoá, phục vụ dropdown "Khách hàng"
         request.setAttribute("customerList", customerDAO.findAll(1, Integer.MAX_VALUE, null, null, null));
-        request.setAttribute("userList", employeeDAO.findAllActive());
+        // Hợp đồng giao cho Sales, không đổ cả Admin/Kỹ thuật/CSKH vào ô
+        // "người phụ trách".
+        request.setAttribute("userList", employeeDAO.findActiveByRole(SALES_ROLE, keepUserId));
     }
 
     /**

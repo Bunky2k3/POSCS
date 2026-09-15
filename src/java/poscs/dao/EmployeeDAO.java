@@ -259,10 +259,76 @@ public class EmployeeDAO {
     }
 
     /**
-     * Lấy toàn bộ nhân viên đang hoạt động (is_deleted=0), phục vụ các dropdown
-     * "Nhân viên phụ trách" (chỉ cần tên) và việc so khớp username lúc nhập
-     * Excel hàng loạt (CustomerController -- cần username nên SELECT cả cột
-     * đó dù dropdown không hiển thị).
+     * Nhân viên đang hoạt động của MỘT vai, để đổ dropdown "người phụ trách".
+     *
+     * <p>Mỗi màn hình giao việc cho một vai khác nhau -- khách hàng và hợp
+     * đồng giao cho Sales, phiếu hỗ trợ giao cho Kỹ thuật. {@link
+     * #findAllActive()} trả về tất cả và KHÔNG dùng được ở những chỗ đó: nó
+     * mời người nhập chọn cả Admin lẫn kỹ thuật viên vào ô "người phụ trách
+     * khách hàng".
+     *
+     * @param alsoInclude user_id vẫn giữ trong danh sách dù sai vai -- truyền
+     *        người đang được gán của bản ghi ĐANG SỬA vào đây. Thiếu nó thì
+     *        bản ghi cũ có người phụ trách sai vai (đổi vai, hoặc dữ liệu tạo
+     *        trước thay đổi này) sẽ mở form lên với ô trống, và bấm lưu là
+     *        thay mất người phụ trách dù người dùng chỉ định sửa số điện
+     *        thoại. Đúng cái bẫy mà {@code
+     *        AddressDAO.findBranchProvincesIncluding} đã sinh ra để tránh.
+     *        Bỏ qua phần tử null, nên truyền thẳng cột nullable vào được.
+     */
+    public List<User> findActiveByRole(String roleName, Integer... alsoInclude) {
+        List<Integer> keep = new ArrayList<>();
+        if (alsoInclude != null) {
+            for (Integer id : alsoInclude) {
+                if (id != null && id > 0 && !keep.contains(id)) {
+                    keep.add(id);
+                }
+            }
+        }
+        StringBuilder sql = new StringBuilder(
+                "SELECT u.user_id, u.username, u.last_name, u.middle_name, u.first_name, u.department_id " +
+                "FROM users u JOIN roles r ON r.role_id = u.role_id " +
+                "WHERE u.is_deleted = 0 AND (r.role_name = ?");
+        for (int i = 0; i < keep.size(); i++) {
+            sql.append(i == 0 ? " OR u.user_id IN (?" : ",?");
+        }
+        if (!keep.isEmpty()) {
+            sql.append(")");
+        }
+        sql.append(") ORDER BY u.last_name, u.first_name");
+
+        List<User> result = new ArrayList<>();
+        try (Connection conn = DBContext.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql.toString())) {
+            ps.setString(1, roleName);
+            for (int i = 0; i < keep.size(); i++) {
+                ps.setInt(i + 2, keep.get(i));
+            }
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    User u = new User();
+                    u.setUserId(rs.getInt("user_id"));
+                    u.setUsername(rs.getString("username"));
+                    u.setLastName(rs.getString("last_name"));
+                    u.setMiddleName(rs.getString("middle_name"));
+                    u.setFirstName(rs.getString("first_name"));
+                    u.setDepartmentId(rs.getInt("department_id"));
+                    result.add(u);
+                }
+            }
+        } catch (SQLException ex) {
+            LOG.error("Loi truy van nhan vien theo vai (roleName={})", roleName, ex);
+        }
+        return result;
+    }
+
+    /**
+     * Lấy toàn bộ nhân viên đang hoạt động (is_deleted=0), KHÔNG lọc vai.
+     *
+     * <p>Chỉ còn dùng cho việc so khớp username lúc nhập Excel hàng loạt
+     * (cần username nên SELECT cả cột đó). Dropdown "người phụ trách" thì
+     * dùng {@link #findActiveByRole} -- đổ tất cả vào đó là mời người nhập
+     * gán khách hàng cho một kỹ thuật viên.
      */
     public List<User> findAllActive() {
         List<User> result = new ArrayList<>();

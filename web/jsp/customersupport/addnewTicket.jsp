@@ -5,7 +5,7 @@
     Request attribute do TechnicalSupportTicketController#showCreateForm
     thiết lập trước khi forward tới trang này:
       - customerList : List<poscs.model.Enterprise> (toàn bộ khách hàng, để đổ dropdown "Khách hàng")
-      - userList      : List<poscs.model.User>       (toàn bộ nhân viên, để đổ dropdown "Kỹ thuật viên phụ trách")
+      - userList      : List<poscs.model.User>       (nhân viên vai Kỹ thuật, để đổ dropdown "Kỹ thuật viên phụ trách")
 
     Dropdown "Hợp đồng liên quan" KHÔNG đổ sẵn từ server -- JS nạp qua AJAX
     (GET /contract/byEnterprise?enterpriseId=..., xem ContractController)
