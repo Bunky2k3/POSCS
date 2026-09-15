@@ -273,7 +273,7 @@ public class ContractControllerTest {
     // ------------------------------------------------------------------
     //
     // Cặp đôi CHÉO: hợp đồng BÁN ký với bên giữ vai 'Khách mua', hợp đồng MUA
-    // ký với 'Khách bán'. CSDL không ép được (ràng buộc nằm ở enterprise_roles,
+    // ký với 'Nhà cung cấp'. CSDL không ép được (ràng buộc nằm ở enterprise_roles,
     // CHECK không với tới), nên ContractController là chốt duy nhất.
 
     /**
@@ -286,7 +286,7 @@ public class ContractControllerTest {
         when(request.getParameter("action")).thenReturn("create");
         stubValidContractFields();
         when(request.getParameter("kind")).thenReturn("buy");
-        when(customerDAO.findRolesOf(10)).thenReturn(List.of("Khách bán"));
+        when(customerDAO.findRolesOf(10)).thenReturn(List.of("Nhà cung cấp"));
         when(contractDAO.generateNextContractCode()).thenReturn("HD-0001");
         when(contractDAO.insert(any(Contract.class))).thenReturn(5);
 
@@ -307,7 +307,7 @@ public class ContractControllerTest {
     public void create_doiTacSaiVai_khongLuu() throws Exception {
         when(request.getParameter("action")).thenReturn("create");
         stubValidContractFields(); // không có kind -> hợp đồng BÁN
-        when(customerDAO.findRolesOf(10)).thenReturn(List.of("Khách bán")); // sai chiều
+        when(customerDAO.findRolesOf(10)).thenReturn(List.of("Nhà cung cấp")); // sai chiều
 
         controller.doPost(request, response);
 
@@ -321,7 +321,7 @@ public class ContractControllerTest {
         when(request.getParameter("action")).thenReturn("create");
         stubValidContractFields();
         when(request.getParameter("kind")).thenReturn("buy");
-        when(customerDAO.findRolesOf(10)).thenReturn(List.of("Khách mua", "Khách bán"));
+        when(customerDAO.findRolesOf(10)).thenReturn(List.of("Khách mua", "Nhà cung cấp"));
         when(contractDAO.generateNextContractCode()).thenReturn("HD-0001");
         when(contractDAO.insert(any(Contract.class))).thenReturn(5);
 

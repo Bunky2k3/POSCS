@@ -71,7 +71,7 @@ public class ContractController extends HttpServlet {
     private static final String DIRECTION_SELL = "Bán";
     private static final String DIRECTION_BUY = "Mua";
     private static final String ROLE_BUYER = "Khách mua";
-    private static final String ROLE_SUPPLIER = "Khách bán";
+    private static final String ROLE_SUPPLIER = "Nhà cung cấp";
 
     private static final String LIST_VIEW = "/jsp/sale/listcontract.jsp";
     private static final String DETAIL_VIEW = "/jsp/sale/viewcontractdetail.jsp";

@@ -470,7 +470,7 @@ public class CustomerControllerTest {
     }
 
     // ------------------------------------------------------------------
-    // Vai khách hàng: khách mua / khách bán (V20)
+    // Vai khách hàng: khách mua / nhà cung cấp (V20)
     // ------------------------------------------------------------------
     //
     // Vai nằm ở bảng riêng (enterprise_roles) nên CSDL không ép được luật
@@ -516,13 +516,13 @@ public class CustomerControllerTest {
         when(request.getParameter("action")).thenReturn("create");
         stubValidCreateFields();
         when(request.getParameterValues("roles"))
-                .thenReturn(new String[]{"Khách mua", "Khách bán"});
+                .thenReturn(new String[]{"Khách mua", "Nhà cung cấp"});
         when(customerDAO.generateNextEnterpriseCode()).thenReturn("KH-0001");
         when(customerDAO.insert(any(Enterprise.class))).thenReturn(7);
 
         controller.doPost(request, response);
 
-        verify(customerDAO).replaceRolesOf(7, List.of("Khách mua", "Khách bán"));
+        verify(customerDAO).replaceRolesOf(7, List.of("Khách mua", "Nhà cung cấp"));
     }
 
     /**
@@ -554,8 +554,8 @@ public class CustomerControllerTest {
 
         controller.doGet(request, response);
 
-        verify(customerDAO).findAll(anyInt(), anyInt(), any(), any(), any(), any(), eq(false), eq("Khách bán"));
-        verify(customerDAO).countAll(any(), any(), any(), any(), eq("Khách bán"));
+        verify(customerDAO).findAll(anyInt(), anyInt(), any(), any(), any(), any(), eq(false), eq("Nhà cung cấp"));
+        verify(customerDAO).countAll(any(), any(), any(), any(), eq("Nhà cung cấp"));
         verify(request).setAttribute("kind", "supplier");
     }
 

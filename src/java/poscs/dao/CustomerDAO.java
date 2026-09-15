@@ -643,7 +643,7 @@ public class CustomerDAO {
     // Vai của khách hàng (bảng enterprise_roles)
     // ==================================================================
     //
-    // 'Khách mua' = bên đó mua của mình, 'Khách bán' = bên đó bán cho mình.
+    // 'Khách mua' = bên đó mua của mình, 'Nhà cung cấp' = bên đó bán cho mình.
     // Một công ty giữ được cả hai vai -- đó là lý do vai nằm ở bảng riêng chứ
     // không phải một cột trên enterprises. Xem ghi chú đầu V20.
 
@@ -652,7 +652,7 @@ public class CustomerDAO {
      * form hợp đồng.
      *
      * <p>Hợp đồng BÁN chỉ ký được với bên giữ vai 'Khách mua', hợp đồng MUA
-     * chỉ ký được với 'Khách bán' -- cặp đôi CHÉO, xem ghi chú đầu V21. Đổ cả
+     * chỉ ký được với 'Nhà cung cấp' -- cặp đôi CHÉO, xem ghi chú đầu V21. Đổ cả
      * hai vai vào một ô là mời người nhập ký hợp đồng bán với nhà cung cấp.
      *
      * @param keepEnterpriseId khách đang đứng tên hợp đồng ĐANG SỬA -- giữ lại

@@ -112,10 +112,10 @@
         <c:set var="activeNav" value="customer" scope="request"/>
         <%-- Trang này không có tham số kind trên URL, nên suy mục con cần tô
              sáng từ chính vai của khách: chỉ khi khách CHỈ là bên bán mới sáng
-             "Khách hàng bán". Khách hai vai thì sáng "Khách hàng mua" -- phải
+             "Nhà cung cấp". Khách hai vai thì sáng "Khách hàng mua" -- phải
              chọn một, và đó là danh sách mặc định. --%>
         <c:set var="activeCustomerKind" scope="request"
-               value="${not empty customerRoles and customerRoles.contains('Khách bán') and not customerRoles.contains('Khách mua') ? 'supplier' : 'buyer'}"/>
+               value="${not empty customerRoles and customerRoles.contains('Nhà cung cấp') and not customerRoles.contains('Khách mua') ? 'supplier' : 'buyer'}"/>
         <%@ include file="/jsp/common/sidebar.jsp" %>
         <div class="main-content">
 
@@ -199,8 +199,8 @@
                         <div class="role-check-group">
                             <label class="role-check"><input type="checkbox" name="roles" value="Khách mua"
                                 ${customerRoles.contains('Khách mua') ? 'checked' : ''}> Khách hàng mua <small>(mua của mình)</small></label>
-                            <label class="role-check"><input type="checkbox" name="roles" value="Khách bán"
-                                ${customerRoles.contains('Khách bán') ? 'checked' : ''}> Khách hàng bán <small>(bán cho mình)</small></label>
+                            <label class="role-check"><input type="checkbox" name="roles" value="Nhà cung cấp"
+                                ${customerRoles.contains('Nhà cung cấp') ? 'checked' : ''}> Nhà cung cấp <small>(bán cho mình)</small></label>
                         </div>
                         <span class="error-text" id="err-roles">Chọn ít nhất một vai.</span>
                     </div>

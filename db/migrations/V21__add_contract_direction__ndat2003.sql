@@ -1,6 +1,6 @@
 -- Chiều của hợp đồng: mình bán ra hay mình mua vào.
 --
--- Nối tiếp V20 (tách khách hàng thành khách mua / khách bán). Cho tới giờ
+-- Nối tiếp V20 (tách khách hàng thành khách mua / nhà cung cấp). Cho tới giờ
 -- contracts.contract_type nói NỘI DUNG hợp đồng (Cung cấp thiết bị / Thi công
 -- lắp đặt / Bảo trì bảo dưỡng) chứ không nói chiều tiền đi -- cả 15 hợp đồng
 -- hiện có đều là mình cung cấp ra, nhưng không có chỗ nào phát biểu điều đó.
@@ -8,7 +8,7 @@
 -- GÓC NHÌN: 'Bán'/'Mua' ở đây là CỦA MÌNH.
 --
 --     hợp đồng 'Bán'  = mình bán ra   -> đối tác giữ vai 'Khách mua'
---     hợp đồng 'Mua'  = mình mua vào  -> đối tác giữ vai 'Khách bán'
+--     hợp đồng 'Mua'  = mình mua vào  -> đối tác giữ vai 'Nhà cung cấp'
 --
 -- Cặp đôi bị CHÉO, và đó chính là lý do enterprise_roles.role ở V20 cố ý
 -- không đặt là 'Mua'/'Bán': để hai bảng không dùng chung một chữ với nghĩa
@@ -30,7 +30,7 @@ INSERT INTO schema_migrations (version) VALUES ('V21__add_contract_direction__nd
 
 ALTER TABLE `contracts`
   ADD COLUMN `direction` varchar(10) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'Bán'
-      COMMENT 'Bán = mình bán ra (đối tác là Khách mua); Mua = mình mua vào (đối tác là Khách bán)'
+      COMMENT 'Bán = mình bán ra (đối tác là Khách mua); Mua = mình mua vào (đối tác là Nhà cung cấp)'
       AFTER `contract_type`,
   ADD KEY `idx_contracts_direction` (`direction`);
 

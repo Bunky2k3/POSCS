@@ -4349,7 +4349,7 @@ CREATE TABLE `contracts` (
   `title` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
   `contract_type` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
   -- 'Bán' = mình bán ra (đối tác giữ vai 'Khách mua')
-  -- 'Mua' = mình mua vào (đối tác giữ vai 'Khách bán')
+  -- 'Mua' = mình mua vào (đối tác giữ vai 'Nhà cung cấp')
   -- Cặp đôi CHÉO -- xem ghi chú đầu V21.
   `direction` varchar(10) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'Bán',
   `signing_date` date NOT NULL,
@@ -4540,7 +4540,7 @@ CREATE TABLE `enterprise_roles` (
   `enterprise_role_id` int NOT NULL AUTO_INCREMENT,
   `enterprise_id` int NOT NULL,
   -- 'Khách mua'  = bên đó MUA của mình  -> gắn với hợp đồng 'Bán'
-  -- 'Khách bán'  = bên đó BÁN cho mình  -> gắn với hợp đồng 'Mua'
+  -- 'Nhà cung cấp'  = bên đó BÁN cho mình  -> gắn với hợp đồng 'Mua'
   `role` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`enterprise_role_id`),
