@@ -262,13 +262,8 @@
                 <div class="doc-icon"><i class="fa-solid fa-file-contract"></i></div>
                 <div>
                     <span class="contract-code">${fn:escapeXml(contract.contractCode)}</span>
-                    <%-- Số trên giấy đứng cạnh mã nội bộ, không thay nó: khi đối chiếu
-                         với tệp hồ sơ giấy thì người ta tra theo số này. --%>
-                    <c:if test="${not empty contract.contractNumber}">
-                        <span class="contract-code" style="color:#6b7280; font-weight:600;">
-                            &middot; Số HĐ: ${fn:escapeXml(contract.contractNumber)}
-                        </span>
-                    </c:if>
+                    <%-- Số hợp đồng KHÔNG lặp lại ở đây: nó đã đứng đầu khối
+                         "Thông tin chung" bên dưới, hiện cùng mã nội bộ. --%>
                     <h2>
                         ${fn:escapeXml(contract.title)}
                         <span class="type-badge">${fn:escapeXml(contract.contractType)}</span>
@@ -429,6 +424,25 @@
         <div class="info-card card-box">
             <div class="section-header"><h5>Thông tin chung</h5></div>
             <div class="row">
+                <%-- Số hợp đồng đứng ĐẦU: đây là thứ khách đọc khi gọi điện, và
+                     là cách người dùng đối chiếu với tệp hồ sơ giấy. Mã HD-xxxx
+                     đứng cạnh chứ không thay -- nó là định danh nội bộ. --%>
+                <div class="col-md-6 field-row">
+                    <label>Số hợp đồng</label>
+                    <div class="view-value">
+                        <c:choose>
+                            <c:when test="${not empty contract.contractNumber}">
+                                <strong>${fn:escapeXml(contract.contractNumber)}</strong>
+                            </c:when>
+                            <c:otherwise><span style="color:#9ca3af;">chưa có số</span></c:otherwise>
+                        </c:choose>
+                    </div>
+                </div>
+                <div class="col-md-6 field-row">
+                    <label>Mã hợp đồng (hệ thống)</label>
+                    <div class="view-value">${fn:escapeXml(contract.contractCode)}</div>
+                </div>
+
                 <div class="col-md-6 field-row">
                     <label>Khách hàng</label>
                     <div class="view-value">
@@ -449,24 +463,32 @@
                         </c:choose>
                     </div>
                 </div>
-                <div class="col-md-4 field-row">
-                    <label>Ngày ký</label>
-                    <div class="view-value"><fmt:formatDate value="${contract.signingDate}" pattern="dd/MM/yyyy"/></div>
+
+                <div class="col-md-6 field-row">
+                    <label>Loại hợp đồng</label>
+                    <div class="view-value">${fn:escapeXml(contract.contractType)}</div>
                 </div>
-                <div class="col-md-4 field-row">
-                    <label>Ngày hiệu lực</label>
-                    <div class="view-value"><c:choose>
-                        <c:when test="${contract.effectiveDate != null}"><fmt:formatDate value="${contract.effectiveDate}" pattern="dd/MM/yyyy"/></c:when>
-                        <c:otherwise><span style="color:#9ca3af;">chưa chốt</span></c:otherwise>
-                    </c:choose></div>
+                <div class="col-md-6 field-row">
+                    <label>Chiều</label>
+                    <%-- Cặp đôi CHÉO: hợp đồng 'Bán' ký với đối tác giữ vai
+                         'Khách mua'. Ghi rõ nghĩa ra để người đọc không phải
+                         nhớ quy ước đó (xem ghi chú đầu V21). --%>
+                    <div class="view-value">
+                        <c:choose>
+                            <c:when test="${contract.direction == 'Mua'}">Hợp đồng mua &mdash; mình mua vào</c:when>
+                            <c:otherwise>Hợp đồng bán &mdash; mình bán ra</c:otherwise>
+                        </c:choose>
+                    </div>
                 </div>
-                <div class="col-md-4 field-row">
-                    <label>Ngày kết thúc</label>
-                    <div class="view-value"><c:choose>
-                        <c:when test="${contract.endDate != null}"><fmt:formatDate value="${contract.endDate}" pattern="dd/MM/yyyy"/></c:when>
-                        <c:otherwise><span style="color:#9ca3af;">chưa chốt</span></c:otherwise>
-                    </c:choose></div>
-                </div>
+
+                <%-- BA MỐC THỜI GIAN ĐÃ BỎ KHỎI ĐÂY theo yêu cầu (2026-09-15).
+                     Dữ liệu vẫn còn nguyên trong CSDL và vẫn dùng để tính trạng
+                     thái theo lịch (nhãn ở đầu trang) -- chỉ là không bày ra
+                     trong khối thông tin chung nữa.
+
+                     Ngày ký vẫn hiện ở thanh tiến trình vòng đời phía trên, vì
+                     ở đó nó là MỐC của quy trình chứ không phải một ô dữ liệu.
+                     Cần bỏ cả chỗ đó thì nói. --%>
             </div>
         </div>
 
