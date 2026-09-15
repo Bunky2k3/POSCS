@@ -726,9 +726,7 @@
                 </c:otherwise>
             </c:choose>
         </div>
-    </div>
 
-        </div>
         <%-- ===== Bản PDF đã ký, xem ngay tại đây =====
              Đặt CUỐI trang: khung nhúng cao 640px, để ở giữa thì nó đẩy mọi khối
              bên dưới ra khỏi tầm mắt và người đọc phải cuộn qua cả trang PDF
@@ -755,6 +753,9 @@
                 </p>
             </div>
         </c:if>
+    </div>
+
+        </div>
 
     </div>
 
