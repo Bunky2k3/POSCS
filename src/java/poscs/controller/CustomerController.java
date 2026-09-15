@@ -183,9 +183,10 @@ public class CustomerController extends HttpServlet {
         }
         request.setAttribute("userList", employeeDAO.findAllActive());
         request.setAttribute("provinceList", addressDAO.findBranchProvinces());
-        // Phân công địa bàn, để form tự điền sẵn người phụ trách khi chọn tỉnh.
-        // Nhúng cả bảng (34 tỉnh) một lần thay vì gọi AJAX mỗi lần đổi ô tỉnh
-        // -- dữ liệu nhỏ, và đỡ hẳn một endpoint phải gác quyền riêng.
+        // Phân công địa bàn, để form điền sẵn rồi KHOÁ ô người phụ trách khi
+        // chọn tỉnh. Nhúng cả bảng (34 tỉnh) một lần thay vì gọi AJAX mỗi lần
+        // đổi ô tỉnh -- dữ liệu nhỏ, và đỡ hẳn một endpoint phải gác quyền
+        // riêng. Khoá thật nằm ở resolveAccountOwnerId, đây chỉ là tầng hiển thị.
         request.setAttribute("territoryAssignments", territoryDAO.findAllAssignments());
         request.getRequestDispatcher(CREATE_VIEW).forward(request, response);
     }
@@ -213,6 +214,9 @@ public class CustomerController extends HttpServlet {
                 ? customer.getAddress().getDistrict().getProvinceId()
                 : null;
         request.setAttribute("provinceList", addressDAO.findBranchProvincesIncluding(currentProvinceId));
+        // Như showCreateForm: form sửa cũng phải khoá ô người phụ trách theo
+        // địa bàn, nếu không thì đổi tỉnh ở đây là đường vòng thoát khoá.
+        request.setAttribute("territoryAssignments", territoryDAO.findAllAssignments());
         request.getRequestDispatcher(UPDATE_VIEW).forward(request, response);
     }
 
@@ -283,7 +287,7 @@ public class CustomerController extends HttpServlet {
         e.setJoinDate(parseDateOrNull(request.getParameter("joinDate")));
         e.setLogoUrl(FileStorage.save(request.getPart("logo"), LOGO_SUBFOLDER, FileStorage.IMAGE_EXTENSIONS));
 
-        Integer accountOwnerId = parseIntOrNull(request.getParameter("accountOwnerId"));
+        Integer accountOwnerId = resolveAccountOwnerId(request);
         if (accountOwnerId != null) {
             e.setAccountOwnerId(accountOwnerId);
         }
@@ -342,7 +346,7 @@ public class CustomerController extends HttpServlet {
         String newLogoUrl = FileStorage.save(request.getPart("logo"), LOGO_SUBFOLDER, FileStorage.IMAGE_EXTENSIONS);
         e.setLogoUrl(newLogoUrl != null ? newLogoUrl : existing.getLogoUrl());
 
-        Integer accountOwnerId = parseIntOrNull(request.getParameter("accountOwnerId"));
+        Integer accountOwnerId = resolveAccountOwnerId(request);
         if (accountOwnerId != null) {
             e.setAccountOwnerId(accountOwnerId);
         }
@@ -448,6 +452,37 @@ public class CustomerController extends HttpServlet {
     // ------------------------------------------------------------------
     // Helpers
     // ------------------------------------------------------------------
+
+    /**
+     * Người phụ trách chính: địa bàn quyết định, không phải người nhập liệu.
+     *
+     * <p>Đây là CHỖ KHOÁ DUY NHẤT. Tỉnh của khách đã có người cầm thì trả về
+     * người đó và bỏ qua hẳn ô {@code accountOwnerId} gửi lên -- khoá ở JSP
+     * chỉ là khoá hình, ai mở devtools cũng gỡ được. Tỉnh chưa ai cầm thì mới
+     * dùng giá trị người dùng chọn.
+     *
+     * <p>Nhánh "chưa ai cầm" không phải chiều lòng ai: bảng phân công mới phủ
+     * một phần trong 34 tỉnh, khoá tất thì không tạo nổi khách hàng ở những
+     * tỉnh còn trống -- biến "chưa phân công" thành chặn nghiệp vụ. Khi khách
+     * giao đủ bảng phân công thì nhánh này tự hết đường chạy, không phải sửa
+     * code.
+     *
+     * <p>Suy từ xã/phường chứ không từ ô tỉnh: xem {@link
+     * poscs.dao.TerritoryDAO#findAssigneeOfWard}.
+     */
+    private Integer resolveAccountOwnerId(HttpServletRequest request) {
+        Integer wardId = parseIntOrNull(request.getParameter("districtId"));
+        if (wardId != null) {
+            Integer territoryOwnerId = territoryDAO.findAssigneeOfWard(wardId);
+            // Kiểm > 0 chứ không chỉ != null: user_id 0 không phải người nào
+            // cả, mà nhận nó ở đây là khoá khách hàng vào một nhân viên không
+            // tồn tại rồi vỡ ở tầng khoá ngoại -- xa chỗ gây ra hẳn một tầng.
+            if (territoryOwnerId != null && territoryOwnerId > 0) {
+                return territoryOwnerId;
+            }
+        }
+        return parseIntOrNull(request.getParameter("accountOwnerId"));
+    }
 
     /**
      * @param existingAddressId address_id khách hàng đã có sẵn (null nếu tạo mới hoặc

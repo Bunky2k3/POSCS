@@ -15,12 +15,19 @@ import poscs.model.Province;
 /**
  * Phân công địa bàn: ai cầm tỉnh nào (bảng user_provinces).
  *
- * <p>Chỉ lưu chiều TỈNH -&gt; NGƯỜI, và chỉ cho tầng lá. Địa bàn của quản lý
- * vùng không lưu ở đây mà suy ra bằng {@link #findProvincesManagedBy} -- gộp
- * địa bàn của cấp dưới. Nhập tay cả hai tầng là tạo ra hai nguồn sự thật rồi
- * có ngày lệch nhau; đó là mô hình đã chốt với khách hàng.
+ * <p>Chỉ lưu chiều TỈNH -&gt; NGƯỜI. Người cầm tỉnh KHÔNG nhất thiết là nhân
+ * viên tác nghiệp: khách hàng xác nhận 2026-09-15 rằng cấp trên cũng trực
+ * tiếp cầm địa bàn và tự đi đàm phán -- nên bảng này nhận mọi user, không lọc
+ * theo vai trò hay theo tầng trong cây tổ chức.
  *
- * <p>Xem ghi chú đầu V19 về trạng thái "đang theo giả định" của tính năng này.
+ * <p>{@link #findProvincesManagedBy} là thứ khác: địa bàn mà một người bao
+ * phủ QUA CẤP DƯỚI. Không lưu, mà suy ra bằng cách gộp -- lưu tay cả hai thứ
+ * là tạo ra hai nguồn sự thật rồi có ngày lệch nhau. Một người có thể có cả
+ * hai: vài tỉnh tự cầm, vài tỉnh phủ qua lính.
+ *
+ * <p>Giả định của V19 ("địa bàn là thực thể riêng") đã được khách hàng xác
+ * nhận 2026-09-15, kèm quyết định KHOÁ ô người phụ trách theo địa bàn ở luồng
+ * tạo/sửa khách hàng -- xem {@link #findAssigneeOfWard}.
  */
 public class TerritoryDAO {
 
@@ -67,6 +74,34 @@ public class TerritoryDAO {
             }
         } catch (SQLException ex) {
             LOG.error("Loi tra nguoi cam tinh (provinceId={})", provinceId, ex);
+            return null;
+        }
+    }
+
+    /**
+     * Người cầm tỉnh chứa xã/phường này, hoặc null nếu tỉnh đó chưa ai cầm.
+     *
+     * Suy từ xã/phường chứ KHÔNG nhận provinceId rời từ request: form gửi lên
+     * cả hai ô, nhưng chỉ ô xã/phường mới thực sự đi vào địa chỉ khách hàng.
+     * Tin vào provinceId rời thì một request nặn tay khai được tỉnh A để lấy
+     * người của tỉnh A trong khi địa chỉ nằm ở tỉnh B -- đúng cái mà khoá ô
+     * người phụ trách sinh ra để chặn.
+     *
+     * "Chưa ai cầm" là trạng thái hợp lệ, xem {@link #findAssigneeOf}.
+     */
+    public Integer findAssigneeOfWard(int wardId) {
+        String sql = "SELECT up.user_id FROM districts d " +
+                     "JOIN user_provinces up ON up.province_id = d.province_id " +
+                     "JOIN users u ON u.user_id = up.user_id AND u.is_deleted = 0 " +
+                     "WHERE d.districts_id = ?";
+        try (Connection conn = DBContext.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, wardId);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next() ? rs.getInt(1) : null;
+            }
+        } catch (SQLException ex) {
+            LOG.error("Loi tra nguoi cam dia ban theo xa/phuong (wardId={})", wardId, ex);
             return null;
         }
     }

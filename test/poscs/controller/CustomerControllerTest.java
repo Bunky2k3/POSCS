@@ -8,6 +8,7 @@ import jakarta.servlet.http.HttpSession;
 import jakarta.servlet.http.Part;
 import org.junit.Before;
 import org.junit.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.MockedStatic;
 import poscs.common.FileStorage;
 import poscs.dao.AddressDAO;
@@ -16,12 +17,14 @@ import poscs.dao.CustomerDAO;
 import poscs.dao.CustomerLifecycleEventDAO;
 import poscs.dao.EmployeeDAO;
 import poscs.dao.TechnicalSupportTicketDAO;
+import poscs.dao.TerritoryDAO;
 import poscs.model.CustomerLifecycleEvent;
 import poscs.model.Enterprise;
 import poscs.model.RelationshipRating;
 import poscs.model.Role;
 import poscs.model.User;
 
+import static org.junit.Assert.assertEquals;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
@@ -47,6 +50,7 @@ public class CustomerControllerTest {
     private ContractDAO contractDAO;
     private TechnicalSupportTicketDAO ticketDAO;
     private CustomerLifecycleEventDAO lifecycleEventDAO;
+    private TerritoryDAO territoryDAO;
 
     private HttpServletRequest request;
     private HttpServletResponse response;
@@ -62,6 +66,7 @@ public class CustomerControllerTest {
         contractDAO = mock(ContractDAO.class);
         ticketDAO = mock(TechnicalSupportTicketDAO.class);
         lifecycleEventDAO = mock(CustomerLifecycleEventDAO.class);
+        territoryDAO = mock(TerritoryDAO.class);
 
         setField(controller, "customerDAO", customerDAO);
         setField(controller, "employeeDAO", employeeDAO);
@@ -69,6 +74,7 @@ public class CustomerControllerTest {
         setField(controller, "contractDAO", contractDAO);
         setField(controller, "ticketDAO", ticketDAO);
         setField(controller, "lifecycleEventDAO", lifecycleEventDAO);
+        setField(controller, "territoryDAO", territoryDAO);
 
         request = mock(HttpServletRequest.class);
         response = mock(HttpServletResponse.class);
@@ -327,6 +333,100 @@ public class CustomerControllerTest {
         controller.doPost(request, response);
 
         verify(response).sendRedirect(CONTEXT_PATH + "/customer?action=new&error=create_failed");
+    }
+
+    // ------------------------------------------------------------------
+    // Khoá người phụ trách theo địa bàn
+    // ------------------------------------------------------------------
+    //
+    // Quy tắc khách hàng chốt 2026-09-15: tỉnh quyết định người phụ trách
+    // chính, người nhập liệu không chọn. Khoá ở JSP chỉ là khoá hình (ô
+    // disabled, ai mở devtools cũng gỡ được) nên chỗ phải đúng là đây --
+    // và đó cũng là lý do các test dưới đây POST thẳng một accountOwnerId
+    // khác với người cầm tỉnh, đúng như một request nặn tay sẽ làm.
+
+    /**
+     * Người cầm tỉnh THẮNG giá trị gửi lên. Nếu không, khoá chỉ tồn tại
+     * trong trình duyệt và bất kỳ ai cũng tự gán khách hàng cho mình được.
+     */
+    @Test
+    public void create_provinceHasOwner_overridesSubmittedAccountOwner() throws Exception {
+        when(request.getParameter("action")).thenReturn("create");
+        stubValidCreateFields(); // accountOwnerId=9, districtId=10
+        when(territoryDAO.findAssigneeOfWard(10)).thenReturn(42);
+        when(customerDAO.generateNextEnterpriseCode()).thenReturn("KH-0001");
+        when(customerDAO.insert(any(Enterprise.class))).thenReturn(7);
+
+        controller.doPost(request, response);
+
+        ArgumentCaptor<Enterprise> saved = ArgumentCaptor.forClass(Enterprise.class);
+        verify(customerDAO).insert(saved.capture());
+        assertEquals(42, saved.getValue().getAccountOwnerId());
+    }
+
+    /**
+     * Tỉnh chưa ai cầm thì KHÔNG khoá. Bảng phân công mới phủ một phần trong
+     * 34 tỉnh; khoá tất thì "chưa phân công" biến thành chặn nghiệp vụ --
+     * không tạo nổi khách hàng ở những tỉnh còn trống.
+     */
+    @Test
+    public void create_provinceWithoutOwner_keepsSubmittedAccountOwner() throws Exception {
+        when(request.getParameter("action")).thenReturn("create");
+        stubValidCreateFields();
+        when(territoryDAO.findAssigneeOfWard(10)).thenReturn(null);
+        when(customerDAO.generateNextEnterpriseCode()).thenReturn("KH-0001");
+        when(customerDAO.insert(any(Enterprise.class))).thenReturn(7);
+
+        controller.doPost(request, response);
+
+        ArgumentCaptor<Enterprise> saved = ArgumentCaptor.forClass(Enterprise.class);
+        verify(customerDAO).insert(saved.capture());
+        assertEquals(9, saved.getValue().getAccountOwnerId());
+    }
+
+    /**
+     * Địa bàn suy từ XÃ/PHƯỜNG, không từ ô tỉnh gửi kèm. Form gửi lên cả hai
+     * ô nhưng chỉ xã/phường mới đi vào địa chỉ khách hàng -- tin vào ô tỉnh
+     * rời thì khai tỉnh 99 để lấy người của tỉnh 99 trong khi khách nằm ở
+     * tỉnh khác, đúng cái mà khoá này sinh ra để chặn.
+     */
+    @Test
+    public void create_ignoresSubmittedProvinceId_resolvesOwnerFromWard() throws Exception {
+        when(request.getParameter("action")).thenReturn("create");
+        stubValidCreateFields();
+        when(request.getParameter("provinceId")).thenReturn("99");
+        when(territoryDAO.findAssigneeOfWard(10)).thenReturn(42);
+        when(customerDAO.generateNextEnterpriseCode()).thenReturn("KH-0001");
+        when(customerDAO.insert(any(Enterprise.class))).thenReturn(7);
+
+        controller.doPost(request, response);
+
+        verify(territoryDAO).findAssigneeOfWard(10);
+        verify(territoryDAO, never()).findAssigneeOf(anyInt());
+    }
+
+    /**
+     * Form sửa phải khoá y hệt form tạo, nếu không thì tạo khách xong mở
+     * trang sửa đổi lại người phụ trách là đường vòng thoát khoá.
+     */
+    @Test
+    public void update_provinceHasOwner_overridesSubmittedAccountOwner() throws Exception {
+        when(request.getParameter("action")).thenReturn("update");
+        when(request.getParameter("customerId")).thenReturn("5");
+        Enterprise existing = new Enterprise();
+        existing.setEnterpriseId(5);
+        existing.setAddressId(31);
+        when(customerDAO.findById(5)).thenReturn(existing);
+
+        stubValidCreateFields();
+        when(territoryDAO.findAssigneeOfWard(10)).thenReturn(42);
+        when(customerDAO.update(any(Enterprise.class))).thenReturn(true);
+
+        controller.doPost(request, response);
+
+        ArgumentCaptor<Enterprise> saved = ArgumentCaptor.forClass(Enterprise.class);
+        verify(customerDAO).update(saved.capture());
+        assertEquals(42, saved.getValue().getAccountOwnerId());
     }
 
     // ------------------------------------------------------------------

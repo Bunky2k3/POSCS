@@ -178,6 +178,10 @@
                                 <option value="${staff.userId}">${fn:escapeXml(staff.fullName)}</option>
                             </c:forEach>
                         </select>
+                        <%-- Ô select bị disabled thì trình duyệt KHÔNG gửi giá trị lên.
+                             Input này gánh giá trị lúc ô bị khoá; lúc ô mở thì nó tự
+                             disabled để không gửi hai giá trị cùng tên. --%>
+                        <input type="hidden" id="accountOwnerHidden" name="accountOwnerId" disabled>
                         <div id="goiYDiaBan" class="text-muted" style="display:none; font-size: 0.8rem; margin-top: 6px; text-transform: none; font-weight: 400;"></div>
                         <span class="error-text" id="err-assignee">Vui lòng chọn người phụ trách chính.</span>
                     </div>
@@ -304,39 +308,64 @@
             reader.readAsDataURL(input.files[0]);
         }
 
-        // ===== Điền sẵn người phụ trách theo địa bàn =====
+        // ===== Người phụ trách chính suy từ địa bàn =====
         //
         // Bảng phân công tỉnh -> người, nhúng sẵn từ server (34 tỉnh, nhỏ).
-        // ĐIỀN SẴN chứ KHÔNG khoá: khách hàng chưa chốt hệ thống có phải tự
-        // gán người phụ trách theo tỉnh hay không (xem ghi chú đầu V19). Làm
-        // dạng gợi ý thì cả hai hướng đều sống được -- muốn tự gán thì chỉ
-        // việc bấm lưu, muốn tự chọn thì đổi lại như thường, không ai bị chặn.
+        // Ai cầm tỉnh nào là dữ kiện tổ chức, không phải lựa chọn của người
+        // nhập liệu -- nên tỉnh đã có người thì điền sẵn rồi KHOÁ ô lại.
+        //
+        // Tỉnh CHƯA ai cầm thì mở cho tự chọn như cũ: bảng phân công mới phủ
+        // một phần trong 34 tỉnh, khoá tất thì không tạo nổi khách hàng ở
+        // những tỉnh còn trống.
+        //
+        // Đây chỉ là tầng hiển thị. Khoá thật nằm ở CustomerController
+        // .resolveAccountOwnerId -- ô disabled ai mở devtools cũng gỡ được.
         var phanCongDiaBan = {
             <c:forEach var="e" items="${territoryAssignments}" varStatus="st">'${e.key}': ${e.value}<c:if test="${!st.last}">,</c:if></c:forEach>
         };
         var oNguoiPhuTrach = document.getElementById('assignee');
+        var oNguoiPhuTrachAn = document.getElementById('accountOwnerHidden');
         var goiYDiaBan = document.getElementById('goiYDiaBan');
+        // Tên đang nằm trong ô là do địa bàn điền, hay do người dùng tự chọn?
+        // Phải phân biệt, nếu không thì đổi từ tỉnh CÓ người sang tỉnh TRỐNG
+        // sẽ để tên của tỉnh cũ nằm lại trong ô đã mở khoá -- người dùng bấm
+        // lưu là gán khách cho một người chẳng liên quan gì tới tỉnh mới.
+        var dienBoiDiaBan = false;
 
-        function dienSanNguoiPhuTrach(provinceId) {
-            goiYDiaBan.style.display = 'none';
-            if (!provinceId) { return; }
-            var userId = phanCongDiaBan[provinceId];
-            if (!userId) { return; }
-            // Người dùng đã tự chọn ai đó rồi thì tôn trọng lựa chọn của họ,
-            // chỉ điền khi ô đang trống.
-            if (oNguoiPhuTrach.value) { return; }
-            var opt = Array.prototype.find.call(oNguoiPhuTrach.options, function (o) {
+        function apDungPhanCongDiaBan(provinceId) {
+            var userId = provinceId ? phanCongDiaBan[provinceId] : null;
+            var opt = userId ? Array.prototype.find.call(oNguoiPhuTrach.options, function (o) {
                 return o.value === String(userId);
-            });
-            if (!opt) { return; }
+            }) : null;
+
+            if (!opt) {
+                // Tỉnh trống, hoặc người cầm tỉnh không còn trong danh sách
+                // nhân viên đang hoạt động: trả ô về cho người dùng tự chọn.
+                oNguoiPhuTrach.disabled = false;
+                oNguoiPhuTrachAn.disabled = true;
+                goiYDiaBan.style.display = 'none';
+                if (dienBoiDiaBan) {
+                    oNguoiPhuTrach.value = '';
+                    dienBoiDiaBan = false;
+                }
+                return;
+            }
             oNguoiPhuTrach.value = opt.value;
-            goiYDiaBan.textContent = 'Đã điền sẵn theo người phụ trách địa bàn. Đổi lại được nếu cần.';
+            oNguoiPhuTrach.disabled = true;
+            oNguoiPhuTrachAn.disabled = false;
+            oNguoiPhuTrachAn.value = opt.value;
+            dienBoiDiaBan = true;
+            goiYDiaBan.textContent = 'Theo phân công địa bàn. Muốn đổi thì sửa người phụ trách tỉnh ở trang Nhân viên.';
             goiYDiaBan.style.display = 'block';
         }
 
+        // Người dùng tự chọn ai đó ở tỉnh trống thì lựa chọn đó là của họ,
+        // đừng xoá khi họ đổi sang một tỉnh trống khác.
+        oNguoiPhuTrach.addEventListener('change', function () { dienBoiDiaBan = false; });
+
         document.getElementById('province').addEventListener('change', function () {
             loadWards(this.value);
-            dienSanNguoiPhuTrach(this.value);
+            apDungPhanCongDiaBan(this.value);
         });
 
         function validateForm() {

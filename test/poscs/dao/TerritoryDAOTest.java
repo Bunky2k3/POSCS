@@ -78,6 +78,54 @@ public class TerritoryDAOTest {
     }
 
     // ------------------------------------------------------------------
+    // findAssigneeOfWard -- căn cứ để khoá ô người phụ trách
+    // ------------------------------------------------------------------
+
+    @Test
+    public void findAssigneeOfWard_tinhChuaXaPhuongDaCoNguoiCam_traVeUserId() throws Exception {
+        PreparedStatement ps = statementReturning(singleRow(row("user_id", 42)));
+        Connection conn = connectionReturning(ps);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            assertEquals(Integer.valueOf(42), dao.findAssigneeOfWard(10));
+            verify(ps).setInt(1, 10);
+        }
+    }
+
+    /**
+     * Null ở đây KHÔNG phải lỗi: CustomerController đọc nó là "tỉnh chưa ai
+     * cầm" rồi mở ô người phụ trách cho người dùng tự chọn. Trả 0 thì khách
+     * hàng được gán cho một nhân viên không tồn tại và INSERT vỡ ở tầng FK.
+     */
+    @Test
+    public void findAssigneeOfWard_tinhChuaAiCam_traVeNull() throws Exception {
+        PreparedStatement ps = statementReturning(emptyResultSet());
+        Connection conn = connectionReturning(ps);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            assertNull(dao.findAssigneeOfWard(10));
+        }
+    }
+
+    /**
+     * Lỗi CSDL làm khoá HỞ ra chứ không chặn người dùng: cùng đường với "tỉnh
+     * chưa ai cầm". Đánh đổi có chủ ý -- fail-closed ở đây nghĩa là CSDL chập
+     * một nhịp thì không ai tạo được khách hàng nữa.
+     */
+    @Test
+    public void findAssigneeOfWard_loiCsdl_traVeNullChuKhongNem() throws Exception {
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenThrow(new SQLException("hỏng"));
+
+            assertNull(dao.findAssigneeOfWard(10));
+        }
+    }
+
+    // ------------------------------------------------------------------
     // replaceProvincesOf -- transaction
     // ------------------------------------------------------------------
 

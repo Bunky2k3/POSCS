@@ -181,6 +181,10 @@
                                 <option value="${staff.userId}" ${staff.userId == customer.accountOwnerId ? 'selected' : ''}>${fn:escapeXml(staff.fullName)}</option>
                             </c:forEach>
                         </select>
+                        <%-- Xem ghi chú ở addnewcustomer.jsp: ô select bị disabled thì
+                             trình duyệt không gửi giá trị lên, input này gánh thay. --%>
+                        <input type="hidden" id="accountOwnerHidden" name="accountOwnerId" disabled>
+                        <div id="goiYDiaBan" class="text-muted" style="display:none; font-size: 0.8rem; margin-top: 6px; text-transform: none; font-weight: 400;"></div>
                         <span class="error-text" id="err-assignee">Vui lòng chọn người phụ trách chính.</span>
                     </div>
                     <div class="col-md-6 field-row">
@@ -316,12 +320,66 @@
                 });
         }
 
+        // ===== Người phụ trách chính suy từ địa bàn =====
+        //
+        // Giống hệt addnewcustomer.jsp (xem ghi chú đầy đủ ở đó): tỉnh đã có
+        // người cầm thì điền sẵn rồi KHOÁ, tỉnh trống thì mở cho tự chọn.
+        //
+        // Form sửa BẮT BUỘC phải có khoá này, nếu không thì mở form sửa rồi
+        // đổi người phụ trách là đường vòng thoát khoá của form tạo.
+        var phanCongDiaBan = {
+            <c:forEach var="e" items="${territoryAssignments}" varStatus="st">'${e.key}': ${e.value}<c:if test="${!st.last}">,</c:if></c:forEach>
+        };
+        var oNguoiPhuTrach = document.getElementById('assignee');
+        var oNguoiPhuTrachAn = document.getElementById('accountOwnerHidden');
+        var goiYDiaBan = document.getElementById('goiYDiaBan');
+        // Xem ghi chú ở addnewcustomer.jsp: phải phân biệt tên do địa bàn điền
+        // với tên do người dùng chọn, nếu không thì đổi sang tỉnh trống sẽ để
+        // lại tên của tỉnh cũ trong ô đã mở khoá.
+        //
+        // Ở form sửa, giá trị ban đầu là người phụ trách ĐANG LƯU của khách
+        // hàng -- đó là lựa chọn có sẵn, không phải do địa bàn điền, nên cờ
+        // khởi tạo bằng false.
+        var dienBoiDiaBan = false;
+
+        function apDungPhanCongDiaBan(provinceId) {
+            var userId = provinceId ? phanCongDiaBan[provinceId] : null;
+            var opt = userId ? Array.prototype.find.call(oNguoiPhuTrach.options, function (o) {
+                return o.value === String(userId);
+            }) : null;
+
+            if (!opt) {
+                oNguoiPhuTrach.disabled = false;
+                oNguoiPhuTrachAn.disabled = true;
+                goiYDiaBan.style.display = 'none';
+                if (dienBoiDiaBan) {
+                    oNguoiPhuTrach.value = '';
+                    dienBoiDiaBan = false;
+                }
+                return;
+            }
+            oNguoiPhuTrach.value = opt.value;
+            oNguoiPhuTrach.disabled = true;
+            oNguoiPhuTrachAn.disabled = false;
+            oNguoiPhuTrachAn.value = opt.value;
+            dienBoiDiaBan = true;
+            goiYDiaBan.textContent = 'Theo phân công địa bàn. Muốn đổi thì sửa người phụ trách tỉnh ở trang Nhân viên.';
+            goiYDiaBan.style.display = 'block';
+        }
+
+        oNguoiPhuTrach.addEventListener('change', function () { dienBoiDiaBan = false; });
+
         document.getElementById('province').addEventListener('change', function () {
             loadWards(this.value, null);
+            apDungPhanCongDiaBan(this.value);
         });
 
         // Khởi tạo đúng danh sách xã/phường theo tỉnh đã chọn sẵn khi load trang
         loadWards(document.getElementById('province').value, initialDistrictValue);
+        // Và khoá luôn ô người phụ trách theo tỉnh sẵn có -- khách hàng cũ có
+        // thể đang đứng tên người khác với người cầm tỉnh; mở form ra là thấy
+        // ngay tên đúng theo địa bàn, không phải chờ lưu xong mới biết.
+        apDungPhanCongDiaBan(document.getElementById('province').value);
 
         function validateForm() {
             var valid = true;
