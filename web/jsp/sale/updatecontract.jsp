@@ -137,7 +137,15 @@
 
                 <div class="section-header"><h5>Thông tin chung</h5></div>
                 <div class="row">
-                    <div class="col-12 field-row">
+                    <div class="col-md-6 field-row">
+                        <label>Mã hợp đồng (hệ thống)</label>
+                        <%-- Chỉ đọc và không gửi lên: mã do generateNextContractCode()
+                             sinh lúc tạo, sửa được thì mọi liên kết nội bộ bám vào nó
+                             hoá ra bám vào một chuỗi người gõ tay. --%>
+                        <input type="text" class="form-control" disabled
+                               value="${fn:escapeXml(contract.contractCode)}">
+                    </div>
+                    <div class="col-md-6 field-row">
                         <label>Số hợp đồng</label>
                         <input type="text" class="form-control" id="contractNumber" name="contractNumber"
                                maxlength="100" placeholder="VD: 123/2026/HĐKT-POSTEF"
@@ -160,6 +168,16 @@
                         <span class="error-text" id="err-customer">Vui lòng chọn khách hàng.</span>
                     </div>
                     <div class="col-md-6 field-row">
+                        <label>Người phụ trách <span class="req">*</span></label>
+                        <select class="form-select" id="owner" name="ownerId">
+                            <option value="">-- Chọn nhân viên --</option>
+                            <c:forEach var="staff" items="${userList}">
+                                <option value="${staff.userId}" ${staff.userId == contract.ownerId ? 'selected' : ''}>${fn:escapeXml(staff.fullName)}</option>
+                            </c:forEach>
+                        </select>
+                        <span class="error-text" id="err-owner">Vui lòng chọn người phụ trách.</span>
+                    </div>
+                    <div class="col-md-6 field-row">
                         <label>Loại hợp đồng <span class="req">*</span></label>
                         <select class="form-select" id="contractType" name="contractType">
                             <option value="">-- Chọn loại hợp đồng --</option>
@@ -170,42 +188,6 @@
                         <span class="error-text" id="err-contractType">Vui lòng chọn loại hợp đồng.</span>
                     </div>
 
-                    <div class="col-md-4 field-row">
-                        <label>Ngày ký <span class="req">*</span></label>
-                        <%-- CHỈ ĐỌC, và không gửi lên (không có name). Ngày ký là
-                             dấu của một hành động đã xảy ra, do hệ thống đóng lúc
-                             bấm Ký -- sửa lại được thì nó thành một ô khai báo, và
-                             hợp đồng đã ký có thể bị lùi ngày. ContractController
-                             cũng giữ nguyên giá trị cũ khi lưu, không đọc từ form. --%>
-                        <input type="date" class="form-control" id="signDate" disabled
-                               value="<fmt:formatDate value="${contract.signingDate}" pattern="yyyy-MM-dd"/>">
-                        <span style="font-size:0.78rem; color:#9ca3af; display:block; margin-top:6px;">
-                            <c:choose>
-                                <c:when test="${contract.signingDate == null}">Chưa ký — ngày ký ghi vào lúc bấm "Ký hợp đồng".</c:when>
-                                <c:otherwise>Ngày ký đã chốt, không sửa được.</c:otherwise>
-                            </c:choose>
-                        </span>
-                        <span class="error-text" id="err-dates">Điền cả hai mốc, và ngày hiệu lực phải trước hoặc bằng ngày kết thúc.</span>
-                    </div>
-                    <div class="col-md-4 field-row">
-                        <label>Ngày hiệu lực</label>
-                        <input type="date" class="form-control" id="effectiveDate" name="effectiveDate" value="<fmt:formatDate value="${contract.effectiveDate}" pattern="yyyy-MM-dd"/>">
-                    </div>
-                    <div class="col-md-4 field-row">
-                        <label>Ngày kết thúc</label>
-                        <input type="date" class="form-control" id="endDate" name="endDate" value="<fmt:formatDate value="${contract.endDate}" pattern="yyyy-MM-dd"/>">
-                    </div>
-
-                    <div class="col-md-6 field-row">
-                        <label>Người phụ trách <span class="req">*</span></label>
-                        <select class="form-select" id="owner" name="ownerId">
-                            <option value="">-- Chọn nhân viên --</option>
-                            <c:forEach var="staff" items="${userList}">
-                                <option value="${staff.userId}" ${staff.userId == contract.ownerId ? 'selected' : ''}>${fn:escapeXml(staff.fullName)}</option>
-                            </c:forEach>
-                        </select>
-                        <span class="error-text" id="err-owner">Vui lòng chọn người phụ trách.</span>
-                    </div>
 <div class="col-12" style="margin-top:6px; margin-bottom:10px;">
                         <div style="font-size:0.8rem; font-weight:700; color:var(--primary-dark); text-transform:uppercase; letter-spacing:.3px;">
                             Thông tin ký kết
@@ -254,7 +236,48 @@
                             con số lệch nhau chính là công nợ.
                         </span>
                     </div>
-                                        <div class="col-12 field-row">
+                                        <%-- THỜI HẠN tách thành khối riêng, không nằm chung "Thông tin
+                         chung" nữa -- khối đó giờ chỉ mang thông tin nhận dạng hợp
+                         đồng, khớp với trang xem.
+
+                         Vẫn PHẢI giữ ô nhập ở đây: hợp đồng thiếu ngày hiệu lực hoặc
+                         ngày kết thúc thì KHÔNG ký được (ContractDAO.changeProgressStatus),
+                         nên bỏ hẳn là không hợp đồng nào ký được nữa. --%>
+                    <div class="col-12" style="margin-top:6px; margin-bottom:10px;">
+                        <div style="font-size:0.8rem; font-weight:700; color:var(--primary-dark); text-transform:uppercase; letter-spacing:.3px;">
+                            Thời hạn hợp đồng
+                        </div>
+                        <div style="font-size:0.78rem; color:#9ca3af; margin-top:2px;">
+                            Điền khi đã chốt với khách. Phải có đủ ngày hiệu lực và ngày kết thúc thì mới ký được.
+                        </div>
+                    </div>
+                    <div class="col-md-4 field-row">
+                        <label>Ngày ký</label>
+                        <%-- CHỈ ĐỌC, và không gửi lên (không có name). Ngày ký là
+                             dấu của một hành động đã xảy ra, do hệ thống đóng lúc
+                             bấm Ký -- sửa lại được thì nó thành một ô khai báo, và
+                             hợp đồng đã ký có thể bị lùi ngày. ContractController
+                             cũng giữ nguyên giá trị cũ khi lưu, không đọc từ form. --%>
+                        <input type="date" class="form-control" id="signDate" disabled
+                               value="<fmt:formatDate value="${contract.signingDate}" pattern="yyyy-MM-dd"/>">
+                        <span style="font-size:0.78rem; color:#9ca3af; display:block; margin-top:6px;">
+                            <c:choose>
+                                <c:when test="${contract.signingDate == null}">Chưa ký — ngày ký ghi vào lúc bấm "Ký hợp đồng".</c:when>
+                                <c:otherwise>Ngày ký đã chốt, không sửa được.</c:otherwise>
+                            </c:choose>
+                        </span>
+                        <span class="error-text" id="err-dates">Điền cả hai mốc, và ngày hiệu lực phải trước hoặc bằng ngày kết thúc.</span>
+                    </div>
+                    <div class="col-md-4 field-row">
+                        <label>Ngày hiệu lực</label>
+                        <input type="date" class="form-control" id="effectiveDate" name="effectiveDate" value="<fmt:formatDate value="${contract.effectiveDate}" pattern="yyyy-MM-dd"/>">
+                    </div>
+                    <div class="col-md-4 field-row">
+                        <label>Ngày kết thúc</label>
+                        <input type="date" class="form-control" id="endDate" name="endDate" value="<fmt:formatDate value="${contract.endDate}" pattern="yyyy-MM-dd"/>">
+                    </div>
+
+                    <div class="col-12 field-row">
                         <label>Link file PDF hợp đồng (Google Drive)</label>
                         <input type="url" class="form-control" id="attachmentUrl" name="attachmentUrl"
                                value="${fn:escapeXml(contract.attachmentUrl)}"

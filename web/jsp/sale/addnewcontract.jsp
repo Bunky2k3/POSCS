@@ -103,7 +103,8 @@
                         <input type="text" class="form-control" id="contractNumber" name="contractNumber"
                                maxlength="100" placeholder="VD: 123/2026/HĐKT-POSTEF">
                         <span style="font-size:0.78rem; color:#9ca3af; display:block; margin-top:6px;">
-                            Số ghi trên bản hợp đồng giấy. Mã HD-xxxx của hệ thống vẫn sinh tự động, không thay thế số này.
+                            Số ghi trên bản hợp đồng giấy. Mã nội bộ dạng HD-xxxx do hệ thống tự sinh
+                            khi lưu, không có ô nhập và không thay thế số này.
                         </span>
                     </div>
 
@@ -121,6 +122,16 @@
                             </c:forEach>
                         </select>
                         <span class="error-text" id="err-customer">Vui lòng chọn khách hàng.</span>
+                    </div>
+                    <div class="col-md-6 field-row">
+                        <label>Người phụ trách <span class="req">*</span></label>
+                        <select class="form-select" id="owner" name="ownerId">
+                            <option value="">-- Chọn nhân viên --</option>
+                            <c:forEach var="staff" items="${userList}">
+                                <option value="${staff.userId}">${fn:escapeXml(staff.fullName)}</option>
+                            </c:forEach>
+                        </select>
+                        <span class="error-text" id="err-owner">Vui lòng chọn người phụ trách.</span>
                     </div>
                     <div class="col-md-6 field-row">
                         <label>Loại hợp đồng <span class="req">*</span></label>
@@ -203,16 +214,6 @@
                         </div>
                     </div>
 
-                    <div class="col-md-6 field-row">
-                        <label>Người phụ trách <span class="req">*</span></label>
-                        <select class="form-select" id="owner" name="ownerId">
-                            <option value="">-- Chọn nhân viên --</option>
-                            <c:forEach var="staff" items="${userList}">
-                                <option value="${staff.userId}">${fn:escapeXml(staff.fullName)}</option>
-                            </c:forEach>
-                        </select>
-                        <span class="error-text" id="err-owner">Vui lòng chọn người phụ trách.</span>
-                    </div>
                     <div class="col-12 field-row">
                         <label>Link file PDF hợp đồng (Google Drive)</label>
                         <input type="url" class="form-control" id="attachmentUrl" name="attachmentUrl"
