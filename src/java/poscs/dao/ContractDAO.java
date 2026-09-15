@@ -21,6 +21,7 @@ import poscs.common.Period;
 import poscs.model.Address;
 import poscs.model.Contract;
 import poscs.model.ContractHistory;
+import poscs.model.ContractPayment;
 import poscs.model.ContractProduct;
 import poscs.model.District;
 import poscs.model.Enterprise;
@@ -537,8 +538,12 @@ public class ContractDAO {
                     insertHistory(conn, newId, ContractHistory.EVENT_CREATED,
                             "Tạo bản nháp " + contract.getContractCode()
                                     + (direction == null ? "" : " — hợp đồng " + direction.toLowerCase())
-                                    + ", dự kiến hiệu lực " + formatDate(contract.getEffectiveDate())
-                                    + " đến " + formatDate(contract.getEndDate()),
+                                    // Nháp có thể chưa chốt thời hạn (V26). Bỏ hẳn mệnh đề
+                                    // đó khi thiếu, thay vì để lại 'hiệu lực  đến ' cụt lủn.
+                                    + (contract.getEffectiveDate() == null || contract.getEndDate() == null
+                                            ? ", chưa chốt thời hạn"
+                                            : ", dự kiến hiệu lực " + formatDate(contract.getEffectiveDate())
+                                                    + " đến " + formatDate(contract.getEndDate())),
                             actorId, null);
 
                     conn.commit();
@@ -1298,6 +1303,202 @@ public class ContractDAO {
     }
 
     // ==================================================================
+    /**
+     * Các kỳ thanh toán của một hợp đồng, kỳ đến hạn sớm nhất trước.
+     *
+     * <p>Bảng contract_payments đã tồn tại từ lâu và ĐANG ĐƯỢC ĐỌC (ba hàm
+     * sumInvoiceAmount* bên dưới nuôi dải KPI doanh thu của dashboard), nhưng
+     * cho tới trước phần này thì KHÔNG màn hình nào ghi vào đó -- nghĩa là con
+     * số doanh thu trên dashboard đóng băng ở dữ liệu gieo mẫu.
+     */
+    public List<ContractPayment> findPaymentsByContractId(int contractId) {
+        List<ContractPayment> result = new ArrayList<>();
+        String sql = "SELECT payment_id, contract_id, invoice_amount, due_date, paid_date, created_at " +
+                "FROM contract_payments WHERE contract_id = ? ORDER BY due_date, payment_id";
+        try (Connection conn = DBContext.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, contractId);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    ContractPayment p = new ContractPayment();
+                    p.setPaymentId(rs.getInt("payment_id"));
+                    p.setContractId(rs.getInt("contract_id"));
+                    p.setInvoiceAmount(rs.getBigDecimal("invoice_amount"));
+                    p.setDueDate(rs.getDate("due_date"));
+                    p.setPaidDate(rs.getDate("paid_date"));
+                    p.setCreatedAt(rs.getTimestamp("created_at"));
+                    result.add(p);
+                }
+            }
+        } catch (SQLException ex) {
+            LOG.error("Loi truy van ky thanh toan (contractId={})", contractId, ex);
+        }
+        return result;
+    }
+
+    /**
+     * Lập một kỳ thanh toán, kèm dòng nhật ký -- trong cùng transaction.
+     *
+     * <p>CHẶN khi hợp đồng đã đóng băng, nhưng KHÔNG chặn khi đã ký. Khác hàng
+     * hoá ở chỗ đó, và có lý do: hàng hoá là nội dung hợp đồng (ký xong là
+     * chứng cứ), còn lịch thu tiền là thứ mình theo dõi trong lúc thực hiện --
+     * hợp đồng ký tháng trước mà giờ mới nhập kỳ thu là chuyện bình thường.
+     */
+    public boolean insertPayment(int contractId, ContractPayment payment, int actorId) {
+        if (payment.getInvoiceAmount() == null || payment.getInvoiceAmount().signum() <= 0
+                || payment.getDueDate() == null) {
+            return false;
+        }
+        String sql = "INSERT INTO contract_payments (contract_id, invoice_amount, due_date, paid_date) " +
+                "VALUES (?, ?, ?, ?)";
+        try (Connection conn = DBContext.getConnection()) {
+            conn.setAutoCommit(false);
+            boolean committed = false;
+            try {
+                if (isFrozen(conn, contractId)) {
+                    return false;
+                }
+                try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                    ps.setInt(1, contractId);
+                    ps.setBigDecimal(2, payment.getInvoiceAmount());
+                    ps.setDate(3, payment.getDueDate());
+                    ps.setDate(4, payment.getPaidDate());
+                    if (ps.executeUpdate() == 0) {
+                        return false;
+                    }
+                }
+                insertHistory(conn, contractId, ContractHistory.EVENT_PAYMENT_ADDED,
+                        "Lập kỳ thanh toán " + formatMoney(payment.getInvoiceAmount())
+                                + ", đến hạn " + formatDate(payment.getDueDate())
+                                + (payment.getPaidDate() == null ? ""
+                                        : " (đã thu " + formatDate(payment.getPaidDate()) + ")"),
+                        actorId, null);
+                conn.commit();
+                committed = true;
+            } finally {
+                finishTransaction(conn, committed, "lap ky thanh toan", contractId);
+            }
+            return committed;
+        } catch (SQLException ex) {
+            LOG.error("Loi lap ky thanh toan (contractId={})", contractId, ex);
+            return false;
+        }
+    }
+
+    /**
+     * Ghi nhận tiền của một kỳ đã về.
+     *
+     * <p>KHÔNG chặn kể cả khi hợp đồng đã thanh lý: tiền bảo hành giữ lại
+     * thường chỉ về sau thanh lý cả năm. Đóng băng nói về NỘI DUNG hợp đồng,
+     * không nói về việc tiền có thật sự vào tài khoản hay chưa.
+     */
+    public boolean markPaymentPaid(int paymentId, int contractId, Date paidDate, int actorId) {
+        if (paidDate == null) {
+            return false;
+        }
+        try (Connection conn = DBContext.getConnection()) {
+            conn.setAutoCommit(false);
+            boolean committed = false;
+            try {
+                ContractPayment before = lockPayment(conn, paymentId, contractId);
+                if (before == null || before.getPaidDate() != null) {
+                    // Đã ghi nhận rồi thì thôi -- ghi đè lần nữa chỉ sinh thêm
+                    // một dòng nhật ký nói về việc chẳng thay đổi gì.
+                    return false;
+                }
+                try (PreparedStatement ps = conn.prepareStatement(
+                        "UPDATE contract_payments SET paid_date = ? WHERE payment_id = ? AND contract_id = ?")) {
+                    ps.setDate(1, paidDate);
+                    ps.setInt(2, paymentId);
+                    ps.setInt(3, contractId);
+                    if (ps.executeUpdate() == 0) {
+                        return false;
+                    }
+                }
+                insertHistory(conn, contractId, ContractHistory.EVENT_PAYMENT_PAID,
+                        "Đã thu " + formatMoney(before.getInvoiceAmount())
+                                + " (kỳ đến hạn " + formatDate(before.getDueDate()) + ")"
+                                + " ngày " + formatDate(paidDate),
+                        actorId, null);
+                conn.commit();
+                committed = true;
+            } finally {
+                finishTransaction(conn, committed, "ghi nhan da thu", contractId);
+            }
+            return committed;
+        } catch (SQLException ex) {
+            LOG.error("Loi ghi nhan da thu (paymentId={}, contractId={})", paymentId, contractId, ex);
+            return false;
+        }
+    }
+
+    /** Xoá một kỳ lập nhầm. Đọc TRƯỚC khi xoá để nhật ký nói được đã xoá cái gì. */
+    public boolean deletePayment(int paymentId, int contractId, int actorId) {
+        try (Connection conn = DBContext.getConnection()) {
+            conn.setAutoCommit(false);
+            boolean committed = false;
+            try {
+                if (isFrozen(conn, contractId)) {
+                    return false;
+                }
+                ContractPayment before = lockPayment(conn, paymentId, contractId);
+                if (before == null) {
+                    return false;
+                }
+                try (PreparedStatement ps = conn.prepareStatement(
+                        "DELETE FROM contract_payments WHERE payment_id = ? AND contract_id = ?")) {
+                    ps.setInt(1, paymentId);
+                    ps.setInt(2, contractId);
+                    if (ps.executeUpdate() == 0) {
+                        return false;
+                    }
+                }
+                insertHistory(conn, contractId, ContractHistory.EVENT_PAYMENT_REMOVED,
+                        "Xoá kỳ " + formatMoney(before.getInvoiceAmount())
+                                + " đến hạn " + formatDate(before.getDueDate()),
+                        actorId, null);
+                conn.commit();
+                committed = true;
+            } finally {
+                finishTransaction(conn, committed, "xoa ky thanh toan", contractId);
+            }
+            return committed;
+        } catch (SQLException ex) {
+            LOG.error("Loi xoa ky thanh toan (paymentId={}, contractId={})", paymentId, contractId, ex);
+            return false;
+        }
+    }
+
+    /** Đọc và khoá một kỳ thanh toán trong transaction; null nếu không thuộc hợp đồng này. */
+    private ContractPayment lockPayment(Connection conn, int paymentId, int contractId) throws SQLException {
+        String sql = "SELECT payment_id, invoice_amount, due_date, paid_date FROM contract_payments " +
+                "WHERE payment_id = ? AND contract_id = ? FOR UPDATE";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, paymentId);
+            ps.setInt(2, contractId);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (!rs.next()) {
+                    return null;
+                }
+                ContractPayment p = new ContractPayment();
+                p.setPaymentId(rs.getInt("payment_id"));
+                p.setContractId(contractId);
+                p.setInvoiceAmount(rs.getBigDecimal("invoice_amount"));
+                p.setDueDate(rs.getDate("due_date"));
+                p.setPaidDate(rs.getDate("paid_date"));
+                return p;
+            }
+        }
+    }
+
+    /** Tiền trong câu nhật ký viết như người Việt đọc: "1.500.000.000 đ". */
+    private static String formatMoney(BigDecimal amount) {
+        if (amount == null) {
+            return "";
+        }
+        return String.format("%,.0f", amount).replace(',', '.') + " đ";
+    }
+
     // Kỳ thanh toán của hợp đồng (bảng contract_payments)
     // ==================================================================
     //

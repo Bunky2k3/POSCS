@@ -223,6 +223,12 @@
             <span>Phải có lý do thì mới huỷ được bản ghi hợp đồng.</span>
         </div>
     </c:if>
+    <c:if test="${param.error == 'payment_failed'}">
+        <div class="toast-msg blocked show">
+            <i class="fa-solid fa-circle-xmark"></i>
+            <span>Không thực hiện được trên kỳ thanh toán &mdash; kiểm lại số tiền, ngày đến hạn, hoặc hợp đồng đã đóng băng.</span>
+        </div>
+    </c:if>
     <c:if test="${param.error == 'missing_term'}">
         <div class="toast-msg blocked show">
             <i class="fa-solid fa-circle-xmark"></i>
@@ -670,6 +676,133 @@ Nhập lý do:', true)">
             </c:if>
         </div>
 
+        <!-- ===== Kỳ thanh toán ===== -->
+        <div class="info-card card-box">
+            <div class="section-header"><h5>Kỳ thanh toán</h5></div>
+
+            <%-- Ba con số này là lý do bảng bên dưới tồn tại: giá trị hợp đồng
+                 là ĐIỀU KHOẢN, tổng các kỳ là KẾ HOẠCH thu, đã thu là THỰC TẾ.
+                 Chỗ lệch giữa chúng chính là công nợ. --%>
+            <div class="row g-2" style="margin-bottom:14px;">
+                <div class="col-md-4">
+                    <div style="border:1px solid #eef2f6; border-radius:10px; padding:10px 14px; background:#f9fafb;">
+                        <div style="font-size:0.72rem; color:#6b7280; text-transform:uppercase; letter-spacing:.3px;">Tổng các kỳ đã lập</div>
+                        <div class="money-vnd" data-vnd="${paymentScheduled}" style="font-weight:700; color:#111827;">&mdash;</div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div style="border:1px solid #cfe3d0; border-radius:10px; padding:10px 14px; background:#f3f7f3;">
+                        <div style="font-size:0.72rem; color:#2f6b34; text-transform:uppercase; letter-spacing:.3px;">Đã thu</div>
+                        <div class="money-vnd" data-vnd="${paymentCollected}" style="font-weight:700; color:#2f6b34;">&mdash;</div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div style="border:1px solid #f5d9a8; border-radius:10px; padding:10px 14px; background:#fff8ec;">
+                        <div style="font-size:0.72rem; color:#8a5a00; text-transform:uppercase; letter-spacing:.3px;">Còn phải thu</div>
+                        <div class="money-vnd" data-vnd="${paymentOutstanding}" style="font-weight:700; color:#8a5a00;">&mdash;</div>
+                    </div>
+                </div>
+            </div>
+
+            <c:if test="${paymentMismatch}">
+                <div class="lc-alert">
+                    <i class="fa-solid fa-triangle-exclamation" style="margin-top:2px;"></i>
+                    <span>Tổng các kỳ đã lập <strong>không khớp</strong> giá trị hợp đồng
+                        (<span class="money-vnd" data-vnd="${contract.contractValue}">&mdash;</span>).
+                        Có thể còn kỳ chưa nhập &mdash; kiểm lại trước khi đối chiếu công nợ.</span>
+                </div>
+            </c:if>
+
+            <c:choose>
+                <c:when test="${empty contractPayments}">
+                    <div class="empty-mini" style="color:#9ca3af; font-size:0.87rem;">Chưa lập kỳ thanh toán nào.</div>
+                </c:when>
+                <c:otherwise>
+                    <table class="item-table">
+                        <thead>
+                            <tr>
+                                <th style="width:40px;">#</th>
+                                <th>Số tiền</th>
+                                <th style="width:130px;">Đến hạn</th>
+                                <th style="width:160px;">Tình trạng</th>
+                                <th style="width:160px;"></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <c:forEach var="p" items="${contractPayments}" varStatus="row">
+                                <tr>
+                                    <td>${row.index + 1}</td>
+                                    <td><strong class="money-vnd" data-vnd="${p.invoiceAmount}">&mdash;</strong></td>
+                                    <td><fmt:formatDate value="${p.dueDate}" pattern="dd/MM/yyyy"/></td>
+                                    <td>
+                                        <c:choose>
+                                            <c:when test="${p.paidDate != null}">
+                                                <span style="color:#2f6b34; font-weight:600;">
+                                                    <i class="fa-solid fa-circle-check"></i>
+                                                    Đã thu <fmt:formatDate value="${p.paidDate}" pattern="dd/MM/yyyy"/>
+                                                </span>
+                                            </c:when>
+                                            <c:otherwise><span style="color:#9ca3af;">Chưa thu</span></c:otherwise>
+                                        </c:choose>
+                                    </td>
+                                    <td style="text-align:right;">
+                                        <c:if test="${p.paidDate == null and canRecordPayment}">
+                                            <button type="button" class="btn-remove-item"
+                                                    style="width:auto; padding:0 10px; border-color:#cfe3d0; background:#f3f7f3; color:#2f6b34;"
+                                                    title="Ghi nhận tiền của kỳ này đã về"
+                                                    onclick="markPaid(${p.paymentId})">
+                                                <i class="fa-solid fa-check"></i> Đã thu
+                                            </button>
+                                        </c:if>
+                                        <c:if test="${canEditPayments}">
+                                            <button type="button" class="btn-remove-item" title="Xoá kỳ này"
+                                                    onclick="confirmRemovePayment(${p.paymentId})">
+                                                <i class="fa-solid fa-xmark"></i>
+                                            </button>
+                                        </c:if>
+                                    </td>
+                                </tr>
+                            </c:forEach>
+                        </tbody>
+                    </table>
+                </c:otherwise>
+            </c:choose>
+
+            <c:if test="${not canEditPayments and canManage}">
+                <div style="margin-top:16px; padding-top:16px; border-top:1.5px solid #eef2f6;
+                            font-size:0.83rem; color:#6b7280; display:flex; align-items:flex-start; gap:8px;">
+                    <i class="fa-solid fa-lock" style="margin-top:3px; color:#9ca3af;"></i>
+                    <span>Hợp đồng đã đóng băng nên không lập thêm kỳ được. Tiền của kỳ đã lập thì
+                        vẫn ghi nhận được khi về &mdash; tiền bảo hành giữ lại thường về sau thanh lý.</span>
+                </div>
+            </c:if>
+            <c:if test="${canEditPayments}">
+                <form class="add-product-form" method="POST" action="${pageContext.request.contextPath}/contract">
+                    <input type="hidden" name="csrfToken" value="${csrfToken}">
+                    <input type="hidden" name="action" value="addPayment">
+                    <input type="hidden" name="contractId" value="${contract.contractId}">
+                    <div class="row g-2 align-items-end">
+                        <div class="col-md-4">
+                            <label class="form-label">Số tiền (VNĐ)</label>
+                            <input type="text" class="form-control" name="invoiceAmount"
+                                   inputmode="numeric" placeholder="VD: 450.000.000" required>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Đến hạn</label>
+                            <input type="date" class="form-control" name="dueDate" required>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Ngày đã thu (nếu có)</label>
+                            <input type="date" class="form-control" name="paidDate">
+                        </div>
+                        <div class="col-md-2">
+                            <button type="submit" class="btn-add-item"><i class="fa-solid fa-plus"></i> Lập kỳ</button>
+                        </div>
+                    </div>
+                </form>
+            </c:if>
+        </div>
+
         <%-- Đã bỏ thẻ "Điều khoản & ghi chú -- Chưa hỗ trợ trong phiên bản
              này": một thẻ rỗng chỉ để báo là chưa làm thì không nói được gì với
              người dùng, và khi demo cho khách nó là thứ đập vào mắt đầu tiên.
@@ -722,6 +855,15 @@ Nhập lý do:', true)">
         <input type="hidden" name="action" value="delete">
         <input type="hidden" name="id" id="deleteFormId">
         <input type="hidden" name="voidReason" id="deleteFormReason">
+    </form>
+
+    <!-- Form ẩn cho thao tác trên một kỳ thanh toán -->
+    <form id="paymentForm" method="POST" action="${pageContext.request.contextPath}/contract" style="display:none">
+        <input type="hidden" name="csrfToken" value="${csrfToken}">
+        <input type="hidden" name="action" id="paymentAction">
+        <input type="hidden" name="contractId" value="${contract.contractId}">
+        <input type="hidden" name="paymentId" id="paymentFormId">
+        <input type="hidden" name="paidDate" id="paymentPaidDate">
     </form>
 
     <!-- Form ẩn để gửi một bước chuyển trên trục tiến độ qua POST -->
@@ -792,6 +934,27 @@ Nhập lý do:', true)">
             document.getElementById('progressToStatus').value = toStatus;
             document.getElementById('progressNote').value = note === null ? '' : note.trim();
             document.getElementById('progressForm').submit();
+        }
+
+        // Ngày thu để trống thì server lấy hôm nay -- phần lớn thao tác là ghi
+        // nhận ngay lúc tiền về, hỏi ngày mỗi lần chỉ tổ chậm.
+        function markPaid(paymentId) {
+            if (!confirm('Ghi nhận tiền của kỳ này đã về hôm nay?')) {
+                return;
+            }
+            document.getElementById('paymentAction').value = 'markPaid';
+            document.getElementById('paymentFormId').value = paymentId;
+            document.getElementById('paymentPaidDate').value = '';
+            document.getElementById('paymentForm').submit();
+        }
+
+        function confirmRemovePayment(paymentId) {
+            if (!confirm('Xoá kỳ thanh toán này?')) {
+                return;
+            }
+            document.getElementById('paymentAction').value = 'removePayment';
+            document.getElementById('paymentFormId').value = paymentId;
+            document.getElementById('paymentForm').submit();
         }
 
         function confirmRemoveProduct(contractProductId) {

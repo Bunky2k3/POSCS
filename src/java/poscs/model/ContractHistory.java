@@ -35,8 +35,17 @@ public class ContractHistory {
     /** Gỡ một dòng hàng hoá/dịch vụ khỏi hợp đồng. */
     public static final String EVENT_PRODUCT_REMOVED = "Gỡ hàng hoá";
 
+    /** Lập thêm một kỳ thanh toán theo điều khoản hợp đồng. */
+    public static final String EVENT_PAYMENT_ADDED = "Thêm kỳ thanh toán";
+
+    /** Ghi nhận tiền của một kỳ đã về. */
+    public static final String EVENT_PAYMENT_PAID = "Ghi nhận đã thu";
+
+    /** Xoá một kỳ thanh toán lập nhầm. */
+    public static final String EVENT_PAYMENT_REMOVED = "Xoá kỳ thanh toán";
+
     // Ba loại dưới đây là MỐC VÒNG ĐỜI: dòng của chúng có fromStatus/toStatus,
-    // khác các loại trên (dòng sửa đổi, hai cột đó để null).
+    // khác mọi loại ở trên (dòng sửa đổi, hai cột đó để null).
 
     /** Nháp → Đã ký. Từ đây nội dung là chứng cứ pháp lý. */
     public static final String EVENT_SIGNED = "Ký hợp đồng";

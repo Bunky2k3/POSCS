@@ -279,6 +279,97 @@ public class ContractStatusIntegrationTest {
                         ContractDAO.PROGRESS_SIGNED));
     }
 
+    // ------------------------------------------------------------------
+    // Kỳ thanh toán -- bảng contract_payments cuối cùng cũng có đường GHI
+    // ------------------------------------------------------------------
+
+    private poscs.model.ContractPayment payment(String amount, java.time.LocalDate due) {
+        poscs.model.ContractPayment p = new poscs.model.ContractPayment();
+        p.setInvoiceAmount(new java.math.BigDecimal(amount));
+        p.setDueDate(java.sql.Date.valueOf(due));
+        return p;
+    }
+
+    @Test
+    public void payments_areWrittenReadBackAndLogged() throws Exception {
+        IntegrationDb.assumeAvailable();
+
+        assertTrue(contractDAO.insertPayment(2, payment("450000000", java.time.LocalDate.now()), Fixtures.USER_ID));
+        assertTrue(contractDAO.insertPayment(2, payment("550000000",
+                java.time.LocalDate.now().plusMonths(3)), Fixtures.USER_ID));
+
+        List<poscs.model.ContractPayment> rows = contractDAO.findPaymentsByContractId(2);
+        assertEquals(2, rows.size());
+        assertEquals("Kỳ đến hạn sớm nhất phải đứng trước",
+                new java.math.BigDecimal("450000000.00"), rows.get(0).getInvoiceAmount());
+        assertNull("Mới lập thì chưa thu", rows.get(0).getPaidDate());
+
+        // Mỗi thao tác đều để lại dấu vết, cùng dòng thời gian với mọi thay
+        // đổi khác của hợp đồng.
+        assertEquals(2, IntegrationDb.count("contract_history",
+                "contract_id = 2 AND event_type = N'Thêm kỳ thanh toán'"));
+    }
+
+    @Test
+    public void payments_rejectNonPositiveAmountAndMissingDueDate() {
+        IntegrationDb.assumeAvailable();
+
+        assertFalse(contractDAO.insertPayment(2, payment("0", java.time.LocalDate.now()), Fixtures.USER_ID));
+        assertFalse(contractDAO.insertPayment(2, payment("-1000", java.time.LocalDate.now()), Fixtures.USER_ID));
+
+        poscs.model.ContractPayment noDue = new poscs.model.ContractPayment();
+        noDue.setInvoiceAmount(new java.math.BigDecimal("1000"));
+        assertFalse(contractDAO.insertPayment(2, noDue, Fixtures.USER_ID));
+
+        assertEquals(0, contractDAO.findPaymentsByContractId(2).size());
+    }
+
+    @Test
+    public void markPaid_isIdempotentAndFeedsTheRevenueSum() throws Exception {
+        IntegrationDb.assumeAvailable();
+
+        assertTrue(contractDAO.insertPayment(2, payment("450000000", java.time.LocalDate.now()), Fixtures.USER_ID));
+        int paymentId = contractDAO.findPaymentsByContractId(2).get(0).getPaymentId();
+
+        assertTrue(contractDAO.markPaymentPaid(paymentId, 2,
+                java.sql.Date.valueOf(java.time.LocalDate.now()), Fixtures.USER_ID));
+        // Ghi nhận lần hai không được sinh thêm dòng nhật ký nói về việc chẳng
+        // thay đổi gì.
+        assertFalse(contractDAO.markPaymentPaid(paymentId, 2,
+                java.sql.Date.valueOf(java.time.LocalDate.now()), Fixtures.USER_ID));
+        assertEquals(1, IntegrationDb.count("contract_history",
+                "contract_id = 2 AND event_type = N'Ghi nhận đã thu'"));
+
+        // Đây là điều khiến cả phần này đáng làm: trước đó sumInvoiceAmount*
+        // đọc một bảng không màn hình nào ghi vào được.
+        assertEquals(new java.math.BigDecimal("450000000.00"),
+                contractDAO.sumInvoiceAmountByContractId(2));
+    }
+
+    @Test
+    public void payments_scheduleIsLockedAfterLiquidationButMoneyCanStillArrive() {
+        IntegrationDb.assumeAvailable();
+
+        assertTrue(contractDAO.insertPayment(2, payment("450000000",
+                java.time.LocalDate.now().plusYears(1)), Fixtures.USER_ID));
+        int paymentId = contractDAO.findPaymentsByContractId(2).get(0).getPaymentId();
+
+        assertTrue(contractDAO.changeProgressStatus(2, ContractDAO.PROGRESS_LIQUIDATED,
+                Fixtures.USER_ID, "Biên bản thanh lý số 09"));
+
+        assertFalse("Đóng băng thì không lập thêm kỳ",
+                contractDAO.insertPayment(2, payment("1000000", java.time.LocalDate.now()), Fixtures.USER_ID));
+        assertFalse("...cũng không xoá kỳ đã lập",
+                contractDAO.deletePayment(paymentId, 2, Fixtures.USER_ID));
+
+        // Nhưng tiền bảo hành giữ lại thường chỉ về sau thanh lý cả năm --
+        // đóng băng nói về NỘI DUNG hợp đồng, không nói về việc tiền đã vào
+        // tài khoản hay chưa.
+        assertTrue("Ghi nhận tiền về vẫn phải được sau thanh lý",
+                contractDAO.markPaymentPaid(paymentId, 2,
+                        java.sql.Date.valueOf(java.time.LocalDate.now()), Fixtures.USER_ID));
+    }
+
     /**
      * Đường ghi đầy đủ của một lần sửa: giá trị cũ đọc trong transaction, câu
      * mô tả dựng sẵn, và bấm Lưu mà không đổi gì thì KHÔNG sinh dòng nào.

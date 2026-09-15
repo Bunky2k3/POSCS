@@ -35,6 +35,7 @@ import poscs.dao.ProductDAO;
 import poscs.model.Address;
 import poscs.model.Contract;
 import poscs.model.ContractHistory;
+import poscs.model.ContractPayment;
 import poscs.model.ContractProduct;
 import poscs.model.District;
 import poscs.model.Enterprise;
@@ -171,6 +172,15 @@ public class ContractController extends HttpServlet {
             case "changeProgress":
                 handleChangeProgress(request, response);
                 break;
+            case "addPayment":
+                handleAddPayment(request, response);
+                break;
+            case "markPaid":
+                handleMarkPaid(request, response);
+                break;
+            case "removePayment":
+                handleRemovePayment(request, response);
+                break;
             default:
                 response.sendRedirect(request.getContextPath() + "/contract");
         }
@@ -272,6 +282,38 @@ public class ContractController extends HttpServlet {
                 contract.isDraft() && AccessControl.hasFullAccess(request, AccessControl.Resource.CONTRACT));
         List<ContractHistory> history = contractDAO.findHistoryByContractId(id);
         request.setAttribute("contractHistory", history);
+
+        // Kỳ thanh toán. Lịch thu tiền sửa được cho tới khi hợp đồng đóng băng
+        // -- KHÁC hàng hoá, vốn chốt ngay khi ký. Lý do: hàng hoá là nội dung
+        // hợp đồng, còn lịch thu là thứ mình theo dõi trong lúc thực hiện, và
+        // hợp đồng ký tháng trước mà giờ mới nhập kỳ thu là chuyện bình thường.
+        List<ContractPayment> payments = contractDAO.findPaymentsByContractId(id);
+        request.setAttribute("contractPayments", payments);
+        request.setAttribute("canEditPayments",
+                !contract.isFrozen() && AccessControl.hasFullAccess(request, AccessControl.Resource.CONTRACT));
+        // Ghi nhận tiền về thì cho phép kể cả sau thanh lý: tiền bảo hành giữ
+        // lại thường chỉ về sau thanh lý cả năm. Đóng băng nói về NỘI DUNG hợp
+        // đồng, không nói về việc tiền đã vào tài khoản hay chưa.
+        request.setAttribute("canRecordPayment",
+                AccessControl.hasFullAccess(request, AccessControl.Resource.CONTRACT));
+
+        java.math.BigDecimal scheduled = java.math.BigDecimal.ZERO;
+        java.math.BigDecimal collected = java.math.BigDecimal.ZERO;
+        for (ContractPayment p : payments) {
+            scheduled = scheduled.add(p.getInvoiceAmount());
+            if (p.getPaidDate() != null) {
+                collected = collected.add(p.getInvoiceAmount());
+            }
+        }
+        request.setAttribute("paymentScheduled", scheduled);
+        request.setAttribute("paymentCollected", collected);
+        request.setAttribute("paymentOutstanding", scheduled.subtract(collected));
+        // Tổng các kỳ đã lập lệch với giá trị hợp đồng nghĩa là lập thiếu hoặc
+        // lập thừa -- người dùng cần biết, nhưng đây là CẢNH BÁO chứ không phải
+        // lỗi: hợp đồng có thể còn kỳ chưa nhập.
+        request.setAttribute("paymentMismatch",
+                contract.getContractValue() != null
+                        && contract.getContractValue().compareTo(scheduled) != 0);
 
         // Ba mốc vòng đời kéo riêng ra khỏi nhật ký để dựng thanh tiến trình ở
         // đầu trang. Bản thân nhật ký vẫn còn nguyên bên dưới -- thanh tiến
@@ -1055,6 +1097,82 @@ public class ContractController extends HttpServlet {
     // ------------------------------------------------------------------
     // Helpers
     // ------------------------------------------------------------------
+
+    // ------------------------------------------------------------------
+    // Kỳ thanh toán
+    // ------------------------------------------------------------------
+
+    private void handleAddPayment(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        if (!AccessControl.requireFullAccess(request, response, AccessControl.Resource.CONTRACT)) {
+            return;
+        }
+        Integer contractId = parseIntOrNull(request.getParameter("contractId"));
+        if (contractId == null || contractDAO.findById(contractId) == null) {
+            response.sendRedirect(request.getContextPath() + "/contract?error=notfound");
+            return;
+        }
+
+        ContractPayment payment = new ContractPayment();
+        payment.setInvoiceAmount(parseMoneyOrNull(request.getParameter("invoiceAmount")));
+        payment.setDueDate(parseDateOrNull(request.getParameter("dueDate")));
+        payment.setPaidDate(parseDateOrNull(request.getParameter("paidDate")));
+
+        if (!contractDAO.insertPayment(contractId, payment, actorId(request))) {
+            LOG.warn("Lap ky thanh toan that bai (actor={}, contractId={})", Logs.actor(request), contractId);
+            response.sendRedirect(request.getContextPath()
+                    + "/contract?action=view&id=" + contractId + "&error=payment_failed");
+            return;
+        }
+        response.sendRedirect(request.getContextPath() + "/contract?action=view&id=" + contractId);
+    }
+
+    private void handleMarkPaid(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        if (!AccessControl.requireFullAccess(request, response, AccessControl.Resource.CONTRACT)) {
+            return;
+        }
+        Integer contractId = parseIntOrNull(request.getParameter("contractId"));
+        Integer paymentId = parseIntOrNull(request.getParameter("paymentId"));
+        if (contractId == null || paymentId == null) {
+            response.sendRedirect(request.getContextPath() + "/contract?error=notfound");
+            return;
+        }
+        // Ngày thu mặc định là hôm nay -- phần lớn thao tác là ghi nhận ngay
+        // lúc tiền về; ai cần lùi ngày thì điền ô riêng.
+        Date paidDate = parseDateOrNull(request.getParameter("paidDate"));
+        if (paidDate == null) {
+            paidDate = Date.valueOf(java.time.LocalDate.now());
+        }
+
+        if (!contractDAO.markPaymentPaid(paymentId, contractId, paidDate, actorId(request))) {
+            LOG.warn("Ghi nhan da thu that bai (actor={}, contractId={}, paymentId={})",
+                    Logs.actor(request), contractId, paymentId);
+            response.sendRedirect(request.getContextPath()
+                    + "/contract?action=view&id=" + contractId + "&error=payment_failed");
+            return;
+        }
+        response.sendRedirect(request.getContextPath() + "/contract?action=view&id=" + contractId);
+    }
+
+    private void handleRemovePayment(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        if (!AccessControl.requireFullAccess(request, response, AccessControl.Resource.CONTRACT)) {
+            return;
+        }
+        Integer contractId = parseIntOrNull(request.getParameter("contractId"));
+        Integer paymentId = parseIntOrNull(request.getParameter("paymentId"));
+        if (contractId == null || paymentId == null) {
+            response.sendRedirect(request.getContextPath() + "/contract?error=notfound");
+            return;
+        }
+
+        if (!contractDAO.deletePayment(paymentId, contractId, actorId(request))) {
+            LOG.warn("Xoa ky thanh toan that bai (actor={}, contractId={}, paymentId={})",
+                    Logs.actor(request), contractId, paymentId);
+            response.sendRedirect(request.getContextPath()
+                    + "/contract?action=view&id=" + contractId + "&error=payment_failed");
+            return;
+        }
+        response.sendRedirect(request.getContextPath() + "/contract?action=view&id=" + contractId);
+    }
 
     /** Dòng nhật ký gần nhất của một loại mốc vòng đời, hoặc null nếu chưa xảy ra. */
     private static ContractHistory milestoneOf(List<ContractHistory> history, String eventType) {
