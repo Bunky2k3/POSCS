@@ -540,33 +540,38 @@ public class ContractDAOTest {
         }
     }
 
+    /**
+     * Trùng mã là LỖI NHẬP LIỆU, không phải chuyện của máy.
+     *
+     * <p>Trước V28 mã do hệ thống sinh nên insert() tự sinh mã khác rồi thử lại
+     * tối đa 5 lần. Giờ mã do người dùng gõ: tự đổi hộ nghĩa là lưu một mã khác
+     * thứ họ vừa nhập mà không báo gì. Phải trả về DUPLICATE_CODE để controller
+     * nói được "mã này đã có rồi".
+     */
     @Test
-    public void insert_duplicateContractCode_regeneratesCodeAndRetries() throws Exception {
-        ResultSet keys = singleRow(row("id", 55));
-        PreparedStatement insertPs = mock(PreparedStatement.class);
-        when(insertPs.executeUpdate())
-                .thenThrow(duplicateKeyError("contract_code")) // lần 1: đụng UNIQUE KEY
-                .thenReturn(1);                                // lần 2: mã mới, thành công
-        when(insertPs.getGeneratedKeys()).thenReturn(keys);
-
-        // generateNextContractCode() chạy xen giữa 2 lần thử, đọc mã lớn nhất hiện có.
-        PreparedStatement codePs = statementReturning(singleRow(row("contract_code", "HD-0007")));
-
-        Connection conn = mock(Connection.class);
-        when(conn.prepareStatement(anyString(), anyInt())).thenReturn(insertPs);
-        when(conn.prepareStatement(anyString())).thenReturn(codePs);
+    public void insert_duplicateContractCode_reportsItInsteadOfInventingANewOne() throws Exception {
+        PreparedStatement ps = mock(PreparedStatement.class);
+        when(ps.executeUpdate()).thenThrow(duplicateKeyError("contract_code"));
+        Connection conn = connectionReturning(ps);
 
         try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
             db.when(DBContext::getConnection).thenReturn(conn);
 
-            Contract c = contract("HD-0007");
-            assertEquals(55, dao.insert(c, ACTOR));
+            Contract c = contract("01/2026/HĐKT-POSTEF");
+            assertEquals(ContractDAO.DUPLICATE_CODE, dao.insert(c, ACTOR));
 
-            // Mã phải được sinh lại chứ không thử lại y nguyên mã cũ -- lặp lại
-            // cùng một mã sẽ trùng mãi cho tới khi hết lượt thử.
-            assertEquals("HD-0008", c.getContractCode());
-            verify(insertPs, times(2)).executeUpdate();
+            // Mã giữ NGUYÊN thứ người dùng gõ -- đổi nó đi là thay đổi dữ liệu
+            // của họ sau lưng.
+            assertEquals("01/2026/HĐKT-POSTEF", c.getContractCode());
+            verify(ps, times(1)).executeUpdate();
+            verify(conn, never()).commit();
         }
+    }
+
+    /** Lỗi trùng mã phải phân biệt được với lỗi chung, vì hai bên cần hai câu trả lời khác nhau. */
+    @Test
+    public void insert_duplicateCode_isDistinctFromAGenericFailure() throws Exception {
+        assertNotEquals(ContractDAO.DUPLICATE_CODE, -1);
     }
 
     @Test
@@ -582,26 +587,6 @@ public class ContractDAOTest {
 
             // Sinh lại mã không cứu được lỗi này -- thử lại 5 lần chỉ tổ chậm.
             verify(ps, times(1)).executeUpdate();
-        }
-    }
-
-    @Test
-    public void insert_duplicateCodeEveryAttempt_givesUpAfterMaxAttempts() throws Exception {
-        PreparedStatement insertPs = mock(PreparedStatement.class);
-        when(insertPs.executeUpdate()).thenThrow(duplicateKeyError("contract_code"));
-        PreparedStatement codePs = statementReturning(singleRow(row("contract_code", "HD-0007")));
-
-        Connection conn = mock(Connection.class);
-        when(conn.prepareStatement(anyString(), anyInt())).thenReturn(insertPs);
-        when(conn.prepareStatement(anyString())).thenReturn(codePs);
-
-        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
-            db.when(DBContext::getConnection).thenReturn(conn);
-
-            assertEquals(-1, dao.insert(contract("HD-0007"), ACTOR));
-
-            // Vòng lặp phải dừng, không quay vô hạn khi mã mới vẫn cứ trùng.
-            verify(insertPs, times(5)).executeUpdate();
         }
     }
 
@@ -729,10 +714,11 @@ public class ContractDAOTest {
      * Vị trí tham số của cột status trong câu INSERT của {@code insert()}.
      *
      * <p>Bám theo THỨ TỰ CỘT của câu lệnh đó, nên thêm một cột vào giữa là
-     * số này phải đổi theo -- đã dịch một lần khi thêm contract_number.
+     * số này phải đổi theo -- đã dịch một lần khi thêm contract_number (V25),
+     * rồi dịch ngược lại khi gộp nó vào contract_code (V28).
      * Tách ra hằng số để lần sau chỉ sửa một chỗ thay vì năm chỗ.
      */
-    private static final int STATUS_PARAM_INDEX = 12;
+    private static final int STATUS_PARAM_INDEX = 11;
 
     /** Chạy insert() với cặp ngày cho trước rồi trả về statement để soi tham số đã bind. */
     private PreparedStatement captureStatusFor(Date effectiveDate, Date endDate) throws Exception {

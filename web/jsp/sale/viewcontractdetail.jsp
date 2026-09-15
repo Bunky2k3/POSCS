@@ -424,23 +424,16 @@
         <div class="info-card card-box">
             <div class="section-header"><h5>Thông tin chung</h5></div>
             <div class="row">
-                <%-- Số hợp đồng đứng ĐẦU: đây là thứ khách đọc khi gọi điện, và
-                     là cách người dùng đối chiếu với tệp hồ sơ giấy. Mã HD-xxxx
-                     đứng cạnh chứ không thay -- nó là định danh nội bộ. --%>
+                <%-- Một mã duy nhất, do người dùng nhập, chính là số ghi trên bản
+                     giấy (V28). Trước đó có thêm một "mã hệ thống" HD-xxxx nữa --
+                     hai cột cho một khái niệm. --%>
                 <div class="col-md-6 field-row">
-                    <label>Số hợp đồng</label>
-                    <div class="view-value">
-                        <c:choose>
-                            <c:when test="${not empty contract.contractNumber}">
-                                <strong>${fn:escapeXml(contract.contractNumber)}</strong>
-                            </c:when>
-                            <c:otherwise><span style="color:#9ca3af;">chưa có số</span></c:otherwise>
-                        </c:choose>
-                    </div>
+                    <label>Mã hợp đồng</label>
+                    <div class="view-value"><strong>${fn:escapeXml(contract.contractCode)}</strong></div>
                 </div>
                 <div class="col-md-6 field-row">
-                    <label>Mã hợp đồng (hệ thống)</label>
-                    <div class="view-value">${fn:escapeXml(contract.contractCode)}</div>
+                    <label>Loại hợp đồng</label>
+                    <div class="view-value">${fn:escapeXml(contract.contractType)}</div>
                 </div>
 
                 <div class="col-md-6 field-row">
@@ -464,10 +457,6 @@
                     </div>
                 </div>
 
-                <div class="col-md-6 field-row">
-                    <label>Loại hợp đồng</label>
-                    <div class="view-value">${fn:escapeXml(contract.contractType)}</div>
-                </div>
                 <div class="col-md-6 field-row">
                     <label>Chiều</label>
                     <%-- Cặp đôi CHÉO: hợp đồng 'Bán' ký với đối tác giữ vai

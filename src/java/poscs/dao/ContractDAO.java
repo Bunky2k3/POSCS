@@ -111,7 +111,7 @@ public class ContractDAO {
         "LEFT JOIN provinces p ON d.province_id = p.province_id ";
 
     private static final String SELECT_BASE =
-        "SELECT c.contract_id, c.contract_code, c.contract_number, c.title, c.contract_type, c.direction, c.signing_date, " +
+        "SELECT c.contract_id, c.contract_code, c.title, c.contract_type, c.direction, c.signing_date, " +
         "       c.effective_date, c.end_date, c.enterprise_id, c.owner_id, c.attachment_url, " +
         "       c.signer_name, c.signer_position, c.counterparty_signer_name, c.counterparty_signer_position, c.authorization_ref, c.signing_place, c.contract_value, " +
         "       c.progress_status, c.created_at, c.updated_at, c.is_deleted, " +
@@ -445,29 +445,14 @@ public class ContractDAO {
         }
     }
 
-    /** Sinh mã hợp đồng tiếp theo dạng HD-0001, HD-0002, ... */
-    public String generateNextContractCode() {
-        String sql = "SELECT contract_code FROM contracts ORDER BY contract_id DESC LIMIT 1";
-        try (Connection conn = DBContext.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql);
-             ResultSet rs = ps.executeQuery()) {
-            int nextNumber = 1;
-            if (rs.next()) {
-                String lastCode = rs.getString("contract_code");
-                String digits = lastCode.replaceAll("[^0-9]", "");
-                if (!digits.isEmpty()) {
-                    nextNumber = Integer.parseInt(digits) + 1;
-                }
-            }
-            return String.format("HD-%04d", nextNumber);
-        } catch (SQLException ex) {
-            LOG.error("Loi sinh ma hop dong", ex);
-            return null;
-        }
-    }
-
-    /** Thử lại tối đa bao nhiêu lần khi contract_code sinh ra bị trùng (xem insert()). */
-    private static final int MAX_CODE_GEN_ATTEMPTS = 5;
+    /**
+     * Giá trị trả về của {@link #insert} khi mã hợp đồng đã tồn tại.
+     *
+     * <p>Tách khỏi -1 (lỗi chung) vì hai thứ đó cần hai câu trả lời khác nhau
+     * cho người dùng: "mã này đã có rồi, đổi mã khác" khác hẳn "lưu thất bại,
+     * thử lại".
+     */
+    public static final int DUPLICATE_CODE = -2;
 
     /**
      * Thêm hợp đồng mới kèm dòng nhật ký "Khởi tạo". Trả về contract_id vừa
@@ -477,19 +462,23 @@ public class ContractDAO {
      */
     public int insert(Contract contract, int actorId) {
         String sql = "INSERT INTO contracts " +
-                "(contract_code, contract_number, title, contract_type, direction, signing_date, effective_date, end_date, " +
+                "(contract_code, title, contract_type, direction, signing_date, effective_date, end_date, " +
                 " enterprise_id, owner_id, attachment_url, status, progress_status, " +
                 " signer_name, signer_position, counterparty_signer_name, counterparty_signer_position, " +
                 " authorization_ref, signing_place, contract_value) " +
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
-        // contract_code sinh từ generateNextContractCode() (đọc mã lớn nhất hiện có
-        // rồi +1) có thể trùng nếu 2 request tạo hợp đồng gần như đồng thời cùng
-        // đọc được "mã lớn nhất" giống nhau -- cột contract_code có UNIQUE KEY
-        // (xem db/schema.sql) nên lần INSERT bị trùng sẽ bị DB từ chối thay vì âm
-        // thầm ghi đè; thử sinh mã mới và INSERT lại vài lần thay vì báo lỗi ngay,
-        // để người dùng không phải tự bấm lưu lại.
-        for (int attempt = 1; attempt <= MAX_CODE_GEN_ATTEMPTS; attempt++) {
+        // Trước V28 mã do hệ thống sinh, nên trùng mã là chuyện của máy và
+        // insert() tự sinh mã khác rồi thử lại tối đa 5 lần. Giờ mã do NGƯỜI
+        // DÙNG nhập, nên trùng mã là lỗi nhập liệu: phải nói cho họ biết để đổi,
+        // chứ tự đổi hộ là lưu một mã khác thứ họ vừa gõ mà không báo gì.
+        //
+        // UNIQUE KEY trên contract_code vẫn là chốt chặn thật -- kiểm trước ở
+        // controller chỉ để báo lỗi tử tế, còn hai người lưu cùng lúc cùng một
+        // mã thì chỉ ràng buộc ở CSDL mới bắt được.
+        {
+            // Khối này từng là vòng for thử lại; giữ lại dấu ngoặc để phần thân
+            // bên dưới không phải thụt lề lại toàn bộ.
             try (Connection conn = DBContext.getConnection()) {
                 conn.setAutoCommit(false);
                 boolean committed = false;
@@ -497,25 +486,24 @@ public class ContractDAO {
                     int newId = -1;
                     try (PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
                         ps.setString(1, contract.getContractCode());
-                        ps.setString(2, contract.getContractNumber());
-                        ps.setString(3, contract.getTitle());
-                        ps.setString(4, contract.getContractType());
-                        ps.setString(5, contract.getDirection());
-                        ps.setDate(6, contract.getSigningDate());
-                        ps.setDate(7, contract.getEffectiveDate());
-                        ps.setDate(8, contract.getEndDate());
-                        ps.setInt(9, contract.getEnterpriseId());
-                        ps.setInt(10, contract.getOwnerId());
-                        ps.setString(11, contract.getAttachmentUrl());
-                        ps.setString(12, computeStatus(contract.getEffectiveDate(), contract.getEndDate()));
+                        ps.setString(2, contract.getTitle());
+                        ps.setString(3, contract.getContractType());
+                        ps.setString(4, contract.getDirection());
+                        ps.setDate(5, contract.getSigningDate());
+                        ps.setDate(6, contract.getEffectiveDate());
+                        ps.setDate(7, contract.getEndDate());
+                        ps.setInt(8, contract.getEnterpriseId());
+                        ps.setInt(9, contract.getOwnerId());
+                        ps.setString(10, contract.getAttachmentUrl());
+                        ps.setString(11, computeStatus(contract.getEffectiveDate(), contract.getEndDate()));
                         // Hợp đồng mới LUÔN là bản nháp -- tạo không còn đồng
                         // nghĩa với ký. Đó là cách duy nhất diễn đạt được luật
                         // KH "nhân viên không tự ký hợp đồng được": trước đây
                         // signing_date là NOT NULL nên không có khoảnh khắc nào
                         // hợp đồng tồn tại mà chưa ký, và vì thế không có chỗ
                         // nào để chặn việc ký.
-                        ps.setString(13, PROGRESS_DRAFT);
-                        bindSigningParties(ps, 14, contract);
+                        ps.setString(12, PROGRESS_DRAFT);
+                        bindSigningParties(ps, 13, contract);
 
                         if (ps.executeUpdate() == 0) {
                             return -1;
@@ -553,15 +541,14 @@ public class ContractDAO {
                     finishTransaction(conn, committed, "them hop dong", contract.getContractCode());
                 }
             } catch (SQLException ex) {
-                if (isDuplicateKeyError(ex, "contract_code") && attempt < MAX_CODE_GEN_ATTEMPTS) {
-                    contract.setContractCode(generateNextContractCode());
-                    continue;
+                if (isDuplicateKeyError(ex, "contract_code")) {
+                    LOG.warn("Ma hop dong da ton tai (contractCode={})", contract.getContractCode());
+                    return DUPLICATE_CODE;
                 }
                 LOG.error("Loi them hop dong (contractCode={})", contract.getContractCode(), ex);
                 return -1;
             }
         }
-        return -1;
     }
 
     /**
@@ -625,7 +612,7 @@ public class ContractDAO {
      */
     public boolean update(Contract contract, int actorId) {
         String sql = "UPDATE contracts SET " +
-                "contract_number = ?, title = ?, contract_type = ?, signing_date = ?, effective_date = ?, end_date = ?, " +
+                "contract_code = ?, title = ?, contract_type = ?, signing_date = ?, effective_date = ?, end_date = ?, " +
                 "enterprise_id = ?, owner_id = ?, attachment_url = ?, status = ?, " +
                 "signer_name = ?, signer_position = ?, counterparty_signer_name = ?, counterparty_signer_position = ?, " +
                 "authorization_ref = ?, signing_place = ?, contract_value = ? " +
@@ -654,7 +641,7 @@ public class ContractDAO {
                 }
 
                 try (PreparedStatement ps = conn.prepareStatement(sql)) {
-                    ps.setString(1, contract.getContractNumber());
+                    ps.setString(1, contract.getContractCode());
                     ps.setString(2, contract.getTitle());
                     ps.setString(3, contract.getContractType());
                     ps.setDate(4, contract.getSigningDate());
@@ -687,8 +674,16 @@ public class ContractDAO {
             }
             return committed;
         } catch (SQLException ex) {
-            LOG.error("Loi cap nhat hop dong (contractId={}, contractCode={})",
-                    contract.getContractId(), contract.getContractCode(), ex);
+            // Sửa mã thành một mã đã tồn tại cũng đụng UNIQUE KEY. Ghi rõ ở log
+            // để người trực không phải đoán, còn người dùng nhận thông báo từ
+            // controller (đã kiểm trùng trước khi gọi).
+            if (isDuplicateKeyError(ex, "contract_code")) {
+                LOG.warn("Ma hop dong da ton tai khi sua (contractId={}, contractCode={})",
+                        contract.getContractId(), contract.getContractCode());
+            } else {
+                LOG.error("Loi cap nhat hop dong (contractId={}, contractCode={})",
+                        contract.getContractId(), contract.getContractCode(), ex);
+            }
             return false;
         }
     }
@@ -921,6 +916,32 @@ public class ContractDAO {
         }
     }
 
+    /**
+     * true nếu mã hợp đồng đã có người khác dùng.
+     *
+     * <p>{@code exceptId} là hợp đồng đang sửa -- bỏ chính nó ra, nếu không thì
+     * mở form sửa lên bấm Lưu mà không đổi mã cũng bị báo trùng với chính mình.
+     * Truyền 0 khi đang tạo mới.
+     */
+    public boolean contractCodeExists(String code, int exceptId) {
+        if (code == null || code.trim().isEmpty()) {
+            return false;
+        }
+        String sql = "SELECT 1 FROM contracts WHERE contract_code = ? AND contract_id <> ? LIMIT 1";
+        try (Connection conn = DBContext.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, code.trim());
+            ps.setInt(2, exceptId);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next();
+            }
+        } catch (SQLException ex) {
+            LOG.error("Loi kiem tra trung ma hop dong (code={})", code, ex);
+            // Không chặn khi chính phép kiểm hỏng: UNIQUE KEY vẫn còn đó.
+            return false;
+        }
+    }
+
     /** Nhật ký của 1 hợp đồng, mới nhất trước, kèm tên người thực hiện. */
     public List<ContractHistory> findHistoryByContractId(int contractId) {
         List<ContractHistory> result = new ArrayList<>();
@@ -994,7 +1015,7 @@ public class ContractDAO {
 
     /** Đọc và khoá bản ghi hợp đồng trong transaction đang mở; null nếu không có. */
     private Contract lockForUpdate(Connection conn, int contractId) throws SQLException {
-        String sql = "SELECT contract_id, contract_code, contract_number, title, contract_type, direction, signing_date, " +
+        String sql = "SELECT contract_id, contract_code, title, contract_type, direction, signing_date, " +
                 "       effective_date, end_date, enterprise_id, owner_id, attachment_url, progress_status, " +
                 "       signer_name, signer_position, counterparty_signer_name, counterparty_signer_position, " +
                 "       authorization_ref, signing_place, contract_value " +
@@ -1008,8 +1029,7 @@ public class ContractDAO {
                 Contract c = new Contract();
                 c.setContractId(rs.getInt("contract_id"));
                 c.setContractCode(rs.getString("contract_code"));
-                c.setContractNumber(rs.getString("contract_number"));
-                c.setTitle(rs.getString("title"));
+                        c.setTitle(rs.getString("title"));
                 c.setContractType(rs.getString("contract_type"));
                 c.setDirection(rs.getString("direction"));
                 c.setSigningDate(rs.getDate("signing_date"));
@@ -1038,7 +1058,7 @@ public class ContractDAO {
      */
     private String describeChanges(Connection conn, Contract before, Contract after) throws SQLException {
         List<String> parts = new ArrayList<>();
-        addChange(parts, "Số hợp đồng", before.getContractNumber(), after.getContractNumber());
+        addChange(parts, "Mã hợp đồng", before.getContractCode(), after.getContractCode());
         addChange(parts, "Tiêu đề", before.getTitle(), after.getTitle());
         addChange(parts, "Loại hợp đồng", before.getContractType(), after.getContractType());
         addChange(parts, "Ngày ký", formatDate(before.getSigningDate()), formatDate(after.getSigningDate()));
@@ -1167,9 +1187,8 @@ public class ContractDAO {
             // Gộp cả số hợp đồng thật: khách gọi điện đọc số in trên giấy chứ
             // không đọc mã nội bộ HD-xxxx, nên đó mới là thứ người dùng gõ vào
             // ô tìm kiếm nhiều nhất.
-            conditions.add("(c.contract_code LIKE ? OR c.contract_number LIKE ? OR c.title LIKE ? OR e.enterprise_name LIKE ?)");
+            conditions.add("(c.contract_code LIKE ? OR c.title LIKE ? OR e.enterprise_name LIKE ?)");
             String likeValue = "%" + keyword.trim() + "%";
-            params.add(likeValue);
             params.add(likeValue);
             params.add(likeValue);
             params.add(likeValue);
@@ -1244,7 +1263,6 @@ public class ContractDAO {
         Contract c = new Contract();
         c.setContractId(rs.getInt("contract_id"));
         c.setContractCode(rs.getString("contract_code"));
-        c.setContractNumber(rs.getString("contract_number"));
         c.setTitle(rs.getString("title"));
         c.setContractType(rs.getString("contract_type"));
         c.setSigningDate(rs.getDate("signing_date"));

@@ -124,6 +124,7 @@
                     <c:choose>
                         <c:when test="${param.error == 'invalid_drive_link'}">Link file PDF phải là địa chỉ bắt đầu bằng http:// hoặc https://. Vui lòng dán lại.</c:when>
                         <c:when test="${param.error == 'invalid'}">Thông tin hợp đồng chưa hợp lệ. Vui lòng kiểm tra lại các ô bắt buộc.</c:when>
+                        <c:when test="${param.error == 'duplicate_code'}">Mã hợp đồng này đã có hợp đồng khác dùng. Kiểm lại số trên bản giấy hoặc nhập mã khác.</c:when>
                         <c:when test="${param.error == 'update_failed'}">Không lưu được thay đổi. Vui lòng thử lại.</c:when>
                         <c:otherwise>Đã có lỗi xảy ra. Vui lòng thử lại.</c:otherwise>
                     </c:choose>
@@ -137,19 +138,16 @@
 
                 <div class="section-header"><h5>Thông tin chung</h5></div>
                 <div class="row">
-                    <div class="col-md-6 field-row">
-                        <label>Mã hợp đồng (hệ thống)</label>
-                        <%-- Chỉ đọc và không gửi lên: mã do generateNextContractCode()
-                             sinh lúc tạo, sửa được thì mọi liên kết nội bộ bám vào nó
-                             hoá ra bám vào một chuỗi người gõ tay. --%>
-                        <input type="text" class="form-control" disabled
+                    <%-- Mã hợp đồng sửa được: nó là số trên bản giấy do người dùng
+                         nhập, và nhập sai thì phải có đường chữa. Các bảng khác trỏ
+                         sang hợp đồng bằng contract_id chứ không bằng mã, nên đổi
+                         chuỗi này không làm gãy liên kết nào. --%>
+                    <div class="col-12 field-row">
+                        <label>Mã hợp đồng <span class="req">*</span></label>
+                        <input type="text" class="form-control" id="contractCode" name="contractCode"
+                               maxlength="50" placeholder="VD: 01/2026/HĐKT-POSTEF"
                                value="${fn:escapeXml(contract.contractCode)}">
-                    </div>
-                    <div class="col-md-6 field-row">
-                        <label>Số hợp đồng</label>
-                        <input type="text" class="form-control" id="contractNumber" name="contractNumber"
-                               maxlength="100" placeholder="VD: 123/2026/HĐKT-POSTEF"
-                               value="${fn:escapeXml(contract.contractNumber)}">
+                        <span class="error-text" id="err-contractCode">Mã hợp đồng không được để trống.</span>
                     </div>
 
                     <div class="col-12 field-row">
@@ -532,6 +530,12 @@
 
             var title = document.getElementById('title');
             if (!title.value.trim()) { document.getElementById('err-title').style.display = 'block'; valid = false; }
+
+            var contractCode = document.getElementById('contractCode');
+            if (!contractCode.value.trim()) {
+                document.getElementById('err-contractCode').style.display = 'block';
+                valid = false;
+            }
 
             ['customer', 'contractType', 'owner'].forEach(function (id) {
                 var el = document.getElementById(id);

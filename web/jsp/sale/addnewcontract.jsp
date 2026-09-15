@@ -78,6 +78,7 @@
                     <c:choose>
                         <c:when test="${param.error == 'invalid_drive_link'}">Link file PDF phải là địa chỉ bắt đầu bằng http:// hoặc https://. Vui lòng dán lại.</c:when>
                         <c:when test="${param.error == 'invalid'}">Thông tin hợp đồng chưa hợp lệ. Vui lòng kiểm tra lại các ô bắt buộc.</c:when>
+                        <c:when test="${param.error == 'duplicate_code'}">Mã hợp đồng này đã có hợp đồng khác dùng. Kiểm lại số trên bản giấy hoặc nhập mã khác.</c:when>
                         <c:when test="${param.error == 'create_failed'}">Không lưu được hợp đồng. Vui lòng thử lại.</c:when>
                         <c:otherwise>Đã có lỗi xảy ra. Vui lòng thử lại.</c:otherwise>
                     </c:choose>
@@ -94,17 +95,17 @@
 
                 <div class="section-header"><h5>Thông tin chung</h5></div>
                 <div class="row">
-                    <%-- Số hợp đồng THẬT, in trên bản giấy. Khác mã HD-xxxx mà hệ
-                         thống tự sinh: mã kia là định danh nội bộ, còn đây là thứ
-                         khách hàng đọc khi gọi điện. Không bắt buộc -- bản nháp
-                         thường chưa được cấp số, điền sau khi ký cũng được. --%>
+                    <%-- Mã hợp đồng do NGƯỜI DÙNG nhập, chính là số ghi trên bản
+                         giấy. Hệ thống KHÔNG sinh mã nữa (V28) -- trước đó nó tự
+                         sinh HD-xxxx và có thêm một ô "Số hợp đồng" riêng, hai cột
+                         cho một khái niệm. --%>
                     <div class="col-12 field-row">
-                        <label>Số hợp đồng</label>
-                        <input type="text" class="form-control" id="contractNumber" name="contractNumber"
-                               maxlength="100" placeholder="VD: 123/2026/HĐKT-POSTEF">
+                        <label>Mã hợp đồng <span class="req">*</span></label>
+                        <input type="text" class="form-control" id="contractCode" name="contractCode"
+                               maxlength="50" placeholder="VD: 01/2026/HĐKT-POSTEF">
+                        <span class="error-text" id="err-contractCode">Mã hợp đồng không được để trống.</span>
                         <span style="font-size:0.78rem; color:#9ca3af; display:block; margin-top:6px;">
-                            Số ghi trên bản hợp đồng giấy. Mã nội bộ dạng HD-xxxx do hệ thống tự sinh
-                            khi lưu, không có ô nhập và không thay thế số này.
+                            Nhập đúng số ghi trên bản hợp đồng giấy. Mỗi hợp đồng một mã, không trùng nhau.
                         </span>
                     </div>
 
@@ -251,6 +252,12 @@
 
             var title = document.getElementById('title');
             if (!title.value.trim()) { document.getElementById('err-title').style.display = 'block'; valid = false; }
+
+            var contractCode = document.getElementById('contractCode');
+            if (!contractCode.value.trim()) {
+                document.getElementById('err-contractCode').style.display = 'block';
+                valid = false;
+            }
 
             ['customer', 'contractType', 'owner'].forEach(function (id) {
                 var el = document.getElementById(id);

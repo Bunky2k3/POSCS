@@ -82,7 +82,7 @@ public class DaoSchemaIntegrationTest {
         assertNotNull(contractDAO.findById(Fixtures.CONTRACT_ID));
         assertEquals(1, contractDAO.findByEnterpriseId(Fixtures.ENTERPRISE_ID).size());
         assertNotNull(contractDAO.findProductsByContractId(Fixtures.CONTRACT_ID));
-        assertNotNull(contractDAO.generateNextContractCode());
+        assertFalse(contractDAO.contractCodeExists("khong-ton-tai-o-dau-ca", 0));
         assertNotNull(contractDAO.countStatusSummary());
         assertNotNull(contractDAO.findExpiringSoon(10));
     }

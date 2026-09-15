@@ -203,6 +203,8 @@ public class ContractControllerTest {
     // ------------------------------------------------------------------
 
     private void stubValidContractFields() {
+        // Mã hợp đồng là ô BẮT BUỘC từ V28 -- hệ thống thôi sinh mã hộ.
+        when(request.getParameter("contractCode")).thenReturn("01/2026/HĐKT-POSTEF");
         when(request.getParameter("title")).thenReturn("Hợp đồng cung cấp thiết bị");
         when(request.getParameter("contractType")).thenReturn("Cung cấp thiết bị");
         when(request.getParameter("signDate")).thenReturn("2026-01-01");
@@ -250,7 +252,6 @@ public class ContractControllerTest {
     public void create_validFields_insertsAndRedirectsToDetail() throws Exception {
         when(request.getParameter("action")).thenReturn("create");
         stubValidContractFields();
-        when(contractDAO.generateNextContractCode()).thenReturn("HD-0001");
         when(contractDAO.insert(any(Contract.class), anyInt())).thenReturn(77);
 
         controller.doPost(request, response);
@@ -316,7 +317,6 @@ public class ContractControllerTest {
         stubValidContractFields();
         when(request.getParameter("kind")).thenReturn("buy");
         when(customerDAO.findRolesOf(10)).thenReturn(List.of("Nhà cung cấp"));
-        when(contractDAO.generateNextContractCode()).thenReturn("HD-0001");
         when(contractDAO.insert(any(Contract.class), anyInt())).thenReturn(5);
 
         controller.doPost(request, response);
@@ -351,7 +351,6 @@ public class ContractControllerTest {
         stubValidContractFields();
         when(request.getParameter("kind")).thenReturn("buy");
         when(customerDAO.findRolesOf(10)).thenReturn(List.of("Khách mua", "Nhà cung cấp"));
-        when(contractDAO.generateNextContractCode()).thenReturn("HD-0001");
         when(contractDAO.insert(any(Contract.class), anyInt())).thenReturn(5);
 
         controller.doPost(request, response);
@@ -403,7 +402,6 @@ public class ContractControllerTest {
         stubValidContractFields();
         when(request.getParameter("contractValue")).thenReturn(raw);
         // findRolesOf(10) đã được stubValidContractFields() gán 'Khách mua'.
-        when(contractDAO.generateNextContractCode()).thenReturn("HD-0001");
         when(contractDAO.insert(any(Contract.class), anyInt())).thenReturn(5);
 
         controller.doPost(request, response);

@@ -527,14 +527,14 @@ public class ContractController extends HttpServlet {
             } else if (signDate.after(effectiveDate) || effectiveDate.after(endDate)) {
                 errors.add("Ngày ký phải ≤ Hiệu lực từ phải ≤ Đến ngày.");
             }
-            if (!isBlank(contractCode)) {
-                // Cố ý KHÔNG lọc chiều ở đây: mã hợp đồng là duy nhất trên
-                // toàn bảng, tra theo một chiều là bỏ sót trùng ở chiều kia.
-                boolean exists = contractDAO.findAll(1, Integer.MAX_VALUE, contractCode.trim(), null, null).stream()
-                        .anyMatch(c -> c.getContractCode() != null && c.getContractCode().equalsIgnoreCase(contractCode.trim()));
-                if (exists) {
-                    errors.add("Mã hợp đồng \"" + contractCode.trim() + "\" đã tồn tại.");
-                }
+            // Từ V28 mã KHÔNG còn sinh tự động, nên thiếu mã trong file PDF là
+            // lỗi phải báo -- trước đó chỗ này lặng lẽ sinh hộ một mã HD-xxxx.
+            if (isBlank(contractCode)) {
+                errors.add("Thiếu \"Mã hợp đồng\" trong file PDF.");
+            } else if (contractDAO.contractCodeExists(contractCode.trim(), 0)) {
+                // Cố ý KHÔNG lọc chiều: mã hợp đồng là duy nhất trên toàn bảng,
+                // tra theo một chiều là bỏ sót trùng ở chiều kia.
+                errors.add("Mã hợp đồng \"" + contractCode.trim() + "\" đã tồn tại.");
             }
 
             if (isBlank(buyerTax)) {
@@ -657,7 +657,9 @@ public class ContractController extends HttpServlet {
             }
 
             Contract contract = new Contract();
-            contract.setContractCode(isBlank(contractCode) ? contractDAO.generateNextContractCode() : contractCode.trim());
+            // Mã lấy từ chính file PDF. Thiếu thì BÁO LỖI chứ không sinh hộ:
+            // từ V28 mã là số hợp đồng thật, hệ thống không có quyền bịa ra.
+            contract.setContractCode(isBlank(contractCode) ? null : contractCode.trim());
             contract.setTitle(title.trim());
             contract.setContractType(contractType.trim());
             contract.setSigningDate(signDate);
@@ -857,9 +859,23 @@ public class ContractController extends HttpServlet {
             response.sendRedirect(request.getContextPath() + "/contract?action=new&error=invalid_drive_link");
             return;
         }
-        c.setContractCode(contractDAO.generateNextContractCode());
+        // Kiểm trùng TRƯỚC để báo đúng lý do. Chốt chặn thật vẫn là UNIQUE KEY
+        // trên contract_code: hai người lưu cùng lúc cùng một mã thì chỉ ràng
+        // buộc ở CSDL mới bắt được, và insert() trả DUPLICATE_CODE.
+        if (contractDAO.contractCodeExists(c.getContractCode(), 0)) {
+            response.sendRedirect(request.getContextPath()
+                    + "/contract?action=new&kind=" + (DIRECTION_BUY.equals(c.getDirection()) ? "buy" : "sell")
+                    + "&error=duplicate_code");
+            return;
+        }
 
         int newId = contractDAO.insert(c, actorId(request));
+        if (newId == ContractDAO.DUPLICATE_CODE) {
+            response.sendRedirect(request.getContextPath()
+                    + "/contract?action=new&kind=" + (DIRECTION_BUY.equals(c.getDirection()) ? "buy" : "sell")
+                    + "&error=duplicate_code");
+            return;
+        }
         if (newId <= 0) {
             LOG.warn("Tao hop dong that bai (actor={}, contractCode={})", Logs.actor(request), c.getContractCode());
             response.sendRedirect(request.getContextPath() + "/contract?action=new&error=create_failed");
@@ -892,6 +908,10 @@ public class ContractController extends HttpServlet {
         c.setSigningDate(existing.getSigningDate());
         if (!isValid(c) || !counterpartyMatchesDirection(c)) {
             response.sendRedirect(request.getContextPath() + "/contract?action=edit&id=" + id + "&error=invalid");
+            return;
+        }
+        if (contractDAO.contractCodeExists(c.getContractCode(), id)) {
+            response.sendRedirect(request.getContextPath() + "/contract?action=edit&id=" + id + "&error=duplicate_code");
             return;
         }
         if (!TextRules.isSafeHttpUrl(c.getAttachmentUrl())) {
@@ -1404,10 +1424,9 @@ public class ContractController extends HttpServlet {
      * cáo lặng lẽ đổi nghĩa.
      */
     private Contract buildContractFromRequest(HttpServletRequest request, Contract c) {
-        // Số hợp đồng THẬT (ghi trên giấy) -- khác contract_code là mã nội bộ
-        // do generateNextContractCode() sinh. Người dùng nhập, có thể để trống
-        // ở bản nháp vì số thường chỉ được cấp lúc ký.
-        c.setContractNumber(emptyToNull(request.getParameter("contractNumber")));
+        // Mã hợp đồng do NGƯỜI DÙNG nhập (V28), chính là số ghi trên bản giấy.
+        // Không còn sinh tự động, nên đây là ô bắt buộc -- isValid() kiểm.
+        c.setContractCode(emptyToNull(request.getParameter("contractCode")));
         c.setTitle(emptyToNull(request.getParameter("title")));
         c.setContractType(emptyToNull(request.getParameter("contractType")));
         c.setSigningDate(parseDateOrNull(request.getParameter("signDate")));
@@ -1464,7 +1483,7 @@ public class ContractController extends HttpServlet {
     }
 
     private boolean isValid(Contract c) {
-        if (c.getTitle() == null || c.getContractType() == null
+        if (c.getContractCode() == null || c.getTitle() == null || c.getContractType() == null
                 || c.getEnterpriseId() <= 0 || c.getOwnerId() <= 0) {
             return false;
         }
