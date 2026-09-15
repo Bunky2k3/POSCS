@@ -17,7 +17,6 @@ import poscs.dao.CustomerDAO;
 import poscs.dao.CustomerLifecycleEventDAO;
 import poscs.dao.EmployeeDAO;
 import poscs.dao.TechnicalSupportTicketDAO;
-import poscs.dao.TerritoryDAO;
 import poscs.model.CustomerLifecycleEvent;
 import poscs.model.Enterprise;
 import poscs.model.RelationshipRating;
@@ -50,7 +49,6 @@ public class CustomerControllerTest {
     private ContractDAO contractDAO;
     private TechnicalSupportTicketDAO ticketDAO;
     private CustomerLifecycleEventDAO lifecycleEventDAO;
-    private TerritoryDAO territoryDAO;
 
     private HttpServletRequest request;
     private HttpServletResponse response;
@@ -66,7 +64,6 @@ public class CustomerControllerTest {
         contractDAO = mock(ContractDAO.class);
         ticketDAO = mock(TechnicalSupportTicketDAO.class);
         lifecycleEventDAO = mock(CustomerLifecycleEventDAO.class);
-        territoryDAO = mock(TerritoryDAO.class);
 
         setField(controller, "customerDAO", customerDAO);
         setField(controller, "employeeDAO", employeeDAO);
@@ -74,7 +71,6 @@ public class CustomerControllerTest {
         setField(controller, "contractDAO", contractDAO);
         setField(controller, "ticketDAO", ticketDAO);
         setField(controller, "lifecycleEventDAO", lifecycleEventDAO);
-        setField(controller, "territoryDAO", territoryDAO);
 
         request = mock(HttpServletRequest.class);
         response = mock(HttpServletResponse.class);
@@ -353,7 +349,7 @@ public class CustomerControllerTest {
     public void create_provinceHasOwner_overridesSubmittedAccountOwner() throws Exception {
         when(request.getParameter("action")).thenReturn("create");
         stubValidCreateFields(); // accountOwnerId=9, districtId=10
-        when(territoryDAO.findAssigneeOfWard(10)).thenReturn(42);
+        when(employeeDAO.findAssigneeOfWard(10)).thenReturn(42);
         when(customerDAO.generateNextEnterpriseCode()).thenReturn("KH-0001");
         when(customerDAO.insert(any(Enterprise.class))).thenReturn(7);
 
@@ -373,7 +369,7 @@ public class CustomerControllerTest {
     public void create_provinceWithoutOwner_keepsSubmittedAccountOwner() throws Exception {
         when(request.getParameter("action")).thenReturn("create");
         stubValidCreateFields();
-        when(territoryDAO.findAssigneeOfWard(10)).thenReturn(null);
+        when(employeeDAO.findAssigneeOfWard(10)).thenReturn(null);
         when(customerDAO.generateNextEnterpriseCode()).thenReturn("KH-0001");
         when(customerDAO.insert(any(Enterprise.class))).thenReturn(7);
 
@@ -395,14 +391,14 @@ public class CustomerControllerTest {
         when(request.getParameter("action")).thenReturn("create");
         stubValidCreateFields();
         when(request.getParameter("provinceId")).thenReturn("99");
-        when(territoryDAO.findAssigneeOfWard(10)).thenReturn(42);
+        when(employeeDAO.findAssigneeOfWard(10)).thenReturn(42);
         when(customerDAO.generateNextEnterpriseCode()).thenReturn("KH-0001");
         when(customerDAO.insert(any(Enterprise.class))).thenReturn(7);
 
         controller.doPost(request, response);
 
-        verify(territoryDAO).findAssigneeOfWard(10);
-        verify(territoryDAO, never()).findAssigneeOf(anyInt());
+        verify(employeeDAO).findAssigneeOfWard(10);
+        verify(employeeDAO, never()).findAssigneeOf(anyInt());
     }
 
     /**
@@ -419,7 +415,7 @@ public class CustomerControllerTest {
         when(customerDAO.findById(5)).thenReturn(existing);
 
         stubValidCreateFields();
-        when(territoryDAO.findAssigneeOfWard(10)).thenReturn(42);
+        when(employeeDAO.findAssigneeOfWard(10)).thenReturn(42);
         when(customerDAO.update(any(Enterprise.class))).thenReturn(true);
 
         controller.doPost(request, response);

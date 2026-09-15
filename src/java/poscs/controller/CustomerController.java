@@ -54,7 +54,6 @@ public class CustomerController extends HttpServlet {
 
     private final CustomerDAO customerDAO = new CustomerDAO();
     private final EmployeeDAO employeeDAO = new EmployeeDAO();
-    private final poscs.dao.TerritoryDAO territoryDAO = new poscs.dao.TerritoryDAO();
     private final AddressDAO addressDAO = new AddressDAO();
     private final ContractDAO contractDAO = new ContractDAO();
     private final TechnicalSupportTicketDAO ticketDAO = new TechnicalSupportTicketDAO();
@@ -187,7 +186,7 @@ public class CustomerController extends HttpServlet {
         // chọn tỉnh. Nhúng cả bảng (34 tỉnh) một lần thay vì gọi AJAX mỗi lần
         // đổi ô tỉnh -- dữ liệu nhỏ, và đỡ hẳn một endpoint phải gác quyền
         // riêng. Khoá thật nằm ở resolveAccountOwnerId, đây chỉ là tầng hiển thị.
-        request.setAttribute("territoryAssignments", territoryDAO.findAllAssignments());
+        request.setAttribute("territoryAssignments", employeeDAO.findAllAssignments());
         request.getRequestDispatcher(CREATE_VIEW).forward(request, response);
     }
 
@@ -216,7 +215,7 @@ public class CustomerController extends HttpServlet {
         request.setAttribute("provinceList", addressDAO.findBranchProvincesIncluding(currentProvinceId));
         // Như showCreateForm: form sửa cũng phải khoá ô người phụ trách theo
         // địa bàn, nếu không thì đổi tỉnh ở đây là đường vòng thoát khoá.
-        request.setAttribute("territoryAssignments", territoryDAO.findAllAssignments());
+        request.setAttribute("territoryAssignments", employeeDAO.findAllAssignments());
         request.getRequestDispatcher(UPDATE_VIEW).forward(request, response);
     }
 
@@ -468,12 +467,12 @@ public class CustomerController extends HttpServlet {
      * code.
      *
      * <p>Suy từ xã/phường chứ không từ ô tỉnh: xem {@link
-     * poscs.dao.TerritoryDAO#findAssigneeOfWard}.
+     * poscs.dao.EmployeeDAO#findAssigneeOfWard}.
      */
     private Integer resolveAccountOwnerId(HttpServletRequest request) {
         Integer wardId = parseIntOrNull(request.getParameter("districtId"));
         if (wardId != null) {
-            Integer territoryOwnerId = territoryDAO.findAssigneeOfWard(wardId);
+            Integer territoryOwnerId = employeeDAO.findAssigneeOfWard(wardId);
             // Kiểm > 0 chứ không chỉ != null: user_id 0 không phải người nào
             // cả, mà nhận nó ở đây là khoá khách hàng vào một nhân viên không
             // tồn tại rồi vỡ ở tầng khoá ngoại -- xa chỗ gây ra hẳn một tầng.
