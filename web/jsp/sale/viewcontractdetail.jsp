@@ -5,8 +5,9 @@
 <%--
     Request attribute do ContractController#showDetail thiết lập trước khi forward tới trang này:
       - contract         : poscs.model.Contract (có sẵn .enterprise và .owner đã join, .status đã tính theo BR-17)
-      - canDelete        : boolean -- true nếu hợp đồng đang ở trạng thái "Chưa hiệu lực" (BR-46)
+      - canVoid          : boolean -- true nếu người đang xem là Admin (chỉ Admin huỷ được bản ghi nhập nhầm)
       - contractProducts : List<poscs.model.ContractProduct> -- hạng mục sản phẩm/dịch vụ (chỉ đọc)
+      - contractHistory  : List<poscs.model.ContractHistory> -- nhật ký thay đổi, mới nhất trước
 
     Hạng mục sản phẩm/dịch vụ hiển thị sản phẩm/số lượng/đơn vị/ghi chú thật
     từ contractproducts -- KHÔNG có đơn giá/thành tiền/VAT vì bảng đó chưa có
@@ -148,6 +149,18 @@
             <span>Không gỡ được sản phẩm này -- vui lòng thử lại.</span>
         </div>
     </c:if>
+    <c:if test="${param.error == 'void_reason_required'}">
+        <div class="toast-msg blocked show">
+            <i class="fa-solid fa-circle-xmark"></i>
+            <span>Phải có lý do thì mới huỷ được bản ghi hợp đồng.</span>
+        </div>
+    </c:if>
+    <c:if test="${param.error == 'void_failed'}">
+        <div class="toast-msg blocked show">
+            <i class="fa-solid fa-circle-xmark"></i>
+            <span>Không huỷ được bản ghi này -- vui lòng thử lại.</span>
+        </div>
+    </c:if>
 
     <div class="page-container">
         <a href="${pageContext.request.contextPath}/contract" class="back-link-top"><i class="fa-solid fa-arrow-left-long"></i> Quay lại danh sách</a>
@@ -208,14 +221,18 @@
                 <a href="${pageContext.request.contextPath}/contract?action=exportPdf&id=${contract.contractId}" class="btn-delete-detail" style="cursor:pointer; color:var(--primary); border-color:#e5e7eb;"><i class="fa-solid fa-file-pdf"></i> Xuất PDF</a>
                 <c:if test="${canManage}">
                     <a href="${pageContext.request.contextPath}/contract?action=edit&id=${contract.contractId}" class="btn-edit-detail"><i class="fa-solid fa-pen"></i> Sửa thông tin</a>
-                    <c:choose>
-                        <c:when test="${canDelete}">
-                            <button type="button" class="btn-delete-detail" style="cursor:pointer; color:var(--danger); border-color:var(--danger);" onclick="confirmDelete(${contract.contractId})"><i class="fa-solid fa-trash"></i> Xóa</button>
-                        </c:when>
-                        <c:otherwise>
-                            <button class="btn-delete-detail" disabled title="Chỉ được xóa hợp đồng ở trạng thái chưa hiệu lực"><i class="fa-solid fa-trash"></i> Xóa</button>
-                        </c:otherwise>
-                    </c:choose>
+                </c:if>
+                <%-- Huỷ bản ghi đứng NGOÀI canManage: nó không còn là thao tác
+                     nghiệp vụ của Sales mà là việc sửa hậu quả nhập liệu sai,
+                     chỉ Admin làm được. Không có nhánh hiển thị nút mờ cho
+                     người khác -- nút xám kèm tooltip chỉ mời người ta đi tìm
+                     cách bấm, trong khi đây là thứ họ không nên bấm. --%>
+                <c:if test="${canVoid}">
+                    <button type="button" class="btn-delete-detail" style="cursor:pointer; color:var(--danger); border-color:var(--danger);"
+                            onclick="confirmVoid(${contract.contractId})"
+                            title="Gỡ một bản ghi NHẬP NHẦM khỏi danh sách. Không phải huỷ hợp đồng ngoài đời.">
+                        <i class="fa-solid fa-trash"></i> Huỷ bản ghi
+                    </button>
                 </c:if>
             </div>
         </div>
@@ -367,16 +384,61 @@
             <div class="section-header"><h5>Điều khoản & ghi chú</h5></div>
             <div class="empty-mini" style="color:#9ca3af; font-size:0.87rem;">Chưa hỗ trợ trong phiên bản này.</div>
         </div>
+
+        <!-- ===== Nhật ký thay đổi ===== -->
+        <div class="info-card card-box">
+            <div class="section-header"><h5>Nhật ký thay đổi</h5></div>
+            <c:choose>
+                <c:when test="${empty contractHistory}">
+                    <div class="empty-mini" style="color:#9ca3af; font-size:0.87rem;">Chưa có thay đổi nào được ghi lại.</div>
+                </c:when>
+                <c:otherwise>
+                    <div class="table-responsive">
+                        <table class="table align-middle" style="font-size:0.87rem;">
+                            <thead>
+                                <tr>
+                                    <th style="width:150px;">Thời điểm</th>
+                                    <th style="width:130px;">Sự kiện</th>
+                                    <th>Nội dung</th>
+                                    <th style="width:170px;">Người thực hiện</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <c:forEach var="h" items="${contractHistory}">
+                                    <tr>
+                                        <td><fmt:formatDate value="${h.changedAt}" pattern="dd/MM/yyyy HH:mm"/></td>
+                                        <td>${fn:escapeXml(h.eventType)}</td>
+                                        <td>
+                                            ${fn:escapeXml(h.detail)}
+                                            <%-- note là chữ người dùng gõ, detail là chữ hệ thống sinh.
+                                                 Hiện tách hẳn dòng để không ai đọc nhầm lý do của
+                                                 người thành ghi nhận của máy. --%>
+                                            <c:if test="${not empty h.note}">
+                                                <div style="color:#6b7280; margin-top:2px;">
+                                                    Lý do: ${fn:escapeXml(h.note)}
+                                                </div>
+                                            </c:if>
+                                        </td>
+                                        <td>${fn:escapeXml(h.changedByUser.fullName)}</td>
+                                    </tr>
+                                </c:forEach>
+                            </tbody>
+                        </table>
+                    </div>
+                </c:otherwise>
+            </c:choose>
+        </div>
     </div>
 
         </div>
     </div>
 
-    <!-- Form ẩn để gửi yêu cầu xoá qua POST (không đổi state bằng GET) -->
+    <!-- Form ẩn để gửi yêu cầu huỷ bản ghi qua POST (không đổi state bằng GET) -->
     <form id="deleteForm" method="POST" action="${pageContext.request.contextPath}/contract" style="display:none">
         <input type="hidden" name="csrfToken" value="${csrfToken}">
         <input type="hidden" name="action" value="delete">
         <input type="hidden" name="id" id="deleteFormId">
+        <input type="hidden" name="voidReason" id="deleteFormReason">
     </form>
 
     <!-- Form ẩn để gửi yêu cầu gỡ 1 dòng sản phẩm qua POST -->
@@ -388,11 +450,25 @@
     </form>
 
     <script>
-        function confirmDelete(contractId) {
-            if (confirm('Bạn có chắc chắn muốn xóa hợp đồng này?')) {
-                document.getElementById('deleteFormId').value = contractId;
-                document.getElementById('deleteForm').submit();
+        // Hỏi lý do chứ không phải hỏi "có chắc không". Bản ghi bị huỷ vẫn nằm
+        // trong CSDL và vẫn có dòng nhật ký, nên thứ cần thu thập là VÌ SAO --
+        // để sau này phân biệt được nhập nhầm với huỷ đi cho khuất mắt.
+        // Server cũng kiểm lại lý do rỗng (handleDelete), chỗ này chỉ để đỡ
+        // một vòng đi về.
+        function confirmVoid(contractId) {
+            var reason = prompt('Huỷ bản ghi hợp đồng này khỏi danh sách.\n'
+                + 'Đây là thao tác sửa nhập liệu sai, không phải huỷ hợp đồng ngoài đời.\n\n'
+                + 'Nhập lý do:');
+            if (reason === null) {
+                return;
             }
+            if (reason.trim() === '') {
+                alert('Phải có lý do thì mới huỷ được bản ghi.');
+                return;
+            }
+            document.getElementById('deleteFormId').value = contractId;
+            document.getElementById('deleteFormReason').value = reason.trim();
+            document.getElementById('deleteForm').submit();
         }
 
         function confirmRemoveProduct(contractProductId) {

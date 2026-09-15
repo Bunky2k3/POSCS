@@ -47,9 +47,16 @@ public class ContractDAOTest {
 
     private final ContractDAO dao = new ContractDAO();
 
+    /** user_id giả của người đang thao tác -- mọi đường ghi đều gắn kèm vào nhật ký. */
+    private static final int ACTOR = 9;
+
     private static ContractProduct item(int productId, int quantity) {
         ContractProduct p = new ContractProduct();
         p.setProductId(productId);
+        // Có sẵn tên thì DAO dựng được câu nhật ký ngay, không phải quay lại
+        // bảng products tra thêm -- giống đường mà ContractController đi khi
+        // người dùng bấm "Thêm sản phẩm".
+        p.setProductName("Thiết bị " + productId);
         p.setQuantity(quantity);
         p.setUnit("cái");
         p.setNotes(null);
@@ -76,7 +83,7 @@ public class ContractDAOTest {
     @Test
     public void insertProducts_emptyList_returnsTrueWithoutTouchingDatabase() throws Exception {
         try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
-            assertTrue(dao.insertProducts(1, new ArrayList<>()));
+            assertTrue(dao.insertProducts(1, new ArrayList<>(), ACTOR));
 
             // Hợp đồng không có hạng mục nào là hợp lệ -- không được mở kết nối
             // chỉ để chạy một batch rỗng.
@@ -92,7 +99,7 @@ public class ContractDAOTest {
         try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
             db.when(DBContext::getConnection).thenReturn(conn);
 
-            assertTrue(dao.insertProducts(1, Arrays.asList(item(10, 2), item(11, 5))));
+            assertTrue(dao.insertProducts(1, Arrays.asList(item(10, 2), item(11, 5)), ACTOR));
 
             InOrder inOrder = inOrder(conn, ps);
             inOrder.verify(conn).setAutoCommit(false);
@@ -113,7 +120,7 @@ public class ContractDAOTest {
         try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
             db.when(DBContext::getConnection).thenReturn(conn);
 
-            assertFalse(dao.insertProducts(1, Arrays.asList(item(10, 2), item(11, 5))));
+            assertFalse(dao.insertProducts(1, Arrays.asList(item(10, 2), item(11, 5)), ACTOR));
 
             // Không rollback thì các dòng trước chỗ hỏng vẫn nằm lại trong CSDL,
             // trong khi hàm báo false -- hợp đồng có một nửa hạng mục.
@@ -132,7 +139,7 @@ public class ContractDAOTest {
         try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
             db.when(DBContext::getConnection).thenReturn(conn);
 
-            assertFalse(dao.insertProducts(1, Arrays.asList(item(10, 2))));
+            assertFalse(dao.insertProducts(1, Arrays.asList(item(10, 2)), ACTOR));
 
             verify(conn).rollback();
             verify(conn).setAutoCommit(true);
@@ -153,7 +160,7 @@ public class ContractDAOTest {
             // hướng nguy hiểm: bên gọi sẽ bảo người dùng "chưa ghi gì" và họ
             // nhập lại, tạo ra hạng mục trùng.
             assertTrue("Lỗi dọn dẹp sau commit không được biến thành thất bại",
-                    dao.insertProducts(1, Arrays.asList(item(10, 2))));
+                    dao.insertProducts(1, Arrays.asList(item(10, 2)), ACTOR));
             verify(conn, never()).rollback();
         }
     }
@@ -170,25 +177,154 @@ public class ContractDAOTest {
 
             // Lỗi chồng lỗi vẫn phải thoát ra bằng giá trị trả về, không được
             // ném ngoại lệ lên tận servlet thành trang 500.
-            assertFalse(dao.insertProducts(1, Arrays.asList(item(10, 2))));
+            assertFalse(dao.insertProducts(1, Arrays.asList(item(10, 2)), ACTOR));
         }
     }
 
     @Test
     public void insertProducts_bindsEveryItemOntoTheSameStatement() throws Exception {
         PreparedStatement ps = mock(PreparedStatement.class);
-        Connection conn = connectionReturning(ps);
+        // Tách statement của nhật ký ra: nó cũng bind contract_id vào tham số 1,
+        // dùng chung mock thì times(2) bên dưới đếm cả nó thành 3.
+        Connection conn = connectionRoutingOn("contract_history", mock(PreparedStatement.class), ps);
 
         try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
             db.when(DBContext::getConnection).thenReturn(conn);
 
-            dao.insertProducts(77, Arrays.asList(item(10, 2), item(11, 5)));
+            dao.insertProducts(77, Arrays.asList(item(10, 2), item(11, 5)), ACTOR);
 
             verify(ps, times(2)).setInt(1, 77); // contract_id lặp lại cho từng dòng
             verify(ps).setInt(2, 10);
             verify(ps).setInt(3, 2);
             verify(ps).setInt(2, 11);
             verify(ps).setInt(3, 5);
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // Nhật ký -- ghi cùng transaction với thay đổi
+    // ------------------------------------------------------------------
+
+    @Test
+    public void insertProducts_writesHistoryRowInsideTheSameTransaction() throws Exception {
+        PreparedStatement historyPs = mock(PreparedStatement.class);
+        PreparedStatement itemPs = mock(PreparedStatement.class);
+        Connection conn = connectionRoutingOn("contract_history", historyPs, itemPs);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            assertTrue(dao.insertProducts(7, Arrays.asList(item(10, 2)), ACTOR));
+
+            // Dòng nhật ký phải nằm TRƯỚC commit. Ghi sau commit thì hàng hoá đã
+            // vào CSDL trong khi nhật ký còn có thể hỏng -- đúng cái lỗ mà bảng
+            // này sinh ra để bịt.
+            InOrder inOrder = inOrder(itemPs, historyPs, conn);
+            inOrder.verify(itemPs).executeBatch();
+            inOrder.verify(historyPs).executeUpdate();
+            inOrder.verify(conn).commit();
+
+            ArgumentCaptor<String> detail = ArgumentCaptor.forClass(String.class);
+            verify(historyPs).setString(eq(3), detail.capture());
+            assertTrue("Nhật ký phải nói rõ đã thêm hàng hoá gì, không chỉ là 'có thay đổi'",
+                    detail.getValue().contains("Thiết bị 10"));
+            verify(historyPs).setInt(4, ACTOR);
+        }
+    }
+
+    @Test
+    public void insertProducts_historyFails_rollsBackTheProductRowsToo() throws Exception {
+        PreparedStatement historyPs = mock(PreparedStatement.class);
+        when(historyPs.executeUpdate()).thenThrow(new SQLException("contract_history hỏng"));
+        PreparedStatement itemPs = mock(PreparedStatement.class);
+        Connection conn = connectionRoutingOn("contract_history", historyPs, itemPs);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            // Hàng hoá vào được mà nhật ký ghi hụt là trường hợp tệ nhất: thay
+            // đổi có thật nhưng không truy được ai làm. Thà không ghi gì cả.
+            assertFalse(dao.insertProducts(7, Arrays.asList(item(10, 2)), ACTOR));
+            verify(conn).rollback();
+            verify(conn, never()).commit();
+        }
+    }
+
+    @Test
+    public void deleteProductLine_readsTheLineBeforeDeletingIt() throws Exception {
+        PreparedStatement historyPs = mock(PreparedStatement.class);
+        // singleRow() tự chạy vài lệnh when() bên trong, nên phải lấy ra biến
+        // trước; gọi lồng trong when(...) sẽ ném UnfinishedStubbingException.
+        ResultSet line = singleRow(row("product_name", "Modem quang GPON", "quantity", 5, "unit", "cái"));
+        PreparedStatement linePs = mock(PreparedStatement.class);
+        when(linePs.executeQuery()).thenReturn(line);
+        when(linePs.executeUpdate()).thenReturn(1);
+        Connection conn = connectionRoutingOn("contract_history", historyPs, linePs);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            assertTrue(dao.deleteProductLine(3, 7, ACTOR));
+
+            // DELETE là xoá cứng: đọc sau lệnh xoá thì không còn gì để đọc, và
+            // dòng nhật ký sẽ chỉ nói được "đã gỡ một thứ gì đó".
+            InOrder inOrder = inOrder(linePs);
+            inOrder.verify(linePs).executeQuery();
+            inOrder.verify(linePs).executeUpdate();
+
+            ArgumentCaptor<String> detail = ArgumentCaptor.forClass(String.class);
+            verify(historyPs).setString(eq(3), detail.capture());
+            assertTrue(detail.getValue().contains("Modem quang GPON"));
+            assertTrue(detail.getValue().contains("5"));
+        }
+    }
+
+    @Test
+    public void deleteProductLine_lineNotInThisContract_deletesNothing() throws Exception {
+        ResultSet noLine = emptyResultSet();
+        PreparedStatement linePs = mock(PreparedStatement.class);
+        when(linePs.executeQuery()).thenReturn(noLine);
+        Connection conn = connectionReturning(linePs);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            // Không tra ra dòng nào thì phải dừng hẳn, đừng chạy DELETE với cặp
+            // id do người gọi đưa và hy vọng mệnh đề WHERE đỡ hộ.
+            assertFalse(dao.deleteProductLine(3, 7, ACTOR));
+            verify(linePs, never()).executeUpdate();
+            verify(conn).rollback();
+        }
+    }
+
+    @Test
+    public void voidRecord_blankReason_refusesWithoutTouchingDatabase() throws Exception {
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            // Lý do là toàn bộ giá trị của thao tác này: một bản ghi biến khỏi
+            // danh sách mà không nói vì sao thì sau không phân biệt được nhập
+            // nhầm với xoá để che.
+            assertFalse(dao.voidRecord(7, ACTOR, "   "));
+            assertFalse(dao.voidRecord(7, ACTOR, null));
+            db.verify(DBContext::getConnection, never());
+        }
+    }
+
+    @Test
+    public void voidRecord_storesTheReasonInNoteNotInDetail() throws Exception {
+        PreparedStatement historyPs = mock(PreparedStatement.class);
+        PreparedStatement updatePs = mock(PreparedStatement.class);
+        when(updatePs.executeUpdate()).thenReturn(1);
+        Connection conn = connectionRoutingOn("contract_history", historyPs, updatePs);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            assertTrue(dao.voidRecord(7, ACTOR, "  Nhập trùng với HD-0042  "));
+
+            // detail do hệ thống sinh, note là chữ người dùng gõ. Trộn hai thứ
+            // vào một cột là mất khả năng phân biệt máy ghi hay người khai.
+            verify(historyPs).setString(5, "Nhập trùng với HD-0042");
+            verify(conn).commit();
         }
     }
 
@@ -209,7 +345,7 @@ public class ContractDAOTest {
         try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
             db.when(DBContext::getConnection).thenReturn(conn);
 
-            assertEquals(123, dao.insert(contract("HD-0001")));
+            assertEquals(123, dao.insert(contract("HD-0001"), ACTOR));
             verify(conn).prepareStatement(anyString(), eq(Statement.RETURN_GENERATED_KEYS));
         }
     }
@@ -223,7 +359,7 @@ public class ContractDAOTest {
         try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
             db.when(DBContext::getConnection).thenReturn(conn);
 
-            assertEquals(-1, dao.insert(contract("HD-0001")));
+            assertEquals(-1, dao.insert(contract("HD-0001"), ACTOR));
         }
     }
 
@@ -247,7 +383,7 @@ public class ContractDAOTest {
             db.when(DBContext::getConnection).thenReturn(conn);
 
             Contract c = contract("HD-0007");
-            assertEquals(55, dao.insert(c));
+            assertEquals(55, dao.insert(c, ACTOR));
 
             // Mã phải được sinh lại chứ không thử lại y nguyên mã cũ -- lặp lại
             // cùng một mã sẽ trùng mãi cho tới khi hết lượt thử.
@@ -265,7 +401,7 @@ public class ContractDAOTest {
         try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
             db.when(DBContext::getConnection).thenReturn(conn);
 
-            assertEquals(-1, dao.insert(contract("HD-0001")));
+            assertEquals(-1, dao.insert(contract("HD-0001"), ACTOR));
 
             // Sinh lại mã không cứu được lỗi này -- thử lại 5 lần chỉ tổ chậm.
             verify(ps, times(1)).executeUpdate();
@@ -285,7 +421,7 @@ public class ContractDAOTest {
         try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
             db.when(DBContext::getConnection).thenReturn(conn);
 
-            assertEquals(-1, dao.insert(contract("HD-0007")));
+            assertEquals(-1, dao.insert(contract("HD-0007"), ACTOR));
 
             // Vòng lặp phải dừng, không quay vô hạn khi mã mới vẫn cứ trùng.
             verify(insertPs, times(5)).executeUpdate();
@@ -413,7 +549,7 @@ public class ContractDAOTest {
             Contract c = contract("HD-0001");
             c.setEffectiveDate(effectiveDate);
             c.setEndDate(endDate);
-            dao.insert(c);
+            dao.insert(c, ACTOR);
         }
         return ps;
     }

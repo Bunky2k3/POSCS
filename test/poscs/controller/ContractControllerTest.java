@@ -156,7 +156,6 @@ public class ContractControllerTest {
         Contract contract = new Contract();
         contract.setContractId(5);
         when(contractDAO.findById(5)).thenReturn(contract);
-        when(contractDAO.canDelete(5)).thenReturn(true);
 
         RequestDispatcher dispatcher = mock(RequestDispatcher.class);
         when(request.getRequestDispatcher("/jsp/sale/viewcontractdetail.jsp")).thenReturn(dispatcher);
@@ -164,7 +163,9 @@ public class ContractControllerTest {
         controller.doGet(request, response);
 
         verify(request).setAttribute("contract", contract);
-        verify(request).setAttribute("canDelete", true);
+        // Sales xem được hợp đồng nhưng không huỷ được bản ghi -- việc đó của
+        // Admin. Trước đây cờ này tính theo trạng thái ngày tháng (BR-46 cũ).
+        verify(request).setAttribute("canVoid", false);
         verify(dispatcher).forward(request, response);
         verify(response, never()).sendRedirect(anyString());
     }
@@ -195,7 +196,7 @@ public class ContractControllerTest {
 
         controller.doPost(request, response);
 
-        verify(contractDAO, never()).insert(any());
+        verify(contractDAO, never()).insert(any(), anyInt());
         // Redirect mang theo kind: mất nó là form tạo lại mở sai chiều, và ô
         // "Khách hàng" liệt kê nhầm nhóm đối tác.
         verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=new&kind=sell&error=invalid");
@@ -211,7 +212,7 @@ public class ContractControllerTest {
 
         controller.doPost(request, response);
 
-        verify(contractDAO, never()).insert(any());
+        verify(contractDAO, never()).insert(any(), anyInt());
         // Redirect mang theo kind: mất nó là form tạo lại mở sai chiều, và ô
         // "Khách hàng" liệt kê nhầm nhóm đối tác.
         verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=new&kind=sell&error=invalid");
@@ -222,11 +223,11 @@ public class ContractControllerTest {
         when(request.getParameter("action")).thenReturn("create");
         stubValidContractFields();
         when(contractDAO.generateNextContractCode()).thenReturn("HD-0001");
-        when(contractDAO.insert(any(Contract.class))).thenReturn(77);
+        when(contractDAO.insert(any(Contract.class), anyInt())).thenReturn(77);
 
         controller.doPost(request, response);
 
-        verify(contractDAO).insert(any(Contract.class));
+        verify(contractDAO).insert(any(Contract.class), anyInt());
         verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=view&id=77");
     }
 
@@ -239,7 +240,7 @@ public class ContractControllerTest {
         controller.doPost(request, response);
 
         verify(response).sendError(eq(HttpServletResponse.SC_FORBIDDEN), anyString());
-        verify(contractDAO, never()).insert(any());
+        verify(contractDAO, never()).insert(any(), anyInt());
     }
 
     @Test
@@ -250,7 +251,7 @@ public class ContractControllerTest {
 
         controller.doPost(request, response);
 
-        verify(contractDAO, never()).update(any());
+        verify(contractDAO, never()).update(any(), anyInt());
         verify(response).sendRedirect(CONTEXT_PATH + "/contract?error=notfound");
     }
 
@@ -260,11 +261,11 @@ public class ContractControllerTest {
         when(request.getParameter("contractId")).thenReturn("5");
         when(contractDAO.findById(5)).thenReturn(new Contract());
         stubValidContractFields();
-        when(contractDAO.update(any(Contract.class))).thenReturn(true);
+        when(contractDAO.update(any(Contract.class), anyInt())).thenReturn(true);
 
         controller.doPost(request, response);
 
-        verify(contractDAO).update(argThat((Contract c) -> c.getContractId() == 5));
+        verify(contractDAO).update(argThat((Contract c) -> c.getContractId() == 5), anyInt());
         verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=view&id=5");
     }
 
@@ -288,12 +289,12 @@ public class ContractControllerTest {
         when(request.getParameter("kind")).thenReturn("buy");
         when(customerDAO.findRolesOf(10)).thenReturn(List.of("Nhà cung cấp"));
         when(contractDAO.generateNextContractCode()).thenReturn("HD-0001");
-        when(contractDAO.insert(any(Contract.class))).thenReturn(5);
+        when(contractDAO.insert(any(Contract.class), anyInt())).thenReturn(5);
 
         controller.doPost(request, response);
 
         ArgumentCaptor<Contract> saved = ArgumentCaptor.forClass(Contract.class);
-        verify(contractDAO).insert(saved.capture());
+        verify(contractDAO).insert(saved.capture(), anyInt());
         assertEquals("Mua", saved.getValue().getDirection());
     }
 
@@ -311,7 +312,7 @@ public class ContractControllerTest {
 
         controller.doPost(request, response);
 
-        verify(contractDAO, never()).insert(any());
+        verify(contractDAO, never()).insert(any(), anyInt());
         verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=new&kind=sell&error=invalid");
     }
 
@@ -323,11 +324,11 @@ public class ContractControllerTest {
         when(request.getParameter("kind")).thenReturn("buy");
         when(customerDAO.findRolesOf(10)).thenReturn(List.of("Khách mua", "Nhà cung cấp"));
         when(contractDAO.generateNextContractCode()).thenReturn("HD-0001");
-        when(contractDAO.insert(any(Contract.class))).thenReturn(5);
+        when(contractDAO.insert(any(Contract.class), anyInt())).thenReturn(5);
 
         controller.doPost(request, response);
 
-        verify(contractDAO).insert(any(Contract.class));
+        verify(contractDAO).insert(any(Contract.class), anyInt());
     }
 
     /**
@@ -364,32 +365,57 @@ public class ContractControllerTest {
     }
 
     // ------------------------------------------------------------------
-    // POST ?action=delete (BR-46)
+    // POST ?action=delete -- huỷ bản ghi NHẬP NHẦM (thay cho BR-46 cũ)
     // ------------------------------------------------------------------
+    //
+    // BR-46 cũ cho Sales xoá hợp đồng khi trạng thái là "Chưa hiệu lực". Điều
+    // kiện đó tính theo LỊCH, nên hợp đồng ký hôm qua và hiệu lực tháng sau vẫn
+    // xoá được cùng toàn bộ nội dung đã ký. Điều kiện đúng phải là chưa ký, mà
+    // signing_date NOT NULL nên không bản ghi nào chưa ký -- xoá theo nghĩa
+    // nghiệp vụ không còn tồn tại. Thứ còn lại là sửa hậu quả nhập liệu sai:
+    // Admin, có lý do, có dấu vết.
 
     @Test
-    public void delete_contractNotDeletable_blocksDeletion() throws Exception {
+    public void delete_salesRole_isRefusedEvenForAnExistingContract() throws Exception {
         when(request.getParameter("action")).thenReturn("delete");
         when(request.getParameter("id")).thenReturn("5");
+        when(request.getParameter("voidReason")).thenReturn("Nhập trùng");
         when(contractDAO.findById(5)).thenReturn(new Contract());
-        when(contractDAO.canDelete(5)).thenReturn(false);
 
         controller.doPost(request, response);
 
-        verify(contractDAO, never()).softDelete(anyInt());
-        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=view&id=5&error=cannot_delete");
+        // loginAs("Sales") ở setUp: có Full access trên CONTRACT nhưng vẫn
+        // không được huỷ bản ghi. Đây là ranh giới mới, dễ bị xoá nhầm khi ai
+        // đó "dọn" requireAdmin về lại requireFullAccess cho đồng bộ.
+        verify(contractDAO, never()).voidRecord(anyInt(), anyInt(), anyString());
     }
 
     @Test
-    public void delete_contractDeletable_softDeletesAndRedirectsToList() throws Exception {
+    public void delete_adminWithoutReason_isRefused() throws Exception {
+        loginAs("Admin");
         when(request.getParameter("action")).thenReturn("delete");
         when(request.getParameter("id")).thenReturn("5");
+        when(request.getParameter("voidReason")).thenReturn("   ");
         when(contractDAO.findById(5)).thenReturn(new Contract());
-        when(contractDAO.canDelete(5)).thenReturn(true);
 
         controller.doPost(request, response);
 
-        verify(contractDAO).softDelete(5);
+        verify(contractDAO, never()).voidRecord(anyInt(), anyInt(), anyString());
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=view&id=5&error=void_reason_required");
+    }
+
+    @Test
+    public void delete_adminWithReason_voidsRecordAndRedirectsToList() throws Exception {
+        loginAs("Admin");
+        when(request.getParameter("action")).thenReturn("delete");
+        when(request.getParameter("id")).thenReturn("5");
+        when(request.getParameter("voidReason")).thenReturn("Nhập trùng với HD-0042");
+        when(contractDAO.findById(5)).thenReturn(new Contract());
+        when(contractDAO.voidRecord(eq(5), anyInt(), anyString())).thenReturn(true);
+
+        controller.doPost(request, response);
+
+        verify(contractDAO).voidRecord(5, 99, "Nhập trùng với HD-0042");
         verify(response).sendRedirect(CONTEXT_PATH + "/contract");
     }
 
@@ -405,7 +431,7 @@ public class ContractControllerTest {
 
         controller.doPost(request, response);
 
-        verify(contractDAO, never()).insertProducts(anyInt(), anyList());
+        verify(contractDAO, never()).insertProducts(anyInt(), anyList(), anyInt());
         verify(response).sendRedirect(CONTEXT_PATH + "/contract?error=notfound");
     }
 
@@ -420,7 +446,7 @@ public class ContractControllerTest {
 
         controller.doPost(request, response);
 
-        verify(contractDAO, never()).insertProducts(anyInt(), anyList());
+        verify(contractDAO, never()).insertProducts(anyInt(), anyList(), anyInt());
         verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=view&id=5&error=add_product_invalid");
     }
 
@@ -439,12 +465,12 @@ public class ContractControllerTest {
         Product product = new Product();
         product.setProductId(3);
         when(productDAO.findById(3)).thenReturn(product);
-        when(contractDAO.insertProducts(eq(5), anyList())).thenReturn(true);
+        when(contractDAO.insertProducts(eq(5), anyList(), anyInt())).thenReturn(true);
 
         controller.doPost(request, response);
 
         verify(contractDAO).insertProducts(eq(5), argThat((java.util.List<ContractProduct> items) ->
-                items.size() == 1 && items.get(0).getQuantity() == 1000));
+                items.size() == 1 && items.get(0).getQuantity() == 1000), anyInt());
         verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=view&id=5");
     }
 
@@ -461,7 +487,7 @@ public class ContractControllerTest {
 
         controller.doPost(request, response);
 
-        verify(contractDAO, never()).insertProducts(anyInt(), anyList());
+        verify(contractDAO, never()).insertProducts(anyInt(), anyList(), anyInt());
         verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=view&id=5&error=add_product_invalid");
     }
 
@@ -470,7 +496,7 @@ public class ContractControllerTest {
         when(request.getParameter("action")).thenReturn("removeProduct");
         when(request.getParameter("contractId")).thenReturn("5");
         when(request.getParameter("contractProductId")).thenReturn("42");
-        when(contractDAO.deleteProductLine(42, 5)).thenReturn(false);
+        when(contractDAO.deleteProductLine(42, 5, 99)).thenReturn(false);
 
         controller.doPost(request, response);
 
@@ -482,7 +508,7 @@ public class ContractControllerTest {
         when(request.getParameter("action")).thenReturn("removeProduct");
         when(request.getParameter("contractId")).thenReturn("5");
         when(request.getParameter("contractProductId")).thenReturn("42");
-        when(contractDAO.deleteProductLine(42, 5)).thenReturn(true);
+        when(contractDAO.deleteProductLine(42, 5, 99)).thenReturn(true);
 
         controller.doPost(request, response);
 
@@ -529,20 +555,21 @@ public class ContractControllerTest {
     }
 
     /**
-     * Xoá id không có thật: canDelete cũng trả false cho id đó, nên nếu kiểm
-     * ràng buộc trước thì người dùng nhận thông báo "không thể xoá" -- sai hẳn
-     * lý do. Phải báo không tìm thấy.
+     * Huỷ id không có thật: voidRecord cũng trả false cho id đó, nên nếu kiểm
+     * ràng buộc trước thì người dùng nhận thông báo "không huỷ được" -- sai hẳn
+     * lý do, tưởng là vướng nghiệp vụ. Phải báo không tìm thấy.
      */
     @Test
-    public void delete_contractNotFound_redirectsWithNotFoundNotCannotDelete() throws Exception {
+    public void delete_contractNotFound_redirectsWithNotFoundNotVoidFailed() throws Exception {
+        loginAs("Admin");
         when(request.getParameter("action")).thenReturn("delete");
         when(request.getParameter("id")).thenReturn("999999");
+        when(request.getParameter("voidReason")).thenReturn("Nhập nhầm");
         when(contractDAO.findById(999999)).thenReturn(null);
 
         controller.doPost(request, response);
 
-        verify(contractDAO, never()).canDelete(anyInt());
-        verify(contractDAO, never()).softDelete(anyInt());
+        verify(contractDAO, never()).voidRecord(anyInt(), anyInt(), anyString());
         verify(response).sendRedirect(CONTEXT_PATH + "/contract?error=notfound");
     }
 
@@ -555,7 +582,7 @@ public class ContractControllerTest {
 
         controller.doPost(request, response);
 
-        verify(contractDAO, never()).update(any(Contract.class));
+        verify(contractDAO, never()).update(any(Contract.class), anyInt());
         verify(response).sendRedirect(CONTEXT_PATH + "/contract?error=notfound");
     }
 

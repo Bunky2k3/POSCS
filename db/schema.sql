@@ -4487,6 +4487,32 @@ CREATE TABLE `contract_payments` (
   CONSTRAINT `fk_payment_contract` FOREIGN KEY (`contract_id`) REFERENCES `contracts` (`contract_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+DROP TABLE IF EXISTS `contract_history`;
+CREATE TABLE `contract_history` (
+  `history_id`  int NOT NULL AUTO_INCREMENT,
+  `contract_id` int NOT NULL,
+  -- 'Khởi tạo' | 'Sửa thông tin' | 'Thêm hàng hoá' | 'Gỡ hàng hoá' | 'Huỷ bản ghi'
+  -- Chuỗi tự do, không ENUM: vòng đời còn đang mở (thanh lý, phụ lục, bàn giao
+  -- liên phòng đều chưa làm). Danh sách hợp lệ ở ContractHistory.EVENT_*.
+  `event_type`  varchar(30) COLLATE utf8mb4_unicode_ci NOT NULL,
+  -- Câu mô tả ĐÃ DỰNG SẴN lúc ghi, không phải JSON diff dựng câu lúc đọc.
+  `detail`      varchar(500) COLLATE utf8mb4_unicode_ci NOT NULL,
+  -- Chỉ có giá trị với dòng chuyển trạng thái tiến độ; NULL với dòng sửa đổi.
+  `from_status` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `to_status`   varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `changed_by`  int NOT NULL,
+  `changed_at`  timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  -- Lý do do NGƯỜI DÙNG nhập, tách khỏi detail do hệ thống sinh.
+  `note`        text COLLATE utf8mb4_unicode_ci,
+  PRIMARY KEY (`history_id`),
+  KEY `idx_contract_history_contract` (`contract_id`),
+  KEY `changed_by` (`changed_by`),
+  -- KHÔNG cascade, khác technicalrequesthistory: lịch sử phải sống lâu hơn thứ
+  -- nó nói về. Xem đầu V23 để biết vì sao.
+  CONSTRAINT `fk_contract_history_contract` FOREIGN KEY (`contract_id`) REFERENCES `contracts` (`contract_id`),
+  CONSTRAINT `fk_contract_history_user` FOREIGN KEY (`changed_by`) REFERENCES `users` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 DROP TABLE IF EXISTS `customer_evaluation_rules`;
 CREATE TABLE `customer_evaluation_rules` (
   `rule_id`     int NOT NULL AUTO_INCREMENT,

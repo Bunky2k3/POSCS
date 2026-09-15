@@ -143,28 +143,78 @@ public class ContractStatusIntegrationTest {
     }
 
     @Test
-    public void canDelete_onlyAllowsContractsThatHaveNotTakenEffect() {
+    public void voidRecord_removesRowFromEveryQueryButKeepsItInTheTable() throws Exception {
         IntegrationDb.assumeAvailable();
 
-        // BR-46. Quy tắc này đọc trực tiếp effective_date/end_date bằng SQL,
-        // nên chỉ chạy thật mới kiểm được.
-        assertTrue("Hợp đồng chưa hiệu lực thì được xoá", contractDAO.canDelete(1));
-        assertFalse("Hợp đồng đang hiệu lực thì không", contractDAO.canDelete(2));
-        assertFalse("Hợp đồng sắp hết hạn thì không", contractDAO.canDelete(3));
-        assertFalse("Hợp đồng đã hết hạn thì không", contractDAO.canDelete(4));
-    }
+        assertTrue(contractDAO.voidRecord(1, Fixtures.USER_ID, "Nhập nhầm khi thử nghiệm"));
 
-    @Test
-    public void softDelete_removesRowFromEveryQueryButKeepsItInTheTable() throws Exception {
-        IntegrationDb.assumeAvailable();
-
-        assertTrue(contractDAO.softDelete(1));
-
-        assertEquals("Xoá mềm phải biến mất khỏi danh sách",
+        assertEquals("Bản ghi bị huỷ phải biến mất khỏi danh sách",
                 3, contractDAO.findAll(1, 50, null, null, null).size());
         assertEquals("...và khỏi bộ đếm phân trang", 3, contractDAO.countAll(null, null, null));
         assertNull("...và khỏi findById", contractDAO.findById(1));
         assertEquals("...nhưng dòng vẫn còn trong bảng, chỉ đánh dấu is_deleted",
                 1, IntegrationDb.count("contracts", "contract_id = 1 AND is_deleted = 1"));
+    }
+
+    /**
+     * Không còn điều kiện xoá theo trạng thái lịch (BR-46 cũ): hợp đồng nào
+     * cũng đã ký, nên huỷ được hay không là câu hỏi về QUYỀN, chặn ở
+     * ContractController chứ không ở DAO. Thứ DAO vẫn phải chặn là huỷ không lý
+     * do, và huỷ lại một bản ghi đã huỷ.
+     */
+    @Test
+    public void voidRecord_refusesBlankReasonAndDoubleVoid() throws Exception {
+        IntegrationDb.assumeAvailable();
+
+        assertFalse("Huỷ không lý do thì không được ghi gì",
+                contractDAO.voidRecord(2, Fixtures.USER_ID, "  "));
+        assertEquals(0, IntegrationDb.count("contracts", "contract_id = 2 AND is_deleted = 1"));
+
+        assertTrue(contractDAO.voidRecord(2, Fixtures.USER_ID, "Nhập trùng"));
+        assertFalse("Huỷ lần hai không được sinh thêm dòng nhật ký",
+                contractDAO.voidRecord(2, Fixtures.USER_ID, "Huỷ lại lần nữa"));
+        assertEquals(1, IntegrationDb.count("contract_history", "contract_id = 2"));
+    }
+
+    /**
+     * Nhật ký phải sống lâu hơn thứ nó nói về: contract_history cố ý KHÔNG có
+     * ON DELETE CASCADE, khác technicalrequesthistory. Kiểm ở đây vì ràng buộc
+     * khoá ngoại chỉ tồn tại trong CSDL thật -- test mock không chạy SQL nên
+     * không bao giờ thấy.
+     */
+    @Test
+    public void voidRecord_keepsTheHistoryRowAfterTheContractIsGone() throws Exception {
+        IntegrationDb.assumeAvailable();
+
+        assertTrue(contractDAO.voidRecord(3, Fixtures.USER_ID, "Khách huỷ đơn"));
+
+        assertEquals("Nhật ký vẫn tra được kể cả khi hợp đồng đã khuất khỏi mọi truy vấn",
+                1, contractDAO.findHistoryByContractId(3).size());
+        assertEquals("Lý do người dùng nhập phải nằm ở cột note, không lẫn vào detail",
+                1, IntegrationDb.count("contract_history",
+                        "contract_id = 3 AND note = 'Khách huỷ đơn'"));
+    }
+
+    /**
+     * Đường ghi đầy đủ của một lần sửa: giá trị cũ đọc trong transaction, câu
+     * mô tả dựng sẵn, và bấm Lưu mà không đổi gì thì KHÔNG sinh dòng nào.
+     */
+    @Test
+    public void update_writesOneHistoryRowDescribingWhatActuallyChanged() throws Exception {
+        IntegrationDb.assumeAvailable();
+
+        Contract c = contractDAO.findById(2);
+        c.setTitle("Tiêu đề đã sửa");
+        assertTrue(contractDAO.update(c, Fixtures.USER_ID));
+
+        List<poscs.model.ContractHistory> history = contractDAO.findHistoryByContractId(2);
+        assertEquals(1, history.size());
+        assertTrue("Nhật ký phải nói rõ đổi gì thành gì, không chỉ 'đã sửa'",
+                history.get(0).getDetail().contains("Tiêu đề đã sửa"));
+
+        // Lưu lại y nguyên: không có gì đổi thì dòng thời gian không được dài
+        // thêm, nếu không những lần sửa thật sẽ bị chôn giữa các dòng rỗng.
+        assertTrue(contractDAO.update(contractDAO.findById(2), Fixtures.USER_ID));
+        assertEquals(1, contractDAO.findHistoryByContractId(2).size());
     }
 }
