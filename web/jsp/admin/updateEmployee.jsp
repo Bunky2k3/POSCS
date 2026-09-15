@@ -143,7 +143,7 @@
 
                           CHỈ điền cho tầng lá. Địa bàn của quản lý vùng không
                           nhập tay mà suy ra bằng cách gộp địa bàn của cấp dưới
-                          (xem TerritoryDAO.findProvincesManagedBy) -- nhập cả
+                          (xem EmployeeDAO.findProvincesManagedBy) -- nhập cả
                           hai tầng là tạo hai nguồn sự thật rồi có ngày lệch nhau.
                         --%>
                         <div class="col-12 field-row">

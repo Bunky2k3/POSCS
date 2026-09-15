@@ -50,7 +50,6 @@ public class EmployeeController extends HttpServlet {
             "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
 
     private final EmployeeDAO employeeDAO = new EmployeeDAO();
-    private final poscs.dao.TerritoryDAO territoryDAO = new poscs.dao.TerritoryDAO();
     private final AddressDAO addressDAO = new AddressDAO();
 
     @Override
@@ -155,8 +154,8 @@ public class EmployeeController extends HttpServlet {
         // Địa bàn trực tiếp cầm, và -- nếu người này là cấp trên -- địa bàn
         // suy ra từ cấp dưới. Hai thứ khác nhau nên hiện tách bạch: tầng lá
         // cầm tỉnh, quản lý vùng KHÔNG nhập tay mà bao phủ theo cấp dưới.
-        request.setAttribute("assignedProvinces", territoryDAO.findProvincesOf(id));
-        request.setAttribute("managedProvinces", territoryDAO.findProvincesManagedBy(id));
+        request.setAttribute("assignedProvinces", employeeDAO.findProvincesOf(id));
+        request.setAttribute("managedProvinces", employeeDAO.findProvincesManagedBy(id));
         request.getRequestDispatcher(DETAIL_VIEW).forward(request, response);
     }
 
@@ -169,7 +168,7 @@ public class EmployeeController extends HttpServlet {
     private void showCreateForm(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
         request.setAttribute("managerList", employeeDAO.findEligibleManagers(null));
-        request.setAttribute("selectableProvinces", territoryDAO.findSelectableProvinces(null));
+        request.setAttribute("selectableProvinces", employeeDAO.findSelectableProvinces(null));
         request.setAttribute("roleList", employeeDAO.findAllRoles());
         request.setAttribute("departmentList", employeeDAO.findAllDepartments());
         request.setAttribute("provinceList", addressDAO.findAllProvinces());
@@ -186,8 +185,8 @@ public class EmployeeController extends HttpServlet {
         }
         request.setAttribute("employee", employee);
         request.setAttribute("managerList", employeeDAO.findEligibleManagers(id));
-        request.setAttribute("selectableProvinces", territoryDAO.findSelectableProvinces(id));
-        request.setAttribute("assignedProvinces", territoryDAO.findProvincesOf(id));
+        request.setAttribute("selectableProvinces", employeeDAO.findSelectableProvinces(id));
+        request.setAttribute("assignedProvinces", employeeDAO.findProvincesOf(id));
         request.setAttribute("roleList", employeeDAO.findAllRoles());
         request.setAttribute("departmentList", employeeDAO.findAllDepartments());
         request.setAttribute("provinceList", addressDAO.findAllProvinces());
@@ -233,7 +232,7 @@ public class EmployeeController extends HttpServlet {
 
         int newId = employeeDAO.insert(u);
         if (newId > 0) {
-            territoryDAO.replaceProvincesOf(newId, parseIntList(request.getParameterValues("provinceIds")));
+            employeeDAO.replaceProvincesOf(newId, parseIntList(request.getParameterValues("provinceIds")));
         }
         if (newId <= 0) {
             LOG.warn("Tao nhan vien that bai (actor={}, username={})", Logs.actor(request), u.getUsername());
@@ -324,7 +323,7 @@ public class EmployeeController extends HttpServlet {
         boolean ok = employeeDAO.update(u);
         if (ok) {
             // Địa bàn lưu ở bảng riêng nên phải ghi tách khỏi hồ sơ nhân viên.
-            territoryDAO.replaceProvincesOf(id, parseIntList(request.getParameterValues("provinceIds")));
+            employeeDAO.replaceProvincesOf(id, parseIntList(request.getParameterValues("provinceIds")));
         }
         if (!ok) {
             LOG.warn("Cap nhat nhan vien that bai (actor={}, userId={})", Logs.actor(request), id);
