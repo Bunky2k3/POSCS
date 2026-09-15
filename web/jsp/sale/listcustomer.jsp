@@ -295,9 +295,12 @@
             </div>
             <select id="filterType" name="type">
                 <option value="">Tất cả loại khách hàng</option>
-                <option value="Nhà mạng viễn thông" ${typeFilter == 'Nhà mạng viễn thông' ? 'selected' : ''}>Nhà mạng viễn thông</option>
-                <option value="Nhà thầu thi công" ${typeFilter == 'Nhà thầu thi công' ? 'selected' : ''}>Nhà thầu thi công</option>
-                <option value="Đại lý phân phối" ${typeFilter == 'Đại lý phân phối' ? 'selected' : ''}>Đại lý phân phối</option>
+                <%-- Danh sách khác nhau theo vai: khách mua phân theo họ là nhà
+                     mạng / nhà thầu / đại lý, còn nhà cung cấp phân theo họ sản
+                     xuất / nhập khẩu / phân phối. Xem CustomerController. --%>
+                <c:forEach var="ct" items="${customerTypeOptions}">
+                    <option value="${fn:escapeXml(ct)}" ${typeFilter == ct ? 'selected' : ''}>${fn:escapeXml(ct)}</option>
+                </c:forEach>
             </select>
             <select id="filterAssignee" name="assigneeId">
                 <%-- Nhãn nói rõ "chính": bộ lọc chỉ soi cột phụ trách chính,
@@ -307,12 +310,19 @@
                     <option value="${staff.userId}" ${assigneeFilter == staff.userId ? 'selected' : ''}>${fn:escapeXml(staff.fullName)}</option>
                 </c:forEach>
             </select>
-            <select id="filterProvince" name="provinceId">
-                <option value="">Tất cả tỉnh địa bàn</option>
-                <c:forEach var="province" items="${provinceList}">
-                    <option value="${province.provinceId}" ${provinceFilter == province.provinceId ? 'selected' : ''}>${fn:escapeXml(province.shortName)}</option>
-                </c:forEach>
-            </select>
+            <%-- Nhà cung cấp KHÔNG lọc theo tỉnh. Tỉnh ở đây là địa bàn BÁN
+                 HÀNG -- nó quyết định ai cầm khách nào (user_provinces); bên bán
+                 hàng cho mình thì không chia theo địa bàn. Controller cũng bỏ
+                 luôn tham số đó với vai này, nên URL còn sót provinceId cũng
+                 không âm thầm cắt mất kết quả. --%>
+            <c:if test="${showProvinceFilter}">
+                <select id="filterProvince" name="provinceId">
+                    <option value="">Tất cả tỉnh địa bàn</option>
+                    <c:forEach var="province" items="${provinceList}">
+                        <option value="${province.provinceId}" ${provinceFilter == province.provinceId ? 'selected' : ''}>${fn:escapeXml(province.shortName)}</option>
+                    </c:forEach>
+                </select>
+            </c:if>
         </form>
 
         <!-- ===== Bảng danh sách ===== -->
@@ -502,7 +512,12 @@
         // Tự động submit lại form lọc khi đổi loại KH / người phụ trách
         document.getElementById('filterType').addEventListener('change', function () { document.getElementById('filterForm').submit(); });
         document.getElementById('filterAssignee').addEventListener('change', function () { document.getElementById('filterForm').submit(); });
-        document.getElementById('filterProvince').addEventListener('change', function () { document.getElementById('filterForm').submit(); });
+        // Ô tỉnh không có ở màn Nhà cung cấp -- gắn sự kiện lên null là vỡ
+        // toàn bộ đoạn script phía sau, kể cả các bộ lọc khác.
+        var provinceSelect = document.getElementById('filterProvince');
+        if (provinceSelect) {
+            provinceSelect.addEventListener('change', function () { document.getElementById('filterForm').submit(); });
+        }
     </script>
 
     <script src="${pageContext.request.contextPath}/js/appshell.js"></script>

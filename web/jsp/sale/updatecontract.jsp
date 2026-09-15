@@ -181,9 +181,11 @@
                         <label>Loại hợp đồng <span class="req">*</span></label>
                         <select class="form-select" id="contractType" name="contractType">
                             <option value="">-- Chọn loại hợp đồng --</option>
-                            <option value="Cung cấp thiết bị" ${contract.contractType == 'Cung cấp thiết bị' ? 'selected' : ''}>Cung cấp thiết bị</option>
-                            <option value="Thi công lắp đặt" ${contract.contractType == 'Thi công lắp đặt' ? 'selected' : ''}>Thi công lắp đặt</option>
-                            <option value="Bảo trì bảo dưỡng" ${contract.contractType == 'Bảo trì bảo dưỡng' ? 'selected' : ''}>Bảo trì bảo dưỡng</option>
+                            <%-- Loại hợp đồng theo CHIỀU: hợp đồng mua không dùng chung bộ
+                                 chữ với hợp đồng bán. Xem ContractController. --%>
+                            <c:forEach var="ct" items="${contractTypeOptions}">
+                                <option value="${fn:escapeXml(ct)}" ${contract.contractType == ct ? 'selected' : ''}>${fn:escapeXml(ct)}</option>
+                            </c:forEach>
                         </select>
                         <span class="error-text" id="err-contractType">Vui lòng chọn loại hợp đồng.</span>
                     </div>

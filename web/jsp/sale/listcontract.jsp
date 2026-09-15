@@ -263,16 +263,23 @@
             </select>
             <select id="filterType" name="type">
                 <option value="">Tất cả loại hợp đồng</option>
-                <option value="Cung cấp thiết bị" ${typeFilter == 'Cung cấp thiết bị' ? 'selected' : ''}>Cung cấp thiết bị</option>
-                <option value="Thi công lắp đặt" ${typeFilter == 'Thi công lắp đặt' ? 'selected' : ''}>Thi công lắp đặt</option>
-                <option value="Bảo trì bảo dưỡng" ${typeFilter == 'Bảo trì bảo dưỡng' ? 'selected' : ''}>Bảo trì bảo dưỡng</option>
-            </select>
-            <select id="filterProvince" name="provinceId">
-                <option value="">Tất cả tỉnh địa bàn</option>
-                <c:forEach var="province" items="${provinceList}">
-                    <option value="${province.provinceId}" ${provinceFilter == province.provinceId ? 'selected' : ''}>${fn:escapeXml(province.shortName)}</option>
+                <%-- Loại hợp đồng theo CHIỀU: hợp đồng mua không dùng chung bộ
+                     chữ với hợp đồng bán. Xem ContractController. --%>
+                <c:forEach var="ct" items="${contractTypeOptions}">
+                    <option value="${fn:escapeXml(ct)}" ${typeFilter == ct ? 'selected' : ''}>${fn:escapeXml(ct)}</option>
                 </c:forEach>
             </select>
+<%-- Hợp đồng MUA không lọc theo tỉnh: tỉnh suy ra từ địa chỉ đối tác,
+                 mà đối tác của hợp đồng mua là nhà cung cấp -- nhóm không chia
+                 theo địa bàn. --%>
+            <c:if test="${showProvinceFilter}">
+                <select id="filterProvince" name="provinceId">
+                    <option value="">Tất cả tỉnh địa bàn</option>
+                    <c:forEach var="province" items="${provinceList}">
+                        <option value="${province.provinceId}" ${provinceFilter == province.provinceId ? 'selected' : ''}>${fn:escapeXml(province.shortName)}</option>
+                    </c:forEach>
+                </select>
+            </c:if>
             <select id="filterYear" name="year">
                 <option value="">Mọi thời điểm</option>
                 <c:forEach var="y" items="${yearList}">
@@ -457,7 +464,12 @@
         document.getElementById('filterStatus').addEventListener('change', function () { document.getElementById('filterForm').submit(); });
         document.getElementById('filterProgress').addEventListener('change', function () { document.getElementById('filterForm').submit(); });
         document.getElementById('filterType').addEventListener('change', function () { document.getElementById('filterForm').submit(); });
-        document.getElementById('filterProvince').addEventListener('change', function () { document.getElementById('filterForm').submit(); });
+        // Ô tỉnh không có ở mục Hợp đồng mua -- gắn sự kiện lên null là vỡ
+        // cả đoạn script phía sau, kể cả các bộ lọc khác.
+        var provinceSelect = document.getElementById('filterProvince');
+        if (provinceSelect) {
+            provinceSelect.addEventListener('change', function () { document.getElementById('filterForm').submit(); });
+        }
         document.getElementById('filterYear').addEventListener('change', function () { document.getElementById('filterForm').submit(); });
         document.getElementById('filterPeriod').addEventListener('change', function () { document.getElementById('filterForm').submit(); });
     </script>

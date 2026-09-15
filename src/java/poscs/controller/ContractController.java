@@ -75,6 +75,27 @@ public class ContractController extends HttpServlet {
     private static final String ROLE_BUYER = "Khách mua";
     private static final String ROLE_SUPPLIER = "Nhà cung cấp";
 
+    /**
+     * Loại hợp đồng, TÁCH THEO CHIỀU.
+     *
+     * <p>Bộ cũ -- "Cung cấp thiết bị", "Thi công lắp đặt", "Bảo trì bảo dưỡng"
+     * -- viết từ góc nhìn người BÁN. Gắn nguyên bộ đó lên một hợp đồng MUA thì
+     * câu chữ nói ngược: mình đi mua thiết bị chứ không "cung cấp" cho ai, và
+     * mình thuê người thi công chứ không đi thi công.
+     *
+     * <p>Gom về đây thay vì chép cứng trong JSP: trước đó cùng ba lựa chọn nằm
+     * ở listcontract, addnewcontract và updatecontract.
+     */
+    private static final java.util.List<String> SELL_CONTRACT_TYPES = java.util.List.of(
+            "Cung cấp thiết bị", "Thi công lắp đặt", "Bảo trì bảo dưỡng");
+
+    private static final java.util.List<String> BUY_CONTRACT_TYPES = java.util.List.of(
+            "Mua thiết bị", "Mua vật tư", "Thuê thi công lắp đặt", "Thuê bảo trì");
+
+    private static java.util.List<String> contractTypesFor(String direction) {
+        return DIRECTION_BUY.equals(direction) ? BUY_CONTRACT_TYPES : SELL_CONTRACT_TYPES;
+    }
+
     private static final String LIST_VIEW = "/jsp/sale/listcontract.jsp";
     private static final String DETAIL_VIEW = "/jsp/sale/viewcontractdetail.jsp";
     private static final String CREATE_VIEW = "/jsp/sale/addnewcontract.jsp";
@@ -203,6 +224,16 @@ public class ContractController extends HttpServlet {
         Period period = Period.parse(request.getParameter("year"), request.getParameter("period"));
         // Chiều đứng ĐỘC LẬP với kỳ -- hai mục con vẫn lọc được theo năm/quý/tháng.
         String direction = directionFromKind(request.getParameter("kind"));
+        // Hợp đồng MUA không lọc theo tỉnh. Tỉnh của hợp đồng suy ra từ địa chỉ
+        // đối tác đứng tên, mà với hợp đồng mua thì đối tác là NHÀ CUNG CẤP --
+        // nhóm không chia theo địa bàn (xem CustomerController). Lọc theo tỉnh
+        // ở đó vừa vô nghĩa vừa cắt mất kết quả.
+        //
+        // Bỏ ở controller chứ không chỉ ẩn ô chọn: một provinceId còn sót trên
+        // URL vẫn âm thầm thu hẹp danh sách.
+        if (DIRECTION_BUY.equals(direction)) {
+            provinceFilter = null;
+        }
         // Trục tiến độ: độc lập với trục lịch (status) và với kỳ. Một hợp đồng
         // "Đã hết hạn" theo lịch mà vẫn "Đã ký" theo tiến độ chính là việc còn
         // tồn -- lọc được hai trục riêng thì mới nhìn ra chỗ đó.
@@ -229,9 +260,14 @@ public class ContractController extends HttpServlet {
         request.setAttribute("keyword", keyword);
         request.setAttribute("statusFilter", statusFilter);
         request.setAttribute("progressFilter", progressFilter);
+        // Loại hợp đồng khác nhau theo chiều -- xem SELL_CONTRACT_TYPES /
+        // BUY_CONTRACT_TYPES. JSP dựng dropdown từ đây thay vì chép cứng.
+        request.setAttribute("contractTypeOptions", contractTypesFor(direction));
+        request.setAttribute("showProvinceFilter", !DIRECTION_BUY.equals(direction));
         request.setAttribute("typeFilter", typeFilter);
         request.setAttribute("provinceFilter", provinceFilter);
         request.setAttribute("kind", DIRECTION_BUY.equals(direction) ? "buy" : "sell");
+        request.setAttribute("contractTypeOptions", contractTypesFor(direction));
         setPeriodAttributes(request, period);
 
         request.getRequestDispatcher(LIST_VIEW).forward(request, response);
@@ -282,6 +318,16 @@ public class ContractController extends HttpServlet {
         // phải gom các hợp đồng cùng tỉnh lại với nhau.
         // Xuất đúng danh sách đang xem, giữ nguyên cả kỳ lẫn chiều.
         String direction = directionFromKind(request.getParameter("kind"));
+        // Hợp đồng MUA không lọc theo tỉnh. Tỉnh của hợp đồng suy ra từ địa chỉ
+        // đối tác đứng tên, mà với hợp đồng mua thì đối tác là NHÀ CUNG CẤP --
+        // nhóm không chia theo địa bàn (xem CustomerController). Lọc theo tỉnh
+        // ở đó vừa vô nghĩa vừa cắt mất kết quả.
+        //
+        // Bỏ ở controller chứ không chỉ ẩn ô chọn: một provinceId còn sót trên
+        // URL vẫn âm thầm thu hẹp danh sách.
+        if (DIRECTION_BUY.equals(direction)) {
+            provinceFilter = null;
+        }
         List<Contract> all = contractDAO.findAll(1, Integer.MAX_VALUE, keyword, statusFilter, typeFilter,
                 provinceFilter, true, period, direction, request.getParameter("progress"));
         // Giữ cột "Mã HĐ" trong file dù danh sách trên màn hình đã bỏ -- xem lý do
@@ -740,6 +786,7 @@ public class ContractController extends HttpServlet {
         setDropdownAttributes(request, null, direction, null);
         request.setAttribute("direction", direction);
         request.setAttribute("kind", DIRECTION_BUY.equals(direction) ? "buy" : "sell");
+        request.setAttribute("contractTypeOptions", contractTypesFor(direction));
         request.getRequestDispatcher(CREATE_VIEW).forward(request, response);
     }
 
@@ -764,6 +811,7 @@ public class ContractController extends HttpServlet {
                 contract.getDirection(), contract.getEnterpriseId());
         request.setAttribute("direction", contract.getDirection());
         request.setAttribute("kind", DIRECTION_BUY.equals(contract.getDirection()) ? "buy" : "sell");
+        request.setAttribute("contractTypeOptions", contractTypesFor(contract.getDirection()));
 
         // Đây mới là trang có nút bấm. Trang xem dùng cùng dữ liệu này nhưng
         // không đặt cờ nào, nên không mọc nút.
