@@ -309,14 +309,17 @@ public class ContractController extends HttpServlet {
                 provinceFilter, true, period, direction, request.getParameter("progress"));
         // Giữ cột "Mã HĐ" trong file dù danh sách trên màn hình đã bỏ -- xem lý do
         // ở CustomerController.exportExcel: STT chỉ đúng trong phạm vi một file.
-        String[] headers = {"STT", "Mã HĐ", "Tiêu đề", "Loại HĐ", "Tỉnh/Thành phố", "Khách hàng", "Người phụ trách",
-            "Ngày ký", "Ngày hiệu lực", "Ngày kết thúc", "Trạng thái"};
+        String[] headers = {"STT", "Mã HĐ", "Số hợp đồng", "Tiêu đề", "Loại HĐ", "Tỉnh/Thành phố", "Khách hàng",
+            "Người phụ trách", "Ngày ký", "Ngày hiệu lực", "Ngày kết thúc", "Trạng thái", "Tiến độ"};
         List<Object[]> rows = new ArrayList<>();
         int stt = 1;
         for (Contract c : all) {
             rows.add(new Object[]{
                 stt++,
                 c.getContractCode(),
+                // Số trên giấy: để cạnh mã nội bộ chứ không thay nó, vì người đọc
+                // file cần đối chiếu được với cả hệ thống lẫn tệp hồ sơ giấy.
+                c.getContractNumber() != null ? c.getContractNumber() : "",
                 c.getTitle(),
                 c.getContractType(),
                 provinceNameOf(c),
@@ -325,7 +328,8 @@ public class ContractController extends HttpServlet {
                 c.getSigningDate() != null ? c.getSigningDate().toString() : "",
                 c.getEffectiveDate() != null ? c.getEffectiveDate().toString() : "",
                 c.getEndDate() != null ? c.getEndDate().toString() : "",
-                c.getStatus()
+                c.getStatus(),
+                c.getProgressStatus()
             });
         }
         ExcelUtil.writeWorkbook(response,
@@ -1214,6 +1218,10 @@ public class ContractController extends HttpServlet {
      * cáo lặng lẽ đổi nghĩa.
      */
     private Contract buildContractFromRequest(HttpServletRequest request, Contract c) {
+        // Số hợp đồng THẬT (ghi trên giấy) -- khác contract_code là mã nội bộ
+        // do generateNextContractCode() sinh. Người dùng nhập, có thể để trống
+        // ở bản nháp vì số thường chỉ được cấp lúc ký.
+        c.setContractNumber(emptyToNull(request.getParameter("contractNumber")));
         c.setTitle(emptyToNull(request.getParameter("title")));
         c.setContractType(emptyToNull(request.getParameter("contractType")));
         c.setSigningDate(parseDateOrNull(request.getParameter("signDate")));

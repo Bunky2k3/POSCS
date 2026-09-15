@@ -94,6 +94,19 @@
 
                 <div class="section-header"><h5>Thông tin chung</h5></div>
                 <div class="row">
+                    <%-- Số hợp đồng THẬT, in trên bản giấy. Khác mã HD-xxxx mà hệ
+                         thống tự sinh: mã kia là định danh nội bộ, còn đây là thứ
+                         khách hàng đọc khi gọi điện. Không bắt buộc -- bản nháp
+                         thường chưa được cấp số, điền sau khi ký cũng được. --%>
+                    <div class="col-12 field-row">
+                        <label>Số hợp đồng</label>
+                        <input type="text" class="form-control" id="contractNumber" name="contractNumber"
+                               maxlength="100" placeholder="VD: 123/2026/HĐKT-POSTEF">
+                        <span style="font-size:0.78rem; color:#9ca3af; display:block; margin-top:6px;">
+                            Số ghi trên bản hợp đồng giấy. Mã HD-xxxx của hệ thống vẫn sinh tự động, không thay thế số này.
+                        </span>
+                    </div>
+
                     <div class="col-12 field-row">
                         <label>Tiêu đề hợp đồng <span class="req">*</span></label>
                         <input type="text" class="form-control" id="title" name="title" placeholder="VD: Cung cấp cáp quang OM4 đợt 2">

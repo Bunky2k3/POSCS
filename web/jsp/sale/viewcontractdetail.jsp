@@ -245,6 +245,13 @@
                 <div class="doc-icon"><i class="fa-solid fa-file-contract"></i></div>
                 <div>
                     <span class="contract-code">${fn:escapeXml(contract.contractCode)}</span>
+                    <%-- Số trên giấy đứng cạnh mã nội bộ, không thay nó: khi đối chiếu
+                         với tệp hồ sơ giấy thì người ta tra theo số này. --%>
+                    <c:if test="${not empty contract.contractNumber}">
+                        <span class="contract-code" style="color:#6b7280; font-weight:600;">
+                            &middot; Số HĐ: ${fn:escapeXml(contract.contractNumber)}
+                        </span>
+                    </c:if>
                     <h2>
                         ${fn:escapeXml(contract.title)}
                         <span class="type-badge">${fn:escapeXml(contract.contractType)}</span>

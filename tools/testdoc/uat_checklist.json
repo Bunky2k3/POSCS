@@ -135,6 +135,15 @@
       ]
     },
     {
+      "m": "Quản lý hợp đồng",
+      "c": "Ghi được số hợp đồng thật in trên bản giấy (khác mã HD-xxxx hệ thống tự sinh), để trống cũng lưu được, và tìm kiếm được theo số đó",
+      "ref": [
+        "TC_CTRADD_014",
+        "TC_CTRADD_015",
+        "TC_CTRLIST_011"
+      ]
+    },
+    {
       "m": "Vòng đời hợp đồng",
       "c": "Hợp đồng mới ra bản nháp chưa có ngày ký; ký là một bước riêng mà nhân viên có cấp trên không bấm được; thanh lý phải có căn cứ và sau đó không ai sửa được nữa, kể cả Admin",
       "ref": [

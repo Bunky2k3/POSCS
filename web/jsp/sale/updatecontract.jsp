@@ -94,6 +94,13 @@
                 <div class="section-header"><h5>Thông tin chung</h5></div>
                 <div class="row">
                     <div class="col-12 field-row">
+                        <label>Số hợp đồng</label>
+                        <input type="text" class="form-control" id="contractNumber" name="contractNumber"
+                               maxlength="100" placeholder="VD: 123/2026/HĐKT-POSTEF"
+                               value="${fn:escapeXml(contract.contractNumber)}">
+                    </div>
+
+                    <div class="col-12 field-row">
                         <label>Tiêu đề hợp đồng <span class="req">*</span></label>
                         <input type="text" class="form-control" id="title" name="title" value="${fn:escapeXml(contract.title)}">
                         <span class="error-text" id="err-title">Tiêu đề không được để trống.</span>

@@ -110,7 +110,7 @@ public class ContractDAO {
         "LEFT JOIN provinces p ON d.province_id = p.province_id ";
 
     private static final String SELECT_BASE =
-        "SELECT c.contract_id, c.contract_code, c.title, c.contract_type, c.direction, c.signing_date, " +
+        "SELECT c.contract_id, c.contract_code, c.contract_number, c.title, c.contract_type, c.direction, c.signing_date, " +
         "       c.effective_date, c.end_date, c.enterprise_id, c.owner_id, c.attachment_url, " +
         "       c.progress_status, c.created_at, c.updated_at, c.is_deleted, " +
         "       e.enterprise_name, p.province_id, p.province_name, " +
@@ -466,9 +466,9 @@ public class ContractDAO {
      */
     public int insert(Contract contract, int actorId) {
         String sql = "INSERT INTO contracts " +
-                "(contract_code, title, contract_type, direction, signing_date, effective_date, end_date, " +
+                "(contract_code, contract_number, title, contract_type, direction, signing_date, effective_date, end_date, " +
                 " enterprise_id, owner_id, attachment_url, status, progress_status) " +
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
         // contract_code sinh từ generateNextContractCode() (đọc mã lớn nhất hiện có
         // rồi +1) có thể trùng nếu 2 request tạo hợp đồng gần như đồng thời cùng
@@ -484,23 +484,24 @@ public class ContractDAO {
                     int newId = -1;
                     try (PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
                         ps.setString(1, contract.getContractCode());
-                        ps.setString(2, contract.getTitle());
-                        ps.setString(3, contract.getContractType());
-                        ps.setString(4, contract.getDirection());
-                        ps.setDate(5, contract.getSigningDate());
-                        ps.setDate(6, contract.getEffectiveDate());
-                        ps.setDate(7, contract.getEndDate());
-                        ps.setInt(8, contract.getEnterpriseId());
-                        ps.setInt(9, contract.getOwnerId());
-                        ps.setString(10, contract.getAttachmentUrl());
-                        ps.setString(11, computeStatus(contract.getEffectiveDate(), contract.getEndDate()));
+                        ps.setString(2, contract.getContractNumber());
+                        ps.setString(3, contract.getTitle());
+                        ps.setString(4, contract.getContractType());
+                        ps.setString(5, contract.getDirection());
+                        ps.setDate(6, contract.getSigningDate());
+                        ps.setDate(7, contract.getEffectiveDate());
+                        ps.setDate(8, contract.getEndDate());
+                        ps.setInt(9, contract.getEnterpriseId());
+                        ps.setInt(10, contract.getOwnerId());
+                        ps.setString(11, contract.getAttachmentUrl());
+                        ps.setString(12, computeStatus(contract.getEffectiveDate(), contract.getEndDate()));
                         // Hợp đồng mới LUÔN là bản nháp -- tạo không còn đồng
                         // nghĩa với ký. Đó là cách duy nhất diễn đạt được luật
                         // KH "nhân viên không tự ký hợp đồng được": trước đây
                         // signing_date là NOT NULL nên không có khoảnh khắc nào
                         // hợp đồng tồn tại mà chưa ký, và vì thế không có chỗ
                         // nào để chặn việc ký.
-                        ps.setString(12, PROGRESS_DRAFT);
+                        ps.setString(13, PROGRESS_DRAFT);
 
                         if (ps.executeUpdate() == 0) {
                             return -1;
@@ -606,7 +607,7 @@ public class ContractDAO {
      */
     public boolean update(Contract contract, int actorId) {
         String sql = "UPDATE contracts SET " +
-                "title = ?, contract_type = ?, signing_date = ?, effective_date = ?, end_date = ?, " +
+                "contract_number = ?, title = ?, contract_type = ?, signing_date = ?, effective_date = ?, end_date = ?, " +
                 "enterprise_id = ?, owner_id = ?, attachment_url = ?, status = ? " +
                 "WHERE contract_id = ? AND is_deleted = 0";
 
@@ -633,16 +634,17 @@ public class ContractDAO {
                 }
 
                 try (PreparedStatement ps = conn.prepareStatement(sql)) {
-                    ps.setString(1, contract.getTitle());
-                    ps.setString(2, contract.getContractType());
-                    ps.setDate(3, contract.getSigningDate());
-                    ps.setDate(4, contract.getEffectiveDate());
-                    ps.setDate(5, contract.getEndDate());
-                    ps.setInt(6, contract.getEnterpriseId());
-                    ps.setInt(7, contract.getOwnerId());
-                    ps.setString(8, contract.getAttachmentUrl());
-                    ps.setString(9, computeStatus(contract.getEffectiveDate(), contract.getEndDate()));
-                    ps.setInt(10, contract.getContractId());
+                    ps.setString(1, contract.getContractNumber());
+                    ps.setString(2, contract.getTitle());
+                    ps.setString(3, contract.getContractType());
+                    ps.setDate(4, contract.getSigningDate());
+                    ps.setDate(5, contract.getEffectiveDate());
+                    ps.setDate(6, contract.getEndDate());
+                    ps.setInt(7, contract.getEnterpriseId());
+                    ps.setInt(8, contract.getOwnerId());
+                    ps.setString(9, contract.getAttachmentUrl());
+                    ps.setString(10, computeStatus(contract.getEffectiveDate(), contract.getEndDate()));
+                    ps.setInt(11, contract.getContractId());
                     if (ps.executeUpdate() == 0) {
                         return false;
                     }
@@ -948,7 +950,7 @@ public class ContractDAO {
 
     /** Đọc và khoá bản ghi hợp đồng trong transaction đang mở; null nếu không có. */
     private Contract lockForUpdate(Connection conn, int contractId) throws SQLException {
-        String sql = "SELECT contract_id, contract_code, title, contract_type, direction, signing_date, " +
+        String sql = "SELECT contract_id, contract_code, contract_number, title, contract_type, direction, signing_date, " +
                 "       effective_date, end_date, enterprise_id, owner_id, attachment_url, progress_status " +
                 "FROM contracts WHERE contract_id = ? AND is_deleted = 0 FOR UPDATE";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -960,6 +962,7 @@ public class ContractDAO {
                 Contract c = new Contract();
                 c.setContractId(rs.getInt("contract_id"));
                 c.setContractCode(rs.getString("contract_code"));
+                c.setContractNumber(rs.getString("contract_number"));
                 c.setTitle(rs.getString("title"));
                 c.setContractType(rs.getString("contract_type"));
                 c.setDirection(rs.getString("direction"));
@@ -982,6 +985,7 @@ public class ContractDAO {
      */
     private String describeChanges(Connection conn, Contract before, Contract after) throws SQLException {
         List<String> parts = new ArrayList<>();
+        addChange(parts, "Số hợp đồng", before.getContractNumber(), after.getContractNumber());
         addChange(parts, "Tiêu đề", before.getTitle(), after.getTitle());
         addChange(parts, "Loại hợp đồng", before.getContractType(), after.getContractType());
         addChange(parts, "Ngày ký", formatDate(before.getSigningDate()), formatDate(after.getSigningDate()));
@@ -1080,8 +1084,12 @@ public class ContractDAO {
         conditions.add("c.is_deleted = 0");
 
         if (keyword != null && !keyword.trim().isEmpty()) {
-            conditions.add("(c.contract_code LIKE ? OR c.title LIKE ? OR e.enterprise_name LIKE ?)");
+            // Gộp cả số hợp đồng thật: khách gọi điện đọc số in trên giấy chứ
+            // không đọc mã nội bộ HD-xxxx, nên đó mới là thứ người dùng gõ vào
+            // ô tìm kiếm nhiều nhất.
+            conditions.add("(c.contract_code LIKE ? OR c.contract_number LIKE ? OR c.title LIKE ? OR e.enterprise_name LIKE ?)");
             String likeValue = "%" + keyword.trim() + "%";
+            params.add(likeValue);
             params.add(likeValue);
             params.add(likeValue);
             params.add(likeValue);
@@ -1156,6 +1164,7 @@ public class ContractDAO {
         Contract c = new Contract();
         c.setContractId(rs.getInt("contract_id"));
         c.setContractCode(rs.getString("contract_code"));
+        c.setContractNumber(rs.getString("contract_number"));
         c.setTitle(rs.getString("title"));
         c.setContractType(rs.getString("contract_type"));
         c.setSigningDate(rs.getDate("signing_date"));

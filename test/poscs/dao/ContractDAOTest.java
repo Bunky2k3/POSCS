@@ -575,7 +575,7 @@ public class ContractDAOTest {
                 Date.valueOf(LocalDate.now().plusDays(10)),
                 Date.valueOf(LocalDate.now().plusYears(1)));
 
-        verify(ps).setString(11, ContractDAO.STATUS_DRAFT);
+        verify(ps).setString(STATUS_PARAM_INDEX, ContractDAO.STATUS_DRAFT);
     }
 
     @Test
@@ -584,7 +584,7 @@ public class ContractDAOTest {
                 Date.valueOf(LocalDate.now().minusYears(2)),
                 Date.valueOf(LocalDate.now().minusDays(1)));
 
-        verify(ps).setString(11, ContractDAO.STATUS_EXPIRED);
+        verify(ps).setString(STATUS_PARAM_INDEX, ContractDAO.STATUS_EXPIRED);
     }
 
     @Test
@@ -593,7 +593,7 @@ public class ContractDAOTest {
                 Date.valueOf(LocalDate.now().minusMonths(6)),
                 Date.valueOf(LocalDate.now().plusDays(10)));
 
-        verify(ps).setString(11, ContractDAO.STATUS_SOON);
+        verify(ps).setString(STATUS_PARAM_INDEX, ContractDAO.STATUS_SOON);
     }
 
     @Test
@@ -602,14 +602,14 @@ public class ContractDAOTest {
                 Date.valueOf(LocalDate.now().minusMonths(6)),
                 Date.valueOf(LocalDate.now().plusDays(31)));
 
-        verify(ps).setString(11, ContractDAO.STATUS_ACTIVE);
+        verify(ps).setString(STATUS_PARAM_INDEX, ContractDAO.STATUS_ACTIVE);
     }
 
     @Test
     public void insert_missingDates_fallsBackToDraftStatus() throws Exception {
         PreparedStatement ps = captureStatusFor(null, null);
 
-        verify(ps).setString(11, ContractDAO.STATUS_DRAFT);
+        verify(ps).setString(STATUS_PARAM_INDEX, ContractDAO.STATUS_DRAFT);
     }
 
     // ------------------------------------------------------------------
@@ -671,6 +671,15 @@ public class ContractDAOTest {
             assertTrue(capturedSql(conn).contains("ORDER BY p.province_name IS NULL"));
         }
     }
+
+    /**
+     * Vị trí tham số của cột status trong câu INSERT của {@code insert()}.
+     *
+     * <p>Bám theo THỨ TỰ CỘT của câu lệnh đó, nên thêm một cột vào giữa là
+     * số này phải đổi theo -- đã dịch một lần khi thêm contract_number.
+     * Tách ra hằng số để lần sau chỉ sửa một chỗ thay vì năm chỗ.
+     */
+    private static final int STATUS_PARAM_INDEX = 12;
 
     /** Chạy insert() với cặp ngày cho trước rồi trả về statement để soi tham số đã bind. */
     private PreparedStatement captureStatusFor(Date effectiveDate, Date endDate) throws Exception {

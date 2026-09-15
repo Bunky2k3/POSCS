@@ -5,7 +5,18 @@ import java.sql.Timestamp;
 
 public class Contract {
     private int contractId;
+
+    /** Mã NỘI BỘ do hệ thống sinh, dạng HD-0015. Định danh của bản ghi. */
     private String contractCode;
+
+    /**
+     * Số hợp đồng THẬT in trên bản giấy, kiểu "123/2026/HĐKT-POSTEF".
+     *
+     * <p>Khác {@link #contractCode}: cái kia là mã nội bộ mình tự sinh, cái này
+     * là thứ khách hàng đọc khi gọi điện. Có thể null -- bản nháp chưa ký thì
+     * thường chưa được cấp số.
+     */
+    private String contractNumber;
     private String title;
     private String contractType;
     /** 'Bán' = mình bán ra, 'Mua' = mình mua vào -- xem ghi chú đầu V21. */
@@ -72,6 +83,9 @@ public class Contract {
     // Các hàm Getters và Setters
     public int getContractId() { return contractId; }
     public void setContractId(int contractId) { this.contractId = contractId; }
+
+    public String getContractNumber() { return contractNumber; }
+    public void setContractNumber(String contractNumber) { this.contractNumber = contractNumber; }
 
     public String getContractCode() { return contractCode; }
     public void setContractCode(String contractCode) { this.contractCode = contractCode; }

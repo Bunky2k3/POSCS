@@ -100,6 +100,16 @@
           "p": "Đăng nhập bằng vai trò Kỹ thuật",
           "t": "-",
           "e": "Xem được danh sách nhưng không có nút Thêm/Sửa/Xoá hợp đồng"
+        },
+        {
+          "d": "Tìm kiếm theo số hợp đồng",
+          "s": [
+            "Ở danh sách, gõ một phần số hợp đồng vào ô tìm kiếm"
+          ],
+          "p": "Có hợp đồng đã nhập số",
+          "t": "keyword: 123/2026",
+          "e": "Ra đúng hợp đồng mang số đó",
+          "n": "Khách gọi điện đọc số trên giấy chứ không đọc mã HD-xxxx, nên đây là đường tra chính"
         }
       ]
     },
@@ -314,6 +324,34 @@
           "p": "Đăng nhập bằng vai trò CSKH",
           "t": "POST action=create kèm dữ liệu hợp lệ",
           "e": "Trả về trang lỗi 403, không hợp đồng nào được tạo"
+        },
+        {
+          "d": "Nhập số hợp đồng thật lúc tạo",
+          "s": [
+            "Bấm Thêm hợp đồng",
+            "Điền ô Số hợp đồng theo số ghi trên bản giấy",
+            "Điền nốt các ô bắt buộc rồi Lưu"
+          ],
+          "t": "Số hợp đồng: 123/2026/HĐKT-POSTEF",
+          "e": "Lưu thành công; trang chi tiết hiện CẢ HAI — mã nội bộ HD-xxxx do hệ thống sinh và số hợp đồng vừa nhập",
+          "n": "Hai thứ song song, không thay thế nhau: mã là định danh nội bộ, số là thứ in trên giấy"
+        },
+        {
+          "d": "Để trống số hợp đồng",
+          "s": [
+            "Tạo hợp đồng, không điền ô Số hợp đồng"
+          ],
+          "t": "Số hợp đồng: (để trống)",
+          "e": "Vẫn lưu được — bản nháp thường chưa được cấp số, điền sau khi ký cũng được"
+        },
+        {
+          "d": "Hai hợp đồng trùng số",
+          "s": [
+            "Tạo hai hợp đồng cùng nhập một số"
+          ],
+          "t": "cả hai: 123/2026/HĐKT-POSTEF",
+          "e": "Cả hai đều lưu được, mã nội bộ HD-xxxx vẫn khác nhau",
+          "n": "Cố ý không đặt UNIQUE lên số hợp đồng: đây là chuỗi tự do, hai chi nhánh đánh số riêng hoặc lặp qua các năm đều có thật. Chống trùng đã có contract_code lo"
         }
       ]
     },

@@ -4345,7 +4345,11 @@ INSERT INTO `productcatalogues` (`product_id`, `catalogue_url`, `file_name`, `di
 DROP TABLE IF EXISTS `contracts`;
 CREATE TABLE `contracts` (
   `contract_id` int NOT NULL AUTO_INCREMENT,
+  -- Mã NỘI BỘ do hệ thống sinh (HD-0015). Định danh của bản ghi.
   `contract_code` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  -- Số hợp đồng THẬT in trên bản giấy ("123/2026/HĐKT-POSTEF"), người nhập.
+  -- Nullable (nháp chưa ký thì chưa có số) và KHÔNG unique -- xem V25.
+  `contract_number` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `title` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
   `contract_type` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
   -- 'Bán' = mình bán ra (đối tác giữ vai 'Khách mua')
@@ -4372,6 +4376,7 @@ CREATE TABLE `contracts` (
   KEY `owner_id` (`owner_id`),
   KEY `idx_contracts_direction` (`direction`),
   KEY `idx_contracts_progress` (`progress_status`),
+  KEY `idx_contracts_number` (`contract_number`),
   CONSTRAINT `contracts_ibfk_1` FOREIGN KEY (`enterprise_id`) REFERENCES `enterprises` (`enterprise_id`),
   CONSTRAINT `contracts_ibfk_2` FOREIGN KEY (`owner_id`) REFERENCES `users` (`user_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
