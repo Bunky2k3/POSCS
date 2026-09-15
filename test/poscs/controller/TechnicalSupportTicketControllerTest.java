@@ -932,6 +932,42 @@ public class TechnicalSupportTicketControllerTest {
     }
 
     // ------------------------------------------------------------------
+    // Dropdown "Kỹ thuật viên phụ trách" chỉ liệt kê vai Kỹ thuật
+    // ------------------------------------------------------------------
+    //
+    // Khác hẳn màn Khách hàng/Hợp đồng (lọc Sales): phiếu giao cho Kỹ thuật.
+    // Trước đây cả ba màn dùng chung findAllActive() nên ô này -- vốn tên là
+    // "Kỹ thuật viên phụ trách" -- liệt kê cả CSKH lẫn Admin. Giao nhầm cho
+    // một CSKH thì phiếu nằm im: họ không có quyền sửa phiếu được giao.
+
+    @Test
+    public void createForm_chiDoNhanVienKyThuatVaoDropdown() throws Exception {
+        when(request.getParameter("action")).thenReturn("new");
+        RequestDispatcher dispatcher = mock(RequestDispatcher.class);
+        when(request.getRequestDispatcher("/jsp/customersupport/addnewTicket.jsp")).thenReturn(dispatcher);
+
+        controller.doGet(request, response);
+
+        verify(employeeDAO).findActiveByRole("Kỹ thuật", (Integer) null);
+        verify(employeeDAO, never()).findAllActive();
+    }
+
+    /** Kỹ thuật viên đang giữ phiếu phải còn trong ô kể cả khi đã đổi vai. */
+    @Test
+    public void editForm_giuLaiKyThuatVienDangDuocGiao() throws Exception {
+        when(request.getParameter("action")).thenReturn("edit");
+        when(request.getParameter("id")).thenReturn("3");
+        when(ticketDAO.findById(3)).thenReturn(fullyValidExistingTicket());
+        RequestDispatcher dispatcher = mock(RequestDispatcher.class);
+        when(request.getRequestDispatcher("/jsp/customersupport/updateTicket.jsp")).thenReturn(dispatcher);
+
+        controller.doGet(request, response);
+
+        verify(employeeDAO).findActiveByRole("Kỹ thuật", 50);
+        verify(employeeDAO, never()).findAllActive();
+    }
+
+    // ------------------------------------------------------------------
     // GET ?action=exportPdf
     // ------------------------------------------------------------------
 

@@ -8,6 +8,7 @@ import java.util.List;
 import org.junit.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.MockedStatic;
+import poscs.model.User;
 
 import static org.junit.Assert.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -330,6 +331,81 @@ public class EmployeeDAOTest {
 
             assertNotNull(dao.findAll(1, 10, null, null, null));
             assertTrue(dao.findAll(1, 10, null, null, null).isEmpty());
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // findActiveByRole -- lọc dropdown "người phụ trách" theo vai
+    // ------------------------------------------------------------------
+    //
+    // Cái sai mà những test này canh: dropdown đổ TOÀN BỘ nhân viên vào, nên
+    // ô "Người phụ trách khách hàng" mời chọn cả Admin lẫn kỹ thuật viên.
+    // Ràng buộc thứ hai quan trọng không kém: người ĐANG được gán phải còn
+    // trong danh sách kể cả khi đã đổi vai, nếu không thì mở form sửa lên ô
+    // trống rồi bấm lưu là thay mất người phụ trách.
+
+    @Test
+    public void findActiveByRole_khongCoAlsoInclude_chiLocTheoVai() throws Exception {
+        PreparedStatement ps = statementReturning(singleRow(row(
+                "user_id", 20, "username", "sales2", "last_name", "Tran",
+                "middle_name", "Thi", "first_name", "Ha", "department_id", 2)));
+        Connection conn = connectionReturning(ps);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            List<User> result = dao.findActiveByRole("Sales");
+
+            assertEquals(1, result.size());
+            assertEquals(20, result.get(0).getUserId());
+            verify(ps).setString(1, "Sales");
+            // Không có ai để giữ thêm thì không được sinh tham số thừa.
+            verify(ps, never()).setInt(eq(2), anyInt());
+        }
+    }
+
+    @Test
+    public void findActiveByRole_coAlsoInclude_ganThamSoChoTungNguoi() throws Exception {
+        PreparedStatement ps = statementReturning(emptyResultSet());
+        Connection conn = connectionReturning(ps);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            dao.findActiveByRole("Sales", 7, 9);
+
+            verify(ps).setString(1, "Sales");
+            verify(ps).setInt(2, 7);
+            verify(ps).setInt(3, 9);
+        }
+    }
+
+    /**
+     * Cột người hỗ trợ là nullable nên bên gọi truyền thẳng vào được; null và
+     * 0 phải bị bỏ qua chứ không thành tham số rỗng làm lệch thứ tự đặt tham
+     * số của những id hợp lệ đứng sau.
+     */
+    @Test
+    public void findActiveByRole_boQuaNullVaSoKhongVaTrungLap() throws Exception {
+        PreparedStatement ps = statementReturning(emptyResultSet());
+        Connection conn = connectionReturning(ps);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            dao.findActiveByRole("Sales", null, 0, 7, 7);
+
+            verify(ps).setInt(2, 7);
+            verify(ps, never()).setInt(eq(3), anyInt());
+        }
+    }
+
+    @Test
+    public void findActiveByRole_loiCsdl_traVeDanhSachRongChuKhongNem() throws Exception {
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenThrow(new SQLException("hỏng"));
+
+            assertTrue(dao.findActiveByRole("Sales").isEmpty());
         }
     }
 

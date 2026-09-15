@@ -465,6 +465,61 @@ public class CustomerControllerTest {
         verify(response, never()).sendError(eq(HttpServletResponse.SC_FORBIDDEN), anyString());
     }
 
+    // ------------------------------------------------------------------
+    // Dropdown "người phụ trách" chỉ liệt kê Sales
+    // ------------------------------------------------------------------
+    //
+    // Khách hàng giao cho Sales. Trước đây dropdown đổ findAllActive() --
+    // toàn bộ nhân viên -- nên ô "Người phụ trách chính" mời chọn cả Admin
+    // lẫn kỹ thuật viên lẫn CSKH.
+
+    @Test
+    public void createForm_chiDoNhanVienSalesVaoDropdown() throws Exception {
+        RequestDispatcher dispatcher = mock(RequestDispatcher.class);
+        when(request.getRequestDispatcher("/jsp/sale/addnewcustomer.jsp")).thenReturn(dispatcher);
+        when(request.getParameter("action")).thenReturn("new");
+
+        controller.doGet(request, response);
+
+        verify(employeeDAO).findActiveByRole("Sales");
+        verify(employeeDAO, never()).findAllActive();
+    }
+
+    /**
+     * Form sửa phải giữ lại người ĐANG phụ trách kể cả khi họ đã đổi vai --
+     * nếu không thì mở form lên ô trống, bấm lưu là thay mất người phụ trách
+     * dù người dùng chỉ định sửa số điện thoại.
+     */
+    @Test
+    public void editForm_giuLaiCaHaiVaiDangGanDuNguoiDoDaDoiVai() throws Exception {
+        RequestDispatcher dispatcher = mock(RequestDispatcher.class);
+        when(request.getRequestDispatcher("/jsp/sale/updatecustomer.jsp")).thenReturn(dispatcher);
+        when(request.getParameter("action")).thenReturn("edit");
+        when(request.getParameter("id")).thenReturn("5");
+
+        Enterprise customer = new Enterprise();
+        customer.setEnterpriseId(5);
+        customer.setAccountOwnerId(41);
+        customer.setSupportOwnerId(42);
+        when(customerDAO.findById(5)).thenReturn(customer);
+
+        controller.doGet(request, response);
+
+        verify(employeeDAO).findActiveByRole("Sales", 41, 42);
+        verify(employeeDAO, never()).findAllActive();
+    }
+
+    @Test
+    public void listPage_oLocNguoiPhuTrachChiLietKeSales() throws Exception {
+        RequestDispatcher dispatcher = mock(RequestDispatcher.class);
+        when(request.getRequestDispatcher("/jsp/sale/listcustomer.jsp")).thenReturn(dispatcher);
+
+        controller.doGet(request, response);
+
+        verify(employeeDAO).findActiveByRole("Sales");
+        verify(employeeDAO, never()).findAllActive();
+    }
+
     /**
      * Xoá một id không có thật phải báo không tìm thấy. Trước đây hàm chỉ kiểm
      * id có phải số hay không rồi gọi thẳng softDelete: UPDATE không chạm dòng

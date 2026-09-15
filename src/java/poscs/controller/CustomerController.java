@@ -47,6 +47,9 @@ public class CustomerController extends HttpServlet {
     private static final String LOGO_SUBFOLDER = "enterprise_logos";
 
     private static final int PAGE_SIZE = 10;
+    /** Vai được giao phụ trách khách hàng -- khớp roles.role_name, xem AccessControl. */
+    private static final String SALES_ROLE = "Sales";
+
     private static final String LIST_VIEW = "/jsp/sale/listcustomer.jsp";
     private static final String DETAIL_VIEW = "/jsp/sale/viewcustomerdetail.jsp";
     private static final String CREATE_VIEW = "/jsp/sale/addnewcustomer.jsp";
@@ -139,7 +142,10 @@ public class CustomerController extends HttpServlet {
         int totalPages = Math.max(1, (int) Math.ceil(totalCount / (double) PAGE_SIZE));
 
         request.setAttribute("customerList", customerList);
-        request.setAttribute("userList", employeeDAO.findAllActive());
+        // Khách hàng giao cho Sales, nên ô lọc "người phụ trách" chỉ liệt kê
+        // Sales -- đổ cả Admin/Kỹ thuật/CSKH vào là mời người dùng lọc theo
+        // những người không bao giờ phụ trách khách hàng nào.
+        request.setAttribute("userList", employeeDAO.findActiveByRole(SALES_ROLE));
         request.setAttribute("provinceList", addressDAO.findBranchProvinces());
         request.setAttribute("currentPage", page);
         request.setAttribute("totalPages", totalPages);
@@ -180,7 +186,7 @@ public class CustomerController extends HttpServlet {
         if (!AccessControl.requireFullAccess(request, response, AccessControl.Resource.CUSTOMER)) {
             return;
         }
-        request.setAttribute("userList", employeeDAO.findAllActive());
+        request.setAttribute("userList", employeeDAO.findActiveByRole(SALES_ROLE));
         request.setAttribute("provinceList", addressDAO.findBranchProvinces());
         // Phân công địa bàn, để form điền sẵn rồi KHOÁ ô người phụ trách khi
         // chọn tỉnh. Nhúng cả bảng (34 tỉnh) một lần thay vì gọi AJAX mỗi lần
@@ -205,7 +211,11 @@ public class CustomerController extends HttpServlet {
         }
 
         request.setAttribute("customer", customer);
-        request.setAttribute("userList", employeeDAO.findAllActive());
+        // Cùng lý do với danh sách tỉnh ngay dưới: người đang phụ trách khách
+        // này phải còn trong danh sách kể cả khi họ đã đổi vai, nếu không thì
+        // mở form sửa lên ô trống rồi bấm lưu là thay mất người phụ trách.
+        request.setAttribute("userList", employeeDAO.findActiveByRole(
+                SALES_ROLE, customer.getAccountOwnerId(), customer.getSupportOwnerId()));
         // Khách cũ có thể nằm ngoài 18 tỉnh địa bàn -- giữ tỉnh đó trong danh
         // sách, nếu không thì mở form sửa lên ô tỉnh trống và bấm lưu là mất
         // địa chỉ dù người dùng chỉ định sửa số điện thoại.

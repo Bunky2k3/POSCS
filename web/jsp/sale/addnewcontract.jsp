@@ -4,7 +4,7 @@
 <%--
     Request attribute do ContractController#showCreateForm thiết lập trước khi forward tới trang này:
       - customerList : List<poscs.model.Enterprise> (toàn bộ khách hàng, để đổ dropdown "Khách hàng")
-      - userList      : List<poscs.model.User>       (toàn bộ nhân viên, để đổ dropdown "Người phụ trách")
+      - userList      : List<poscs.model.User>       (nhân viên vai Sales, để đổ dropdown "Người phụ trách")
 
     Form này chỉ tạo bản ghi trong bảng contracts. Hạng mục sản phẩm/dịch vụ
     (contractproducts) được gắn ở trang chi tiết hợp đồng sau khi tạo xong,

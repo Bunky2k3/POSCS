@@ -53,6 +53,13 @@ public class TechnicalSupportTicketController extends HttpServlet {
     private static final Logger LOG = LoggerFactory.getLogger(TechnicalSupportTicketController.class);
 
     private static final int PAGE_SIZE = 10;
+    /**
+     * Vai được giao XỬ LÝ phiếu -- khớp roles.role_name, xem AccessControl.
+     * Khác hẳn vai được quyền TẠO phiếu (CSKH): người tiếp nhận và người đi
+     * sửa là hai người khác nhau.
+     */
+    private static final String TECHNICIAN_ROLE = "Kỹ thuật";
+
     private static final String LIST_VIEW = "/jsp/customersupport/listTicket.jsp";
     private static final String DETAIL_VIEW = "/jsp/customersupport/viewdetailTicket.jsp";
     private static final String CREATE_VIEW = "/jsp/customersupport/addnewTicket.jsp";
@@ -409,7 +416,7 @@ public class TechnicalSupportTicketController extends HttpServlet {
         if (!AccessControl.requireFullAccess(request, response, AccessControl.Resource.TICKET)) {
             return;
         }
-        setDropdownAttributes(request);
+        setDropdownAttributes(request, null);
         request.getRequestDispatcher(CREATE_VIEW).forward(request, response);
     }
 
@@ -432,7 +439,7 @@ public class TechnicalSupportTicketController extends HttpServlet {
         }
 
         request.setAttribute("ticket", ticket);
-        setDropdownAttributes(request);
+        setDropdownAttributes(request, ticket.getAssignedTechnicianId());
         request.getRequestDispatcher(UPDATE_VIEW).forward(request, response);
     }
 
@@ -600,10 +607,18 @@ public class TechnicalSupportTicketController extends HttpServlet {
     // Helpers
     // ------------------------------------------------------------------
 
-    private void setDropdownAttributes(HttpServletRequest request) {
+    /**
+     * @param keepUserId kỹ thuật viên đang được giao phiếu đang sửa -- giữ
+     *        trong dropdown kể cả khi họ đã đổi vai, xem
+     *        EmployeeDAO.findActiveByRole.
+     */
+    private void setDropdownAttributes(HttpServletRequest request, Integer keepUserId) {
         // Toàn bộ khách hàng chưa xoá, phục vụ dropdown "Khách hàng"
         request.setAttribute("customerList", customerDAO.findAll(1, Integer.MAX_VALUE, null, null, null));
-        request.setAttribute("userList", employeeDAO.findAllActive());
+        // Phiếu giao cho Kỹ thuật. Trước đây đổ cả 15 người vào đây trong khi
+        // ô này tên là "Kỹ thuật viên phụ trách" -- chọn nhầm một CSKH thì
+        // phiếu nằm im vì người đó không có quyền sửa phiếu được giao.
+        request.setAttribute("userList", employeeDAO.findActiveByRole(TECHNICIAN_ROLE, keepUserId));
     }
 
     private TechnicalRequest buildTicketFromRequest(HttpServletRequest request, TechnicalRequest t) {
