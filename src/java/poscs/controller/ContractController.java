@@ -167,6 +167,9 @@ public class ContractController extends HttpServlet {
             case "removeProduct":
                 handleRemoveProduct(request, response);
                 break;
+            case "changeProgress":
+                handleChangeProgress(request, response);
+                break;
             default:
                 response.sendRedirect(request.getContextPath() + "/contract");
         }
@@ -189,10 +192,15 @@ public class ContractController extends HttpServlet {
         Period period = Period.parse(request.getParameter("year"), request.getParameter("period"));
         // Chiều đứng ĐỘC LẬP với kỳ -- hai mục con vẫn lọc được theo năm/quý/tháng.
         String direction = directionFromKind(request.getParameter("kind"));
+        // Trục tiến độ: độc lập với trục lịch (status) và với kỳ. Một hợp đồng
+        // "Đã hết hạn" theo lịch mà vẫn "Đã ký" theo tiến độ chính là việc còn
+        // tồn -- lọc được hai trục riêng thì mới nhìn ra chỗ đó.
+        String progressFilter = request.getParameter("progress");
 
         List<Contract> contractList = contractDAO.findAll(page, PAGE_SIZE, keyword, statusFilter, typeFilter,
-                provinceFilter, false, period, direction);
-        int totalCount = contractDAO.countAll(keyword, statusFilter, typeFilter, provinceFilter, period, direction);
+                provinceFilter, false, period, direction, progressFilter);
+        int totalCount = contractDAO.countAll(keyword, statusFilter, typeFilter, provinceFilter, period, direction,
+                progressFilter);
         int totalPages = Math.max(1, (int) Math.ceil(totalCount / (double) PAGE_SIZE));
         // Dải KPI trạng thái phải đếm CÙNG phạm vi với bảng bên dưới: đứng ở
         // Hợp đồng mua mà KPI gộp cả hợp đồng bán thì hai con số cạnh nhau
@@ -209,6 +217,7 @@ public class ContractController extends HttpServlet {
         request.setAttribute("pageSize", PAGE_SIZE);
         request.setAttribute("keyword", keyword);
         request.setAttribute("statusFilter", statusFilter);
+        request.setAttribute("progressFilter", progressFilter);
         request.setAttribute("typeFilter", typeFilter);
         request.setAttribute("provinceFilter", provinceFilter);
         request.setAttribute("kind", DIRECTION_BUY.equals(direction) ? "buy" : "sell");
@@ -246,7 +255,15 @@ public class ContractController extends HttpServlet {
         // Huỷ bản ghi chỉ dành cho Admin -- xem handleDelete. Không còn điều
         // kiện theo trạng thái: hợp đồng nào cũng đã ký, nên "xoá được hay
         // không" bây giờ là câu hỏi về quyền, không phải về ngày tháng.
-        request.setAttribute("canVoid", AccessControl.isAdmin(request));
+        request.setAttribute("canVoid",
+                AccessControl.isAdmin(request)
+                        || (contract.isDraft() && AccessControl.hasFullAccess(request, AccessControl.Resource.CONTRACT)));
+        // Trục tiến độ: JSP chỉ hiện đúng những nút bấm được. Chặn thật vẫn ở
+        // handleChangeProgress + ContractDAO.ALLOWED_TRANSITIONS.
+        request.setAttribute("canSign", contract.isDraft() && canSign(request));
+        request.setAttribute("canClose",
+                ContractDAO.PROGRESS_SIGNED.equals(contract.getProgressStatus())
+                        && AccessControl.hasFullAccess(request, AccessControl.Resource.CONTRACT));
         request.setAttribute("contractProducts", contractDAO.findProductsByContractId(id));
         request.setAttribute("contractHistory", contractDAO.findHistoryByContractId(id));
         // Danh sách sản phẩm còn hoạt động, phục vụ dropdown "Thêm sản phẩm" bên dưới bảng hạng mục.
@@ -268,7 +285,7 @@ public class ContractController extends HttpServlet {
         // Xuất đúng danh sách đang xem, giữ nguyên cả kỳ lẫn chiều.
         String direction = directionFromKind(request.getParameter("kind"));
         List<Contract> all = contractDAO.findAll(1, Integer.MAX_VALUE, keyword, statusFilter, typeFilter,
-                provinceFilter, true, period, direction);
+                provinceFilter, true, period, direction, request.getParameter("progress"));
         // Giữ cột "Mã HĐ" trong file dù danh sách trên màn hình đã bỏ -- xem lý do
         // ở CustomerController.exportExcel: STT chỉ đúng trong phạm vi một file.
         String[] headers = {"STT", "Mã HĐ", "Tiêu đề", "Loại HĐ", "Tỉnh/Thành phố", "Khách hàng", "Người phụ trách",
@@ -817,6 +834,69 @@ public class ContractController extends HttpServlet {
     }
 
     /**
+     * Một bước trên trục tiến độ: ký, thanh lý, hoặc chấm dứt sớm.
+     *
+     * <p><b>Ký tách khỏi tạo, và người ký phải khác nhân viên.</b> KH trả lời
+     * 2026-09-15: nhân viên không tự ký hợp đồng được. Trước đây
+     * {@code signing_date} là NOT NULL nên tạo hợp đồng là đã ký -- không có
+     * khoảnh khắc nào hợp đồng tồn tại mà chưa ký, nên cũng không có chỗ nào
+     * để chặn. Bây giờ tạo ra bản nháp, còn ký là action riêng ở đây.
+     *
+     * <p>Điều kiện ký dùng LẠI đúng vị ngữ mà luồng duyệt yêu cầu thay đổi đã
+     * dùng cho người duyệt ({@code !currentUser.isSubordinate()}, xem
+     * ChangeRequestController): người có cấp trên thì không phải người chốt.
+     * Không đẻ ra khái niệm "người được ký" thứ hai -- hệ thống đã có bốn cấu
+     * trúc tổ chức song song rồi, thêm cái nữa là thêm chỗ để hai nơi nói hai
+     * điều khác nhau về cùng một người.
+     *
+     * <p>Thanh lý và chấm dứt sớm thì BẮT BUỘC có lý do: cả hai đóng băng hợp
+     * đồng vĩnh viễn, không đường quay lại, nên phải biết vì sao. Luật hợp lệ
+     * của từng bước chuyển nằm ở ContractDAO.ALLOWED_TRANSITIONS, đúng một chỗ.
+     */
+    private void handleChangeProgress(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        if (!AccessControl.requireFullAccess(request, response, AccessControl.Resource.CONTRACT)) {
+            return;
+        }
+        Integer id = parseIntOrNull(request.getParameter("contractId"));
+        if (id == null || contractDAO.findById(id) == null) {
+            response.sendRedirect(request.getContextPath() + "/contract?error=notfound");
+            return;
+        }
+
+        String toStatus = request.getParameter("toStatus");
+        if (ContractDAO.PROGRESS_SIGNED.equals(toStatus) && !canSign(request)) {
+            response.sendError(HttpServletResponse.SC_FORBIDDEN,
+                    "Bạn không được ký hợp đồng. Việc này thuộc về cấp trên.");
+            return;
+        }
+
+        String note = request.getParameter("progressNote");
+        if (!contractDAO.changeProgressStatus(id, toStatus, actorId(request), note)) {
+            LOG.warn("Chuyen trang thai tien do hop dong that bai (actor={}, contractId={}, toStatus={})",
+                    Logs.actor(request), id, toStatus);
+            response.sendRedirect(request.getContextPath()
+                    + "/contract?action=view&id=" + id + "&error=progress_failed");
+            return;
+        }
+        response.sendRedirect(request.getContextPath() + "/contract?action=view&id=" + id);
+    }
+
+    /**
+     * true nếu người đang đăng nhập được KÝ hợp đồng: Admin, hoặc người không
+     * có cấp trên trong cây tổ chức (quản lý vùng).
+     *
+     * <p>Lưu ý về hiện trạng dữ liệu: phần lớn Sales hiện có {@code manager_id}
+     * null vì bảng phân công cấp trên chưa nhập, nên họ vẫn ký được. Đó là cố
+     * ý và khớp với nguyên tắc đã áp ở AccessControl -- "chưa xếp vào cây thì
+     * chưa bị siết" -- để bật tính năng lên không làm đứng việc của ai. Luật KH
+     * chỉ thật sự có hiệu lực với từng người khi họ được gán cấp trên.
+     */
+    private boolean canSign(HttpServletRequest request) {
+        User user = AccessControl.currentUser(request);
+        return user != null && !user.isSubordinate();
+    }
+
+    /**
      * Huỷ một bản ghi hợp đồng NHẬP NHẦM khỏi danh sách -- không phải huỷ hợp
      * đồng ngoài đời.
      *
@@ -827,15 +907,27 @@ public class ContractController extends HttpServlet {
      * liệu sai, và nó thuộc về Admin, có lý do, có dấu vết.
      */
     private void handleDelete(HttpServletRequest request, HttpServletResponse response) throws IOException {
-        if (!AccessControl.requireAdmin(request, response)) {
+        if (!AccessControl.requireFullAccess(request, response, AccessControl.Resource.CONTRACT)) {
             return;
         }
         Integer id = parseIntOrNull(request.getParameter("id"));
         // Kiểm tồn tại trước: với id không có thật thì voidRecord cũng trả
         // false, và người dùng nhận thông báo "không huỷ được" -- sai hẳn lý
         // do, tưởng là vướng ràng buộc nghiệp vụ.
-        if (id == null || contractDAO.findById(id) == null) {
+        Contract target = id == null ? null : contractDAO.findById(id);
+        if (target == null) {
             response.sendRedirect(request.getContextPath() + "/contract?error=notfound");
+            return;
+        }
+
+        // Bản NHÁP thì ai quản được hợp đồng cũng xoá được: nó chưa ký, chưa là
+        // chứng cứ gì, xoá một bản nháp sai là việc thường ngày. Đây chính là
+        // điều kiện đúng của BR-46 cũ ("chưa ký") -- trước V24 nó không với tới
+        // được vì signing_date NOT NULL khiến mọi hợp đồng đều đã ký.
+        //
+        // Đã ký trở đi thì chỉ Admin, vì lúc đó không còn là xoá nghiệp vụ mà
+        // là gỡ một bản ghi nhập nhầm ra khỏi danh sách.
+        if (!target.isDraft() && !AccessControl.requireAdmin(request, response)) {
             return;
         }
 
@@ -1110,11 +1202,18 @@ public class ContractController extends HttpServlet {
     /** BR-44: các trường bắt buộc phải có, và Ngày ký ≤ Ngày hiệu lực ≤ Ngày kết thúc. */
     private boolean isValid(Contract c) {
         if (c.getTitle() == null || c.getContractType() == null
-                || c.getSigningDate() == null || c.getEffectiveDate() == null || c.getEndDate() == null
+                || c.getEffectiveDate() == null || c.getEndDate() == null
                 || c.getEnterpriseId() <= 0 || c.getOwnerId() <= 0) {
             return false;
         }
-        return !c.getSigningDate().after(c.getEffectiveDate()) && !c.getEffectiveDate().after(c.getEndDate());
+        // Ngày ký có thể TRỐNG: bản nháp chưa ký thì chưa có ngày ký, và ngày
+        // đó được đóng dấu lúc bấm Ký (ContractDAO.changeProgressStatus đặt
+        // CURDATE()) chứ không phải thứ người dùng gõ vào ô. Khi đã có thì vẫn
+        // phải giữ BR-44: ký <= hiệu lực <= kết thúc.
+        if (c.getSigningDate() != null && c.getSigningDate().after(c.getEffectiveDate())) {
+            return false;
+        }
+        return !c.getEffectiveDate().after(c.getEndDate());
     }
 
     /**

@@ -135,6 +135,24 @@
       ]
     },
     {
+      "m": "Vòng đời hợp đồng",
+      "c": "Hợp đồng mới ra bản nháp chưa có ngày ký; ký là một bước riêng mà nhân viên có cấp trên không bấm được; thanh lý phải có căn cứ và sau đó không ai sửa được nữa, kể cả Admin",
+      "ref": [
+        "TC_CTRLIFE_001",
+        "TC_CTRLIFE_002",
+        "TC_CTRLIFE_003",
+        "TC_CTRLIFE_006",
+        "TC_CTRLIFE_007"
+      ]
+    },
+    {
+      "m": "Theo dõi hợp đồng còn tồn",
+      "c": "Lọc đồng thời Trạng thái = Đã hết hạn và Tiến độ = Đã ký để ra danh sách hợp đồng quá hạn mà chưa thanh lý",
+      "ref": [
+        "TC_CTRLIFE_009"
+      ]
+    },
+    {
       "m": "Quản lý hợp đồng",
       "c": "Ràng buộc thứ tự ngày ký ≤ ngày hiệu lực ≤ ngày kết thúc",
       "ref": [
@@ -173,10 +191,10 @@
     },
     {
       "m": "Quản lý hợp đồng",
-      "c": "Chỉ xoá được hợp đồng chưa tới ngày hiệu lực (BR-46)",
+      "c": "Hợp đồng đã ký không xoá được; chỉ bản nháp chưa ký mới xoá được (thay cho BR-46 cũ, vốn tính theo ngày hiệu lực nên hợp đồng đã ký vẫn lọt)",
       "ref": [
         "TC_CTRDEL_002",
-        "ST_CUS_014"
+        "TC_CTRLIFE_010"
       ]
     },
     {

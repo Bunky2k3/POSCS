@@ -4352,13 +4352,17 @@ CREATE TABLE `contracts` (
   -- 'Mua' = mình mua vào (đối tác giữ vai 'Nhà cung cấp')
   -- Cặp đôi CHÉO -- xem ghi chú đầu V21.
   `direction` varchar(10) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'Bán',
-  `signing_date` date NOT NULL,
+  `signing_date` date DEFAULT NULL,
   `effective_date` date NOT NULL,
   `end_date` date NOT NULL,
   `enterprise_id` int NOT NULL,
   `owner_id` int NOT NULL,
   `attachment_url` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  -- Trục LỊCH: hàm thuần của effective_date/end_date, không ai đặt được.
   `status` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'Đang hiệu lực',
+  -- Trục TIẾN ĐỘ: 'Nháp' | 'Đã ký' | 'Đã thanh lý' | 'Chấm dứt sớm'.
+  -- Do người đặt, có chứng từ; lệch với trục lịch ở cả hai chiều. Xem V24.
+  `progress_status` varchar(30) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'Nháp',
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   `is_deleted` tinyint(1) NOT NULL DEFAULT '0',
@@ -4367,6 +4371,7 @@ CREATE TABLE `contracts` (
   KEY `enterprise_id` (`enterprise_id`),
   KEY `owner_id` (`owner_id`),
   KEY `idx_contracts_direction` (`direction`),
+  KEY `idx_contracts_progress` (`progress_status`),
   CONSTRAINT `contracts_ibfk_1` FOREIGN KEY (`enterprise_id`) REFERENCES `enterprises` (`enterprise_id`),
   CONSTRAINT `contracts_ibfk_2` FOREIGN KEY (`owner_id`) REFERENCES `users` (`user_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

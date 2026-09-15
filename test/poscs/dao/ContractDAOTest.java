@@ -63,6 +63,19 @@ public class ContractDAOTest {
         return p;
     }
 
+    /**
+     * PreparedStatement dùng chung cho các test insertProducts: trả sẵn một
+     * dòng trạng thái tiến độ cho lần kiểm "hợp đồng đã đóng băng chưa" mà
+     * ContractDAO chạy trước khi ghi. Không có nó thì executeQuery() trả null
+     * và test chết vì NPE ở chỗ chẳng liên quan gì tới thứ nó đang kiểm.
+     */
+    private static PreparedStatement statementForActiveContract() throws SQLException {
+        ResultSet progress = singleRow(row("progress_status", ContractDAO.PROGRESS_SIGNED));
+        PreparedStatement ps = mock(PreparedStatement.class);
+        when(ps.executeQuery()).thenReturn(progress);
+        return ps;
+    }
+
     private static Contract contract(String code) {
         Contract c = new Contract();
         c.setContractCode(code);
@@ -93,7 +106,7 @@ public class ContractDAOTest {
 
     @Test
     public void insertProducts_allRowsSucceed_commitsAndRestoresAutoCommit() throws Exception {
-        PreparedStatement ps = mock(PreparedStatement.class);
+        PreparedStatement ps = statementForActiveContract();
         Connection conn = connectionReturning(ps);
 
         try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
@@ -113,7 +126,7 @@ public class ContractDAOTest {
 
     @Test
     public void insertProducts_batchFails_rollsBackAndReturnsFalse() throws Exception {
-        PreparedStatement ps = mock(PreparedStatement.class);
+        PreparedStatement ps = statementForActiveContract();
         when(ps.executeBatch()).thenThrow(new SQLException("khoá ngoại product_id không tồn tại"));
         Connection conn = connectionReturning(ps);
 
@@ -132,7 +145,7 @@ public class ContractDAOTest {
 
     @Test
     public void insertProducts_commitFails_rollsBackAndReturnsFalse() throws Exception {
-        PreparedStatement ps = mock(PreparedStatement.class);
+        PreparedStatement ps = statementForActiveContract();
         Connection conn = connectionReturning(ps);
         doThrow(new SQLException("mất kết nối lúc commit")).when(conn).commit();
 
@@ -148,7 +161,7 @@ public class ContractDAOTest {
 
     @Test
     public void insertProducts_autoCommitResetFailsAfterCommit_stillReportsSuccess() throws Exception {
-        PreparedStatement ps = mock(PreparedStatement.class);
+        PreparedStatement ps = statementForActiveContract();
         Connection conn = connectionReturning(ps);
         // commit() đã thành công, chỉ khâu dọn dẹp sau đó hỏng.
         doThrow(new SQLException("kết nối chết khi trả autocommit")).when(conn).setAutoCommit(true);
@@ -167,7 +180,7 @@ public class ContractDAOTest {
 
     @Test
     public void insertProducts_rollbackAlsoFails_stillReturnsFalseWithoutThrowing() throws Exception {
-        PreparedStatement ps = mock(PreparedStatement.class);
+        PreparedStatement ps = statementForActiveContract();
         when(ps.executeBatch()).thenThrow(new SQLException("batch hỏng"));
         Connection conn = connectionReturning(ps);
         doThrow(new SQLException("rollback cũng hỏng")).when(conn).rollback();
@@ -184,9 +197,11 @@ public class ContractDAOTest {
     @Test
     public void insertProducts_bindsEveryItemOntoTheSameStatement() throws Exception {
         PreparedStatement ps = mock(PreparedStatement.class);
-        // Tách statement của nhật ký ra: nó cũng bind contract_id vào tham số 1,
-        // dùng chung mock thì times(2) bên dưới đếm cả nó thành 3.
-        Connection conn = connectionRoutingOn("contract_history", mock(PreparedStatement.class), ps);
+        // Chỉ câu INSERT hạng mục mới đi vào ps. Hai câu còn lại của cùng lời
+        // gọi -- kiểm trạng thái tiến độ và ghi nhật ký -- cũng bind contract_id
+        // vào tham số 1, nên dùng chung một mock thì times(2) bên dưới đếm
+        // thành 4 và test thất bại vì thứ nó không hề nói tới.
+        Connection conn = connectionRoutingOn("contractproducts", ps, statementForActiveContract());
 
         try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
             db.when(DBContext::getConnection).thenReturn(conn);
@@ -208,7 +223,7 @@ public class ContractDAOTest {
     @Test
     public void insertProducts_writesHistoryRowInsideTheSameTransaction() throws Exception {
         PreparedStatement historyPs = mock(PreparedStatement.class);
-        PreparedStatement itemPs = mock(PreparedStatement.class);
+        PreparedStatement itemPs = statementForActiveContract();
         Connection conn = connectionRoutingOn("contract_history", historyPs, itemPs);
 
         try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
@@ -236,7 +251,7 @@ public class ContractDAOTest {
     public void insertProducts_historyFails_rollsBackTheProductRowsToo() throws Exception {
         PreparedStatement historyPs = mock(PreparedStatement.class);
         when(historyPs.executeUpdate()).thenThrow(new SQLException("contract_history hỏng"));
-        PreparedStatement itemPs = mock(PreparedStatement.class);
+        PreparedStatement itemPs = statementForActiveContract();
         Connection conn = connectionRoutingOn("contract_history", historyPs, itemPs);
 
         try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
@@ -255,9 +270,15 @@ public class ContractDAOTest {
         PreparedStatement historyPs = mock(PreparedStatement.class);
         // singleRow() tự chạy vài lệnh when() bên trong, nên phải lấy ra biến
         // trước; gọi lồng trong when(...) sẽ ném UnfinishedStubbingException.
+        //
+        // HAI lần executeQuery, theo đúng thứ tự DAO chạy: kiểm hợp đồng đã
+        // đóng băng chưa, rồi mới đọc dòng hàng hoá sắp xoá. Trả cùng một
+        // ResultSet cho cả hai thì con trỏ của lần đầu đã chạy hết, lần sau đọc
+        // ra rỗng.
+        ResultSet progress = singleRow(row("progress_status", ContractDAO.PROGRESS_SIGNED));
         ResultSet line = singleRow(row("product_name", "Modem quang GPON", "quantity", 5, "unit", "cái"));
         PreparedStatement linePs = mock(PreparedStatement.class);
-        when(linePs.executeQuery()).thenReturn(line);
+        when(linePs.executeQuery()).thenReturn(progress, line);
         when(linePs.executeUpdate()).thenReturn(1);
         Connection conn = connectionRoutingOn("contract_history", historyPs, linePs);
 
@@ -295,6 +316,122 @@ public class ContractDAOTest {
             verify(linePs, never()).executeUpdate();
             verify(conn).rollback();
         }
+    }
+
+    // ------------------------------------------------------------------
+    // Trục tiến độ
+    // ------------------------------------------------------------------
+
+    @Test
+    public void changeProgressStatus_unknownTarget_refusesWithoutTouchingDatabase() throws Exception {
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            assertFalse(dao.changeProgressStatus(5, "Đang đàm phán", ACTOR, null));
+            db.verify(DBContext::getConnection, never());
+        }
+    }
+
+    @Test
+    public void changeProgressStatus_liquidateWithoutNote_refusesWithoutTouchingDatabase() throws Exception {
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            // Thanh lý và chấm dứt sớm đóng băng hợp đồng vĩnh viễn, không có
+            // đường quay lại -- không được phép xảy ra mà không ai biết vì sao.
+            assertFalse(dao.changeProgressStatus(5, ContractDAO.PROGRESS_LIQUIDATED, ACTOR, "  "));
+            assertFalse(dao.changeProgressStatus(5, ContractDAO.PROGRESS_TERMINATED, ACTOR, null));
+            db.verify(DBContext::getConnection, never());
+        }
+    }
+
+    @Test
+    public void changeProgressStatus_illegalStep_rollsBackAndWritesNothing() throws Exception {
+        ResultSet current = singleRow(row("progress_status", ContractDAO.PROGRESS_LIQUIDATED));
+        PreparedStatement ps = mock(PreparedStatement.class);
+        when(ps.executeQuery()).thenReturn(current);
+        Connection conn = connectionReturning(ps);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            // Đã thanh lý thì không đi đâu được nữa -- luật KH: sau thanh lý
+            // không được thay đổi, kể cả cấp cao.
+            assertFalse(dao.changeProgressStatus(5, ContractDAO.PROGRESS_TERMINATED, ACTOR, "đổi ý"));
+            verify(ps, never()).executeUpdate();
+            verify(conn).rollback();
+            verify(conn, never()).commit();
+        }
+    }
+
+    @Test
+    public void changeProgressStatus_signing_stampsSigningDateAndLogsBothEnds() throws Exception {
+        ResultSet current = singleRow(row("progress_status", ContractDAO.PROGRESS_DRAFT));
+        PreparedStatement historyPs = mock(PreparedStatement.class);
+        PreparedStatement contractPs = mock(PreparedStatement.class);
+        when(contractPs.executeQuery()).thenReturn(current);
+        when(contractPs.executeUpdate()).thenReturn(1);
+        Connection conn = connectionRoutingOn("contract_history", historyPs, contractPs);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            assertTrue(dao.changeProgressStatus(5, ContractDAO.PROGRESS_SIGNED, ACTOR, null));
+
+            // Ngày ký là ngày hành động xảy ra, do CSDL đóng dấu -- không phải
+            // thứ người dùng gõ vào ô rồi sửa lại sau.
+            ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+            verify(conn, atLeastOnce()).prepareStatement(sql.capture());
+            assertTrue("Bước ký phải đóng dấu signing_date",
+                    sql.getAllValues().stream().anyMatch(q -> q.contains("signing_date = CURDATE()")));
+
+            // Dòng nhật ký của MỐC vòng đời mang cả hai đầu, khác dòng sửa đổi.
+            verify(historyPs).setString(4, ContractDAO.PROGRESS_DRAFT);
+            verify(historyPs).setString(5, ContractDAO.PROGRESS_SIGNED);
+            verify(conn).commit();
+        }
+    }
+
+    @Test
+    public void changeProgressStatus_liquidating_doesNotTouchSigningDate() throws Exception {
+        ResultSet current = singleRow(row("progress_status", ContractDAO.PROGRESS_SIGNED));
+        PreparedStatement historyPs = mock(PreparedStatement.class);
+        PreparedStatement contractPs = mock(PreparedStatement.class);
+        when(contractPs.executeQuery()).thenReturn(current);
+        when(contractPs.executeUpdate()).thenReturn(1);
+        Connection conn = connectionRoutingOn("contract_history", historyPs, contractPs);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            assertTrue(dao.changeProgressStatus(5, ContractDAO.PROGRESS_LIQUIDATED, ACTOR, " Biên bản 12 "));
+
+            ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+            verify(conn, atLeastOnce()).prepareStatement(sql.capture());
+            assertFalse("Chỉ bước KÝ mới đóng dấu ngày ký",
+                    sql.getAllValues().stream().anyMatch(q -> q.contains("signing_date = CURDATE()")));
+            verify(historyPs).setString(7, "Biên bản 12");
+        }
+    }
+
+    /**
+     * Contract.isDraft()/isFrozen() so chuỗi bằng hằng riêng của model, vì model
+     * không phụ thuộc ngược lên DAO. Hai bên lệch nhau một dấu là nút bấm trên
+     * JSP biến mất mà không ai hiểu vì sao -- nên canh ở đây.
+     */
+    @Test
+    public void progressConstants_matchTheOnesOnTheModel() {
+        Contract c = new Contract();
+
+        c.setProgressStatus(ContractDAO.PROGRESS_DRAFT);
+        assertTrue(c.isDraft());
+        assertFalse(c.isFrozen());
+
+        c.setProgressStatus(ContractDAO.PROGRESS_SIGNED);
+        assertFalse(c.isDraft());
+        assertFalse(c.isFrozen());
+
+        c.setProgressStatus(ContractDAO.PROGRESS_LIQUIDATED);
+        assertTrue(c.isFrozen());
+
+        c.setProgressStatus(ContractDAO.PROGRESS_TERMINATED);
+        assertTrue(c.isFrozen());
     }
 
     @Test

@@ -14,6 +14,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import poscs.common.Period;
@@ -48,6 +49,39 @@ public class ContractDAO {
     public static final String STATUS_SOON = "Sắp hết hạn";
     public static final String STATUS_EXPIRED = "Đã hết hạn";
 
+    // ------------------------------------------------------------------
+    // Trục TIẾN ĐỘ -- người đặt, khác hẳn 4 hằng STATUS_* ở trên (trục LỊCH,
+    // tính từ ngày tháng). Hai trục lệch nhau ở cả hai chiều; đừng suy cái này
+    // ra từ cái kia. Xem đầu V24.
+    // ------------------------------------------------------------------
+
+    /** Chưa ký. Sửa thoải mái, xoá được, chưa là chứng cứ gì. */
+    public static final String PROGRESS_DRAFT = "Nháp";
+
+    /** Đã ký. Nội dung thành chứng cứ pháp lý; đổi phải đi qua phụ lục. */
+    public static final String PROGRESS_SIGNED = "Đã ký";
+
+    /** Đã thanh lý -- ĐÓNG BĂNG. Theo luật KH: xong hợp đồng = đã thanh lý. */
+    public static final String PROGRESS_LIQUIDATED = "Đã thanh lý";
+
+    /** Chấm dứt trước hạn -- cũng đóng băng, chỉ khác lý do. */
+    public static final String PROGRESS_TERMINATED = "Chấm dứt sớm";
+
+    /**
+     * Các bước chuyển HỢP LỆ trên trục tiến độ. Không có đường nào quay lại:
+     * ký rồi thì không trở về nháp được (nội dung đã thành chứng cứ), và đóng
+     * băng rồi thì không đi đâu nữa.
+     *
+     * Để ở đây, đúng một chỗ, thay vì rải if-else trong controller: mỗi màn
+     * hình tự kiểm một kiểu là chỗ đầu tiên hai nơi nói hai luật khác nhau.
+     */
+    private static final Map<String, Set<String>> ALLOWED_TRANSITIONS = Map.of(
+            PROGRESS_DRAFT, Set.of(PROGRESS_SIGNED),
+            PROGRESS_SIGNED, Set.of(PROGRESS_LIQUIDATED, PROGRESS_TERMINATED),
+            PROGRESS_LIQUIDATED, Set.of(),
+            PROGRESS_TERMINATED, Set.of()
+    );
+
     private static final int SOON_THRESHOLD_DAYS = 30;
 
     /** Khớp varchar(500) của contract_history.detail -- xem {@link #truncate}. */
@@ -78,7 +112,7 @@ public class ContractDAO {
     private static final String SELECT_BASE =
         "SELECT c.contract_id, c.contract_code, c.title, c.contract_type, c.direction, c.signing_date, " +
         "       c.effective_date, c.end_date, c.enterprise_id, c.owner_id, c.attachment_url, " +
-        "       c.created_at, c.updated_at, c.is_deleted, " +
+        "       c.progress_status, c.created_at, c.updated_at, c.is_deleted, " +
         "       e.enterprise_name, p.province_id, p.province_name, " +
         "       u.last_name AS owner_last_name, u.middle_name AS owner_middle_name, u.first_name AS owner_first_name " +
         "FROM contracts c " +
@@ -147,7 +181,7 @@ public class ContractDAO {
      */
     public List<Contract> findAll(int page, int pageSize, String keyword, String statusFilter, String typeFilter,
             Integer provinceId, boolean sortByProvince) {
-        return findAll(page, pageSize, keyword, statusFilter, typeFilter, provinceId, sortByProvince, null, null);
+        return findAll(page, pageSize, keyword, statusFilter, typeFilter, provinceId, sortByProvince, null, null, null);
     }
 
     /**
@@ -157,11 +191,11 @@ public class ContractDAO {
      * người ta theo dõi -- ngày hiệu lực có thể rơi sang kỳ sau.
      */
     public List<Contract> findAll(int page, int pageSize, String keyword, String statusFilter, String typeFilter,
-            Integer provinceId, boolean sortByProvince, Period period, String direction) {
+            Integer provinceId, boolean sortByProvince, Period period, String direction, String progressFilter) {
         List<Contract> result = new ArrayList<>();
         StringBuilder sql = new StringBuilder(SELECT_BASE);
         List<Object> params = new ArrayList<>();
-        appendFilters(sql, params, keyword, statusFilter, typeFilter, provinceId, period, direction);
+        appendFilters(sql, params, keyword, statusFilter, typeFilter, provinceId, period, direction, progressFilter);
         sql.append(sortByProvince
                 ? " ORDER BY p.province_name IS NULL, " + AddressDAO.PROVINCE_SHORT_NAME_ORDER
                         + ", c.contract_id DESC LIMIT ? OFFSET ?"
@@ -190,17 +224,17 @@ public class ContractDAO {
 
     /** Như {@link #countAll(String, String, String)} nhưng lọc thêm theo tỉnh/thành. */
     public int countAll(String keyword, String statusFilter, String typeFilter, Integer provinceId) {
-        return countAll(keyword, statusFilter, typeFilter, provinceId, null, null);
+        return countAll(keyword, statusFilter, typeFilter, provinceId, null, null, null);
     }
 
     /** Như trên, kèm lọc theo kỳ (ngày ký). */
     public int countAll(String keyword, String statusFilter, String typeFilter, Integer provinceId, Period period,
-            String direction) {
+            String direction, String progressFilter) {
         StringBuilder sql = new StringBuilder(
             "SELECT COUNT(*) FROM contracts c LEFT JOIN enterprises e ON c.enterprise_id = e.enterprise_id "
             + JOIN_PROVINCE_OF_ENTERPRISE);
         List<Object> params = new ArrayList<>();
-        appendFilters(sql, params, keyword, statusFilter, typeFilter, provinceId, period, direction);
+        appendFilters(sql, params, keyword, statusFilter, typeFilter, provinceId, period, direction, progressFilter);
 
         try (Connection conn = DBContext.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql.toString())) {
@@ -369,6 +403,9 @@ public class ContractDAO {
             conn.setAutoCommit(false);
             boolean committed = false;
             try {
+                if (isFrozen(conn, contractId)) {
+                    return false;
+                }
                 // Đọc TRƯỚC khi xoá: đây là DELETE cứng, sau lệnh dưới thì không
                 // còn chỗ nào biết dòng vừa mất là hàng hoá gì, số lượng bao
                 // nhiêu -- mà đó chính là nội dung duy nhất đáng ghi lại.
@@ -430,8 +467,8 @@ public class ContractDAO {
     public int insert(Contract contract, int actorId) {
         String sql = "INSERT INTO contracts " +
                 "(contract_code, title, contract_type, direction, signing_date, effective_date, end_date, " +
-                " enterprise_id, owner_id, attachment_url, status) " +
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                " enterprise_id, owner_id, attachment_url, status, progress_status) " +
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
         // contract_code sinh từ generateNextContractCode() (đọc mã lớn nhất hiện có
         // rồi +1) có thể trùng nếu 2 request tạo hợp đồng gần như đồng thời cùng
@@ -457,6 +494,13 @@ public class ContractDAO {
                         ps.setInt(9, contract.getOwnerId());
                         ps.setString(10, contract.getAttachmentUrl());
                         ps.setString(11, computeStatus(contract.getEffectiveDate(), contract.getEndDate()));
+                        // Hợp đồng mới LUÔN là bản nháp -- tạo không còn đồng
+                        // nghĩa với ký. Đó là cách duy nhất diễn đạt được luật
+                        // KH "nhân viên không tự ký hợp đồng được": trước đây
+                        // signing_date là NOT NULL nên không có khoảnh khắc nào
+                        // hợp đồng tồn tại mà chưa ký, và vì thế không có chỗ
+                        // nào để chặn việc ký.
+                        ps.setString(12, PROGRESS_DRAFT);
 
                         if (ps.executeUpdate() == 0) {
                             return -1;
@@ -477,9 +521,9 @@ public class ContractDAO {
                     // lần tạo hợp đồng chỉ vì một dòng mô tả.
                     String direction = contract.getDirection();
                     insertHistory(conn, newId, ContractHistory.EVENT_CREATED,
-                            "Tạo hợp đồng " + contract.getContractCode()
+                            "Tạo bản nháp " + contract.getContractCode()
                                     + (direction == null ? "" : " — hợp đồng " + direction.toLowerCase())
-                                    + ", hiệu lực " + formatDate(contract.getEffectiveDate())
+                                    + ", dự kiến hiệu lực " + formatDate(contract.getEffectiveDate())
                                     + " đến " + formatDate(contract.getEndDate()),
                             actorId, null);
 
@@ -519,6 +563,9 @@ public class ContractDAO {
             conn.setAutoCommit(false);
             boolean committed = false;
             try {
+                if (isFrozen(conn, contractId)) {
+                    return false;
+                }
                 try (PreparedStatement ps = conn.prepareStatement(sql)) {
                     for (ContractProduct item : items) {
                         ps.setInt(1, contractId);
@@ -575,6 +622,13 @@ public class ContractDAO {
                 // TechnicalSupportTicketDAO.update.
                 Contract before = lockForUpdate(conn, contract.getContractId());
                 if (before == null) {
+                    return false;
+                }
+                // Luật KH: sau thanh lý không được thay đổi, KỂ CẢ CẤP CAO.
+                // Chặn ở DAO chứ không chỉ ẩn nút: nút ẩn thì POST thẳng vào
+                // URL vẫn ghi được, mà đây là ranh giới pháp lý chứ không phải
+                // chuyện giao diện.
+                if (before.isFrozen()) {
                     return false;
                 }
 
@@ -662,6 +716,136 @@ public class ContractDAO {
             LOG.error("Loi huy ban ghi hop dong (contractId={})", contractId, ex);
             return false;
         }
+    }
+
+    // ------------------------------------------------------------------
+    // Trục tiến độ
+    // ------------------------------------------------------------------
+
+    /**
+     * Chuyển hợp đồng sang một trạng thái tiến độ khác, kèm dòng nhật ký mang
+     * cả from_status lẫn to_status -- TRONG CÙNG MỘT TRANSACTION.
+     *
+     * <p>Trạng thái hiện tại đọc bằng {@code SELECT ... FOR UPDATE} ngay trong
+     * transaction chứ không nhận từ controller. Hai người cùng mở một hợp đồng
+     * rồi cùng bấm Ký thì người thứ hai phải thất bại, chứ không phải ghi đè
+     * lên và để lại một dòng lịch sử "Nháp → Đã ký" thứ hai cho một hợp đồng
+     * đã ký từ trước.
+     *
+     * <p>Bước chuyển phải nằm trong {@link #ALLOWED_TRANSITIONS}: không có
+     * đường quay lại. Ký rồi thì không trở về nháp (nội dung đã thành chứng
+     * cứ), thanh lý rồi thì không đi đâu nữa -- đó là luật KH, "sau thanh lý
+     * không được thay đổi, kể cả cấp cao".
+     *
+     * <p>Khi ký, hàm tự đóng dấu {@code signing_date = CURDATE()}: ngày ký là
+     * ngày hành động xảy ra, không phải thứ người dùng gõ vào ô.
+     *
+     * @param note lý do/ghi chú người dùng nhập; bắt buộc với thanh lý và chấm
+     *             dứt sớm (hai bước không thể quay lại), tuỳ chọn khi ký.
+     * @return true nếu đã chuyển; false nếu hợp đồng không tồn tại, bước
+     *         chuyển không hợp lệ, hoặc thiếu lý do ở bước bắt buộc.
+     */
+    public boolean changeProgressStatus(int contractId, String toStatus, int actorId, String note) {
+        if (!ALLOWED_TRANSITIONS.containsKey(toStatus)) {
+            return false;
+        }
+        boolean needsNote = PROGRESS_LIQUIDATED.equals(toStatus) || PROGRESS_TERMINATED.equals(toStatus);
+        if (needsNote && (note == null || note.trim().isEmpty())) {
+            return false;
+        }
+
+        try (Connection conn = DBContext.getConnection()) {
+            conn.setAutoCommit(false);
+            boolean committed = false;
+            try {
+                String fromStatus = lockProgressStatus(conn, contractId);
+                if (fromStatus == null) {
+                    return false;
+                }
+                if (!ALLOWED_TRANSITIONS.getOrDefault(fromStatus, Set.of()).contains(toStatus)) {
+                    return false;
+                }
+
+                String sql = PROGRESS_SIGNED.equals(toStatus)
+                        ? "UPDATE contracts SET progress_status = ?, signing_date = CURDATE() "
+                          + "WHERE contract_id = ? AND is_deleted = 0"
+                        : "UPDATE contracts SET progress_status = ? WHERE contract_id = ? AND is_deleted = 0";
+                try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                    ps.setString(1, toStatus);
+                    ps.setInt(2, contractId);
+                    if (ps.executeUpdate() == 0) {
+                        return false;
+                    }
+                }
+
+                insertStatusChange(conn, contractId, fromStatus, toStatus, actorId,
+                        note == null || note.trim().isEmpty() ? null : note.trim());
+
+                conn.commit();
+                committed = true;
+            } finally {
+                finishTransaction(conn, committed, "chuyen trang thai tien do hop dong", contractId);
+            }
+            return committed;
+        } catch (SQLException ex) {
+            LOG.error("Loi chuyen trang thai tien do hop dong (contractId={}, toStatus={})",
+                    contractId, toStatus, ex);
+            return false;
+        }
+    }
+
+    /**
+     * true nếu hợp đồng đã thanh lý hoặc chấm dứt sớm -- đọc trong transaction
+     * đang mở, dùng để chặn mọi đường ghi. Hợp đồng không tồn tại thì trả false
+     * và để lệnh ghi phía sau tự thất bại vì không khớp dòng nào: trả true ở
+     * đây sẽ báo "đã đóng băng" cho một id không có thật, sai hẳn lý do.
+     */
+    private boolean isFrozen(Connection conn, int contractId) throws SQLException {
+        String status = lockProgressStatus(conn, contractId);
+        return PROGRESS_LIQUIDATED.equals(status) || PROGRESS_TERMINATED.equals(status);
+    }
+
+    /** Đọc và khoá trạng thái tiến độ hiện tại; null nếu hợp đồng không tồn tại. */
+    private String lockProgressStatus(Connection conn, int contractId) throws SQLException {
+        String sql = "SELECT progress_status FROM contracts WHERE contract_id = ? AND is_deleted = 0 FOR UPDATE";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, contractId);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next() ? rs.getString("progress_status") : null;
+            }
+        }
+    }
+
+    /**
+     * Dòng nhật ký của một bước chuyển tiến độ -- khác dòng sửa đổi ở chỗ có
+     * from_status/to_status, nên dựng lại được cả dòng thời gian vòng đời chứ
+     * không chỉ danh sách thay đổi.
+     */
+    private void insertStatusChange(Connection conn, int contractId, String fromStatus, String toStatus,
+            int changedBy, String note) throws SQLException {
+        String sql = "INSERT INTO contract_history " +
+                "(contract_id, event_type, detail, from_status, to_status, changed_by, note) " +
+                "VALUES (?, ?, ?, ?, ?, ?, ?)";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, contractId);
+            ps.setString(2, eventTypeOf(toStatus));
+            ps.setString(3, truncate(fromStatus + " → " + toStatus, DETAIL_MAX_LENGTH));
+            ps.setString(4, fromStatus);
+            ps.setString(5, toStatus);
+            ps.setInt(6, changedBy);
+            ps.setString(7, note);
+            ps.executeUpdate();
+        }
+    }
+
+    private static String eventTypeOf(String toStatus) {
+        if (PROGRESS_SIGNED.equals(toStatus)) {
+            return ContractHistory.EVENT_SIGNED;
+        }
+        if (PROGRESS_LIQUIDATED.equals(toStatus)) {
+            return ContractHistory.EVENT_LIQUIDATED;
+        }
+        return ContractHistory.EVENT_TERMINATED;
     }
 
     // ------------------------------------------------------------------
@@ -765,7 +949,7 @@ public class ContractDAO {
     /** Đọc và khoá bản ghi hợp đồng trong transaction đang mở; null nếu không có. */
     private Contract lockForUpdate(Connection conn, int contractId) throws SQLException {
         String sql = "SELECT contract_id, contract_code, title, contract_type, direction, signing_date, " +
-                "       effective_date, end_date, enterprise_id, owner_id, attachment_url " +
+                "       effective_date, end_date, enterprise_id, owner_id, attachment_url, progress_status " +
                 "FROM contracts WHERE contract_id = ? AND is_deleted = 0 FOR UPDATE";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, contractId);
@@ -785,6 +969,7 @@ public class ContractDAO {
                 c.setEnterpriseId(rs.getInt("enterprise_id"));
                 c.setOwnerId(rs.getInt("owner_id"));
                 c.setAttachmentUrl(rs.getString("attachment_url"));
+                c.setProgressStatus(rs.getString("progress_status"));
                 return c;
             }
         }
@@ -890,7 +1075,7 @@ public class ContractDAO {
     }
 
     private void appendFilters(StringBuilder sql, List<Object> params, String keyword, String statusFilter,
-            String typeFilter, Integer provinceId, Period period, String direction) {
+            String typeFilter, Integer provinceId, Period period, String direction, String progressFilter) {
         List<String> conditions = new ArrayList<>();
         conditions.add("c.is_deleted = 0");
 
@@ -914,9 +1099,16 @@ public class ContractDAO {
             params.add(provinceId);
         }
         if (period != null) {
+            // Lọc theo NGÀY KÝ, nên bản nháp (signing_date NULL) rơi ra ngoài
+            // -- đúng nghĩa: "hợp đồng ký trong quý này" không gồm thứ chưa ký.
+            // Muốn xem nháp thì bỏ bộ lọc kỳ, hoặc lọc theo trục tiến độ.
             conditions.add("c.signing_date BETWEEN ? AND ?");
             params.add(period.getFrom());
             params.add(period.getTo());
+        }
+        if (progressFilter != null && !progressFilter.trim().isEmpty()) {
+            conditions.add("c.progress_status = ?");
+            params.add(progressFilter.trim());
         }
         // Chiều đứng ĐỘC LẬP với kỳ: hai mục con Hợp đồng bán / Hợp đồng mua
         // vẫn phải lọc được theo năm/quý/tháng như trước.
@@ -973,6 +1165,7 @@ public class ContractDAO {
         c.setOwnerId(rs.getInt("owner_id"));
         c.setAttachmentUrl(rs.getString("attachment_url"));
         c.setStatus(computeStatus(c.getEffectiveDate(), c.getEndDate()));
+        c.setProgressStatus(rs.getString("progress_status"));
         c.setCreatedAt(rs.getTimestamp("created_at"));
         c.setUpdatedAt(rs.getTimestamp("updated_at"));
         c.setDeleted(rs.getBoolean("is_deleted"));

@@ -415,8 +415,8 @@
       "sheet": "VoidContract",
       "prefix": "TC_CTRDEL",
       "screen": "POST /POSCS/contract action=delete",
-      "description": "Gỡ một bản ghi NHẬP NHẦM khỏi danh sách — không phải huỷ hợp đồng ngoài đời. Chỉ Admin, bắt buộc lý do, luôn để lại dòng nhật ký. Thay cho BR-46 cũ (xoá khi Chưa hiệu lực) vốn tính theo lịch, nên hợp đồng ký hôm qua mà hiệu lực tháng sau vẫn xoá được.",
-      "precondition": "Đăng nhập bằng Admin",
+      "description": "Gỡ một bản ghi NHẬP NHẦM khỏi danh sách — không phải huỷ hợp đồng ngoài đời. Với hợp đồng ĐÃ KÝ thì chỉ Admin làm được; bản nháp chưa ký thì ai quản được hợp đồng cũng xoá được (xem TC_CTRLIFE_010). Cả hai đường đều bắt buộc lý do và đều để lại dòng nhật ký. Thay cho BR-46 cũ (xoá khi Chưa hiệu lực) vốn tính theo lịch, nên hợp đồng ký hôm qua mà hiệu lực tháng sau vẫn xoá được.",
+      "precondition": "Đăng nhập bằng Admin; hợp đồng dùng để thử đã ở trạng thái Đã ký",
       "cases": [
         {
           "d": "Admin huỷ bản ghi kèm lý do",
@@ -453,14 +453,15 @@
           "n": "Khác BR-46 cũ: không còn điều kiện theo trạng thái lịch. Điều kiện bây giờ là QUYỀN, không phải ngày tháng"
         },
         {
-          "d": "Vai trò Sales mở trang chi tiết",
+          "d": "Vai trò Sales mở chi tiết một hợp đồng ĐÃ KÝ",
           "s": [
             "Đăng nhập bằng Sales",
-            "Mở chi tiết một hợp đồng"
+            "Mở chi tiết một hợp đồng đã ký"
           ],
-          "p": "Đăng nhập bằng vai trò Sales",
+          "p": "Đăng nhập bằng vai trò Sales; hợp đồng ở trạng thái Đã ký",
           "t": "-",
-          "e": "Không thấy nút Huỷ bản ghi; nút Sửa thông tin vẫn còn"
+          "e": "Không thấy nút Huỷ bản ghi; nút Sửa thông tin vẫn còn",
+          "n": "Với bản NHÁP thì ngược lại — Sales thấy và bấm được, xem TC_CTRLIFE_010"
         },
         {
           "d": "Vai trò Sales gọi thẳng action=delete",
@@ -500,6 +501,114 @@
           "p": "Đăng nhập bằng Admin; bản ghi đã bị huỷ trước đó",
           "t": "id bản ghi đã huỷ",
           "e": "Bị chặn, và không sinh thêm dòng nhật ký nào"
+        }
+      ]
+    },
+    {
+      "name": "Vòng đời hợp đồng",
+      "sheet": "ContractLifecycle",
+      "prefix": "TC_CTRLIFE",
+      "screen": "POST /POSCS/contract action=changeProgress",
+      "description": "Trục tiến độ: Nháp → Đã ký → Đã thanh lý (hoặc Chấm dứt sớm). Tạo hợp đồng KHÔNG còn đồng nghĩa với ký — theo luật KH, nhân viên không tự ký hợp đồng được.",
+      "precondition": "Đăng nhập bằng Admin hoặc Sales chưa có cấp trên; migration V24 đã chạy",
+      "cases": [
+        {
+          "d": "Tạo hợp đồng mới ra bản nháp, chưa có ngày ký",
+          "s": [
+            "Vào Hợp đồng bán, bấm Thêm hợp đồng",
+            "Điền tiêu đề, loại, khách hàng, người phụ trách, ngày hiệu lực và ngày kết thúc",
+            "ĐỂ TRỐNG ô ngày ký, bấm Lưu"
+          ],
+          "t": "ngày ký: (để trống)",
+          "e": "Lưu thành công; trang chi tiết hiện nhãn tiến độ 'Nháp', cột Thời hạn ghi 'chưa ký'",
+          "n": "Trước V24 ô ngày ký là bắt buộc, nên tạo hợp đồng là đã ký — không có chỗ nào để chặn việc ký"
+        },
+        {
+          "d": "Ký hợp đồng",
+          "s": [
+            "Mở bản nháp",
+            "Bấm Ký hợp đồng và xác nhận"
+          ],
+          "t": "-",
+          "e": "Nhãn tiến độ đổi thành 'Đã ký'; ngày ký tự điền bằng NGÀY HÔM NAY; nhật ký có dòng 'Ký hợp đồng' ghi Nháp → Đã ký",
+          "o": "Ngày ký do hệ thống đóng dấu lúc bấm, không phải thứ người dùng gõ"
+        },
+        {
+          "d": "Nhân viên có cấp trên bấm ký",
+          "s": [
+            "Đăng nhập bằng một tài khoản Sales đã được gán Cấp trên ở màn hình Nhân viên",
+            "Mở một hợp đồng nháp"
+          ],
+          "p": "Tài khoản Sales có manager_id trỏ tới người khác",
+          "t": "-",
+          "e": "Không thấy nút Ký hợp đồng; gửi thẳng POST action=changeProgress cũng trả 403",
+          "n": "Luật KH: nhân viên không tự ký. Người chưa được gán cấp trên thì vẫn ký được — cố ý, xem PERMISSIONS.md"
+        },
+        {
+          "d": "Bỏ qua bước ký, thanh lý thẳng từ nháp",
+          "s": [
+            "Với một hợp đồng đang là Nháp, gửi POST action=changeProgress toStatus='Đã thanh lý'"
+          ],
+          "t": "toStatus: Đã thanh lý",
+          "e": "Bị chặn, hợp đồng vẫn là Nháp, không sinh dòng nhật ký nào"
+        },
+        {
+          "d": "Thanh lý không nhập căn cứ",
+          "s": [
+            "Mở hợp đồng Đã ký",
+            "Bấm Thanh lý rồi để trống ô căn cứ"
+          ],
+          "t": "căn cứ: (để trống)",
+          "e": "Bị chặn kèm thông báo; hợp đồng vẫn Đã ký",
+          "n": "Thanh lý và chấm dứt sớm đóng băng vĩnh viễn, không quay lại được — phải biết vì sao"
+        },
+        {
+          "d": "Thanh lý có căn cứ",
+          "s": [
+            "Bấm Thanh lý, nhập số biên bản, xác nhận"
+          ],
+          "t": "căn cứ: Biên bản thanh lý số 07",
+          "e": "Nhãn tiến độ đổi thành 'Đã thanh lý'; nhật ký có dòng Thanh lý ghi Đã ký → Đã thanh lý, cột lý do chứa số biên bản"
+        },
+        {
+          "d": "Sửa hợp đồng đã thanh lý bằng tài khoản Admin",
+          "s": [
+            "Đăng nhập bằng Admin",
+            "Mở hợp đồng đã thanh lý",
+            "Gửi thẳng POST action=update với tiêu đề mới"
+          ],
+          "p": "Hợp đồng ở trạng thái Đã thanh lý",
+          "t": "tiêu đề mới bất kỳ",
+          "e": "Không lưu được; tiêu đề giữ nguyên. Nút Sửa thông tin cũng không hiện trên trang",
+          "n": "Luật KH: sau thanh lý không được thay đổi, KỂ CẢ CẤP CAO"
+        },
+        {
+          "d": "Chuyển tiếp từ trạng thái đã đóng băng",
+          "s": [
+            "Với hợp đồng Đã thanh lý, gửi POST action=changeProgress toStatus='Chấm dứt sớm'"
+          ],
+          "t": "toStatus: Chấm dứt sớm",
+          "e": "Bị chặn; trạng thái giữ nguyên Đã thanh lý"
+        },
+        {
+          "d": "Lọc hết hạn mà chưa thanh lý",
+          "s": [
+            "Ở danh sách hợp đồng, chọn Trạng thái = 'Đã hết hạn' và Tiến độ = 'Đã ký'"
+          ],
+          "t": "-",
+          "e": "Ra đúng các hợp đồng quá hạn theo lịch nhưng chưa thanh lý — hàng đợi việc còn tồn",
+          "n": "Đây là lý do hai trục không được gộp làm một nhãn"
+        },
+        {
+          "d": "Xoá bản nháp bằng tài khoản Sales",
+          "s": [
+            "Đăng nhập bằng Sales",
+            "Mở một hợp đồng đang là Nháp, bấm Huỷ bản ghi, nhập lý do"
+          ],
+          "p": "Hợp đồng ở trạng thái Nháp",
+          "t": "lý do: Soạn nhầm khách hàng",
+          "e": "Xoá được — nháp chưa ký nên chưa là chứng cứ gì",
+          "n": "Đây đúng là điều kiện của BR-46 cũ ('chưa ký'), thứ mà trước V24 không với tới được"
         }
       ]
     },

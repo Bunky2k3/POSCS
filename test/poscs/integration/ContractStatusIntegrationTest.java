@@ -66,9 +66,12 @@ public class ContractStatusIntegrationTest {
     private void insertContract(int id, String code, int effectiveOffsetDays, int endOffsetDays)
             throws Exception {
         IntegrationDb.exec(
-            "INSERT INTO contracts (contract_id, contract_code, title, contract_type, signing_date, "
+            // progress_status ghi thẳng 'Đã ký': bốn hợp đồng này đều có ngày ký,
+            // chúng đại diện cho dữ liệu đã tồn tại trước V24. Để rơi về mặc
+            // định 'Nháp' thì trục tiến độ mâu thuẫn với chính signing_date.
+            "INSERT INTO contracts (contract_id, contract_code, title, contract_type, progress_status, signing_date, "
             + "effective_date, end_date, enterprise_id, owner_id) VALUES ("
-            + id + ", '" + code + "', N'Hợp đồng " + code + "', N'Bán hàng', "
+            + id + ", '" + code + "', N'Hợp đồng " + code + "', N'Bán hàng', N'Đã ký', "
             + "DATE_ADD(CURDATE(), INTERVAL " + (effectiveOffsetDays - 5) + " DAY), "
             + "DATE_ADD(CURDATE(), INTERVAL " + effectiveOffsetDays + " DAY), "
             + "DATE_ADD(CURDATE(), INTERVAL " + endOffsetDays + " DAY), "
@@ -193,6 +196,87 @@ public class ContractStatusIntegrationTest {
         assertEquals("Lý do người dùng nhập phải nằm ở cột note, không lẫn vào detail",
                 1, IntegrationDb.count("contract_history",
                         "contract_id = 3 AND note = 'Khách huỷ đơn'"));
+    }
+
+    // ------------------------------------------------------------------
+    // Trục tiến độ -- chỉ CSDL thật mới kiểm được, vì luật nằm ở SELECT ...
+    // FOR UPDATE bên trong transaction.
+    // ------------------------------------------------------------------
+
+    /**
+     * Vòng đời đủ một vòng: nháp → ký → thanh lý, rồi đóng băng.
+     *
+     * <p>Mọi hợp đồng gieo trong lớp này đều đã ở 'Đã ký' (insertContract ghi
+     * thẳng vào bảng), nên bước nháp→ký kiểm trên một bản ghi tạo qua DAO.
+     */
+    @Test
+    public void progress_runsThroughTheWholeLifecycleThenFreezes() throws Exception {
+        IntegrationDb.assumeAvailable();
+
+        Contract draft = new Contract();
+        draft.setContractCode("HD-NHAP");
+        draft.setTitle("Hợp đồng đang soạn");
+        draft.setContractType("Bán hàng");
+        draft.setDirection("Bán");
+        draft.setEffectiveDate(java.sql.Date.valueOf(java.time.LocalDate.now()));
+        draft.setEndDate(java.sql.Date.valueOf(java.time.LocalDate.now().plusYears(1)));
+        draft.setEnterpriseId(Fixtures.ENTERPRISE_ID);
+        draft.setOwnerId(Fixtures.USER_ID);
+        int id = contractDAO.insert(draft, Fixtures.USER_ID);
+        assertTrue(id > 0);
+
+        // Tạo KHÔNG còn đồng nghĩa với ký -- đó là cách duy nhất diễn đạt được
+        // luật KH "nhân viên không tự ký hợp đồng được".
+        assertEquals("Hợp đồng mới phải là bản nháp",
+                ContractDAO.PROGRESS_DRAFT, contractDAO.findById(id).getProgressStatus());
+        assertNull("Nháp thì chưa có ngày ký", contractDAO.findById(id).getSigningDate());
+
+        assertFalse("Nháp không nhảy thẳng sang thanh lý được",
+                contractDAO.changeProgressStatus(id, ContractDAO.PROGRESS_LIQUIDATED, Fixtures.USER_ID, "bỏ qua bước ký"));
+
+        assertTrue(contractDAO.changeProgressStatus(id, ContractDAO.PROGRESS_SIGNED, Fixtures.USER_ID, null));
+        Contract signed = contractDAO.findById(id);
+        assertEquals(ContractDAO.PROGRESS_SIGNED, signed.getProgressStatus());
+        assertNotNull("Bấm Ký phải đóng dấu ngày ký", signed.getSigningDate());
+
+        assertTrue(contractDAO.changeProgressStatus(id, ContractDAO.PROGRESS_LIQUIDATED,
+                Fixtures.USER_ID, "Biên bản thanh lý số 07"));
+
+        // Luật KH: sau thanh lý không được thay đổi, KỂ CẢ CẤP CAO.
+        assertFalse("Đã thanh lý thì không đi đâu nữa",
+                contractDAO.changeProgressStatus(id, ContractDAO.PROGRESS_TERMINATED, Fixtures.USER_ID, "đổi ý"));
+        Contract frozen = contractDAO.findById(id);
+        frozen.setTitle("Sửa lén sau thanh lý");
+        assertFalse("Đã thanh lý thì sửa nội dung cũng phải bị chặn",
+                contractDAO.update(frozen, Fixtures.USER_ID));
+        assertEquals("Hợp đồng đang soạn", contractDAO.findById(id).getTitle());
+
+        // Ba mốc vòng đời + dòng Khởi tạo lúc tạo nháp = 4 dòng nhật ký, và hai
+        // mốc thành công phải mang cả from lẫn to.
+        List<poscs.model.ContractHistory> history = contractDAO.findHistoryByContractId(id);
+        assertEquals(3, history.size());
+        assertTrue("Mốc vòng đời phải có from/to, khác dòng sửa đổi",
+                history.get(0).isStatusChange());
+        assertEquals(ContractDAO.PROGRESS_LIQUIDATED, history.get(0).getToStatus());
+        assertEquals(ContractDAO.PROGRESS_SIGNED, history.get(0).getFromStatus());
+    }
+
+    /**
+     * Hai trục lệch nhau: hợp đồng hết hạn theo LỊCH mà theo TIẾN ĐỘ vẫn "Đã
+     * ký" nghĩa là hết hạn nhưng chưa thanh lý. Đó là hàng đợi việc còn tồn, và
+     * là lý do hai trục không được gộp làm một.
+     */
+    @Test
+    public void progress_andCalendarAxesDisagreeOnPurpose() {
+        IntegrationDb.assumeAvailable();
+
+        Contract expired = contractDAO.findById(4); // -90 → -1 ngày, đã hết hạn
+        assertEquals(EXPIRED, expired.getStatus());
+        assertEquals(ContractDAO.PROGRESS_SIGNED, expired.getProgressStatus());
+
+        assertEquals("Lọc hai trục cùng lúc phải ra đúng hợp đồng hết hạn mà chưa thanh lý",
+                1, contractDAO.countAll(null, EXPIRED, null, null, null, null,
+                        ContractDAO.PROGRESS_SIGNED));
     }
 
     /**

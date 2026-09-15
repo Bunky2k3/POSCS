@@ -35,6 +35,18 @@ public class ContractHistory {
     /** Gỡ một dòng hàng hoá/dịch vụ khỏi hợp đồng. */
     public static final String EVENT_PRODUCT_REMOVED = "Gỡ hàng hoá";
 
+    // Ba loại dưới đây là MỐC VÒNG ĐỜI: dòng của chúng có fromStatus/toStatus,
+    // khác các loại trên (dòng sửa đổi, hai cột đó để null).
+
+    /** Nháp → Đã ký. Từ đây nội dung là chứng cứ pháp lý. */
+    public static final String EVENT_SIGNED = "Ký hợp đồng";
+
+    /** Đã ký → Đã thanh lý. Theo luật KH đây là lúc hợp đồng thật sự xong. */
+    public static final String EVENT_LIQUIDATED = "Thanh lý";
+
+    /** Đã ký → Chấm dứt sớm. Cũng đóng băng, chỉ khác lý do. */
+    public static final String EVENT_TERMINATED = "Chấm dứt sớm";
+
     /**
      * Xoá mềm bản ghi hợp đồng. Tên là "Huỷ bản ghi" chứ không phải "Xoá hợp
      * đồng": hợp đồng đã ký thì không xoá được trong nghiệp vụ, thao tác này

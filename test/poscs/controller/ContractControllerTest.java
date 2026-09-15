@@ -80,10 +80,27 @@ public class ContractControllerTest {
     }
 
     private void loginAs(String roleName) {
+        loginAs(roleName, null);
+    }
+
+    /**
+     * @param managerId cấp trên trong cây tổ chức; null = chưa xếp vào cây, và
+     *                  theo AccessControl thì "chưa xếp vào cây thì chưa bị
+     *                  siết" -- đó là lý do mặc định của mọi test là null.
+     */
+    private void loginAs(String roleName, Integer managerId) {
         User user = new User();
         user.setUserId(99);
         user.setRole(new Role(1, roleName));
+        user.setManagerId(managerId);
         when(session.getAttribute("currentUser")).thenReturn(user);
+    }
+
+    private static Contract contractWithProgress(String progressStatus) {
+        Contract c = new Contract();
+        c.setContractId(5);
+        c.setProgressStatus(progressStatus);
+        return c;
     }
 
     private static void setField(Object target, String fieldName, Object value) throws Exception {
@@ -347,7 +364,7 @@ public class ContractControllerTest {
 
         ArgumentCaptor<Period> period = ArgumentCaptor.forClass(Period.class);
         verify(contractDAO).findAll(anyInt(), anyInt(), any(), any(), any(), any(), eq(false),
-                period.capture(), eq("Mua"));
+                period.capture(), eq("Mua"), nullable(String.class));
         assertNotNull("kỳ phải còn nguyên khi lọc theo chiều", period.getValue());
         assertEquals("Quý 2/2026", period.getValue().getLabel());
     }
@@ -360,8 +377,99 @@ public class ContractControllerTest {
         controller.doGet(request, response);
 
         verify(contractDAO).findAll(anyInt(), anyInt(), any(), any(), any(), any(), eq(false),
-                nullable(Period.class), eq("Bán"));
+                nullable(Period.class), eq("Bán"), nullable(String.class));
         verify(request).setAttribute("kind", "sell");
+    }
+
+    // ------------------------------------------------------------------
+    // POST ?action=changeProgress -- trục tiến độ
+    // ------------------------------------------------------------------
+    //
+    // KH trả lời 2026-09-15: nhân viên không tự ký hợp đồng được. Trước V24
+    // câu đó không diễn đạt nổi -- signing_date NOT NULL nên tạo hợp đồng là đã
+    // ký, không có khoảnh khắc nào để chặn.
+
+    @Test
+    public void sign_userWithAManager_isRefused() throws Exception {
+        loginAs("Sales", 42); // có cấp trên => là nhân viên, không phải người chốt
+        when(request.getParameter("action")).thenReturn("changeProgress");
+        when(request.getParameter("contractId")).thenReturn("5");
+        when(request.getParameter("toStatus")).thenReturn(ContractDAO.PROGRESS_SIGNED);
+        when(contractDAO.findById(5)).thenReturn(contractWithProgress(ContractDAO.PROGRESS_DRAFT));
+
+        controller.doPost(request, response);
+
+        verify(contractDAO, never()).changeProgressStatus(anyInt(), anyString(), anyInt(), any());
+        verify(response).sendError(eq(HttpServletResponse.SC_FORBIDDEN), anyString());
+    }
+
+    @Test
+    public void sign_userWithoutAManager_isAllowed() throws Exception {
+        when(request.getParameter("action")).thenReturn("changeProgress");
+        when(request.getParameter("contractId")).thenReturn("5");
+        when(request.getParameter("toStatus")).thenReturn(ContractDAO.PROGRESS_SIGNED);
+        when(contractDAO.findById(5)).thenReturn(contractWithProgress(ContractDAO.PROGRESS_DRAFT));
+        when(contractDAO.changeProgressStatus(eq(5), eq(ContractDAO.PROGRESS_SIGNED), anyInt(), any()))
+                .thenReturn(true);
+
+        controller.doPost(request, response);
+
+        verify(contractDAO).changeProgressStatus(eq(5), eq(ContractDAO.PROGRESS_SIGNED), eq(99), any());
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=view&id=5");
+    }
+
+    /**
+     * Cấp dưới bị chặn ở TẦNG QUYỀN, không phải bởi luật ký.
+     *
+     * <p>AccessControl siết người có cấp trên xuống chỉ-xem trên Hợp đồng, nên
+     * họ không thực hiện được bước tiến độ nào cả -- kể cả thanh lý, vốn không
+     * liên quan gì tới chữ ký. Ghi lại ở đây vì dễ hiểu nhầm thành "luật ký
+     * chặn họ", rồi có người đi nới canSign để cho thanh lý và tưởng đã xong.
+     */
+    @Test
+    public void changeProgress_subordinate_isBlockedByAccessControl() throws Exception {
+        loginAs("Sales", 42);
+        when(request.getParameter("action")).thenReturn("changeProgress");
+        when(request.getParameter("contractId")).thenReturn("5");
+        when(request.getParameter("toStatus")).thenReturn(ContractDAO.PROGRESS_LIQUIDATED);
+        when(request.getParameter("progressNote")).thenReturn("Biên bản thanh lý số 12");
+
+        controller.doPost(request, response);
+
+        verify(contractDAO, never()).changeProgressStatus(anyInt(), anyString(), anyInt(), any());
+        verify(response).sendError(eq(HttpServletResponse.SC_FORBIDDEN), anyString());
+    }
+
+    /**
+     * Ngược lại: luật ký KHÔNG được tự suy rộng sang các bước khác. Người quản
+     * được hợp đồng thì thanh lý được, không phải đi qua canSign lần nữa.
+     */
+    @Test
+    public void liquidate_managerRole_isAllowedWithReason() throws Exception {
+        when(request.getParameter("action")).thenReturn("changeProgress");
+        when(request.getParameter("contractId")).thenReturn("5");
+        when(request.getParameter("toStatus")).thenReturn(ContractDAO.PROGRESS_LIQUIDATED);
+        when(request.getParameter("progressNote")).thenReturn("Biên bản thanh lý số 12");
+        when(contractDAO.findById(5)).thenReturn(contractWithProgress(ContractDAO.PROGRESS_SIGNED));
+        when(contractDAO.changeProgressStatus(anyInt(), anyString(), anyInt(), any())).thenReturn(true);
+
+        controller.doPost(request, response);
+
+        verify(contractDAO).changeProgressStatus(eq(5), eq(ContractDAO.PROGRESS_LIQUIDATED), eq(99),
+                eq("Biên bản thanh lý số 12"));
+    }
+
+    @Test
+    public void changeProgress_contractNotFound_redirectsWithNotFound() throws Exception {
+        when(request.getParameter("action")).thenReturn("changeProgress");
+        when(request.getParameter("contractId")).thenReturn("999999");
+        when(request.getParameter("toStatus")).thenReturn(ContractDAO.PROGRESS_SIGNED);
+        when(contractDAO.findById(999999)).thenReturn(null);
+
+        controller.doPost(request, response);
+
+        verify(contractDAO, never()).changeProgressStatus(anyInt(), anyString(), anyInt(), any());
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?error=notfound");
     }
 
     // ------------------------------------------------------------------
@@ -376,18 +484,38 @@ public class ContractControllerTest {
     // Admin, có lý do, có dấu vết.
 
     @Test
-    public void delete_salesRole_isRefusedEvenForAnExistingContract() throws Exception {
+    public void delete_salesRole_signedContract_isRefused() throws Exception {
         when(request.getParameter("action")).thenReturn("delete");
         when(request.getParameter("id")).thenReturn("5");
         when(request.getParameter("voidReason")).thenReturn("Nhập trùng");
-        when(contractDAO.findById(5)).thenReturn(new Contract());
+        when(contractDAO.findById(5)).thenReturn(contractWithProgress(ContractDAO.PROGRESS_SIGNED));
 
         controller.doPost(request, response);
 
-        // loginAs("Sales") ở setUp: có Full access trên CONTRACT nhưng vẫn
-        // không được huỷ bản ghi. Đây là ranh giới mới, dễ bị xoá nhầm khi ai
-        // đó "dọn" requireAdmin về lại requireFullAccess cho đồng bộ.
+        // loginAs("Sales") ở setUp: có Full access trên CONTRACT nhưng hợp đồng
+        // ĐÃ KÝ thì vẫn không huỷ được. Ranh giới này dễ bị xoá nhầm khi ai đó
+        // "dọn" requireAdmin về lại requireFullAccess cho đồng bộ.
         verify(contractDAO, never()).voidRecord(anyInt(), anyInt(), anyString());
+    }
+
+    /**
+     * Bản NHÁP thì ai quản được hợp đồng cũng xoá được -- nó chưa ký, chưa là
+     * chứng cứ gì. Đây đúng là điều kiện của BR-46 cũ ("chưa ký"), thứ mà trước
+     * V24 không với tới được vì signing_date NOT NULL khiến mọi hợp đồng đều đã
+     * ký.
+     */
+    @Test
+    public void delete_salesRole_draftContract_isAllowed() throws Exception {
+        when(request.getParameter("action")).thenReturn("delete");
+        when(request.getParameter("id")).thenReturn("5");
+        when(request.getParameter("voidReason")).thenReturn("Soạn nhầm khách hàng");
+        when(contractDAO.findById(5)).thenReturn(contractWithProgress(ContractDAO.PROGRESS_DRAFT));
+        when(contractDAO.voidRecord(eq(5), anyInt(), anyString())).thenReturn(true);
+
+        controller.doPost(request, response);
+
+        verify(contractDAO).voidRecord(5, 99, "Soạn nhầm khách hàng");
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract");
     }
 
     @Test
@@ -410,7 +538,7 @@ public class ContractControllerTest {
         when(request.getParameter("action")).thenReturn("delete");
         when(request.getParameter("id")).thenReturn("5");
         when(request.getParameter("voidReason")).thenReturn("Nhập trùng với HD-0042");
-        when(contractDAO.findById(5)).thenReturn(new Contract());
+        when(contractDAO.findById(5)).thenReturn(contractWithProgress(ContractDAO.PROGRESS_SIGNED));
         when(contractDAO.voidRecord(eq(5), anyInt(), anyString())).thenReturn(true);
 
         controller.doPost(request, response);

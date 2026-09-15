@@ -5,7 +5,9 @@
 <%--
     Request attribute do ContractController#showDetail thiết lập trước khi forward tới trang này:
       - contract         : poscs.model.Contract (có sẵn .enterprise và .owner đã join, .status đã tính theo BR-17)
-      - canVoid          : boolean -- true nếu người đang xem là Admin (chỉ Admin huỷ được bản ghi nhập nhầm)
+      - canVoid          : boolean -- Admin, hoặc người quản được hợp đồng khi nó còn là bản Nháp
+      - canSign          : boolean -- true nếu hợp đồng đang là Nháp VÀ người xem được ký (không có cấp trên)
+      - canClose         : boolean -- true nếu hợp đồng Đã ký và người xem quản được hợp đồng (thanh lý/chấm dứt)
       - contractProducts : List<poscs.model.ContractProduct> -- hạng mục sản phẩm/dịch vụ (chỉ đọc)
       - contractHistory  : List<poscs.model.ContractHistory> -- nhật ký thay đổi, mới nhất trước
 
@@ -49,6 +51,17 @@
         .status-pill .dot { width: 6px; height: 6px; border-radius: 50%; }
         .status-soon { background: #fff4e0; color: var(--warning); }
         .status-soon .dot { background: var(--warning); }
+
+        /* Nhãn trục TIẾN ĐỘ -- viền nét đứt để mắt phân biệt ngay với nhãn
+           trục lịch đặc bên cạnh, vì hai nhãn nói hai chuyện khác nhau. */
+        .progress-pill {
+            display: inline-flex; align-items: center; padding: 3px 11px; border-radius: 20px;
+            font-size: 0.72rem; font-weight: 600; white-space: nowrap; margin-left: 8px;
+            border: 1.5px dashed transparent;
+        }
+        .progress-draft  { background: #f3f4f6; color: #4b5563; border-color: #d1d5db; }
+        .progress-signed { background: #e8f3ff; color: var(--primary-dark); border-color: var(--primary-light); }
+        .progress-frozen { background: #eef7ee; color: #2f6b34; border-color: #a8cfaa; }
 
         .header-actions { display: flex; gap: 10px; }
         .btn-edit-detail {
@@ -155,6 +168,12 @@
             <span>Phải có lý do thì mới huỷ được bản ghi hợp đồng.</span>
         </div>
     </c:if>
+    <c:if test="${param.error == 'progress_failed'}">
+        <div class="toast-msg blocked show">
+            <i class="fa-solid fa-circle-xmark"></i>
+            <span>Không chuyển được trạng thái — có thể hợp đồng đã được người khác chuyển trước đó.</span>
+        </div>
+    </c:if>
     <c:if test="${param.error == 'void_failed'}">
         <div class="toast-msg blocked show">
             <i class="fa-solid fa-circle-xmark"></i>
@@ -180,6 +199,16 @@
                             <c:when test="${contract.status == 'Đã hết hạn'}"><span class="status-pill status-expired"><span class="dot"></span>Đã hết hạn</span></c:when>
                             <c:otherwise><span class="status-pill status-draft"><span class="dot"></span>Chưa hiệu lực</span></c:otherwise>
                         </c:choose>
+                        <%-- Nhãn thứ hai, cạnh nhãn lịch ở trên, CỐ Ý không gộp:
+                             hai trục khác nhau và lệch nhau ở cả hai chiều. Một
+                             hợp đồng "Đã hết hạn" theo lịch mà vẫn "Đã ký" theo
+                             tiến độ nghĩa là hết hạn nhưng chưa thanh lý — đúng
+                             việc còn tồn mà người dùng cần nhìn ra. Gộp một nhãn
+                             là mất hẳn thông tin đó. --%>
+                        <span class="progress-pill progress-${contract.draft ? 'draft' : (contract.frozen ? 'frozen' : 'signed')}"
+                              title="Trạng thái tiến độ — do người đặt, khác với trạng thái theo lịch bên cạnh">
+                            ${fn:escapeXml(contract.progressStatus)}
+                        </span>
                     </h2>
                     <div style="color:#6b7280; font-size:0.85rem;">Khách hàng:
                         <a href="${pageContext.request.contextPath}/customer?action=view&id=${contract.enterpriseId}" style="color:var(--primary); font-weight:600; text-decoration:none;">
@@ -219,8 +248,37 @@
                     </span>
                 </c:if>
                 <a href="${pageContext.request.contextPath}/contract?action=exportPdf&id=${contract.contractId}" class="btn-delete-detail" style="cursor:pointer; color:var(--primary); border-color:#e5e7eb;"><i class="fa-solid fa-file-pdf"></i> Xuất PDF</a>
-                <c:if test="${canManage}">
+                <%-- Hợp đồng đã đóng băng thì không sửa nữa, kể cả cấp cao —
+                     luật KH. Ẩn nút chỉ là phép lịch sự; chặn thật ở
+                     ContractDAO.update. --%>
+                <c:if test="${canManage and not contract.frozen}">
                     <a href="${pageContext.request.contextPath}/contract?action=edit&id=${contract.contractId}" class="btn-edit-detail"><i class="fa-solid fa-pen"></i> Sửa thông tin</a>
+                </c:if>
+                <c:if test="${canSign}">
+                    <button type="button" class="btn-edit-detail" style="cursor:pointer;"
+                            onclick="changeProgress('Đã ký', 'Ký hợp đồng này?
+
+Sau khi ký, nội dung trở thành chứng cứ và không quay lại bản nháp được.', false)">
+                        <i class="fa-solid fa-signature"></i> Ký hợp đồng
+                    </button>
+                </c:if>
+                <c:if test="${canClose}">
+                    <button type="button" class="btn-delete-detail" style="cursor:pointer; color:var(--primary); border-color:#e5e7eb;"
+                            onclick="changeProgress('Đã thanh lý', 'Thanh lý hợp đồng — đây là lúc hợp đồng coi như xong.
+
+Sau thanh lý KHÔNG sửa được nữa, kể cả cấp cao.
+
+Nhập căn cứ (số biên bản thanh lý, ngày ký biên bản...):', true)">
+                        <i class="fa-solid fa-file-circle-check"></i> Thanh lý
+                    </button>
+                    <button type="button" class="btn-delete-detail" style="cursor:pointer; color:var(--warning); border-color:var(--warning);"
+                            onclick="changeProgress('Chấm dứt sớm', 'Chấm dứt hợp đồng trước hạn.
+
+Cũng đóng băng vĩnh viễn như thanh lý, chỉ khác lý do.
+
+Nhập lý do:', true)">
+                        <i class="fa-solid fa-ban"></i> Chấm dứt sớm
+                    </button>
                 </c:if>
                 <%-- Huỷ bản ghi đứng NGOÀI canManage: nó không còn là thao tác
                      nghiệp vụ của Sales mà là việc sửa hậu quả nhập liệu sai,
@@ -441,6 +499,15 @@
         <input type="hidden" name="voidReason" id="deleteFormReason">
     </form>
 
+    <!-- Form ẩn để gửi một bước chuyển trên trục tiến độ qua POST -->
+    <form id="progressForm" method="POST" action="${pageContext.request.contextPath}/contract" style="display:none">
+        <input type="hidden" name="csrfToken" value="${csrfToken}">
+        <input type="hidden" name="action" value="changeProgress">
+        <input type="hidden" name="contractId" value="${contract.contractId}">
+        <input type="hidden" name="toStatus" id="progressToStatus">
+        <input type="hidden" name="progressNote" id="progressNote">
+    </form>
+
     <!-- Form ẩn để gửi yêu cầu gỡ 1 dòng sản phẩm qua POST -->
     <form id="removeProductForm" method="POST" action="${pageContext.request.contextPath}/contract" style="display:none">
         <input type="hidden" name="csrfToken" value="${csrfToken}">
@@ -469,6 +536,29 @@
             document.getElementById('deleteFormId').value = contractId;
             document.getElementById('deleteFormReason').value = reason.trim();
             document.getElementById('deleteForm').submit();
+        }
+
+        // requireNote=true với thanh lý và chấm dứt sớm: hai bước đó đóng băng
+        // hợp đồng vĩnh viễn, không có đường quay lại, nên phải biết căn cứ.
+        // Ký thì chỉ cần xác nhận — ghi chú tuỳ chọn, để trống cũng ký được.
+        // Server kiểm lại cả hai điều (ContractDAO.changeProgressStatus).
+        function changeProgress(toStatus, message, requireNote) {
+            var note = null;
+            if (requireNote) {
+                note = prompt(message);
+                if (note === null) {
+                    return;
+                }
+                if (note.trim() === '') {
+                    alert('Phải nhập căn cứ thì mới thực hiện được — bước này không quay lại được.');
+                    return;
+                }
+            } else if (!confirm(message)) {
+                return;
+            }
+            document.getElementById('progressToStatus').value = toStatus;
+            document.getElementById('progressNote').value = note === null ? '' : note.trim();
+            document.getElementById('progressForm').submit();
         }
 
         function confirmRemoveProduct(contractProductId) {

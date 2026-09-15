@@ -23,7 +23,22 @@ public class Contract {
     private User owner;
 
     private String attachmentUrl;
+
+    /**
+     * Trục LỊCH: "Chưa hiệu lực"/"Đang hiệu lực"/"Sắp hết hạn"/"Đã hết hạn".
+     * Tính lại từ effective_date/end_date mỗi lần đọc (BR-17), không ai đặt
+     * được -- xem ContractDAO.computeStatus.
+     */
     private String status;
+
+    /**
+     * Trục TIẾN ĐỘ: "Nháp"/"Đã ký"/"Đã thanh lý"/"Chấm dứt sớm". Do người đặt.
+     *
+     * ĐỪNG trộn với {@link #status}. Hai trục lệch nhau ở CẢ HAI chiều -- hết
+     * hạn theo lịch mà chưa thanh lý, và thanh lý sớm mà theo lịch vẫn đang
+     * hiệu lực -- nên không suy ra cái này từ cái kia được.
+     */
+    private String progressStatus;
 
     private Timestamp createdAt;
     private Timestamp updatedAt;
@@ -96,6 +111,27 @@ public class Contract {
 
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }
+
+    public String getProgressStatus() { return progressStatus; }
+    public void setProgressStatus(String progressStatus) { this.progressStatus = progressStatus; }
+
+    // Chuỗi viết lại ở đây thay vì tham chiếu ContractDAO.PROGRESS_*: model
+    // không phụ thuộc ngược lên tầng DAO. Có test canh hai bên không lệch nhau
+    // (ContractDAOTest.progressConstants_matchTheOnesOnTheModel).
+    private static final String DRAFT = "Nháp";
+    private static final String LIQUIDATED = "Đã thanh lý";
+    private static final String TERMINATED = "Chấm dứt sớm";
+
+    /** true nếu hợp đồng chưa ký -- còn sửa thoải mái, và còn xoá được. */
+    public boolean isDraft() { return DRAFT.equals(progressStatus); }
+
+    /**
+     * true nếu hợp đồng đã đóng băng (thanh lý hoặc chấm dứt sớm): không đổi
+     * được nữa, kể cả cấp cao. Phát sinh sau đó phải đi qua hợp đồng mới.
+     */
+    public boolean isFrozen() {
+        return LIQUIDATED.equals(progressStatus) || TERMINATED.equals(progressStatus);
+    }
 
     public Timestamp getCreatedAt() { return createdAt; }
     public void setCreatedAt(Timestamp createdAt) { this.createdAt = createdAt; }
