@@ -34,6 +34,23 @@ any role — every single action (including list/view) requires Admin.
 
 `Full` = create, read, update, delete. `View only` = list + detail views, no create/update/delete.
 
+**One exception to the "delete" half: Contract.** A signed contract is legal
+evidence, so there is no business delete for it any more — `Full` on Contract
+means create/read/update only. What remains is *voiding a mis-entered record*
+(`action=delete`, `ContractDAO.voidRecord`), which is gated by
+`AccessControl.requireAdmin` rather than `requireFullAccess`, requires a
+written reason, and always leaves a `contract_history` row. So `Sales` has Full
+access on Contract yet cannot void one. The detail page exposes this through a
+separate `canVoid` attribute (`isAdmin`), not `canManage`, and the list screen
+has no delete button at all.
+
+This replaced BR-46, which allowed deleting while the status was
+"Chưa hiệu lực". That status is computed from `effective_date`, so a contract
+signed yesterday but effective next month was still deletable together with
+everything it said. The correct condition would have been *not yet signed*, and
+`signing_date` is `NOT NULL` — no row is unsigned, which is why the business
+delete disappeared rather than being re-gated.
+
 `Sales` is split into the two tiers of the org chart: a **manager** (`quản lý
 vùng`) and the **staff** under them (`nhân viên cầm tỉnh`, one province each).
 Every other role is a single tier — a `Kỹ thuật` or `CSKH` user having a
