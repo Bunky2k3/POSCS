@@ -193,6 +193,12 @@
     <%@ include file="/jsp/common/topbar.jsp" %>
     <div class="app-shell">
         <c:set var="activeNav" value="customer" scope="request"/>
+        <%-- Trang này không có tham số kind trên URL, nên suy mục con cần tô
+             sáng từ chính vai của khách: chỉ khi khách CHỈ là bên bán mới sáng
+             "Khách hàng bán". Khách hai vai thì sáng "Khách hàng mua" -- phải
+             chọn một, và đó là danh sách mặc định. --%>
+        <c:set var="activeCustomerKind" scope="request"
+               value="${not empty customerRoles and customerRoles.contains('Khách bán') and not customerRoles.contains('Khách mua') ? 'supplier' : 'buyer'}"/>
         <%@ include file="/jsp/common/sidebar.jsp" %>
         <div class="main-content">
 
@@ -244,6 +250,19 @@
                 <div class="col-md-6 field-row">
                     <label>Nhóm khách hàng</label>
                     <div class="view-value">${fn:escapeXml(customer.customerGroup)}</div>
+                </div>
+                <%-- Vai quyết định khách này nằm ở danh sách nào. Hiện cả hai
+                     khi công ty vừa mua vừa bán -- đó là trạng thái hợp lệ. --%>
+                <div class="col-md-6 field-row">
+                    <label>Vai</label>
+                    <div class="view-value">
+                        <c:choose>
+                            <c:when test="${not empty customerRoles}">
+                                <c:forEach var="r" items="${customerRoles}" varStatus="st">${r == 'Khách bán' ? 'Khách hàng bán' : 'Khách hàng mua'}<c:if test="${!st.last}">, </c:if></c:forEach>
+                            </c:when>
+                            <c:otherwise>&mdash;</c:otherwise>
+                        </c:choose>
+                    </div>
                 </div>
                 <div class="col-md-6 field-row">
                     <label>Người phụ trách chính</label>

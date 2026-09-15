@@ -4530,6 +4530,20 @@ CREATE TABLE `user_provinces` (
   CONSTRAINT `fk_user_provinces_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+DROP TABLE IF EXISTS `enterprise_roles`;
+CREATE TABLE `enterprise_roles` (
+  `enterprise_role_id` int NOT NULL AUTO_INCREMENT,
+  `enterprise_id` int NOT NULL,
+  -- 'Khách mua'  = bên đó MUA của mình  -> gắn với hợp đồng 'Bán'
+  -- 'Khách bán'  = bên đó BÁN cho mình  -> gắn với hợp đồng 'Mua'
+  `role` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`enterprise_role_id`),
+  UNIQUE KEY `uq_enterprise_roles` (`enterprise_id`, `role`),
+  CONSTRAINT `fk_enterprise_roles_enterprise` FOREIGN KEY (`enterprise_id`)
+      REFERENCES `enterprises` (`enterprise_id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 DROP TABLE IF EXISTS `change_requests`;
 CREATE TABLE `change_requests` (
   `request_id` int NOT NULL AUTO_INCREMENT,
@@ -4602,6 +4616,12 @@ INSERT INTO enterprises (enterprise_code, enterprise_name, customer_type, custom
 ('KH-0011', 'Công ty Cổ phần Hạ tầng mạng Sầm Sơn', 'Nhà thầu thi công', 'Thân thiết', '2801234577', 'lienhe@htmsamson.example.com', '0237801011', 'https://htmsamson.example.com', (SELECT address_id FROM addresses WHERE street_and_local_name = '18 Đường Nguyễn Du' AND districts_id = 1369 LIMIT 1), (SELECT user_id FROM users WHERE username = 'sales5'), (SELECT user_id FROM users WHERE username = 'sales4'), 'Trịnh Bá Long', 'Active', 'Có nguy cơ rời bỏ', '2023-06-21');
 INSERT INTO enterprises (enterprise_code, enterprise_name, customer_type, customer_group, tax_code, email, phone, website, address_id, account_owner_id, support_owner_id, legal_representative, status, current_relationship_rating, join_date) VALUES
 ('KH-0012', 'Công ty TNHH Giải pháp mạng Xứ Nghệ', 'Nhà mạng viễn thông', 'Thường', '2901234578', 'lienhe@gpmxunghe.example.com', '0238801012', 'https://gpmxunghe.example.com', (SELECT address_id FROM addresses WHERE street_and_local_name = '63 Đường Lê Duẩn' AND districts_id = 1535 LIMIT 1), (SELECT user_id FROM users WHERE username = 'sales6'), (SELECT user_id FROM users WHERE username = 'sales2'), 'Đặng Quang Vinh', 'Active', 'Tốt', '2024-10-30');
+
+-- ===== Vai của khách hàng =====
+-- Toàn bộ khách demo đều là bên MUA của mình: mọi hợp đồng bên dưới đều là
+-- mình cung cấp ra, chưa có hợp đồng mua vào nào.
+INSERT INTO enterprise_roles (enterprise_id, role)
+SELECT enterprise_id, 'Khách mua' FROM enterprises;
 
 -- ===== Người liên hệ =====
 INSERT INTO enterprisecontacts (enterprise_id, contact_last_name, contact_middle_name, contact_first_name, contact_phone, contact_email, position) VALUES

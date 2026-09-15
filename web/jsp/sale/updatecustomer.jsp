@@ -59,6 +59,20 @@
 
         .error-text { color: var(--danger); font-size: 12px; margin-top: 5px; display: none; }
 
+        /* Hai vai là hai ô tick ĐỘC LẬP, không phải radio: khách vừa mua vừa
+           bán thì tick cả hai. Viền + nền để nhìn ra ngay đây là ô chọn được,
+           khác hẳn dòng chữ thường. */
+        .role-check-group { display: flex; gap: 10px; flex-wrap: wrap; }
+        .role-check {
+            display: inline-flex; align-items: center; gap: 8px; cursor: pointer;
+            padding: 0.55rem 0.9rem; border: 1px solid #e5e7eb; border-radius: 10px;
+            background: #f9fafb; font-size: 0.86rem; font-weight: 600; color: #374151;
+            text-transform: none; letter-spacing: 0; margin-bottom: 0;
+        }
+        .role-check:hover { border-color: var(--primary-light); background: #fff; }
+        .role-check small { color: #9ca3af; font-weight: 500; }
+        .role-check input { width: 15px; height: 15px; accent-color: var(--primary); }
+
         /* ===== Logo doanh nghiệp ===== */
         .logo-upload-wrap { display: flex; flex-direction: column; align-items: center; margin-bottom: 24px; }
         .logo-avatar-wrap { position: relative; width: 92px; height: 92px; }
@@ -98,6 +112,12 @@
     <%@ include file="/jsp/common/topbar.jsp" %>
     <div class="app-shell">
         <c:set var="activeNav" value="customer" scope="request"/>
+        <%-- Trang này không có tham số kind trên URL, nên suy mục con cần tô
+             sáng từ chính vai của khách: chỉ khi khách CHỈ là bên bán mới sáng
+             "Khách hàng bán". Khách hai vai thì sáng "Khách hàng mua" -- phải
+             chọn một, và đó là danh sách mặc định. --%>
+        <c:set var="activeCustomerKind" scope="request"
+               value="${not empty customerRoles and customerRoles.contains('Khách bán') and not customerRoles.contains('Khách mua') ? 'supplier' : 'buyer'}"/>
         <%@ include file="/jsp/common/sidebar.jsp" %>
         <div class="main-content">
 
@@ -172,6 +192,20 @@
                             <option value="Thường" ${customer.customerGroup == 'Thường' ? 'selected' : ''}>Khách hàng thường</option>
                         </select>
                         <span class="error-text" id="err-customerGroup">Vui lòng chọn nhóm khách hàng.</span>
+                    </div>
+                    <div class="col-md-6 field-row">
+                        <label>Vai của khách hàng <span class="req">*</span></label>
+                        <%-- Hai vai độc lập, không phải hai lựa chọn loại trừ: một công
+                             ty vừa mua thiết bị vừa cung cấp linh kiện thì tick cả hai và
+                             nó xuất hiện ở cả hai danh sách. Đó là lý do vai nằm ở bảng
+                             riêng chứ không phải một cột trên enterprises (xem V20). --%>
+                        <div class="role-check-group">
+                            <label class="role-check"><input type="checkbox" name="roles" value="Khách mua"
+                                ${customerRoles.contains('Khách mua') ? 'checked' : ''}> Khách hàng mua <small>(mua của mình)</small></label>
+                            <label class="role-check"><input type="checkbox" name="roles" value="Khách bán"
+                                ${customerRoles.contains('Khách bán') ? 'checked' : ''}> Khách hàng bán <small>(bán cho mình)</small></label>
+                        </div>
+                        <span class="error-text" id="err-roles">Chọn ít nhất một vai.</span>
                     </div>
                     <div class="col-md-6 field-row">
                         <label>Người phụ trách chính <span class="req">*</span></label>
@@ -392,6 +426,12 @@
                 var el = document.getElementById(id);
                 if (!el.value) { document.getElementById('err-' + id).style.display = 'block'; valid = false; }
             });
+
+            // Ít nhất một vai. Server chặn lại lần nữa -- không có vai nào thì
+            // khách lưu được nhưng biến khỏi cả hai danh sách.
+            if (document.querySelectorAll('input[name="roles"]:checked').length === 0) {
+                document.getElementById('err-roles').style.display = 'block'; valid = false;
+            }
 
             var name = document.getElementById('customerName');
             if (!name.value.trim()) { document.getElementById('err-customerName').style.display = 'block'; valid = false; }

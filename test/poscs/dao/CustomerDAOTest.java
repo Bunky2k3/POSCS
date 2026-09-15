@@ -209,7 +209,7 @@ public class CustomerDAOTest {
         try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
             db.when(DBContext::getConnection).thenReturn(conn);
 
-            dao.findAll(1, 10, null, null, 7, null, false);
+            dao.findAll(1, 10, null, null, 7, null, false, null);
 
             String sql = capturedSql(conn);
             assertTrue(sql.contains("e.account_owner_id = ?"));
@@ -388,7 +388,7 @@ public class CustomerDAOTest {
         try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
             db.when(DBContext::getConnection).thenReturn(conn);
 
-            dao.findAll(1, 10, null, null, null, 3, false);
+            dao.findAll(1, 10, null, null, null, 3, false, null);
 
             // Tỉnh nằm ở districts.province_id chứ không phải trên enterprises.
             assertTrue(capturedSql(conn).contains("d.province_id = ?"));
@@ -410,7 +410,7 @@ public class CustomerDAOTest {
         try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
             db.when(DBContext::getConnection).thenReturn(conn);
 
-            assertEquals(4, dao.countAll(null, null, null, 3));
+            assertEquals(4, dao.countAll(null, null, null, 3, null));
 
             String sql = capturedSql(conn);
             assertTrue(sql.contains("LEFT JOIN addresses a"));
@@ -427,7 +427,7 @@ public class CustomerDAOTest {
         try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
             db.when(DBContext::getConnection).thenReturn(conn);
 
-            dao.findAll(1, 10, null, null, null, null, true);
+            dao.findAll(1, 10, null, null, null, null, true, null);
 
             String sql = capturedSql(conn);
             assertTrue(sql.contains("ORDER BY p.province_name IS NULL"));
@@ -444,7 +444,7 @@ public class CustomerDAOTest {
         try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
             db.when(DBContext::getConnection).thenReturn(conn);
 
-            dao.findAll(1, 10, null, null, null, null, false);
+            dao.findAll(1, 10, null, null, null, null, false, null);
 
             String sql = capturedSql(conn);
             assertTrue(sql.contains("ORDER BY e.enterprise_id DESC"));
@@ -461,6 +461,109 @@ public class CustomerDAOTest {
             e.setEnterpriseId(12);
 
             assertFalse(dao.update(e));
+        }
+    }
+
+    // ==================================================================
+    // Vai của khách hàng (enterprise_roles)
+    // ==================================================================
+
+    /**
+     * Lọc theo vai phải dùng EXISTS, KHÔNG phải JOIN: công ty giữ cả hai vai
+     * khớp hai dòng ở enterprise_roles, JOIN vào là nó hiện hai lần trong
+     * danh sách và số đếm phân trang cũng lệch theo.
+     */
+    @Test
+    public void findAll_locTheoVai_dungExistsChuKhongJoin() throws Exception {
+        PreparedStatement ps = statementReturning(emptyResultSet());
+        Connection conn = connectionReturning(ps);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            dao.findAll(1, 10, null, null, null, null, false, "Khách bán");
+
+            String sql = capturedSql(conn);
+            assertTrue("phải lọc bằng EXISTS", sql.contains("EXISTS"));
+            assertFalse("không được JOIN enterprise_roles",
+                    sql.contains("JOIN enterprise_roles"));
+            // bindParams dùng setObject cho mọi tham số, không phải setString.
+            verify(ps).setObject(1, "Khách bán");
+        }
+    }
+
+    @Test
+    public void findAll_khongLocVai_khongThemDieuKienNao() throws Exception {
+        PreparedStatement ps = statementReturning(emptyResultSet());
+        Connection conn = connectionReturning(ps);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            dao.findAll(1, 10, null, null, null, null, false, null);
+
+            assertFalse(capturedSql(conn).contains("enterprise_roles"));
+        }
+    }
+
+    /**
+     * Danh sách rỗng vẫn phải XOÁ HẾT: gỡ toàn bộ vai là thao tác hợp lệ ở
+     * tầng DAO (luật "ít nhất một vai" chặn ở CustomerController), chứ không
+     * được lặng lẽ giữ nguyên vai cũ.
+     */
+    @Test
+    public void replaceRolesOf_danhSachRong_vanXoaHet() throws Exception {
+        PreparedStatement del = mock(PreparedStatement.class);
+        PreparedStatement ins = mock(PreparedStatement.class);
+        Connection conn = mock(Connection.class);
+        when(conn.prepareStatement(contains("DELETE"))).thenReturn(del);
+        when(conn.prepareStatement(contains("INSERT"))).thenReturn(ins);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            assertTrue(dao.replaceRolesOf(5, List.of()));
+
+            verify(del).executeUpdate();
+            verify(ins, never()).executeBatch();
+            verify(conn).commit();
+        }
+    }
+
+    /**
+     * Xoá rồi chèn phải nằm trong MỘT transaction: chèn lỗi giữa chừng mà đã
+     * commit phần xoá thì khách đó mất sạch vai và biến khỏi cả hai danh sách.
+     */
+    @Test
+    public void replaceRolesOf_chenLoi_rollbackChuKhongDeMatVaiCu() throws Exception {
+        PreparedStatement del = mock(PreparedStatement.class);
+        PreparedStatement ins = mock(PreparedStatement.class);
+        when(ins.executeBatch()).thenThrow(new SQLException("trùng vai"));
+        Connection conn = mock(Connection.class);
+        when(conn.prepareStatement(contains("DELETE"))).thenReturn(del);
+        when(conn.prepareStatement(contains("INSERT"))).thenReturn(ins);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            assertFalse(dao.replaceRolesOf(5, List.of("Khách mua")));
+
+            verify(conn).rollback();
+            verify(conn, never()).commit();
+        }
+    }
+
+    @Test
+    public void findRolesOf_traVeDuCaHaiVai() throws Exception {
+        PreparedStatement ps = statementReturning(resultSetOf(List.of(
+                row("role", "Khách bán"), row("role", "Khách mua"))));
+        Connection conn = connectionReturning(ps);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            assertEquals(List.of("Khách bán", "Khách mua"), dao.findRolesOf(5));
+            verify(ps).setInt(1, 5);
         }
     }
 
