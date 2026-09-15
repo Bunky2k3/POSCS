@@ -8,11 +8,9 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.LocalDate;
-import java.time.YearMonth;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.slf4j.Logger;
@@ -751,40 +749,6 @@ public class ContractDAO {
             LOG.error("Loi tinh doanh thu theo thang", ex);
         }
         return BigDecimal.ZERO;
-    }
-
-    /**
-     * Tổng tiền đã thu theo từng tháng trong N tháng gần nhất (tính cả
-     * tháng hiện tại), key "yyyy-MM", đủ N tháng kể cả tháng không có
-     * khoản thu nào (giá trị 0) -- phục vụ biểu đồ cột doanh thu.
-     */
-    public Map<String, BigDecimal> sumInvoiceAmountLastNMonths(int months) {
-        LinkedHashMap<String, BigDecimal> result = new LinkedHashMap<>();
-        YearMonth end = YearMonth.now();
-        YearMonth start = end.minusMonths(months - 1L);
-        for (YearMonth ym = start; !ym.isAfter(end); ym = ym.plusMonths(1)) {
-            result.put(ym.toString(), BigDecimal.ZERO);
-        }
-
-        String sql = "SELECT YEAR(paid_date) AS y, MONTH(paid_date) AS m, SUM(invoice_amount) AS total " +
-                     "FROM contract_payments " +
-                     "WHERE paid_date IS NOT NULL AND paid_date >= ? " +
-                     "GROUP BY YEAR(paid_date), MONTH(paid_date)";
-        try (Connection conn = DBContext.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setDate(1, java.sql.Date.valueOf(start.atDay(1)));
-            try (ResultSet rs = ps.executeQuery()) {
-                while (rs.next()) {
-                    String key = String.format("%04d-%02d", rs.getInt("y"), rs.getInt("m"));
-                    if (result.containsKey(key)) {
-                        result.put(key, rs.getBigDecimal("total"));
-                    }
-                }
-            }
-        } catch (SQLException ex) {
-            LOG.error("Loi tinh doanh thu theo n thang", ex);
-        }
-        return result;
     }
 
     /** Tổng tiền đã lập hoá đơn (thu hoặc chưa thu) của 1 hợp đồng cụ thể -- dùng làm "Giá trị" hợp đồng. */
