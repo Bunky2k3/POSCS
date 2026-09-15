@@ -121,8 +121,20 @@
 
                     <div class="col-md-4 field-row">
                         <label>Ngày ký <span class="req">*</span></label>
-                        <input type="date" class="form-control" id="signDate" name="signDate" value="<fmt:formatDate value="${contract.signingDate}" pattern="yyyy-MM-dd"/>">
-                        <span class="error-text" id="err-dates">Ngày ký, ngày hiệu lực, ngày hết hạn không hợp lệ.</span>
+                        <%-- CHỈ ĐỌC, và không gửi lên (không có name). Ngày ký là
+                             dấu của một hành động đã xảy ra, do hệ thống đóng lúc
+                             bấm Ký -- sửa lại được thì nó thành một ô khai báo, và
+                             hợp đồng đã ký có thể bị lùi ngày. ContractController
+                             cũng giữ nguyên giá trị cũ khi lưu, không đọc từ form. --%>
+                        <input type="date" class="form-control" id="signDate" disabled
+                               value="<fmt:formatDate value="${contract.signingDate}" pattern="yyyy-MM-dd"/>">
+                        <span style="font-size:0.78rem; color:#9ca3af; display:block; margin-top:6px;">
+                            <c:choose>
+                                <c:when test="${contract.signingDate == null}">Chưa ký — ngày ký ghi vào lúc bấm "Ký hợp đồng".</c:when>
+                                <c:otherwise>Ngày ký đã chốt, không sửa được.</c:otherwise>
+                            </c:choose>
+                        </span>
+                        <span class="error-text" id="err-dates">Ngày hiệu lực phải trước hoặc bằng ngày kết thúc.</span>
                     </div>
                     <div class="col-md-4 field-row">
                         <label>Ngày hiệu lực <span class="req">*</span></label>
@@ -185,10 +197,10 @@
                 if (!el.value) { document.getElementById('err-' + id).style.display = 'block'; valid = false; }
             });
 
-            var signDate = document.getElementById('signDate').value;
+
             var effectiveDate = document.getElementById('effectiveDate').value;
             var endDate = document.getElementById('endDate').value;
-            if (!signDate || !effectiveDate || !endDate || !(signDate <= effectiveDate && effectiveDate <= endDate)) {
+            if (!effectiveDate || !endDate || !(effectiveDate <= endDate)) {
                 document.getElementById('err-dates').style.display = 'block';
                 valid = false;
             }

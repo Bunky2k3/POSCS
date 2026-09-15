@@ -120,18 +120,26 @@
                         <span class="error-text" id="err-contractType">Vui lòng chọn loại hợp đồng.</span>
                     </div>
 
-                    <div class="col-md-4 field-row">
-                        <label>Ngày ký <span class="req">*</span></label>
-                        <input type="date" class="form-control" id="signDate" name="signDate">
-                        <span class="error-text" id="err-dates">Ngày ký, ngày hiệu lực, ngày hết hạn không hợp lệ.</span>
-                    </div>
-                    <div class="col-md-4 field-row">
-                        <label>Ngày hiệu lực <span class="req">*</span></label>
+                    <%-- KHÔNG có ô "Ngày ký" ở form tạo. Hợp đồng mới ra ở trạng
+                         thái Nháp; ngày ký được đóng dấu lúc bấm nút Ký ở trang
+                         chi tiết. Để ô này lại thì người dùng điền vào và sinh
+                         ra bản ghi tự mâu thuẫn -- tiến độ ghi "Nháp" mà vẫn có
+                         ngày ký -- đồng thời mở đường ký lùi ngày. --%>
+                    <div class="col-md-6 field-row">
+                        <label>Ngày hiệu lực dự kiến <span class="req">*</span></label>
                         <input type="date" class="form-control" id="effectiveDate" name="effectiveDate">
+                        <span class="error-text" id="err-dates">Ngày hiệu lực phải trước hoặc bằng ngày kết thúc.</span>
                     </div>
-                    <div class="col-md-4 field-row">
-                        <label>Ngày kết thúc <span class="req">*</span></label>
+                    <div class="col-md-6 field-row">
+                        <label>Ngày kết thúc dự kiến <span class="req">*</span></label>
                         <input type="date" class="form-control" id="endDate" name="endDate">
+                    </div>
+                    <div class="col-12 field-row">
+                        <div style="background:#f8fafc; border:1px solid #eef2f6; border-radius:10px; padding:10px 14px; font-size:0.82rem; color:#6b7280;">
+                            <i class="fa-solid fa-circle-info" style="color:var(--primary);"></i>
+                            Lưu xong, hợp đồng ở trạng thái <strong>Nháp</strong> — còn sửa và xoá thoải mái.
+                            Ngày ký được ghi vào lúc bấm <strong>Ký hợp đồng</strong> ở trang chi tiết.
+                        </div>
                     </div>
 
                     <div class="col-md-6 field-row">
@@ -149,7 +157,7 @@
                         <input type="url" class="form-control" id="attachmentUrl" name="attachmentUrl"
                                placeholder="VD: https://drive.google.com/file/d/...">
                         <span style="font-size:0.78rem; color:#9ca3af; display:block; margin-top:6px;">
-                            Tải bản PDF đã ký lên Drive rồi dán link vào đây. Không bắt buộc.
+                            Dán link bản thảo hoặc bản PDF đã ký trên Drive. Không bắt buộc, điền sau cũng được.
                         </span>
                     </div>
                 </div>
@@ -185,10 +193,10 @@
                 if (!el.value) { document.getElementById('err-' + id).style.display = 'block'; valid = false; }
             });
 
-            var signDate = document.getElementById('signDate').value;
+
             var effectiveDate = document.getElementById('effectiveDate').value;
             var endDate = document.getElementById('endDate').value;
-            if (!signDate || !effectiveDate || !endDate || !(signDate <= effectiveDate && effectiveDate <= endDate)) {
+            if (!effectiveDate || !endDate || !(effectiveDate <= endDate)) {
                 document.getElementById('err-dates').style.display = 'block';
                 valid = false;
             }

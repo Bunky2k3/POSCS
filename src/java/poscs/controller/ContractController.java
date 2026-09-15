@@ -34,6 +34,7 @@ import poscs.dao.EmployeeDAO;
 import poscs.dao.ProductDAO;
 import poscs.model.Address;
 import poscs.model.Contract;
+import poscs.model.ContractHistory;
 import poscs.model.ContractProduct;
 import poscs.model.District;
 import poscs.model.Enterprise;
@@ -265,7 +266,27 @@ public class ContractController extends HttpServlet {
                 ContractDAO.PROGRESS_SIGNED.equals(contract.getProgressStatus())
                         && AccessControl.hasFullAccess(request, AccessControl.Resource.CONTRACT));
         request.setAttribute("contractProducts", contractDAO.findProductsByContractId(id));
-        request.setAttribute("contractHistory", contractDAO.findHistoryByContractId(id));
+        List<ContractHistory> history = contractDAO.findHistoryByContractId(id);
+        request.setAttribute("contractHistory", history);
+
+        // Ba mốc vòng đời kéo riêng ra khỏi nhật ký để dựng thanh tiến trình ở
+        // đầu trang. Bản thân nhật ký vẫn còn nguyên bên dưới -- thanh tiến
+        // trình trả lời "đang ở đâu", nhật ký trả lời "đã đi qua những gì".
+        request.setAttribute("createdEvent", milestoneOf(history, ContractHistory.EVENT_CREATED));
+        request.setAttribute("signedEvent", milestoneOf(history, ContractHistory.EVENT_SIGNED));
+        ContractHistory closed = milestoneOf(history, ContractHistory.EVENT_LIQUIDATED);
+        if (closed == null) {
+            closed = milestoneOf(history, ContractHistory.EVENT_TERMINATED);
+        }
+        request.setAttribute("closedEvent", closed);
+
+        // Hết hạn theo LỊCH mà tiến độ vẫn "Đã ký" = hết hạn nhưng chưa thanh
+        // lý. Đây là việc còn tồn, và là toàn bộ lý do hai trục không gộp làm
+        // một -- nên nó phải hiện thành cảnh báo chứ không để người dùng tự
+        // đối chiếu hai cái nhãn.
+        request.setAttribute("overdueUnclosed",
+                ContractDAO.STATUS_EXPIRED.equals(contract.getStatus())
+                        && ContractDAO.PROGRESS_SIGNED.equals(contract.getProgressStatus()));
         // Danh sách sản phẩm còn hoạt động, phục vụ dropdown "Thêm sản phẩm" bên dưới bảng hạng mục.
         request.setAttribute("productOptions", productDAO.findAll(1, Integer.MAX_VALUE, null, null));
 
@@ -810,11 +831,16 @@ public class ContractController extends HttpServlet {
             return;
         }
 
+        Contract existing = contractDAO.findById(id);
         Contract c = buildContractFromRequest(request, new Contract());
         c.setContractId(id);
         // Giữ nguyên chiều cũ -- DAO.update cũng không ghi cột này. Nhưng vẫn
         // phải gán để kiểm được khách hàng mới chọn có đúng vai không.
-        c.setDirection(contractDAO.findById(id).getDirection());
+        c.setDirection(existing.getDirection());
+        // Ngày ký chép từ bản ghi đang có, KHÔNG lấy từ form (form hiển thị ô
+        // đó ở dạng chỉ đọc và không gửi lên): nó là dấu của một hành động đã
+        // xảy ra. Thiếu dòng này thì mỗi lần bấm Lưu là xoá mất ngày ký.
+        c.setSigningDate(existing.getSigningDate());
         if (!isValid(c) || !counterpartyMatchesDirection(c)) {
             response.sendRedirect(request.getContextPath() + "/contract?action=edit&id=" + id + "&error=invalid");
             return;
@@ -1010,6 +1036,16 @@ public class ContractController extends HttpServlet {
     // ------------------------------------------------------------------
     // Helpers
     // ------------------------------------------------------------------
+
+    /** Dòng nhật ký gần nhất của một loại mốc vòng đời, hoặc null nếu chưa xảy ra. */
+    private static ContractHistory milestoneOf(List<ContractHistory> history, String eventType) {
+        for (ContractHistory h : history) {
+            if (eventType.equals(h.getEventType())) {
+                return h;
+            }
+        }
+        return null;
+    }
 
     /**
      * user_id người đang thao tác, để ghi vào nhật ký hợp đồng.
