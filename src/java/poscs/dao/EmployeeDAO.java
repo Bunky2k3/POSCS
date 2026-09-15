@@ -857,37 +857,17 @@ public class EmployeeDAO {
     }
 
     /**
-     * Người đang cầm tỉnh này, hoặc null nếu chưa ai.
-     *
-     * "Chưa ai cầm" là trạng thái hợp lệ và là mặc định lúc mới bật tính năng
-     * -- bên gọi phải xử lý null chứ không được coi là lỗi.
-     */
-    public Integer findAssigneeOf(int provinceId) {
-        String sql = "SELECT up.user_id FROM user_provinces up " +
-                     "JOIN users u ON u.user_id = up.user_id AND u.is_deleted = 0 " +
-                     "WHERE up.province_id = ?";
-        try (Connection conn = DBContext.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, provinceId);
-            try (ResultSet rs = ps.executeQuery()) {
-                return rs.next() ? rs.getInt(1) : null;
-            }
-        } catch (SQLException ex) {
-            LOG.error("Loi tra nguoi cam tinh (provinceId={})", provinceId, ex);
-            return null;
-        }
-    }
-
-    /**
      * Người cầm tỉnh chứa xã/phường này, hoặc null nếu tỉnh đó chưa ai cầm.
      *
      * Suy từ xã/phường chứ KHÔNG nhận provinceId rời từ request: form gửi lên
      * cả hai ô, nhưng chỉ ô xã/phường mới thực sự đi vào địa chỉ khách hàng.
      * Tin vào provinceId rời thì một request nặn tay khai được tỉnh A để lấy
      * người của tỉnh A trong khi địa chỉ nằm ở tỉnh B -- đúng cái mà khoá ô
-     * người phụ trách sinh ra để chặn.
+     * người phụ trách sinh ra để chặn. Đó cũng là lý do ở đây KHÔNG có bản
+     * tra theo province_id: có là mời người ta dùng nhầm.
      *
-     * "Chưa ai cầm" là trạng thái hợp lệ, xem {@link #findAssigneeOf}.
+     * "Chưa ai cầm" là trạng thái hợp lệ và là mặc định lúc mới bật tính năng
+     * -- bên gọi phải xử lý null chứ không được coi là lỗi.
      */
     public Integer findAssigneeOfWard(int wardId) {
         String sql = "SELECT up.user_id FROM districts d " +
