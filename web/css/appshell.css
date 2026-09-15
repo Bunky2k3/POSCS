@@ -93,6 +93,24 @@ body { font-family: 'Inter', sans-serif; background: #f3f4f6; min-height: 100vh;
 .sidebar-link:hover { background: #f0f9ff; color: var(--primary-dark); }
 .sidebar-link.active { background: linear-gradient(120deg, var(--primary), var(--primary-light)); color: #fff; }
 .sidebar-link.active i { color: #fff; }
+/* Mục con của một nhóm điều hướng (vd Khách hàng mua / Khách hàng bán).
+   Thụt vào và nhỏ hơn để đọc ra ngay là cấp dưới, không phải mục ngang hàng. */
+.sidebar-sub { display: flex; flex-direction: column; }
+.sidebar-sub .sidebar-link {
+    padding-left: 42px; font-size: 0.84rem; font-weight: 500;
+}
+.sidebar-group-label {
+    display: flex; align-items: center; gap: 12px;
+    padding: 9px 12px 4px; color: #9ca3af;
+    font-weight: 700; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.04em;
+}
+.sidebar-group-label i { width: 18px; text-align: center; flex-shrink: 0; }
+/* Thu gọn thì nhãn nhóm và phần thụt đầu dòng đều vô nghĩa -- chỉ còn icon. */
+.sidebar.collapsed .sidebar-group-label span { display: none; }
+.sidebar.collapsed .sidebar-sub .sidebar-link { padding-left: 12px; }
+.sidebar.collapsed:hover .sidebar-sub .sidebar-link { padding-left: 42px; }
+.sidebar.collapsed:hover .sidebar-group-label span { display: inline; }
+
 .sidebar.collapsed { width: 68px; }
 .sidebar.collapsed .sidebar-link { justify-content: center; }
 .sidebar.collapsed .sidebar-link span { display: none; }

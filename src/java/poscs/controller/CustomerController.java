@@ -49,6 +49,16 @@ public class CustomerController extends HttpServlet {
     /** Vai được giao phụ trách khách hàng -- khớp roles.role_name, xem AccessControl. */
     private static final String SALES_ROLE = "Sales";
 
+    /**
+     * Hai vai của khách hàng, khớp enterprise_roles.role (xem ghi chú đầu V20).
+     *
+     * <p>Theo góc nhìn CỦA ĐỐI TÁC, không phải của mình: "Khách mua" là bên đó
+     * mua của mình. Cố ý không đặt là 'Mua'/'Bán' vì hợp đồng sẽ dùng đúng hai
+     * chữ đó theo chiều ngược lại.
+     */
+    private static final String ROLE_BUYER = "Khách mua";
+    private static final String ROLE_SUPPLIER = "Khách bán";
+
     private static final String LIST_VIEW = "/jsp/sale/listcustomer.jsp";
     private static final String DETAIL_VIEW = "/jsp/sale/viewcustomerdetail.jsp";
     private static final String CREATE_VIEW = "/jsp/sale/addnewcustomer.jsp";
@@ -133,10 +143,14 @@ public class CustomerController extends HttpServlet {
         String typeFilter = request.getParameter("type");
         Integer assigneeFilter = parseIntOrNull(request.getParameter("assigneeId"));
         Integer provinceFilter = parseIntOrNull(request.getParameter("provinceId"));
+        // Hai mục con trên thanh điều hướng đi vào cùng trang này, khác nhau ở
+        // đúng tham số kind. Giá trị lạ (hoặc thiếu) thì coi như khách mua --
+        // đó là danh sách cũ, và là chiều duy nhất có dữ liệu trước V20.
+        String roleFilter = roleFromKind(request.getParameter("kind"));
 
         List<Enterprise> customerList = customerDAO.findAll(page, PAGE_SIZE, keyword, typeFilter, assigneeFilter,
-                provinceFilter, false);
-        int totalCount = customerDAO.countAll(keyword, typeFilter, assigneeFilter, provinceFilter);
+                provinceFilter, false, roleFilter);
+        int totalCount = customerDAO.countAll(keyword, typeFilter, assigneeFilter, provinceFilter, roleFilter);
         int totalPages = Math.max(1, (int) Math.ceil(totalCount / (double) PAGE_SIZE));
 
         request.setAttribute("customerList", customerList);
@@ -154,6 +168,8 @@ public class CustomerController extends HttpServlet {
         request.setAttribute("typeFilter", typeFilter);
         request.setAttribute("assigneeFilter", assigneeFilter);
         request.setAttribute("provinceFilter", provinceFilter);
+        request.setAttribute("roleFilter", roleFilter);
+        request.setAttribute("kind", ROLE_SUPPLIER.equals(roleFilter) ? "supplier" : "buyer");
 
         request.getRequestDispatcher(LIST_VIEW).forward(request, response);
     }
@@ -173,6 +189,7 @@ public class CustomerController extends HttpServlet {
         request.setAttribute("contractList", contractDAO.findByEnterpriseId(id));
         request.setAttribute("ticketList", ticketDAO.findByEnterpriseId(id));
         request.setAttribute("lifecycleEventList", customerDAO.findLifecycleEventsByEnterpriseId(id));
+        request.setAttribute("customerRoles", customerDAO.findRolesOf(id));
 
         request.getRequestDispatcher(DETAIL_VIEW).forward(request, response);
     }
@@ -191,6 +208,11 @@ public class CustomerController extends HttpServlet {
         // đổi ô tỉnh -- dữ liệu nhỏ, và đỡ hẳn một endpoint phải gác quyền
         // riêng. Khoá thật nằm ở resolveAccountOwnerId, đây chỉ là tầng hiển thị.
         request.setAttribute("territoryAssignments", employeeDAO.findAllAssignments());
+        // Tick sẵn vai ứng với danh sách người dùng vừa đứng: bấm "Thêm" từ
+        // trang Khách hàng bán mà form mặc định là khách mua thì lưu xong nó
+        // rơi vào danh sách kia, và người nhập không hiểu vì sao.
+        request.setAttribute("customerRoles",
+                List.of(roleFromKind(request.getParameter("kind"))));
         request.getRequestDispatcher(CREATE_VIEW).forward(request, response);
     }
 
@@ -224,6 +246,7 @@ public class CustomerController extends HttpServlet {
         // Như showCreateForm: form sửa cũng phải khoá ô người phụ trách theo
         // địa bàn, nếu không thì đổi tỉnh ở đây là đường vòng thoát khoá.
         request.setAttribute("territoryAssignments", employeeDAO.findAllAssignments());
+        request.setAttribute("customerRoles", customerDAO.findRolesOf(id));
         request.getRequestDispatcher(UPDATE_VIEW).forward(request, response);
     }
 
@@ -237,8 +260,11 @@ public class CustomerController extends HttpServlet {
         // Sắp theo tỉnh (sortByProvince=true): quản lý khách hàng chia theo địa bàn
         // nên file xuất ra phải gom các dòng cùng tỉnh lại với nhau, không phải
         // mới-nhất-trước như danh sách trên màn hình.
+        // Xuất đúng danh sách đang xem: đứng ở "Khách hàng bán" mà bấm Xuất
+        // Excel lại ra khách mua thì người dùng không cách nào biết file sai.
+        String roleFilter = roleFromKind(request.getParameter("kind"));
         List<Enterprise> all = customerDAO.findAll(1, Integer.MAX_VALUE, keyword, typeFilter, assigneeFilter,
-                provinceFilter, true);
+                provinceFilter, true, roleFilter);
         // File Excel vẫn giữ cột "Mã KH" dù danh sách trên màn hình đã bỏ: STT chỉ
         // là số thứ tự dòng trong chính file này, hai người mở hai file xuất ở hai
         // thời điểm sẽ có STT khác nhau cho cùng một khách -- cần một cột để đối
@@ -267,7 +293,9 @@ public class CustomerController extends HttpServlet {
                 e.getCurrentRelationshipRating() != null ? e.getCurrentRelationshipRating().toString() : ""
             });
         }
-        ExcelUtil.writeWorkbook(response, "khach_hang", headers, rows);
+        ExcelUtil.writeWorkbook(response,
+                ROLE_SUPPLIER.equals(roleFilter) ? "khach_hang_ban" : "khach_hang_mua",
+                headers, rows);
     }
 
     // ------------------------------------------------------------------
@@ -307,7 +335,12 @@ public class CustomerController extends HttpServlet {
         // khách không có địa chỉ sẽ rơi khỏi mọi bộ lọc/thống kê theo tỉnh.
         // Chỉ chặn ở tầng ứng dụng, cột address_id vẫn để NULL được cho dữ
         // liệu cũ tạo trước thay đổi này.
-        if (!isValidCommonFields(e) || isBlank(e.getTaxCode()) || e.getAddress() == null) {
+        // Ít nhất một vai: khách không vai nào sẽ không xuất hiện ở cả hai
+        // danh sách -- lưu được nhưng coi như biến mất. CSDL không ép được
+        // luật này (ràng buộc nằm ở bảng khác, CHECK không với tới), nên chặn
+        // ở đây là chốt duy nhất.
+        List<String> roles = rolesFromRequest(request);
+        if (!isValidCommonFields(e) || isBlank(e.getTaxCode()) || e.getAddress() == null || roles.isEmpty()) {
             response.sendRedirect(request.getContextPath() + "/customer?action=new&error=invalid");
             return;
         }
@@ -319,6 +352,8 @@ public class CustomerController extends HttpServlet {
             response.sendRedirect(request.getContextPath() + "/customer?action=new&error=create_failed");
             return;
         }
+        // Vai nằm ở bảng riêng nên phải ghi tách khỏi hồ sơ khách hàng.
+        customerDAO.replaceRolesOf(newId, roles);
         response.sendRedirect(request.getContextPath() + "/customer?action=view&id=" + newId);
     }
 
@@ -365,12 +400,17 @@ public class CustomerController extends HttpServlet {
         // request không gửi lên địa chỉ mới nhưng khách đã có sẵn address_id
         // (DAO giữ nguyên địa chỉ cũ) -- sửa tên/SĐT của khách cũ không vì thế
         // mà bị chặn.
-        if (!isValidCommonFields(e) || (e.getAddress() == null && existing.getAddressId() == null)) {
+        List<String> roles = rolesFromRequest(request);
+        if (!isValidCommonFields(e) || (e.getAddress() == null && existing.getAddressId() == null)
+                || roles.isEmpty()) {
             response.sendRedirect(request.getContextPath() + "/customer?action=edit&id=" + id + "&error=invalid");
             return;
         }
 
         boolean ok = customerDAO.update(e);
+        if (ok) {
+            customerDAO.replaceRolesOf(id, roles);
+        }
         if (!ok) {
             LOG.warn("Cap nhat khach hang that bai (actor={}, enterpriseId={})", Logs.actor(request), id);
             response.sendRedirect(request.getContextPath() + "/customer?action=edit&id=" + id + "&error=update_failed");
@@ -477,6 +517,41 @@ public class CustomerController extends HttpServlet {
      * <p>Suy từ xã/phường chứ không từ ô tỉnh: xem {@link
      * poscs.dao.EmployeeDAO#findAssigneeOfWard}.
      */
+    /**
+     * Đổi tham số {@code kind} trên URL thành vai trong CSDL.
+     *
+     * <p>Chỉ "supplier" mới ra khách bán; mọi giá trị khác -- kể cả thiếu hẳn
+     * -- đều ra khách mua. Cố ý KHÔNG trả null cho "xem tất cả": trộn hai
+     * chiều vào một danh sách chính là cái chung chung mà việc tách này sinh
+     * ra để bỏ, và một công ty giữ cả hai vai sẽ khó nói nó đang nằm ở đâu.
+     */
+    private String roleFromKind(String kind) {
+        return "supplier".equals(kind) ? ROLE_SUPPLIER : ROLE_BUYER;
+    }
+
+    /**
+     * Các vai người dùng tick trên form, đã lọc bỏ giá trị lạ.
+     *
+     * <p>Lọc theo danh sách trắng chứ không nhận thẳng chuỗi gửi lên: cột
+     * {@code role} là varchar tự do, một request nặn tay ghi được vai "Khách
+     * VIP" vào đó rồi khách hàng biến khỏi cả hai danh sách.
+     */
+    private List<String> rolesFromRequest(HttpServletRequest request) {
+        List<String> result = new ArrayList<>();
+        String[] submitted = request.getParameterValues("roles");
+        if (submitted == null) {
+            return result;
+        }
+        for (String value : submitted) {
+            if (ROLE_BUYER.equals(value) || ROLE_SUPPLIER.equals(value)) {
+                if (!result.contains(value)) {
+                    result.add(value);
+                }
+            }
+        }
+        return result;
+    }
+
     private Integer resolveAccountOwnerId(HttpServletRequest request) {
         Integer wardId = parseIntOrNull(request.getParameter("districtId"));
         if (wardId != null) {

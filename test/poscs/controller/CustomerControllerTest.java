@@ -1,6 +1,7 @@
 package poscs.controller;
 
 import java.lang.reflect.Field;
+import java.util.List;
 import jakarta.servlet.RequestDispatcher;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -219,6 +220,9 @@ public class CustomerControllerTest {
         // tỉnh chỉ suy ra được qua xã/phường của địa chỉ.
         when(request.getParameter("districtId")).thenReturn("10");
         when(request.getParameter("addressDetail")).thenReturn("Số 1 Trần Phú");
+        // Vai là bắt buộc từ V20: khách không vai nào sẽ không xuất hiện ở cả
+        // hai danh sách, nên request hợp lệ phải có ít nhất một.
+        when(request.getParameterValues("roles")).thenReturn(new String[]{"Khách mua"});
     }
 
     /**
@@ -463,6 +467,107 @@ public class CustomerControllerTest {
 
         verify(dispatcher).forward(request, response);
         verify(response, never()).sendError(eq(HttpServletResponse.SC_FORBIDDEN), anyString());
+    }
+
+    // ------------------------------------------------------------------
+    // Vai khách hàng: khách mua / khách bán (V20)
+    // ------------------------------------------------------------------
+    //
+    // Vai nằm ở bảng riêng (enterprise_roles) nên CSDL không ép được luật
+    // "ít nhất một vai" -- ràng buộc nói về sự tồn tại của dòng ở bảng khác,
+    // CHECK không với tới. Những test này canh đúng chỗ chặn duy nhất.
+
+    /**
+     * Không tick vai nào thì khách lưu được nhưng biến khỏi CẢ HAI danh sách
+     * -- không ai biết cho tới khi có người đi tìm không thấy.
+     */
+    @Test
+    public void create_khongCoVaiNao_khongLuuVaBaoLoi() throws Exception {
+        when(request.getParameter("action")).thenReturn("create");
+        stubValidCreateFields();
+        when(request.getParameterValues("roles")).thenReturn(null);
+
+        controller.doPost(request, response);
+
+        verify(customerDAO, never()).insert(any());
+        verify(response).sendRedirect(CONTEXT_PATH + "/customer?action=new&error=invalid");
+    }
+
+    /**
+     * Cột enterprise_roles.role là varchar tự do. Nhận thẳng chuỗi gửi lên là
+     * một request nặn tay ghi được vai "Khách VIP" vào đó, rồi khách hàng biến
+     * khỏi cả hai danh sách y như trường hợp không có vai.
+     */
+    @Test
+    public void create_vaiLa_biLocBo() throws Exception {
+        when(request.getParameter("action")).thenReturn("create");
+        stubValidCreateFields();
+        when(request.getParameterValues("roles")).thenReturn(new String[]{"Khách VIP"});
+
+        controller.doPost(request, response);
+
+        verify(customerDAO, never()).insert(any());
+        verify(response).sendRedirect(CONTEXT_PATH + "/customer?action=new&error=invalid");
+    }
+
+    /** Công ty vừa mua vừa bán: giữ cả hai vai, không phải chọn một. */
+    @Test
+    public void create_caHaiVai_ghiDuCaHai() throws Exception {
+        when(request.getParameter("action")).thenReturn("create");
+        stubValidCreateFields();
+        when(request.getParameterValues("roles"))
+                .thenReturn(new String[]{"Khách mua", "Khách bán"});
+        when(customerDAO.generateNextEnterpriseCode()).thenReturn("KH-0001");
+        when(customerDAO.insert(any(Enterprise.class))).thenReturn(7);
+
+        controller.doPost(request, response);
+
+        verify(customerDAO).replaceRolesOf(7, List.of("Khách mua", "Khách bán"));
+    }
+
+    /**
+     * Vai chỉ được ghi SAU khi biết insert thành công. Ghi trước là để lại vai
+     * trỏ vào một enterprise_id không tồn tại.
+     */
+    @Test
+    public void create_insertThatBai_khongGhiVai() throws Exception {
+        when(request.getParameter("action")).thenReturn("create");
+        stubValidCreateFields();
+        when(customerDAO.generateNextEnterpriseCode()).thenReturn("KH-0001");
+        when(customerDAO.insert(any(Enterprise.class))).thenReturn(0);
+
+        controller.doPost(request, response);
+
+        verify(customerDAO, never()).replaceRolesOf(anyInt(), any());
+    }
+
+    /**
+     * Hai mục con trên thanh điều hướng đi vào cùng trang, khác đúng tham số
+     * kind. Thiếu kind phải ra khách mua -- đó là danh sách cũ và là chiều duy
+     * nhất có dữ liệu trước V20.
+     */
+    @Test
+    public void list_kindSupplier_locDanhSachTheoVaiKhachBan() throws Exception {
+        RequestDispatcher dispatcher = mock(RequestDispatcher.class);
+        when(request.getRequestDispatcher("/jsp/sale/listcustomer.jsp")).thenReturn(dispatcher);
+        when(request.getParameter("kind")).thenReturn("supplier");
+
+        controller.doGet(request, response);
+
+        verify(customerDAO).findAll(anyInt(), anyInt(), any(), any(), any(), any(), eq(false), eq("Khách bán"));
+        verify(customerDAO).countAll(any(), any(), any(), any(), eq("Khách bán"));
+        verify(request).setAttribute("kind", "supplier");
+    }
+
+    @Test
+    public void list_thieuKind_macDinhLaKhachMua() throws Exception {
+        RequestDispatcher dispatcher = mock(RequestDispatcher.class);
+        when(request.getRequestDispatcher("/jsp/sale/listcustomer.jsp")).thenReturn(dispatcher);
+
+        controller.doGet(request, response);
+
+        verify(customerDAO).findAll(anyInt(), anyInt(), any(), any(), any(), any(), eq(false), eq("Khách mua"));
+        verify(request).setAttribute("kind", "buyer");
     }
 
     // ------------------------------------------------------------------

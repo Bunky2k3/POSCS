@@ -51,7 +51,7 @@ public class CustomerDAO {
      * @param page 1-indexed
      */
     public List<Enterprise> findAll(int page, int pageSize, String keyword, String customerType, Integer accountOwnerId) {
-        return findAll(page, pageSize, keyword, customerType, accountOwnerId, null, false);
+        return findAll(page, pageSize, keyword, customerType, accountOwnerId, null, false, null);
     }
 
     /**
@@ -65,11 +65,11 @@ public class CustomerDAO {
      *                       để các dòng cùng tỉnh nằm liền nhau
      */
     public List<Enterprise> findAll(int page, int pageSize, String keyword, String customerType,
-            Integer accountOwnerId, Integer provinceId, boolean sortByProvince) {
+            Integer accountOwnerId, Integer provinceId, boolean sortByProvince, String role) {
         List<Enterprise> result = new ArrayList<>();
         StringBuilder sql = new StringBuilder(SELECT_ENTERPRISE_BASE);
         List<Object> params = new ArrayList<>();
-        appendFilters(sql, params, keyword, customerType, accountOwnerId, provinceId);
+        appendFilters(sql, params, keyword, customerType, accountOwnerId, provinceId, role);
         // "p.province_name IS NULL" đứng đầu để dồn khách chưa có địa chỉ xuống
         // cuối file -- mặc định MySQL xếp NULL lên đầu khi ORDER BY tăng dần.
         sql.append(sortByProvince
@@ -95,18 +95,18 @@ public class CustomerDAO {
 
     /** Đếm tổng số khách hàng thoả điều kiện lọc, phục vụ phân trang (BR-12). */
     public int countAll(String keyword, String customerType, Integer accountOwnerId) {
-        return countAll(keyword, customerType, accountOwnerId, null);
+        return countAll(keyword, customerType, accountOwnerId, null, null);
     }
 
     /** Như {@link #countAll(String, String, Integer)} nhưng lọc thêm theo tỉnh/thành. */
-    public int countAll(String keyword, String customerType, Integer accountOwnerId, Integer provinceId) {
+    public int countAll(String keyword, String customerType, Integer accountOwnerId, Integer provinceId, String role) {
         // Phải JOIN tới districts thì mới lọc được theo tỉnh; districts đã có sẵn
         // province_id nên không cần join thêm bảng provinces chỉ để đếm.
         StringBuilder sql = new StringBuilder("SELECT COUNT(*) FROM enterprises e "
                 + "LEFT JOIN addresses a ON e.address_id = a.address_id "
                 + "LEFT JOIN districts d ON a.districts_id = d.districts_id ");
         List<Object> params = new ArrayList<>();
-        appendFilters(sql, params, keyword, customerType, accountOwnerId, provinceId);
+        appendFilters(sql, params, keyword, customerType, accountOwnerId, provinceId, role);
 
         try (Connection conn = DBContext.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql.toString())) {
@@ -467,7 +467,7 @@ public class CustomerDAO {
     // ------------------------------------------------------------------
 
     private void appendFilters(StringBuilder sql, List<Object> params, String keyword, String customerType,
-            Integer accountOwnerId, Integer provinceId) {
+            Integer accountOwnerId, Integer provinceId, String role) {
         List<String> conditions = new ArrayList<>();
         conditions.add("e.is_deleted = 0");
 
@@ -493,6 +493,14 @@ public class CustomerDAO {
         if (provinceId != null) {
             conditions.add("d.province_id = ?");
             params.add(provinceId);
+        }
+        if (role != null && !role.trim().isEmpty()) {
+            // EXISTS chứ KHÔNG phải JOIN: một công ty giữ cả hai vai sẽ khớp
+            // hai dòng ở enterprise_roles, JOIN vào là nó xuất hiện hai lần
+            // trong danh sách và đếm phân trang cũng lệch theo.
+            conditions.add("EXISTS (SELECT 1 FROM enterprise_roles er "
+                    + "WHERE er.enterprise_id = e.enterprise_id AND er.role = ?)");
+            params.add(role);
         }
 
         sql.append("WHERE ").append(String.join(" AND ", conditions));
@@ -629,6 +637,81 @@ public class CustomerDAO {
         }
 
         return e;
+    }
+
+    // ==================================================================
+    // Vai của khách hàng (bảng enterprise_roles)
+    // ==================================================================
+    //
+    // 'Khách mua' = bên đó mua của mình, 'Khách bán' = bên đó bán cho mình.
+    // Một công ty giữ được cả hai vai -- đó là lý do vai nằm ở bảng riêng chứ
+    // không phải một cột trên enterprises. Xem ghi chú đầu V20.
+
+    /** Các vai của một khách hàng. Rỗng là hợp lệ về mặt CSDL (xem replaceRolesOf). */
+    public List<String> findRolesOf(int enterpriseId) {
+        List<String> result = new ArrayList<>();
+        String sql = "SELECT role FROM enterprise_roles WHERE enterprise_id = ? ORDER BY role";
+        try (Connection conn = DBContext.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, enterpriseId);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    result.add(rs.getString("role"));
+                }
+            }
+        } catch (SQLException ex) {
+            LOG.error("Loi truy van vai cua khach hang (enterpriseId={})", enterpriseId, ex);
+        }
+        return result;
+    }
+
+    /**
+     * Đặt lại toàn bộ vai của một khách hàng thành đúng {@code roles}.
+     *
+     * <p>Xoá hết rồi chèn lại TRONG CÙNG MỘT TRANSACTION, không phải hai lời
+     * gọi rời nhau: nửa chừng mà lỗi thì khách đó mất sạch vai và biến khỏi cả
+     * hai danh sách -- không ai biết cho tới khi có người đi tìm không thấy.
+     *
+     * <p>Danh sách rỗng KHÔNG bị chặn ở đây: "ít nhất một vai" là luật nghiệp
+     * vụ, chặn ở CustomerController cùng chỗ với các luật khác. DAO chỉ lo ghi
+     * đúng cái được bảo ghi.
+     *
+     * @return true nếu đã ghi xong.
+     */
+    public boolean replaceRolesOf(int enterpriseId, List<String> roles) {
+        try (Connection conn = DBContext.getConnection()) {
+            conn.setAutoCommit(false);
+            boolean committed = false;
+            try {
+                try (PreparedStatement del = conn.prepareStatement(
+                        "DELETE FROM enterprise_roles WHERE enterprise_id = ?")) {
+                    del.setInt(1, enterpriseId);
+                    del.executeUpdate();
+                }
+                if (roles != null && !roles.isEmpty()) {
+                    try (PreparedStatement ins = conn.prepareStatement(
+                            "INSERT INTO enterprise_roles (enterprise_id, role) VALUES (?, ?)")) {
+                        for (String role : roles) {
+                            ins.setInt(1, enterpriseId);
+                            ins.setString(2, role);
+                            ins.addBatch();
+                        }
+                        ins.executeBatch();
+                    }
+                }
+                conn.commit();
+                committed = true;
+                return true;
+            } finally {
+                if (!committed) {
+                    conn.rollback();
+                }
+                conn.setAutoCommit(true);
+            }
+        } catch (SQLException ex) {
+            LOG.error("Loi dat lai vai cua khach hang (enterpriseId={})", enterpriseId, ex);
+            return false;
+        }
     }
 
     // ==================================================================
