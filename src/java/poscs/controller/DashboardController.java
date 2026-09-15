@@ -79,7 +79,11 @@ public class DashboardController extends HttpServlet {
         request.setAttribute("newCustomersThisMonth", customerDAO.countNewInPeriod(provinceFilter, period));
 
         // ===== KPI: hợp đồng =====
-        Map<String, Integer> contractStatusSummary = contractDAO.countStatusSummary(provinceFilter, period);
+        // direction = null: dải KPI này đếm CẢ hai chiều, cố ý. Trang tổng quan
+        // là bức tranh chung, và đếm hợp đồng hai chiều chung một ô chỉ là rộng
+        // chứ không sai. Khác hẳn doanh thu ngay dưới -- cộng tiền thu vào với
+        // tiền trả ra thì con số vô nghĩa, nên chỗ đó lọc 'Bán' (xem V21).
+        Map<String, Integer> contractStatusSummary = contractDAO.countStatusSummary(provinceFilter, period, null);
         request.setAttribute("contractStatusSummary", contractStatusSummary);
 
         // ===== KPI: doanh thu =====

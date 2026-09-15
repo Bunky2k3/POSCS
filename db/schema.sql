@@ -4348,6 +4348,10 @@ CREATE TABLE `contracts` (
   `contract_code` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
   `title` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
   `contract_type` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
+  -- 'Bán' = mình bán ra (đối tác giữ vai 'Khách mua')
+  -- 'Mua' = mình mua vào (đối tác giữ vai 'Khách bán')
+  -- Cặp đôi CHÉO -- xem ghi chú đầu V21.
+  `direction` varchar(10) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'Bán',
   `signing_date` date NOT NULL,
   `effective_date` date NOT NULL,
   `end_date` date NOT NULL,
@@ -4362,6 +4366,7 @@ CREATE TABLE `contracts` (
   UNIQUE KEY `contract_code` (`contract_code`),
   KEY `enterprise_id` (`enterprise_id`),
   KEY `owner_id` (`owner_id`),
+  KEY `idx_contracts_direction` (`direction`),
   CONSTRAINT `contracts_ibfk_1` FOREIGN KEY (`enterprise_id`) REFERENCES `enterprises` (`enterprise_id`),
   CONSTRAINT `contracts_ibfk_2` FOREIGN KEY (`owner_id`) REFERENCES `users` (`user_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

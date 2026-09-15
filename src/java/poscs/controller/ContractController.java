@@ -61,6 +61,18 @@ public class ContractController extends HttpServlet {
     /** Vai được giao phụ trách hợp đồng -- khớp roles.role_name, xem AccessControl. */
     private static final String SALES_ROLE = "Sales";
 
+    /**
+     * Chiều hợp đồng, khớp contracts.direction (xem ghi chú đầu V21).
+     *
+     * <p>Theo góc nhìn CỦA MÌNH, và cặp đôi với vai đối tác bị CHÉO: hợp đồng
+     * BÁN thì bên kia là "Khách mua". Đó là lý do V20 không đặt vai khách hàng
+     * là 'Mua'/'Bán'.
+     */
+    private static final String DIRECTION_SELL = "Bán";
+    private static final String DIRECTION_BUY = "Mua";
+    private static final String ROLE_BUYER = "Khách mua";
+    private static final String ROLE_SUPPLIER = "Khách bán";
+
     private static final String LIST_VIEW = "/jsp/sale/listcontract.jsp";
     private static final String DETAIL_VIEW = "/jsp/sale/viewcontractdetail.jsp";
     private static final String CREATE_VIEW = "/jsp/sale/addnewcontract.jsp";
@@ -175,12 +187,17 @@ public class ContractController extends HttpServlet {
         String typeFilter = request.getParameter("type");
         Integer provinceFilter = parseIntOrNull(request.getParameter("provinceId"));
         Period period = Period.parse(request.getParameter("year"), request.getParameter("period"));
+        // Chiều đứng ĐỘC LẬP với kỳ -- hai mục con vẫn lọc được theo năm/quý/tháng.
+        String direction = directionFromKind(request.getParameter("kind"));
 
         List<Contract> contractList = contractDAO.findAll(page, PAGE_SIZE, keyword, statusFilter, typeFilter,
-                provinceFilter, false, period);
-        int totalCount = contractDAO.countAll(keyword, statusFilter, typeFilter, provinceFilter, period);
+                provinceFilter, false, period, direction);
+        int totalCount = contractDAO.countAll(keyword, statusFilter, typeFilter, provinceFilter, period, direction);
         int totalPages = Math.max(1, (int) Math.ceil(totalCount / (double) PAGE_SIZE));
-        Map<String, Integer> statusSummary = contractDAO.countStatusSummary();
+        // Dải KPI trạng thái phải đếm CÙNG phạm vi với bảng bên dưới: đứng ở
+        // Hợp đồng mua mà KPI gộp cả hợp đồng bán thì hai con số cạnh nhau
+        // không khớp, và không có gì trên màn hình giải thích vì sao.
+        Map<String, Integer> statusSummary = contractDAO.countStatusSummary(provinceFilter, period, direction);
 
         request.setAttribute("contractList", contractList);
         request.setAttribute("statusSummary", statusSummary);
@@ -194,6 +211,7 @@ public class ContractController extends HttpServlet {
         request.setAttribute("statusFilter", statusFilter);
         request.setAttribute("typeFilter", typeFilter);
         request.setAttribute("provinceFilter", provinceFilter);
+        request.setAttribute("kind", DIRECTION_BUY.equals(direction) ? "buy" : "sell");
         setPeriodAttributes(request, period);
 
         request.getRequestDispatcher(LIST_VIEW).forward(request, response);
@@ -243,8 +261,10 @@ public class ContractController extends HttpServlet {
 
         // Sắp theo tỉnh: hợp đồng được giao việc theo địa bàn nên file xuất ra
         // phải gom các hợp đồng cùng tỉnh lại với nhau.
+        // Xuất đúng danh sách đang xem, giữ nguyên cả kỳ lẫn chiều.
+        String direction = directionFromKind(request.getParameter("kind"));
         List<Contract> all = contractDAO.findAll(1, Integer.MAX_VALUE, keyword, statusFilter, typeFilter,
-                provinceFilter, true, period);
+                provinceFilter, true, period, direction);
         // Giữ cột "Mã HĐ" trong file dù danh sách trên màn hình đã bỏ -- xem lý do
         // ở CustomerController.exportExcel: STT chỉ đúng trong phạm vi một file.
         String[] headers = {"STT", "Mã HĐ", "Tiêu đề", "Loại HĐ", "Tỉnh/Thành phố", "Khách hàng", "Người phụ trách",
@@ -266,7 +286,9 @@ public class ContractController extends HttpServlet {
                 c.getStatus()
             });
         }
-        ExcelUtil.writeWorkbook(response, "hop_dong", headers, rows);
+        ExcelUtil.writeWorkbook(response,
+                DIRECTION_BUY.equals(direction) ? "hop_dong_mua" : "hop_dong_ban",
+                headers, rows);
     }
 
     /**
@@ -437,6 +459,8 @@ public class ContractController extends HttpServlet {
                 errors.add("Ngày ký phải ≤ Hiệu lực từ phải ≤ Đến ngày.");
             }
             if (!isBlank(contractCode)) {
+                // Cố ý KHÔNG lọc chiều ở đây: mã hợp đồng là duy nhất trên
+                // toàn bảng, tra theo một chiều là bỏ sót trùng ở chiều kia.
                 boolean exists = contractDAO.findAll(1, Integer.MAX_VALUE, contractCode.trim(), null, null).stream()
                         .anyMatch(c -> c.getContractCode() != null && c.getContractCode().equalsIgnoreCase(contractCode.trim()));
                 if (exists) {
@@ -685,7 +709,13 @@ public class ContractController extends HttpServlet {
         if (!AccessControl.requireFullAccess(request, response, AccessControl.Resource.CONTRACT)) {
             return;
         }
-        setDropdownAttributes(request, null);
+        // Chiều lấy từ mục con người dùng vừa đứng, và ô "Khách hàng" lọc
+        // theo đúng chiều đó -- bấm Thêm từ Hợp đồng mua thì chỉ chọn được
+        // nhà cung cấp.
+        String direction = directionFromKind(request.getParameter("kind"));
+        setDropdownAttributes(request, null, direction, null);
+        request.setAttribute("direction", direction);
+        request.setAttribute("kind", DIRECTION_BUY.equals(direction) ? "buy" : "sell");
         request.getRequestDispatcher(CREATE_VIEW).forward(request, response);
     }
 
@@ -704,7 +734,12 @@ public class ContractController extends HttpServlet {
         }
 
         request.setAttribute("contract", contract);
-        setDropdownAttributes(request, contract.getOwnerId());
+        // Chiều của hợp đồng đang sửa, KHÔNG phải của tham số kind trên URL:
+        // mở hợp đồng mua từ link bất kỳ vẫn phải thấy danh sách nhà cung cấp.
+        setDropdownAttributes(request, contract.getOwnerId(),
+                contract.getDirection(), contract.getEnterpriseId());
+        request.setAttribute("direction", contract.getDirection());
+        request.setAttribute("kind", DIRECTION_BUY.equals(contract.getDirection()) ? "buy" : "sell");
         request.getRequestDispatcher(UPDATE_VIEW).forward(request, response);
     }
 
@@ -717,8 +752,13 @@ public class ContractController extends HttpServlet {
             return;
         }
         Contract c = buildContractFromRequest(request, new Contract());
-        if (!isValid(c)) {
-            response.sendRedirect(request.getContextPath() + "/contract?action=new&error=invalid");
+        // Chiều lấy từ mục con đang đứng, không từ form -- xem
+        // buildContractFromRequest.
+        c.setDirection(directionFromKind(request.getParameter("kind")));
+        if (!isValid(c) || !counterpartyMatchesDirection(c)) {
+            response.sendRedirect(request.getContextPath()
+                    + "/contract?action=new&kind=" + (DIRECTION_BUY.equals(c.getDirection()) ? "buy" : "sell")
+                    + "&error=invalid");
             return;
         }
         if (!TextRules.isSafeHttpUrl(c.getAttachmentUrl())) {
@@ -750,7 +790,10 @@ public class ContractController extends HttpServlet {
 
         Contract c = buildContractFromRequest(request, new Contract());
         c.setContractId(id);
-        if (!isValid(c)) {
+        // Giữ nguyên chiều cũ -- DAO.update cũng không ghi cột này. Nhưng vẫn
+        // phải gán để kiểm được khách hàng mới chọn có đúng vai không.
+        c.setDirection(contractDAO.findById(id).getDirection());
+        if (!isValid(c) || !counterpartyMatchesDirection(c)) {
             response.sendRedirect(request.getContextPath() + "/contract?action=edit&id=" + id + "&error=invalid");
             return;
         }
@@ -857,9 +900,58 @@ public class ContractController extends HttpServlet {
      * @param keepUserId người đang phụ trách bản ghi đang sửa -- giữ trong
      *        dropdown kể cả khi họ đã đổi vai, xem EmployeeDAO.findActiveByRole.
      */
+    /**
+     * Đổi tham số {@code kind} trên URL thành chiều hợp đồng.
+     *
+     * <p>Chỉ "buy" mới ra hợp đồng mua; mọi giá trị khác -- kể cả thiếu hẳn --
+     * đều ra hợp đồng bán. Đó là chiều duy nhất hệ thống từng có trước V21,
+     * nên link cũ và bookmark cũ vẫn mở đúng danh sách như trước.
+     */
+    private String directionFromKind(String kind) {
+        return "buy".equals(kind) ? DIRECTION_BUY : DIRECTION_SELL;
+    }
+
+    /** Vai mà đối tác phải giữ để ký được hợp đồng chiều này -- cặp đôi CHÉO. */
+    private String counterpartyRoleFor(String direction) {
+        return DIRECTION_BUY.equals(direction) ? ROLE_SUPPLIER : ROLE_BUYER;
+    }
+
+    /**
+     * Khách hàng đứng tên có đúng vai cho chiều này không.
+     *
+     * <p>Lọc ô chọn ở JSP chỉ là khoá hình: ai mở devtools cũng POST được một
+     * enterprise_id bất kỳ. Không kiểm ở đây thì hợp đồng BÁN gắn được vào
+     * nhà cung cấp, và khách đó xuất hiện ở danh sách hợp đồng bán trong khi
+     * không hề giữ vai khách mua -- dữ liệu tự mâu thuẫn, không có gì báo.
+     *
+     * <p>CSDL không ép được luật này: nó nói về sự tồn tại của dòng ở
+     * enterprise_roles, CHECK không với tới.
+     */
+    private boolean counterpartyMatchesDirection(Contract c) {
+        if (c.getEnterpriseId() <= 0) {
+            return false;
+        }
+        return customerDAO.findRolesOf(c.getEnterpriseId())
+                .contains(counterpartyRoleFor(c.getDirection()));
+    }
+
     private void setDropdownAttributes(HttpServletRequest request, Integer keepUserId) {
-        // Toàn bộ khách hàng chưa xoá, phục vụ dropdown "Khách hàng"
-        request.setAttribute("customerList", customerDAO.findAll(1, Integer.MAX_VALUE, null, null, null));
+        setDropdownAttributes(request, keepUserId, DIRECTION_SELL, null);
+    }
+
+    /**
+     * @param direction    chiều của hợp đồng đang tạo/sửa -- quyết định ô
+     *                     "Khách hàng" liệt kê ai (cặp đôi CHÉO: hợp đồng BÁN
+     *                     chỉ chọn được khách giữ vai 'Khách mua')
+     * @param keepCustomerId khách đang đứng tên hợp đồng đang sửa -- giữ trong
+     *                     ô kể cả khi vai của họ đã bị gỡ, nếu không thì mở
+     *                     form sửa lên ô trống rồi bấm lưu là đổi mất khách
+     *                     hàng dù người dùng chỉ định sửa ngày kết thúc
+     */
+    private void setDropdownAttributes(HttpServletRequest request, Integer keepUserId,
+            String direction, Integer keepCustomerId) {
+        request.setAttribute("customerList", customerDAO.findAllByRole(
+                counterpartyRoleFor(direction), keepCustomerId));
         // Hợp đồng giao cho Sales, không đổ cả Admin/Kỹ thuật/CSKH vào ô
         // "người phụ trách".
         request.setAttribute("userList", employeeDAO.findActiveByRole(SALES_ROLE, keepUserId));
@@ -948,6 +1040,13 @@ public class ContractController extends HttpServlet {
         return sb.toString();
     }
 
+    /**
+     * Chiều KHÔNG đọc từ request ở đây -- bên gọi tự đặt. Lúc tạo thì lấy từ
+     * tham số kind (người dùng đang đứng ở mục con nào); lúc sửa thì giữ
+     * nguyên chiều cũ của hợp đồng. Nhận từ form là mở đường cho một request
+     * nặn tay đổi hợp đồng bán thành hợp đồng mua, và con số doanh thu đã báo
+     * cáo lặng lẽ đổi nghĩa.
+     */
     private Contract buildContractFromRequest(HttpServletRequest request, Contract c) {
         c.setTitle(emptyToNull(request.getParameter("title")));
         c.setContractType(emptyToNull(request.getParameter("contractType")));

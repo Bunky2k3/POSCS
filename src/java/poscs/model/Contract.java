@@ -8,6 +8,8 @@ public class Contract {
     private String contractCode;
     private String title;
     private String contractType;
+    /** 'Bán' = mình bán ra, 'Mua' = mình mua vào -- xem ghi chú đầu V21. */
+    private String direction;
     private Date signingDate;
     private Date effectiveDate;
     private Date endDate;
@@ -64,6 +66,9 @@ public class Contract {
 
     public String getContractType() { return contractType; }
     public void setContractType(String contractType) { this.contractType = contractType; }
+
+    public String getDirection() { return direction; }
+    public void setDirection(String direction) { this.direction = direction; }
 
     public Date getSigningDate() { return signingDate; }
     public void setSigningDate(Date signingDate) { this.signingDate = signingDate; }

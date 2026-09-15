@@ -647,6 +647,47 @@ public class CustomerDAO {
     // Một công ty giữ được cả hai vai -- đó là lý do vai nằm ở bảng riêng chứ
     // không phải một cột trên enterprises. Xem ghi chú đầu V20.
 
+    /**
+     * Khách hàng đang hoạt động giữ MỘT vai, để đổ dropdown "Khách hàng" ở
+     * form hợp đồng.
+     *
+     * <p>Hợp đồng BÁN chỉ ký được với bên giữ vai 'Khách mua', hợp đồng MUA
+     * chỉ ký được với 'Khách bán' -- cặp đôi CHÉO, xem ghi chú đầu V21. Đổ cả
+     * hai vai vào một ô là mời người nhập ký hợp đồng bán với nhà cung cấp.
+     *
+     * @param keepEnterpriseId khách đang đứng tên hợp đồng ĐANG SỬA -- giữ lại
+     *        kể cả khi vai của họ đã bị gỡ. Thiếu nó thì mở form sửa lên ô
+     *        trống, bấm lưu là đổi mất khách hàng dù người dùng chỉ định sửa
+     *        ngày kết thúc. Cùng cái bẫy đã chữa cho ô tỉnh và ô người phụ
+     *        trách.
+     */
+    public List<Enterprise> findAllByRole(String role, Integer keepEnterpriseId) {
+        StringBuilder sql = new StringBuilder(SELECT_ENTERPRISE_BASE);
+        List<Object> params = new ArrayList<>();
+        sql.append("WHERE e.is_deleted = 0 AND (EXISTS (SELECT 1 FROM enterprise_roles er "
+                + "WHERE er.enterprise_id = e.enterprise_id AND er.role = ?)");
+        params.add(role);
+        if (keepEnterpriseId != null && keepEnterpriseId > 0) {
+            sql.append(" OR e.enterprise_id = ?");
+            params.add(keepEnterpriseId);
+        }
+        sql.append(") ORDER BY e.enterprise_name");
+
+        List<Enterprise> result = new ArrayList<>();
+        try (Connection conn = DBContext.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql.toString())) {
+            bindParams(ps, params);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    result.add(mapRow(rs));
+                }
+            }
+        } catch (SQLException ex) {
+            LOG.error("Loi truy van khach hang theo vai (role={})", role, ex);
+        }
+        return result;
+    }
+
     /** Các vai của một khách hàng. Rỗng là hợp lệ về mặt CSDL (xem replaceRolesOf). */
     public List<String> findRolesOf(int enterpriseId) {
         List<String> result = new ArrayList<>();

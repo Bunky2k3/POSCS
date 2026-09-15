@@ -302,7 +302,7 @@ public class ContractDAOTest {
                 Date.valueOf(LocalDate.now().plusDays(10)),
                 Date.valueOf(LocalDate.now().plusYears(1)));
 
-        verify(ps).setString(10, ContractDAO.STATUS_DRAFT);
+        verify(ps).setString(11, ContractDAO.STATUS_DRAFT);
     }
 
     @Test
@@ -311,7 +311,7 @@ public class ContractDAOTest {
                 Date.valueOf(LocalDate.now().minusYears(2)),
                 Date.valueOf(LocalDate.now().minusDays(1)));
 
-        verify(ps).setString(10, ContractDAO.STATUS_EXPIRED);
+        verify(ps).setString(11, ContractDAO.STATUS_EXPIRED);
     }
 
     @Test
@@ -320,7 +320,7 @@ public class ContractDAOTest {
                 Date.valueOf(LocalDate.now().minusMonths(6)),
                 Date.valueOf(LocalDate.now().plusDays(10)));
 
-        verify(ps).setString(10, ContractDAO.STATUS_SOON);
+        verify(ps).setString(11, ContractDAO.STATUS_SOON);
     }
 
     @Test
@@ -329,14 +329,14 @@ public class ContractDAOTest {
                 Date.valueOf(LocalDate.now().minusMonths(6)),
                 Date.valueOf(LocalDate.now().plusDays(31)));
 
-        verify(ps).setString(10, ContractDAO.STATUS_ACTIVE);
+        verify(ps).setString(11, ContractDAO.STATUS_ACTIVE);
     }
 
     @Test
     public void insert_missingDates_fallsBackToDraftStatus() throws Exception {
         PreparedStatement ps = captureStatusFor(null, null);
 
-        verify(ps).setString(10, ContractDAO.STATUS_DRAFT);
+        verify(ps).setString(11, ContractDAO.STATUS_DRAFT);
     }
 
     // ------------------------------------------------------------------
