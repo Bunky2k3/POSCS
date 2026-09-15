@@ -492,29 +492,6 @@
             </div>
         </div>
 
-        <%-- ===== Bản PDF đã ký, xem ngay tại đây =====
-             Chỉ hiện khi link nhận ra được là file Drive (controller dựng sẵn
-             drivePreviewUrl). Link tới nơi khác vẫn còn nút "Mở PDF trên Drive"
-             ở đầu trang -- nhúng chúng dễ ra khung trắng vì site đó tự chặn. --%>
-        <c:if test="${not empty drivePreviewUrl}">
-            <div class="info-card card-box">
-                <div class="section-header">
-                    <h5>Bản PDF đã ký</h5>
-                    <a href="${fn:escapeXml(attachmentUrl)}" target="_blank" rel="noopener noreferrer"
-                       style="font-size:0.85rem; color:var(--primary); font-weight:600; text-decoration:none;">
-                        Mở trên Drive <i class="fa-solid fa-arrow-up-right-from-square"></i>
-                    </a>
-                </div>
-                <iframe src="${fn:escapeXml(drivePreviewUrl)}"
-                        style="width:100%; height:640px; border:1px solid #eef2f6; border-radius:12px;"
-                        allow="autoplay" title="Bản PDF hợp đồng"></iframe>
-                <p style="font-size:0.78rem; color:#9ca3af; margin:10px 0 0;">
-                    Không thấy nội dung? File trên Drive có thể đang giới hạn quyền xem --
-                    hãy mở bằng link ở trên để đăng nhập Google và kiểm tra quyền truy cập.
-                </p>
-            </div>
-        </c:if>
-
         <!-- ===== Ký kết & giá trị ===== -->
         <div class="info-card card-box">
             <div class="section-header"><h5>Ký kết &amp; giá trị</h5></div>
@@ -752,6 +729,33 @@
     </div>
 
         </div>
+        <%-- ===== Bản PDF đã ký, xem ngay tại đây =====
+             Đặt CUỐI trang: khung nhúng cao 640px, để ở giữa thì nó đẩy mọi khối
+             bên dưới ra khỏi tầm mắt và người đọc phải cuộn qua cả trang PDF
+             mới tới được nhật ký.
+
+             Chỉ hiện khi link nhận ra được là file Drive (controller dựng sẵn
+             drivePreviewUrl). Link tới nơi khác vẫn còn nút "Mở PDF trên Drive"
+             ở đầu trang -- nhúng chúng dễ ra khung trắng vì site đó tự chặn. --%>
+        <c:if test="${not empty drivePreviewUrl}">
+            <div class="info-card card-box">
+                <div class="section-header">
+                    <h5>Bản PDF đã ký</h5>
+                    <a href="${fn:escapeXml(attachmentUrl)}" target="_blank" rel="noopener noreferrer"
+                       style="font-size:0.85rem; color:var(--primary); font-weight:600; text-decoration:none;">
+                        Mở trên Drive <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                    </a>
+                </div>
+                <iframe src="${fn:escapeXml(drivePreviewUrl)}"
+                        style="width:100%; height:640px; border:1px solid #eef2f6; border-radius:12px;"
+                        allow="autoplay" title="Bản PDF hợp đồng"></iframe>
+                <p style="font-size:0.78rem; color:#9ca3af; margin:10px 0 0;">
+                    Không thấy nội dung? File trên Drive có thể đang giới hạn quyền xem --
+                    hãy mở bằng link ở trên để đăng nhập Google và kiểm tra quyền truy cập.
+                </p>
+            </div>
+        </c:if>
+
     </div>
 
     <script>
@@ -762,25 +766,6 @@
             var n = Number(el.dataset.vnd);
             el.textContent = isNaN(n) ? '—' : n.toLocaleString('vi-VN', { maximumFractionDigits: 0 }) + ' ₫';
         });
-
-        function changeProgress(toStatus, message, requireNote) {
-            var note = null;
-            if (requireNote) {
-                note = prompt(message);
-                if (note === null) {
-                    return;
-                }
-                if (note.trim() === '') {
-                    alert('Phải nhập căn cứ thì mới thực hiện được — bước này không quay lại được.');
-                    return;
-                }
-            } else if (!confirm(message)) {
-                return;
-            }
-            document.getElementById('progressToStatus').value = toStatus;
-            document.getElementById('progressNote').value = note === null ? '' : note.trim();
-            document.getElementById('progressForm').submit();
-        }
 
     </script>
 
