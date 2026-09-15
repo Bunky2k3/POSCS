@@ -16,7 +16,6 @@ import jakarta.servlet.http.HttpServletResponse;
 import poscs.common.Period;
 import poscs.dao.AddressDAO;
 import poscs.dao.ContractDAO;
-import poscs.dao.ContractPaymentDAO;
 import poscs.dao.CustomerDAO;
 import poscs.dao.TechnicalSupportTicketDAO;
 import poscs.model.Contract;
@@ -51,7 +50,6 @@ public class DashboardController extends HttpServlet {
     private final CustomerDAO customerDAO = new CustomerDAO();
     private final ContractDAO contractDAO = new ContractDAO();
     private final TechnicalSupportTicketDAO ticketDAO = new TechnicalSupportTicketDAO();
-    private final ContractPaymentDAO paymentDAO = new ContractPaymentDAO();
     private final AddressDAO addressDAO = new AddressDAO();
 
     @Override
@@ -88,13 +86,13 @@ public class DashboardController extends HttpServlet {
         BigDecimal revenueThisMonth;
         BigDecimal revenueLastMonth;
         if (period != null) {
-            revenueThisMonth = paymentDAO.sumInvoiceAmountInPeriod(period, provinceFilter);
-            revenueLastMonth = paymentDAO.sumInvoiceAmountInPeriod(period.previous(), provinceFilter);
+            revenueThisMonth = contractDAO.sumInvoiceAmountInPeriod(period, provinceFilter);
+            revenueLastMonth = contractDAO.sumInvoiceAmountInPeriod(period.previous(), provinceFilter);
         } else {
-            revenueThisMonth = paymentDAO.sumInvoiceAmountByMonth(
+            revenueThisMonth = contractDAO.sumInvoiceAmountByMonth(
                     today.getYear(), today.getMonthValue(), provinceFilter);
             LocalDate lastMonth = today.minusMonths(1);
-            revenueLastMonth = paymentDAO.sumInvoiceAmountByMonth(
+            revenueLastMonth = contractDAO.sumInvoiceAmountByMonth(
                     lastMonth.getYear(), lastMonth.getMonthValue(), provinceFilter);
         }
         request.setAttribute("revenueThisMonth", revenueThisMonth);
@@ -123,7 +121,7 @@ public class DashboardController extends HttpServlet {
         Map<Integer, BigDecimal> contractValues = new HashMap<>();
         Map<Integer, Long> daysRemaining = new HashMap<>();
         for (Contract c : expiringContracts) {
-            contractValues.put(c.getContractId(), paymentDAO.sumInvoiceAmountByContractId(c.getContractId()));
+            contractValues.put(c.getContractId(), contractDAO.sumInvoiceAmountByContractId(c.getContractId()));
             LocalDate endDate = c.getEndDate().toLocalDate();
             daysRemaining.put(c.getContractId(), ChronoUnit.DAYS.between(today, endDate));
         }

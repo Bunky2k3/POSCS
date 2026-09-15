@@ -15,7 +15,6 @@ import org.junit.Before;
 import org.junit.Test;
 import poscs.common.Period;
 import poscs.dao.ContractDAO;
-import poscs.dao.ContractPaymentDAO;
 import poscs.dao.CustomerDAO;
 import poscs.dao.TechnicalSupportTicketDAO;
 import poscs.model.Contract;
@@ -36,7 +35,6 @@ public class DashboardControllerTest {
     private CustomerDAO customerDAO;
     private ContractDAO contractDAO;
     private TechnicalSupportTicketDAO ticketDAO;
-    private ContractPaymentDAO paymentDAO;
 
     private HttpServletRequest request;
     private HttpServletResponse response;
@@ -47,11 +45,9 @@ public class DashboardControllerTest {
         customerDAO = mock(CustomerDAO.class);
         contractDAO = mock(ContractDAO.class);
         ticketDAO = mock(TechnicalSupportTicketDAO.class);
-        paymentDAO = mock(ContractPaymentDAO.class);
         setField(controller, "customerDAO", customerDAO);
         setField(controller, "contractDAO", contractDAO);
         setField(controller, "ticketDAO", ticketDAO);
-        setField(controller, "paymentDAO", paymentDAO);
 
         request = mock(HttpServletRequest.class);
         response = mock(HttpServletResponse.class);
@@ -77,10 +73,10 @@ public class DashboardControllerTest {
     @Test
     public void revenueGrewFromLastMonth_computesPositiveTrendPercent() throws Exception {
         LocalDate today = LocalDate.now();
-        when(paymentDAO.sumInvoiceAmountByMonth(eq(today.getYear()), eq(today.getMonthValue()), nullable(Integer.class)))
+        when(contractDAO.sumInvoiceAmountByMonth(eq(today.getYear()), eq(today.getMonthValue()), nullable(Integer.class)))
                 .thenReturn(BigDecimal.valueOf(1_500_000));
         LocalDate lastMonth = today.minusMonths(1);
-        when(paymentDAO.sumInvoiceAmountByMonth(eq(lastMonth.getYear()), eq(lastMonth.getMonthValue()), nullable(Integer.class)))
+        when(contractDAO.sumInvoiceAmountByMonth(eq(lastMonth.getYear()), eq(lastMonth.getMonthValue()), nullable(Integer.class)))
                 .thenReturn(BigDecimal.valueOf(1_000_000));
 
         controller.doGet(request, response);
@@ -92,7 +88,7 @@ public class DashboardControllerTest {
     @Test
     public void noRevenueLastMonth_skipsTrendPercentToAvoidDivisionByZero() throws Exception {
         LocalDate today = LocalDate.now();
-        when(paymentDAO.sumInvoiceAmountByMonth(anyInt(), anyInt(), nullable(Integer.class))).thenReturn(BigDecimal.ZERO);
+        when(contractDAO.sumInvoiceAmountByMonth(anyInt(), anyInt(), nullable(Integer.class))).thenReturn(BigDecimal.ZERO);
 
         controller.doGet(request, response);
 
@@ -107,8 +103,8 @@ public class DashboardControllerTest {
         c.setEndDate(Date.valueOf(today.plusDays(10)));
         List<Contract> expiring = Arrays.asList(c);
         when(contractDAO.findExpiringSoon(anyInt(), nullable(Integer.class))).thenReturn(expiring);
-        when(paymentDAO.sumInvoiceAmountByContractId(9)).thenReturn(BigDecimal.valueOf(5_000_000));
-        when(paymentDAO.sumInvoiceAmountByMonth(anyInt(), anyInt(), nullable(Integer.class))).thenReturn(BigDecimal.ZERO);
+        when(contractDAO.sumInvoiceAmountByContractId(9)).thenReturn(BigDecimal.valueOf(5_000_000));
+        when(contractDAO.sumInvoiceAmountByMonth(anyInt(), anyInt(), nullable(Integer.class))).thenReturn(BigDecimal.ZERO);
 
         controller.doGet(request, response);
 
@@ -121,7 +117,7 @@ public class DashboardControllerTest {
 
     @Test
     public void alwaysForwardsToDashboardJsp() throws Exception {
-        when(paymentDAO.sumInvoiceAmountByMonth(anyInt(), anyInt(), nullable(Integer.class))).thenReturn(BigDecimal.ZERO);
+        when(contractDAO.sumInvoiceAmountByMonth(anyInt(), anyInt(), nullable(Integer.class))).thenReturn(BigDecimal.ZERO);
         RequestDispatcher dispatcher = mock(RequestDispatcher.class);
         when(request.getRequestDispatcher("/dashboard.jsp")).thenReturn(dispatcher);
 
@@ -143,7 +139,7 @@ public class DashboardControllerTest {
     public void provinceSelected_narrowsEveryQueryOnThePage() throws Exception {
         when(request.getParameter("provinceId")).thenReturn("3");
         when(customerDAO.countUpToEndOfPeriod(eq(3), nullable(Period.class))).thenReturn(2);
-        when(paymentDAO.sumInvoiceAmountByMonth(anyInt(), anyInt(), eq(3))).thenReturn(BigDecimal.ZERO);
+        when(contractDAO.sumInvoiceAmountByMonth(anyInt(), anyInt(), eq(3))).thenReturn(BigDecimal.ZERO);
         when(contractDAO.countStatusSummary(eq(3), nullable(Period.class))).thenReturn(Collections.emptyMap());
         when(ticketDAO.countStatusSummary(eq(3), nullable(Period.class))).thenReturn(Collections.emptyMap());
         when(contractDAO.findExpiringSoon(anyInt(), eq(3))).thenReturn(Collections.emptyList());
@@ -158,7 +154,7 @@ public class DashboardControllerTest {
         verify(ticketDAO).countStatusSummary(eq(3), nullable(Period.class));
         verify(ticketDAO).countOverdueOrDueSoon(3);
         verify(ticketDAO).findNeedingAttention(anyInt(), eq(3));
-        verify(paymentDAO, times(2)).sumInvoiceAmountByMonth(anyInt(), anyInt(), eq(3));
+        verify(contractDAO, times(2)).sumInvoiceAmountByMonth(anyInt(), anyInt(), eq(3));
         verify(request).setAttribute("provinceFilter", 3);
     }
 
@@ -176,7 +172,7 @@ public class DashboardControllerTest {
     public void quarterSelected_passesThatDateRangeToEveryPeriodQuery() throws Exception {
         when(request.getParameter("year")).thenReturn("2026");
         when(request.getParameter("period")).thenReturn("q3");
-        when(paymentDAO.sumInvoiceAmountInPeriod(any(Period.class), nullable(Integer.class)))
+        when(contractDAO.sumInvoiceAmountInPeriod(any(Period.class), nullable(Integer.class)))
                 .thenReturn(BigDecimal.ZERO);
 
         controller.doGet(request, response);
@@ -188,9 +184,9 @@ public class DashboardControllerTest {
         verify(customerDAO).countNewInPeriod(isNull(), any(Period.class));
         verify(contractDAO).countStatusSummary(isNull(), any(Period.class));
         verify(ticketDAO).countStatusSummary(isNull(), any(Period.class));
-        verify(paymentDAO, times(2)).sumInvoiceAmountInPeriod(any(Period.class), nullable(Integer.class));
+        verify(contractDAO, times(2)).sumInvoiceAmountInPeriod(any(Period.class), nullable(Integer.class));
         // Có kỳ thì không được rơi về nhánh "tháng hiện tại" nữa.
-        verify(paymentDAO, never()).sumInvoiceAmountByMonth(anyInt(), anyInt(), nullable(Integer.class));
+        verify(contractDAO, never()).sumInvoiceAmountByMonth(anyInt(), anyInt(), nullable(Integer.class));
         verify(request).setAttribute("periodLabel", "Quý 3/2026");
     }
 
@@ -202,7 +198,7 @@ public class DashboardControllerTest {
     public void periodSelected_doesNotNarrowTheAsOfTodayTables() throws Exception {
         when(request.getParameter("year")).thenReturn("2026");
         when(request.getParameter("period")).thenReturn("q3");
-        when(paymentDAO.sumInvoiceAmountInPeriod(any(Period.class), nullable(Integer.class)))
+        when(contractDAO.sumInvoiceAmountInPeriod(any(Period.class), nullable(Integer.class)))
                 .thenReturn(BigDecimal.ZERO);
 
         controller.doGet(request, response);
@@ -215,7 +211,7 @@ public class DashboardControllerTest {
     @Test
     public void invalidProvinceParam_fallsBackToNationwide() throws Exception {
         when(request.getParameter("provinceId")).thenReturn("khong-phai-so");
-        when(paymentDAO.sumInvoiceAmountByMonth(anyInt(), anyInt(), nullable(Integer.class))).thenReturn(BigDecimal.ZERO);
+        when(contractDAO.sumInvoiceAmountByMonth(anyInt(), anyInt(), nullable(Integer.class))).thenReturn(BigDecimal.ZERO);
 
         controller.doGet(request, response);
 
