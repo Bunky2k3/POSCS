@@ -53,6 +53,36 @@
         .btn-cancel { background: #fff; border: 1.5px solid #e5e7eb; color: #6b7280; border-radius: 10px; padding: 0.6rem 1.4rem; font-weight: 600; font-size: 0.9rem; text-decoration: none; display: inline-flex; align-items: center; }
         .btn-cancel:hover { background: #f3f4f6; color: #6b7280; }
 
+        .section-header { display: flex; justify-content: space-between; align-items: center; margin: 0 0 16px; padding-bottom: 10px; border-bottom: 1.5px solid #eef2f6; }
+        .section-header h5 { font-weight: 700; color: var(--primary-dark); font-size: 0.98rem; margin: 0; }
+        .item-table { width: 100%; }
+        .item-table th { font-size: 0.72rem; text-transform: uppercase; color: #9ca3af; font-weight: 700; padding: 8px 10px; border-bottom: 1.5px solid #eef2f6; text-align: left; }
+        .item-table td { padding: 10px 10px; font-size: 0.87rem; color: #111827; border-bottom: 1px solid #f3f4f6; }
+        .item-table tr:last-child td { border-bottom: none; }
+        .btn-remove-item {
+            width: 28px; height: 28px; border-radius: 8px; border: 1px solid #fecaca;
+            background: #fff5f5; color: var(--danger); display: inline-flex; align-items: center; justify-content: center;
+            font-size: 0.8rem; cursor: pointer;
+        }
+        .btn-remove-item:hover { background: var(--danger); color: #fff; }
+        .inline-form { margin-top: 18px; padding-top: 18px; border-top: 1.5px solid #eef2f6; }
+        .inline-form .form-label { font-size: 0.75rem; font-weight: 600; color: #6b7280; margin-bottom: 4px; }
+        .inline-form .form-control, .inline-form .form-select { border-radius: 10px; font-size: 0.88rem; }
+        .btn-add-item {
+            width: 100%; height: 38px; border-radius: 10px; border: none;
+            background: linear-gradient(120deg, var(--primary), var(--primary-light)); color: #fff; cursor: pointer;
+        }
+        .btn-add-item:hover { opacity: 0.9; }
+        .lifecycle-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+        .btn-step {
+            border-radius: 10px; padding: 9px 18px; font-weight: 600; font-size: 0.87rem;
+            display: inline-flex; align-items: center; gap: 8px; cursor: pointer; border: 1.5px solid #e5e7eb; background: #fff;
+        }
+        .btn-step.primary { background: linear-gradient(120deg, var(--primary), var(--primary-light)); color: #fff; border: none; }
+        .btn-step.warn { color: var(--warning); border-color: var(--warning); }
+        .btn-step.danger { color: var(--danger); border-color: var(--danger); }
+        .locked-note { font-size: 0.83rem; color: #6b7280; display: flex; align-items: flex-start; gap: 8px; }
+
         @media (max-width: 768px) { .card-box { padding: 20px 18px 22px; } }
     </style>
 </head>
@@ -74,6 +104,20 @@
             <p>Mã hợp đồng: <strong style="color:var(--primary-dark)">${fn:escapeXml(contract.contractCode)}</strong></p>
         </div>
 
+        <%-- Đóng băng thì ẩn hẳn form nội dung thay vì để người dùng gõ xong
+             rồi nhận lỗi: ContractDAO.update từ chối mọi thay đổi sau thanh lý.
+             Các khối bên dưới vẫn còn, vì ghi nhận tiền về thì luôn phải được. --%>
+        <c:if test="${contract.frozen}">
+            <div class="card-box" style="border-left:4px solid #2f6b34;">
+                <div style="display:flex; align-items:flex-start; gap:10px; font-size:0.88rem; color:#2f6b34;">
+                    <i class="fa-solid fa-lock" style="margin-top:3px;"></i>
+                    <span><strong>Hợp đồng đã ${fn:escapeXml(contract.progressStatus)}.</strong>
+                        Nội dung không sửa được nữa, kể cả bởi quản trị viên — phát sinh sau thời điểm
+                        này phải lập hợp đồng mới. Bên dưới chỉ còn phần ghi nhận tiền về.</span>
+                </div>
+            </div>
+        </c:if>
+        <c:if test="${not contract.frozen}">
         <div class="card-box">
             <c:if test="${not empty param.error}">
                 <div class="alert alert-danger py-2 px-3 mb-3" style="font-size: 0.9rem; border-radius: 12px;">
@@ -233,10 +277,227 @@
                 </div>
             </form>
         </div>
+        </c:if>
+
+        <%-- MỌI THAO TÁC GHI CỦA HỢP ĐỒNG NẰM Ở TRANG NÀY.
+
+             Trang xem (viewcontractdetail.jsp) cố ý không có nút nào gây thay
+             đổi -- xem ghi chú ở đầu khối vòng đời bên đó. Các khối dưới đây
+             đứng NGOÀI form sửa thông tin ở trên: form lồng form là HTML không
+             hợp lệ, trình duyệt sẽ tự cắt và nút bấm gửi đi thiếu tham số. --%>
+
+        <!-- ===== Bước vòng đời ===== -->
+        <c:if test="${canSign or canClose or canVoid}">
+        <div class="card-box" style="margin-top:20px;">
+            <div class="section-header"><h5>Bước vòng đời</h5></div>
+            <div class="lifecycle-actions">
+                <c:if test="${canSign}">
+                    <button type="button" class="btn-step primary"
+                            onclick="changeProgress('Đã ký', 'Ký hợp đồng này?\n\nSau khi ký, nội dung trở thành chứng cứ và không quay lại bản nháp được.', false)">
+                        <i class="fa-solid fa-signature"></i> Ký hợp đồng
+                    </button>
+                </c:if>
+                <c:if test="${canClose}">
+                    <button type="button" class="btn-step"
+                            onclick="changeProgress('Đã thanh lý', 'Thanh lý hợp đồng — đây là lúc hợp đồng coi như xong.\n\nSau thanh lý KHÔNG sửa được nữa, kể cả cấp cao.\n\nNhập căn cứ (số biên bản thanh lý, ngày ký biên bản...):', true)">
+                        <i class="fa-solid fa-file-circle-check"></i> Thanh lý
+                    </button>
+                    <button type="button" class="btn-step warn"
+                            onclick="changeProgress('Chấm dứt sớm', 'Chấm dứt hợp đồng trước hạn.\n\nCũng đóng băng vĩnh viễn như thanh lý, chỉ khác lý do.\n\nNhập lý do:', true)">
+                        <i class="fa-solid fa-ban"></i> Chấm dứt sớm
+                    </button>
+                </c:if>
+                <c:if test="${canVoid}">
+                    <button type="button" class="btn-step danger"
+                            onclick="confirmVoid(${contract.contractId})"
+                            title="Gỡ một bản ghi NHẬP NHẦM khỏi danh sách. Không phải huỷ hợp đồng ngoài đời.">
+                        <i class="fa-solid fa-trash"></i> Huỷ bản ghi
+                    </button>
+                </c:if>
+            </div>
+            <c:if test="${canSign and (contract.effectiveDate == null or contract.endDate == null)}">
+                <div class="locked-note" style="margin-top:12px;">
+                    <i class="fa-solid fa-circle-info" style="margin-top:3px; color:var(--primary);"></i>
+                    <span>Còn thiếu ngày hiệu lực hoặc ngày kết thúc — điền ở form trên và lưu lại thì mới ký được.</span>
+                </div>
+            </c:if>
+        </div>
+        </c:if>
+
+        <!-- ===== Hạng mục hàng hoá ===== -->
+        <div class="card-box" style="margin-top:20px;">
+            <div class="section-header"><h5>Hạng mục sản phẩm / dịch vụ</h5></div>
+            <c:choose>
+                <c:when test="${empty contractProducts}">
+                    <div style="color:#9ca3af; font-size:0.87rem;">Chưa gắn hàng hoá nào.</div>
+                </c:when>
+                <c:otherwise>
+                    <table class="item-table">
+                        <thead><tr><th style="width:40px;">#</th><th>Sản phẩm</th><th style="width:110px;">Số lượng</th><th style="width:90px;">Đơn vị</th><th>Ghi chú</th><th style="width:60px;"></th></tr></thead>
+                        <tbody>
+                            <c:forEach var="cp" items="${contractProducts}" varStatus="row">
+                                <tr>
+                                    <td>${row.index + 1}</td>
+                                    <td>${fn:escapeXml(cp.productName)}<div style="color:#9ca3af; font-size:0.78rem;">${fn:escapeXml(cp.productCode)}</div></td>
+                                    <td>${cp.quantity}</td>
+                                    <td>${fn:escapeXml(cp.unit)}</td>
+                                    <td>${not empty cp.notes ? fn:escapeXml(cp.notes) : '—'}</td>
+                                    <td>
+                                        <c:if test="${canEditProducts}">
+                                            <button type="button" class="btn-remove-item" title="Gỡ hàng hoá này"
+                                                    onclick="confirmRemoveProduct(${cp.contractProductId})">
+                                                <i class="fa-solid fa-xmark"></i>
+                                            </button>
+                                        </c:if>
+                                    </td>
+                                </tr>
+                            </c:forEach>
+                        </tbody>
+                    </table>
+                </c:otherwise>
+            </c:choose>
+            <c:choose>
+                <c:when test="${canEditProducts}">
+                    <form class="inline-form" method="POST" action="${pageContext.request.contextPath}/contract">
+                        <input type="hidden" name="csrfToken" value="${csrfToken}">
+                        <input type="hidden" name="action" value="addProduct">
+                        <input type="hidden" name="contractId" value="${contract.contractId}">
+                        <div class="row g-2 align-items-end">
+                            <div class="col-md-4">
+                                <label class="form-label">Sản phẩm</label>
+                                <select class="form-select" name="productId" required>
+                                    <option value="">-- Chọn sản phẩm --</option>
+                                    <c:forEach var="pr" items="${productOptions}">
+                                        <option value="${pr.productId}">${fn:escapeXml(pr.productName)}</option>
+                                    </c:forEach>
+                                </select>
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label">Số lượng</label>
+                                <input type="text" class="form-control" name="quantity" placeholder="VD: 1.000" required>
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label">Đơn vị</label>
+                                <input type="text" class="form-control" name="unit" placeholder="Cái">
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label">Ghi chú</label>
+                                <input type="text" class="form-control" name="notes">
+                            </div>
+                            <div class="col-md-2">
+                                <button type="submit" class="btn-add-item"><i class="fa-solid fa-plus"></i> Thêm</button>
+                            </div>
+                        </div>
+                    </form>
+                </c:when>
+                <c:otherwise>
+                    <div class="inline-form locked-note">
+                        <i class="fa-solid fa-lock" style="margin-top:3px; color:#9ca3af;"></i>
+                        <span>Hợp đồng đã ký nên hạng mục hàng hoá đã chốt — đây là nội dung hợp đồng,
+                            không sửa thẳng được. Thay đổi phát sinh phải lập phụ lục.</span>
+                    </div>
+                </c:otherwise>
+            </c:choose>
+        </div>
+
+        <!-- ===== Kỳ thanh toán ===== -->
+        <div class="card-box" style="margin-top:20px;">
+            <div class="section-header"><h5>Kỳ thanh toán</h5></div>
+            <c:choose>
+                <c:when test="${empty contractPayments}">
+                    <div style="color:#9ca3af; font-size:0.87rem;">Chưa lập kỳ thanh toán nào.</div>
+                </c:when>
+                <c:otherwise>
+                    <table class="item-table">
+                        <thead><tr><th style="width:40px;">#</th><th>Số tiền</th><th style="width:130px;">Đến hạn</th><th style="width:170px;">Tình trạng</th><th style="width:170px;"></th></tr></thead>
+                        <tbody>
+                            <c:forEach var="pm" items="${contractPayments}" varStatus="row">
+                                <tr>
+                                    <td>${row.index + 1}</td>
+                                    <td><strong class="money-vnd" data-vnd="${pm.invoiceAmount}">&mdash;</strong></td>
+                                    <td><fmt:formatDate value="${pm.dueDate}" pattern="dd/MM/yyyy"/></td>
+                                    <td>
+                                        <c:choose>
+                                            <c:when test="${pm.paidDate != null}">
+                                                <span style="color:#2f6b34; font-weight:600;"><i class="fa-solid fa-circle-check"></i>
+                                                    Đã thu <fmt:formatDate value="${pm.paidDate}" pattern="dd/MM/yyyy"/></span>
+                                            </c:when>
+                                            <c:otherwise><span style="color:#9ca3af;">Chưa thu</span></c:otherwise>
+                                        </c:choose>
+                                    </td>
+                                    <td style="text-align:right;">
+                                        <c:if test="${pm.paidDate == null and canRecordPayment}">
+                                            <button type="button" class="btn-remove-item"
+                                                    style="width:auto; padding:0 10px; border-color:#cfe3d0; background:#f3f7f3; color:#2f6b34;"
+                                                    onclick="markPaid(${pm.paymentId})">
+                                                <i class="fa-solid fa-check"></i> Đã thu
+                                            </button>
+                                        </c:if>
+                                        <c:if test="${canEditPayments}">
+                                            <button type="button" class="btn-remove-item" title="Xoá kỳ này"
+                                                    onclick="confirmRemovePayment(${pm.paymentId})">
+                                                <i class="fa-solid fa-xmark"></i>
+                                            </button>
+                                        </c:if>
+                                    </td>
+                                </tr>
+                            </c:forEach>
+                        </tbody>
+                    </table>
+                </c:otherwise>
+            </c:choose>
+            <c:choose>
+                <c:when test="${canEditPayments}">
+                    <form class="inline-form" method="POST" action="${pageContext.request.contextPath}/contract">
+                        <input type="hidden" name="csrfToken" value="${csrfToken}">
+                        <input type="hidden" name="action" value="addPayment">
+                        <input type="hidden" name="contractId" value="${contract.contractId}">
+                        <div class="row g-2 align-items-end">
+                            <div class="col-md-4">
+                                <label class="form-label">Số tiền (VNĐ)</label>
+                                <input type="text" class="form-control" name="invoiceAmount" inputmode="numeric"
+                                       placeholder="VD: 450.000.000" required>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Đến hạn</label>
+                                <input type="date" class="form-control" name="dueDate" required>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Ngày đã thu (nếu có)</label>
+                                <input type="date" class="form-control" name="paidDate">
+                            </div>
+                            <div class="col-md-2">
+                                <button type="submit" class="btn-add-item"><i class="fa-solid fa-plus"></i> Lập kỳ</button>
+                            </div>
+                        </div>
+                    </form>
+                </c:when>
+                <c:otherwise>
+                    <div class="inline-form locked-note">
+                        <i class="fa-solid fa-lock" style="margin-top:3px; color:#9ca3af;"></i>
+                        <span>Hợp đồng đã đóng băng nên không lập thêm kỳ được. Tiền của kỳ đã lập thì
+                            vẫn ghi nhận được khi về — tiền bảo hành giữ lại thường về sau thanh lý.</span>
+                    </div>
+                </c:otherwise>
+            </c:choose>
+        </div>
     </div>
 
         </div>
     </div>
+
+    <!-- Form ẩn cho các thao tác trên hợp đồng (đứng ngoài mọi form khác) -->
+    <form id="opForm" method="POST" action="${pageContext.request.contextPath}/contract" style="display:none">
+        <input type="hidden" name="csrfToken" value="${csrfToken}">
+        <input type="hidden" name="action" id="opAction">
+        <input type="hidden" name="contractId" value="${contract.contractId}">
+        <input type="hidden" name="id" value="${contract.contractId}">
+        <input type="hidden" name="toStatus" id="opToStatus">
+        <input type="hidden" name="progressNote" id="opProgressNote">
+        <input type="hidden" name="voidReason" id="opVoidReason">
+        <input type="hidden" name="paymentId" id="opPaymentId">
+        <input type="hidden" name="contractProductId" id="opContractProductId">
+    </form>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
@@ -263,6 +524,70 @@
             }
 
             return valid;
+        }
+
+        function submitOp(action) {
+            document.getElementById('opAction').value = action;
+            document.getElementById('opForm').submit();
+        }
+
+        // Số tiền render ở client để dùng đúng cách gom nhóm của tiếng Việt.
+        document.querySelectorAll('.money-vnd').forEach(function (el) {
+            var n = Number(el.dataset.vnd);
+            el.textContent = isNaN(n) ? '\u2014' : n.toLocaleString('vi-VN', { maximumFractionDigits: 0 }) + ' \u20ab';
+        });
+
+        // requireNote=true với thanh lý và chấm dứt sớm: hai bước đó đóng băng
+        // hợp đồng vĩnh viễn, không có đường quay lại, nên phải biết căn cứ.
+        // Server kiểm lại cả hai điều (ContractDAO.changeProgressStatus).
+        function changeProgress(toStatus, message, requireNote) {
+            var note = null;
+            if (requireNote) {
+                note = prompt(message);
+                if (note === null) { return; }
+                if (note.trim() === '') {
+                    alert('Phải nhập căn cứ thì mới thực hiện được — bước này không quay lại được.');
+                    return;
+                }
+            } else if (!confirm(message)) {
+                return;
+            }
+            document.getElementById('opToStatus').value = toStatus;
+            document.getElementById('opProgressNote').value = note === null ? '' : note.trim();
+            submitOp('changeProgress');
+        }
+
+        // Hỏi LÝ DO chứ không hỏi "có chắc không": bản ghi bị huỷ vẫn nằm trong
+        // CSDL và vẫn có dòng nhật ký, nên thứ cần thu thập là vì sao.
+        function confirmVoid() {
+            var reason = prompt('Huỷ bản ghi hợp đồng này khỏi danh sách.\n'
+                + 'Đây là thao tác sửa nhập liệu sai, không phải huỷ hợp đồng ngoài đời.\n\n'
+                + 'Nhập lý do:');
+            if (reason === null) { return; }
+            if (reason.trim() === '') {
+                alert('Phải có lý do thì mới huỷ được bản ghi.');
+                return;
+            }
+            document.getElementById('opVoidReason').value = reason.trim();
+            submitOp('delete');
+        }
+
+        function markPaid(paymentId) {
+            if (!confirm('Ghi nhận tiền của kỳ này đã về hôm nay?')) { return; }
+            document.getElementById('opPaymentId').value = paymentId;
+            submitOp('markPaid');
+        }
+
+        function confirmRemovePayment(paymentId) {
+            if (!confirm('Xoá kỳ thanh toán này?')) { return; }
+            document.getElementById('opPaymentId').value = paymentId;
+            submitOp('removePayment');
+        }
+
+        function confirmRemoveProduct(contractProductId) {
+            if (!confirm('Gỡ hàng hoá này khỏi hợp đồng?')) { return; }
+            document.getElementById('opContractProductId').value = contractProductId;
+            submitOp('removeProduct');
         }
     </script>
 

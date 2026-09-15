@@ -187,9 +187,13 @@ public class ContractControllerTest {
         controller.doGet(request, response);
 
         verify(request).setAttribute("contract", contract);
-        // Sales xem được hợp đồng nhưng không huỷ được bản ghi -- việc đó của
-        // Admin. Trước đây cờ này tính theo trạng thái ngày tháng (BR-46 cũ).
-        verify(request).setAttribute("canVoid", false);
+        // TRANG XEM KHÔNG ĐƯỢC ĐẶT CỜ THAO TÁC NÀO. Mọi nút gây thay đổi đã
+        // chuyển sang trang sửa; JSP bên đó bật nút theo các cờ này. Đặt lại ở
+        // đây là trang xem mọc nút trở lại -- đúng thứ người dùng không muốn.
+        for (String flag : new String[]{"canVoid", "canSign", "canClose",
+                "canEditProducts", "canEditPayments", "canRecordPayment"}) {
+            verify(request, never()).setAttribute(eq(flag), any());
+        }
         verify(dispatcher).forward(request, response);
         verify(response, never()).sendRedirect(anyString());
     }
@@ -647,7 +651,7 @@ public class ContractControllerTest {
         controller.doPost(request, response);
 
         verify(contractDAO, never()).insertProducts(anyInt(), anyList(), anyInt());
-        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=view&id=5&error=add_product_invalid");
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=edit&id=5&error=add_product_invalid");
     }
 
     /**
@@ -671,7 +675,7 @@ public class ContractControllerTest {
 
         verify(contractDAO).insertProducts(eq(5), argThat((java.util.List<ContractProduct> items) ->
                 items.size() == 1 && items.get(0).getQuantity() == 1000), anyInt());
-        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=view&id=5");
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=edit&id=5");
     }
 
     @Test
@@ -688,7 +692,7 @@ public class ContractControllerTest {
         controller.doPost(request, response);
 
         verify(contractDAO, never()).insertProducts(anyInt(), anyList(), anyInt());
-        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=view&id=5&error=add_product_invalid");
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=edit&id=5&error=add_product_invalid");
     }
 
     @Test
@@ -700,11 +704,11 @@ public class ContractControllerTest {
 
         controller.doPost(request, response);
 
-        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=view&id=5&error=remove_product_failed");
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=edit&id=5&error=remove_product_failed");
     }
 
     @Test
-    public void removeProduct_daoSucceeds_redirectsToDetail() throws Exception {
+    public void removeProduct_daoSucceeds_returnsToTheEditPage() throws Exception {
         when(request.getParameter("action")).thenReturn("removeProduct");
         when(request.getParameter("contractId")).thenReturn("5");
         when(request.getParameter("contractProductId")).thenReturn("42");
@@ -712,7 +716,7 @@ public class ContractControllerTest {
 
         controller.doPost(request, response);
 
-        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=view&id=5");
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=edit&id=5");
     }
 
     // ------------------------------------------------------------------

@@ -5,11 +5,16 @@
 <%--
     Request attribute do ContractController#showDetail thiết lập trước khi forward tới trang này:
       - contract         : poscs.model.Contract (có sẵn .enterprise và .owner đã join, .status đã tính theo BR-17)
-      - canVoid          : boolean -- Admin, hoặc người quản được hợp đồng khi nó còn là bản Nháp
-      - canSign          : boolean -- true nếu hợp đồng đang là Nháp VÀ người xem được ký (không có cấp trên)
-      - canClose         : boolean -- true nếu hợp đồng Đã ký và người xem quản được hợp đồng (thanh lý/chấm dứt)
-      - contractProducts : List<poscs.model.ContractProduct> -- hạng mục sản phẩm/dịch vụ (chỉ đọc)
+      - contractProducts : List<poscs.model.ContractProduct> -- hạng mục sản phẩm/dịch vụ
+      - contractPayments : List<poscs.model.ContractPayment> -- kỳ thanh toán
+      - paymentScheduled / paymentCollected / paymentOutstanding : ba con số công nợ
       - contractHistory  : List<poscs.model.ContractHistory> -- nhật ký thay đổi, mới nhất trước
+      - createdEvent / signedEvent / closedEvent : ba mốc vòng đời, để dựng thanh tiến trình
+
+    TRANG NÀY CHỈ ĐỌC. showDetail cố ý KHÔNG đặt một cờ can* nào, nên mọi khối
+    <c:if> điều khiển nút bấm đều tắt. Thao tác làm thay đổi dữ liệu -- ký,
+    thanh lý, chấm dứt, huỷ bản ghi, gắn/gỡ hàng hoá, lập kỳ thanh toán, ghi
+    nhận đã thu -- nằm ở updatecontract.jsp. Đừng thêm nút thao tác vào đây.
 
     Hạng mục sản phẩm/dịch vụ hiển thị sản phẩm/số lượng/đơn vị/ghi chú thật
     từ contractproducts -- KHÔNG có đơn giá/thành tiền/VAT vì bảng đó chưa có
@@ -322,53 +327,25 @@
                     </span>
                 </c:if>
                 <a href="${pageContext.request.contextPath}/contract?action=exportPdf&id=${contract.contractId}" class="btn-delete-detail" style="cursor:pointer; color:var(--primary); border-color:#e5e7eb;"><i class="fa-solid fa-file-pdf"></i> Xuất PDF</a>
-                <%-- Hợp đồng đã đóng băng thì không sửa nữa, kể cả cấp cao —
-                     luật KH. Ẩn nút chỉ là phép lịch sự; chặn thật ở
-                     ContractDAO.update. --%>
-                <c:if test="${canManage and not contract.frozen}">
-                    <a href="${pageContext.request.contextPath}/contract?action=edit&id=${contract.contractId}" class="btn-edit-detail"><i class="fa-solid fa-pen"></i> Sửa thông tin</a>
-                </c:if>
-                <c:if test="${canSign}">
-                    <button type="button" class="btn-edit-detail" style="cursor:pointer;"
-                            onclick="changeProgress('Đã ký', 'Ký hợp đồng này?
-
-Sau khi ký, nội dung trở thành chứng cứ và không quay lại bản nháp được.', false)">
-                        <i class="fa-solid fa-signature"></i> Ký hợp đồng
-                    </button>
-                </c:if>
-                <c:if test="${canClose}">
-                    <button type="button" class="btn-delete-detail" style="cursor:pointer; color:var(--primary); border-color:#e5e7eb;"
-                            onclick="changeProgress('Đã thanh lý', 'Thanh lý hợp đồng — đây là lúc hợp đồng coi như xong.
-
-Sau thanh lý KHÔNG sửa được nữa, kể cả cấp cao.
-
-Nhập căn cứ (số biên bản thanh lý, ngày ký biên bản...):', true)">
-                        <i class="fa-solid fa-file-circle-check"></i> Thanh lý
-                    </button>
-                    <button type="button" class="btn-delete-detail" style="cursor:pointer; color:var(--warning); border-color:var(--warning);"
-                            onclick="changeProgress('Chấm dứt sớm', 'Chấm dứt hợp đồng trước hạn.
-
-Cũng đóng băng vĩnh viễn như thanh lý, chỉ khác lý do.
-
-Nhập lý do:', true)">
-                        <i class="fa-solid fa-ban"></i> Chấm dứt sớm
-                    </button>
-                </c:if>
-                <%-- Huỷ bản ghi đứng NGOÀI canManage: nó không còn là thao tác
-                     nghiệp vụ của Sales mà là việc sửa hậu quả nhập liệu sai,
-                     chỉ Admin làm được. Không có nhánh hiển thị nút mờ cho
-                     người khác -- nút xám kèm tooltip chỉ mời người ta đi tìm
-                     cách bấm, trong khi đây là thứ họ không nên bấm. --%>
-                <c:if test="${canVoid}">
-                    <button type="button" class="btn-delete-detail" style="cursor:pointer; color:var(--danger); border-color:var(--danger);"
-                            onclick="confirmVoid(${contract.contractId})"
-                            title="Gỡ một bản ghi NHẬP NHẦM khỏi danh sách. Không phải huỷ hợp đồng ngoài đời.">
-                        <i class="fa-solid fa-trash"></i> Huỷ bản ghi
-                    </button>
+                <%-- Link duy nhất dẫn tới nơi có thao tác. Mở được cả khi hợp
+                     đồng đã đóng băng: lúc đó nội dung khoá lại nhưng vẫn phải
+                     ghi nhận được tiền về (tiền bảo hành giữ lại thường về sau
+                     thanh lý cả năm), mà nút đó nằm bên trang sửa. --%>
+                <c:if test="${canManage}">
+                    <a href="${pageContext.request.contextPath}/contract?action=edit&id=${contract.contractId}" class="btn-edit-detail"><i class="fa-solid fa-sliders"></i> Quản lý hợp đồng</a>
                 </c:if>
             </div>
         </div>
 
+        <%-- TRANG NÀY CHỈ ĐỌC.
+
+             Mọi thao tác làm thay đổi dữ liệu -- ký, thanh lý, chấm dứt sớm,
+             huỷ bản ghi, gắn/gỡ hàng hoá, lập kỳ thanh toán, ghi nhận đã thu --
+             đã chuyển sang trang Sửa thông tin (updatecontract.jsp). Trang xem
+             chỉ trình bày, không có nút nào gây thay đổi.
+
+             Đừng thêm nút thao tác vào đây. Nếu cần một hành động mới thì nó
+             thuộc về trang sửa. --%>
         <!-- ===== Vòng đời hợp đồng ===== -->
         <%-- Thanh này trả lời câu "hợp đồng đang ở đâu trong quy trình" ngay khi
              mở trang. Trước đây thông tin đó chỉ nằm trong một cái nhãn nhỏ ở
@@ -615,12 +592,6 @@ Nhập lý do:', true)">
                                              (Kỹ thuật, CSKH) mở trang cũng thấy nút gỡ, bấm vào
                                              mới nhận 403. Giờ dùng chung đúng một điều kiện với
                                              form thêm bên dưới. --%>
-                                        <c:if test="${canEditProducts}">
-                                            <button type="button" class="btn-remove-item" title="Gỡ sản phẩm này"
-                                                    onclick="confirmRemoveProduct(${cp.contractProductId})">
-                                                <i class="fa-solid fa-xmark"></i>
-                                            </button>
-                                        </c:if>
                                     </td>
                                 </tr>
                             </c:forEach>
@@ -633,47 +604,6 @@ Nhập lý do:', true)">
                  bộ. Ký xong thì nó là chứng cứ, đổi phải đi qua phụ lục -- nên
                  chỉ sửa được khi hợp đồng còn là bản Nháp. Chặn thật nằm ở
                  ContractDAO.insertProducts/deleteProductLine. --%>
-            <c:if test="${not canEditProducts and canManage}">
-                <div style="margin-top:16px; padding-top:16px; border-top:1.5px solid #eef2f6;
-                            font-size:0.83rem; color:#6b7280; display:flex; align-items:flex-start; gap:8px;">
-                    <i class="fa-solid fa-lock" style="margin-top:3px; color:#9ca3af;"></i>
-                    <span>Hợp đồng đã ký nên hạng mục hàng hoá đã chốt — đây là nội dung hợp đồng,
-                        không sửa thẳng được. Thay đổi phát sinh phải lập phụ lục.</span>
-                </div>
-            </c:if>
-            <c:if test="${canEditProducts}">
-                <form class="add-product-form" method="POST" action="${pageContext.request.contextPath}/contract">
-                    <input type="hidden" name="csrfToken" value="${csrfToken}">
-                    <input type="hidden" name="action" value="addProduct">
-                    <input type="hidden" name="contractId" value="${contract.contractId}">
-                    <div class="row g-2 align-items-end">
-                        <div class="col-md-4">
-                            <label class="form-label">Sản phẩm</label>
-                            <select name="productId" class="form-select" required>
-                                <option value="" selected disabled>-- Chọn sản phẩm --</option>
-                                <c:forEach var="p" items="${productOptions}">
-                                    <option value="${p.productId}">${fn:escapeXml(p.productCode)} - ${fn:escapeXml(p.productName)}</option>
-                                </c:forEach>
-                            </select>
-                        </div>
-                        <div class="col-md-2">
-                            <label class="form-label">Số lượng</label>
-                            <input type="text" name="quantity" class="form-control" placeholder="VD: 1.000" required>
-                        </div>
-                        <div class="col-md-2">
-                            <label class="form-label">Đơn vị</label>
-                            <input type="text" name="unit" class="form-control" placeholder="Cái">
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label">Ghi chú</label>
-                            <input type="text" name="notes" class="form-control" placeholder="Không bắt buộc">
-                        </div>
-                        <div class="col-md-1">
-                            <button type="submit" class="btn-add-item" title="Thêm sản phẩm"><i class="fa-solid fa-plus"></i></button>
-                        </div>
-                    </div>
-                </form>
-            </c:if>
         </div>
 
         <!-- ===== Kỳ thanh toán ===== -->
@@ -746,20 +676,6 @@ Nhập lý do:', true)">
                                         </c:choose>
                                     </td>
                                     <td style="text-align:right;">
-                                        <c:if test="${p.paidDate == null and canRecordPayment}">
-                                            <button type="button" class="btn-remove-item"
-                                                    style="width:auto; padding:0 10px; border-color:#cfe3d0; background:#f3f7f3; color:#2f6b34;"
-                                                    title="Ghi nhận tiền của kỳ này đã về"
-                                                    onclick="markPaid(${p.paymentId})">
-                                                <i class="fa-solid fa-check"></i> Đã thu
-                                            </button>
-                                        </c:if>
-                                        <c:if test="${canEditPayments}">
-                                            <button type="button" class="btn-remove-item" title="Xoá kỳ này"
-                                                    onclick="confirmRemovePayment(${p.paymentId})">
-                                                <i class="fa-solid fa-xmark"></i>
-                                            </button>
-                                        </c:if>
                                     </td>
                                 </tr>
                             </c:forEach>
@@ -768,39 +684,6 @@ Nhập lý do:', true)">
                 </c:otherwise>
             </c:choose>
 
-            <c:if test="${not canEditPayments and canManage}">
-                <div style="margin-top:16px; padding-top:16px; border-top:1.5px solid #eef2f6;
-                            font-size:0.83rem; color:#6b7280; display:flex; align-items:flex-start; gap:8px;">
-                    <i class="fa-solid fa-lock" style="margin-top:3px; color:#9ca3af;"></i>
-                    <span>Hợp đồng đã đóng băng nên không lập thêm kỳ được. Tiền của kỳ đã lập thì
-                        vẫn ghi nhận được khi về &mdash; tiền bảo hành giữ lại thường về sau thanh lý.</span>
-                </div>
-            </c:if>
-            <c:if test="${canEditPayments}">
-                <form class="add-product-form" method="POST" action="${pageContext.request.contextPath}/contract">
-                    <input type="hidden" name="csrfToken" value="${csrfToken}">
-                    <input type="hidden" name="action" value="addPayment">
-                    <input type="hidden" name="contractId" value="${contract.contractId}">
-                    <div class="row g-2 align-items-end">
-                        <div class="col-md-4">
-                            <label class="form-label">Số tiền (VNĐ)</label>
-                            <input type="text" class="form-control" name="invoiceAmount"
-                                   inputmode="numeric" placeholder="VD: 450.000.000" required>
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label">Đến hạn</label>
-                            <input type="date" class="form-control" name="dueDate" required>
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label">Ngày đã thu (nếu có)</label>
-                            <input type="date" class="form-control" name="paidDate">
-                        </div>
-                        <div class="col-md-2">
-                            <button type="submit" class="btn-add-item"><i class="fa-solid fa-plus"></i> Lập kỳ</button>
-                        </div>
-                    </div>
-                </form>
-            </c:if>
         </div>
 
         <%-- Đã bỏ thẻ "Điều khoản & ghi chú -- Chưa hỗ trợ trong phiên bản
@@ -849,66 +732,7 @@ Nhập lý do:', true)">
         </div>
     </div>
 
-    <!-- Form ẩn để gửi yêu cầu huỷ bản ghi qua POST (không đổi state bằng GET) -->
-    <form id="deleteForm" method="POST" action="${pageContext.request.contextPath}/contract" style="display:none">
-        <input type="hidden" name="csrfToken" value="${csrfToken}">
-        <input type="hidden" name="action" value="delete">
-        <input type="hidden" name="id" id="deleteFormId">
-        <input type="hidden" name="voidReason" id="deleteFormReason">
-    </form>
-
-    <!-- Form ẩn cho thao tác trên một kỳ thanh toán -->
-    <form id="paymentForm" method="POST" action="${pageContext.request.contextPath}/contract" style="display:none">
-        <input type="hidden" name="csrfToken" value="${csrfToken}">
-        <input type="hidden" name="action" id="paymentAction">
-        <input type="hidden" name="contractId" value="${contract.contractId}">
-        <input type="hidden" name="paymentId" id="paymentFormId">
-        <input type="hidden" name="paidDate" id="paymentPaidDate">
-    </form>
-
-    <!-- Form ẩn để gửi một bước chuyển trên trục tiến độ qua POST -->
-    <form id="progressForm" method="POST" action="${pageContext.request.contextPath}/contract" style="display:none">
-        <input type="hidden" name="csrfToken" value="${csrfToken}">
-        <input type="hidden" name="action" value="changeProgress">
-        <input type="hidden" name="contractId" value="${contract.contractId}">
-        <input type="hidden" name="toStatus" id="progressToStatus">
-        <input type="hidden" name="progressNote" id="progressNote">
-    </form>
-
-    <!-- Form ẩn để gửi yêu cầu gỡ 1 dòng sản phẩm qua POST -->
-    <form id="removeProductForm" method="POST" action="${pageContext.request.contextPath}/contract" style="display:none">
-        <input type="hidden" name="csrfToken" value="${csrfToken}">
-        <input type="hidden" name="action" value="removeProduct">
-        <input type="hidden" name="contractId" value="${contract.contractId}">
-        <input type="hidden" name="contractProductId" id="removeProductFormId">
-    </form>
-
     <script>
-        // Hỏi lý do chứ không phải hỏi "có chắc không". Bản ghi bị huỷ vẫn nằm
-        // trong CSDL và vẫn có dòng nhật ký, nên thứ cần thu thập là VÌ SAO --
-        // để sau này phân biệt được nhập nhầm với huỷ đi cho khuất mắt.
-        // Server cũng kiểm lại lý do rỗng (handleDelete), chỗ này chỉ để đỡ
-        // một vòng đi về.
-        function confirmVoid(contractId) {
-            var reason = prompt('Huỷ bản ghi hợp đồng này khỏi danh sách.\n'
-                + 'Đây là thao tác sửa nhập liệu sai, không phải huỷ hợp đồng ngoài đời.\n\n'
-                + 'Nhập lý do:');
-            if (reason === null) {
-                return;
-            }
-            if (reason.trim() === '') {
-                alert('Phải có lý do thì mới huỷ được bản ghi.');
-                return;
-            }
-            document.getElementById('deleteFormId').value = contractId;
-            document.getElementById('deleteFormReason').value = reason.trim();
-            document.getElementById('deleteForm').submit();
-        }
-
-        // requireNote=true với thanh lý và chấm dứt sớm: hai bước đó đóng băng
-        // hợp đồng vĩnh viễn, không có đường quay lại, nên phải biết căn cứ.
-        // Ký thì chỉ cần xác nhận — ghi chú tuỳ chọn, để trống cũng ký được.
-        // Server kiểm lại cả hai điều (ContractDAO.changeProgressStatus).
         // Số tiền render ở client để dùng đúng cách gom nhóm của tiếng Việt
         // (dấu chấm), thứ mà fmt:formatNumber không đảm bảo khi request không
         // mang Accept-Language.
@@ -936,33 +760,6 @@ Nhập lý do:', true)">
             document.getElementById('progressForm').submit();
         }
 
-        // Ngày thu để trống thì server lấy hôm nay -- phần lớn thao tác là ghi
-        // nhận ngay lúc tiền về, hỏi ngày mỗi lần chỉ tổ chậm.
-        function markPaid(paymentId) {
-            if (!confirm('Ghi nhận tiền của kỳ này đã về hôm nay?')) {
-                return;
-            }
-            document.getElementById('paymentAction').value = 'markPaid';
-            document.getElementById('paymentFormId').value = paymentId;
-            document.getElementById('paymentPaidDate').value = '';
-            document.getElementById('paymentForm').submit();
-        }
-
-        function confirmRemovePayment(paymentId) {
-            if (!confirm('Xoá kỳ thanh toán này?')) {
-                return;
-            }
-            document.getElementById('paymentAction').value = 'removePayment';
-            document.getElementById('paymentFormId').value = paymentId;
-            document.getElementById('paymentForm').submit();
-        }
-
-        function confirmRemoveProduct(contractProductId) {
-            if (confirm('Gỡ sản phẩm này khỏi hợp đồng?')) {
-                document.getElementById('removeProductFormId').value = contractProductId;
-                document.getElementById('removeProductForm').submit();
-            }
-        }
     </script>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
