@@ -9,7 +9,7 @@
       - contractPayments : List<poscs.model.ContractPayment> -- kỳ thanh toán
       - paymentScheduled / paymentCollected / paymentOutstanding : ba con số công nợ
       - contractHistory  : List<poscs.model.ContractHistory> -- nhật ký thay đổi, mới nhất trước
-      - createdEvent / signedEvent / closedEvent : ba mốc vòng đời, để dựng thanh tiến trình
+      - createdEvent / signedEvent / closedEvent : ba mốc tiến trình, để dựng thanh tiến trình
 
     TRANG NÀY CHỈ ĐỌC. showDetail cố ý KHÔNG đặt một cờ can* nào, nên mọi khối
     <c:if> điều khiển nút bấm đều tắt. Thao tác làm thay đổi dữ liệu -- ký,
@@ -64,7 +64,7 @@
             font-size: 0.72rem; font-weight: 600; white-space: nowrap; margin-left: 8px;
             border: 1.5px dashed transparent;
         }
-        /* ===== Thanh tiến trình vòng đời ===== */
+        /* ===== Thanh tiến trình hợp đồng ===== */
         .lifecycle-card { padding: 20px 26px 8px; margin-bottom: 20px; }
         .lifecycle { display: flex; align-items: flex-start; gap: 0; flex-wrap: nowrap; }
         .lc-step { flex: 1 1 0; display: flex; flex-direction: column; align-items: center; text-align: center; position: relative; min-width: 0; }
@@ -110,7 +110,7 @@
             content: ""; position: absolute; left: -23px; top: 5px; width: 10px; height: 10px;
             border-radius: 50%; background: #d1d5db; border: 2px solid #fff;
         }
-        /* Mốc vòng đời nổi hơn hẳn dòng sửa đổi -- hai loại dòng này nằm chung
+        /* Mốc tiến trình nổi hơn hẳn dòng sửa đổi -- hai loại dòng này nằm chung
            một dòng thời gian, nhìn giống nhau thì mốc bị chìm giữa các lần sửa. */
         .tl-item.milestone::before { background: var(--primary); width: 12px; height: 12px; left: -24px; }
         .tl-head { font-size: 0.86rem; color: #111827; }
@@ -341,13 +341,13 @@
 
              Đừng thêm nút thao tác vào đây. Nếu cần một hành động mới thì nó
              thuộc về trang sửa. --%>
-        <!-- ===== Vòng đời hợp đồng ===== -->
+        <!-- ===== Tiến trình hợp đồng ===== -->
         <%-- Thanh này trả lời câu "hợp đồng đang ở đâu trong quy trình" ngay khi
              mở trang. Trước đây thông tin đó chỉ nằm trong một cái nhãn nhỏ ở
              tiêu đề, nên nhìn vào chỉ thấy vài ô dữ liệu rời chứ không thấy quy
              trình -- đúng chỗ khách hàng sẽ hỏi khi demo. --%>
         <div class="info-card card-box lifecycle-card">
-            <div class="section-header"><h5>Vòng đời hợp đồng</h5></div>
+            <div class="section-header"><h5>Tiến trình hợp đồng</h5></div>
             <div class="lifecycle">
                 <div class="lc-step done">
                     <div class="lc-dot"><i class="fa-solid fa-pen-ruler"></i></div>
@@ -489,7 +489,7 @@
                      thái theo lịch (nhãn ở đầu trang) -- chỉ là không bày ra
                      trong khối thông tin chung nữa.
 
-                     Ngày ký vẫn hiện ở thanh tiến trình vòng đời phía trên, vì
+                     Ngày ký vẫn hiện ở thanh tiến trình phía trên, vì
                      ở đó nó là MỐC của quy trình chứ không phải một ô dữ liệu.
                      Cần bỏ cả chỗ đó thì nói. --%>
             </div>
@@ -697,7 +697,7 @@
         <!-- ===== Phụ lục ===== -->
         <%-- CHỈ ĐỌC, như cả trang này. Nút "Lập phụ lục" nằm ở trang quản lý
              (updatecontract.jsp) cùng mọi thao tác ghi khác -- xem ghi chú đầu
-             khối vòng đời. Ở đây chỉ liệt kê, kèm đường sang từng phụ lục. --%>
+             khối tiến trình. Ở đây chỉ liệt kê, kèm đường sang từng phụ lục. --%>
         <c:if test="${not empty amendments}">
         <div class="info-card card-box">
             <div class="section-header"><h5>Phụ lục</h5></div>
@@ -755,7 +755,7 @@
                 <c:otherwise>
                     <%-- Dòng thời gian chứ không phải bảng: nhật ký này kể một
                          câu chuyện theo thứ tự, mà bảng thì bắt người đọc tự
-                         ghép lại từ bốn cột. Mốc vòng đời (có from/to) được làm
+                         ghép lại từ bốn cột. Mốc tiến trình (có from/to) được làm
                          nổi hơn dòng sửa đổi -- để giống nhau thì mốc bị chìm
                          giữa các lần sửa vặt. --%>
                     <ul class="tl">

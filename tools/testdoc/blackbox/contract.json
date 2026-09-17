@@ -582,7 +582,7 @@
       ]
     },
     {
-      "name": "Vòng đời hợp đồng",
+      "name": "Tiến trình hợp đồng",
       "sheet": "ContractLifecycle",
       "prefix": "TC_CTRLIFE",
       "screen": "POST /POSCS/contract action=changeProgress",
