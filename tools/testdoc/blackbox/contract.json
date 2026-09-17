@@ -411,64 +411,164 @@
       ]
     },
     {
-      "name": "Xoá hợp đồng",
-      "sheet": "DeleteContract",
+      "name": "Huỷ bản ghi hợp đồng",
+      "sheet": "VoidContract",
       "prefix": "TC_CTRDEL",
       "screen": "POST /POSCS/contract action=delete",
-      "description": "Xoá mềm hợp đồng — chỉ cho phép khi hợp đồng còn ở trạng thái Chưa hiệu lực (BR-46)",
-      "precondition": "Đăng nhập bằng Admin hoặc Sales",
+      "description": "Gỡ một bản ghi NHẬP NHẦM khỏi danh sách — không phải huỷ hợp đồng ngoài đời. Chỉ Admin, bắt buộc lý do, luôn để lại dòng nhật ký. Thay cho BR-46 cũ (xoá khi Chưa hiệu lực) vốn tính theo lịch, nên hợp đồng ký hôm qua mà hiệu lực tháng sau vẫn xoá được.",
+      "precondition": "Đăng nhập bằng Admin",
       "cases": [
         {
-          "d": "Xoá hợp đồng đang ở trạng thái Chưa hiệu lực",
+          "d": "Admin huỷ bản ghi kèm lý do",
           "s": [
-            "Tạo hợp đồng có ngày hiệu lực nằm trong tương lai",
-            "Mở chi tiết hợp đồng đó",
-            "Bấm Xoá",
-            "Xác nhận"
+            "Mở chi tiết một hợp đồng bất kỳ",
+            "Bấm Huỷ bản ghi",
+            "Nhập lý do rồi xác nhận"
           ],
-          "p": "Hợp đồng có ngày hiệu lực sau hôm nay, tức trạng thái Chưa hiệu lực",
-          "t": "id hợp đồng Chưa hiệu lực",
-          "e": "Xoá thành công, quay về danh sách và hợp đồng biến mất",
-          "o": "Bản ghi bị đánh dấu is_deleted, không xoá hẳn"
+          "p": "Đăng nhập bằng Admin",
+          "t": "id hợp đồng bất kỳ; lý do: Nhập trùng với HD-0042",
+          "e": "Huỷ thành công, quay về danh sách và hợp đồng biến mất khỏi đó",
+          "o": "Bản ghi chỉ bị đánh dấu is_deleted; contract_history có thêm dòng Huỷ bản ghi, cột note chứa đúng lý do đã nhập"
         },
         {
-          "d": "Xoá hợp đồng đã tới ngày hiệu lực",
+          "d": "Huỷ bản ghi không nhập lý do",
+          "s": [
+            "Bấm Huỷ bản ghi",
+            "Để trống ô lý do rồi xác nhận"
+          ],
+          "p": "Đăng nhập bằng Admin",
+          "t": "lý do: (để trống)",
+          "e": "Bị chặn kèm thông báo phải có lý do, hợp đồng vẫn còn",
+          "n": "Lý do là toàn bộ giá trị của thao tác: bản ghi biến mất mà không nói vì sao thì sau không phân biệt được nhập nhầm với xoá để che"
+        },
+        {
+          "d": "Hợp đồng đang hiệu lực vẫn huỷ được",
           "s": [
             "Mở hợp đồng đang hiệu lực",
-            "Bấm Xoá",
-            "Xác nhận"
+            "Bấm Huỷ bản ghi, nhập lý do, xác nhận"
           ],
-          "p": "Hợp đồng đã qua ngày hiệu lực (Đang hiệu lực / Sắp hết hạn / Đã hết hạn)",
-          "t": "id hợp đồng đã có hiệu lực",
-          "e": "Bị chặn kèm thông báo không thể xoá, hợp đồng vẫn còn",
-          "n": "BR-46: chỉ hợp đồng Chưa hiệu lực mới được xoá"
+          "p": "Đăng nhập bằng Admin; hợp đồng ở trạng thái Đang hiệu lực",
+          "t": "id hợp đồng Đang hiệu lực",
+          "e": "Huỷ thành công",
+          "n": "Khác BR-46 cũ: không còn điều kiện theo trạng thái lịch. Điều kiện bây giờ là QUYỀN, không phải ngày tháng"
         },
         {
-          "d": "Huỷ ở hộp thoại xác nhận",
+          "d": "Vai trò Sales mở trang chi tiết",
           "s": [
-            "Bấm Xoá",
-            "Chọn Huỷ"
+            "Đăng nhập bằng Sales",
+            "Mở chi tiết một hợp đồng"
+          ],
+          "p": "Đăng nhập bằng vai trò Sales",
+          "t": "-",
+          "e": "Không thấy nút Huỷ bản ghi; nút Sửa thông tin vẫn còn"
+        },
+        {
+          "d": "Vai trò Sales gọi thẳng action=delete",
+          "s": [
+            "Đăng nhập bằng Sales",
+            "Gửi POST action=delete kèm lý do hợp lệ"
+          ],
+          "p": "Đăng nhập bằng vai trò Sales",
+          "t": "POST action=delete&id=<id>&voidReason=thu",
+          "e": "Trả về trang lỗi 403, hợp đồng vẫn còn",
+          "n": "Sales có Full access trên hợp đồng nhưng vẫn bị chặn: huỷ bản ghi dùng requireAdmin chứ không phải requireFullAccess"
+        },
+        {
+          "d": "Huỷ ở hộp thoại nhập lý do",
+          "s": [
+            "Bấm Huỷ bản ghi",
+            "Chọn Cancel"
           ],
           "t": "-",
-          "e": "Không có gì bị xoá"
+          "e": "Không có gì bị huỷ"
         },
         {
-          "d": "Xoá bằng id không tồn tại",
+          "d": "Huỷ bằng id không tồn tại",
           "s": [
-            "Gửi POST action=delete với id không có thật"
+            "Gửi POST action=delete với id không có thật, kèm lý do hợp lệ"
           ],
+          "p": "Đăng nhập bằng Admin",
           "t": "id: 999999",
-          "e": "Chuyển về danh sách kèm thông báo không tìm thấy"
+          "e": "Chuyển về danh sách kèm thông báo không tìm thấy",
+          "n": "Phải là 'không tìm thấy', không phải 'không huỷ được' — sai lý do thì người dùng tưởng vướng ràng buộc nghiệp vụ"
         },
         {
-          "d": "Vai trò CSKH gọi thẳng action=delete",
+          "d": "Huỷ lại một bản ghi đã huỷ",
           "s": [
-            "Đăng nhập bằng CSKH",
-            "Gửi POST action=delete"
+            "Gửi POST action=delete lần thứ hai cho cùng id"
           ],
-          "p": "Đăng nhập bằng vai trò CSKH",
-          "t": "POST action=delete&id=<id>",
-          "e": "Trả về trang lỗi 403, hợp đồng vẫn còn"
+          "p": "Đăng nhập bằng Admin; bản ghi đã bị huỷ trước đó",
+          "t": "id bản ghi đã huỷ",
+          "e": "Bị chặn, và không sinh thêm dòng nhật ký nào"
+        }
+      ]
+    },
+    {
+      "name": "Nhật ký thay đổi hợp đồng",
+      "sheet": "ContractHistory",
+      "prefix": "TC_CTRHIS",
+      "screen": "GET /POSCS/contract?action=view — khối Nhật ký thay đổi",
+      "description": "Mọi thay đổi trên hợp đồng đều để lại một dòng, ghi trong cùng transaction với chính thay đổi đó",
+      "precondition": "Đăng nhập bằng Admin hoặc Sales; migration V23 đã chạy",
+      "cases": [
+        {
+          "d": "Sửa một trường rồi xem nhật ký",
+          "s": [
+            "Mở Sửa thông tin của một hợp đồng",
+            "Đổi ngày hết hạn rồi lưu",
+            "Mở lại chi tiết, kéo xuống khối Nhật ký thay đổi"
+          ],
+          "t": "ngày hết hạn: 31/01/2027 -> 30/06/2027",
+          "e": "Có dòng mới, cột Sự kiện là 'Sửa thông tin', Nội dung ghi 'Ngày hết hạn: 31/01/2027 → 30/06/2027', kèm đúng tên người sửa và thời điểm"
+        },
+        {
+          "d": "Bấm Lưu mà không đổi gì",
+          "s": [
+            "Mở Sửa thông tin",
+            "Không sửa gì, bấm Lưu",
+            "Xem lại nhật ký"
+          ],
+          "t": "-",
+          "e": "Không có dòng nào được thêm",
+          "n": "Ghi cả những lần này thì các lần sửa thật bị chôn giữa các dòng rỗng"
+        },
+        {
+          "d": "Đổi khách hàng và người phụ trách",
+          "s": [
+            "Sửa hợp đồng, chọn khách hàng khác và người phụ trách khác",
+            "Lưu rồi xem nhật ký"
+          ],
+          "t": "khách hàng và người phụ trách khác ban đầu",
+          "e": "Nội dung hiện TÊN khách hàng và TÊN người phụ trách cũ → mới, không phải mã số"
+        },
+        {
+          "d": "Thêm rồi gỡ một hàng hoá",
+          "s": [
+            "Ở chi tiết hợp đồng, thêm một sản phẩm với số lượng 5",
+            "Gỡ chính dòng đó",
+            "Xem nhật ký"
+          ],
+          "t": "sản phẩm bất kỳ, số lượng 5",
+          "e": "Hai dòng 'Thêm hàng hoá' và 'Gỡ hàng hoá', cả hai nêu đúng tên sản phẩm và số lượng",
+          "n": "Gỡ là DELETE cứng nên tên phải đọc TRƯỚC khi xoá; dòng nhật ký chỉ ghi chung chung là đã sai"
+        },
+        {
+          "d": "Hợp đồng có từ trước khi bật nhật ký",
+          "s": [
+            "Mở một hợp đồng đã tồn tại trước khi chạy V23"
+          ],
+          "t": "id hợp đồng cũ",
+          "e": "Có đúng một dòng 'Khởi tạo', nội dung nói rõ đây là dòng dựng lại từ ngày tạo bản ghi chứ không phải ghi nhận lúc xảy ra"
+        },
+        {
+          "d": "Nhật ký của bản ghi đã huỷ",
+          "s": [
+            "Huỷ một bản ghi hợp đồng",
+            "Tra contract_history theo contract_id đó"
+          ],
+          "t": "id bản ghi vừa huỷ",
+          "e": "Các dòng nhật ký vẫn còn nguyên",
+          "n": "contract_history cố ý KHÔNG có ON DELETE CASCADE — lịch sử phải sống lâu hơn thứ nó nói về"
         }
       ]
     },

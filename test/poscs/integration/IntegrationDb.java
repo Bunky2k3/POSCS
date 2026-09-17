@@ -154,7 +154,7 @@ public final class IntegrationDb {
         String[] tables = {
             "notifications", "customer_lifecycle_events", "contract_payments",
             "technicalrequestdevices", "technicalrequesthistory", "technicalrequests",
-            "contractproducts", "contracts", "enterprisecontacts", "enterprises",
+            "contract_history", "contractproducts", "contracts", "enterprisecontacts", "enterprises",
             "productimages", "productcatalogues", "products", "users", "addresses"
         };
         try (Connection conn = DBContext.getConnection();

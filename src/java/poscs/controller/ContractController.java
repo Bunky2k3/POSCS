@@ -243,8 +243,12 @@ public class ContractController extends HttpServlet {
         request.setAttribute("attachmentUrl", attachmentIsSafe ? attachmentUrl : null);
         request.setAttribute("attachmentUnsafe", attachmentUrl != null && !attachmentIsSafe);
         request.setAttribute("drivePreviewUrl", attachmentIsSafe ? drivePreviewUrl(attachmentUrl) : null);
-        request.setAttribute("canDelete", contractDAO.canDelete(id));
+        // Huỷ bản ghi chỉ dành cho Admin -- xem handleDelete. Không còn điều
+        // kiện theo trạng thái: hợp đồng nào cũng đã ký, nên "xoá được hay
+        // không" bây giờ là câu hỏi về quyền, không phải về ngày tháng.
+        request.setAttribute("canVoid", AccessControl.isAdmin(request));
         request.setAttribute("contractProducts", contractDAO.findProductsByContractId(id));
+        request.setAttribute("contractHistory", contractDAO.findHistoryByContractId(id));
         // Danh sách sản phẩm còn hoạt động, phục vụ dropdown "Thêm sản phẩm" bên dưới bảng hạng mục.
         request.setAttribute("productOptions", productDAO.findAll(1, Integer.MAX_VALUE, null, null));
 
@@ -597,7 +601,7 @@ public class ContractController extends HttpServlet {
             contract.setEnterpriseId(enterpriseId);
             contract.setOwnerId(ownerId);
 
-            int contractId = contractDAO.insert(contract);
+            int contractId = contractDAO.insert(contract, currentUser.getUserId());
             if (contractId <= 0) {
                 // tránh để lại khách hàng mồ côi (không có hợp đồng nào) nếu vừa tạo
                 // enterprise mới ở bước trên nhưng insert hợp đồng lại thất bại
@@ -608,11 +612,12 @@ public class ContractController extends HttpServlet {
                 request.getRequestDispatcher(IMPORT_VIEW).forward(request, response);
                 return;
             }
-            if (!contractDAO.insertProducts(contractId, items)) {
+            if (!contractDAO.insertProducts(contractId, items, currentUser.getUserId())) {
                 // giữ đúng cam kết "không ghi gì nếu có lỗi" ở javadoc đầu hàm: hợp
                 // đồng vừa tạo (và khách hàng mới nếu có) không được để lại mồ côi
                 // với 0 dòng sản phẩm trong khi vẫn báo import thành công
-                contractDAO.softDelete(contractId);
+                contractDAO.voidRecord(contractId, currentUser.getUserId(),
+                        "Nhập hợp đồng từ PDF thất bại ở bước ghi hạng mục hàng hoá -- bản ghi được thu hồi tự động.");
                 if (createdNewEnterprise) {
                     customerDAO.softDelete(enterpriseId);
                 }
@@ -767,7 +772,7 @@ public class ContractController extends HttpServlet {
         }
         c.setContractCode(contractDAO.generateNextContractCode());
 
-        int newId = contractDAO.insert(c);
+        int newId = contractDAO.insert(c, actorId(request));
         if (newId <= 0) {
             LOG.warn("Tao hop dong that bai (actor={}, contractCode={})", Logs.actor(request), c.getContractCode());
             response.sendRedirect(request.getContextPath() + "/contract?action=new&error=create_failed");
@@ -802,7 +807,7 @@ public class ContractController extends HttpServlet {
             return;
         }
 
-        boolean ok = contractDAO.update(c);
+        boolean ok = contractDAO.update(c, actorId(request));
         if (!ok) {
             LOG.warn("Cap nhat hop dong that bai (actor={}, contractId={})", Logs.actor(request), id);
             response.sendRedirect(request.getContextPath() + "/contract?action=edit&id=" + id + "&error=update_failed");
@@ -811,26 +816,40 @@ public class ContractController extends HttpServlet {
         response.sendRedirect(request.getContextPath() + "/contract?action=view&id=" + id);
     }
 
+    /**
+     * Huỷ một bản ghi hợp đồng NHẬP NHẦM khỏi danh sách -- không phải huỷ hợp
+     * đồng ngoài đời.
+     *
+     * <p>Trước đây đây là "xoá hợp đồng" theo BR-46, mở cho cả Sales và chặn
+     * bằng một điều kiện tính theo lịch (xem {@link ContractDAO#voidRecord} để
+     * biết vì sao điều kiện đó sai). Hợp đồng đã ký là chứng cứ, không xoá được
+     * trong nghiệp vụ; nên việc còn lại chỉ là sửa hậu quả của một lần nhập
+     * liệu sai, và nó thuộc về Admin, có lý do, có dấu vết.
+     */
     private void handleDelete(HttpServletRequest request, HttpServletResponse response) throws IOException {
-        if (!AccessControl.requireFullAccess(request, response, AccessControl.Resource.CONTRACT)) {
+        if (!AccessControl.requireAdmin(request, response)) {
             return;
         }
         Integer id = parseIntOrNull(request.getParameter("id"));
-        // Kiểm tồn tại trước canDelete: với id không có thật thì canDelete cũng
-        // trả false, và người dùng nhận thông báo "không thể xoá" -- sai hẳn lý
+        // Kiểm tồn tại trước: với id không có thật thì voidRecord cũng trả
+        // false, và người dùng nhận thông báo "không huỷ được" -- sai hẳn lý
         // do, tưởng là vướng ràng buộc nghiệp vụ.
         if (id == null || contractDAO.findById(id) == null) {
             response.sendRedirect(request.getContextPath() + "/contract?error=notfound");
             return;
         }
 
-        // BR-46: chỉ được xoá hợp đồng ở trạng thái "Chưa hiệu lực"
-        if (!contractDAO.canDelete(id)) {
-            response.sendRedirect(request.getContextPath() + "/contract?action=view&id=" + id + "&error=cannot_delete");
+        String reason = request.getParameter("voidReason");
+        if (isBlank(reason)) {
+            response.sendRedirect(request.getContextPath() + "/contract?action=view&id=" + id + "&error=void_reason_required");
             return;
         }
 
-        contractDAO.softDelete(id);
+        if (!contractDAO.voidRecord(id, actorId(request), reason)) {
+            LOG.warn("Huy ban ghi hop dong that bai (actor={}, contractId={})", Logs.actor(request), id);
+            response.sendRedirect(request.getContextPath() + "/contract?action=view&id=" + id + "&error=void_failed");
+            return;
+        }
         response.sendRedirect(request.getContextPath() + "/contract");
     }
 
@@ -858,11 +877,15 @@ public class ContractController extends HttpServlet {
 
         ContractProduct item = new ContractProduct();
         item.setProductId(product.getProductId());
+        // Tên chỉ để dựng câu nhật ký ("Thêm 1 hạng mục: Modem quang ×5 cái").
+        // Cột contractproducts không lưu tên, nên không gán ở đây thì DAO phải
+        // quay lại bảng products tra một lần nữa thứ mà chỗ này vừa đọc xong.
+        item.setProductName(product.getProductName());
         item.setQuantity(quantity);
         item.setUnit(isBlank(unit) ? "Cái" : unit.trim());
         item.setNotes(emptyToNull(notes));
 
-        if (!contractDAO.insertProducts(contractId, List.of(item))) {
+        if (!contractDAO.insertProducts(contractId, List.of(item), actorId(request))) {
             LOG.warn("Them san pham vao hop dong that bai (actor={}, contractId={}, productId={})",
                     Logs.actor(request), contractId, item.getProductId());
             response.sendRedirect(request.getContextPath() + "/contract?action=view&id=" + contractId + "&error=add_product_failed");
@@ -883,7 +906,7 @@ public class ContractController extends HttpServlet {
             return;
         }
 
-        if (!contractDAO.deleteProductLine(contractProductId, contractId)) {
+        if (!contractDAO.deleteProductLine(contractProductId, contractId, actorId(request))) {
             LOG.warn("Xoa san pham khoi hop dong that bai (actor={}, contractId={}, contractProductId={})",
                     Logs.actor(request), contractId, contractProductId);
             response.sendRedirect(request.getContextPath() + "/contract?action=view&id=" + contractId + "&error=remove_product_failed");
@@ -895,6 +918,21 @@ public class ContractController extends HttpServlet {
     // ------------------------------------------------------------------
     // Helpers
     // ------------------------------------------------------------------
+
+    /**
+     * user_id người đang thao tác, để ghi vào nhật ký hợp đồng.
+     *
+     * <p>Trả -1 khi không xác định được phiên. Mọi đường ghi đều đã qua
+     * requireFullAccess/requireAdmin nên chuyện đó không xảy ra trong đường
+     * chạy bình thường; nếu có thì -1 vi phạm khoá ngoại contract_history
+     * .changed_by và cả transaction bị rollback. Cố ý để hỏng to như vậy: một
+     * thay đổi không biết ai làm thì thà đừng ghi còn hơn ghi vào nhật ký một
+     * dòng không truy được về người nào.
+     */
+    private int actorId(HttpServletRequest request) {
+        User user = AccessControl.currentUser(request);
+        return user == null ? -1 : user.getUserId();
+    }
 
     /**
      * @param keepUserId người đang phụ trách bản ghi đang sửa -- giữ trong

@@ -125,11 +125,13 @@
     },
     {
       "m": "Quản lý hợp đồng",
-      "c": "Thêm, sửa, xoá hợp đồng gắn với khách hàng và người phụ trách",
+      "c": "Thêm và sửa hợp đồng gắn với khách hàng và người phụ trách; mọi thay đổi để lại dấu vết trong Nhật ký thay đổi. Hợp đồng đã ký không xoá được — chỉ Admin huỷ được bản ghi nhập nhầm, kèm lý do",
       "ref": [
         "TC_CTRADD_001",
         "TC_CTREDIT_002",
-        "TC_CTRDEL_001"
+        "TC_CTRHIS_001",
+        "TC_CTRDEL_001",
+        "TC_CTRDEL_002"
       ]
     },
     {

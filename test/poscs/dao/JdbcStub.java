@@ -40,6 +40,27 @@ public final class JdbcStub {
         return conn;
     }
 
+    /**
+     * Connection giả định tuyến theo nội dung câu SQL: câu nào CHỨA
+     * {@code keyword} thì trả {@code matching}, còn lại trả {@code fallback}.
+     *
+     * <p>Cần từ khi một lời gọi DAO chạy nhiều câu lệnh khác nhau trong cùng
+     * một transaction -- ví dụ {@code ContractDAO.insertProducts} vừa ghi
+     * contractproducts vừa ghi contract_history. Dùng chung một mock
+     * PreparedStatement cho cả hai thì verify() đếm lẫn tham số của câu này
+     * sang câu kia, và một test đang nói về hạng mục hàng hoá lại thất bại vì
+     * dòng nhật ký.
+     */
+    public static Connection connectionRoutingOn(String keyword, PreparedStatement matching,
+            PreparedStatement fallback) throws SQLException {
+        Connection conn = mock(Connection.class);
+        when(conn.prepareStatement(anyString())).thenAnswer(inv ->
+                inv.getArgument(0, String.class).contains(keyword) ? matching : fallback);
+        when(conn.prepareStatement(anyString(), anyInt())).thenAnswer(inv ->
+                inv.getArgument(0, String.class).contains(keyword) ? matching : fallback);
+        return conn;
+    }
+
     /** PreparedStatement giả trả về sẵn 1 ResultSet cho executeQuery(). */
     public static PreparedStatement statementReturning(ResultSet rs) throws SQLException {
         PreparedStatement ps = mock(PreparedStatement.class);

@@ -1,0 +1,154 @@
+package poscs.model;
+
+import java.sql.Timestamp;
+
+/**
+ * Một sự kiện đã xảy ra với hợp đồng -- ánh xạ bảng contract_history.
+ *
+ * Khác {@link TechnicalRequestHistory}: bảng của phiếu hỗ trợ chỉ ghi việc ĐỔI
+ * TRẠNG THÁI, còn bảng này ghi MỌI thứ chạm vào hợp đồng. Lý do là hợp đồng đã
+ * ký là chứng cứ pháp lý, nên câu hỏi cần trả lời không phải "phiếu này đi qua
+ * những bước nào" mà "ai đã đổi cái gì, lúc nào".
+ *
+ * Vì thế bảng chứa HAI loại dòng, nằm chung một dòng thời gian:
+ *
+ *   * Mốc vòng đời -- có fromStatus/toStatus (thanh lý, chấm dứt sớm... sẽ
+ *     dùng ở đợt trục tiến độ; hiện chưa loại nào sinh ra dòng kiểu này).
+ *   * Sửa đổi -- fromStatus/toStatus để null, chỉ có detail mô tả thay đổi.
+ *
+ * detail là câu ĐÃ DỰNG SẴN lúc ghi, không phải dữ liệu thô dựng câu lúc đọc:
+ * lịch sử phải kể đúng một câu chuyện mãi mãi, kể cả khi sau này đổi cách hiển
+ * thị. note thì ngược lại -- là lý do do người dùng gõ vào, nên tách khỏi
+ * detail do hệ thống sinh, để còn phân biệt được máy ghi hay người khai.
+ */
+public class ContractHistory {
+
+    /** Hợp đồng được tạo. */
+    public static final String EVENT_CREATED = "Khởi tạo";
+
+    /** Sửa thông tin trên chính bản ghi hợp đồng (tiêu đề, ngày, người phụ trách...). */
+    public static final String EVENT_UPDATED = "Sửa thông tin";
+
+    /** Gắn thêm một dòng hàng hoá/dịch vụ vào hợp đồng. */
+    public static final String EVENT_PRODUCT_ADDED = "Thêm hàng hoá";
+
+    /** Gỡ một dòng hàng hoá/dịch vụ khỏi hợp đồng. */
+    public static final String EVENT_PRODUCT_REMOVED = "Gỡ hàng hoá";
+
+    /**
+     * Xoá mềm bản ghi hợp đồng. Tên là "Huỷ bản ghi" chứ không phải "Xoá hợp
+     * đồng": hợp đồng đã ký thì không xoá được trong nghiệp vụ, thao tác này
+     * chỉ để gỡ một bản ghi NHẬP NHẦM khỏi danh sách, nên bắt buộc có lý do.
+     */
+    public static final String EVENT_VOIDED = "Huỷ bản ghi";
+
+    private int historyId;
+    private int contractId;
+    private String eventType;
+
+    /** Câu mô tả thay đổi, dựng sẵn lúc ghi để hiển thị thẳng. */
+    private String detail;
+
+    /** Chỉ có giá trị ở dòng chuyển trạng thái tiến độ; null ở dòng sửa đổi. */
+    private String fromStatus;
+    private String toStatus;
+
+    /** user_id người thực hiện -- khoá ngoại sang users. */
+    private int changedBy;
+
+    /** Dữ liệu join từ bảng users -- chỉ có tên, đủ để hiển thị. */
+    private User changedByUser;
+
+    private Timestamp changedAt;
+
+    /** Lý do do người dùng nhập; có thể để trống trừ khi huỷ bản ghi. */
+    private String note;
+
+    public ContractHistory() {
+    }
+
+    /** true nếu dòng này là một bước chuyển trên trục tiến độ, không phải một lần sửa đổi. */
+    public boolean isStatusChange() {
+        return toStatus != null;
+    }
+
+    public int getHistoryId() {
+        return historyId;
+    }
+
+    public void setHistoryId(int historyId) {
+        this.historyId = historyId;
+    }
+
+    public int getContractId() {
+        return contractId;
+    }
+
+    public void setContractId(int contractId) {
+        this.contractId = contractId;
+    }
+
+    public String getEventType() {
+        return eventType;
+    }
+
+    public void setEventType(String eventType) {
+        this.eventType = eventType;
+    }
+
+    public String getDetail() {
+        return detail;
+    }
+
+    public void setDetail(String detail) {
+        this.detail = detail;
+    }
+
+    public String getFromStatus() {
+        return fromStatus;
+    }
+
+    public void setFromStatus(String fromStatus) {
+        this.fromStatus = fromStatus;
+    }
+
+    public String getToStatus() {
+        return toStatus;
+    }
+
+    public void setToStatus(String toStatus) {
+        this.toStatus = toStatus;
+    }
+
+    public int getChangedBy() {
+        return changedBy;
+    }
+
+    public void setChangedBy(int changedBy) {
+        this.changedBy = changedBy;
+    }
+
+    public User getChangedByUser() {
+        return changedByUser;
+    }
+
+    public void setChangedByUser(User changedByUser) {
+        this.changedByUser = changedByUser;
+    }
+
+    public Timestamp getChangedAt() {
+        return changedAt;
+    }
+
+    public void setChangedAt(Timestamp changedAt) {
+        this.changedAt = changedAt;
+    }
+
+    public String getNote() {
+        return note;
+    }
+
+    public void setNote(String note) {
+        this.note = note;
+    }
+}

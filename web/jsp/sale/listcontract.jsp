@@ -328,14 +328,13 @@
                                         <button class="act-view" title="Xem chi tiết" onclick="location.href='${pageContext.request.contextPath}/contract?action=view&id=${contract.contractId}'"><i class="fa-regular fa-eye"></i></button>
                                         <c:if test="${canManage}">
                                             <button class="act-edit" title="Sửa" onclick="location.href='${pageContext.request.contextPath}/contract?action=edit&id=${contract.contractId}'"><i class="fa-solid fa-pen"></i></button>
-                                            <c:choose>
-                                                <c:when test="${contract.status == 'Chưa hiệu lực'}">
-                                                    <button class="act-delete" title="Xóa" onclick="openDeleteModal(${contract.contractId}, '${fn:escapeXml(contract.contractCode)}')"><i class="fa-solid fa-trash"></i></button>
-                                                </c:when>
-                                                <c:otherwise>
-                                                    <button class="act-delete" title="Chỉ được xóa hợp đồng ở trạng thái chưa hiệu lực" disabled><i class="fa-solid fa-trash"></i></button>
-                                                </c:otherwise>
-                                            </c:choose>
+                                            <%-- Không còn nút xoá ở danh sách. Hợp đồng đã ký không
+                                                 xoá được theo nghiệp vụ; thứ còn lại là huỷ một bản
+                                                 ghi NHẬP NHẦM -- việc của Admin, bắt buộc có lý do,
+                                                 và nằm ở trang chi tiết nơi nhìn rõ mình đang huỷ cái
+                                                 gì. Điều kiện "Chưa hiệu lực" cũ ở đây cũng sai: nó
+                                                 tính theo lịch, nên hợp đồng ký hôm qua mà hiệu lực
+                                                 tháng sau vẫn xoá được. --%>
                                         </c:if>
                                     </div>
                                 </td>
@@ -369,32 +368,6 @@
 
         </div>
     </div>
-
-    <!-- ===== Modal xác nhận xóa (MSG-043) ===== -->
-    <div class="modal fade" id="deleteModal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <div class="modal-icon-warn"><i class="fa-solid fa-triangle-exclamation"></i></div>
-                </div>
-                <div class="modal-body">
-                    <h5 class="mb-2" style="font-weight:700; color:#111827;">Xác nhận xóa hợp đồng</h5>
-                    Bạn có chắc chắn muốn xóa hợp đồng <strong id="deleteContractCode"></strong>?
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn-modal-cancel" data-bs-dismiss="modal">Hủy</button>
-                    <button type="button" class="btn-modal-danger" id="confirmDeleteBtn">Xóa hợp đồng</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Form ẩn để gửi yêu cầu xoá qua POST (không đổi state bằng GET) -->
-    <form id="deleteForm" method="POST" action="${pageContext.request.contextPath}/contract" style="display:none">
-        <input type="hidden" name="csrfToken" value="${csrfToken}">
-        <input type="hidden" name="action" value="delete">
-        <input type="hidden" name="id" id="deleteFormId">
-    </form>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
@@ -437,23 +410,6 @@
                 if (wrap.scrollLeft !== before) { e.preventDefault(); }
             }, { passive: false });
         })();
-
-        var deleteModal = new bootstrap.Modal(document.getElementById('deleteModal'));
-        var contractIdToDelete = null;
-
-        function openDeleteModal(contractId, contractCode) {
-            contractIdToDelete = contractId;
-            document.getElementById('deleteContractCode').textContent = contractCode;
-            deleteModal.show();
-        }
-
-        document.getElementById('confirmDeleteBtn').addEventListener('click', function () {
-            if (contractIdToDelete) {
-                document.getElementById('deleteFormId').value = contractIdToDelete;
-                document.getElementById('deleteForm').submit();
-            }
-            deleteModal.hide();
-        });
 
         // Tự động submit lại form lọc khi đổi trạng thái / loại hợp đồng
         document.getElementById('filterStatus').addEventListener('change', function () { document.getElementById('filterForm').submit(); });

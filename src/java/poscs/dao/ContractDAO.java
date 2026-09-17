@@ -8,6 +8,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -18,6 +19,7 @@ import org.slf4j.LoggerFactory;
 import poscs.common.Period;
 import poscs.model.Address;
 import poscs.model.Contract;
+import poscs.model.ContractHistory;
 import poscs.model.ContractProduct;
 import poscs.model.District;
 import poscs.model.Enterprise;
@@ -47,6 +49,19 @@ public class ContractDAO {
     public static final String STATUS_EXPIRED = "Đã hết hạn";
 
     private static final int SOON_THRESHOLD_DAYS = 30;
+
+    /** Khớp varchar(500) của contract_history.detail -- xem {@link #truncate}. */
+    private static final int DETAIL_MAX_LENGTH = 500;
+
+    /** Ngày trong câu nhật ký viết như người Việt đọc, không phải như CSDL lưu. */
+    private static final DateTimeFormatter DETAIL_DATE_FORMAT = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+
+    private static final String SQL_ENTERPRISE_LABEL =
+        "SELECT enterprise_name FROM enterprises WHERE enterprise_id = ?";
+    private static final String SQL_USER_LABEL =
+        "SELECT CONCAT_WS(' ', last_name, middle_name, first_name) FROM users WHERE user_id = ?";
+    private static final String SQL_PRODUCT_LABEL =
+        "SELECT product_name FROM products WHERE product_id = ?";
 
     /**
      * Hợp đồng không có cột tỉnh riêng -- địa bàn của nó là địa bàn của khách
@@ -348,13 +363,34 @@ public class ContractDAO {
      * tác, tránh 1 contractProductId sai/giả mạo xoá nhầm dòng của hợp đồng
      * khác.
      */
-    public boolean deleteProductLine(int contractProductId, int contractId) {
+    public boolean deleteProductLine(int contractProductId, int contractId, int actorId) {
         String sql = "DELETE FROM contractproducts WHERE contract_product_id = ? AND contract_id = ?";
-        try (Connection conn = DBContext.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, contractProductId);
-            ps.setInt(2, contractId);
-            return ps.executeUpdate() > 0;
+        try (Connection conn = DBContext.getConnection()) {
+            conn.setAutoCommit(false);
+            boolean committed = false;
+            try {
+                // Đọc TRƯỚC khi xoá: đây là DELETE cứng, sau lệnh dưới thì không
+                // còn chỗ nào biết dòng vừa mất là hàng hoá gì, số lượng bao
+                // nhiêu -- mà đó chính là nội dung duy nhất đáng ghi lại.
+                String label = describeProductLine(conn, contractProductId, contractId);
+                if (label == null) {
+                    return false;
+                }
+                try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                    ps.setInt(1, contractProductId);
+                    ps.setInt(2, contractId);
+                    if (ps.executeUpdate() == 0) {
+                        return false;
+                    }
+                }
+                insertHistory(conn, contractId, ContractHistory.EVENT_PRODUCT_REMOVED,
+                        "Gỡ hạng mục: " + label, actorId, null);
+                conn.commit();
+                committed = true;
+            } finally {
+                finishTransaction(conn, committed, "xoa hang muc san pham hop dong", contractId);
+            }
+            return committed;
         } catch (SQLException ex) {
             LOG.error("Loi xoa hang muc san pham hop dong (contractProductId={}, contractId={})", contractProductId, contractId, ex);
             return false;
@@ -385,8 +421,13 @@ public class ContractDAO {
     /** Thử lại tối đa bao nhiêu lần khi contract_code sinh ra bị trùng (xem insert()). */
     private static final int MAX_CODE_GEN_ATTEMPTS = 5;
 
-    /** Thêm hợp đồng mới. Trả về contract_id vừa tạo, hoặc -1 nếu lỗi. */
-    public int insert(Contract contract) {
+    /**
+     * Thêm hợp đồng mới kèm dòng nhật ký "Khởi tạo". Trả về contract_id vừa
+     * tạo, hoặc -1 nếu lỗi.
+     *
+     * @param actorId user_id người đang thao tác -- đi vào contract_history.
+     */
+    public int insert(Contract contract, int actorId) {
         String sql = "INSERT INTO contracts " +
                 "(contract_code, title, contract_type, direction, signing_date, effective_date, end_date, " +
                 " enterprise_id, owner_id, attachment_url, status) " +
@@ -399,28 +440,54 @@ public class ContractDAO {
         // thầm ghi đè; thử sinh mã mới và INSERT lại vài lần thay vì báo lỗi ngay,
         // để người dùng không phải tự bấm lưu lại.
         for (int attempt = 1; attempt <= MAX_CODE_GEN_ATTEMPTS; attempt++) {
-            try (Connection conn = DBContext.getConnection();
-                 PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
-                ps.setString(1, contract.getContractCode());
-                ps.setString(2, contract.getTitle());
-                ps.setString(3, contract.getContractType());
-                ps.setString(4, contract.getDirection());
-                ps.setDate(5, contract.getSigningDate());
-                ps.setDate(6, contract.getEffectiveDate());
-                ps.setDate(7, contract.getEndDate());
-                ps.setInt(8, contract.getEnterpriseId());
-                ps.setInt(9, contract.getOwnerId());
-                ps.setString(10, contract.getAttachmentUrl());
-                ps.setString(11, computeStatus(contract.getEffectiveDate(), contract.getEndDate()));
+            try (Connection conn = DBContext.getConnection()) {
+                conn.setAutoCommit(false);
+                boolean committed = false;
+                try {
+                    int newId = -1;
+                    try (PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+                        ps.setString(1, contract.getContractCode());
+                        ps.setString(2, contract.getTitle());
+                        ps.setString(3, contract.getContractType());
+                        ps.setString(4, contract.getDirection());
+                        ps.setDate(5, contract.getSigningDate());
+                        ps.setDate(6, contract.getEffectiveDate());
+                        ps.setDate(7, contract.getEndDate());
+                        ps.setInt(8, contract.getEnterpriseId());
+                        ps.setInt(9, contract.getOwnerId());
+                        ps.setString(10, contract.getAttachmentUrl());
+                        ps.setString(11, computeStatus(contract.getEffectiveDate(), contract.getEndDate()));
 
-                int affected = ps.executeUpdate();
-                if (affected == 0) {
-                    return -1;
-                }
-                try (ResultSet keys = ps.getGeneratedKeys()) {
-                    if (keys.next()) {
-                        return keys.getInt(1);
+                        if (ps.executeUpdate() == 0) {
+                            return -1;
+                        }
+                        try (ResultSet keys = ps.getGeneratedKeys()) {
+                            if (keys.next()) {
+                                newId = keys.getInt(1);
+                            }
+                        }
                     }
+                    if (newId == -1) {
+                        return -1;
+                    }
+
+                    // Chiều có thể null: luồng nhập PDF không gán direction, cột
+                    // trong CSDL tự rơi về DEFAULT 'Bán'. Câu nhật ký không được
+                    // đoán hộ giá trị đó, và càng không được ném NPE làm hỏng cả
+                    // lần tạo hợp đồng chỉ vì một dòng mô tả.
+                    String direction = contract.getDirection();
+                    insertHistory(conn, newId, ContractHistory.EVENT_CREATED,
+                            "Tạo hợp đồng " + contract.getContractCode()
+                                    + (direction == null ? "" : " — hợp đồng " + direction.toLowerCase())
+                                    + ", hiệu lực " + formatDate(contract.getEffectiveDate())
+                                    + " đến " + formatDate(contract.getEndDate()),
+                            actorId, null);
+
+                    conn.commit();
+                    committed = true;
+                    return newId;
+                } finally {
+                    finishTransaction(conn, committed, "them hop dong", contract.getContractCode());
                 }
             } catch (SQLException ex) {
                 if (isDuplicateKeyError(ex, "contract_code") && attempt < MAX_CODE_GEN_ATTEMPTS) {
@@ -443,20 +510,13 @@ public class ContractDAO {
      * ContractController.handleImportPdf) có thể tin tưởng báo "chưa ghi gì vào
      * CSDL" khi trả về false.
      */
-    public boolean insertProducts(int contractId, List<ContractProduct> items) {
+    public boolean insertProducts(int contractId, List<ContractProduct> items, int actorId) {
         if (items.isEmpty()) {
             return true;
         }
         String sql = "INSERT INTO contractproducts (contract_id, product_id, quantity, unit, notes) VALUES (?, ?, ?, ?, ?)";
         try (Connection conn = DBContext.getConnection()) {
             conn.setAutoCommit(false);
-            // committed chỉ true sau conn.commit() thành công -- dùng để finally bên
-            // dưới biết có cần rollback không, thay vì 2 khối catch tách rời (1 cái
-            // rollback+rethrow, 1 cái log+return false) dễ làm mất lỗi gốc nếu chính
-            // rollback()/setAutoCommit(true) cũng ném lỗi. Cả 2 lệnh dọn dẹp trong
-            // finally đều tự bắt lỗi riêng để KHÔNG bao giờ ghi đè lên kết quả
-            // "committed" thật sự -- tránh trường hợp insert đã commit xong nhưng
-            // setAutoCommit(true) ném lỗi khiến hàm báo false sai sự thật.
             boolean committed = false;
             try {
                 try (PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -469,22 +529,18 @@ public class ContractDAO {
                         ps.addBatch();
                     }
                     ps.executeBatch();
-                    conn.commit();
-                    committed = true;
                 }
+                // MỘT lời gọi = MỘT dòng nhật ký, kể cả khi thêm nhiều hạng mục:
+                // luồng nhập PDF gắn cả chục dòng hàng hoá trong một lần, tách ra
+                // mỗi hạng mục một dòng lịch sử thì dòng thời gian của hợp đồng
+                // ngập trong các dòng của đúng một thao tác.
+                insertHistory(conn, contractId, ContractHistory.EVENT_PRODUCT_ADDED,
+                        "Thêm " + items.size() + " hạng mục: " + describeItems(conn, items),
+                        actorId, null);
+                conn.commit();
+                committed = true;
             } finally {
-                if (!committed) {
-                    try {
-                        conn.rollback();
-                    } catch (SQLException rollbackEx) {
-                        LOG.error("Loi rollback hang muc san pham hop dong (contractId={})", contractId, rollbackEx);
-                    }
-                }
-                try {
-                    conn.setAutoCommit(true);
-                } catch (SQLException autoCommitEx) {
-                    LOG.error("Loi reset autocommit sau khi them hang muc san pham (contractId={})", contractId, autoCommitEx);
-                }
+                finishTransaction(conn, committed, "them hang muc san pham hop dong", contractId);
             }
             return committed;
         } catch (SQLException ex) {
@@ -501,25 +557,58 @@ public class ContractDAO {
      * doanh thu đã báo cáo trước đó lặng lẽ đổi nghĩa. Cần đổi thì xoá và tạo
      * lại, để có dấu vết.
      */
-    public boolean update(Contract contract) {
+    public boolean update(Contract contract, int actorId) {
         String sql = "UPDATE contracts SET " +
                 "title = ?, contract_type = ?, signing_date = ?, effective_date = ?, end_date = ?, " +
                 "enterprise_id = ?, owner_id = ?, attachment_url = ?, status = ? " +
                 "WHERE contract_id = ? AND is_deleted = 0";
 
-        try (Connection conn = DBContext.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, contract.getTitle());
-            ps.setString(2, contract.getContractType());
-            ps.setDate(3, contract.getSigningDate());
-            ps.setDate(4, contract.getEffectiveDate());
-            ps.setDate(5, contract.getEndDate());
-            ps.setInt(6, contract.getEnterpriseId());
-            ps.setInt(7, contract.getOwnerId());
-            ps.setString(8, contract.getAttachmentUrl());
-            ps.setString(9, computeStatus(contract.getEffectiveDate(), contract.getEndDate()));
-            ps.setInt(10, contract.getContractId());
-            return ps.executeUpdate() > 0;
+        try (Connection conn = DBContext.getConnection()) {
+            conn.setAutoCommit(false);
+            boolean committed = false;
+            try {
+                // Giá trị cũ đọc NGAY TRONG transaction (SELECT ... FOR UPDATE)
+                // chứ không nhận từ controller: controller đọc hợp đồng ở một
+                // thời điểm trước đó, nên nếu hai người cùng sửa một hợp đồng
+                // thì "giá trị cũ" mà nó biết có thể đã lỗi thời, và nhật ký sẽ
+                // ghi lại một thay đổi chưa từng xảy ra. Cùng lý do với
+                // TechnicalSupportTicketDAO.update.
+                Contract before = lockForUpdate(conn, contract.getContractId());
+                if (before == null) {
+                    return false;
+                }
+
+                try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                    ps.setString(1, contract.getTitle());
+                    ps.setString(2, contract.getContractType());
+                    ps.setDate(3, contract.getSigningDate());
+                    ps.setDate(4, contract.getEffectiveDate());
+                    ps.setDate(5, contract.getEndDate());
+                    ps.setInt(6, contract.getEnterpriseId());
+                    ps.setInt(7, contract.getOwnerId());
+                    ps.setString(8, contract.getAttachmentUrl());
+                    ps.setString(9, computeStatus(contract.getEffectiveDate(), contract.getEndDate()));
+                    ps.setInt(10, contract.getContractId());
+                    if (ps.executeUpdate() == 0) {
+                        return false;
+                    }
+                }
+
+                // Bấm Lưu mà không đổi gì thì KHÔNG sinh dòng nhật ký. Ghi cả
+                // những lần như vậy thì dòng thời gian đầy các dòng "đã sửa"
+                // không nói được đã sửa cái gì, và chôn mất những lần sửa thật.
+                String changes = describeChanges(conn, before, contract);
+                if (changes != null) {
+                    insertHistory(conn, contract.getContractId(), ContractHistory.EVENT_UPDATED,
+                            changes, actorId, null);
+                }
+
+                conn.commit();
+                committed = true;
+            } finally {
+                finishTransaction(conn, committed, "cap nhat hop dong", contract.getContractId());
+            }
+            return committed;
         } catch (SQLException ex) {
             LOG.error("Loi cap nhat hop dong (contractId={}, contractCode={})",
                     contract.getContractId(), contract.getContractCode(), ex);
@@ -527,40 +616,278 @@ public class ContractDAO {
         }
     }
 
-    /** BR-46: chỉ được xoá hợp đồng khi trạng thái hiện tại là "Chưa hiệu lực". */
-    public boolean canDelete(int contractId) {
-        String sql = "SELECT effective_date, end_date FROM contracts WHERE contract_id = ? AND is_deleted = 0";
-        try (Connection conn = DBContext.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, contractId);
-            try (ResultSet rs = ps.executeQuery()) {
-                if (rs.next()) {
-                    String status = computeStatus(rs.getDate("effective_date"), rs.getDate("end_date"));
-                    return STATUS_DRAFT.equals(status);
-                }
-            }
-        } catch (SQLException ex) {
-            LOG.error("Loi kiem tra dieu kien xoa hop dong (contractId={})", contractId, ex);
+    /**
+     * Huỷ mềm một bản ghi hợp đồng (is_deleted = 1), kèm lý do bắt buộc.
+     *
+     * <p>THAY CHO cặp canDelete()/softDelete() cũ. BR-46 cũ cho xoá khi trạng
+     * thái là "Chưa hiệu lực" -- mà trạng thái đó tính theo LỊCH, nên hợp đồng
+     * ký hôm qua và hiệu lực tháng sau vẫn xoá được, mang theo cả nội dung đã
+     * ký. Điều kiện đúng phải là CHƯA KÝ; nhưng signing_date là NOT NULL nên
+     * không bản ghi nào chưa ký, tức là xoá theo nghĩa nghiệp vụ không còn tồn
+     * tại nữa.
+     *
+     * <p>Thứ còn lại là gỡ một bản ghi NHẬP NHẦM khỏi danh sách -- không phải
+     * huỷ hợp đồng ngoài đời. Vì thế nó dành cho Admin (chặn ở
+     * ContractController.handleDelete) và bắt buộc có lý do: một bản ghi biến
+     * mất không dấu vết thì sau này không ai phân biệt được nhập nhầm với xoá
+     * để che.
+     *
+     * @param reason lý do người dùng nhập; rỗng thì từ chối, không ghi gì.
+     */
+    public boolean voidRecord(int contractId, int actorId, String reason) {
+        if (reason == null || reason.trim().isEmpty()) {
+            return false;
         }
-        return false;
-    }
-
-    /** Xoá mềm hợp đồng (is_deleted = 1). Gọi canDelete() trước để áp BR-46. */
-    public boolean softDelete(int contractId) {
-        String sql = "UPDATE contracts SET is_deleted = 1 WHERE contract_id = ?";
-        try (Connection conn = DBContext.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, contractId);
-            return ps.executeUpdate() > 0;
+        String sql = "UPDATE contracts SET is_deleted = 1 WHERE contract_id = ? AND is_deleted = 0";
+        try (Connection conn = DBContext.getConnection()) {
+            conn.setAutoCommit(false);
+            boolean committed = false;
+            try {
+                try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                    ps.setInt(1, contractId);
+                    if (ps.executeUpdate() == 0) {
+                        return false;
+                    }
+                }
+                insertHistory(conn, contractId, ContractHistory.EVENT_VOIDED,
+                        "Huỷ bản ghi khỏi danh sách (dữ liệu vẫn còn trong CSDL)",
+                        actorId, reason.trim());
+                conn.commit();
+                committed = true;
+            } finally {
+                finishTransaction(conn, committed, "huy ban ghi hop dong", contractId);
+            }
+            return committed;
         } catch (SQLException ex) {
-            LOG.error("Loi xoa hop dong (contractId={})", contractId, ex);
+            LOG.error("Loi huy ban ghi hop dong (contractId={})", contractId, ex);
             return false;
         }
     }
 
     // ------------------------------------------------------------------
+    // Nhật ký thay đổi (contract_history)
+    // ------------------------------------------------------------------
+
+    /**
+     * Ghi 1 dòng nhật ký bằng connection ĐANG MỞ của bên gọi -- cố ý không tự
+     * mở connection riêng.
+     *
+     * <p>Dòng nhật ký và thay đổi mà nó nói về phải đúng hoặc sai cùng nhau.
+     * Hai connection rời nhau thì sẽ có lúc hàng hoá đã gỡ xong mà dòng nhật ký
+     * ghi hụt, và không ai phát hiện ra -- đúng cái lỗ mà bảng này sinh ra để
+     * bịt. Ném SQLException ra ngoài để transaction của bên gọi rollback.
+     */
+    private void insertHistory(Connection conn, int contractId, String eventType, String detail,
+            int changedBy, String note) throws SQLException {
+        String sql = "INSERT INTO contract_history " +
+                "(contract_id, event_type, detail, changed_by, note) VALUES (?, ?, ?, ?, ?)";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, contractId);
+            ps.setString(2, eventType);
+            ps.setString(3, truncate(detail, DETAIL_MAX_LENGTH));
+            ps.setInt(4, changedBy);
+            ps.setString(5, note);
+            ps.executeUpdate();
+        }
+    }
+
+    /** Nhật ký của 1 hợp đồng, mới nhất trước, kèm tên người thực hiện. */
+    public List<ContractHistory> findHistoryByContractId(int contractId) {
+        List<ContractHistory> result = new ArrayList<>();
+        String sql = "SELECT h.history_id, h.contract_id, h.event_type, h.detail, h.from_status, h.to_status, " +
+                "       h.changed_by, h.changed_at, h.note, " +
+                "       u.last_name AS changer_last_name, u.middle_name AS changer_middle_name, " +
+                "       u.first_name AS changer_first_name " +
+                "FROM contract_history h " +
+                "JOIN users u ON u.user_id = h.changed_by " +
+                "WHERE h.contract_id = ? " +
+                "ORDER BY h.changed_at DESC, h.history_id DESC";
+        try (Connection conn = DBContext.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, contractId);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    ContractHistory h = new ContractHistory();
+                    h.setHistoryId(rs.getInt("history_id"));
+                    h.setContractId(rs.getInt("contract_id"));
+                    h.setEventType(rs.getString("event_type"));
+                    h.setDetail(rs.getString("detail"));
+                    h.setFromStatus(rs.getString("from_status"));
+                    h.setToStatus(rs.getString("to_status"));
+                    h.setChangedBy(rs.getInt("changed_by"));
+                    h.setChangedAt(rs.getTimestamp("changed_at"));
+                    h.setNote(rs.getString("note"));
+
+                    User changer = new User();
+                    changer.setLastName(rs.getString("changer_last_name"));
+                    changer.setMiddleName(rs.getString("changer_middle_name"));
+                    changer.setFirstName(rs.getString("changer_first_name"));
+                    h.setChangedByUser(changer);
+
+                    result.add(h);
+                }
+            }
+        } catch (SQLException ex) {
+            LOG.error("Loi truy van nhat ky hop dong (contractId={})", contractId, ex);
+        }
+        return result;
+    }
+
+    // ------------------------------------------------------------------
     // Helpers riêng
     // ------------------------------------------------------------------
+
+    /**
+     * Dọn dẹp cuối transaction: rollback nếu chưa commit, rồi trả autocommit về
+     * true.
+     *
+     * <p>Cả hai lệnh tự bắt lỗi riêng để KHÔNG bao giờ ghi đè lên kết quả
+     * "committed" thật sự -- tránh trường hợp đã commit xong nhưng
+     * setAutoCommit(true) ném lỗi khiến hàm gọi báo thất bại sai sự thật. Và vì
+     * nó luôn được gọi trong finally, nó không được phép ném ra: một ngoại lệ ở
+     * đây sẽ nuốt mất ngoại lệ gốc đang trên đường bay ra.
+     */
+    private void finishTransaction(Connection conn, boolean committed, String what, Object id) {
+        if (!committed) {
+            try {
+                conn.rollback();
+            } catch (SQLException rollbackEx) {
+                LOG.error("Loi rollback khi {} (id={})", what, id, rollbackEx);
+            }
+        }
+        try {
+            conn.setAutoCommit(true);
+        } catch (SQLException autoCommitEx) {
+            LOG.error("Loi reset autocommit sau khi {} (id={})", what, id, autoCommitEx);
+        }
+    }
+
+    /** Đọc và khoá bản ghi hợp đồng trong transaction đang mở; null nếu không có. */
+    private Contract lockForUpdate(Connection conn, int contractId) throws SQLException {
+        String sql = "SELECT contract_id, contract_code, title, contract_type, direction, signing_date, " +
+                "       effective_date, end_date, enterprise_id, owner_id, attachment_url " +
+                "FROM contracts WHERE contract_id = ? AND is_deleted = 0 FOR UPDATE";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, contractId);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (!rs.next()) {
+                    return null;
+                }
+                Contract c = new Contract();
+                c.setContractId(rs.getInt("contract_id"));
+                c.setContractCode(rs.getString("contract_code"));
+                c.setTitle(rs.getString("title"));
+                c.setContractType(rs.getString("contract_type"));
+                c.setDirection(rs.getString("direction"));
+                c.setSigningDate(rs.getDate("signing_date"));
+                c.setEffectiveDate(rs.getDate("effective_date"));
+                c.setEndDate(rs.getDate("end_date"));
+                c.setEnterpriseId(rs.getInt("enterprise_id"));
+                c.setOwnerId(rs.getInt("owner_id"));
+                c.setAttachmentUrl(rs.getString("attachment_url"));
+                return c;
+            }
+        }
+    }
+
+    /**
+     * Câu mô tả những gì đổi giữa hai phiên bản hợp đồng, hoặc null nếu không
+     * đổi gì. Chỉ so các trường mà form sửa thật sự gửi lên -- direction không
+     * nằm trong đó vì update() cố ý không ghi cột ấy.
+     */
+    private String describeChanges(Connection conn, Contract before, Contract after) throws SQLException {
+        List<String> parts = new ArrayList<>();
+        addChange(parts, "Tiêu đề", before.getTitle(), after.getTitle());
+        addChange(parts, "Loại hợp đồng", before.getContractType(), after.getContractType());
+        addChange(parts, "Ngày ký", formatDate(before.getSigningDate()), formatDate(after.getSigningDate()));
+        addChange(parts, "Ngày hiệu lực", formatDate(before.getEffectiveDate()), formatDate(after.getEffectiveDate()));
+        addChange(parts, "Ngày hết hạn", formatDate(before.getEndDate()), formatDate(after.getEndDate()));
+        addChange(parts, "Link đính kèm", before.getAttachmentUrl(), after.getAttachmentUrl());
+        // Hai trường dưới là khoá ngoại -- tra tên ra để nhật ký đọc được,
+        // "Khách hàng: #3 -> #7" thì không ai hiểu. Chỉ tra khi có đổi thật,
+        // nên lần bấm Lưu bình thường không tốn thêm truy vấn nào.
+        if (before.getEnterpriseId() != after.getEnterpriseId()) {
+            addChange(parts, "Khách hàng",
+                    lookupLabel(conn, SQL_ENTERPRISE_LABEL, before.getEnterpriseId()),
+                    lookupLabel(conn, SQL_ENTERPRISE_LABEL, after.getEnterpriseId()));
+        }
+        if (before.getOwnerId() != after.getOwnerId()) {
+            addChange(parts, "Người phụ trách",
+                    lookupLabel(conn, SQL_USER_LABEL, before.getOwnerId()),
+                    lookupLabel(conn, SQL_USER_LABEL, after.getOwnerId()));
+        }
+        return parts.isEmpty() ? null : String.join("; ", parts);
+    }
+
+    private static void addChange(List<String> parts, String label, String before, String after) {
+        String b = before == null ? "" : before.trim();
+        String a = after == null ? "" : after.trim();
+        if (b.equals(a)) {
+            return;
+        }
+        parts.add(label + ": " + (b.isEmpty() ? "(trống)" : b) + " → " + (a.isEmpty() ? "(trống)" : a));
+    }
+
+    /** Liệt kê các hạng mục vừa thêm, dạng "Tên hàng ×5 cái; ...". */
+    private String describeItems(Connection conn, List<ContractProduct> items) throws SQLException {
+        List<String> parts = new ArrayList<>();
+        for (ContractProduct item : items) {
+            String name = item.getProductName();
+            if (name == null || name.trim().isEmpty()) {
+                name = lookupLabel(conn, SQL_PRODUCT_LABEL, item.getProductId());
+            }
+            parts.add(name.trim() + " ×" + item.getQuantity()
+                    + (item.getUnit() == null ? "" : " " + item.getUnit()));
+        }
+        return String.join("; ", parts);
+    }
+
+    /** Mô tả 1 dòng hàng hoá đang có; null nếu dòng đó không thuộc hợp đồng này. */
+    private String describeProductLine(Connection conn, int contractProductId, int contractId) throws SQLException {
+        String sql = "SELECT p.product_name, cp.quantity, cp.unit " +
+                "FROM contractproducts cp JOIN products p ON cp.product_id = p.product_id " +
+                "WHERE cp.contract_product_id = ? AND cp.contract_id = ?";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, contractProductId);
+            ps.setInt(2, contractId);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (!rs.next()) {
+                    return null;
+                }
+                String unit = rs.getString("unit");
+                return rs.getString("product_name") + " ×" + rs.getInt("quantity")
+                        + (unit == null ? "" : " " + unit);
+            }
+        }
+    }
+
+    /** Tên hiển thị của 1 khoá ngoại; trả "#id" khi không tra được, không bao giờ null. */
+    private String lookupLabel(Connection conn, String sql, int id) throws SQLException {
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, id);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    String label = rs.getString(1);
+                    if (label != null && !label.trim().isEmpty()) {
+                        return label.trim();
+                    }
+                }
+            }
+        }
+        return "#" + id;
+    }
+
+    private static String formatDate(Date date) {
+        return date == null ? "" : date.toLocalDate().format(DETAIL_DATE_FORMAT);
+    }
+
+    /** Cắt cho vừa cột detail thay vì để MySQL từ chối cả câu INSERT và mất luôn dòng nhật ký. */
+    private static String truncate(String text, int max) {
+        if (text == null) {
+            return "";
+        }
+        return text.length() <= max ? text : text.substring(0, max - 1) + "…";
+    }
 
     private void appendFilters(StringBuilder sql, List<Object> params, String keyword, String statusFilter,
             String typeFilter, Integer provinceId, Period period, String direction) {
