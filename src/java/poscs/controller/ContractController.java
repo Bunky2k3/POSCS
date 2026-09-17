@@ -332,7 +332,12 @@ public class ContractController extends HttpServlet {
                 provinceFilter, true, period, direction, request.getParameter("progress"));
         // Giữ cột "Mã HĐ" trong file dù danh sách trên màn hình đã bỏ -- xem lý do
         // ở CustomerController.exportExcel: STT chỉ đúng trong phạm vi một file.
-        String[] headers = {"STT", "Mã HĐ", "Số hợp đồng", "Tiêu đề", "Loại HĐ", "Tỉnh/Thành phố", "Khách hàng",
+        //
+        // MỘT cột mã, không hai. V25 từng xuất kèm cột "Số hợp đồng" riêng, hồi
+        // mã là định danh máy sinh còn số là thứ in trên giấy; V28 chốt lại rằng
+        // hai thứ đó là một và bỏ cột contract_number, nên cột thứ hai ở đây
+        // không còn gì để đọc.
+        String[] headers = {"STT", "Mã HĐ", "Tiêu đề", "Loại HĐ", "Tỉnh/Thành phố", "Khách hàng",
             "Người phụ trách", "Ngày ký", "Ngày hiệu lực", "Ngày kết thúc", "Trạng thái", "Tiến độ"};
         List<Object[]> rows = new ArrayList<>();
         int stt = 1;
@@ -340,9 +345,6 @@ public class ContractController extends HttpServlet {
             rows.add(new Object[]{
                 stt++,
                 c.getContractCode(),
-                // Số trên giấy: để cạnh mã nội bộ chứ không thay nó, vì người đọc
-                // file cần đối chiếu được với cả hệ thống lẫn tệp hồ sơ giấy.
-                c.getContractNumber() != null ? c.getContractNumber() : "",
                 c.getTitle(),
                 c.getContractType(),
                 provinceNameOf(c),
