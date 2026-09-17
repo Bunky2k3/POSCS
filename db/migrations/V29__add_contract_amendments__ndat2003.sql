@@ -47,10 +47,14 @@ ALTER TABLE `contracts`
 -- Không có dòng nào thì khối "Phụ lục" trên trang hợp đồng mở ra là trống ở
 -- mọi hợp đồng, và không ai kiểm được rằng nó hiển thị đúng.
 --
--- Treo vào hợp đồng bán đã ký có giá trị lớn nhất: phụ lục gia hạn/bổ sung
--- thường rơi vào đúng nhóm đó, và chọn theo điều kiện thay vì ghi cứng id thì
+-- Treo vào hợp đồng bán đã ký có thời hạn kết thúc muộn nhất: phụ lục gia hạn
+-- rơi vào đúng nhóm đó, và chọn theo điều kiện thay vì ghi cứng id thì
 -- migration còn chạy được trên CSDL dựng từ schema.sql (bảng rỗng -> mệnh đề
 -- SELECT trả 0 dòng, cả khối tự bỏ qua, không lỗi).
+--
+-- KHÔNG lọc theo contract_value: V27 thêm cột đó nhưng không gieo giá trị cho
+-- 15 hợp đồng bán demo, nên điều kiện "có giá trị" khớp đúng 0 dòng và cả khối
+-- này im lặng không làm gì. Đã dính khi chạy thử trên CSDL dựng lại từ đầu.
 --
 -- Phụ lục gieo ở trạng thái 'Đã ký' cùng người phụ trách với cha. Thời hạn của
 -- nó nối tiếp ngày kết thúc của cha -- đó là hình dạng của một phụ lục gia
@@ -80,9 +84,8 @@ WHERE p.`direction` = N'Bán'
   AND p.`is_deleted` = 0
   AND p.`parent_contract_id` IS NULL
   AND p.`end_date` IS NOT NULL
-  AND p.`contract_value` IS NOT NULL
   AND NOT EXISTS (SELECT 1 FROM `contracts` c2 WHERE c2.`parent_contract_id` = p.`contract_id`)
-ORDER BY p.`contract_value` DESC, p.`contract_id`
+ORDER BY p.`end_date` DESC, p.`contract_id`
 LIMIT 1;
 
 -- Nhật ký cho phụ lục vừa gieo. HAI dòng, ở HAI hợp đồng khác nhau -- giống

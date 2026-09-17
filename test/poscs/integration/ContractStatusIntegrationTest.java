@@ -371,25 +371,235 @@ public class ContractStatusIntegrationTest {
     }
 
     /**
-     * Đường ghi đầy đủ của một lần sửa: giá trị cũ đọc trong transaction, câu
-     * mô tả dựng sẵn, và bấm Lưu mà không đổi gì thì KHÔNG sinh dòng nào.
+     * Đường ghi đầy đủ của một lần sửa BẢN NHÁP: giá trị cũ đọc trong
+     * transaction, câu mô tả dựng sẵn, và bấm Lưu mà không đổi gì thì KHÔNG
+     * sinh dòng nào.
+     *
+     * <p>Phải chạy trên bản nháp: bốn hợp đồng gieo trong lớp này đều ở 'Đã
+     * ký', mà từ V29 hợp đồng đã ký không nhận sửa tiêu đề nữa.
      */
     @Test
-    public void update_writesOneHistoryRowDescribingWhatActuallyChanged() throws Exception {
+    public void update_onDraft_writesOneHistoryRowDescribingWhatActuallyChanged() throws Exception {
         IntegrationDb.assumeAvailable();
 
-        Contract c = contractDAO.findById(2);
+        int id = insertDraftThroughDao("HD-NHAP-SUA");
+        int rowsAfterCreate = contractDAO.findHistoryByContractId(id).size();
+
+        Contract c = contractDAO.findById(id);
         c.setTitle("Tiêu đề đã sửa");
         assertTrue(contractDAO.update(c, Fixtures.USER_ID));
 
-        List<poscs.model.ContractHistory> history = contractDAO.findHistoryByContractId(2);
-        assertEquals(1, history.size());
+        List<poscs.model.ContractHistory> history = contractDAO.findHistoryByContractId(id);
+        assertEquals(rowsAfterCreate + 1, history.size());
         assertTrue("Nhật ký phải nói rõ đổi gì thành gì, không chỉ 'đã sửa'",
                 history.get(0).getDetail().contains("Tiêu đề đã sửa"));
 
         // Lưu lại y nguyên: không có gì đổi thì dòng thời gian không được dài
         // thêm, nếu không những lần sửa thật sẽ bị chôn giữa các dòng rỗng.
-        assertTrue(contractDAO.update(contractDAO.findById(2), Fixtures.USER_ID));
-        assertEquals(1, contractDAO.findHistoryByContractId(2).size());
+        assertTrue(contractDAO.update(contractDAO.findById(id), Fixtures.USER_ID));
+        assertEquals(rowsAfterCreate + 1, contractDAO.findHistoryByContractId(id).size());
+    }
+
+    /**
+     * Hợp đồng ĐÃ KÝ: điều khoản khoá, chỉ người phụ trách và link bản PDF đi
+     * xuống CSDL.
+     *
+     * <p>Kiểm trên CSDL thật chứ không chỉ trên mock, vì thứ đang kiểm là
+     * "câu UPDATE nào thật sự chạy" -- mock chỉ chứng minh được DAO chọn đúng
+     * chuỗi SQL, không chứng minh được chuỗi đó làm gì với dữ liệu.
+     */
+    @Test
+    public void update_onSignedContract_ignoresTermsButTakesTheAdminFields() throws Exception {
+        IntegrationDb.assumeAvailable();
+
+        Contract before = contractDAO.findById(2);
+        assertEquals(ContractDAO.PROGRESS_SIGNED, before.getProgressStatus());
+
+        Contract edit = contractDAO.findById(2);
+        edit.setTitle("Tiêu đề bị đổi lén");
+        edit.setContractCode("HD-DOI-LEN");
+        edit.setAttachmentUrl("https://drive.google.com/file/d/abc/view");
+        assertTrue(contractDAO.update(edit, Fixtures.USER_ID));
+
+        Contract after = contractDAO.findById(2);
+        assertEquals("Tiêu đề của hợp đồng đã ký không được đổi",
+                before.getTitle(), after.getTitle());
+        assertEquals("Mã của hợp đồng đã ký không được đổi",
+                before.getContractCode(), after.getContractCode());
+        assertEquals("Link bản PDF thì vẫn phải dán được -- nó thường chỉ có SAU khi ký",
+                "https://drive.google.com/file/d/abc/view", after.getAttachmentUrl());
+
+        assertEquals("Nhật ký chỉ được kể về thứ thật sự đã ghi", 1,
+                IntegrationDb.count("contract_history",
+                        "contract_id = 2 AND event_type = N'Sửa thông tin' AND detail LIKE '%Link đính kèm%'"));
+        assertEquals(0, IntegrationDb.count("contract_history",
+                "contract_id = 2 AND detail LIKE '%Tiêu đề%'"));
+    }
+
+    /**
+     * Chữa sai sót nhập liệu: đường duy nhất chạm được vào điều khoản của hợp
+     * đồng đã ký, và nó bắt buộc kèm lý do.
+     */
+    @Test
+    public void correct_rewritesTermsAndRecordsTheReason() throws Exception {
+        IntegrationDb.assumeAvailable();
+
+        Contract fix = contractDAO.findById(2);
+        java.sql.Date signedOn = fix.getSigningDate();
+        fix.setContractCode("HD-0002-DUNG");
+        fix.setSigningDate(java.sql.Date.valueOf(java.time.LocalDate.now().plusDays(3)));
+
+        assertFalse("Thiếu lý do thì không ghi gì",
+                contractDAO.correct(contractDAO.findById(2), Fixtures.USER_ID, "  "));
+        assertTrue(contractDAO.correct(fix, Fixtures.USER_ID, "Gõ nhầm mã, đối chiếu bản giấy"));
+
+        Contract after = contractDAO.findById(2);
+        assertEquals("HD-0002-DUNG", after.getContractCode());
+        assertEquals("Ngày ký là dấu của hành động đã xảy ra, không sửa được kể cả ở đây",
+                signedOn.toString(), after.getSigningDate().toString());
+        assertEquals(1, IntegrationDb.count("contract_history",
+                "contract_id = 2 AND event_type = N'Sửa sai sót' "
+                + "AND note = N'Gõ nhầm mã, đối chiếu bản giấy'"));
+    }
+
+    // ------------------------------------------------------------------
+    // Phụ lục (V29)
+    // ------------------------------------------------------------------
+
+    /**
+     * Vòng đầy đủ của một phụ lục trên CSDL thật: lập, ghi vết lên cả hai hợp
+     * đồng, khoá hợp đồng cha khỏi việc huỷ bản ghi, và chặn phụ lục tầng hai.
+     */
+    @Test
+    public void amendment_fullRoundTripAgainstRealSchema() throws Exception {
+        IntegrationDb.assumeAvailable();
+
+        Contract child = new Contract();
+        child.setParentContractId(2);
+        child.setContractCode("HD-0002/PL01");
+        child.setTitle("Phụ lục 01 — gia hạn");
+        child.setContractType("Bán hàng");
+        // Cố ý sai: phải bị ghi đè bằng giá trị của hợp đồng cha.
+        child.setDirection("Mua");
+        child.setEnterpriseId(Fixtures.ENTERPRISE_ID);
+        child.setOwnerId(Fixtures.USER_ID);
+        child.setEffectiveDate(java.sql.Date.valueOf(java.time.LocalDate.now()));
+        child.setEndDate(java.sql.Date.valueOf(java.time.LocalDate.now().plusYears(1)));
+
+        int childId = contractDAO.insert(child, Fixtures.USER_ID);
+        assertTrue("Lập phụ lục cho hợp đồng đã ký phải được", childId > 0);
+
+        Contract saved = contractDAO.findById(childId);
+        assertEquals(Integer.valueOf(2), saved.getParentContractId());
+        assertEquals("Mã hợp đồng cha phải join ra được", "HD-0002", saved.getParentContractCode());
+        assertEquals("Chiều lấy từ CHA, không từ thứ bên gọi truyền vào", "Bán", saved.getDirection());
+        assertEquals("Phụ lục cũng ra đời ở trạng thái nháp",
+                ContractDAO.PROGRESS_DRAFT, saved.getProgressStatus());
+
+        assertEquals("Hợp đồng cha phải có dòng 'Lập phụ lục'", 1,
+                IntegrationDb.count("contract_history",
+                        "contract_id = 2 AND event_type = N'Lập phụ lục'"));
+
+        assertEquals(1, contractDAO.findAmendmentsByParentId(2).size());
+        assertEquals("Hợp đồng cha đếm được phụ lục của nó",
+                1, contractDAO.findById(2).getAmendmentCount());
+
+        // Còn phụ lục thì không huỷ được bản ghi cha -- khoá ngoại không bắt
+        // được vì hợp đồng xoá MỀM.
+        assertFalse(contractDAO.voidRecord(2, Fixtures.USER_ID, "thử huỷ"));
+        assertEquals(0, IntegrationDb.count("contracts", "contract_id = 2 AND is_deleted = 1"));
+
+        // MỘT TẦNG: ký phụ lục rồi thử treo phụ lục lên chính nó.
+        assertTrue(contractDAO.changeProgressStatus(childId, ContractDAO.PROGRESS_SIGNED,
+                Fixtures.USER_ID, null));
+        Contract grandchild = new Contract();
+        grandchild.setParentContractId(childId);
+        grandchild.setContractCode("HD-0002/PL01/PL01");
+        grandchild.setTitle("Phụ lục của phụ lục");
+        grandchild.setContractType("Bán hàng");
+        grandchild.setEnterpriseId(Fixtures.ENTERPRISE_ID);
+        grandchild.setOwnerId(Fixtures.USER_ID);
+        assertEquals(ContractDAO.INVALID_PARENT, contractDAO.insert(grandchild, Fixtures.USER_ID));
+    }
+
+    /** Hợp đồng chưa ký và hợp đồng đã đóng băng đều không nhận phụ lục. */
+    @Test
+    public void amendment_refusedOnDraftAndOnFrozenParent() throws Exception {
+        IntegrationDb.assumeAvailable();
+
+        int draftId = insertDraftThroughDao("HD-NHAP-PL");
+        assertEquals("Bản nháp sửa thẳng được, phụ lục ở đó chỉ là đường vòng",
+                ContractDAO.INVALID_PARENT,
+                contractDAO.insert(amendmentOf(draftId, "HD-NHAP-PL/PL01"), Fixtures.USER_ID));
+
+        assertTrue(contractDAO.changeProgressStatus(3, ContractDAO.PROGRESS_LIQUIDATED,
+                Fixtures.USER_ID, "Biên bản thanh lý số 07"));
+        assertEquals("Sau thanh lý thì phát sinh là hợp đồng MỚI, không phải phụ lục",
+                ContractDAO.INVALID_PARENT,
+                contractDAO.insert(amendmentOf(3, "HD-0003/PL01"), Fixtures.USER_ID));
+    }
+
+    /**
+     * Phụ lục gia hạn KHÔNG kéo theo thời hạn của hợp đồng gốc (chốt
+     * 2026-09-17): bản ghi cha là thứ ghi trên tờ giấy đã ký.
+     */
+    @Test
+    public void amendment_doesNotExtendTheParentCalendarStatus() throws Exception {
+        IntegrationDb.assumeAvailable();
+
+        // HD-0004 kết thúc hôm qua -> Đã hết hạn theo lịch.
+        assertEquals(EXPIRED, statusOf("HD-0004"));
+
+        Contract extension = amendmentOf(4, "HD-0004/PL01");
+        extension.setEffectiveDate(java.sql.Date.valueOf(java.time.LocalDate.now()));
+        extension.setEndDate(java.sql.Date.valueOf(java.time.LocalDate.now().plusYears(1)));
+        int id = contractDAO.insert(extension, Fixtures.USER_ID);
+        assertTrue(id > 0);
+        assertTrue(contractDAO.changeProgressStatus(id, ContractDAO.PROGRESS_SIGNED, Fixtures.USER_ID, null));
+
+        assertEquals("Hợp đồng gốc giữ nguyên trạng thái theo lịch của chính nó",
+                EXPIRED, statusOf("HD-0004"));
+        assertEquals("Còn phụ lục thì đang hiệu lực", ACTIVE, statusOf("HD-0004/PL01"));
+    }
+
+    /** Ô lọc "Chỉ hợp đồng gốc": danh sách và bộ đếm phân trang phải đi cặp. */
+    @Test
+    public void rootsOnlyFilter_keepsListAndCountInStep() throws Exception {
+        IntegrationDb.assumeAvailable();
+
+        assertTrue(contractDAO.insert(amendmentOf(2, "HD-0002/PL01"), Fixtures.USER_ID) > 0);
+
+        int allRows = contractDAO.findAll(1, 50, null, null, null, null, false, null, null, null, false).size();
+        int rootRows = contractDAO.findAll(1, 50, null, null, null, null, false, null, null, null, true).size();
+        assertEquals("Lọc hợp đồng gốc phải bỏ đúng một phụ lục", allRows - 1, rootRows);
+        assertEquals(rootRows, contractDAO.countAll(null, null, null, null, null, null, null, true));
+        assertEquals(allRows, contractDAO.countAll(null, null, null, null, null, null, null, false));
+    }
+
+    /** Bản nháp tạo qua DAO -- bốn hợp đồng gieo sẵn đều đã ở 'Đã ký'. */
+    private int insertDraftThroughDao(String code) {
+        Contract draft = new Contract();
+        draft.setContractCode(code);
+        draft.setTitle("Hợp đồng " + code);
+        draft.setContractType("Bán hàng");
+        draft.setDirection("Bán");
+        draft.setEffectiveDate(java.sql.Date.valueOf(java.time.LocalDate.now()));
+        draft.setEndDate(java.sql.Date.valueOf(java.time.LocalDate.now().plusYears(1)));
+        draft.setEnterpriseId(Fixtures.ENTERPRISE_ID);
+        draft.setOwnerId(Fixtures.USER_ID);
+        int id = contractDAO.insert(draft, Fixtures.USER_ID);
+        assertTrue(id > 0);
+        return id;
+    }
+
+    private static Contract amendmentOf(int parentId, String code) {
+        Contract c = new Contract();
+        c.setParentContractId(parentId);
+        c.setContractCode(code);
+        c.setTitle("Phụ lục " + code);
+        c.setContractType("Bán hàng");
+        c.setEnterpriseId(Fixtures.ENTERPRISE_ID);
+        c.setOwnerId(Fixtures.USER_ID);
+        return c;
     }
 }
