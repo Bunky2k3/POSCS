@@ -1265,6 +1265,12 @@ public class ContractDAO {
         c.setContractCode(rs.getString("contract_code"));
         c.setTitle(rs.getString("title"));
         c.setContractType(rs.getString("contract_type"));
+        // SELECT_BASE vẫn luôn chọn cột này; chỗ đọc mới là chỗ từng thiếu.
+        // Không có nó thì findById() trả về hợp đồng có direction = null, và
+        // vì counterpartyRoleFor(null) rơi về 'Khách mua', MỌI hợp đồng MUA mở
+        // form sửa lên đều đổ sai bộ loại hợp đồng rồi bấm Lưu là báo "dữ liệu
+        // chưa hợp lệ" -- tức là không sửa được cái nào.
+        c.setDirection(rs.getString("direction"));
         c.setSigningDate(rs.getDate("signing_date"));
         c.setEffectiveDate(rs.getDate("effective_date"));
         c.setEndDate(rs.getDate("end_date"));

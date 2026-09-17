@@ -804,4 +804,47 @@ public class ContractDAOTest {
             assertEquals(BigDecimal.ZERO, dao.sumInvoiceAmountByContractId(11));
         }
     }
+
+    // ------------------------------------------------------------------
+    // findById -- ánh xạ ResultSet sang model
+    // ------------------------------------------------------------------
+
+    /**
+     * Chiều mua/bán phải đi ra khỏi findById.
+     *
+     * <p>SELECT_BASE chọn cột direction từ #110, nhưng mapRow quên đọc nó, nên
+     * findById trả về direction = null. Hệ quả không nhìn thấy ngay trên màn
+     * hình chi tiết (trang đó không in chiều), mà nằm ở form SỬA: controller
+     * đổ bộ loại hợp đồng và danh sách đối tác theo chiều, và
+     * counterpartyRoleFor(null) rơi về 'Khách mua'. Nghĩa là mọi hợp đồng MUA
+     * mở form sửa lên là thấy bộ loại của hợp đồng bán, và bấm Lưu thì
+     * counterpartyMatchesDirection từ chối -- không sửa được cái nào.
+     */
+    @Test
+    public void findById_mapsDirection() throws Exception {
+        PreparedStatement ps = statementReturning(singleRow(buyContractRow("Mua")));
+        Connection conn = connectionReturning(ps);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            assertEquals("Mua", dao.findById(7).getDirection());
+        }
+    }
+
+    /**
+     * Một dòng contracts đủ các cột mà mapRow đọc. Thiếu cột nào thì
+     * JdbcStub trả null cho cột đó, nên test vẫn chạy -- đây chỉ là bộ tối
+     * thiểu để dựng được một Contract có nghĩa.
+     */
+    private static java.util.Map<String, Object> buyContractRow(String direction) {
+        return row("contract_id", 7,
+                "contract_code", "01/2026/HĐMB-POSTEF",
+                "title", "Mua sợi quang",
+                "contract_type", "Mua vật tư",
+                "direction", direction,
+                "enterprise_id", 3,
+                "owner_id", 5,
+                "progress_status", "Đã ký");
+    }
 }
