@@ -269,11 +269,41 @@ public class ChangeRequestController extends HttpServlet {
                 || ChangeRequest.RESOURCE_CONTRACT.equals(r.getResourceType());
         boolean intentOk = ChangeRequest.INTENT_CREATE.equals(r.getIntent())
                 || ChangeRequest.INTENT_UPDATE.equals(r.getIntent())
-                || ChangeRequest.INTENT_DELETE.equals(r.getIntent());
+                || ChangeRequest.INTENT_DELETE.equals(r.getIntent())
+                || ChangeRequest.INTENT_AMENDMENT.equals(r.getIntent());
         if (!resourceOk || !intentOk || r.getProposedContent() == null) {
             return false;
         }
+        if (!intentAllowedFor(r.getResourceType(), r.getIntent())) {
+            return false;
+        }
         return ChangeRequest.INTENT_CREATE.equals(r.getIntent()) || r.getTargetId() != null;
+    }
+
+    /**
+     * Cặp (tài nguyên, loại thay đổi) nào còn nhận được yêu cầu mới.
+     *
+     * <p>Chặn ở ĐƯỜNG GHI, không xoá dữ liệu cũ: các yêu cầu "Sửa/Xoá hợp
+     * đồng" gửi trước khi có luật vòng đời vẫn đọc được, vẫn duyệt được, vẫn
+     * nằm nguyên trong lịch sử. Xoá chúng đi là viết lại quá khứ.
+     *
+     * <p>Hai điều bị chặn và lý do:
+     *
+     * <ul>
+     *   <li><b>Sửa/Xoá hợp đồng.</b> Hợp đồng đã ký không sửa, không xoá được
+     *       nữa -- kể cả cấp trên. Nên yêu cầu loại đó là xin cấp trên làm một
+     *       việc hệ thống không cho làm, và nó chỉ tạo ra một hàng đợi các
+     *       yêu cầu chắc chắn bị từ chối. Thứ cần xin là PHỤ LỤC.</li>
+     *   <li><b>Lập phụ lục cho khách hàng.</b> Khách hàng không có khái niệm
+     *       phụ lục; ở đó "Sửa" vẫn đúng nghĩa và vẫn mở.</li>
+     * </ul>
+     */
+    private boolean intentAllowedFor(String resourceType, String intent) {
+        if (ChangeRequest.RESOURCE_CONTRACT.equals(resourceType)) {
+            return !ChangeRequest.INTENT_UPDATE.equals(intent)
+                    && !ChangeRequest.INTENT_DELETE.equals(intent);
+        }
+        return !ChangeRequest.INTENT_AMENDMENT.equals(intent);
     }
 
     private Integer parseIntOrNull(String value) {

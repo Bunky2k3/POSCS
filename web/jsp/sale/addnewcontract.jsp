@@ -65,12 +65,39 @@
 
 
     <div class="page-container">
-        <a href="${pageContext.request.contextPath}/contract" class="back-link-top"><i class="fa-solid fa-arrow-left-long"></i> Quay lại danh sách</a>
+        <%-- MỘT trang, hai chế độ. parentContract khác rỗng = đang lập PHỤ LỤC
+             cho hợp đồng đó; rỗng = tạo hợp đồng mới.
 
-        <div class="page-header-row">
-            <h2>Tạo hợp đồng</h2>
-            <p>Khởi tạo hợp đồng mới với khách hàng doanh nghiệp</p>
-        </div>
+             Dùng lại trang này chứ không dựng trang thứ hai vì phụ lục là một
+             hợp đồng đầy đủ -- cũng mã trên giấy, cũng thời hạn, cũng hàng hoá,
+             cũng phải ký. Trang riêng sẽ là bản sao của trang này, rồi hai bản
+             sao lệch nhau dần. --%>
+        <c:choose>
+            <c:when test="${not empty parentContract}">
+                <a href="${pageContext.request.contextPath}/contract?action=view&id=${parentContract.contractId}" class="back-link-top"><i class="fa-solid fa-arrow-left-long"></i> Quay lại hợp đồng gốc</a>
+                <div class="page-header-row">
+                    <h2>Lập phụ lục hợp đồng</h2>
+                    <p>Sửa đổi cho hợp đồng <strong style="color:var(--primary-dark)">${fn:escapeXml(parentContract.contractCode)}</strong>
+                       — ${fn:escapeXml(parentContract.title)}</p>
+                </div>
+                <div class="card-box" style="border-left:4px solid #b45309;">
+                    <div style="display:flex; align-items:flex-start; gap:10px; font-size:0.88rem; color:#92400e;">
+                        <i class="fa-solid fa-circle-info" style="margin-top:3px;"></i>
+                        <span>Phụ lục ra đời ở trạng thái <strong>Nháp</strong> và phải được <strong>ký</strong>
+                            như một hợp đồng thường — đó là điểm của nó: sửa đổi trên hợp đồng đã ký phải có
+                            chữ ký, không phải một lần bấm Lưu. Khách hàng và chiều mua/bán lấy theo hợp đồng
+                            gốc, không chọn lại được.</span>
+                    </div>
+                </div>
+            </c:when>
+            <c:otherwise>
+                <a href="${pageContext.request.contextPath}/contract" class="back-link-top"><i class="fa-solid fa-arrow-left-long"></i> Quay lại danh sách</a>
+                <div class="page-header-row">
+                    <h2>Tạo hợp đồng</h2>
+                    <p>Khởi tạo hợp đồng mới với khách hàng doanh nghiệp</p>
+                </div>
+            </c:otherwise>
+        </c:choose>
 
         <div class="card-box">
             <c:if test="${not empty param.error}">
@@ -80,6 +107,7 @@
                         <c:when test="${param.error == 'invalid'}">Thông tin hợp đồng chưa hợp lệ. Vui lòng kiểm tra lại các ô bắt buộc.</c:when>
                         <c:when test="${param.error == 'duplicate_code'}">Mã hợp đồng này đã có hợp đồng khác dùng. Kiểm lại số trên bản giấy hoặc nhập mã khác.</c:when>
                         <c:when test="${param.error == 'create_failed'}">Không lưu được hợp đồng. Vui lòng thử lại.</c:when>
+                        <c:when test="${param.error == 'amendment_not_allowed'}">Hợp đồng gốc không nhận được phụ lục: nó phải đã ký và chưa thanh lý, và bản thân nó không được là phụ lục.</c:when>
                         <c:otherwise>Đã có lỗi xảy ra. Vui lòng thử lại.</c:otherwise>
                     </c:choose>
                 </div>
@@ -87,11 +115,16 @@
 
             <form id="createContractForm" action="${pageContext.request.contextPath}/contract" method="POST" onsubmit="return validateForm();">
                 <input type="hidden" name="csrfToken" value="${csrfToken}">
-                <input type="hidden" name="action" value="create">
+                <input type="hidden" name="action" value="${empty parentContract ? 'create' : 'createAmendment'}">
                 <%-- Chiều hợp đồng đi theo mục con người dùng đang đứng.
                      Server đọc chính tham số này chứ không đọc một ô nào
-                     người dùng sửa được -- xem buildContractFromRequest. --%>
+                     người dùng sửa được -- xem buildContractFromRequest.
+                     Với phụ lục thì cả chiều lẫn khách hàng lấy từ hợp đồng
+                     cha, kind chỉ còn dùng để quay về đúng mục con. --%>
                 <input type="hidden" name="kind" value="${kind}">
+                <c:if test="${not empty parentContract}">
+                    <input type="hidden" name="parentId" value="${parentContract.contractId}">
+                </c:if>
 
                 <div class="section-header"><h5>Thông tin chung</h5></div>
                 <div class="row">
@@ -102,10 +135,19 @@
                     <div class="col-12 field-row">
                         <label>Mã hợp đồng <span class="req">*</span></label>
                         <input type="text" class="form-control" id="contractCode" name="contractCode"
-                               maxlength="50" placeholder="VD: 01/2026/HĐKT-POSTEF">
+                               maxlength="50"
+                               placeholder="${empty parentContract ? 'VD: 01/2026/HĐKT-POSTEF' : fn:escapeXml(parentContract.contractCode).concat('/PL01')}">
                         <span class="error-text" id="err-contractCode">Mã hợp đồng không được để trống.</span>
                         <span style="font-size:0.78rem; color:#9ca3af; display:block; margin-top:6px;">
-                            Nhập đúng số ghi trên bản hợp đồng giấy. Mỗi hợp đồng một mã, không trùng nhau.
+                            <c:choose>
+                                <c:when test="${not empty parentContract}">
+                                    Nhập đúng số ghi trên bản phụ lục giấy. Phụ lục dùng chung không gian mã
+                                    với hợp đồng, nên mã này cũng phải là duy nhất.
+                                </c:when>
+                                <c:otherwise>
+                                    Nhập đúng số ghi trên bản hợp đồng giấy. Mỗi hợp đồng một mã, không trùng nhau.
+                                </c:otherwise>
+                            </c:choose>
                         </span>
                     </div>
 
@@ -116,20 +158,37 @@
                     </div>
                     <div class="col-md-6 field-row">
                         <label>Khách hàng <span class="req">*</span></label>
-                        <select class="form-select" id="customer" name="enterpriseId">
-                            <option value="">-- Chọn khách hàng --</option>
-                            <c:forEach var="customer" items="${customerList}">
-                                <option value="${customer.enterpriseId}">${fn:escapeXml(customer.enterpriseName)}</option>
-                            </c:forEach>
-                        </select>
-                        <span class="error-text" id="err-customer">Vui lòng chọn khách hàng.</span>
+                        <c:choose>
+                            <%-- Phụ lục ký với đúng đối tác của hợp đồng gốc, nên đây
+                                 chỉ còn là thông tin hiển thị. Không gửi lên (không có
+                                 name): ContractDAO.insert đọc thẳng từ hợp đồng cha,
+                                 nên một POST nặn tay cũng không đổi được đối tác. --%>
+                            <c:when test="${not empty parentContract}">
+                                <input type="text" class="form-control" value="${fn:escapeXml(parentContract.enterprise.enterpriseName)}" disabled>
+                                <span style="font-size:0.78rem; color:#9ca3af; display:block; margin-top:6px;">
+                                    Theo hợp đồng gốc, không đổi được.
+                                </span>
+                            </c:when>
+                            <c:otherwise>
+                                <select class="form-select" id="customer" name="enterpriseId">
+                                    <option value="">-- Chọn khách hàng --</option>
+                                    <c:forEach var="customer" items="${customerList}">
+                                        <option value="${customer.enterpriseId}">${fn:escapeXml(customer.enterpriseName)}</option>
+                                    </c:forEach>
+                                </select>
+                                <span class="error-text" id="err-customer">Vui lòng chọn khách hàng.</span>
+                            </c:otherwise>
+                        </c:choose>
                     </div>
                     <div class="col-md-6 field-row">
                         <label>Người phụ trách <span class="req">*</span></label>
+                        <%-- Ở chế độ phụ lục, gợi ý sẵn người phụ trách hợp đồng gốc
+                             nhưng VẪN cho đổi: nhân sự có thể đã khác từ lúc ký. --%>
                         <select class="form-select" id="owner" name="ownerId">
                             <option value="">-- Chọn nhân viên --</option>
                             <c:forEach var="staff" items="${userList}">
-                                <option value="${staff.userId}">${fn:escapeXml(staff.fullName)}</option>
+                                <option value="${staff.userId}"
+                                        ${not empty parentContract and staff.userId == parentContract.ownerId ? 'selected' : ''}>${fn:escapeXml(staff.fullName)}</option>
                             </c:forEach>
                         </select>
                         <span class="error-text" id="err-owner">Vui lòng chọn người phụ trách.</span>
@@ -259,8 +318,12 @@
                 valid = false;
             }
 
+            // Ô "Khách hàng" KHÔNG tồn tại ở chế độ phụ lục (đối tác lấy theo
+            // hợp đồng gốc), nên phải bỏ qua khi vắng mặt thay vì nổ ở
+            // el.value và chặn luôn việc gửi form.
             ['customer', 'contractType', 'owner'].forEach(function (id) {
                 var el = document.getElementById(id);
+                if (!el) { return; }
                 if (!el.value) { document.getElementById('err-' + id).style.display = 'block'; valid = false; }
             });
 

@@ -470,6 +470,20 @@
                     </div>
                 </div>
 
+                <%-- Chỉ hiện trên PHỤ LỤC. Câu "cái này sửa cho hợp đồng nào" là
+                     câu đầu tiên người đọc hỏi khi mở một phụ lục ra, nên nó
+                     thuộc về khối nhận dạng này chứ không phải một khối riêng
+                     cuối trang. Trên hợp đồng gốc thì dòng này vô nghĩa. --%>
+                <c:if test="${contract.amendment}">
+                    <div class="col-md-6 field-row">
+                        <label>Phụ lục của hợp đồng</label>
+                        <div class="view-value">
+                            <a href="${pageContext.request.contextPath}/contract?action=view&id=${contract.parentContractId}">
+                                ${fn:escapeXml(contract.parentContractCode)}</a>
+                        </div>
+                    </div>
+                </c:if>
+
                 <%-- BA MỐC THỜI GIAN ĐÃ BỎ KHỎI ĐÂY theo yêu cầu (2026-09-15).
                      Dữ liệu vẫn còn nguyên trong CSDL và vẫn dùng để tính trạng
                      thái theo lịch (nhãn ở đầu trang) -- chỉ là không bày ra
@@ -679,6 +693,57 @@
              người dùng, và khi demo cho khách nó là thứ đập vào mắt đầu tiên.
              contracts vẫn chưa có cột lưu điều khoản; khi nào có thì dựng lại
              thẻ này với dữ liệu thật. --%>
+
+        <!-- ===== Phụ lục ===== -->
+        <%-- CHỈ ĐỌC, như cả trang này. Nút "Lập phụ lục" nằm ở trang quản lý
+             (updatecontract.jsp) cùng mọi thao tác ghi khác -- xem ghi chú đầu
+             khối vòng đời. Ở đây chỉ liệt kê, kèm đường sang từng phụ lục. --%>
+        <c:if test="${not empty amendments}">
+        <div class="info-card card-box">
+            <div class="section-header"><h5>Phụ lục</h5></div>
+            <p style="font-size:0.86rem; color:#6b7280; margin:0 0 14px;">
+                Các văn bản đã sửa đổi hợp đồng này. Mỗi phụ lục là một hợp đồng con có mã riêng,
+                thời hạn riêng và chữ ký riêng — thời hạn ghi trên phụ lục KHÔNG làm đổi ngày kết
+                thúc của bản hợp đồng gốc.
+            </p>
+            <div class="table-responsive">
+                <table class="table align-middle" style="font-size:0.9rem;">
+                    <thead>
+                        <tr>
+                            <th>Mã phụ lục</th>
+                            <th>Tiêu đề</th>
+                            <th>Thời hạn</th>
+                            <th>Tiến độ</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <c:forEach var="pl" items="${amendments}">
+                            <tr>
+                                <td><strong>${fn:escapeXml(pl.contractCode)}</strong></td>
+                                <td>${fn:escapeXml(pl.title)}</td>
+                                <td>
+                                    <c:choose>
+                                        <c:when test="${pl.effectiveDate == null or pl.endDate == null}">
+                                            <span style="color:#9ca3af;">Chưa chốt</span>
+                                        </c:when>
+                                        <c:otherwise>
+                                            <fmt:formatDate value="${pl.effectiveDate}" pattern="dd/MM/yyyy"/>
+                                            &mdash; <fmt:formatDate value="${pl.endDate}" pattern="dd/MM/yyyy"/>
+                                        </c:otherwise>
+                                    </c:choose>
+                                </td>
+                                <td>${fn:escapeXml(pl.progressStatus)}</td>
+                                <td class="text-end">
+                                    <a href="${pageContext.request.contextPath}/contract?action=view&id=${pl.contractId}">Xem</a>
+                                </td>
+                            </tr>
+                        </c:forEach>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        </c:if>
 
         <!-- ===== Nhật ký thay đổi ===== -->
         <div class="info-card card-box">

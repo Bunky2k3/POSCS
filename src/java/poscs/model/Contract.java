@@ -7,6 +7,29 @@ public class Contract {
     private int contractId;
 
     /**
+     * Hợp đồng gốc mà bản ghi này là PHỤ LỤC của nó; null nếu đây là hợp đồng
+     * gốc.
+     *
+     * <p>Phụ lục là một hợp đồng đầy đủ -- mã riêng, thời hạn riêng, hàng hoá
+     * riêng, và chính nó cũng phải được ký -- nên nó nằm cùng bảng chứ không
+     * có bảng riêng. MỘT TẦNG: phụ lục của phụ lục bị từ chối ở
+     * {@code ContractDAO.insert}, vì khoá ngoại tự trỏ không ép được điều đó.
+     */
+    private Integer parentContractId;
+
+    /** Mã hợp đồng gốc -- join sẵn để màn hình khỏi tra thêm; null ở hợp đồng gốc. */
+    private String parentContractCode;
+
+    /**
+     * Số phụ lục đang treo vào hợp đồng này (đã trừ bản ghi đã huỷ).
+     *
+     * <p>ĐẾM lúc đọc, không phải cột trong CSDL: một cột "có phụ lục" là nguồn
+     * sự thật thứ hai bên cạnh chính các dòng phụ lục, và sớm muộn hai chỗ nói
+     * hai điều khác nhau.
+     */
+    private int amendmentCount;
+
+    /**
      * Mã hợp đồng, chính là số ghi trên bản giấy ("01/2026/HĐKT-POSTEF").
      *
      * <p>NGƯỜI DÙNG NHẬP, không sinh tự động (V28). Trước đó hệ thống sinh
@@ -114,6 +137,15 @@ public class Contract {
     public int getContractId() { return contractId; }
     public void setContractId(int contractId) { this.contractId = contractId; }
 
+    public Integer getParentContractId() { return parentContractId; }
+    public void setParentContractId(Integer parentContractId) { this.parentContractId = parentContractId; }
+
+    public String getParentContractCode() { return parentContractCode; }
+    public void setParentContractCode(String parentContractCode) { this.parentContractCode = parentContractCode; }
+
+    public int getAmendmentCount() { return amendmentCount; }
+    public void setAmendmentCount(int amendmentCount) { this.amendmentCount = amendmentCount; }
+
     public String getContractCode() { return contractCode; }
     public void setContractCode(String contractCode) { this.contractCode = contractCode; }
 
@@ -186,6 +218,33 @@ public class Contract {
 
     /** true nếu hợp đồng chưa ký -- còn sửa thoải mái, và còn xoá được. */
     public boolean isDraft() { return DRAFT.equals(progressStatus); }
+
+    /**
+     * true nếu hợp đồng đã ký và CHƯA đóng băng -- quãng duy nhất lập được phụ
+     * lục.
+     *
+     * <p>Hai đầu đều bị loại có lý do khác nhau: bản nháp thì sửa thẳng được
+     * nên phụ lục chỉ là đường vòng, còn sau thanh lý thì hợp đồng đã chấm dứt
+     * -- phát sinh lúc đó là hợp đồng MỚI, không phải sửa đổi của một thứ đã
+     * hết hiệu lực.
+     */
+    public boolean isSigned() {
+        return !isDraft() && !isFrozen();
+    }
+
+    /** true nếu bản ghi này là phụ lục của một hợp đồng khác. */
+    public boolean isAmendment() { return parentContractId != null; }
+
+    /**
+     * true nếu các trường ĐIỀU KHOẢN đã khoá, chỉ còn dữ liệu quản trị nội bộ
+     * sửa được.
+     *
+     * <p>Từ lúc ký trở đi, nội dung hợp đồng là chứng cứ pháp lý: đổi nó phải
+     * đi qua phụ lục. Còn người phụ trách và link bản PDF đã ký thì không nằm
+     * trên tờ giấy nào -- chúng vẫn sửa được, và link thường chỉ có SAU khi ký.
+     * Chốt chặn thật nằm ở {@code ContractDAO.update}, không phải ở JSP.
+     */
+    public boolean isTermsLocked() { return !isDraft(); }
 
     /**
      * true nếu hợp đồng đã đóng băng (thanh lý hoặc chấm dứt sớm): không đổi

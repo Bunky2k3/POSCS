@@ -4345,6 +4345,10 @@ INSERT INTO `productcatalogues` (`product_id`, `catalogue_url`, `file_name`, `di
 DROP TABLE IF EXISTS `contracts`;
 CREATE TABLE `contracts` (
   `contract_id` int NOT NULL AUTO_INCREMENT,
+  -- Phụ lục: hợp đồng con trỏ về hợp đồng gốc. NULL = đây là hợp đồng gốc.
+  -- MỘT TẦNG -- phụ lục của phụ lục không tồn tại trong nghiệp vụ; khoá ngoại
+  -- tự trỏ không ép được điều đó nên luật nằm ở ContractDAO.insert. Xem V29.
+  `parent_contract_id` int DEFAULT NULL,
   -- Mã hợp đồng, chính là số ghi trên bản giấy ("01/2026/HĐKT-POSTEF").
   -- NGƯỜI DÙNG NHẬP, hệ thống không sinh (V28). UNIQUE là chốt chặn thật cho
   -- việc trùng mã; controller kiểm trước chỉ để báo lỗi tử tế.
@@ -4388,8 +4392,12 @@ CREATE TABLE `contracts` (
   KEY `owner_id` (`owner_id`),
   KEY `idx_contracts_direction` (`direction`),
   KEY `idx_contracts_progress` (`progress_status`),
+  KEY `idx_contracts_parent` (`parent_contract_id`),
   CONSTRAINT `contracts_ibfk_1` FOREIGN KEY (`enterprise_id`) REFERENCES `enterprises` (`enterprise_id`),
-  CONSTRAINT `contracts_ibfk_2` FOREIGN KEY (`owner_id`) REFERENCES `users` (`user_id`)
+  CONSTRAINT `contracts_ibfk_2` FOREIGN KEY (`owner_id`) REFERENCES `users` (`user_id`),
+  -- KHÔNG cascade: hợp đồng vốn xoá mềm, nên cascade chỉ chực chờ người sau lỡ
+  -- tay xoá cứng một dòng rồi mang theo cả phụ lục của nó. Xem V29.
+  CONSTRAINT `fk_contracts_parent` FOREIGN KEY (`parent_contract_id`) REFERENCES `contracts` (`contract_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 DROP TABLE IF EXISTS `contractproducts`;

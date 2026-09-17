@@ -16,6 +16,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.mockito.MockedStatic;
 import poscs.model.Contract;
+import poscs.model.ContractHistory;
 import poscs.model.ContractProduct;
 
 import static org.junit.Assert.*;
@@ -491,6 +492,13 @@ public class ContractDAOTest {
         PreparedStatement historyPs = mock(PreparedStatement.class);
         PreparedStatement updatePs = mock(PreparedStatement.class);
         when(updatePs.executeUpdate()).thenReturn(1);
+        // voidRecord đếm phụ lục TRƯỚC khi huỷ: hợp đồng còn phụ lục thì không
+        // huỷ được, nếu không phụ lục thành văn bản không tra ngược được nó sửa
+        // cho cái gì. Ở đây trả 0 -- hợp đồng này chưa có phụ lục nào.
+        // Dựng ResultSet TRƯỚC: singleRow() tự tạo một mock, và tạo mock ở giữa
+        // một lời when(...) đang dở khiến Mockito báo "unfinished stubbing".
+        ResultSet noAmendments = singleRow(row("count", 0));
+        when(updatePs.executeQuery()).thenReturn(noAmendments);
         Connection conn = connectionRoutingOn("contract_history", historyPs, updatePs);
 
         try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
@@ -802,6 +810,326 @@ public class ContractDAOTest {
             db.when(DBContext::getConnection).thenThrow(new SQLException("hỏng"));
 
             assertEquals(BigDecimal.ZERO, dao.sumInvoiceAmountByContractId(11));
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // Phụ lục (parent_contract_id)
+    // ------------------------------------------------------------------
+
+    /**
+     * Hợp đồng cha phải ĐÃ KÝ. Bản nháp thì sửa thẳng được, nên phụ lục ở đó chỉ
+     * là đường vòng dựng ra hai bản ghi cho một thứ chưa ai ký.
+     */
+    @Test
+    public void insert_amendmentOfDraftParent_rejected() throws Exception {
+        assertEquals(ContractDAO.INVALID_PARENT,
+                insertAmendmentAgainstParent(parentRow(ContractDAO.PROGRESS_DRAFT, null)));
+    }
+
+    /**
+     * Sau thanh lý KHÔNG lập phụ lục: hợp đồng đã chấm dứt thì không còn gì để
+     * sửa đổi, phát sinh lúc đó là hợp đồng mới. Luật KH: "sau thanh lý không
+     * được thay đổi, kể cả cấp cao".
+     */
+    @Test
+    public void insert_amendmentOfLiquidatedParent_rejected() throws Exception {
+        assertEquals(ContractDAO.INVALID_PARENT,
+                insertAmendmentAgainstParent(parentRow(ContractDAO.PROGRESS_LIQUIDATED, null)));
+    }
+
+    /**
+     * MỘT TẦNG. Khoá ngoại tự trỏ cho phép chuỗi dài tuỳ ý, nên luật này chỉ
+     * tồn tại ở đây -- bỏ nó đi thì "hợp đồng gốc đã bị sửa những gì" phải đi
+     * lần theo một chuỗi không ai biết trước dài bao nhiêu.
+     */
+    @Test
+    public void insert_amendmentOfAnAmendment_rejected() throws Exception {
+        assertEquals(ContractDAO.INVALID_PARENT,
+                insertAmendmentAgainstParent(parentRow(ContractDAO.PROGRESS_SIGNED, 42)));
+    }
+
+    /**
+     * Lập phụ lục sinh HAI dòng nhật ký, ở HAI hợp đồng: "Khởi tạo" trên chính
+     * phụ lục, và "Lập phụ lục" trên hợp đồng CHA.
+     *
+     * <p>Dòng trên cha mới là dòng quan trọng: câu hỏi "hợp đồng này về sau có
+     * bị sửa gì không" được hỏi khi đang mở hợp đồng gốc, không phải khi đang
+     * mở phụ lục.
+     */
+    @Test
+    public void insert_amendment_logsOnBothContracts() throws Exception {
+        ResultSet parent = singleRow(parentRow(ContractDAO.PROGRESS_SIGNED, null));
+        ResultSet keys = singleRow(row("GENERATED_KEY", 77));
+        PreparedStatement historyPs = mock(PreparedStatement.class);
+        PreparedStatement contractPs = mock(PreparedStatement.class);
+        when(contractPs.executeQuery()).thenReturn(parent);
+        when(contractPs.executeUpdate()).thenReturn(1);
+        when(contractPs.getGeneratedKeys()).thenReturn(keys);
+        Connection conn = connectionRoutingOn("contract_history", historyPs, contractPs);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            assertEquals(77, dao.insert(amendmentOf(3), ACTOR));
+
+            // Dòng của phụ lục treo vào chính nó (77); dòng "Lập phụ lục" treo
+            // vào hợp đồng cha (3). Hai id khác nhau -- đó là toàn bộ điểm.
+            verify(historyPs).setInt(1, 77);
+            verify(historyPs).setInt(1, 3);
+            verify(historyPs).setString(2, ContractHistory.EVENT_AMENDMENT_CREATED);
+            verify(conn).commit();
+        }
+    }
+
+    /** Đối tác và chiều của phụ lục lấy từ CHA, không từ thứ bên gọi truyền vào. */
+    @Test
+    public void insert_amendment_inheritsCounterpartyAndDirectionFromParent() throws Exception {
+        ResultSet parent = singleRow(parentRow(ContractDAO.PROGRESS_SIGNED, null));
+        ResultSet keys = singleRow(row("GENERATED_KEY", 77));
+        PreparedStatement historyPs = mock(PreparedStatement.class);
+        PreparedStatement contractPs = mock(PreparedStatement.class);
+        when(contractPs.executeQuery()).thenReturn(parent);
+        when(contractPs.executeUpdate()).thenReturn(1);
+        when(contractPs.getGeneratedKeys()).thenReturn(keys);
+        Connection conn = connectionRoutingOn("contract_history", historyPs, contractPs);
+
+        Contract child = amendmentOf(3);
+        // Thứ bên gọi truyền vào CỐ Ý sai: đối tác khác, chiều ngược lại.
+        child.setEnterpriseId(999);
+        child.setDirection("Bán");
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            assertEquals(77, dao.insert(child, ACTOR));
+
+            verify(contractPs).setString(4, "Mua");  // chiều của cha
+            verify(contractPs).setInt(8, 12);        // đối tác của cha
+        }
+    }
+
+    /**
+     * Hợp đồng còn phụ lục thì KHÔNG huỷ bản ghi được.
+     *
+     * <p>Khoá ngoại không thay được phép kiểm này: hợp đồng xoá MỀM, nên CSDL
+     * không thấy có gì bị xoá cả, và phụ lục sẽ lặng lẽ trỏ về một hợp đồng đã
+     * biến mất khỏi mọi danh sách.
+     */
+    @Test
+    public void voidRecord_withLiveAmendments_refuses() throws Exception {
+        ResultSet oneAmendment = singleRow(row("count", 1));
+        PreparedStatement historyPs = mock(PreparedStatement.class);
+        PreparedStatement contractPs = mock(PreparedStatement.class);
+        when(contractPs.executeQuery()).thenReturn(oneAmendment);
+        Connection conn = connectionRoutingOn("contract_history", historyPs, contractPs);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            assertFalse(dao.voidRecord(7, ACTOR, "nhập nhầm"));
+            verify(contractPs, never()).executeUpdate();
+            verify(conn).rollback();
+            verify(conn, never()).commit();
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // Siết form sửa sau khi ký
+    // ------------------------------------------------------------------
+
+    /**
+     * Hợp đồng ĐÃ KÝ: chỉ owner_id và attachment_url đi xuống CSDL.
+     *
+     * <p>Chặn ở DAO chứ không chỉ ẩn ô: nút ẩn thì POST thẳng vào URL vẫn ghi
+     * được, mà đây là ranh giới pháp lý chứ không phải chuyện giao diện.
+     */
+    @Test
+    public void update_signedContract_writesOnlyAdminFields() throws Exception {
+        ResultSet current = singleRow(parentRow(ContractDAO.PROGRESS_SIGNED, null));
+        PreparedStatement historyPs = mock(PreparedStatement.class);
+        PreparedStatement contractPs = mock(PreparedStatement.class);
+        when(contractPs.executeQuery()).thenReturn(current);
+        when(contractPs.executeUpdate()).thenReturn(1);
+        Connection conn = connectionRoutingOn("contract_history", historyPs, contractPs);
+
+        Contract submitted = new Contract();
+        submitted.setContractId(5);
+        submitted.setOwnerId(88);
+        submitted.setAttachmentUrl("https://drive.google.com/file/d/xyz");
+        // Người dùng (hoặc một POST nặn tay) cố đổi điều khoản.
+        submitted.setTitle("Tiêu đề bị đổi lén");
+        submitted.setContractValue(new BigDecimal("1"));
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            assertTrue(dao.update(submitted, ACTOR));
+
+            ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+            verify(conn, atLeastOnce()).prepareStatement(sql.capture());
+            String updateSql = sql.getAllValues().stream()
+                    .filter(q -> q.startsWith("UPDATE contracts SET"))
+                    .findFirst().orElse("");
+            assertEquals("UPDATE contracts SET owner_id = ?, attachment_url = ? "
+                    + "WHERE contract_id = ? AND is_deleted = 0", updateSql);
+        }
+    }
+
+    /** Bản NHÁP thì vẫn ghi đủ mọi cột -- siết chỉ bắt đầu từ lúc ký. */
+    @Test
+    public void update_draftContract_writesEveryField() throws Exception {
+        ResultSet current = singleRow(parentRow(ContractDAO.PROGRESS_DRAFT, null));
+        PreparedStatement historyPs = mock(PreparedStatement.class);
+        PreparedStatement contractPs = mock(PreparedStatement.class);
+        when(contractPs.executeQuery()).thenReturn(current);
+        when(contractPs.executeUpdate()).thenReturn(1);
+        Connection conn = connectionRoutingOn("contract_history", historyPs, contractPs);
+
+        Contract submitted = new Contract();
+        submitted.setContractId(5);
+        submitted.setContractCode("01/2026/HĐKT-POSTEF");
+        submitted.setTitle("Tiêu đề mới");
+        submitted.setContractType("Cung cấp thiết bị");
+        submitted.setEnterpriseId(12);
+        submitted.setOwnerId(88);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            assertTrue(dao.update(submitted, ACTOR));
+            verify(contractPs).setString(2, "Tiêu đề mới");
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // correct() -- Admin chữa sai sót nhập liệu
+    // ------------------------------------------------------------------
+
+    /** Thiếu lý do thì không mở cả kết nối: thay đổi trên hợp đồng đã ký phải giải thích được. */
+    @Test
+    public void correct_withoutReason_writesNothing() throws Exception {
+        Contract c = new Contract();
+        c.setContractId(5);
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            assertFalse(dao.correct(c, ACTOR, "   "));
+            db.verify(DBContext::getConnection, never());
+        }
+    }
+
+    /**
+     * Đóng băng rồi thì Admin cũng không sửa được. Luật KH nói rõ "kể cả cấp
+     * cao"; nếu Admin là ngoại lệ thì câu đó không còn nghĩa gì.
+     */
+    @Test
+    public void correct_frozenContract_refusesEvenForAdmin() throws Exception {
+        ResultSet current = singleRow(parentRow(ContractDAO.PROGRESS_LIQUIDATED, null));
+        PreparedStatement ps = mock(PreparedStatement.class);
+        when(ps.executeQuery()).thenReturn(current);
+        Connection conn = connectionReturning(ps);
+
+        Contract c = new Contract();
+        c.setContractId(5);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            assertFalse(dao.correct(c, ACTOR, "đối chiếu bản giấy"));
+            verify(ps, never()).executeUpdate();
+            verify(conn).rollback();
+        }
+    }
+
+    /** Bản nháp đã sửa thẳng được rồi -- đi đường này chỉ làm loãng loại sự kiện. */
+    @Test
+    public void correct_draftContract_refuses() throws Exception {
+        ResultSet current = singleRow(parentRow(ContractDAO.PROGRESS_DRAFT, null));
+        PreparedStatement ps = mock(PreparedStatement.class);
+        when(ps.executeQuery()).thenReturn(current);
+        Connection conn = connectionReturning(ps);
+
+        Contract c = new Contract();
+        c.setContractId(5);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            assertFalse(dao.correct(c, ACTOR, "đối chiếu bản giấy"));
+            verify(ps, never()).executeUpdate();
+        }
+    }
+
+    /** Lý do người dùng gõ vào cột note, và dòng mang loại riêng "Sửa sai sót". */
+    @Test
+    public void correct_storesReasonAndItsOwnEventType() throws Exception {
+        ResultSet current = singleRow(parentRow(ContractDAO.PROGRESS_SIGNED, null));
+        PreparedStatement historyPs = mock(PreparedStatement.class);
+        PreparedStatement contractPs = mock(PreparedStatement.class);
+        when(contractPs.executeQuery()).thenReturn(current);
+        when(contractPs.executeUpdate()).thenReturn(1);
+        Connection conn = connectionRoutingOn("contract_history", historyPs, contractPs);
+
+        Contract c = new Contract();
+        c.setContractId(5);
+        c.setContractCode("02/2026/HĐKT-POSTEF");
+        c.setTitle("Tiêu đề đúng theo bản giấy");
+        c.setContractType("Cung cấp thiết bị");
+        c.setEnterpriseId(12);
+        c.setOwnerId(88);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            assertTrue(dao.correct(c, ACTOR, "  Gõ nhầm mã, đối chiếu bản giấy  "));
+
+            verify(historyPs).setString(2, ContractHistory.EVENT_CORRECTED);
+            verify(historyPs).setString(5, "Gõ nhầm mã, đối chiếu bản giấy");
+            verify(conn).commit();
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // Helper cho nhóm test phụ lục
+    // ------------------------------------------------------------------
+
+    /** Một dòng contracts đủ để lockForUpdate dựng lại được hợp đồng cha. */
+    private static java.util.Map<String, Object> parentRow(String progressStatus, Integer ownParentId) {
+        return row("contract_id", 3,
+                "contract_code", "01/2026/HĐMB-POSTEF",
+                "title", "Hợp đồng gốc",
+                "contract_type", "Mua vật tư",
+                "direction", "Mua",
+                "enterprise_id", 12,
+                "owner_id", 5,
+                "progress_status", progressStatus,
+                "parent_contract_id", ownParentId);
+    }
+
+    private static Contract amendmentOf(int parentId) {
+        Contract c = new Contract();
+        c.setParentContractId(parentId);
+        c.setContractCode("01/2026/HĐMB-POSTEF/PL01");
+        c.setTitle("Phụ lục 01 — bổ sung hạng mục");
+        c.setContractType("Mua vật tư");
+        c.setOwnerId(5);
+        return c;
+    }
+
+    /** Chạy insert() một phụ lục trên hợp đồng cha mô tả bởi {@code parent}. */
+    private int insertAmendmentAgainstParent(java.util.Map<String, Object> parent) throws Exception {
+        ResultSet parentRs = singleRow(parent);
+        PreparedStatement ps = mock(PreparedStatement.class);
+        when(ps.executeQuery()).thenReturn(parentRs);
+        Connection conn = connectionReturning(ps);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            int result = dao.insert(amendmentOf(3), ACTOR);
+            // Bị từ chối thì KHÔNG được để lại gì -- kể cả dòng nhật ký.
+            verify(ps, never()).executeUpdate();
+            verify(conn).rollback();
+            return result;
         }
     }
 

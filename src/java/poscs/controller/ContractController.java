@@ -142,6 +142,9 @@ public class ContractController extends HttpServlet {
             case "new":
                 showCreateForm(request, response);
                 break;
+            case "newAmendment":
+                showAmendmentForm(request, response);
+                break;
             case "edit":
                 showEditForm(request, response);
                 break;
@@ -177,6 +180,12 @@ public class ContractController extends HttpServlet {
                 break;
             case "update":
                 handleUpdate(request, response);
+                break;
+            case "createAmendment":
+                handleCreateAmendment(request, response);
+                break;
+            case "correct":
+                handleCorrect(request, response);
                 break;
             case "delete":
                 handleDelete(request, response);
@@ -238,11 +247,15 @@ public class ContractController extends HttpServlet {
         // "Đã hết hạn" theo lịch mà vẫn "Đã ký" theo tiến độ chính là việc còn
         // tồn -- lọc được hai trục riêng thì mới nhìn ra chỗ đó.
         String progressFilter = request.getParameter("progress");
+        // Phụ lục mặc định HIỆN thành dòng riêng: chính nó cũng phải được ký,
+        // nên phải tìm thấy được bằng mã. Ô này để thu về danh sách hợp đồng
+        // gốc khi người dùng muốn đếm "bao nhiêu hợp đồng" theo nghĩa thường.
+        boolean rootsOnly = "root".equals(request.getParameter("scope"));
 
         List<Contract> contractList = contractDAO.findAll(page, PAGE_SIZE, keyword, statusFilter, typeFilter,
-                provinceFilter, false, period, direction, progressFilter);
+                provinceFilter, false, period, direction, progressFilter, rootsOnly);
         int totalCount = contractDAO.countAll(keyword, statusFilter, typeFilter, provinceFilter, period, direction,
-                progressFilter);
+                progressFilter, rootsOnly);
         int totalPages = Math.max(1, (int) Math.ceil(totalCount / (double) PAGE_SIZE));
         // Dải KPI trạng thái phải đếm CÙNG phạm vi với bảng bên dưới: đứng ở
         // Hợp đồng mua mà KPI gộp cả hợp đồng bán thì hai con số cạnh nhau
@@ -260,6 +273,7 @@ public class ContractController extends HttpServlet {
         request.setAttribute("keyword", keyword);
         request.setAttribute("statusFilter", statusFilter);
         request.setAttribute("progressFilter", progressFilter);
+        request.setAttribute("scopeFilter", rootsOnly ? "root" : null);
         // Loại hợp đồng khác nhau theo chiều -- xem SELL_CONTRACT_TYPES /
         // BUY_CONTRACT_TYPES. JSP dựng dropdown từ đây thay vì chép cứng.
         request.setAttribute("contractTypeOptions", contractTypesFor(direction));
@@ -328,8 +342,12 @@ public class ContractController extends HttpServlet {
         if (DIRECTION_BUY.equals(direction)) {
             provinceFilter = null;
         }
+        // Ô "Cả phụ lục / Chỉ hợp đồng gốc" phải đi theo sang file: xuất ra một
+        // danh sách khác thứ đang nhìn thấy là cách chắc chắn nhất để hai con số
+        // trong cùng một cuộc họp không khớp nhau.
         List<Contract> all = contractDAO.findAll(1, Integer.MAX_VALUE, keyword, statusFilter, typeFilter,
-                provinceFilter, true, period, direction, request.getParameter("progress"));
+                provinceFilter, true, period, direction, request.getParameter("progress"),
+                "root".equals(request.getParameter("scope")));
         // Giữ cột "Mã HĐ" trong file dù danh sách trên màn hình đã bỏ -- xem lý do
         // ở CustomerController.exportExcel: STT chỉ đúng trong phạm vi một file.
         //
@@ -337,7 +355,7 @@ public class ContractController extends HttpServlet {
         // mã là định danh máy sinh còn số là thứ in trên giấy; V28 chốt lại rằng
         // hai thứ đó là một và bỏ cột contract_number, nên cột thứ hai ở đây
         // không còn gì để đọc.
-        String[] headers = {"STT", "Mã HĐ", "Tiêu đề", "Loại HĐ", "Tỉnh/Thành phố", "Khách hàng",
+        String[] headers = {"STT", "Mã HĐ", "Phụ lục của", "Tiêu đề", "Loại HĐ", "Tỉnh/Thành phố", "Khách hàng",
             "Người phụ trách", "Ngày ký", "Ngày hiệu lực", "Ngày kết thúc", "Trạng thái", "Tiến độ"};
         List<Object[]> rows = new ArrayList<>();
         int stt = 1;
@@ -345,6 +363,9 @@ public class ContractController extends HttpServlet {
             rows.add(new Object[]{
                 stt++,
                 c.getContractCode(),
+                // Rỗng ở hợp đồng gốc. Có cột này thì đọc file cũng phân biệt
+                // được phụ lục với hợp đồng, y như nhãn trên màn hình.
+                c.getParentContractCode() != null ? c.getParentContractCode() : "",
                 c.getTitle(),
                 c.getContractType(),
                 provinceNameOf(c),
@@ -794,6 +815,47 @@ public class ContractController extends HttpServlet {
         request.getRequestDispatcher(CREATE_VIEW).forward(request, response);
     }
 
+    /**
+     * Form lập PHỤ LỤC cho một hợp đồng đã ký -- dùng lại chính trang tạo hợp
+     * đồng, chỉ khác vài thuộc tính.
+     *
+     * <p>Dùng lại chứ không dựng trang thứ hai, vì phụ lục là một hợp đồng đầy
+     * đủ: cũng mã trên giấy, cũng thời hạn, cũng hàng hoá, cũng phải ký. Trang
+     * riêng sẽ là bản sao của trang này, rồi hai bản sao lệch nhau dần.
+     *
+     * <p>Khác biệt duy nhất: khách hàng và chiều KHÔNG cho chọn -- chúng lấy từ
+     * hợp đồng cha. Form ẩn hai ô đó đi, còn chốt chặn thật nằm ở
+     * ContractDAO.insert (nó đọc hai giá trị ấy từ cha, không từ form).
+     */
+    private void showAmendmentForm(HttpServletRequest request, HttpServletResponse response)
+            throws ServletException, IOException {
+        if (!AccessControl.requireFullAccess(request, response, AccessControl.Resource.CONTRACT)) {
+            return;
+        }
+        Integer parentId = parseIntOrNull(request.getParameter("parentId"));
+        Contract parent = parentId != null ? contractDAO.findById(parentId) : null;
+        if (parent == null) {
+            response.sendRedirect(request.getContextPath() + "/contract?error=notfound");
+            return;
+        }
+        // Kiểm lại ở đây để BÁO ĐÚNG LÝ DO thay vì đưa người dùng vào một form
+        // mà bấm Lưu chắc chắn thất bại. Chặn thật vẫn ở DAO, trong transaction.
+        if (!parent.isSigned() || parent.isAmendment()) {
+            response.sendRedirect(request.getContextPath()
+                    + "/contract?action=view&id=" + parentId + "&error=amendment_not_allowed");
+            return;
+        }
+
+        request.setAttribute("parentContract", parent);
+        // Người phụ trách gợi ý theo cha, nhưng sửa được: phụ lục có thể do
+        // người khác theo, nhất là khi nhân sự đã đổi từ lúc ký hợp đồng gốc.
+        setDropdownAttributes(request, parent.getOwnerId(), parent.getDirection(), parent.getEnterpriseId());
+        request.setAttribute("direction", parent.getDirection());
+        request.setAttribute("kind", DIRECTION_BUY.equals(parent.getDirection()) ? "buy" : "sell");
+        request.setAttribute("contractTypeOptions", contractTypesFor(parent.getDirection()));
+        request.getRequestDispatcher(CREATE_VIEW).forward(request, response);
+    }
+
     private void showEditForm(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
         // Trang form cũng là thao tác quản trị: vai trò chỉ-xem không được
@@ -834,7 +896,21 @@ public class ContractController extends HttpServlet {
         request.setAttribute("canSign", contract.isDraft() && canSign(request));
         request.setAttribute("canClose",
                 ContractDAO.PROGRESS_SIGNED.equals(contract.getProgressStatus()));
-        request.setAttribute("canVoid", AccessControl.isAdmin(request) || contract.isDraft());
+        // Còn phụ lục thì không huỷ được bản ghi cha -- phụ lục sẽ thành văn
+        // bản sửa đổi không tra ngược được nó sửa cho cái gì. Chặn thật nằm ở
+        // ContractDAO.voidRecord, ở đây chỉ để không mọc ra một cái nút chắc
+        // chắn thất bại.
+        request.setAttribute("canVoid",
+                (AccessControl.isAdmin(request) || contract.isDraft()) && contract.getAmendmentCount() == 0);
+
+        // Điều khoản khoá từ lúc ký: form chỉ còn hiển thị chúng, không nhập.
+        request.setAttribute("canEditTerms", !contract.isTermsLocked());
+        // Đường chữa SAI SÓT NHẬP LIỆU, khác hẳn đường sửa nội dung. Admin, bắt
+        // buộc lý do, sinh dòng nhật ký loại riêng. Không mở sau khi đóng băng:
+        // luật KH nói "kể cả cấp cao", và Admin không phải ngoại lệ.
+        request.setAttribute("canCorrect", AccessControl.isAdmin(request) && contract.isSigned());
+        // Lập phụ lục: chỉ từ hợp đồng gốc ĐÃ KÝ và chưa đóng băng.
+        request.setAttribute("canAddAmendment", contract.isSigned() && !contract.isAmendment());
 
         request.getRequestDispatcher(UPDATE_VIEW).forward(request, response);
     }
@@ -899,7 +975,25 @@ public class ContractController extends HttpServlet {
         }
 
         Contract existing = contractDAO.findById(id);
-        Contract c = buildContractFromRequest(request, new Contract());
+        Contract c;
+        if (existing.isTermsLocked()) {
+            // ĐÃ KÝ: form chỉ còn hai ô nhập được, các trường điều khoản hiển
+            // thị dạng chữ và KHÔNG gửi lên. Nên dựng bản ghi từ giá trị đang
+            // có rồi chỉ chồng hai ô đó lên -- đọc từ form thì mọi trường khoá
+            // về null và isValid() từ chối ngay, tức là đổi người phụ trách
+            // cũng không lưu được.
+            //
+            // DAO vẫn tự lọc lần nữa (ContractDAO.withTermsFrom): chỗ này chỉ
+            // lo cho người dùng bình thường, còn một POST nặn tay thì không.
+            c = existing;
+            Integer ownerId = parseIntOrNull(request.getParameter("ownerId"));
+            if (ownerId != null) {
+                c.setOwnerId(ownerId);
+            }
+            c.setAttachmentUrl(emptyToNull(request.getParameter("attachmentUrl")));
+        } else {
+            c = buildContractFromRequest(request, new Contract());
+        }
         c.setContractId(id);
         // Giữ nguyên chiều cũ -- DAO.update cũng không ghi cột này. Nhưng vẫn
         // phải gán để kiểm được khách hàng mới chọn có đúng vai không.
@@ -925,6 +1019,131 @@ public class ContractController extends HttpServlet {
         if (!ok) {
             LOG.warn("Cap nhat hop dong that bai (actor={}, contractId={})", Logs.actor(request), id);
             response.sendRedirect(request.getContextPath() + "/contract?action=edit&id=" + id + "&error=update_failed");
+            return;
+        }
+        response.sendRedirect(request.getContextPath() + "/contract?action=view&id=" + id);
+    }
+
+    /**
+     * Lập một phụ lục cho hợp đồng đã ký.
+     *
+     * <p>Đi qua chính {@code ContractDAO.insert} như mọi hợp đồng khác, chỉ
+     * khác ở chỗ mang theo {@code parentContractId}. Phụ lục ra đời ở trạng
+     * thái Nháp và phải được KÝ như hợp đồng thường -- đó là điểm của cả việc
+     * này: một sửa đổi trên hợp đồng đã ký phải có chữ ký của người được ký,
+     * chứ không phải một lần bấm Lưu trên form.
+     *
+     * <p>Khách hàng và chiều KHÔNG đọc từ form: DAO lấy thẳng từ hợp đồng cha.
+     */
+    private void handleCreateAmendment(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        if (!AccessControl.requireFullAccess(request, response, AccessControl.Resource.CONTRACT)) {
+            return;
+        }
+        Integer parentId = parseIntOrNull(request.getParameter("parentId"));
+        Contract parent = parentId != null ? contractDAO.findById(parentId) : null;
+        if (parent == null) {
+            response.sendRedirect(request.getContextPath() + "/contract?error=notfound");
+            return;
+        }
+
+        Contract c = buildContractFromRequest(request, new Contract());
+        c.setParentContractId(parentId);
+        // Hai trường này không có ô trên form phụ lục; gán sẵn để isValid() và
+        // counterpartyMatchesDirection() kiểm đúng thứ sẽ được ghi xuống.
+        c.setEnterpriseId(parent.getEnterpriseId());
+        c.setDirection(parent.getDirection());
+        String back = "/contract?action=newAmendment&parentId=" + parentId;
+
+        if (!isValid(c) || !counterpartyMatchesDirection(c)) {
+            response.sendRedirect(request.getContextPath() + back + "&error=invalid");
+            return;
+        }
+        if (!TextRules.isSafeHttpUrl(c.getAttachmentUrl())) {
+            response.sendRedirect(request.getContextPath() + back + "&error=invalid_drive_link");
+            return;
+        }
+        if (contractDAO.contractCodeExists(c.getContractCode(), 0)) {
+            response.sendRedirect(request.getContextPath() + back + "&error=duplicate_code");
+            return;
+        }
+
+        int newId = contractDAO.insert(c, actorId(request));
+        if (newId == ContractDAO.DUPLICATE_CODE) {
+            response.sendRedirect(request.getContextPath() + back + "&error=duplicate_code");
+            return;
+        }
+        if (newId == ContractDAO.INVALID_PARENT) {
+            // Hợp đồng cha vừa đổi trạng thái trong lúc form đang mở -- ví dụ
+            // vừa được thanh lý. Đưa về trang hợp đồng cha, ở đó người dùng
+            // thấy ngay vì sao.
+            LOG.warn("Lap phu luc bi tu choi vi hop dong cha (actor={}, parentId={})",
+                    Logs.actor(request), parentId);
+            response.sendRedirect(request.getContextPath()
+                    + "/contract?action=view&id=" + parentId + "&error=amendment_not_allowed");
+            return;
+        }
+        if (newId <= 0) {
+            LOG.warn("Lap phu luc that bai (actor={}, parentId={}, contractCode={})",
+                    Logs.actor(request), parentId, c.getContractCode());
+            response.sendRedirect(request.getContextPath() + back + "&error=create_failed");
+            return;
+        }
+        response.sendRedirect(request.getContextPath() + "/contract?action=view&id=" + newId);
+    }
+
+    /**
+     * ADMIN chữa một sai sót NHẬP LIỆU trên hợp đồng đã ký.
+     *
+     * <p>Không phải cửa sau cho việc sửa nội dung: sửa đổi thật thì đi qua phụ
+     * lục và để lại một văn bản có chữ ký. Cái này chỉ chữa thứ gõ sai so với
+     * chính bản giấy đang cầm -- nhầm một chữ số trong mã, chọn nhầm khách hàng
+     * lúc tạo.
+     *
+     * <p>Lý do là BẮT BUỘC, và DAO từ chối khi thiếu. Nó vào cột note của dòng
+     * nhật ký, tách khỏi câu mô tả do hệ thống sinh, nên về sau còn phân biệt
+     * được máy ghi với người khai.
+     */
+    private void handleCorrect(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        // requireAdmin, không phải requireFullAccess: đây là thao tác chạm vào
+        // điều khoản của hợp đồng đã ký, hẹp hơn hẳn quyền quản lý hợp đồng.
+        if (!AccessControl.requireAdmin(request, response)) {
+            return;
+        }
+        Integer id = parseIntOrNull(request.getParameter("contractId"));
+        Contract existing = id != null ? contractDAO.findById(id) : null;
+        if (existing == null) {
+            response.sendRedirect(request.getContextPath() + "/contract?error=notfound");
+            return;
+        }
+        String back = "/contract?action=edit&id=" + id;
+
+        String reason = request.getParameter("correctionReason");
+        if (reason == null || reason.trim().isEmpty()) {
+            response.sendRedirect(request.getContextPath() + back + "&error=missing_reason");
+            return;
+        }
+
+        Contract c = buildContractFromRequest(request, new Contract());
+        c.setContractId(id);
+        c.setDirection(existing.getDirection());
+        // Ngày ký không sửa được kể cả ở đây -- DAO cũng giữ lại giá trị cũ.
+        c.setSigningDate(existing.getSigningDate());
+        if (!isValid(c) || !counterpartyMatchesDirection(c)) {
+            response.sendRedirect(request.getContextPath() + back + "&error=invalid");
+            return;
+        }
+        if (contractDAO.contractCodeExists(c.getContractCode(), id)) {
+            response.sendRedirect(request.getContextPath() + back + "&error=duplicate_code");
+            return;
+        }
+        if (!TextRules.isSafeHttpUrl(c.getAttachmentUrl())) {
+            response.sendRedirect(request.getContextPath() + back + "&error=invalid_drive_link");
+            return;
+        }
+
+        if (!contractDAO.correct(c, actorId(request), reason)) {
+            LOG.warn("Sua sai sot hop dong that bai (actor={}, contractId={})", Logs.actor(request), id);
+            response.sendRedirect(request.getContextPath() + back + "&error=update_failed");
             return;
         }
         response.sendRedirect(request.getContextPath() + "/contract?action=view&id=" + id);
@@ -1151,6 +1370,12 @@ public class ContractController extends HttpServlet {
                         && ContractDAO.PROGRESS_SIGNED.equals(contract.getProgressStatus()));
 
         request.setAttribute("contractProducts", contractDAO.findProductsByContractId(id));
+
+        // Phụ lục: hiện ở CẢ trang xem lẫn trang quản lý. Trên hợp đồng gốc đây
+        // là danh sách các văn bản đã sửa đổi nó; trên chính một phụ lục thì
+        // danh sách rỗng (một tầng) và thứ cần thấy là đường ngược về cha, cái
+        // đó nằm sẵn trong contract.parentContractCode.
+        request.setAttribute("amendments", contractDAO.findAmendmentsByParentId(id));
 
         List<ContractPayment> payments = contractDAO.findPaymentsByContractId(id);
         request.setAttribute("contractPayments", payments);

@@ -136,7 +136,7 @@
     },
     {
       "m": "Quản lý hợp đồng",
-      "c": "Ghi được số hợp đồng thật in trên bản giấy (khác mã HD-xxxx hệ thống tự sinh), để trống cũng lưu được, và tìm kiếm được theo số đó",
+      "c": "Mã hợp đồng do người dùng nhập, chính là số in trên bản giấy; trùng mã thì báo lỗi để nhập lại, và tìm kiếm được theo mã đó",
       "ref": [
         "TC_CTRADD_014",
         "TC_CTRADD_015",
@@ -204,6 +204,51 @@
       "ref": [
         "TC_CTRDEL_002",
         "TC_CTRLIFE_010"
+      ]
+    },
+    {
+      "m": "Quản lý hợp đồng",
+      "c": "Hợp đồng đã ký thì điều khoản khoá lại — tiêu đề, khách hàng, loại, thời hạn, người ký, giá trị, hàng hoá đều không sửa được nữa; chỉ còn người phụ trách và link bản PDF đã ký là đổi được",
+      "ref": [
+        "TC_CTREDIT_010",
+        "TC_CTREDIT_011",
+        "TC_CTREDIT_012"
+      ]
+    },
+    {
+      "m": "Quản lý hợp đồng",
+      "c": "Thay đổi điều khoản của hợp đồng đã ký đi qua PHỤ LỤC: một hợp đồng con có mã riêng, thời hạn riêng, và cũng phải được ký. Hợp đồng gốc ghi lại việc lập phụ lục trong Nhật ký thay đổi",
+      "ref": [
+        "TC_CTRPL_005",
+        "TC_CTRPL_006",
+        "TC_CTRPL_008"
+      ]
+    },
+    {
+      "m": "Quản lý hợp đồng",
+      "c": "Phụ lục chỉ lập được cho hợp đồng ĐÃ KÝ và CHƯA thanh lý; phụ lục của phụ lục bị chặn (một tầng); và hợp đồng còn phụ lục thì không huỷ bản ghi được",
+      "ref": [
+        "TC_CTRPL_002",
+        "TC_CTRPL_003",
+        "TC_CTRPL_010",
+        "TC_CTRPL_011"
+      ]
+    },
+    {
+      "m": "Quản lý hợp đồng",
+      "c": "Phụ lục gia hạn KHÔNG làm đổi ngày kết thúc của hợp đồng gốc — bản ghi gốc giữ nguyên những gì đã ký, thời hạn mới nằm trên chính phụ lục",
+      "ref": [
+        "TC_CTRPL_009"
+      ]
+    },
+    {
+      "m": "Quản lý hợp đồng",
+      "c": "Gõ sai so với bản giấy thì Admin chữa được, bắt buộc nêu lý do, và lần chữa đó hiện trong Nhật ký thay đổi dưới loại riêng \"Sửa sai sót\". Sau khi thanh lý thì Admin cũng không chữa được nữa",
+      "ref": [
+        "TC_CTRFIX_002",
+        "TC_CTRFIX_004",
+        "TC_CTRFIX_005",
+        "TC_CTRFIX_007"
       ]
     },
     {
@@ -517,6 +562,16 @@
     {
       "m": "Vận hành & bàn giao",
       "c": "Tài liệu hướng dẫn sử dụng và hướng dẫn triển khai đầy đủ để bàn giao"
+    },
+    {
+      "m": "Chức năng dùng chung",
+      "c": "Cấp dưới xin thay đổi trên Hợp đồng thì chỉ chọn được \"Tạo mới\" hoặc \"Lập phụ lục\" — xin \"Sửa\"/\"Xoá\" không còn nghĩa vì cấp trên cũng không sửa hay xoá hợp đồng đã ký. Các yêu cầu cũ vẫn đọc và duyệt được",
+      "ref": [
+        "TC_CRINTENT_001",
+        "TC_CRINTENT_003",
+        "TC_CRINTENT_005",
+        "TC_CRINTENT_007"
+      ]
     }
   ]
 }

@@ -202,6 +202,146 @@ public class ContractControllerTest {
     // POST ?action=create / update (BR-44)
     // ------------------------------------------------------------------
 
+    /**
+     * Hợp đồng ở trạng thái Nháp.
+     *
+     * <p>{@code new Contract()} KHÔNG dùng được nữa: progressStatus của nó là
+     * null, mà mọi vị ngữ vòng đời đều hỏi "có phải Nháp không" và null trả lời
+     * KHÔNG -- tức là bản ghi trắng bị coi như đã ký, và form sửa chỉ nhận hai
+     * trường. Mặc định đó là cố ý (thà khoá nhầm còn hơn mở nhầm một hợp đồng
+     * đã ký), nhưng nó khiến test phải nói rõ mình đang đứng ở đâu.
+     */
+    private static Contract draftContract() {
+        Contract c = new Contract();
+        c.setProgressStatus("Nháp");
+        return c;
+    }
+
+    // ------------------------------------------------------------------
+    // Siết form sửa + phụ lục (đợt 3)
+    // ------------------------------------------------------------------
+
+    /** Hợp đồng đã ký: mọi ô điều khoản trên form bị bỏ qua, chỉ hai trường đi tiếp. */
+    @Test
+    public void update_signedContract_keepsTermsFromTheStoredRecord() throws Exception {
+        Contract signed = signedContract();
+        when(request.getParameter("action")).thenReturn("update");
+        when(request.getParameter("contractId")).thenReturn("5");
+        when(contractDAO.findById(5)).thenReturn(signed);
+        // Form gửi lên một tiêu đề khác -- có thể là POST nặn tay, vì ô đó
+        // hiển thị dạng khoá.
+        stubValidContractFields();
+        when(request.getParameter("title")).thenReturn("Tiêu đề bị đổi lén");
+        when(request.getParameter("ownerId")).thenReturn("88");
+        when(contractDAO.update(any(Contract.class), anyInt())).thenReturn(true);
+
+        controller.doPost(request, response);
+
+        verify(contractDAO).update(argThat((Contract c) ->
+                "Hợp đồng gốc".equals(c.getTitle()) && c.getOwnerId() == 88), anyInt());
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=view&id=5");
+    }
+
+    /**
+     * Chữa sai sót là việc của ADMIN.
+     *
+     * <p>Không dùng requireFullAccess như các action khác: quyền quản lý hợp
+     * đồng cho phép tạo, sửa nháp, ký -- chạm vào điều khoản của hợp đồng ĐÃ KÝ
+     * thì hẹp hơn hẳn.
+     */
+    @Test
+    public void correct_nonAdmin_isRefusedAndWritesNothing() throws Exception {
+        when(request.getParameter("action")).thenReturn("correct");
+        when(request.getParameter("contractId")).thenReturn("5");
+
+        controller.doPost(request, response);
+
+        verify(contractDAO, never()).correct(any(Contract.class), anyInt(), anyString());
+    }
+
+    /** Thiếu lý do thì không gọi xuống DAO -- báo lỗi ngay, không để mất dữ liệu người dùng vừa gõ. */
+    @Test
+    public void correct_withoutReason_redirectsWithoutCallingDao() throws Exception {
+        loginAs("Admin");
+        when(request.getParameter("action")).thenReturn("correct");
+        when(request.getParameter("contractId")).thenReturn("5");
+        when(contractDAO.findById(5)).thenReturn(signedContract());
+        when(request.getParameter("correctionReason")).thenReturn("   ");
+
+        controller.doPost(request, response);
+
+        verify(contractDAO, never()).correct(any(Contract.class), anyInt(), anyString());
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=edit&id=5&error=missing_reason");
+    }
+
+    /**
+     * Form lập phụ lục từ chối hợp đồng cha chưa ký, và đưa người dùng về đúng
+     * hợp đồng đó thay vì mở một form mà bấm Lưu chắc chắn thất bại.
+     */
+    @Test
+    public void newAmendment_draftParent_redirectsWithReason() throws Exception {
+        when(request.getParameter("action")).thenReturn("newAmendment");
+        when(request.getParameter("parentId")).thenReturn("3");
+        when(contractDAO.findById(3)).thenReturn(draftContract());
+
+        controller.doGet(request, response);
+
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=view&id=3&error=amendment_not_allowed");
+    }
+
+    /** Phụ lục mang parentContractId, và khách hàng lấy từ hợp đồng cha chứ không từ form. */
+    @Test
+    public void createAmendment_carriesParentAndInheritsCounterparty() throws Exception {
+        Contract parent = signedContract();
+        parent.setContractId(3);
+        parent.setEnterpriseId(10);
+        when(request.getParameter("action")).thenReturn("createAmendment");
+        when(request.getParameter("parentId")).thenReturn("3");
+        when(contractDAO.findById(3)).thenReturn(parent);
+        stubValidContractFields();
+        // Form phụ lục không có ô khách hàng; giá trị lạ dưới đây phải bị bỏ qua.
+        when(request.getParameter("enterpriseId")).thenReturn("777");
+        when(contractDAO.insert(any(Contract.class), anyInt())).thenReturn(90);
+
+        controller.doPost(request, response);
+
+        verify(contractDAO).insert(argThat((Contract c) ->
+                c.getParentContractId() != null && c.getParentContractId() == 3
+                        && c.getEnterpriseId() == 10), anyInt());
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=view&id=90");
+    }
+
+    /** Hợp đồng cha vừa đổi trạng thái giữa chừng: DAO từ chối, người dùng về trang hợp đồng cha. */
+    @Test
+    public void createAmendment_daoRejectsParent_redirectsToParent() throws Exception {
+        Contract parent = signedContract();
+        parent.setContractId(3);
+        parent.setEnterpriseId(10);
+        when(request.getParameter("action")).thenReturn("createAmendment");
+        when(request.getParameter("parentId")).thenReturn("3");
+        when(contractDAO.findById(3)).thenReturn(parent);
+        stubValidContractFields();
+        when(contractDAO.insert(any(Contract.class), anyInt())).thenReturn(ContractDAO.INVALID_PARENT);
+
+        controller.doPost(request, response);
+
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=view&id=3&error=amendment_not_allowed");
+    }
+
+    /** Hợp đồng đã ký với đối tác giữ đúng vai -- dùng cho nhóm test siết form. */
+    private static Contract signedContract() {
+        Contract c = new Contract();
+        c.setContractId(5);
+        c.setProgressStatus("Đã ký");
+        c.setContractCode("01/2026/HĐKT-POSTEF");
+        c.setTitle("Hợp đồng gốc");
+        c.setContractType("Cung cấp thiết bị");
+        c.setDirection("Bán");
+        c.setEnterpriseId(10);
+        c.setOwnerId(99);
+        return c;
+    }
+
     private void stubValidContractFields() {
         // Mã hợp đồng là ô BẮT BUỘC từ V28 -- hệ thống thôi sinh mã hộ.
         when(request.getParameter("contractCode")).thenReturn("01/2026/HĐKT-POSTEF");
@@ -288,7 +428,10 @@ public class ContractControllerTest {
     public void update_validFields_updatesAndRedirectsToDetail() throws Exception {
         when(request.getParameter("action")).thenReturn("update");
         when(request.getParameter("contractId")).thenReturn("5");
-        when(contractDAO.findById(5)).thenReturn(new Contract());
+        // Bản NHÁP: đó là trạng thái duy nhất mà form sửa còn gửi lên đủ mọi ô.
+        // Hợp đồng đã ký đi đường khác hẳn -- xem
+        // update_contractDaKy_chiNhanNguoiPhuTrachVaLink.
+        when(contractDAO.findById(5)).thenReturn(draftContract());
         stubValidContractFields();
         when(contractDAO.update(any(Contract.class), anyInt())).thenReturn(true);
 
@@ -374,7 +517,7 @@ public class ContractControllerTest {
 
         ArgumentCaptor<Period> period = ArgumentCaptor.forClass(Period.class);
         verify(contractDAO).findAll(anyInt(), anyInt(), any(), any(), any(), any(), eq(false),
-                period.capture(), eq("Mua"), nullable(String.class));
+                period.capture(), eq("Mua"), nullable(String.class), eq(false));
         assertNotNull("kỳ phải còn nguyên khi lọc theo chiều", period.getValue());
         assertEquals("Quý 2/2026", period.getValue().getLabel());
     }
@@ -387,7 +530,7 @@ public class ContractControllerTest {
         controller.doGet(request, response);
 
         verify(contractDAO).findAll(anyInt(), anyInt(), any(), any(), any(), any(), eq(false),
-                nullable(Period.class), eq("Bán"), nullable(String.class));
+                nullable(Period.class), eq("Bán"), nullable(String.class), eq(false));
         verify(request).setAttribute("kind", "sell");
     }
 

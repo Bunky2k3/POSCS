@@ -44,6 +44,13 @@ delete it, with a reason. The detail page exposes this through a separate
 `canVoid` attribute, not `canManage`, and the list screen has no delete
 button at all.
 
+Voiding is refused outright — for Admin too — while the contract still has
+**amendments** hanging off it (`parent_contract_id`). A foreign key cannot
+enforce that here, because contracts are deleted *softly*: the database sees
+nothing being removed, and the amendment would quietly point at a contract
+that has vanished from every list. `ContractDAO.voidRecord` counts them inside
+the transaction, after locking.
+
 **Signing is a separate, gated step.** Per the customer (2026-09-15), staff do
 not sign contracts themselves. Creating a contract therefore produces a
 `Nháp` (draft) with no `signing_date`; a distinct `action=changeProgress`
@@ -65,6 +72,42 @@ as described above. Liquidating or terminating early is *not* gated by the
 signing rule — any Full-access user may do it, with a mandatory reason — and
 both freeze the contract permanently: after that `ContractDAO.update` refuses
 every edit, including from Admin.
+
+**Signing also locks the terms.** From `Đã ký` onward `ContractDAO.update`
+writes exactly two columns — `owner_id` and `attachment_url`. Neither appears
+on the paper both parties signed: the owner is an internal assignment that
+follows staffing, and the link to the signed PDF usually only *exists* after
+signing, so locking it would mean the file can never be attached. Everything
+else — code, title, type, counterparty, the three dates, signing parties,
+place, value, and the line items — is contract content, and changing it goes
+through an amendment.
+
+This is enforced in the DAO, not by disabling inputs: a hidden button still
+POSTs. The form submits the locked fields as `disabled` (browsers do not send
+those) and `ContractController.handleUpdate` rebuilds the record from what is
+stored, so a hand-made POST changes nothing either.
+
+**Correcting a data-entry mistake** is a separate, narrower door:
+`action=correct` / `ContractDAO.correct`. It is **Admin only**
+(`requireAdmin`, not `requireFullAccess` — managing contracts is a wider
+permission than touching the terms of a signed one), requires a written
+reason, and writes a `Sửa sai sót` row into `contract_history` carrying that
+reason. It is not a back door for changing what was agreed — that is what an
+amendment is for — only for fixing what was typed wrong against the paper in
+hand. It still refuses once the contract is frozen: the customer's rule says
+"no changes after liquidation, *including from senior staff*", and Admin is
+not an exception to it.
+
+**Amendments** (`contracts.parent_contract_id`, V29) are how a signed contract
+changes. An amendment is a full contract row of its own — its own code, dates,
+line items, value — and it has to be **signed** like any other, which is the
+whole point: a change to a signed contract carries a signature, not a click on
+Save. Creating one is ordinary Full access (`action=newAmendment` /
+`createAmendment`); the parent must be exactly `Đã ký` (a draft is edited
+directly; a frozen contract has ended, so what comes after it is a *new*
+contract), and it must not itself be an amendment — one level only, checked in
+`ContractDAO.insert` inside the transaction, since a self-referencing foreign
+key permits chains of any length.
 
 This replaced BR-46, which allowed deleting while the status was
 "Chưa hiệu lực". That status is computed from `effective_date`, so a contract
@@ -155,6 +198,21 @@ The agreed rule, on top of the role matrix rather than replacing it:
 - The **subordinate** (`nhân viên cầm tỉnh`, leaf tier, one province each)
   is **read-only**, create included. To change anything they submit a
   **change request** to their manager, who approves or rejects it.
+
+**On Contract, the available intents changed with the lifecycle rules.**
+`Sửa` and `Xoá` are refused on the write path
+(`ChangeRequestController.intentAllowedFor`), because a signed contract cannot
+be edited or deleted by the manager either — such a request asks somebody to
+do something the system does not allow, and only builds a queue of requests
+certain to be rejected. What a subordinate can actually ask for is
+`Lập phụ lục`, which is a thing the manager *can* do; its `targetId` is the
+**parent** contract and the request detail page links straight to the
+amendment form. `Lập phụ lục` is meaningless on Customer and is refused there,
+where `Sửa` still means what it always did.
+
+Existing rows are untouched: `Sửa`/`Xoá` requests submitted before this rule
+still read, still display, and can still be reviewed. Only new ones are
+refused — deleting the old ones would be rewriting the record.
 
 Scope and consequences worth knowing before implementing:
 

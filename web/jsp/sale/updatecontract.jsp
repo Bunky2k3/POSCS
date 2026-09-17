@@ -100,9 +100,25 @@
         <a href="${pageContext.request.contextPath}/contract?action=view&id=${contract.contractId}" class="back-link-top"><i class="fa-solid fa-arrow-left-long"></i> Quay lại chi tiết hợp đồng</a>
 
         <div class="page-header-row">
-            <h2>Cập nhật hợp đồng</h2>
-            <p>Mã hợp đồng: <strong style="color:var(--primary-dark)">${fn:escapeXml(contract.contractCode)}</strong></p>
+            <h2>${contract.amendment ? 'Cập nhật phụ lục' : 'Cập nhật hợp đồng'}</h2>
+            <p>Mã ${contract.amendment ? 'phụ lục' : 'hợp đồng'}:
+               <strong style="color:var(--primary-dark)">${fn:escapeXml(contract.contractCode)}</strong></p>
         </div>
+
+        <%-- Đường ngược về hợp đồng gốc. Đứng ở đây thay vì trong khối "Phụ lục"
+             bên dưới: trên một phụ lục thì khối đó không hiện (một tầng), mà câu
+             "cái này sửa cho hợp đồng nào" lại là câu đầu tiên người đọc hỏi. --%>
+        <c:if test="${contract.amendment}">
+            <div class="card-box" style="border-left:4px solid #4338ca;">
+                <div style="display:flex; align-items:flex-start; gap:10px; font-size:0.88rem; color:#3730a3;">
+                    <i class="fa-solid fa-link" style="margin-top:3px;"></i>
+                    <span>Đây là <strong>phụ lục</strong> của hợp đồng
+                        <a href="${pageContext.request.contextPath}/contract?action=view&id=${contract.parentContractId}">
+                            ${fn:escapeXml(contract.parentContractCode)}</a>.
+                        Nó có vòng đời riêng và phải được ký như một hợp đồng thường.</span>
+                </div>
+            </div>
+        </c:if>
 
         <%-- Đóng băng thì ẩn hẳn form nội dung thay vì để người dùng gõ xong
              rồi nhận lỗi: ContractDAO.update từ chối mọi thay đổi sau thanh lý.
@@ -126,6 +142,8 @@
                         <c:when test="${param.error == 'invalid'}">Thông tin hợp đồng chưa hợp lệ. Vui lòng kiểm tra lại các ô bắt buộc.</c:when>
                         <c:when test="${param.error == 'duplicate_code'}">Mã hợp đồng này đã có hợp đồng khác dùng. Kiểm lại số trên bản giấy hoặc nhập mã khác.</c:when>
                         <c:when test="${param.error == 'update_failed'}">Không lưu được thay đổi. Vui lòng thử lại.</c:when>
+                        <c:when test="${param.error == 'missing_reason'}">Sửa sai sót trên hợp đồng đã ký thì bắt buộc phải nêu lý do.</c:when>
+                        <c:when test="${param.error == 'amendment_not_allowed'}">Hợp đồng này không lập phụ lục được: nó phải đã ký và chưa thanh lý, và bản thân nó không được là phụ lục.</c:when>
                         <c:otherwise>Đã có lỗi xảy ra. Vui lòng thử lại.</c:otherwise>
                     </c:choose>
                 </div>
@@ -133,8 +151,35 @@
 
             <form id="createContractForm" action="${pageContext.request.contextPath}/contract" method="POST" onsubmit="return validateForm();">
                 <input type="hidden" name="csrfToken" value="${csrfToken}">
-                <input type="hidden" name="action" value="update">
+                <%-- Một form, hai đích. Bình thường gửi "update" (sau khi ký thì
+                     server chỉ nhận người phụ trách + link). Admin bật chế độ
+                     chữa sai sót thì script đổi ô này thành "correct" -- đường
+                     duy nhất chạm được vào điều khoản của hợp đồng đã ký, và nó
+                     bắt buộc kèm lý do. --%>
+                <input type="hidden" name="action" id="formAction" value="update">
                 <input type="hidden" name="contractId" value="${contract.contractId}">
+
+                <%-- Vì sao phần lớn ô ở dưới bị mờ. Nói ngay tại chỗ, không để
+                     người dùng bấm vào một ô không gõ được rồi tự đoán. --%>
+                <c:if test="${not canEditTerms}">
+                    <div style="border:1px solid #fed7aa; background:#fffbeb; border-radius:12px; padding:12px 14px; margin-bottom:16px;">
+                        <div style="display:flex; align-items:flex-start; gap:10px; font-size:0.88rem; color:#92400e;">
+                            <i class="fa-solid fa-file-signature" style="margin-top:3px;"></i>
+                            <div>
+                                <strong>Hợp đồng đã ký — điều khoản đã khoá.</strong>
+                                Chỉ còn <strong>người phụ trách</strong> và <strong>link bản PDF</strong> sửa được;
+                                hai thứ đó là dữ liệu quản trị nội bộ, không nằm trên tờ giấy hai bên ký.
+                                <div style="margin-top:6px;">
+                                    Cần thay đổi điều khoản thì <strong>lập phụ lục</strong> — một văn bản riêng, có chữ ký.
+                                    <c:if test="${canCorrect}">
+                                        Còn nếu đây chỉ là <strong>gõ sai so với bản giấy</strong>, dùng nút
+                                        “Chữa sai sót nhập liệu” bên dưới.
+                                    </c:if>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </c:if>
 
                 <div class="section-header"><h5>Thông tin chung</h5></div>
                 <div class="row">
@@ -146,18 +191,18 @@
                         <label>Mã hợp đồng <span class="req">*</span></label>
                         <input type="text" class="form-control" id="contractCode" name="contractCode"
                                maxlength="50" placeholder="VD: 01/2026/HĐKT-POSTEF"
-                               value="${fn:escapeXml(contract.contractCode)}">
+                               value="${fn:escapeXml(contract.contractCode)}" ${canEditTerms ? '' : 'disabled'} data-term="1">
                         <span class="error-text" id="err-contractCode">Mã hợp đồng không được để trống.</span>
                     </div>
 
                     <div class="col-12 field-row">
                         <label>Tiêu đề hợp đồng <span class="req">*</span></label>
-                        <input type="text" class="form-control" id="title" name="title" value="${fn:escapeXml(contract.title)}">
+                        <input type="text" class="form-control" id="title" name="title" value="${fn:escapeXml(contract.title)}" ${canEditTerms ? '' : 'disabled'} data-term="1">
                         <span class="error-text" id="err-title">Tiêu đề không được để trống.</span>
                     </div>
                     <div class="col-md-6 field-row">
                         <label>Khách hàng <span class="req">*</span></label>
-                        <select class="form-select" id="customer" name="enterpriseId">
+                        <select class="form-select" id="customer" name="enterpriseId" ${canEditTerms ? '' : 'disabled'} data-term="1">
                             <option value="">-- Chọn khách hàng --</option>
                             <c:forEach var="customer" items="${customerList}">
                                 <option value="${customer.enterpriseId}" ${customer.enterpriseId == contract.enterpriseId ? 'selected' : ''}>${fn:escapeXml(customer.enterpriseName)}</option>
@@ -177,7 +222,7 @@
                     </div>
                     <div class="col-md-6 field-row">
                         <label>Loại hợp đồng <span class="req">*</span></label>
-                        <select class="form-select" id="contractType" name="contractType">
+                        <select class="form-select" id="contractType" name="contractType" ${canEditTerms ? '' : 'disabled'} data-term="1">
                             <option value="">-- Chọn loại hợp đồng --</option>
                             <%-- Loại hợp đồng theo CHIỀU: hợp đồng mua không dùng chung bộ
                                  chữ với hợp đồng bán. Xem ContractController. --%>
@@ -199,25 +244,25 @@
                     </div>
                     <div class="col-md-6 field-row">
                         <label>Người ký bên mình</label>
-                        <input type="text" class="form-control" id="signerName" name="signerName" maxlength="100" value="${fn:escapeXml(contract.signerName)}">
+                        <input type="text" class="form-control" id="signerName" name="signerName" maxlength="100" value="${fn:escapeXml(contract.signerName)}" ${canEditTerms ? '' : 'disabled'} data-term="1">
                     </div>
                     <div class="col-md-6 field-row">
                         <label>Chức vụ</label>
                         <input type="text" class="form-control" id="signerPosition" name="signerPosition"
-                               maxlength="100" placeholder="VD: Giám đốc chi nhánh" value="${fn:escapeXml(contract.signerPosition)}">
+                               maxlength="100" placeholder="VD: Giám đốc chi nhánh" value="${fn:escapeXml(contract.signerPosition)}" ${canEditTerms ? '' : 'disabled'} data-term="1">
                     </div>
                     <div class="col-md-6 field-row">
                         <label>Người ký bên đối tác</label>
-                        <input type="text" class="form-control" id="counterpartySignerName" name="counterpartySignerName" maxlength="100" value="${fn:escapeXml(contract.counterpartySignerName)}">
+                        <input type="text" class="form-control" id="counterpartySignerName" name="counterpartySignerName" maxlength="100" value="${fn:escapeXml(contract.counterpartySignerName)}" ${canEditTerms ? '' : 'disabled'} data-term="1">
                     </div>
                     <div class="col-md-6 field-row">
                         <label>Chức vụ</label>
-                        <input type="text" class="form-control" id="counterpartySignerPosition" name="counterpartySignerPosition" maxlength="100" value="${fn:escapeXml(contract.counterpartySignerPosition)}">
+                        <input type="text" class="form-control" id="counterpartySignerPosition" name="counterpartySignerPosition" maxlength="100" value="${fn:escapeXml(contract.counterpartySignerPosition)}" ${canEditTerms ? '' : 'disabled'} data-term="1">
                     </div>
                     <div class="col-md-6 field-row">
                         <label>Căn cứ uỷ quyền</label>
                         <input type="text" class="form-control" id="authorizationRef" name="authorizationRef"
-                               maxlength="255" placeholder="VD: GUQ số 05/2026 ngày 10/01/2026" value="${fn:escapeXml(contract.authorizationRef)}">
+                               maxlength="255" placeholder="VD: GUQ số 05/2026 ngày 10/01/2026" value="${fn:escapeXml(contract.authorizationRef)}" ${canEditTerms ? '' : 'disabled'} data-term="1">
                         <span style="font-size:0.78rem; color:#9ca3af; display:block; margin-top:6px;">
                             Chỉ điền khi người ký không phải đại diện pháp luật.
                         </span>
@@ -225,12 +270,12 @@
                     <div class="col-md-6 field-row">
                         <label>Nơi ký</label>
                         <input type="text" class="form-control" id="signingPlace" name="signingPlace"
-                               maxlength="255" placeholder="VD: Hà Nội" value="${fn:escapeXml(contract.signingPlace)}">
+                               maxlength="255" placeholder="VD: Hà Nội" value="${fn:escapeXml(contract.signingPlace)}" ${canEditTerms ? '' : 'disabled'} data-term="1">
                     </div>
                     <div class="col-md-6 field-row">
                         <label>Giá trị hợp đồng (VNĐ)</label>
                         <input type="text" class="form-control" id="contractValue" name="contractValue"
-                               inputmode="numeric" placeholder="VD: 1.500.000.000" value="${contract.contractValue}">
+                               inputmode="numeric" placeholder="VD: 1.500.000.000" value="${contract.contractValue}" ${canEditTerms ? '' : 'disabled'} data-term="1">
                         <span style="font-size:0.78rem; color:#9ca3af; display:block; margin-top:6px;">
                             Giá trị theo điều khoản. Số tiền thực thu ghi ở mục Kỳ thanh toán — hai
                             con số lệch nhau chính là công nợ.
@@ -270,11 +315,11 @@
                     </div>
                     <div class="col-md-4 field-row">
                         <label>Ngày hiệu lực</label>
-                        <input type="date" class="form-control" id="effectiveDate" name="effectiveDate" value="<fmt:formatDate value="${contract.effectiveDate}" pattern="yyyy-MM-dd"/>">
+                        <input type="date" class="form-control" id="effectiveDate" name="effectiveDate" value="<fmt:formatDate value="${contract.effectiveDate}" pattern="yyyy-MM-dd"/>" ${canEditTerms ? '' : 'disabled'} data-term="1">
                     </div>
                     <div class="col-md-4 field-row">
                         <label>Ngày kết thúc</label>
-                        <input type="date" class="form-control" id="endDate" name="endDate" value="<fmt:formatDate value="${contract.endDate}" pattern="yyyy-MM-dd"/>">
+                        <input type="date" class="form-control" id="endDate" name="endDate" value="<fmt:formatDate value="${contract.endDate}" pattern="yyyy-MM-dd"/>" ${canEditTerms ? '' : 'disabled'} data-term="1">
                     </div>
 
                     <div class="col-12 field-row">
@@ -294,8 +339,37 @@
                 </p>
 
 
+                <%-- Chế độ CHỮA SAI SÓT: chỉ Admin, chỉ trên hợp đồng đã ký và
+                     chưa thanh lý. Mở ra thì các ô điều khoản gõ lại được, ô
+                     action đổi sang "correct", và lý do thành bắt buộc.
+
+                     Đây KHÔNG phải cửa sau để sửa nội dung hợp đồng: sửa đổi
+                     thật thì đi qua phụ lục và để lại một văn bản có chữ ký.
+                     Cái này chỉ chữa thứ gõ sai so với chính bản giấy đang cầm.
+                     Server kiểm lại quyền Admin và bắt buộc lý do
+                     (ContractController.handleCorrect / ContractDAO.correct). --%>
+                <c:if test="${canCorrect}">
+                    <div id="correctionBox" style="display:none; border:1px solid #fecaca; background:#fef2f2; border-radius:12px; padding:14px; margin-top:14px;">
+                        <div style="font-size:0.88rem; color:#991b1b; margin-bottom:10px;">
+                            <i class="fa-solid fa-triangle-exclamation me-1"></i>
+                            <strong>Đang chữa sai sót trên hợp đồng đã ký.</strong>
+                            Chỉ dùng khi dữ liệu trên hệ thống khác với bản giấy. Thay đổi sẽ ghi vào
+                            nhật ký kèm lý do bạn nêu, dưới tên bạn.
+                        </div>
+                        <label>Lý do <span class="req">*</span></label>
+                        <textarea class="form-control" id="correctionReason" name="correctionReason" rows="2"
+                                  placeholder="VD: Mã hợp đồng gõ nhầm 01 thành 10, đối chiếu bản giấy ngày 12/03/2026"></textarea>
+                        <span class="error-text" id="err-correctionReason">Vui lòng nêu lý do sửa.</span>
+                    </div>
+                </c:if>
+
                 <div class="action-bar">
                     <a href="${pageContext.request.contextPath}/contract?action=view&id=${contract.contractId}" class="btn-cancel">Hủy</a>
+                    <c:if test="${canCorrect}">
+                        <button type="button" class="btn-cancel" id="toggleCorrection">
+                            <i class="fa-solid fa-pen-ruler me-1"></i> Chữa sai sót nhập liệu
+                        </button>
+                    </c:if>
                     <button type="submit" class="btn-primary"><i class="fa-solid fa-check me-1"></i> Lưu thay đổi</button>
                 </div>
             </form>
@@ -343,6 +417,92 @@
                     <i class="fa-solid fa-circle-info" style="margin-top:3px; color:var(--primary);"></i>
                     <span>Còn thiếu ngày hiệu lực hoặc ngày kết thúc — điền ở form trên và lưu lại thì mới ký được.</span>
                 </div>
+            </c:if>
+            <%-- Vì sao nút "Huỷ bản ghi" biến mất. Không nói thì trông như mất quyền. --%>
+            <c:if test="${contract.amendmentCount > 0}">
+                <div class="locked-note" style="margin-top:12px;">
+                    <i class="fa-solid fa-circle-info" style="margin-top:3px; color:var(--primary);"></i>
+                    <span>Hợp đồng này đang có ${contract.amendmentCount} phụ lục nên không huỷ bản ghi được —
+                        phụ lục sẽ thành văn bản không tra ngược được nó sửa cho cái gì. Huỷ từng phụ lục trước
+                        nếu thật sự cần.</span>
+                </div>
+            </c:if>
+        </div>
+        </c:if>
+
+        <!-- ===== Phụ lục ===== -->
+        <%-- Hiện cả khi danh sách rỗng, MIỄN LÀ hợp đồng này nhận được phụ lục:
+             ở đó cái người dùng cần là cái nút, và một khối trống có nút nói rõ
+             hơn hẳn việc không có gì.
+
+             Trên chính một phụ lục thì khối này biến mất (canAddAmendment false
+             vì một tầng) và thay bằng đường ngược về hợp đồng gốc. --%>
+        <c:if test="${canAddAmendment or not empty amendments}">
+        <div class="card-box" style="margin-top:20px;">
+            <div class="section-header"><h5>Phụ lục</h5></div>
+            <p style="font-size:0.86rem; color:#6b7280; margin:0 0 12px;">
+                Hợp đồng đã ký không sửa thẳng được. Mọi thay đổi điều khoản đi qua một phụ lục —
+                hợp đồng con có mã riêng, thời hạn riêng, và cũng phải được ký.
+            </p>
+
+            <c:choose>
+                <c:when test="${empty amendments}">
+                    <p style="font-size:0.88rem; color:#9ca3af; margin:0 0 14px;">Chưa có phụ lục nào.</p>
+                </c:when>
+                <c:otherwise>
+                    <div class="table-responsive">
+                        <table class="table align-middle" style="font-size:0.9rem;">
+                            <thead>
+                                <tr>
+                                    <th>Mã phụ lục</th>
+                                    <th>Tiêu đề</th>
+                                    <th>Thời hạn</th>
+                                    <th>Tiến độ</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <c:forEach var="pl" items="${amendments}">
+                                    <tr>
+                                        <td><strong>${fn:escapeXml(pl.contractCode)}</strong></td>
+                                        <td>${fn:escapeXml(pl.title)}</td>
+                                        <td>
+                                            <c:choose>
+                                                <c:when test="${pl.effectiveDate == null or pl.endDate == null}">
+                                                    <span style="color:#9ca3af;">Chưa chốt</span>
+                                                </c:when>
+                                                <c:otherwise>
+                                                    <fmt:formatDate value="${pl.effectiveDate}" pattern="dd/MM/yyyy"/>
+                                                    — <fmt:formatDate value="${pl.endDate}" pattern="dd/MM/yyyy"/>
+                                                </c:otherwise>
+                                            </c:choose>
+                                        </td>
+                                        <td>${fn:escapeXml(pl.progressStatus)}</td>
+                                        <td class="text-end">
+                                            <a href="${pageContext.request.contextPath}/contract?action=view&id=${pl.contractId}"
+                                               class="btn-outline-action"><i class="fa-solid fa-eye"></i> Xem</a>
+                                        </td>
+                                    </tr>
+                                </c:forEach>
+                            </tbody>
+                        </table>
+                    </div>
+                    <%-- Phụ lục KHÔNG kéo theo thời hạn của hợp đồng gốc: bản ghi cha
+                         là thứ ghi trên tờ giấy đã ký, và trạng thái theo lịch của nó
+                         vẫn tính từ ngày kết thúc của chính nó. Nói rõ ở đây, vì đó là
+                         chỗ người dùng sẽ thấy "kỳ lạ" trên trang danh sách. --%>
+                    <p style="font-size:0.8rem; color:#9ca3af; margin:4px 0 14px;">
+                        Phụ lục gia hạn không đổi ngày kết thúc của hợp đồng gốc — bản ghi gốc giữ nguyên
+                        những gì đã ký, thời hạn mới nằm trên chính phụ lục.
+                    </p>
+                </c:otherwise>
+            </c:choose>
+
+            <c:if test="${canAddAmendment}">
+                <a href="${pageContext.request.contextPath}/contract?action=newAmendment&parentId=${contract.contractId}"
+                   class="btn-primary" style="display:inline-block; text-decoration:none;">
+                    <i class="fa-solid fa-file-circle-plus me-1"></i> Lập phụ lục
+                </a>
             </c:if>
         </div>
         </c:if>
@@ -524,35 +684,67 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+        // Ô điều khoản đã khoá thì disabled -- trình duyệt KHÔNG gửi chúng lên,
+        // và server cũng không đọc (ContractController.handleUpdate dựng bản ghi
+        // từ giá trị đang có). Nên mọi phép kiểm dưới đây phải bỏ qua ô disabled,
+        // nếu không thì một ô mờ để trống sẽ chặn cả lần lưu.
+        function activeValue(id) {
+            var el = document.getElementById(id);
+            return (!el || el.disabled) ? null : el.value;
+        }
+
         function validateForm() {
             var valid = true;
             document.querySelectorAll('.error-text').forEach(function (el) { el.style.display = 'none'; });
 
-            var title = document.getElementById('title');
-            if (!title.value.trim()) { document.getElementById('err-title').style.display = 'block'; valid = false; }
+            var title = activeValue('title');
+            if (title !== null && !title.trim()) { document.getElementById('err-title').style.display = 'block'; valid = false; }
 
-            var contractCode = document.getElementById('contractCode');
-            if (!contractCode.value.trim()) {
+            var contractCode = activeValue('contractCode');
+            if (contractCode !== null && !contractCode.trim()) {
                 document.getElementById('err-contractCode').style.display = 'block';
                 valid = false;
             }
 
             ['customer', 'contractType', 'owner'].forEach(function (id) {
-                var el = document.getElementById(id);
-                if (!el.value) { document.getElementById('err-' + id).style.display = 'block'; valid = false; }
+                var value = activeValue(id);
+                if (value !== null && !value) { document.getElementById('err-' + id).style.display = 'block'; valid = false; }
             });
-
 
             // Để trống được: bản nháp chưa chốt thời hạn. Nhưng điền cả hai
             // thì thứ tự phải đúng, và phải có đủ hai mốc mới ký được.
-            var effectiveDate = document.getElementById('effectiveDate').value;
-            var endDate = document.getElementById('endDate').value;
-            if ((effectiveDate || endDate) && !(effectiveDate && endDate && effectiveDate <= endDate)) {
+            var effectiveDate = activeValue('effectiveDate');
+            var endDate = activeValue('endDate');
+            if (effectiveDate !== null && endDate !== null
+                    && (effectiveDate || endDate) && !(effectiveDate && endDate && effectiveDate <= endDate)) {
                 document.getElementById('err-dates').style.display = 'block';
                 valid = false;
             }
 
+            // Chế độ chữa sai sót: lý do là bắt buộc. Server từ chối khi thiếu
+            // (ContractDAO.correct trả false), đây chỉ để báo sớm.
+            var reason = document.getElementById('correctionReason');
+            if (reason && !reason.disabled && document.getElementById('formAction').value === 'correct'
+                    && !reason.value.trim()) {
+                document.getElementById('err-correctionReason').style.display = 'block';
+                valid = false;
+            }
+
             return valid;
+        }
+
+        // Bật chế độ chữa sai sót: mở lại các ô điều khoản, đổi đích của form,
+        // hiện ô lý do. Một chiều -- muốn thoát thì tải lại trang, để không ai
+        // vô tình bật lên rồi lưu nhầm dưới dạng "sửa sai sót".
+        var toggleCorrection = document.getElementById('toggleCorrection');
+        if (toggleCorrection) {
+            toggleCorrection.addEventListener('click', function () {
+                document.querySelectorAll('[data-term]').forEach(function (el) { el.disabled = false; });
+                document.getElementById('formAction').value = 'correct';
+                document.getElementById('correctionBox').style.display = 'block';
+                toggleCorrection.disabled = true;
+                document.getElementById('correctionReason').focus();
+            });
         }
 
         function submitOp(action) {
