@@ -100,6 +100,16 @@
           "p": "Đăng nhập bằng vai trò Kỹ thuật",
           "t": "-",
           "e": "Xem được danh sách nhưng không có nút Thêm/Sửa/Xoá hợp đồng"
+        },
+        {
+          "d": "Tìm kiếm theo số hợp đồng",
+          "s": [
+            "Ở danh sách, gõ một phần số hợp đồng vào ô tìm kiếm"
+          ],
+          "p": "Có hợp đồng đã nhập số",
+          "t": "keyword: 123/2026",
+          "e": "Ra đúng hợp đồng mang số đó",
+          "n": "Khách gọi điện đọc số trên giấy chứ không đọc mã HD-xxxx, nên đây là đường tra chính"
         }
       ]
     },
@@ -314,6 +324,34 @@
           "p": "Đăng nhập bằng vai trò CSKH",
           "t": "POST action=create kèm dữ liệu hợp lệ",
           "e": "Trả về trang lỗi 403, không hợp đồng nào được tạo"
+        },
+        {
+          "d": "Nhập số hợp đồng thật lúc tạo",
+          "s": [
+            "Bấm Thêm hợp đồng",
+            "Điền ô Số hợp đồng theo số ghi trên bản giấy",
+            "Điền nốt các ô bắt buộc rồi Lưu"
+          ],
+          "t": "Số hợp đồng: 123/2026/HĐKT-POSTEF",
+          "e": "Lưu thành công; trang chi tiết hiện CẢ HAI — mã nội bộ HD-xxxx do hệ thống sinh và số hợp đồng vừa nhập",
+          "n": "Hai thứ song song, không thay thế nhau: mã là định danh nội bộ, số là thứ in trên giấy"
+        },
+        {
+          "d": "Để trống số hợp đồng",
+          "s": [
+            "Tạo hợp đồng, không điền ô Số hợp đồng"
+          ],
+          "t": "Số hợp đồng: (để trống)",
+          "e": "Vẫn lưu được — bản nháp thường chưa được cấp số, điền sau khi ký cũng được"
+        },
+        {
+          "d": "Hai hợp đồng trùng số",
+          "s": [
+            "Tạo hai hợp đồng cùng nhập một số"
+          ],
+          "t": "cả hai: 123/2026/HĐKT-POSTEF",
+          "e": "Cả hai đều lưu được, mã nội bộ HD-xxxx vẫn khác nhau",
+          "n": "Cố ý không đặt UNIQUE lên số hợp đồng: đây là chuỗi tự do, hai chi nhánh đánh số riêng hoặc lặp qua các năm đều có thật. Chống trùng đã có contract_code lo"
         }
       ]
     },
@@ -322,7 +360,7 @@
       "sheet": "UpdateContract",
       "prefix": "TC_CTREDIT",
       "screen": "/POSCS/contract?action=edit&id=<id> — POST action=update",
-      "description": "Cập nhật thông tin hợp đồng đã tạo",
+      "description": "Cập nhật hợp đồng. Bản NHÁP sửa được mọi trường; từ khi KÝ thì điều khoản khoá lại và chỉ còn người phụ trách + link bản PDF sửa được — đổi điều khoản phải đi qua phụ lục.",
       "precondition": "Đăng nhập bằng Admin hoặc Sales; có hợp đồng đã tạo",
       "cases": [
         {
@@ -407,6 +445,45 @@
           "p": "Đăng nhập bằng vai trò Kỹ thuật",
           "t": "POST action=update kèm dữ liệu hợp lệ",
           "e": "Trả về trang lỗi 403, hợp đồng không đổi"
+        },
+        {
+          "d": "Hợp đồng đã ký: các ô điều khoản hiển thị dạng khoá",
+          "s": [
+            "Mở một hợp đồng đang ở trạng thái Đã ký",
+            "Bấm Sửa thông tin"
+          ],
+          "p": "Có hợp đồng ở trạng thái Đã ký",
+          "t": "-",
+          "e": "Đầu form có khối cảnh báo \"Hợp đồng đã ký — điều khoản đã khoá\"; các ô mã, tiêu đề, khách hàng, loại, người ký, nơi ký, uỷ quyền, giá trị, ngày hiệu lực và ngày kết thúc đều mờ, không gõ được; ô Người phụ trách và ô Link file PDF vẫn gõ được",
+          "n": "Mở được hai ô đó là cố ý: cả hai đều không nằm trên tờ giấy hai bên ký, và link PDF thường chỉ có SAU khi ký"
+        },
+        {
+          "d": "Hợp đồng đã ký: đổi người phụ trách và dán link PDF",
+          "s": [
+            "Mở form sửa của một hợp đồng Đã ký",
+            "Chọn người phụ trách khác, dán link Google Drive vào ô Link file PDF",
+            "Bấm Lưu thay đổi"
+          ],
+          "t": "Người phụ trách: một Sales khác; Link: https://drive.google.com/file/d/abc/view",
+          "e": "Lưu thành công; trang chi tiết hiện người phụ trách mới và khung xem PDF; nhật ký có dòng \"Sửa thông tin\" kể đúng hai thay đổi đó"
+        },
+        {
+          "d": "Hợp đồng đã ký: POST thẳng để đổi tiêu đề",
+          "s": [
+            "Với một hợp đồng Đã ký, gửi POST action=update kèm contractId và một title khác"
+          ],
+          "t": "title: Tiêu đề bị đổi lén",
+          "e": "Tiêu đề KHÔNG đổi; nhật ký không sinh dòng nào kể về tiêu đề",
+          "n": "Ô mờ trên form chỉ là lớp trình bày; chặn thật nằm ở ContractDAO.update — nó chỉ ghi owner_id và attachment_url"
+        },
+        {
+          "d": "Hợp đồng đã thanh lý: không còn form sửa",
+          "s": [
+            "Mở trang quản lý của một hợp đồng Đã thanh lý"
+          ],
+          "p": "Có hợp đồng đã thanh lý",
+          "t": "-",
+          "e": "Form thông tin biến mất, thay bằng thông báo \"Hợp đồng đã Đã thanh lý\"; chỉ còn phần ghi nhận tiền về"
         }
       ]
     },
@@ -415,8 +492,8 @@
       "sheet": "VoidContract",
       "prefix": "TC_CTRDEL",
       "screen": "POST /POSCS/contract action=delete",
-      "description": "Gỡ một bản ghi NHẬP NHẦM khỏi danh sách — không phải huỷ hợp đồng ngoài đời. Chỉ Admin, bắt buộc lý do, luôn để lại dòng nhật ký. Thay cho BR-46 cũ (xoá khi Chưa hiệu lực) vốn tính theo lịch, nên hợp đồng ký hôm qua mà hiệu lực tháng sau vẫn xoá được.",
-      "precondition": "Đăng nhập bằng Admin",
+      "description": "Gỡ một bản ghi NHẬP NHẦM khỏi danh sách — không phải huỷ hợp đồng ngoài đời. Với hợp đồng ĐÃ KÝ thì chỉ Admin làm được; bản nháp chưa ký thì ai quản được hợp đồng cũng xoá được (xem TC_CTRLIFE_010). Cả hai đường đều bắt buộc lý do và đều để lại dòng nhật ký. Thay cho BR-46 cũ (xoá khi Chưa hiệu lực) vốn tính theo lịch, nên hợp đồng ký hôm qua mà hiệu lực tháng sau vẫn xoá được.",
+      "precondition": "Đăng nhập bằng Admin; hợp đồng dùng để thử đã ở trạng thái Đã ký",
       "cases": [
         {
           "d": "Admin huỷ bản ghi kèm lý do",
@@ -453,14 +530,15 @@
           "n": "Khác BR-46 cũ: không còn điều kiện theo trạng thái lịch. Điều kiện bây giờ là QUYỀN, không phải ngày tháng"
         },
         {
-          "d": "Vai trò Sales mở trang chi tiết",
+          "d": "Vai trò Sales mở chi tiết một hợp đồng ĐÃ KÝ",
           "s": [
             "Đăng nhập bằng Sales",
-            "Mở chi tiết một hợp đồng"
+            "Mở chi tiết một hợp đồng đã ký"
           ],
-          "p": "Đăng nhập bằng vai trò Sales",
+          "p": "Đăng nhập bằng vai trò Sales; hợp đồng ở trạng thái Đã ký",
           "t": "-",
-          "e": "Không thấy nút Huỷ bản ghi; nút Sửa thông tin vẫn còn"
+          "e": "Không thấy nút Huỷ bản ghi; nút Sửa thông tin vẫn còn",
+          "n": "Với bản NHÁP thì ngược lại — Sales thấy và bấm được, xem TC_CTRLIFE_010"
         },
         {
           "d": "Vai trò Sales gọi thẳng action=delete",
@@ -500,6 +578,344 @@
           "p": "Đăng nhập bằng Admin; bản ghi đã bị huỷ trước đó",
           "t": "id bản ghi đã huỷ",
           "e": "Bị chặn, và không sinh thêm dòng nhật ký nào"
+        }
+      ]
+    },
+    {
+      "name": "Vòng đời hợp đồng",
+      "sheet": "ContractLifecycle",
+      "prefix": "TC_CTRLIFE",
+      "screen": "POST /POSCS/contract action=changeProgress",
+      "description": "Trục tiến độ: Nháp → Đã ký → Đã thanh lý (hoặc Chấm dứt sớm). Tạo hợp đồng KHÔNG còn đồng nghĩa với ký — theo luật KH, nhân viên không tự ký hợp đồng được.",
+      "precondition": "Đăng nhập bằng Admin hoặc Sales chưa có cấp trên; migration V24 đã chạy",
+      "cases": [
+        {
+          "d": "Tạo hợp đồng mới ra bản nháp, chưa có ngày ký",
+          "s": [
+            "Vào Hợp đồng bán, bấm Thêm hợp đồng",
+            "Điền tiêu đề, loại, khách hàng, người phụ trách, ngày hiệu lực và ngày kết thúc",
+            "ĐỂ TRỐNG ô ngày ký, bấm Lưu"
+          ],
+          "t": "ngày ký: (để trống)",
+          "e": "Lưu thành công; trang chi tiết hiện nhãn tiến độ 'Nháp', cột Thời hạn ghi 'chưa ký'",
+          "n": "Trước V24 ô ngày ký là bắt buộc, nên tạo hợp đồng là đã ký — không có chỗ nào để chặn việc ký"
+        },
+        {
+          "d": "Ký hợp đồng",
+          "s": [
+            "Mở bản nháp",
+            "Bấm Ký hợp đồng và xác nhận"
+          ],
+          "t": "-",
+          "e": "Nhãn tiến độ đổi thành 'Đã ký'; ngày ký tự điền bằng NGÀY HÔM NAY; nhật ký có dòng 'Ký hợp đồng' ghi Nháp → Đã ký",
+          "o": "Ngày ký do hệ thống đóng dấu lúc bấm, không phải thứ người dùng gõ"
+        },
+        {
+          "d": "Nhân viên có cấp trên bấm ký",
+          "s": [
+            "Đăng nhập bằng một tài khoản Sales đã được gán Cấp trên ở màn hình Nhân viên",
+            "Mở một hợp đồng nháp"
+          ],
+          "p": "Tài khoản Sales có manager_id trỏ tới người khác",
+          "t": "-",
+          "e": "Không thấy nút Ký hợp đồng; gửi thẳng POST action=changeProgress cũng trả 403",
+          "n": "Luật KH: nhân viên không tự ký. Người chưa được gán cấp trên thì vẫn ký được — cố ý, xem PERMISSIONS.md"
+        },
+        {
+          "d": "Bỏ qua bước ký, thanh lý thẳng từ nháp",
+          "s": [
+            "Với một hợp đồng đang là Nháp, gửi POST action=changeProgress toStatus='Đã thanh lý'"
+          ],
+          "t": "toStatus: Đã thanh lý",
+          "e": "Bị chặn, hợp đồng vẫn là Nháp, không sinh dòng nhật ký nào"
+        },
+        {
+          "d": "Thanh lý không nhập căn cứ",
+          "s": [
+            "Mở hợp đồng Đã ký",
+            "Bấm Thanh lý rồi để trống ô căn cứ"
+          ],
+          "t": "căn cứ: (để trống)",
+          "e": "Bị chặn kèm thông báo; hợp đồng vẫn Đã ký",
+          "n": "Thanh lý và chấm dứt sớm đóng băng vĩnh viễn, không quay lại được — phải biết vì sao"
+        },
+        {
+          "d": "Thanh lý có căn cứ",
+          "s": [
+            "Bấm Thanh lý, nhập số biên bản, xác nhận"
+          ],
+          "t": "căn cứ: Biên bản thanh lý số 07",
+          "e": "Nhãn tiến độ đổi thành 'Đã thanh lý'; nhật ký có dòng Thanh lý ghi Đã ký → Đã thanh lý, cột lý do chứa số biên bản"
+        },
+        {
+          "d": "Sửa hợp đồng đã thanh lý bằng tài khoản Admin",
+          "s": [
+            "Đăng nhập bằng Admin",
+            "Mở hợp đồng đã thanh lý",
+            "Gửi thẳng POST action=update với tiêu đề mới"
+          ],
+          "p": "Hợp đồng ở trạng thái Đã thanh lý",
+          "t": "tiêu đề mới bất kỳ",
+          "e": "Không lưu được; tiêu đề giữ nguyên. Nút Sửa thông tin cũng không hiện trên trang",
+          "n": "Luật KH: sau thanh lý không được thay đổi, KỂ CẢ CẤP CAO"
+        },
+        {
+          "d": "Chuyển tiếp từ trạng thái đã đóng băng",
+          "s": [
+            "Với hợp đồng Đã thanh lý, gửi POST action=changeProgress toStatus='Chấm dứt sớm'"
+          ],
+          "t": "toStatus: Chấm dứt sớm",
+          "e": "Bị chặn; trạng thái giữ nguyên Đã thanh lý"
+        },
+        {
+          "d": "Lọc hết hạn mà chưa thanh lý",
+          "s": [
+            "Ở danh sách hợp đồng, chọn Trạng thái = 'Đã hết hạn' và Tiến độ = 'Đã ký'"
+          ],
+          "t": "-",
+          "e": "Ra đúng các hợp đồng quá hạn theo lịch nhưng chưa thanh lý — hàng đợi việc còn tồn",
+          "n": "Đây là lý do hai trục không được gộp làm một nhãn"
+        },
+        {
+          "d": "Xoá bản nháp bằng tài khoản Sales",
+          "s": [
+            "Đăng nhập bằng Sales",
+            "Mở một hợp đồng đang là Nháp, bấm Huỷ bản ghi, nhập lý do"
+          ],
+          "p": "Hợp đồng ở trạng thái Nháp",
+          "t": "lý do: Soạn nhầm khách hàng",
+          "e": "Xoá được — nháp chưa ký nên chưa là chứng cứ gì",
+          "n": "Đây đúng là điều kiện của BR-46 cũ ('chưa ký'), thứ mà trước V24 không với tới được"
+        }
+      ]
+    },
+    {
+      "name": "Phụ lục hợp đồng",
+      "sheet": "ContractAmendment",
+      "prefix": "TC_CTRPL",
+      "screen": "/POSCS/contract?action=newAmendment&parentId=<id> — POST action=createAmendment",
+      "description": "Hợp đồng đã ký không sửa thẳng được; mọi thay đổi điều khoản đi qua một PHỤ LỤC. Phụ lục là một hợp đồng con (contracts.parent_contract_id), có mã riêng, thời hạn riêng, hàng hoá riêng, và chính nó cũng phải được ký. MỘT TẦNG — phụ lục của phụ lục bị từ chối.",
+      "precondition": "Đăng nhập bằng Admin hoặc Sales có quyền quản lý hợp đồng; migration V29 đã chạy",
+      "cases": [
+        {
+          "d": "Hợp đồng đã ký có nút Lập phụ lục",
+          "s": [
+            "Mở trang quản lý của một hợp đồng Đã ký"
+          ],
+          "p": "Có hợp đồng ở trạng thái Đã ký",
+          "t": "-",
+          "e": "Có khối \"Phụ lục\" với dòng \"Chưa có phụ lục nào\" và nút \"Lập phụ lục\""
+        },
+        {
+          "d": "Bản nháp không có nút Lập phụ lục",
+          "s": [
+            "Mở trang quản lý của một hợp đồng Nháp"
+          ],
+          "t": "-",
+          "e": "Không có khối \"Phụ lục\"; gõ thẳng URL action=newAmendment thì bị đưa về trang hợp đồng kèm thông báo",
+          "n": "Bản nháp sửa thẳng được, nên phụ lục ở đó chỉ là đường vòng dựng ra hai bản ghi cho một thứ chưa ai ký"
+        },
+        {
+          "d": "Hợp đồng đã thanh lý không lập được phụ lục",
+          "s": [
+            "Mở trang quản lý của một hợp đồng Đã thanh lý",
+            "Gõ thẳng URL action=newAmendment&parentId=<id của nó>"
+          ],
+          "p": "Có hợp đồng đã thanh lý",
+          "t": "-",
+          "e": "Bị đưa về trang hợp đồng đó kèm thông báo \"phải đã ký và chưa thanh lý\"",
+          "n": "Hợp đồng đã chấm dứt thì không còn gì để sửa đổi — phát sinh sau thanh lý là hợp đồng MỚI"
+        },
+        {
+          "d": "Form phụ lục không cho chọn khách hàng",
+          "s": [
+            "Từ hợp đồng Đã ký, bấm \"Lập phụ lục\""
+          ],
+          "t": "-",
+          "e": "Tiêu đề trang là \"Lập phụ lục hợp đồng\" kèm mã hợp đồng gốc; ô Khách hàng hiển thị tên đối tác của hợp đồng gốc ở dạng khoá; ô Người phụ trách điền sẵn người của hợp đồng gốc nhưng vẫn đổi được"
+        },
+        {
+          "d": "Lập phụ lục thành công",
+          "s": [
+            "Ở form phụ lục, nhập mã phụ lục, tiêu đề, loại hợp đồng, người phụ trách",
+            "Bấm Lưu"
+          ],
+          "t": "Mã: 01/2026/HĐKT-POSTEF/PL01; Tiêu đề: Phụ lục 01 — gia hạn",
+          "e": "Tạo xong, chuyển tới trang xem phụ lục; phụ lục ở trạng thái NHÁP; khối Thông tin chung có dòng \"Phụ lục của hợp đồng\" trỏ về hợp đồng gốc"
+        },
+        {
+          "d": "Hợp đồng gốc ghi nhận việc lập phụ lục",
+          "s": [
+            "Sau khi lập phụ lục, mở lại trang xem HỢP ĐỒNG GỐC"
+          ],
+          "t": "-",
+          "e": "Khối \"Phụ lục\" liệt kê phụ lục vừa lập; nhật ký của hợp đồng gốc có dòng \"Lập phụ lục\" kèm mã phụ lục",
+          "o": "Dòng nhật ký ghi lên hợp đồng CHA là chỗ người ta đi tìm: câu \"hợp đồng này có bị sửa gì không\" được hỏi khi đang mở hợp đồng gốc"
+        },
+        {
+          "d": "Phụ lục trùng mã với hợp đồng khác",
+          "s": [
+            "Ở form phụ lục, nhập một mã đã có hợp đồng khác dùng",
+            "Bấm Lưu"
+          ],
+          "t": "Mã: (mã của một hợp đồng đang có)",
+          "e": "Bị chặn kèm thông báo \"Mã hợp đồng này đã có hợp đồng khác dùng\"; không tạo bản ghi nào",
+          "n": "Phụ lục dùng chung không gian mã với hợp đồng — cùng một cột contract_code có UNIQUE"
+        },
+        {
+          "d": "Ký phụ lục",
+          "s": [
+            "Mở phụ lục vừa lập, điền ngày hiệu lực và ngày kết thúc, lưu",
+            "Bấm Ký hợp đồng"
+          ],
+          "t": "-",
+          "e": "Phụ lục chuyển sang Đã ký và tự đóng dấu ngày ký, đúng như một hợp đồng thường",
+          "o": "Đây là điểm của phụ lục: sửa đổi trên hợp đồng đã ký phải có chữ ký, không phải một lần bấm Lưu"
+        },
+        {
+          "d": "Phụ lục gia hạn không đổi thời hạn hợp đồng gốc",
+          "s": [
+            "Lập và ký một phụ lục có ngày kết thúc muộn hơn hợp đồng gốc",
+            "Mở lại trang xem hợp đồng gốc"
+          ],
+          "t": "Ngày kết thúc phụ lục: muộn hơn hợp đồng gốc 6 tháng",
+          "e": "Hợp đồng gốc giữ nguyên ngày kết thúc cũ và nguyên trạng thái theo lịch của nó",
+          "n": "Quyết định 2026-09-17: bản ghi gốc là thứ ghi trên tờ giấy đã ký; thời hạn mới nằm trên chính phụ lục"
+        },
+        {
+          "d": "Phụ lục của phụ lục bị từ chối",
+          "s": [
+            "Mở một phụ lục đã ký",
+            "Gõ thẳng URL action=newAmendment&parentId=<id của phụ lục đó>"
+          ],
+          "t": "-",
+          "e": "Bị đưa về trang phụ lục kèm thông báo; không có khối \"Phụ lục\" trên trang một phụ lục",
+          "n": "MỘT TẦNG: khoá ngoại tự trỏ cho phép chuỗi dài tuỳ ý, nên luật này chỉ tồn tại ở ContractDAO.insert"
+        },
+        {
+          "d": "Không huỷ được bản ghi hợp đồng còn phụ lục",
+          "s": [
+            "Đăng nhập Admin, mở trang quản lý hợp đồng gốc đang có phụ lục",
+            "Tìm nút Huỷ bản ghi"
+          ],
+          "t": "-",
+          "e": "Không có nút Huỷ bản ghi, thay bằng ghi chú giải thích; gửi thẳng POST action=delete kèm lý do cũng bị từ chối và hợp đồng vẫn còn trong danh sách",
+          "n": "Hợp đồng xoá MỀM nên khoá ngoại không bắt được — phép kiểm nằm trong transaction của voidRecord"
+        },
+        {
+          "d": "Phụ lục hiện trên danh sách kèm nhãn",
+          "s": [
+            "Vào danh sách Hợp đồng bán"
+          ],
+          "t": "-",
+          "e": "Phụ lục hiện thành một dòng riêng, dưới tiêu đề có nhãn \"PL của <mã hợp đồng gốc>\"",
+          "o": "Phụ lục phải tới được bằng tìm kiếm vì chính nó cũng cần được ký"
+        },
+        {
+          "d": "Lọc bỏ phụ lục khỏi danh sách",
+          "s": [
+            "Ở danh sách hợp đồng, chọn ô lọc \"Chỉ hợp đồng gốc\""
+          ],
+          "t": "Phạm vi: Chỉ hợp đồng gốc",
+          "e": "Danh sách còn lại hợp đồng gốc; số tổng và phân trang khớp với danh sách đang hiện"
+        },
+        {
+          "d": "Xuất Excel giữ đúng phạm vi đang xem",
+          "s": [
+            "Chọn \"Chỉ hợp đồng gốc\" rồi bấm Xuất Excel"
+          ],
+          "t": "Phạm vi: Chỉ hợp đồng gốc",
+          "e": "File xuất ra không có dòng phụ lục nào; file có cột \"Phụ lục của\", để trống ở hợp đồng gốc"
+        }
+      ]
+    },
+    {
+      "name": "Chữa sai sót nhập liệu trên hợp đồng đã ký",
+      "sheet": "ContractCorrect",
+      "prefix": "TC_CTRFIX",
+      "screen": "/POSCS/contract?action=edit&id=<id> — POST action=correct",
+      "description": "Đường hẹp dành cho Admin chữa thứ GÕ SAI so với bản giấy. Không phải cửa để đổi nội dung hợp đồng — đổi nội dung thì lập phụ lục. Bắt buộc có lý do, và ghi vào nhật ký dưới loại sự kiện riêng \"Sửa sai sót\".",
+      "precondition": "Đăng nhập bằng Admin; có hợp đồng ở trạng thái Đã ký; migration V29 đã chạy",
+      "cases": [
+        {
+          "d": "Admin thấy nút chữa sai sót",
+          "s": [
+            "Đăng nhập Admin",
+            "Mở form sửa của một hợp đồng Đã ký"
+          ],
+          "t": "-",
+          "e": "Thanh nút cuối form có thêm \"Chữa sai sót nhập liệu\""
+        },
+        {
+          "d": "Sales không thấy nút chữa sai sót",
+          "s": [
+            "Đăng nhập bằng một tài khoản Sales",
+            "Mở form sửa của cùng hợp đồng đó"
+          ],
+          "t": "-",
+          "e": "Không có nút \"Chữa sai sót nhập liệu\"; gửi thẳng POST action=correct trả 403",
+          "n": "Quyền quản lý hợp đồng cho tạo, sửa nháp, ký — chạm vào điều khoản của hợp đồng đã ký thì hẹp hơn hẳn"
+        },
+        {
+          "d": "Bật chế độ chữa sai sót thì các ô mở lại",
+          "s": [
+            "Đăng nhập Admin, mở form sửa hợp đồng Đã ký",
+            "Bấm \"Chữa sai sót nhập liệu\""
+          ],
+          "t": "-",
+          "e": "Các ô điều khoản hết mờ và gõ được; hiện khối đỏ kèm ô \"Lý do\" bắt buộc"
+        },
+        {
+          "d": "Chữa sai sót mà để trống lý do",
+          "s": [
+            "Bật chế độ chữa sai sót",
+            "Sửa mã hợp đồng",
+            "Để trống ô Lý do rồi bấm Lưu thay đổi"
+          ],
+          "t": "Lý do: (để trống)",
+          "e": "Bị chặn kèm thông báo \"bắt buộc phải nêu lý do\"; mã hợp đồng KHÔNG đổi",
+          "n": "Một thay đổi trên hợp đồng đã ký mà không ai giải thích được thì về sau không phân biệt nổi với sửa để che"
+        },
+        {
+          "d": "Chữa sai sót có lý do",
+          "s": [
+            "Bật chế độ chữa sai sót",
+            "Sửa mã hợp đồng cho khớp bản giấy",
+            "Nhập lý do rồi bấm Lưu thay đổi"
+          ],
+          "t": "Mã: 02/2026/HĐKT-POSTEF; Lý do: Gõ nhầm 01 thành 02, đối chiếu bản giấy",
+          "e": "Lưu thành công; nhật ký có dòng loại \"Sửa sai sót\" ghi \"Mã hợp đồng: ... -> ...\" và mang đúng lý do vừa nhập, dưới tên người đang đăng nhập",
+          "o": "Lý do nằm ở cột note, tách khỏi câu mô tả do hệ thống sinh — còn phân biệt được máy ghi hay người khai"
+        },
+        {
+          "d": "Ngày ký không sửa được kể cả khi chữa sai sót",
+          "s": [
+            "Bật chế độ chữa sai sót",
+            "Thử sửa ô Ngày ký"
+          ],
+          "t": "-",
+          "e": "Ô Ngày ký vẫn khoá; gửi POST kèm signDate khác cũng không làm đổi ngày ký đã lưu",
+          "n": "Ngày ký là dấu của một hành động hệ thống đã đóng lúc bấm Ký, không phải ô khai báo"
+        },
+        {
+          "d": "Hợp đồng đã thanh lý: Admin cũng không chữa được",
+          "s": [
+            "Mở trang quản lý của một hợp đồng Đã thanh lý bằng Admin",
+            "Gửi POST action=correct kèm lý do hợp lệ"
+          ],
+          "p": "Có hợp đồng đã thanh lý",
+          "t": "Lý do: đối chiếu bản giấy",
+          "e": "Bị từ chối; không trường nào đổi, không sinh dòng nhật ký nào",
+          "n": "Luật KH: sau thanh lý không được thay đổi, KỂ CẢ CẤP CAO — Admin không phải ngoại lệ"
+        },
+        {
+          "d": "Bản nháp không đi đường chữa sai sót",
+          "s": [
+            "Với một hợp đồng Nháp, gửi POST action=correct kèm lý do"
+          ],
+          "t": "Lý do: sửa nhầm",
+          "e": "Bị từ chối; bản nháp sửa thẳng bằng action=update",
+          "n": "Đi đường này cho bản nháp chỉ làm loãng đúng loại sự kiện sinh ra để nổi bật"
         }
       ]
     },

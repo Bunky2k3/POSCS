@@ -88,24 +88,43 @@ public final class JdbcStub {
     public static ResultSet resultSetOf(List<Map<String, Object>> rows) throws SQLException {
         ResultSet rs = mock(ResultSet.class);
         int[] cursor = {-1};
+        // JDBC: wasNull() nói về CỘT VỪA ĐỌC, bất kể getter nào. Không giả lập
+        // nó thì mọi cột int nullable đọc ra 0 và wasNull() trả false -- tức là
+        // "không có cha" và "cha số 0" thành một, đúng chỗ ContractDAO.mapRow
+        // dùng để phân biệt hợp đồng gốc với phụ lục.
+        boolean[] wasNull = {false};
 
         when(rs.next()).thenAnswer(inv -> {
             cursor[0]++;
             return cursor[0] < rows.size();
         });
+        when(rs.wasNull()).thenAnswer(inv -> wasNull[0]);
 
-        when(rs.getInt(anyString())).thenAnswer(inv -> asInt(cell(rows, cursor, inv.getArgument(0, String.class))));
-        when(rs.getInt(anyInt())).thenAnswer(inv -> asInt(cellByIndex(rows, cursor, inv.getArgument(0, Integer.class))));
-        when(rs.getString(anyString())).thenAnswer(inv -> (String) cell(rows, cursor, inv.getArgument(0, String.class)));
-        when(rs.getString(anyInt())).thenAnswer(inv -> (String) cellByIndex(rows, cursor, inv.getArgument(0, Integer.class)));
-        when(rs.getBoolean(anyString())).thenAnswer(inv -> asBoolean(cell(rows, cursor, inv.getArgument(0, String.class))));
-        when(rs.getBigDecimal(anyString())).thenAnswer(inv -> (java.math.BigDecimal) cell(rows, cursor, inv.getArgument(0, String.class)));
-        when(rs.getBigDecimal(anyInt())).thenAnswer(inv -> (java.math.BigDecimal) cellByIndex(rows, cursor, inv.getArgument(0, Integer.class)));
-        when(rs.getTimestamp(anyString())).thenAnswer(inv -> (java.sql.Timestamp) cell(rows, cursor, inv.getArgument(0, String.class)));
-        when(rs.getDate(anyString())).thenAnswer(inv -> (java.sql.Date) cell(rows, cursor, inv.getArgument(0, String.class)));
-        when(rs.getObject(anyString())).thenAnswer(inv -> cell(rows, cursor, inv.getArgument(0, String.class)));
+        when(rs.getInt(anyString())).thenAnswer(inv -> asInt(track(wasNull, cell(rows, cursor, inv.getArgument(0, String.class)))));
+        when(rs.getInt(anyInt())).thenAnswer(inv -> asInt(track(wasNull, cellByIndex(rows, cursor, inv.getArgument(0, Integer.class)))));
+        when(rs.getString(anyString())).thenAnswer(inv -> (String) track(wasNull, cell(rows, cursor, inv.getArgument(0, String.class))));
+        when(rs.getString(anyInt())).thenAnswer(inv -> (String) track(wasNull, cellByIndex(rows, cursor, inv.getArgument(0, Integer.class))));
+        when(rs.getBoolean(anyString())).thenAnswer(inv -> asBoolean(track(wasNull, cell(rows, cursor, inv.getArgument(0, String.class)))));
+        when(rs.getBigDecimal(anyString())).thenAnswer(inv -> (java.math.BigDecimal) track(wasNull, cell(rows, cursor, inv.getArgument(0, String.class))));
+        when(rs.getBigDecimal(anyInt())).thenAnswer(inv -> (java.math.BigDecimal) track(wasNull, cellByIndex(rows, cursor, inv.getArgument(0, Integer.class))));
+        when(rs.getTimestamp(anyString())).thenAnswer(inv -> (java.sql.Timestamp) track(wasNull, cell(rows, cursor, inv.getArgument(0, String.class))));
+        when(rs.getDate(anyString())).thenAnswer(inv -> (java.sql.Date) track(wasNull, cell(rows, cursor, inv.getArgument(0, String.class))));
+        when(rs.getObject(anyString())).thenAnswer(inv -> track(wasNull, cell(rows, cursor, inv.getArgument(0, String.class))));
 
         return rs;
+    }
+
+    /**
+     * Ghi lại "cột vừa đọc có NULL không" rồi trả chính giá trị đó, để
+     * {@code wasNull()} trả lời đúng ngay sau đó.
+     *
+     * <p>Một cột VẮNG MẶT trong map cũng tính là NULL: map chỉ liệt kê những
+     * cột test quan tâm, và cột không liệt kê nghĩa là "không có giá trị" --
+     * đúng thứ SQL NULL mô tả.
+     */
+    private static Object track(boolean[] wasNull, Object value) {
+        wasNull[0] = value == null;
+        return value;
     }
 
     /** ResultSet giả cho 1 dòng duy nhất. */

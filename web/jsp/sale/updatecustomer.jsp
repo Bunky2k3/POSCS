@@ -175,9 +175,10 @@
                         <label>Loại khách hàng <span class="req">*</span></label>
                         <select class="form-select" id="customerType" name="customerType">
                             <option value="">-- Chọn loại khách hàng --</option>
-                            <option value="Nhà mạng viễn thông" ${customer.customerType == 'Nhà mạng viễn thông' ? 'selected' : ''}>Nhà mạng viễn thông</option>
-                            <option value="Nhà thầu thi công" ${customer.customerType == 'Nhà thầu thi công' ? 'selected' : ''}>Nhà thầu thi công</option>
-                            <option value="Đại lý phân phối" ${customer.customerType == 'Đại lý phân phối' ? 'selected' : ''}>Đại lý phân phối</option>
+                            <%-- Loại khách hàng theo VAI, đổ từ CustomerController --%>
+                            <c:forEach var="ct" items="${customerTypeOptions}">
+                                <option value="${fn:escapeXml(ct)}" ${customer.customerType == ct ? 'selected' : ''}>${fn:escapeXml(ct)}</option>
+                            </c:forEach>
                         </select>
                         <span class="error-text" id="err-customerType">Vui lòng chọn loại khách hàng.</span>
                     </div>

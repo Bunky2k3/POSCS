@@ -35,6 +35,49 @@ public class ContractHistory {
     /** Gỡ một dòng hàng hoá/dịch vụ khỏi hợp đồng. */
     public static final String EVENT_PRODUCT_REMOVED = "Gỡ hàng hoá";
 
+    /** Lập thêm một kỳ thanh toán theo điều khoản hợp đồng. */
+    public static final String EVENT_PAYMENT_ADDED = "Thêm kỳ thanh toán";
+
+    /** Ghi nhận tiền của một kỳ đã về. */
+    public static final String EVENT_PAYMENT_PAID = "Ghi nhận đã thu";
+
+    /** Xoá một kỳ thanh toán lập nhầm. */
+    public static final String EVENT_PAYMENT_REMOVED = "Xoá kỳ thanh toán";
+
+    /**
+     * Lập một phụ lục cho hợp đồng này. Dòng này ghi lên HỢP ĐỒNG CHA, không
+     * phải lên phụ lục -- phụ lục tự có dòng "Khởi tạo" của nó.
+     *
+     * <p>Đó là chỗ người đọc sẽ đi tìm: câu hỏi "hợp đồng này về sau có bị sửa
+     * gì không" được hỏi khi đang mở hợp đồng gốc.
+     */
+    public static final String EVENT_AMENDMENT_CREATED = "Lập phụ lục";
+
+    /**
+     * Admin chữa một sai sót NHẬP LIỆU trên hợp đồng đã ký.
+     *
+     * <p>Tách hẳn khỏi {@link #EVENT_UPDATED}: sửa một bản nháp là chuyện bình
+     * thường, còn chạm vào điều khoản của hợp đồng đã ký thì phải phân biệt
+     * được ngay trên dòng thời gian. Luôn kèm lý do người dùng nhập ở
+     * {@code note} -- đường ghi từ chối khi thiếu.
+     *
+     * <p>KHÔNG phải cửa sau cho việc sửa nội dung: sửa đổi thật thì đi qua phụ
+     * lục. Cái này chỉ để chữa thứ gõ sai so với chính bản giấy đang cầm.
+     */
+    public static final String EVENT_CORRECTED = "Sửa sai sót";
+
+    // Ba loại dưới đây là MỐC VÒNG ĐỜI: dòng của chúng có fromStatus/toStatus,
+    // khác mọi loại ở trên (dòng sửa đổi, hai cột đó để null).
+
+    /** Nháp → Đã ký. Từ đây nội dung là chứng cứ pháp lý. */
+    public static final String EVENT_SIGNED = "Ký hợp đồng";
+
+    /** Đã ký → Đã thanh lý. Theo luật KH đây là lúc hợp đồng thật sự xong. */
+    public static final String EVENT_LIQUIDATED = "Thanh lý";
+
+    /** Đã ký → Chấm dứt sớm. Cũng đóng băng, chỉ khác lý do. */
+    public static final String EVENT_TERMINATED = "Chấm dứt sớm";
+
     /**
      * Xoá mềm bản ghi hợp đồng. Tên là "Huỷ bản ghi" chứ không phải "Xoá hợp
      * đồng": hợp đồng đã ký thì không xoá được trong nghiệp vụ, thao tác này

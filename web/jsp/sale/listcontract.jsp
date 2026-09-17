@@ -106,17 +106,21 @@
            khung ngoài (.table-responsive) cho kéo ngang -- đổi lại lấy
            được khoảng thở cho chữ. */
         .custom-table th, .custom-table td { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        /* Chia lại khi thêm cột Tiến độ: tổng vẫn 100%, phần thêm lấy bớt từ
+           hai cột rộng nhất (Hợp đồng, Thời hạn) chứ không nhồi thêm vào tổng. */
         .custom-table th:nth-child(1), .custom-table td:nth-child(1) { width: 5%; }   /* STT */
-        .custom-table th:nth-child(2), .custom-table td:nth-child(2) { width: 25%; }  /* Hợp đồng + khách */
-        .custom-table th:nth-child(3), .custom-table td:nth-child(3) { width: 13%; }  /* Loại HĐ */
-        .custom-table th:nth-child(4), .custom-table td:nth-child(4) { width: 16%; }  /* Thời hạn */
-        .custom-table th:nth-child(5), .custom-table td:nth-child(5) { width: 14%; }  /* Trạng thái */
-        .custom-table th:nth-child(6), .custom-table td:nth-child(6) { width: 15%; }  /* Phụ trách */
-        .custom-table th:nth-child(7), .custom-table td:nth-child(7) { width: 12%; }  /* Thao tác */
+        .custom-table th:nth-child(2), .custom-table td:nth-child(2) { width: 22%; }  /* Hợp đồng + khách */
+        .custom-table th:nth-child(3), .custom-table td:nth-child(3) { width: 12%; }  /* Loại HĐ */
+        .custom-table th:nth-child(4), .custom-table td:nth-child(4) { width: 14%; }  /* Thời hạn */
+        .custom-table th:nth-child(5), .custom-table td:nth-child(5) { width: 13%; }  /* Trạng thái (lịch) */
+        .custom-table th:nth-child(6), .custom-table td:nth-child(6) { width: 12%; }  /* Tiến độ */
+        .custom-table th:nth-child(7), .custom-table td:nth-child(7) { width: 12%; }  /* Phụ trách */
+        .custom-table th:nth-child(8), .custom-table td:nth-child(8) { width: 10%; }  /* Thao tác */
         .custom-table td.cell-wrap { white-space: normal; }
         .cell-2line { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
         .cell-sub { font-size: 0.74rem; color: #6b7280; line-height: 1.35; }
         .prov-tag { font-weight: 700; color: var(--primary-dark); }
+        .pl-tag { display: inline-block; padding: 1px 7px; border-radius: 20px; font-size: 0.68rem; font-weight: 700; background: #eef2ff; color: #4338ca; }
         .term-cell { font-variant-numeric: tabular-nums; color: #4b5563; font-size: 0.76rem; }
         .cell-clip { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
@@ -128,6 +132,14 @@
         .contract-title-link:hover { color: var(--primary); text-decoration: underline; }
 
         .type-badge { display: inline-block; padding: 3px 9px; border-radius: 20px; font-size: 0.68rem; font-weight: 600; background: #f3f4f6; color: #4b5563; }
+
+        .progress-pill {
+            display: inline-flex; align-items: center; padding: 3px 10px; border-radius: 20px;
+            font-size: 0.7rem; font-weight: 600; white-space: nowrap; border: 1.5px dashed transparent;
+        }
+        .progress-draft  { background: #f3f4f6; color: #4b5563; border-color: #d1d5db; }
+        .progress-signed { background: #e8f3ff; color: var(--primary-dark); border-color: var(--primary-light); }
+        .progress-frozen { background: #eef7ee; color: #2f6b34; border-color: #a8cfaa; }
 
         .status-pill { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 20px; font-size: 0.72rem; font-weight: 600; white-space: nowrap; }
         .status-pill .dot { width: 6px; height: 6px; border-radius: 50%; }
@@ -202,7 +214,7 @@
                 <%-- Xuất Excel là thao tác ĐỌC: chỉ lấy đúng dữ liệu vai trò này vốn đã
                      xem được trên màn hình, đổi sang dạng file. Nên KHÔNG khoá theo
                      canManage -- xem PERMISSIONS.md. --%>
-                <a href="${pageContext.request.contextPath}/contract?action=exportExcel&kind=${kind}&keyword=${fn:escapeXml(keyword)}&status=${fn:escapeXml(statusFilter)}&type=${fn:escapeXml(typeFilter)}&provinceId=${provinceFilter}&year=${yearFilter}&period=${periodFilter}" class="btn-outline-action"><i class="fa-solid fa-file-excel"></i> Xuất Excel</a>
+                <a href="${pageContext.request.contextPath}/contract?action=exportExcel&kind=${kind}&keyword=${fn:escapeXml(keyword)}&status=${fn:escapeXml(statusFilter)}&progress=${fn:escapeXml(progressFilter)}&scope=${fn:escapeXml(scopeFilter)}&type=${fn:escapeXml(typeFilter)}&provinceId=${provinceFilter}&year=${yearFilter}&period=${periodFilter}" class="btn-outline-action"><i class="fa-solid fa-file-excel"></i> Xuất Excel</a>
                 <%-- Nhập PDF thì ngược lại: nó TẠO hợp đồng mới, nên vẫn khoá. --%>
                 <c:if test="${canManage}">
                     <a href="${pageContext.request.contextPath}/contract?action=importForm" class="btn-outline-action"><i class="fa-solid fa-file-pdf"></i> Nhập PDF</a>
@@ -240,18 +252,43 @@
                 <option value="Đã hết hạn" ${statusFilter == 'Đã hết hạn' ? 'selected' : ''}>Đã hết hạn</option>
                 <option value="Chưa hiệu lực" ${statusFilter == 'Chưa hiệu lực' ? 'selected' : ''}>Chưa hiệu lực</option>
             </select>
+            <%-- Trục TIẾN ĐỘ, đứng riêng với trục lịch ở trên. Chọn "Đã ký" rồi
+                 thêm trạng thái lịch "Đã hết hạn" sẽ ra đúng danh sách hết hạn
+                 mà chưa thanh lý — hàng đợi việc còn tồn. --%>
+            <select id="filterProgress" name="progress">
+                <option value="">Tất cả tiến độ</option>
+                <option value="Nháp" ${progressFilter == 'Nháp' ? 'selected' : ''}>Nháp (chưa ký)</option>
+                <option value="Đã ký" ${progressFilter == 'Đã ký' ? 'selected' : ''}>Đã ký</option>
+                <option value="Đã thanh lý" ${progressFilter == 'Đã thanh lý' ? 'selected' : ''}>Đã thanh lý</option>
+                <option value="Chấm dứt sớm" ${progressFilter == 'Chấm dứt sớm' ? 'selected' : ''}>Chấm dứt sớm</option>
+            </select>
+            <%-- Phụ lục nằm CÙNG bảng và mặc định hiện thành dòng riêng: chính
+                 nó cũng phải được ký, nên phải tìm thấy được bằng mã. Ô này để
+                 thu về danh sách hợp đồng gốc khi cần đếm "bao nhiêu hợp đồng"
+                 theo nghĩa thường. --%>
+            <select id="filterScope" name="scope">
+                <option value="">Cả phụ lục</option>
+                <option value="root" ${scopeFilter == 'root' ? 'selected' : ''}>Chỉ hợp đồng gốc</option>
+            </select>
             <select id="filterType" name="type">
                 <option value="">Tất cả loại hợp đồng</option>
-                <option value="Cung cấp thiết bị" ${typeFilter == 'Cung cấp thiết bị' ? 'selected' : ''}>Cung cấp thiết bị</option>
-                <option value="Thi công lắp đặt" ${typeFilter == 'Thi công lắp đặt' ? 'selected' : ''}>Thi công lắp đặt</option>
-                <option value="Bảo trì bảo dưỡng" ${typeFilter == 'Bảo trì bảo dưỡng' ? 'selected' : ''}>Bảo trì bảo dưỡng</option>
-            </select>
-            <select id="filterProvince" name="provinceId">
-                <option value="">Tất cả tỉnh địa bàn</option>
-                <c:forEach var="province" items="${provinceList}">
-                    <option value="${province.provinceId}" ${provinceFilter == province.provinceId ? 'selected' : ''}>${fn:escapeXml(province.shortName)}</option>
+                <%-- Loại hợp đồng theo CHIỀU: hợp đồng mua không dùng chung bộ
+                     chữ với hợp đồng bán. Xem ContractController. --%>
+                <c:forEach var="ct" items="${contractTypeOptions}">
+                    <option value="${fn:escapeXml(ct)}" ${typeFilter == ct ? 'selected' : ''}>${fn:escapeXml(ct)}</option>
                 </c:forEach>
             </select>
+<%-- Hợp đồng MUA không lọc theo tỉnh: tỉnh suy ra từ địa chỉ đối tác,
+                 mà đối tác của hợp đồng mua là nhà cung cấp -- nhóm không chia
+                 theo địa bàn. --%>
+            <c:if test="${showProvinceFilter}">
+                <select id="filterProvince" name="provinceId">
+                    <option value="">Tất cả tỉnh địa bàn</option>
+                    <c:forEach var="province" items="${provinceList}">
+                        <option value="${province.provinceId}" ${provinceFilter == province.provinceId ? 'selected' : ''}>${fn:escapeXml(province.shortName)}</option>
+                    </c:forEach>
+                </select>
+            </c:if>
             <select id="filterYear" name="year">
                 <option value="">Mọi thời điểm</option>
                 <c:forEach var="y" items="${yearList}">
@@ -282,6 +319,7 @@
                             <th>Loại HĐ</th>
                             <th>Thời hạn</th>
                             <th>Trạng thái</th>
+                            <th>Tiến độ</th>
                             <th>Phụ trách</th>
                             <th class="text-end">Thao tác</th>
                         </tr>
@@ -298,6 +336,11 @@
                                     <div class="cell-2line">
                                         <a href="${pageContext.request.contextPath}/contract?action=view&id=${contract.contractId}" class="contract-title-link">${fn:escapeXml(contract.title)}</a>
                                         <span class="cell-sub">
+                                            <%-- Nhãn phụ lục đứng TRƯỚC tên khách hàng: nó trả lời
+                                                 "dòng này là cái gì", mà câu đó phải đọc được trước
+                                                 khi đọc chi tiết. Hợp đồng gốc không mang nhãn nào --
+                                                 chúng là số đông, gắn nhãn cho số đông là không gắn. --%>
+                                            <c:if test="${contract.amendment}"><span class="pl-tag">PL của ${fn:escapeXml(contract.parentContractCode)}</span> &middot; </c:if>
                                             <c:choose>
                                                 <c:when test="${contract.enterprise != null}"><c:if test="${contract.enterprise.address.district.province != null}"><span class="prov-tag">${fn:escapeXml(contract.enterprise.address.district.province.shortName)}</span> &middot; </c:if>${fn:escapeXml(contract.enterprise.enterpriseName)}</c:when>
                                                 <c:otherwise>&mdash;</c:otherwise>
@@ -308,7 +351,19 @@
                                 <td><span class="type-badge">${fn:escapeXml(contract.contractType)}</span></td>
                                 <%-- Hai cột ngày gộp thành một khoảng thời hạn, năm rút về 2 chữ số:
                                      "10/08/26 → 14/08/27" vừa một dòng mà vẫn đủ nghĩa. --%>
-                                <td class="term-cell"><fmt:formatDate value="${contract.signingDate}" pattern="dd/MM/yy"/> &rarr; <fmt:formatDate value="${contract.endDate}" pattern="dd/MM/yy"/></td>
+                                <%-- Bản nháp chưa có ngày ký; hiện "chưa ký" thay vì để
+                                     trống, để người đọc phân biệt với lỗi dữ liệu. --%>
+                                <td class="term-cell">
+                                    <c:choose>
+                                        <c:when test="${contract.signingDate != null}"><fmt:formatDate value="${contract.signingDate}" pattern="dd/MM/yy"/></c:when>
+                                        <c:otherwise><span style="color:#9ca3af;">chưa ký</span></c:otherwise>
+                                    </c:choose>
+                                    &rarr;
+                                    <c:choose>
+                                        <c:when test="${contract.endDate != null}"><fmt:formatDate value="${contract.endDate}" pattern="dd/MM/yy"/></c:when>
+                                        <c:otherwise><span style="color:#9ca3af;">chưa chốt</span></c:otherwise>
+                                    </c:choose>
+                                </td>
                                 <td>
                                     <c:choose>
                                         <c:when test="${contract.status == 'Đang hiệu lực'}"><span class="status-pill status-active"><span class="dot"></span>Đang hiệu lực</span></c:when>
@@ -316,6 +371,14 @@
                                         <c:when test="${contract.status == 'Đã hết hạn'}"><span class="status-pill status-expired"><span class="dot"></span>Đã hết hạn</span></c:when>
                                         <c:otherwise><span class="status-pill status-draft"><span class="dot"></span>Chưa hiệu lực</span></c:otherwise>
                                     </c:choose>
+                                </td>
+                                <%-- Cột riêng, KHÔNG gộp vào cột Trạng thái bên trái:
+                                     hai trục lệch nhau ở cả hai chiều, và chính chỗ
+                                     lệch mới là thông tin (hết hạn mà chưa thanh lý). --%>
+                                <td>
+                                    <span class="progress-pill progress-${contract.draft ? 'draft' : (contract.frozen ? 'frozen' : 'signed')}">
+                                        ${fn:escapeXml(contract.progressStatus)}
+                                    </span>
                                 </td>
                                 <td>
                                     <c:choose>
@@ -355,11 +418,11 @@
                 <span class="pagination-info">Hiển thị ${fn:length(contractList)} trong tổng số ${totalCount} hợp đồng</span>
                 <nav>
                     <ul class="pagination pagination-sm mb-0">
-                        <li class="page-item ${currentPage <= 1 ? 'disabled' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/contract?action=list&kind=${kind}&page=${currentPage - 1}&keyword=${fn:escapeXml(keyword)}&status=${fn:escapeXml(statusFilter)}&type=${fn:escapeXml(typeFilter)}&provinceId=${provinceFilter}&year=${yearFilter}&period=${periodFilter}">Trước</a></li>
+                        <li class="page-item ${currentPage <= 1 ? 'disabled' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/contract?action=list&kind=${kind}&page=${currentPage - 1}&keyword=${fn:escapeXml(keyword)}&status=${fn:escapeXml(statusFilter)}&progress=${fn:escapeXml(progressFilter)}&scope=${fn:escapeXml(scopeFilter)}&type=${fn:escapeXml(typeFilter)}&provinceId=${provinceFilter}&year=${yearFilter}&period=${periodFilter}">Trước</a></li>
                         <c:forEach begin="1" end="${totalPages}" var="p">
-                            <li class="page-item ${p == currentPage ? 'active' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/contract?action=list&kind=${kind}&page=${p}&keyword=${fn:escapeXml(keyword)}&status=${fn:escapeXml(statusFilter)}&type=${fn:escapeXml(typeFilter)}&provinceId=${provinceFilter}&year=${yearFilter}&period=${periodFilter}">${p}</a></li>
+                            <li class="page-item ${p == currentPage ? 'active' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/contract?action=list&kind=${kind}&page=${p}&keyword=${fn:escapeXml(keyword)}&status=${fn:escapeXml(statusFilter)}&progress=${fn:escapeXml(progressFilter)}&scope=${fn:escapeXml(scopeFilter)}&type=${fn:escapeXml(typeFilter)}&provinceId=${provinceFilter}&year=${yearFilter}&period=${periodFilter}">${p}</a></li>
                         </c:forEach>
-                        <li class="page-item ${currentPage >= totalPages ? 'disabled' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/contract?action=list&kind=${kind}&page=${currentPage + 1}&keyword=${fn:escapeXml(keyword)}&status=${fn:escapeXml(statusFilter)}&type=${fn:escapeXml(typeFilter)}&provinceId=${provinceFilter}&year=${yearFilter}&period=${periodFilter}">Sau</a></li>
+                        <li class="page-item ${currentPage >= totalPages ? 'disabled' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/contract?action=list&kind=${kind}&page=${currentPage + 1}&keyword=${fn:escapeXml(keyword)}&status=${fn:escapeXml(statusFilter)}&progress=${fn:escapeXml(progressFilter)}&scope=${fn:escapeXml(scopeFilter)}&type=${fn:escapeXml(typeFilter)}&provinceId=${provinceFilter}&year=${yearFilter}&period=${periodFilter}">Sau</a></li>
                     </ul>
                 </nav>
             </div>
@@ -413,8 +476,14 @@
 
         // Tự động submit lại form lọc khi đổi trạng thái / loại hợp đồng
         document.getElementById('filterStatus').addEventListener('change', function () { document.getElementById('filterForm').submit(); });
+        document.getElementById('filterProgress').addEventListener('change', function () { document.getElementById('filterForm').submit(); });
         document.getElementById('filterType').addEventListener('change', function () { document.getElementById('filterForm').submit(); });
-        document.getElementById('filterProvince').addEventListener('change', function () { document.getElementById('filterForm').submit(); });
+        // Ô tỉnh không có ở mục Hợp đồng mua -- gắn sự kiện lên null là vỡ
+        // cả đoạn script phía sau, kể cả các bộ lọc khác.
+        var provinceSelect = document.getElementById('filterProvince');
+        if (provinceSelect) {
+            provinceSelect.addEventListener('change', function () { document.getElementById('filterForm').submit(); });
+        }
         document.getElementById('filterYear').addEventListener('change', function () { document.getElementById('filterForm').submit(); });
         document.getElementById('filterPeriod').addEventListener('change', function () { document.getElementById('filterForm').submit(); });
     </script>

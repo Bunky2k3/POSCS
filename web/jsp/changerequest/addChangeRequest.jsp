@@ -88,13 +88,22 @@
                     </div>
                     <div class="col-md-6 field-row">
                         <label for="intent">Loại thay đổi <span class="req">*</span></label>
+                        <%-- Bộ lựa chọn KHÁC NHAU theo tài nguyên, và script bên
+                             dưới ẩn/hiện chúng: hợp đồng đã ký thì không sửa,
+                             không xoá được nữa kể cả bởi cấp trên, nên xin hai
+                             việc đó là xin một thứ hệ thống không cho làm. Thứ
+                             xin được là PHỤ LỤC. Khách hàng thì ngược lại --
+                             không có khái niệm phụ lục, "Sửa" vẫn đúng nghĩa.
+                             Luật thật nằm ở ChangeRequestController.isValid. --%>
                         <select class="form-select" id="intent" name="intent">
                             <option value="">-- Chọn --</option>
                             <option value="Tạo mới" ${presetIntent == 'Tạo mới' ? 'selected' : ''}>Tạo mới</option>
-                            <option value="Sửa" ${presetIntent == 'Sửa' ? 'selected' : ''}>Sửa</option>
-                            <option value="Xoá" ${presetIntent == 'Xoá' ? 'selected' : ''}>Xoá</option>
+                            <option value="Sửa" data-for="Khách hàng" ${presetIntent == 'Sửa' ? 'selected' : ''}>Sửa</option>
+                            <option value="Xoá" data-for="Khách hàng" ${presetIntent == 'Xoá' ? 'selected' : ''}>Xoá</option>
+                            <option value="Lập phụ lục" data-for="Hợp đồng" ${presetIntent == 'Lập phụ lục' ? 'selected' : ''}>Lập phụ lục</option>
                         </select>
                         <span class="error-text" id="err-intent">Vui lòng chọn loại thay đổi.</span>
+                        <span style="font-size:0.78rem; color:#9ca3af; display:block; margin-top:6px;" id="intentHint"></span>
                     </div>
 
                     <%-- Mã bản ghi chỉ có nghĩa khi Sửa/Xoá. Với "Tạo mới" thì
@@ -138,14 +147,35 @@
     <script src="${pageContext.request.contextPath}/js/appshell.js"></script>
     <script>
         var intentEl = document.getElementById('intent');
+        var resourceEl = document.getElementById('resourceType');
         var targetIdRow = document.getElementById('targetIdRow');
+        var intentHint = document.getElementById('intentHint');
+
+        // Loại thay đổi nào dùng được phụ thuộc vào tài nguyên đang chọn --
+        // giống đúng luật ChangeRequestController.intentAllowedFor áp ở server.
+        // Ẩn ở đây chỉ để người dùng không chọn một thứ sẽ bị từ chối.
+        function syncIntentOptions() {
+            var resource = resourceEl.value;
+            Array.prototype.forEach.call(intentEl.options, function (opt) {
+                var only = opt.getAttribute('data-for');
+                var ok = !only || !resource || only === resource;
+                opt.hidden = !ok;
+                opt.disabled = !ok;
+                if (!ok && intentEl.value === opt.value) { intentEl.value = ''; }
+            });
+            intentHint.textContent = resource === 'Hợp đồng'
+                ? 'Hợp đồng đã ký không sửa hay xoá được nữa. Cần thay đổi điều khoản thì xin lập phụ lục.'
+                : '';
+        }
 
         function toggleTargetId() {
             var creating = intentEl.value === 'Tạo mới';
             targetIdRow.style.display = creating ? 'none' : '';
             if (creating) { document.getElementById('targetId').value = ''; }
         }
+        resourceEl.addEventListener('change', function () { syncIntentOptions(); toggleTargetId(); });
         intentEl.addEventListener('change', toggleTargetId);
+        syncIntentOptions();
         toggleTargetId();
 
         function validateForm() {

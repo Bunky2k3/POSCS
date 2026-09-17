@@ -25,6 +25,20 @@ public class ChangeRequest {
     public static final String INTENT_UPDATE = "Sửa";
     public static final String INTENT_DELETE = "Xoá";
 
+    /**
+     * Đề nghị lập PHỤ LỤC cho một hợp đồng đã ký.
+     *
+     * <p>Sinh ra vì luật vòng đời hợp đồng mâu thuẫn với hai intent bên trên:
+     * hợp đồng đã ký thì không sửa và không xoá được nữa, kể cả bởi cấp trên
+     * -- nên một yêu cầu "Sửa hợp đồng" gửi lên là yêu cầu cấp trên làm một
+     * việc hệ thống không cho làm. Thứ cấp dưới thật sự cần xin là một PHỤ
+     * LỤC, và đó là việc cấp trên làm được.
+     *
+     * <p>Chỉ dùng cho {@link #RESOURCE_CONTRACT} -- khách hàng không có khái
+     * niệm phụ lục, ở đó "Sửa" vẫn đúng nghĩa.
+     */
+    public static final String INTENT_AMENDMENT = "Lập phụ lục";
+
     /** Giá trị hợp lệ của status. */
     public static final String STATUS_PENDING = "Chờ duyệt";
     public static final String STATUS_APPROVED = "Đã duyệt";
@@ -118,6 +132,10 @@ public class ChangeRequest {
         }
         if (targetId == null) {
             return base;
+        }
+        // Lập phụ lục có form riêng, và targetId ở đây là hợp đồng CHA.
+        if (INTENT_AMENDMENT.equals(intent)) {
+            return base + "?action=newAmendment&parentId=" + targetId;
         }
         // Sửa và Xoá đều dẫn tới trang chi tiết: xoá là thao tác có xác nhận
         // riêng ở đó, không đưa thẳng người duyệt tới một nút xoá.

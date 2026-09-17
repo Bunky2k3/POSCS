@@ -169,6 +169,81 @@ public class ChangeRequestControllerTest {
         verify(response).sendRedirect(CONTEXT_PATH + "/changerequest?action=view&id=8");
     }
 
+    // ------------------------------------------------------------------
+    // Hợp đồng: xin SỬA/XOÁ không còn nghĩa, thứ xin được là PHỤ LỤC
+    // ------------------------------------------------------------------
+    //
+    // Từ khi có luật vòng đời, hợp đồng đã ký không sửa và không xoá được nữa,
+    // kể cả bởi cấp trên. Nên một yêu cầu "Sửa hợp đồng" là xin cấp trên làm
+    // một việc hệ thống không cho làm -- nó chỉ dựng ra một hàng đợi các yêu
+    // cầu chắc chắn bị từ chối.
+    //
+    // Chặn ở ĐƯỜNG GHI. Các yêu cầu gửi trước luật này vẫn đọc được, vẫn duyệt
+    // được, vẫn nằm nguyên trong lịch sử -- xoá chúng đi là viết lại quá khứ.
+
+    @Test
+    public void xinSuaHopDong_khongDuocGhi() throws Exception {
+        loginAs(21, "Sales", 20);
+        stubValidCreateParams();
+        when(request.getParameter("resourceType")).thenReturn(ChangeRequest.RESOURCE_CONTRACT);
+        when(request.getParameter("intent")).thenReturn(ChangeRequest.INTENT_UPDATE);
+
+        controller.doPost(request, response);
+
+        verify(changeRequestDAO, never()).insert(any());
+        verify(response).sendRedirect(CONTEXT_PATH + "/changerequest?action=new&error=invalid");
+    }
+
+    @Test
+    public void xinXoaHopDong_khongDuocGhi() throws Exception {
+        loginAs(21, "Sales", 20);
+        stubValidCreateParams();
+        when(request.getParameter("resourceType")).thenReturn(ChangeRequest.RESOURCE_CONTRACT);
+        when(request.getParameter("intent")).thenReturn(ChangeRequest.INTENT_DELETE);
+
+        controller.doPost(request, response);
+
+        verify(changeRequestDAO, never()).insert(any());
+    }
+
+    @Test
+    public void xinLapPhuLucChoHopDong_ghiDuoc() throws Exception {
+        loginAs(21, "Sales", 20);
+        stubValidCreateParams();
+        when(request.getParameter("resourceType")).thenReturn(ChangeRequest.RESOURCE_CONTRACT);
+        when(request.getParameter("intent")).thenReturn(ChangeRequest.INTENT_AMENDMENT);
+        when(changeRequestDAO.insert(any(ChangeRequest.class))).thenReturn(9);
+
+        controller.doPost(request, response);
+
+        verify(changeRequestDAO).insert(argThat((ChangeRequest r) ->
+                ChangeRequest.INTENT_AMENDMENT.equals(r.getIntent()) && r.getTargetId() == 12));
+        verify(response).sendRedirect(CONTEXT_PATH + "/changerequest?action=view&id=9");
+    }
+
+    /** Khách hàng KHÔNG có khái niệm phụ lục; ở đó "Sửa" vẫn đúng nghĩa và vẫn mở. */
+    @Test
+    public void xinLapPhuLucChoKhachHang_khongDuocGhi() throws Exception {
+        loginAs(21, "Sales", 20);
+        stubValidCreateParams();
+        when(request.getParameter("intent")).thenReturn(ChangeRequest.INTENT_AMENDMENT);
+
+        controller.doPost(request, response);
+
+        verify(changeRequestDAO, never()).insert(any());
+    }
+
+    /** Yêu cầu "Lập phụ lục" dẫn người duyệt thẳng tới form phụ lục, với targetId là hợp đồng CHA. */
+    @Test
+    public void duongDanCuaYeuCauLapPhuLuc_traToiFormPhuLuc() {
+        ChangeRequest r = new ChangeRequest();
+        r.setResourceType(ChangeRequest.RESOURCE_CONTRACT);
+        r.setIntent(ChangeRequest.INTENT_AMENDMENT);
+        r.setTargetId(7);
+
+        assertEquals("/contract?action=newAmendment&parentId=7", r.getActionPath());
+    }
+
     @Test
     public void loaiDuLieuLa_khongDuocGhi() throws Exception {
         loginAs(21, "Sales", 20);

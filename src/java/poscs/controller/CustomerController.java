@@ -59,6 +59,28 @@ public class CustomerController extends HttpServlet {
     private static final String ROLE_BUYER = "Khách mua";
     private static final String ROLE_SUPPLIER = "Nhà cung cấp";
 
+    /**
+     * Loại khách hàng, TÁCH THEO VAI -- hai danh sách khác hẳn nhau.
+     *
+     * <p>"Nhà mạng viễn thông", "Nhà thầu thi công", "Đại lý phân phối" là cách
+     * phân loại người MUA của mình. Áp nguyên bộ đó cho nhà cung cấp thì vô
+     * nghĩa: bên bán hàng cho mình được phân theo họ sản xuất, nhập khẩu hay
+     * phân phối, chứ không phải theo họ là nhà mạng hay nhà thầu.
+     *
+     * <p>Gom về đây thay vì chép cứng trong JSP: trước đó cùng ba lựa chọn đó
+     * nằm ở listcustomer, addnewcustomer và updatecustomer -- ba bản sao, sửa
+     * một chỗ là hai chỗ còn lại lệch đi trong im lặng.
+     */
+    private static final List<String> BUYER_TYPES = List.of(
+            "Nhà mạng viễn thông", "Nhà thầu thi công", "Đại lý phân phối");
+
+    private static final List<String> SUPPLIER_TYPES = List.of(
+            "Nhà sản xuất", "Nhà nhập khẩu", "Nhà phân phối", "Đơn vị dịch vụ");
+
+    private static List<String> customerTypesFor(String role) {
+        return ROLE_SUPPLIER.equals(role) ? SUPPLIER_TYPES : BUYER_TYPES;
+    }
+
     private static final String LIST_VIEW = "/jsp/sale/listcustomer.jsp";
     private static final String DETAIL_VIEW = "/jsp/sale/viewcustomerdetail.jsp";
     private static final String CREATE_VIEW = "/jsp/sale/addnewcustomer.jsp";
@@ -147,6 +169,16 @@ public class CustomerController extends HttpServlet {
         // đúng tham số kind. Giá trị lạ (hoặc thiếu) thì coi như khách mua --
         // đó là danh sách cũ, và là chiều duy nhất có dữ liệu trước V20.
         String roleFilter = roleFromKind(request.getParameter("kind"));
+        // ĐỊA BÀN KHÔNG ÁP CHO NHÀ CUNG CẤP. Tỉnh ở đây là địa bàn BÁN HÀNG --
+        // nó quyết định ai cầm khách nào (user_provinces). Bên bán hàng cho
+        // mình thì không được chia theo địa bàn, nên lọc theo tỉnh ở màn đó vừa
+        // vô nghĩa vừa cắt mất kết quả.
+        //
+        // Bỏ ở đây chứ không chỉ ẩn ô chọn: ẩn thôi thì một provinceId còn sót
+        // trên URL vẫn âm thầm thu hẹp danh sách.
+        if (ROLE_SUPPLIER.equals(roleFilter)) {
+            provinceFilter = null;
+        }
 
         List<Enterprise> customerList = customerDAO.findAll(page, PAGE_SIZE, keyword, typeFilter, assigneeFilter,
                 provinceFilter, false, roleFilter);
@@ -170,6 +202,10 @@ public class CustomerController extends HttpServlet {
         request.setAttribute("provinceFilter", provinceFilter);
         request.setAttribute("roleFilter", roleFilter);
         request.setAttribute("kind", ROLE_SUPPLIER.equals(roleFilter) ? "supplier" : "buyer");
+        // JSP dựng dropdown từ đây thay vì chép cứng ba lựa chọn -- xem
+        // BUYER_TYPES/SUPPLIER_TYPES.
+        request.setAttribute("customerTypeOptions", customerTypesFor(roleFilter));
+        request.setAttribute("showProvinceFilter", !ROLE_SUPPLIER.equals(roleFilter));
 
         request.getRequestDispatcher(LIST_VIEW).forward(request, response);
     }
@@ -211,8 +247,9 @@ public class CustomerController extends HttpServlet {
         // Tick sẵn vai ứng với danh sách người dùng vừa đứng: bấm "Thêm" từ
         // trang Nhà cung cấp mà form mặc định là khách mua thì lưu xong nó
         // rơi vào danh sách kia, và người nhập không hiểu vì sao.
-        request.setAttribute("customerRoles",
-                List.of(roleFromKind(request.getParameter("kind"))));
+        String role = roleFromKind(request.getParameter("kind"));
+        request.setAttribute("customerRoles", List.of(role));
+        request.setAttribute("customerTypeOptions", customerTypesFor(role));
         request.getRequestDispatcher(CREATE_VIEW).forward(request, response);
     }
 
@@ -247,6 +284,12 @@ public class CustomerController extends HttpServlet {
         // địa bàn, nếu không thì đổi tỉnh ở đây là đường vòng thoát khoá.
         request.setAttribute("territoryAssignments", employeeDAO.findAllAssignments());
         request.setAttribute("customerRoles", customerDAO.findRolesOf(id));
+        // Loại khách hàng theo ĐÚNG VAI của khách đang sửa: mở một nhà cung
+        // cấp ra mà dropdown đổ toàn loại của khách mua thì bấm lưu là đổi mất
+        // phân loại của họ.
+        List<String> roles = customerDAO.findRolesOf(customer.getEnterpriseId());
+        request.setAttribute("customerTypeOptions",
+                customerTypesFor(roles.contains(ROLE_SUPPLIER) ? ROLE_SUPPLIER : ROLE_BUYER));
         request.getRequestDispatcher(UPDATE_VIEW).forward(request, response);
     }
 
@@ -263,6 +306,16 @@ public class CustomerController extends HttpServlet {
         // Xuất đúng danh sách đang xem: đứng ở "Nhà cung cấp" mà bấm Xuất
         // Excel lại ra khách mua thì người dùng không cách nào biết file sai.
         String roleFilter = roleFromKind(request.getParameter("kind"));
+        // ĐỊA BÀN KHÔNG ÁP CHO NHÀ CUNG CẤP. Tỉnh ở đây là địa bàn BÁN HÀNG --
+        // nó quyết định ai cầm khách nào (user_provinces). Bên bán hàng cho
+        // mình thì không được chia theo địa bàn, nên lọc theo tỉnh ở màn đó vừa
+        // vô nghĩa vừa cắt mất kết quả.
+        //
+        // Bỏ ở đây chứ không chỉ ẩn ô chọn: ẩn thôi thì một provinceId còn sót
+        // trên URL vẫn âm thầm thu hẹp danh sách.
+        if (ROLE_SUPPLIER.equals(roleFilter)) {
+            provinceFilter = null;
+        }
         List<Enterprise> all = customerDAO.findAll(1, Integer.MAX_VALUE, keyword, typeFilter, assigneeFilter,
                 provinceFilter, true, roleFilter);
         // File Excel vẫn giữ cột "Mã KH" dù danh sách trên màn hình đã bỏ: STT chỉ

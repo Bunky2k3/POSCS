@@ -34,6 +34,8 @@ import poscs.dao.EmployeeDAO;
 import poscs.dao.ProductDAO;
 import poscs.model.Address;
 import poscs.model.Contract;
+import poscs.model.ContractHistory;
+import poscs.model.ContractPayment;
 import poscs.model.ContractProduct;
 import poscs.model.District;
 import poscs.model.Enterprise;
@@ -72,6 +74,27 @@ public class ContractController extends HttpServlet {
     private static final String DIRECTION_BUY = "Mua";
     private static final String ROLE_BUYER = "Khách mua";
     private static final String ROLE_SUPPLIER = "Nhà cung cấp";
+
+    /**
+     * Loại hợp đồng, TÁCH THEO CHIỀU.
+     *
+     * <p>Bộ cũ -- "Cung cấp thiết bị", "Thi công lắp đặt", "Bảo trì bảo dưỡng"
+     * -- viết từ góc nhìn người BÁN. Gắn nguyên bộ đó lên một hợp đồng MUA thì
+     * câu chữ nói ngược: mình đi mua thiết bị chứ không "cung cấp" cho ai, và
+     * mình thuê người thi công chứ không đi thi công.
+     *
+     * <p>Gom về đây thay vì chép cứng trong JSP: trước đó cùng ba lựa chọn nằm
+     * ở listcontract, addnewcontract và updatecontract.
+     */
+    private static final java.util.List<String> SELL_CONTRACT_TYPES = java.util.List.of(
+            "Cung cấp thiết bị", "Thi công lắp đặt", "Bảo trì bảo dưỡng");
+
+    private static final java.util.List<String> BUY_CONTRACT_TYPES = java.util.List.of(
+            "Mua thiết bị", "Mua vật tư", "Thuê thi công lắp đặt", "Thuê bảo trì");
+
+    private static java.util.List<String> contractTypesFor(String direction) {
+        return DIRECTION_BUY.equals(direction) ? BUY_CONTRACT_TYPES : SELL_CONTRACT_TYPES;
+    }
 
     private static final String LIST_VIEW = "/jsp/sale/listcontract.jsp";
     private static final String DETAIL_VIEW = "/jsp/sale/viewcontractdetail.jsp";
@@ -119,6 +142,9 @@ public class ContractController extends HttpServlet {
             case "new":
                 showCreateForm(request, response);
                 break;
+            case "newAmendment":
+                showAmendmentForm(request, response);
+                break;
             case "edit":
                 showEditForm(request, response);
                 break;
@@ -155,6 +181,12 @@ public class ContractController extends HttpServlet {
             case "update":
                 handleUpdate(request, response);
                 break;
+            case "createAmendment":
+                handleCreateAmendment(request, response);
+                break;
+            case "correct":
+                handleCorrect(request, response);
+                break;
             case "delete":
                 handleDelete(request, response);
                 break;
@@ -166,6 +198,18 @@ public class ContractController extends HttpServlet {
                 break;
             case "removeProduct":
                 handleRemoveProduct(request, response);
+                break;
+            case "changeProgress":
+                handleChangeProgress(request, response);
+                break;
+            case "addPayment":
+                handleAddPayment(request, response);
+                break;
+            case "markPaid":
+                handleMarkPaid(request, response);
+                break;
+            case "removePayment":
+                handleRemovePayment(request, response);
                 break;
             default:
                 response.sendRedirect(request.getContextPath() + "/contract");
@@ -189,10 +233,29 @@ public class ContractController extends HttpServlet {
         Period period = Period.parse(request.getParameter("year"), request.getParameter("period"));
         // Chiều đứng ĐỘC LẬP với kỳ -- hai mục con vẫn lọc được theo năm/quý/tháng.
         String direction = directionFromKind(request.getParameter("kind"));
+        // Hợp đồng MUA không lọc theo tỉnh. Tỉnh của hợp đồng suy ra từ địa chỉ
+        // đối tác đứng tên, mà với hợp đồng mua thì đối tác là NHÀ CUNG CẤP --
+        // nhóm không chia theo địa bàn (xem CustomerController). Lọc theo tỉnh
+        // ở đó vừa vô nghĩa vừa cắt mất kết quả.
+        //
+        // Bỏ ở controller chứ không chỉ ẩn ô chọn: một provinceId còn sót trên
+        // URL vẫn âm thầm thu hẹp danh sách.
+        if (DIRECTION_BUY.equals(direction)) {
+            provinceFilter = null;
+        }
+        // Trục tiến độ: độc lập với trục lịch (status) và với kỳ. Một hợp đồng
+        // "Đã hết hạn" theo lịch mà vẫn "Đã ký" theo tiến độ chính là việc còn
+        // tồn -- lọc được hai trục riêng thì mới nhìn ra chỗ đó.
+        String progressFilter = request.getParameter("progress");
+        // Phụ lục mặc định HIỆN thành dòng riêng: chính nó cũng phải được ký,
+        // nên phải tìm thấy được bằng mã. Ô này để thu về danh sách hợp đồng
+        // gốc khi người dùng muốn đếm "bao nhiêu hợp đồng" theo nghĩa thường.
+        boolean rootsOnly = "root".equals(request.getParameter("scope"));
 
         List<Contract> contractList = contractDAO.findAll(page, PAGE_SIZE, keyword, statusFilter, typeFilter,
-                provinceFilter, false, period, direction);
-        int totalCount = contractDAO.countAll(keyword, statusFilter, typeFilter, provinceFilter, period, direction);
+                provinceFilter, false, period, direction, progressFilter, rootsOnly);
+        int totalCount = contractDAO.countAll(keyword, statusFilter, typeFilter, provinceFilter, period, direction,
+                progressFilter, rootsOnly);
         int totalPages = Math.max(1, (int) Math.ceil(totalCount / (double) PAGE_SIZE));
         // Dải KPI trạng thái phải đếm CÙNG phạm vi với bảng bên dưới: đứng ở
         // Hợp đồng mua mà KPI gộp cả hợp đồng bán thì hai con số cạnh nhau
@@ -209,9 +272,16 @@ public class ContractController extends HttpServlet {
         request.setAttribute("pageSize", PAGE_SIZE);
         request.setAttribute("keyword", keyword);
         request.setAttribute("statusFilter", statusFilter);
+        request.setAttribute("progressFilter", progressFilter);
+        request.setAttribute("scopeFilter", rootsOnly ? "root" : null);
+        // Loại hợp đồng khác nhau theo chiều -- xem SELL_CONTRACT_TYPES /
+        // BUY_CONTRACT_TYPES. JSP dựng dropdown từ đây thay vì chép cứng.
+        request.setAttribute("contractTypeOptions", contractTypesFor(direction));
+        request.setAttribute("showProvinceFilter", !DIRECTION_BUY.equals(direction));
         request.setAttribute("typeFilter", typeFilter);
         request.setAttribute("provinceFilter", provinceFilter);
         request.setAttribute("kind", DIRECTION_BUY.equals(direction) ? "buy" : "sell");
+        request.setAttribute("contractTypeOptions", contractTypesFor(direction));
         setPeriodAttributes(request, period);
 
         request.getRequestDispatcher(LIST_VIEW).forward(request, response);
@@ -243,14 +313,9 @@ public class ContractController extends HttpServlet {
         request.setAttribute("attachmentUrl", attachmentIsSafe ? attachmentUrl : null);
         request.setAttribute("attachmentUnsafe", attachmentUrl != null && !attachmentIsSafe);
         request.setAttribute("drivePreviewUrl", attachmentIsSafe ? drivePreviewUrl(attachmentUrl) : null);
-        // Huỷ bản ghi chỉ dành cho Admin -- xem handleDelete. Không còn điều
-        // kiện theo trạng thái: hợp đồng nào cũng đã ký, nên "xoá được hay
-        // không" bây giờ là câu hỏi về quyền, không phải về ngày tháng.
-        request.setAttribute("canVoid", AccessControl.isAdmin(request));
-        request.setAttribute("contractProducts", contractDAO.findProductsByContractId(id));
-        request.setAttribute("contractHistory", contractDAO.findHistoryByContractId(id));
-        // Danh sách sản phẩm còn hoạt động, phục vụ dropdown "Thêm sản phẩm" bên dưới bảng hạng mục.
-        request.setAttribute("productOptions", productDAO.findAll(1, Integer.MAX_VALUE, null, null));
+        // TRANG XEM KHÔNG ĐẶT MỘT CỜ can* NÀO. Mọi thao tác làm thay đổi
+        // dữ liệu đã chuyển sang trang Sửa thông tin; ở đây chỉ trình bày.
+        putContractWorkspace(request, contract);
 
         request.getRequestDispatcher(DETAIL_VIEW).forward(request, response);
     }
@@ -267,18 +332,40 @@ public class ContractController extends HttpServlet {
         // phải gom các hợp đồng cùng tỉnh lại với nhau.
         // Xuất đúng danh sách đang xem, giữ nguyên cả kỳ lẫn chiều.
         String direction = directionFromKind(request.getParameter("kind"));
+        // Hợp đồng MUA không lọc theo tỉnh. Tỉnh của hợp đồng suy ra từ địa chỉ
+        // đối tác đứng tên, mà với hợp đồng mua thì đối tác là NHÀ CUNG CẤP --
+        // nhóm không chia theo địa bàn (xem CustomerController). Lọc theo tỉnh
+        // ở đó vừa vô nghĩa vừa cắt mất kết quả.
+        //
+        // Bỏ ở controller chứ không chỉ ẩn ô chọn: một provinceId còn sót trên
+        // URL vẫn âm thầm thu hẹp danh sách.
+        if (DIRECTION_BUY.equals(direction)) {
+            provinceFilter = null;
+        }
+        // Ô "Cả phụ lục / Chỉ hợp đồng gốc" phải đi theo sang file: xuất ra một
+        // danh sách khác thứ đang nhìn thấy là cách chắc chắn nhất để hai con số
+        // trong cùng một cuộc họp không khớp nhau.
         List<Contract> all = contractDAO.findAll(1, Integer.MAX_VALUE, keyword, statusFilter, typeFilter,
-                provinceFilter, true, period, direction);
+                provinceFilter, true, period, direction, request.getParameter("progress"),
+                "root".equals(request.getParameter("scope")));
         // Giữ cột "Mã HĐ" trong file dù danh sách trên màn hình đã bỏ -- xem lý do
         // ở CustomerController.exportExcel: STT chỉ đúng trong phạm vi một file.
-        String[] headers = {"STT", "Mã HĐ", "Tiêu đề", "Loại HĐ", "Tỉnh/Thành phố", "Khách hàng", "Người phụ trách",
-            "Ngày ký", "Ngày hiệu lực", "Ngày kết thúc", "Trạng thái"};
+        //
+        // MỘT cột mã, không hai. V25 từng xuất kèm cột "Số hợp đồng" riêng, hồi
+        // mã là định danh máy sinh còn số là thứ in trên giấy; V28 chốt lại rằng
+        // hai thứ đó là một và bỏ cột contract_number, nên cột thứ hai ở đây
+        // không còn gì để đọc.
+        String[] headers = {"STT", "Mã HĐ", "Phụ lục của", "Tiêu đề", "Loại HĐ", "Tỉnh/Thành phố", "Khách hàng",
+            "Người phụ trách", "Ngày ký", "Ngày hiệu lực", "Ngày kết thúc", "Trạng thái", "Tiến độ"};
         List<Object[]> rows = new ArrayList<>();
         int stt = 1;
         for (Contract c : all) {
             rows.add(new Object[]{
                 stt++,
                 c.getContractCode(),
+                // Rỗng ở hợp đồng gốc. Có cột này thì đọc file cũng phân biệt
+                // được phụ lục với hợp đồng, y như nhãn trên màn hình.
+                c.getParentContractCode() != null ? c.getParentContractCode() : "",
                 c.getTitle(),
                 c.getContractType(),
                 provinceNameOf(c),
@@ -287,7 +374,8 @@ public class ContractController extends HttpServlet {
                 c.getSigningDate() != null ? c.getSigningDate().toString() : "",
                 c.getEffectiveDate() != null ? c.getEffectiveDate().toString() : "",
                 c.getEndDate() != null ? c.getEndDate().toString() : "",
-                c.getStatus()
+                c.getStatus(),
+                c.getProgressStatus()
             });
         }
         ExcelUtil.writeWorkbook(response,
@@ -462,14 +550,14 @@ public class ContractController extends HttpServlet {
             } else if (signDate.after(effectiveDate) || effectiveDate.after(endDate)) {
                 errors.add("Ngày ký phải ≤ Hiệu lực từ phải ≤ Đến ngày.");
             }
-            if (!isBlank(contractCode)) {
-                // Cố ý KHÔNG lọc chiều ở đây: mã hợp đồng là duy nhất trên
-                // toàn bảng, tra theo một chiều là bỏ sót trùng ở chiều kia.
-                boolean exists = contractDAO.findAll(1, Integer.MAX_VALUE, contractCode.trim(), null, null).stream()
-                        .anyMatch(c -> c.getContractCode() != null && c.getContractCode().equalsIgnoreCase(contractCode.trim()));
-                if (exists) {
-                    errors.add("Mã hợp đồng \"" + contractCode.trim() + "\" đã tồn tại.");
-                }
+            // Từ V28 mã KHÔNG còn sinh tự động, nên thiếu mã trong file PDF là
+            // lỗi phải báo -- trước đó chỗ này lặng lẽ sinh hộ một mã HD-xxxx.
+            if (isBlank(contractCode)) {
+                errors.add("Thiếu \"Mã hợp đồng\" trong file PDF.");
+            } else if (contractDAO.contractCodeExists(contractCode.trim(), 0)) {
+                // Cố ý KHÔNG lọc chiều: mã hợp đồng là duy nhất trên toàn bảng,
+                // tra theo một chiều là bỏ sót trùng ở chiều kia.
+                errors.add("Mã hợp đồng \"" + contractCode.trim() + "\" đã tồn tại.");
             }
 
             if (isBlank(buyerTax)) {
@@ -592,7 +680,9 @@ public class ContractController extends HttpServlet {
             }
 
             Contract contract = new Contract();
-            contract.setContractCode(isBlank(contractCode) ? contractDAO.generateNextContractCode() : contractCode.trim());
+            // Mã lấy từ chính file PDF. Thiếu thì BÁO LỖI chứ không sinh hộ:
+            // từ V28 mã là số hợp đồng thật, hệ thống không có quyền bịa ra.
+            contract.setContractCode(isBlank(contractCode) ? null : contractCode.trim());
             contract.setTitle(title.trim());
             contract.setContractType(contractType.trim());
             contract.setSigningDate(signDate);
@@ -721,6 +811,48 @@ public class ContractController extends HttpServlet {
         setDropdownAttributes(request, null, direction, null);
         request.setAttribute("direction", direction);
         request.setAttribute("kind", DIRECTION_BUY.equals(direction) ? "buy" : "sell");
+        request.setAttribute("contractTypeOptions", contractTypesFor(direction));
+        request.getRequestDispatcher(CREATE_VIEW).forward(request, response);
+    }
+
+    /**
+     * Form lập PHỤ LỤC cho một hợp đồng đã ký -- dùng lại chính trang tạo hợp
+     * đồng, chỉ khác vài thuộc tính.
+     *
+     * <p>Dùng lại chứ không dựng trang thứ hai, vì phụ lục là một hợp đồng đầy
+     * đủ: cũng mã trên giấy, cũng thời hạn, cũng hàng hoá, cũng phải ký. Trang
+     * riêng sẽ là bản sao của trang này, rồi hai bản sao lệch nhau dần.
+     *
+     * <p>Khác biệt duy nhất: khách hàng và chiều KHÔNG cho chọn -- chúng lấy từ
+     * hợp đồng cha. Form ẩn hai ô đó đi, còn chốt chặn thật nằm ở
+     * ContractDAO.insert (nó đọc hai giá trị ấy từ cha, không từ form).
+     */
+    private void showAmendmentForm(HttpServletRequest request, HttpServletResponse response)
+            throws ServletException, IOException {
+        if (!AccessControl.requireFullAccess(request, response, AccessControl.Resource.CONTRACT)) {
+            return;
+        }
+        Integer parentId = parseIntOrNull(request.getParameter("parentId"));
+        Contract parent = parentId != null ? contractDAO.findById(parentId) : null;
+        if (parent == null) {
+            response.sendRedirect(request.getContextPath() + "/contract?error=notfound");
+            return;
+        }
+        // Kiểm lại ở đây để BÁO ĐÚNG LÝ DO thay vì đưa người dùng vào một form
+        // mà bấm Lưu chắc chắn thất bại. Chặn thật vẫn ở DAO, trong transaction.
+        if (!parent.isSigned() || parent.isAmendment()) {
+            response.sendRedirect(request.getContextPath()
+                    + "/contract?action=view&id=" + parentId + "&error=amendment_not_allowed");
+            return;
+        }
+
+        request.setAttribute("parentContract", parent);
+        // Người phụ trách gợi ý theo cha, nhưng sửa được: phụ lục có thể do
+        // người khác theo, nhất là khi nhân sự đã đổi từ lúc ký hợp đồng gốc.
+        setDropdownAttributes(request, parent.getOwnerId(), parent.getDirection(), parent.getEnterpriseId());
+        request.setAttribute("direction", parent.getDirection());
+        request.setAttribute("kind", DIRECTION_BUY.equals(parent.getDirection()) ? "buy" : "sell");
+        request.setAttribute("contractTypeOptions", contractTypesFor(parent.getDirection()));
         request.getRequestDispatcher(CREATE_VIEW).forward(request, response);
     }
 
@@ -745,6 +877,41 @@ public class ContractController extends HttpServlet {
                 contract.getDirection(), contract.getEnterpriseId());
         request.setAttribute("direction", contract.getDirection());
         request.setAttribute("kind", DIRECTION_BUY.equals(contract.getDirection()) ? "buy" : "sell");
+        request.setAttribute("contractTypeOptions", contractTypesFor(contract.getDirection()));
+
+        // Đây mới là trang có nút bấm. Trang xem dùng cùng dữ liệu này nhưng
+        // không đặt cờ nào, nên không mọc nút.
+        putContractWorkspace(request, contract);
+        request.setAttribute("productOptions", productDAO.findAll(1, Integer.MAX_VALUE, null, null));
+
+        // Hàng hoá là NỘI DUNG hợp đồng: ký xong là chốt, đổi phải đi qua phụ lục.
+        request.setAttribute("canEditProducts", contract.isDraft());
+        // Lịch thu tiền thì khác -- nó là thứ theo dõi trong lúc thực hiện, nên
+        // sửa được cho tới khi hợp đồng đóng băng.
+        request.setAttribute("canEditPayments", !contract.isFrozen());
+        // Còn ghi nhận tiền về thì kể cả sau thanh lý cũng phải được: tiền bảo
+        // hành giữ lại thường chỉ về sau thanh lý cả năm.
+        request.setAttribute("canRecordPayment", true);
+
+        request.setAttribute("canSign", contract.isDraft() && canSign(request));
+        request.setAttribute("canClose",
+                ContractDAO.PROGRESS_SIGNED.equals(contract.getProgressStatus()));
+        // Còn phụ lục thì không huỷ được bản ghi cha -- phụ lục sẽ thành văn
+        // bản sửa đổi không tra ngược được nó sửa cho cái gì. Chặn thật nằm ở
+        // ContractDAO.voidRecord, ở đây chỉ để không mọc ra một cái nút chắc
+        // chắn thất bại.
+        request.setAttribute("canVoid",
+                (AccessControl.isAdmin(request) || contract.isDraft()) && contract.getAmendmentCount() == 0);
+
+        // Điều khoản khoá từ lúc ký: form chỉ còn hiển thị chúng, không nhập.
+        request.setAttribute("canEditTerms", !contract.isTermsLocked());
+        // Đường chữa SAI SÓT NHẬP LIỆU, khác hẳn đường sửa nội dung. Admin, bắt
+        // buộc lý do, sinh dòng nhật ký loại riêng. Không mở sau khi đóng băng:
+        // luật KH nói "kể cả cấp cao", và Admin không phải ngoại lệ.
+        request.setAttribute("canCorrect", AccessControl.isAdmin(request) && contract.isSigned());
+        // Lập phụ lục: chỉ từ hợp đồng gốc ĐÃ KÝ và chưa đóng băng.
+        request.setAttribute("canAddAmendment", contract.isSigned() && !contract.isAmendment());
+
         request.getRequestDispatcher(UPDATE_VIEW).forward(request, response);
     }
 
@@ -770,9 +937,23 @@ public class ContractController extends HttpServlet {
             response.sendRedirect(request.getContextPath() + "/contract?action=new&error=invalid_drive_link");
             return;
         }
-        c.setContractCode(contractDAO.generateNextContractCode());
+        // Kiểm trùng TRƯỚC để báo đúng lý do. Chốt chặn thật vẫn là UNIQUE KEY
+        // trên contract_code: hai người lưu cùng lúc cùng một mã thì chỉ ràng
+        // buộc ở CSDL mới bắt được, và insert() trả DUPLICATE_CODE.
+        if (contractDAO.contractCodeExists(c.getContractCode(), 0)) {
+            response.sendRedirect(request.getContextPath()
+                    + "/contract?action=new&kind=" + (DIRECTION_BUY.equals(c.getDirection()) ? "buy" : "sell")
+                    + "&error=duplicate_code");
+            return;
+        }
 
         int newId = contractDAO.insert(c, actorId(request));
+        if (newId == ContractDAO.DUPLICATE_CODE) {
+            response.sendRedirect(request.getContextPath()
+                    + "/contract?action=new&kind=" + (DIRECTION_BUY.equals(c.getDirection()) ? "buy" : "sell")
+                    + "&error=duplicate_code");
+            return;
+        }
         if (newId <= 0) {
             LOG.warn("Tao hop dong that bai (actor={}, contractCode={})", Logs.actor(request), c.getContractCode());
             response.sendRedirect(request.getContextPath() + "/contract?action=new&error=create_failed");
@@ -793,13 +974,40 @@ public class ContractController extends HttpServlet {
             return;
         }
 
-        Contract c = buildContractFromRequest(request, new Contract());
+        Contract existing = contractDAO.findById(id);
+        Contract c;
+        if (existing.isTermsLocked()) {
+            // ĐÃ KÝ: form chỉ còn hai ô nhập được, các trường điều khoản hiển
+            // thị dạng chữ và KHÔNG gửi lên. Nên dựng bản ghi từ giá trị đang
+            // có rồi chỉ chồng hai ô đó lên -- đọc từ form thì mọi trường khoá
+            // về null và isValid() từ chối ngay, tức là đổi người phụ trách
+            // cũng không lưu được.
+            //
+            // DAO vẫn tự lọc lần nữa (ContractDAO.withTermsFrom): chỗ này chỉ
+            // lo cho người dùng bình thường, còn một POST nặn tay thì không.
+            c = existing;
+            Integer ownerId = parseIntOrNull(request.getParameter("ownerId"));
+            if (ownerId != null) {
+                c.setOwnerId(ownerId);
+            }
+            c.setAttachmentUrl(emptyToNull(request.getParameter("attachmentUrl")));
+        } else {
+            c = buildContractFromRequest(request, new Contract());
+        }
         c.setContractId(id);
         // Giữ nguyên chiều cũ -- DAO.update cũng không ghi cột này. Nhưng vẫn
         // phải gán để kiểm được khách hàng mới chọn có đúng vai không.
-        c.setDirection(contractDAO.findById(id).getDirection());
+        c.setDirection(existing.getDirection());
+        // Ngày ký chép từ bản ghi đang có, KHÔNG lấy từ form (form hiển thị ô
+        // đó ở dạng chỉ đọc và không gửi lên): nó là dấu của một hành động đã
+        // xảy ra. Thiếu dòng này thì mỗi lần bấm Lưu là xoá mất ngày ký.
+        c.setSigningDate(existing.getSigningDate());
         if (!isValid(c) || !counterpartyMatchesDirection(c)) {
             response.sendRedirect(request.getContextPath() + "/contract?action=edit&id=" + id + "&error=invalid");
+            return;
+        }
+        if (contractDAO.contractCodeExists(c.getContractCode(), id)) {
+            response.sendRedirect(request.getContextPath() + "/contract?action=edit&id=" + id + "&error=duplicate_code");
             return;
         }
         if (!TextRules.isSafeHttpUrl(c.getAttachmentUrl())) {
@@ -817,6 +1025,205 @@ public class ContractController extends HttpServlet {
     }
 
     /**
+     * Lập một phụ lục cho hợp đồng đã ký.
+     *
+     * <p>Đi qua chính {@code ContractDAO.insert} như mọi hợp đồng khác, chỉ
+     * khác ở chỗ mang theo {@code parentContractId}. Phụ lục ra đời ở trạng
+     * thái Nháp và phải được KÝ như hợp đồng thường -- đó là điểm của cả việc
+     * này: một sửa đổi trên hợp đồng đã ký phải có chữ ký của người được ký,
+     * chứ không phải một lần bấm Lưu trên form.
+     *
+     * <p>Khách hàng và chiều KHÔNG đọc từ form: DAO lấy thẳng từ hợp đồng cha.
+     */
+    private void handleCreateAmendment(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        if (!AccessControl.requireFullAccess(request, response, AccessControl.Resource.CONTRACT)) {
+            return;
+        }
+        Integer parentId = parseIntOrNull(request.getParameter("parentId"));
+        Contract parent = parentId != null ? contractDAO.findById(parentId) : null;
+        if (parent == null) {
+            response.sendRedirect(request.getContextPath() + "/contract?error=notfound");
+            return;
+        }
+
+        Contract c = buildContractFromRequest(request, new Contract());
+        c.setParentContractId(parentId);
+        // Hai trường này không có ô trên form phụ lục; gán sẵn để isValid() và
+        // counterpartyMatchesDirection() kiểm đúng thứ sẽ được ghi xuống.
+        c.setEnterpriseId(parent.getEnterpriseId());
+        c.setDirection(parent.getDirection());
+        String back = "/contract?action=newAmendment&parentId=" + parentId;
+
+        if (!isValid(c) || !counterpartyMatchesDirection(c)) {
+            response.sendRedirect(request.getContextPath() + back + "&error=invalid");
+            return;
+        }
+        if (!TextRules.isSafeHttpUrl(c.getAttachmentUrl())) {
+            response.sendRedirect(request.getContextPath() + back + "&error=invalid_drive_link");
+            return;
+        }
+        if (contractDAO.contractCodeExists(c.getContractCode(), 0)) {
+            response.sendRedirect(request.getContextPath() + back + "&error=duplicate_code");
+            return;
+        }
+
+        int newId = contractDAO.insert(c, actorId(request));
+        if (newId == ContractDAO.DUPLICATE_CODE) {
+            response.sendRedirect(request.getContextPath() + back + "&error=duplicate_code");
+            return;
+        }
+        if (newId == ContractDAO.INVALID_PARENT) {
+            // Hợp đồng cha vừa đổi trạng thái trong lúc form đang mở -- ví dụ
+            // vừa được thanh lý. Đưa về trang hợp đồng cha, ở đó người dùng
+            // thấy ngay vì sao.
+            LOG.warn("Lap phu luc bi tu choi vi hop dong cha (actor={}, parentId={})",
+                    Logs.actor(request), parentId);
+            response.sendRedirect(request.getContextPath()
+                    + "/contract?action=view&id=" + parentId + "&error=amendment_not_allowed");
+            return;
+        }
+        if (newId <= 0) {
+            LOG.warn("Lap phu luc that bai (actor={}, parentId={}, contractCode={})",
+                    Logs.actor(request), parentId, c.getContractCode());
+            response.sendRedirect(request.getContextPath() + back + "&error=create_failed");
+            return;
+        }
+        response.sendRedirect(request.getContextPath() + "/contract?action=view&id=" + newId);
+    }
+
+    /**
+     * ADMIN chữa một sai sót NHẬP LIỆU trên hợp đồng đã ký.
+     *
+     * <p>Không phải cửa sau cho việc sửa nội dung: sửa đổi thật thì đi qua phụ
+     * lục và để lại một văn bản có chữ ký. Cái này chỉ chữa thứ gõ sai so với
+     * chính bản giấy đang cầm -- nhầm một chữ số trong mã, chọn nhầm khách hàng
+     * lúc tạo.
+     *
+     * <p>Lý do là BẮT BUỘC, và DAO từ chối khi thiếu. Nó vào cột note của dòng
+     * nhật ký, tách khỏi câu mô tả do hệ thống sinh, nên về sau còn phân biệt
+     * được máy ghi với người khai.
+     */
+    private void handleCorrect(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        // requireAdmin, không phải requireFullAccess: đây là thao tác chạm vào
+        // điều khoản của hợp đồng đã ký, hẹp hơn hẳn quyền quản lý hợp đồng.
+        if (!AccessControl.requireAdmin(request, response)) {
+            return;
+        }
+        Integer id = parseIntOrNull(request.getParameter("contractId"));
+        Contract existing = id != null ? contractDAO.findById(id) : null;
+        if (existing == null) {
+            response.sendRedirect(request.getContextPath() + "/contract?error=notfound");
+            return;
+        }
+        String back = "/contract?action=edit&id=" + id;
+
+        String reason = request.getParameter("correctionReason");
+        if (reason == null || reason.trim().isEmpty()) {
+            response.sendRedirect(request.getContextPath() + back + "&error=missing_reason");
+            return;
+        }
+
+        Contract c = buildContractFromRequest(request, new Contract());
+        c.setContractId(id);
+        c.setDirection(existing.getDirection());
+        // Ngày ký không sửa được kể cả ở đây -- DAO cũng giữ lại giá trị cũ.
+        c.setSigningDate(existing.getSigningDate());
+        if (!isValid(c) || !counterpartyMatchesDirection(c)) {
+            response.sendRedirect(request.getContextPath() + back + "&error=invalid");
+            return;
+        }
+        if (contractDAO.contractCodeExists(c.getContractCode(), id)) {
+            response.sendRedirect(request.getContextPath() + back + "&error=duplicate_code");
+            return;
+        }
+        if (!TextRules.isSafeHttpUrl(c.getAttachmentUrl())) {
+            response.sendRedirect(request.getContextPath() + back + "&error=invalid_drive_link");
+            return;
+        }
+
+        if (!contractDAO.correct(c, actorId(request), reason)) {
+            LOG.warn("Sua sai sot hop dong that bai (actor={}, contractId={})", Logs.actor(request), id);
+            response.sendRedirect(request.getContextPath() + back + "&error=update_failed");
+            return;
+        }
+        response.sendRedirect(request.getContextPath() + "/contract?action=view&id=" + id);
+    }
+
+    /**
+     * Một bước trên trục tiến độ: ký, thanh lý, hoặc chấm dứt sớm.
+     *
+     * <p><b>Ký tách khỏi tạo, và người ký phải khác nhân viên.</b> KH trả lời
+     * 2026-09-15: nhân viên không tự ký hợp đồng được. Trước đây
+     * {@code signing_date} là NOT NULL nên tạo hợp đồng là đã ký -- không có
+     * khoảnh khắc nào hợp đồng tồn tại mà chưa ký, nên cũng không có chỗ nào
+     * để chặn. Bây giờ tạo ra bản nháp, còn ký là action riêng ở đây.
+     *
+     * <p>Điều kiện ký dùng LẠI đúng vị ngữ mà luồng duyệt yêu cầu thay đổi đã
+     * dùng cho người duyệt ({@code !currentUser.isSubordinate()}, xem
+     * ChangeRequestController): người có cấp trên thì không phải người chốt.
+     * Không đẻ ra khái niệm "người được ký" thứ hai -- hệ thống đã có bốn cấu
+     * trúc tổ chức song song rồi, thêm cái nữa là thêm chỗ để hai nơi nói hai
+     * điều khác nhau về cùng một người.
+     *
+     * <p>Thanh lý và chấm dứt sớm thì BẮT BUỘC có lý do: cả hai đóng băng hợp
+     * đồng vĩnh viễn, không đường quay lại, nên phải biết vì sao. Luật hợp lệ
+     * của từng bước chuyển nằm ở ContractDAO.ALLOWED_TRANSITIONS, đúng một chỗ.
+     */
+    private void handleChangeProgress(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        if (!AccessControl.requireFullAccess(request, response, AccessControl.Resource.CONTRACT)) {
+            return;
+        }
+        Integer id = parseIntOrNull(request.getParameter("contractId"));
+        if (id == null || contractDAO.findById(id) == null) {
+            response.sendRedirect(request.getContextPath() + "/contract?error=notfound");
+            return;
+        }
+
+        String toStatus = request.getParameter("toStatus");
+        if (ContractDAO.PROGRESS_SIGNED.equals(toStatus) && !canSign(request)) {
+            response.sendError(HttpServletResponse.SC_FORBIDDEN,
+                    "Bạn không được ký hợp đồng. Việc này thuộc về cấp trên.");
+            return;
+        }
+
+        // Kiểm trước ở đây chỉ để BÁO ĐÚNG LÝ DO. Chặn thật vẫn nằm trong
+        // transaction của DAO -- ở đây dữ liệu đã đọc từ trước nên có thể lỗi
+        // thời, còn ở đó nó được khoá lại.
+        Contract target = contractDAO.findById(id);
+        if (ContractDAO.PROGRESS_SIGNED.equals(toStatus)
+                && (target.getEffectiveDate() == null || target.getEndDate() == null)) {
+            response.sendRedirect(request.getContextPath()
+                    + "/contract?action=view&id=" + id + "&error=missing_term");
+            return;
+        }
+
+        String note = request.getParameter("progressNote");
+        if (!contractDAO.changeProgressStatus(id, toStatus, actorId(request), note)) {
+            LOG.warn("Chuyen trang thai tien do hop dong that bai (actor={}, contractId={}, toStatus={})",
+                    Logs.actor(request), id, toStatus);
+            response.sendRedirect(request.getContextPath()
+                    + "/contract?action=view&id=" + id + "&error=progress_failed");
+            return;
+        }
+        response.sendRedirect(request.getContextPath() + "/contract?action=view&id=" + id);
+    }
+
+    /**
+     * true nếu người đang đăng nhập được KÝ hợp đồng: Admin, hoặc người không
+     * có cấp trên trong cây tổ chức (quản lý vùng).
+     *
+     * <p>Lưu ý về hiện trạng dữ liệu: phần lớn Sales hiện có {@code manager_id}
+     * null vì bảng phân công cấp trên chưa nhập, nên họ vẫn ký được. Đó là cố
+     * ý và khớp với nguyên tắc đã áp ở AccessControl -- "chưa xếp vào cây thì
+     * chưa bị siết" -- để bật tính năng lên không làm đứng việc của ai. Luật KH
+     * chỉ thật sự có hiệu lực với từng người khi họ được gán cấp trên.
+     */
+    private boolean canSign(HttpServletRequest request) {
+        User user = AccessControl.currentUser(request);
+        return user != null && !user.isSubordinate();
+    }
+
+    /**
      * Huỷ một bản ghi hợp đồng NHẬP NHẦM khỏi danh sách -- không phải huỷ hợp
      * đồng ngoài đời.
      *
@@ -827,15 +1234,27 @@ public class ContractController extends HttpServlet {
      * liệu sai, và nó thuộc về Admin, có lý do, có dấu vết.
      */
     private void handleDelete(HttpServletRequest request, HttpServletResponse response) throws IOException {
-        if (!AccessControl.requireAdmin(request, response)) {
+        if (!AccessControl.requireFullAccess(request, response, AccessControl.Resource.CONTRACT)) {
             return;
         }
         Integer id = parseIntOrNull(request.getParameter("id"));
         // Kiểm tồn tại trước: với id không có thật thì voidRecord cũng trả
         // false, và người dùng nhận thông báo "không huỷ được" -- sai hẳn lý
         // do, tưởng là vướng ràng buộc nghiệp vụ.
-        if (id == null || contractDAO.findById(id) == null) {
+        Contract target = id == null ? null : contractDAO.findById(id);
+        if (target == null) {
             response.sendRedirect(request.getContextPath() + "/contract?error=notfound");
+            return;
+        }
+
+        // Bản NHÁP thì ai quản được hợp đồng cũng xoá được: nó chưa ký, chưa là
+        // chứng cứ gì, xoá một bản nháp sai là việc thường ngày. Đây chính là
+        // điều kiện đúng của BR-46 cũ ("chưa ký") -- trước V24 nó không với tới
+        // được vì signing_date NOT NULL khiến mọi hợp đồng đều đã ký.
+        //
+        // Đã ký trở đi thì chỉ Admin, vì lúc đó không còn là xoá nghiệp vụ mà
+        // là gỡ một bản ghi nhập nhầm ra khỏi danh sách.
+        if (!target.isDraft() && !AccessControl.requireAdmin(request, response)) {
             return;
         }
 
@@ -871,7 +1290,7 @@ public class ContractController extends HttpServlet {
 
         Product product = productId != null ? productDAO.findById(productId) : null;
         if (product == null || quantity == null || quantity <= 0) {
-            response.sendRedirect(request.getContextPath() + "/contract?action=view&id=" + contractId + "&error=add_product_invalid");
+            response.sendRedirect(request.getContextPath() + "/contract?action=edit&id=" + contractId + "&error=add_product_invalid");
             return;
         }
 
@@ -888,10 +1307,10 @@ public class ContractController extends HttpServlet {
         if (!contractDAO.insertProducts(contractId, List.of(item), actorId(request))) {
             LOG.warn("Them san pham vao hop dong that bai (actor={}, contractId={}, productId={})",
                     Logs.actor(request), contractId, item.getProductId());
-            response.sendRedirect(request.getContextPath() + "/contract?action=view&id=" + contractId + "&error=add_product_failed");
+            response.sendRedirect(request.getContextPath() + "/contract?action=edit&id=" + contractId + "&error=add_product_failed");
             return;
         }
-        response.sendRedirect(request.getContextPath() + "/contract?action=view&id=" + contractId);
+        response.sendRedirect(request.getContextPath() + "/contract?action=edit&id=" + contractId);
     }
 
     /** Gỡ 1 dòng sản phẩm/dịch vụ khỏi hợp đồng -- nút "Xoá" từng dòng ở viewcontractdetail.jsp. */
@@ -909,15 +1328,161 @@ public class ContractController extends HttpServlet {
         if (!contractDAO.deleteProductLine(contractProductId, contractId, actorId(request))) {
             LOG.warn("Xoa san pham khoi hop dong that bai (actor={}, contractId={}, contractProductId={})",
                     Logs.actor(request), contractId, contractProductId);
-            response.sendRedirect(request.getContextPath() + "/contract?action=view&id=" + contractId + "&error=remove_product_failed");
+            response.sendRedirect(request.getContextPath() + "/contract?action=edit&id=" + contractId + "&error=remove_product_failed");
             return;
         }
-        response.sendRedirect(request.getContextPath() + "/contract?action=view&id=" + contractId);
+        response.sendRedirect(request.getContextPath() + "/contract?action=edit&id=" + contractId);
     }
 
     // ------------------------------------------------------------------
     // Helpers
     // ------------------------------------------------------------------
+
+    /**
+     * Đổ toàn bộ dữ liệu quanh một hợp đồng -- hàng hoá, kỳ thanh toán, nhật
+     * ký, các mốc vòng đời, ba con số công nợ.
+     *
+     * <p>Dùng chung cho TRANG XEM và TRANG SỬA, và cố ý KHÔNG đặt cờ quyền nào:
+     * hai trang hiển thị cùng dữ liệu nhưng chỉ trang sửa mới có nút bấm. Đặt
+     * cờ ở đây thì trang xem lại mọc nút.
+     */
+    private void putContractWorkspace(HttpServletRequest request, Contract contract) {
+        int id = contract.getContractId();
+
+        List<ContractHistory> history = contractDAO.findHistoryByContractId(id);
+        request.setAttribute("contractHistory", history);
+        // Ba mốc vòng đời kéo riêng ra khỏi nhật ký để dựng thanh tiến trình.
+        // Thanh đó trả lời "đang ở đâu", nhật ký trả lời "đã đi qua những gì".
+        request.setAttribute("createdEvent", milestoneOf(history, ContractHistory.EVENT_CREATED));
+        request.setAttribute("signedEvent", milestoneOf(history, ContractHistory.EVENT_SIGNED));
+        ContractHistory closed = milestoneOf(history, ContractHistory.EVENT_LIQUIDATED);
+        if (closed == null) {
+            closed = milestoneOf(history, ContractHistory.EVENT_TERMINATED);
+        }
+        request.setAttribute("closedEvent", closed);
+
+        // Hết hạn theo LỊCH mà tiến độ vẫn "Đã ký" = hết hạn nhưng chưa thanh
+        // lý. Đây là việc còn tồn, và là toàn bộ lý do hai trục không gộp làm
+        // một -- nên nó hiện thành cảnh báo chứ không để người dùng tự đối
+        // chiếu hai cái nhãn.
+        request.setAttribute("overdueUnclosed",
+                ContractDAO.STATUS_EXPIRED.equals(contract.getStatus())
+                        && ContractDAO.PROGRESS_SIGNED.equals(contract.getProgressStatus()));
+
+        request.setAttribute("contractProducts", contractDAO.findProductsByContractId(id));
+
+        // Phụ lục: hiện ở CẢ trang xem lẫn trang quản lý. Trên hợp đồng gốc đây
+        // là danh sách các văn bản đã sửa đổi nó; trên chính một phụ lục thì
+        // danh sách rỗng (một tầng) và thứ cần thấy là đường ngược về cha, cái
+        // đó nằm sẵn trong contract.parentContractCode.
+        request.setAttribute("amendments", contractDAO.findAmendmentsByParentId(id));
+
+        List<ContractPayment> payments = contractDAO.findPaymentsByContractId(id);
+        request.setAttribute("contractPayments", payments);
+
+        java.math.BigDecimal scheduled = java.math.BigDecimal.ZERO;
+        java.math.BigDecimal collected = java.math.BigDecimal.ZERO;
+        for (ContractPayment p : payments) {
+            scheduled = scheduled.add(p.getInvoiceAmount());
+            if (p.getPaidDate() != null) {
+                collected = collected.add(p.getInvoiceAmount());
+            }
+        }
+        request.setAttribute("paymentScheduled", scheduled);
+        request.setAttribute("paymentCollected", collected);
+        request.setAttribute("paymentOutstanding", scheduled.subtract(collected));
+        // Tổng các kỳ lệch giá trị hợp đồng nghĩa là lập thiếu hoặc lập thừa.
+        // CẢNH BÁO chứ không phải lỗi: có thể còn kỳ chưa nhập.
+        request.setAttribute("paymentMismatch",
+                contract.getContractValue() != null
+                        && contract.getContractValue().compareTo(scheduled) != 0);
+    }
+
+    // ------------------------------------------------------------------
+    // Kỳ thanh toán
+    // ------------------------------------------------------------------
+
+    private void handleAddPayment(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        if (!AccessControl.requireFullAccess(request, response, AccessControl.Resource.CONTRACT)) {
+            return;
+        }
+        Integer contractId = parseIntOrNull(request.getParameter("contractId"));
+        if (contractId == null || contractDAO.findById(contractId) == null) {
+            response.sendRedirect(request.getContextPath() + "/contract?error=notfound");
+            return;
+        }
+
+        ContractPayment payment = new ContractPayment();
+        payment.setInvoiceAmount(parseMoneyOrNull(request.getParameter("invoiceAmount")));
+        payment.setDueDate(parseDateOrNull(request.getParameter("dueDate")));
+        payment.setPaidDate(parseDateOrNull(request.getParameter("paidDate")));
+
+        if (!contractDAO.insertPayment(contractId, payment, actorId(request))) {
+            LOG.warn("Lap ky thanh toan that bai (actor={}, contractId={})", Logs.actor(request), contractId);
+            response.sendRedirect(request.getContextPath()
+                    + "/contract?action=edit&id=" + contractId + "&error=payment_failed");
+            return;
+        }
+        response.sendRedirect(request.getContextPath() + "/contract?action=edit&id=" + contractId);
+    }
+
+    private void handleMarkPaid(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        if (!AccessControl.requireFullAccess(request, response, AccessControl.Resource.CONTRACT)) {
+            return;
+        }
+        Integer contractId = parseIntOrNull(request.getParameter("contractId"));
+        Integer paymentId = parseIntOrNull(request.getParameter("paymentId"));
+        if (contractId == null || paymentId == null) {
+            response.sendRedirect(request.getContextPath() + "/contract?error=notfound");
+            return;
+        }
+        // Ngày thu mặc định là hôm nay -- phần lớn thao tác là ghi nhận ngay
+        // lúc tiền về; ai cần lùi ngày thì điền ô riêng.
+        Date paidDate = parseDateOrNull(request.getParameter("paidDate"));
+        if (paidDate == null) {
+            paidDate = Date.valueOf(java.time.LocalDate.now());
+        }
+
+        if (!contractDAO.markPaymentPaid(paymentId, contractId, paidDate, actorId(request))) {
+            LOG.warn("Ghi nhan da thu that bai (actor={}, contractId={}, paymentId={})",
+                    Logs.actor(request), contractId, paymentId);
+            response.sendRedirect(request.getContextPath()
+                    + "/contract?action=edit&id=" + contractId + "&error=payment_failed");
+            return;
+        }
+        response.sendRedirect(request.getContextPath() + "/contract?action=edit&id=" + contractId);
+    }
+
+    private void handleRemovePayment(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        if (!AccessControl.requireFullAccess(request, response, AccessControl.Resource.CONTRACT)) {
+            return;
+        }
+        Integer contractId = parseIntOrNull(request.getParameter("contractId"));
+        Integer paymentId = parseIntOrNull(request.getParameter("paymentId"));
+        if (contractId == null || paymentId == null) {
+            response.sendRedirect(request.getContextPath() + "/contract?error=notfound");
+            return;
+        }
+
+        if (!contractDAO.deletePayment(paymentId, contractId, actorId(request))) {
+            LOG.warn("Xoa ky thanh toan that bai (actor={}, contractId={}, paymentId={})",
+                    Logs.actor(request), contractId, paymentId);
+            response.sendRedirect(request.getContextPath()
+                    + "/contract?action=edit&id=" + contractId + "&error=payment_failed");
+            return;
+        }
+        response.sendRedirect(request.getContextPath() + "/contract?action=edit&id=" + contractId);
+    }
+
+    /** Dòng nhật ký gần nhất của một loại mốc vòng đời, hoặc null nếu chưa xảy ra. */
+    private static ContractHistory milestoneOf(List<ContractHistory> history, String eventType) {
+        for (ContractHistory h : history) {
+            if (eventType.equals(h.getEventType())) {
+                return h;
+            }
+        }
+        return null;
+    }
 
     /**
      * user_id người đang thao tác, để ghi vào nhật ký hợp đồng.
@@ -1086,6 +1651,9 @@ public class ContractController extends HttpServlet {
      * cáo lặng lẽ đổi nghĩa.
      */
     private Contract buildContractFromRequest(HttpServletRequest request, Contract c) {
+        // Mã hợp đồng do NGƯỜI DÙNG nhập (V28), chính là số ghi trên bản giấy.
+        // Không còn sinh tự động, nên đây là ô bắt buộc -- isValid() kiểm.
+        c.setContractCode(emptyToNull(request.getParameter("contractCode")));
         c.setTitle(emptyToNull(request.getParameter("title")));
         c.setContractType(emptyToNull(request.getParameter("contractType")));
         c.setSigningDate(parseDateOrNull(request.getParameter("signDate")));
@@ -1104,17 +1672,62 @@ public class ContractController extends HttpServlet {
         // dùng tự tải lên rồi dán link vào đây (giống cách catalogue sản phẩm
         // đang lưu link Drive). Hệ thống không đụng tới file đó.
         c.setAttachmentUrl(emptyToNull(request.getParameter("attachmentUrl")));
+
+        c.setSignerName(emptyToNull(request.getParameter("signerName")));
+        c.setSignerPosition(emptyToNull(request.getParameter("signerPosition")));
+        c.setCounterpartySignerName(emptyToNull(request.getParameter("counterpartySignerName")));
+        c.setCounterpartySignerPosition(emptyToNull(request.getParameter("counterpartySignerPosition")));
+        c.setAuthorizationRef(emptyToNull(request.getParameter("authorizationRef")));
+        c.setSigningPlace(emptyToNull(request.getParameter("signingPlace")));
+        c.setContractValue(parseMoneyOrNull(request.getParameter("contractValue")));
         return c;
     }
 
     /** BR-44: các trường bắt buộc phải có, và Ngày ký ≤ Ngày hiệu lực ≤ Ngày kết thúc. */
+    /**
+     * Đọc số tiền người dùng gõ. Chấp nhận cả "1.500.000.000" lẫn "1500000000"
+     * -- người Việt gõ dấu chấm phân nhóm theo thói quen, và bắt họ gõ số trần
+     * chỉ tạo ra lỗi nhập liệu chứ không tạo ra dữ liệu sạch hơn.
+     *
+     * <p>Trả null khi để trống (bản nháp chưa chốt giá) HOẶC khi chuỗi không
+     * đọc được -- không ném ra ngoài: một ô tiền gõ sai không đáng làm hỏng cả
+     * lần lưu, và isValid() bên dưới sẽ bắt nếu giá trị đó là bắt buộc.
+     *
+     * <p>Số âm bị từ chối: giá trị hợp đồng âm không có nghĩa, và nếu lọt vào
+     * thì nó âm thầm trừ đi trong mọi phép cộng sau này.
+     */
+    private java.math.BigDecimal parseMoneyOrNull(String raw) {
+        if (isBlank(raw)) {
+            return null;
+        }
+        String digits = raw.replaceAll("[.,\\s]", "");
+        try {
+            java.math.BigDecimal value = new java.math.BigDecimal(digits);
+            return value.signum() < 0 ? null : value;
+        } catch (NumberFormatException ex) {
+            return null;
+        }
+    }
+
     private boolean isValid(Contract c) {
-        if (c.getTitle() == null || c.getContractType() == null
-                || c.getSigningDate() == null || c.getEffectiveDate() == null || c.getEndDate() == null
+        if (c.getContractCode() == null || c.getTitle() == null || c.getContractType() == null
                 || c.getEnterpriseId() <= 0 || c.getOwnerId() <= 0) {
             return false;
         }
-        return !c.getSigningDate().after(c.getEffectiveDate()) && !c.getEffectiveDate().after(c.getEndDate());
+        // Thời hạn có thể TRỐNG ở bản nháp -- hai mốc đó là kết quả đàm phán,
+        // lúc mới soạn chưa chốt được. Không ký được khi còn thiếu, nên NULL
+        // chỉ sống trong quãng Nháp (xem ContractDAO.changeProgressStatus).
+        // Ngày ký có thể TRỐNG: bản nháp chưa ký thì chưa có ngày ký, và ngày
+        // đó được đóng dấu lúc bấm Ký (ContractDAO.changeProgressStatus đặt
+        // CURDATE()) chứ không phải thứ người dùng gõ vào ô. Khi đã có thì vẫn
+        // phải giữ BR-44: ký <= hiệu lực <= kết thúc.
+        if (c.getSigningDate() != null && c.getEffectiveDate() != null
+                && c.getSigningDate().after(c.getEffectiveDate())) {
+            return false;
+        }
+        // Có cả hai thì vẫn giữ BR-44; thiếu một trong hai thì chưa có gì để so.
+        return c.getEffectiveDate() == null || c.getEndDate() == null
+                || !c.getEffectiveDate().after(c.getEndDate());
     }
 
     /**

@@ -4345,6 +4345,13 @@ INSERT INTO `productcatalogues` (`product_id`, `catalogue_url`, `file_name`, `di
 DROP TABLE IF EXISTS `contracts`;
 CREATE TABLE `contracts` (
   `contract_id` int NOT NULL AUTO_INCREMENT,
+  -- Phụ lục: hợp đồng con trỏ về hợp đồng gốc. NULL = đây là hợp đồng gốc.
+  -- MỘT TẦNG -- phụ lục của phụ lục không tồn tại trong nghiệp vụ; khoá ngoại
+  -- tự trỏ không ép được điều đó nên luật nằm ở ContractDAO.insert. Xem V29.
+  `parent_contract_id` int DEFAULT NULL,
+  -- Mã hợp đồng, chính là số ghi trên bản giấy ("01/2026/HĐKT-POSTEF").
+  -- NGƯỜI DÙNG NHẬP, hệ thống không sinh (V28). UNIQUE là chốt chặn thật cho
+  -- việc trùng mã; controller kiểm trước chỉ để báo lỗi tử tế.
   `contract_code` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
   `title` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
   `contract_type` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
@@ -4352,13 +4359,30 @@ CREATE TABLE `contracts` (
   -- 'Mua' = mình mua vào (đối tác giữ vai 'Nhà cung cấp')
   -- Cặp đôi CHÉO -- xem ghi chú đầu V21.
   `direction` varchar(10) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'Bán',
-  `signing_date` date NOT NULL,
-  `effective_date` date NOT NULL,
-  `end_date` date NOT NULL,
+  `signing_date` date DEFAULT NULL,
+  -- Nullable: bản Nháp chưa chốt được thời hạn (là kết quả đàm phán).
+  -- NULL chỉ tồn tại trong quãng Nháp -- không ký được khi thiếu. Xem V26.
+  `effective_date` date DEFAULT NULL,
+  `end_date` date DEFAULT NULL,
   `enterprise_id` int NOT NULL,
   `owner_id` int NOT NULL,
+  -- Người đặt bút ký, của TỪNG hợp đồng -- khác enterprises.legal_representative
+  -- vốn ở cấp công ty. Có uỷ quyền thì hai thứ đó khác nhau. Xem V27.
+  `signer_name` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `signer_position` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `counterparty_signer_name` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `counterparty_signer_position` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `authorization_ref` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `signing_place` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  -- Giá trị theo ĐIỀU KHOẢN. Khác tổng contract_payments (thực tế thu/chi) --
+  -- chỗ lệch giữa hai con số chính là công nợ, gộp lại là mất khái niệm đó.
+  `contract_value` decimal(15,2) DEFAULT NULL,
   `attachment_url` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  -- Trục LỊCH: hàm thuần của effective_date/end_date, không ai đặt được.
   `status` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'Đang hiệu lực',
+  -- Trục TIẾN ĐỘ: 'Nháp' | 'Đã ký' | 'Đã thanh lý' | 'Chấm dứt sớm'.
+  -- Do người đặt, có chứng từ; lệch với trục lịch ở cả hai chiều. Xem V24.
+  `progress_status` varchar(30) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'Nháp',
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   `is_deleted` tinyint(1) NOT NULL DEFAULT '0',
@@ -4367,8 +4391,13 @@ CREATE TABLE `contracts` (
   KEY `enterprise_id` (`enterprise_id`),
   KEY `owner_id` (`owner_id`),
   KEY `idx_contracts_direction` (`direction`),
+  KEY `idx_contracts_progress` (`progress_status`),
+  KEY `idx_contracts_parent` (`parent_contract_id`),
   CONSTRAINT `contracts_ibfk_1` FOREIGN KEY (`enterprise_id`) REFERENCES `enterprises` (`enterprise_id`),
-  CONSTRAINT `contracts_ibfk_2` FOREIGN KEY (`owner_id`) REFERENCES `users` (`user_id`)
+  CONSTRAINT `contracts_ibfk_2` FOREIGN KEY (`owner_id`) REFERENCES `users` (`user_id`),
+  -- KHÔNG cascade: hợp đồng vốn xoá mềm, nên cascade chỉ chực chờ người sau lỡ
+  -- tay xoá cứng một dòng rồi mang theo cả phụ lục của nó. Xem V29.
+  CONSTRAINT `fk_contracts_parent` FOREIGN KEY (`parent_contract_id`) REFERENCES `contracts` (`contract_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 DROP TABLE IF EXISTS `contractproducts`;

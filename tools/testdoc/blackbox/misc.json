@@ -591,6 +591,82 @@
           "e": "B không còn thêm được khách hàng, nhưng thêm được phiếu hỗ trợ — quyền khớp với vai trò mới"
         }
       ]
+    },
+    {
+      "name": "Yêu cầu thay đổi — loại thay đổi xin được",
+      "sheet": "ChangeRequestIntent",
+      "prefix": "TC_CRINTENT",
+      "screen": "/POSCS/changerequest?action=new — POST action=create",
+      "description": "Cấp dưới chỉ xem được Khách hàng và Hợp đồng, muốn đổi gì thì gửi yêu cầu lên cấp trên. Từ khi có luật vòng đời, trên HỢP ĐỒNG hai loại \"Sửa\" và \"Xoá\" không còn nghĩa — hợp đồng đã ký thì cấp trên cũng không sửa hay xoá được — nên thứ xin được là \"Lập phụ lục\".",
+      "precondition": "Đăng nhập bằng một tài khoản Sales ĐÃ được gán Cấp trên ở màn hình Nhân viên",
+      "cases": [
+        {
+          "d": "Chọn tài nguyên Hợp đồng thì danh sách loại thay đổi đổi theo",
+          "s": [
+            "Vào Yêu cầu thay đổi, bấm Gửi yêu cầu",
+            "Ở ô \"Dữ liệu cần thay đổi\" chọn \"Hợp đồng\""
+          ],
+          "t": "Dữ liệu: Hợp đồng",
+          "e": "Ô \"Loại thay đổi\" chỉ còn \"Tạo mới\" và \"Lập phụ lục\"; có dòng giải thích \"Hợp đồng đã ký không sửa hay xoá được nữa\""
+        },
+        {
+          "d": "Chọn tài nguyên Khách hàng thì vẫn xin sửa / xoá được",
+          "s": [
+            "Ở ô \"Dữ liệu cần thay đổi\" chọn \"Khách hàng\""
+          ],
+          "t": "Dữ liệu: Khách hàng",
+          "e": "Ô \"Loại thay đổi\" có \"Tạo mới\", \"Sửa\", \"Xoá\"; KHÔNG có \"Lập phụ lục\"",
+          "n": "Khách hàng không có khái niệm phụ lục; ở đó \"Sửa\" vẫn đúng nghĩa"
+        },
+        {
+          "d": "Gửi thẳng yêu cầu Sửa hợp đồng",
+          "s": [
+            "Gửi POST action=create với resourceType=\"Hợp đồng\" và intent=\"Sửa\""
+          ],
+          "t": "resourceType: Hợp đồng; intent: Sửa",
+          "e": "Bị chặn, quay về form kèm lỗi; không tạo yêu cầu nào",
+          "n": "Chặn ở đường ghi (ChangeRequestController.intentAllowedFor), không phải chỉ ẩn ô chọn"
+        },
+        {
+          "d": "Gửi thẳng yêu cầu Xoá hợp đồng",
+          "s": [
+            "Gửi POST action=create với resourceType=\"Hợp đồng\" và intent=\"Xoá\""
+          ],
+          "t": "resourceType: Hợp đồng; intent: Xoá",
+          "e": "Bị chặn; không tạo yêu cầu nào"
+        },
+        {
+          "d": "Gửi yêu cầu Lập phụ lục",
+          "s": [
+            "Chọn Hợp đồng + Lập phụ lục",
+            "Nhập mã bản ghi là ID của hợp đồng gốc và nội dung đề xuất",
+            "Bấm Gửi"
+          ],
+          "t": "Mã bản ghi: <id hợp đồng gốc>; Nội dung: Xin gia hạn thêm 6 tháng",
+          "e": "Tạo yêu cầu thành công; cấp trên nhận thông báo"
+        },
+        {
+          "d": "Cấp trên mở yêu cầu Lập phụ lục",
+          "s": [
+            "Đăng nhập bằng cấp trên của người gửi",
+            "Mở yêu cầu vừa nhận và bấm đường dẫn tới màn hình thực hiện"
+          ],
+          "t": "-",
+          "e": "Mở thẳng form \"Lập phụ lục hợp đồng\" của đúng hợp đồng gốc đó",
+          "o": "Duyệt KHÔNG tự áp thay đổi — cấp trên tự làm trên form thường, đường dẫn chỉ đỡ phải dò"
+        },
+        {
+          "d": "Yêu cầu Sửa hợp đồng gửi TRƯỚC luật này vẫn đọc được",
+          "s": [
+            "Mở danh sách yêu cầu thay đổi",
+            "Mở một yêu cầu cũ có loại \"Sửa\" trên tài nguyên Hợp đồng"
+          ],
+          "p": "CSDL còn yêu cầu cũ loại \"Sửa\"/\"Xoá\" trên Hợp đồng",
+          "t": "-",
+          "e": "Yêu cầu hiển thị đầy đủ và vẫn duyệt / từ chối được",
+          "n": "Chỉ chặn yêu cầu MỚI; xoá dữ liệu cũ là viết lại quá khứ"
+        }
+      ]
     }
   ]
 }

@@ -80,10 +80,34 @@ public class ContractControllerTest {
     }
 
     private void loginAs(String roleName) {
+        loginAs(roleName, null);
+    }
+
+    /**
+     * @param managerId cấp trên trong cây tổ chức; null = chưa xếp vào cây, và
+     *                  theo AccessControl thì "chưa xếp vào cây thì chưa bị
+     *                  siết" -- đó là lý do mặc định của mọi test là null.
+     */
+    private void loginAs(String roleName, Integer managerId) {
         User user = new User();
         user.setUserId(99);
         user.setRole(new Role(1, roleName));
+        user.setManagerId(managerId);
         when(session.getAttribute("currentUser")).thenReturn(user);
+    }
+
+    /**
+     * Hợp đồng đủ thời hạn -- từ V26 hai mốc đó nullable và ContractController
+     * chặn việc ký khi còn thiếu, nên thiếu chúng là mọi test về ký đều
+     * trượt sang nhánh missing_term.
+     */
+    private static Contract contractWithProgress(String progressStatus) {
+        Contract c = new Contract();
+        c.setContractId(5);
+        c.setProgressStatus(progressStatus);
+        c.setEffectiveDate(sqlDate(2026, 1, 15));
+        c.setEndDate(sqlDate(2026, 12, 31));
+        return c;
     }
 
     private static void setField(Object target, String fieldName, Object value) throws Exception {
@@ -163,9 +187,13 @@ public class ContractControllerTest {
         controller.doGet(request, response);
 
         verify(request).setAttribute("contract", contract);
-        // Sales xem được hợp đồng nhưng không huỷ được bản ghi -- việc đó của
-        // Admin. Trước đây cờ này tính theo trạng thái ngày tháng (BR-46 cũ).
-        verify(request).setAttribute("canVoid", false);
+        // TRANG XEM KHÔNG ĐƯỢC ĐẶT CỜ THAO TÁC NÀO. Mọi nút gây thay đổi đã
+        // chuyển sang trang sửa; JSP bên đó bật nút theo các cờ này. Đặt lại ở
+        // đây là trang xem mọc nút trở lại -- đúng thứ người dùng không muốn.
+        for (String flag : new String[]{"canVoid", "canSign", "canClose",
+                "canEditProducts", "canEditPayments", "canRecordPayment"}) {
+            verify(request, never()).setAttribute(eq(flag), any());
+        }
         verify(dispatcher).forward(request, response);
         verify(response, never()).sendRedirect(anyString());
     }
@@ -174,7 +202,149 @@ public class ContractControllerTest {
     // POST ?action=create / update (BR-44)
     // ------------------------------------------------------------------
 
+    /**
+     * Hợp đồng ở trạng thái Nháp.
+     *
+     * <p>{@code new Contract()} KHÔNG dùng được nữa: progressStatus của nó là
+     * null, mà mọi vị ngữ vòng đời đều hỏi "có phải Nháp không" và null trả lời
+     * KHÔNG -- tức là bản ghi trắng bị coi như đã ký, và form sửa chỉ nhận hai
+     * trường. Mặc định đó là cố ý (thà khoá nhầm còn hơn mở nhầm một hợp đồng
+     * đã ký), nhưng nó khiến test phải nói rõ mình đang đứng ở đâu.
+     */
+    private static Contract draftContract() {
+        Contract c = new Contract();
+        c.setProgressStatus("Nháp");
+        return c;
+    }
+
+    // ------------------------------------------------------------------
+    // Siết form sửa + phụ lục (đợt 3)
+    // ------------------------------------------------------------------
+
+    /** Hợp đồng đã ký: mọi ô điều khoản trên form bị bỏ qua, chỉ hai trường đi tiếp. */
+    @Test
+    public void update_signedContract_keepsTermsFromTheStoredRecord() throws Exception {
+        Contract signed = signedContract();
+        when(request.getParameter("action")).thenReturn("update");
+        when(request.getParameter("contractId")).thenReturn("5");
+        when(contractDAO.findById(5)).thenReturn(signed);
+        // Form gửi lên một tiêu đề khác -- có thể là POST nặn tay, vì ô đó
+        // hiển thị dạng khoá.
+        stubValidContractFields();
+        when(request.getParameter("title")).thenReturn("Tiêu đề bị đổi lén");
+        when(request.getParameter("ownerId")).thenReturn("88");
+        when(contractDAO.update(any(Contract.class), anyInt())).thenReturn(true);
+
+        controller.doPost(request, response);
+
+        verify(contractDAO).update(argThat((Contract c) ->
+                "Hợp đồng gốc".equals(c.getTitle()) && c.getOwnerId() == 88), anyInt());
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=view&id=5");
+    }
+
+    /**
+     * Chữa sai sót là việc của ADMIN.
+     *
+     * <p>Không dùng requireFullAccess như các action khác: quyền quản lý hợp
+     * đồng cho phép tạo, sửa nháp, ký -- chạm vào điều khoản của hợp đồng ĐÃ KÝ
+     * thì hẹp hơn hẳn.
+     */
+    @Test
+    public void correct_nonAdmin_isRefusedAndWritesNothing() throws Exception {
+        when(request.getParameter("action")).thenReturn("correct");
+        when(request.getParameter("contractId")).thenReturn("5");
+
+        controller.doPost(request, response);
+
+        verify(contractDAO, never()).correct(any(Contract.class), anyInt(), anyString());
+    }
+
+    /** Thiếu lý do thì không gọi xuống DAO -- báo lỗi ngay, không để mất dữ liệu người dùng vừa gõ. */
+    @Test
+    public void correct_withoutReason_redirectsWithoutCallingDao() throws Exception {
+        loginAs("Admin");
+        when(request.getParameter("action")).thenReturn("correct");
+        when(request.getParameter("contractId")).thenReturn("5");
+        when(contractDAO.findById(5)).thenReturn(signedContract());
+        when(request.getParameter("correctionReason")).thenReturn("   ");
+
+        controller.doPost(request, response);
+
+        verify(contractDAO, never()).correct(any(Contract.class), anyInt(), anyString());
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=edit&id=5&error=missing_reason");
+    }
+
+    /**
+     * Form lập phụ lục từ chối hợp đồng cha chưa ký, và đưa người dùng về đúng
+     * hợp đồng đó thay vì mở một form mà bấm Lưu chắc chắn thất bại.
+     */
+    @Test
+    public void newAmendment_draftParent_redirectsWithReason() throws Exception {
+        when(request.getParameter("action")).thenReturn("newAmendment");
+        when(request.getParameter("parentId")).thenReturn("3");
+        when(contractDAO.findById(3)).thenReturn(draftContract());
+
+        controller.doGet(request, response);
+
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=view&id=3&error=amendment_not_allowed");
+    }
+
+    /** Phụ lục mang parentContractId, và khách hàng lấy từ hợp đồng cha chứ không từ form. */
+    @Test
+    public void createAmendment_carriesParentAndInheritsCounterparty() throws Exception {
+        Contract parent = signedContract();
+        parent.setContractId(3);
+        parent.setEnterpriseId(10);
+        when(request.getParameter("action")).thenReturn("createAmendment");
+        when(request.getParameter("parentId")).thenReturn("3");
+        when(contractDAO.findById(3)).thenReturn(parent);
+        stubValidContractFields();
+        // Form phụ lục không có ô khách hàng; giá trị lạ dưới đây phải bị bỏ qua.
+        when(request.getParameter("enterpriseId")).thenReturn("777");
+        when(contractDAO.insert(any(Contract.class), anyInt())).thenReturn(90);
+
+        controller.doPost(request, response);
+
+        verify(contractDAO).insert(argThat((Contract c) ->
+                c.getParentContractId() != null && c.getParentContractId() == 3
+                        && c.getEnterpriseId() == 10), anyInt());
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=view&id=90");
+    }
+
+    /** Hợp đồng cha vừa đổi trạng thái giữa chừng: DAO từ chối, người dùng về trang hợp đồng cha. */
+    @Test
+    public void createAmendment_daoRejectsParent_redirectsToParent() throws Exception {
+        Contract parent = signedContract();
+        parent.setContractId(3);
+        parent.setEnterpriseId(10);
+        when(request.getParameter("action")).thenReturn("createAmendment");
+        when(request.getParameter("parentId")).thenReturn("3");
+        when(contractDAO.findById(3)).thenReturn(parent);
+        stubValidContractFields();
+        when(contractDAO.insert(any(Contract.class), anyInt())).thenReturn(ContractDAO.INVALID_PARENT);
+
+        controller.doPost(request, response);
+
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=view&id=3&error=amendment_not_allowed");
+    }
+
+    /** Hợp đồng đã ký với đối tác giữ đúng vai -- dùng cho nhóm test siết form. */
+    private static Contract signedContract() {
+        Contract c = new Contract();
+        c.setContractId(5);
+        c.setProgressStatus("Đã ký");
+        c.setContractCode("01/2026/HĐKT-POSTEF");
+        c.setTitle("Hợp đồng gốc");
+        c.setContractType("Cung cấp thiết bị");
+        c.setDirection("Bán");
+        c.setEnterpriseId(10);
+        c.setOwnerId(99);
+        return c;
+    }
+
     private void stubValidContractFields() {
+        // Mã hợp đồng là ô BẮT BUỘC từ V28 -- hệ thống thôi sinh mã hộ.
+        when(request.getParameter("contractCode")).thenReturn("01/2026/HĐKT-POSTEF");
         when(request.getParameter("title")).thenReturn("Hợp đồng cung cấp thiết bị");
         when(request.getParameter("contractType")).thenReturn("Cung cấp thiết bị");
         when(request.getParameter("signDate")).thenReturn("2026-01-01");
@@ -222,7 +392,6 @@ public class ContractControllerTest {
     public void create_validFields_insertsAndRedirectsToDetail() throws Exception {
         when(request.getParameter("action")).thenReturn("create");
         stubValidContractFields();
-        when(contractDAO.generateNextContractCode()).thenReturn("HD-0001");
         when(contractDAO.insert(any(Contract.class), anyInt())).thenReturn(77);
 
         controller.doPost(request, response);
@@ -259,7 +428,10 @@ public class ContractControllerTest {
     public void update_validFields_updatesAndRedirectsToDetail() throws Exception {
         when(request.getParameter("action")).thenReturn("update");
         when(request.getParameter("contractId")).thenReturn("5");
-        when(contractDAO.findById(5)).thenReturn(new Contract());
+        // Bản NHÁP: đó là trạng thái duy nhất mà form sửa còn gửi lên đủ mọi ô.
+        // Hợp đồng đã ký đi đường khác hẳn -- xem
+        // update_contractDaKy_chiNhanNguoiPhuTrachVaLink.
+        when(contractDAO.findById(5)).thenReturn(draftContract());
         stubValidContractFields();
         when(contractDAO.update(any(Contract.class), anyInt())).thenReturn(true);
 
@@ -288,7 +460,6 @@ public class ContractControllerTest {
         stubValidContractFields();
         when(request.getParameter("kind")).thenReturn("buy");
         when(customerDAO.findRolesOf(10)).thenReturn(List.of("Nhà cung cấp"));
-        when(contractDAO.generateNextContractCode()).thenReturn("HD-0001");
         when(contractDAO.insert(any(Contract.class), anyInt())).thenReturn(5);
 
         controller.doPost(request, response);
@@ -323,7 +494,6 @@ public class ContractControllerTest {
         stubValidContractFields();
         when(request.getParameter("kind")).thenReturn("buy");
         when(customerDAO.findRolesOf(10)).thenReturn(List.of("Khách mua", "Nhà cung cấp"));
-        when(contractDAO.generateNextContractCode()).thenReturn("HD-0001");
         when(contractDAO.insert(any(Contract.class), anyInt())).thenReturn(5);
 
         controller.doPost(request, response);
@@ -347,7 +517,7 @@ public class ContractControllerTest {
 
         ArgumentCaptor<Period> period = ArgumentCaptor.forClass(Period.class);
         verify(contractDAO).findAll(anyInt(), anyInt(), any(), any(), any(), any(), eq(false),
-                period.capture(), eq("Mua"));
+                period.capture(), eq("Mua"), nullable(String.class), eq(false));
         assertNotNull("kỳ phải còn nguyên khi lọc theo chiều", period.getValue());
         assertEquals("Quý 2/2026", period.getValue().getLabel());
     }
@@ -360,8 +530,163 @@ public class ContractControllerTest {
         controller.doGet(request, response);
 
         verify(contractDAO).findAll(anyInt(), anyInt(), any(), any(), any(), any(), eq(false),
-                nullable(Period.class), eq("Bán"));
+                nullable(Period.class), eq("Bán"), nullable(String.class), eq(false));
         verify(request).setAttribute("kind", "sell");
+    }
+
+    // ------------------------------------------------------------------
+    // Giá trị hợp đồng -- ô tiền người dùng gõ tay
+    // ------------------------------------------------------------------
+
+    /** Tạo hợp đồng với một chuỗi tiền cho trước, trả về giá trị đã parse. */
+    private java.math.BigDecimal contractValueFrom(String raw) throws Exception {
+        when(request.getParameter("action")).thenReturn("create");
+        when(request.getParameter("kind")).thenReturn("sell");
+        stubValidContractFields();
+        when(request.getParameter("contractValue")).thenReturn(raw);
+        // findRolesOf(10) đã được stubValidContractFields() gán 'Khách mua'.
+        when(contractDAO.insert(any(Contract.class), anyInt())).thenReturn(5);
+
+        controller.doPost(request, response);
+
+        ArgumentCaptor<Contract> saved = ArgumentCaptor.forClass(Contract.class);
+        verify(contractDAO).insert(saved.capture(), anyInt());
+        return saved.getValue().getContractValue();
+    }
+
+    @Test
+    public void contractValue_acceptsVietnameseThousandSeparators() throws Exception {
+        // Người Việt gõ dấu chấm phân nhóm theo thói quen. Bắt gõ số trần chỉ
+        // tạo ra lỗi nhập liệu chứ không tạo ra dữ liệu sạch hơn.
+        assertEquals(new java.math.BigDecimal("1500000000"), contractValueFrom("1.500.000.000"));
+    }
+
+    @Test
+    public void contractValue_blankMeansNotAgreedYet() throws Exception {
+        // Bản nháp chưa chốt giá -- để trống là hợp lệ, không phải lỗi.
+        assertNull(contractValueFrom("   "));
+    }
+
+    @Test
+    public void contractValue_negativeIsRejectedRatherThanStored() throws Exception {
+        // Giá trị âm không có nghĩa, và nếu lọt vào thì nó âm thầm trừ đi
+        // trong mọi phép cộng sau này.
+        assertNull(contractValueFrom("-500000"));
+    }
+
+    @Test
+    public void contractValue_garbageDoesNotBreakTheWholeSave() throws Exception {
+        // Một ô tiền gõ sai không đáng làm hỏng cả lần lưu hợp đồng.
+        assertNull(contractValueFrom("một tỷ rưỡi"));
+    }
+
+    // ------------------------------------------------------------------
+    // POST ?action=changeProgress -- trục tiến độ
+    // ------------------------------------------------------------------
+    //
+    // KH trả lời 2026-09-15: nhân viên không tự ký hợp đồng được. Trước V24
+    // câu đó không diễn đạt nổi -- signing_date NOT NULL nên tạo hợp đồng là đã
+    // ký, không có khoảnh khắc nào để chặn.
+
+    @Test
+    public void sign_userWithAManager_isRefused() throws Exception {
+        loginAs("Sales", 42); // có cấp trên => là nhân viên, không phải người chốt
+        when(request.getParameter("action")).thenReturn("changeProgress");
+        when(request.getParameter("contractId")).thenReturn("5");
+        when(request.getParameter("toStatus")).thenReturn(ContractDAO.PROGRESS_SIGNED);
+        when(contractDAO.findById(5)).thenReturn(contractWithProgress(ContractDAO.PROGRESS_DRAFT));
+
+        controller.doPost(request, response);
+
+        verify(contractDAO, never()).changeProgressStatus(anyInt(), anyString(), anyInt(), any());
+        verify(response).sendError(eq(HttpServletResponse.SC_FORBIDDEN), anyString());
+    }
+
+    @Test
+    public void sign_userWithoutAManager_isAllowed() throws Exception {
+        when(request.getParameter("action")).thenReturn("changeProgress");
+        when(request.getParameter("contractId")).thenReturn("5");
+        when(request.getParameter("toStatus")).thenReturn(ContractDAO.PROGRESS_SIGNED);
+        when(contractDAO.findById(5)).thenReturn(contractWithProgress(ContractDAO.PROGRESS_DRAFT));
+        when(contractDAO.changeProgressStatus(eq(5), eq(ContractDAO.PROGRESS_SIGNED), anyInt(), any()))
+                .thenReturn(true);
+
+        controller.doPost(request, response);
+
+        verify(contractDAO).changeProgressStatus(eq(5), eq(ContractDAO.PROGRESS_SIGNED), eq(99), any());
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=view&id=5");
+    }
+
+    /**
+     * Cấp dưới bị chặn ở TẦNG QUYỀN, không phải bởi luật ký.
+     *
+     * <p>AccessControl siết người có cấp trên xuống chỉ-xem trên Hợp đồng, nên
+     * họ không thực hiện được bước tiến độ nào cả -- kể cả thanh lý, vốn không
+     * liên quan gì tới chữ ký. Ghi lại ở đây vì dễ hiểu nhầm thành "luật ký
+     * chặn họ", rồi có người đi nới canSign để cho thanh lý và tưởng đã xong.
+     */
+    @Test
+    public void changeProgress_subordinate_isBlockedByAccessControl() throws Exception {
+        loginAs("Sales", 42);
+        when(request.getParameter("action")).thenReturn("changeProgress");
+        when(request.getParameter("contractId")).thenReturn("5");
+        when(request.getParameter("toStatus")).thenReturn(ContractDAO.PROGRESS_LIQUIDATED);
+        when(request.getParameter("progressNote")).thenReturn("Biên bản thanh lý số 12");
+
+        controller.doPost(request, response);
+
+        verify(contractDAO, never()).changeProgressStatus(anyInt(), anyString(), anyInt(), any());
+        verify(response).sendError(eq(HttpServletResponse.SC_FORBIDDEN), anyString());
+    }
+
+    /**
+     * Ngược lại: luật ký KHÔNG được tự suy rộng sang các bước khác. Người quản
+     * được hợp đồng thì thanh lý được, không phải đi qua canSign lần nữa.
+     */
+    @Test
+    public void liquidate_managerRole_isAllowedWithReason() throws Exception {
+        when(request.getParameter("action")).thenReturn("changeProgress");
+        when(request.getParameter("contractId")).thenReturn("5");
+        when(request.getParameter("toStatus")).thenReturn(ContractDAO.PROGRESS_LIQUIDATED);
+        when(request.getParameter("progressNote")).thenReturn("Biên bản thanh lý số 12");
+        when(contractDAO.findById(5)).thenReturn(contractWithProgress(ContractDAO.PROGRESS_SIGNED));
+        when(contractDAO.changeProgressStatus(anyInt(), anyString(), anyInt(), any())).thenReturn(true);
+
+        controller.doPost(request, response);
+
+        verify(contractDAO).changeProgressStatus(eq(5), eq(ContractDAO.PROGRESS_LIQUIDATED), eq(99),
+                eq("Biên bản thanh lý số 12"));
+    }
+
+    @Test
+    public void sign_contractWithoutATerm_isRefusedWithItsOwnReason() throws Exception {
+        when(request.getParameter("action")).thenReturn("changeProgress");
+        when(request.getParameter("contractId")).thenReturn("5");
+        when(request.getParameter("toStatus")).thenReturn(ContractDAO.PROGRESS_SIGNED);
+        Contract noTerm = new Contract();
+        noTerm.setContractId(5);
+        noTerm.setProgressStatus(ContractDAO.PROGRESS_DRAFT);
+        when(contractDAO.findById(5)).thenReturn(noTerm);
+
+        controller.doPost(request, response);
+
+        // Báo đúng lý do chứ không phải "không chuyển được trạng thái"
+        // chung chung -- người dùng cần biết phải đi điền thời hạn trước.
+        verify(contractDAO, never()).changeProgressStatus(anyInt(), anyString(), anyInt(), any());
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=view&id=5&error=missing_term");
+    }
+
+    @Test
+    public void changeProgress_contractNotFound_redirectsWithNotFound() throws Exception {
+        when(request.getParameter("action")).thenReturn("changeProgress");
+        when(request.getParameter("contractId")).thenReturn("999999");
+        when(request.getParameter("toStatus")).thenReturn(ContractDAO.PROGRESS_SIGNED);
+        when(contractDAO.findById(999999)).thenReturn(null);
+
+        controller.doPost(request, response);
+
+        verify(contractDAO, never()).changeProgressStatus(anyInt(), anyString(), anyInt(), any());
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?error=notfound");
     }
 
     // ------------------------------------------------------------------
@@ -376,18 +701,38 @@ public class ContractControllerTest {
     // Admin, có lý do, có dấu vết.
 
     @Test
-    public void delete_salesRole_isRefusedEvenForAnExistingContract() throws Exception {
+    public void delete_salesRole_signedContract_isRefused() throws Exception {
         when(request.getParameter("action")).thenReturn("delete");
         when(request.getParameter("id")).thenReturn("5");
         when(request.getParameter("voidReason")).thenReturn("Nhập trùng");
-        when(contractDAO.findById(5)).thenReturn(new Contract());
+        when(contractDAO.findById(5)).thenReturn(contractWithProgress(ContractDAO.PROGRESS_SIGNED));
 
         controller.doPost(request, response);
 
-        // loginAs("Sales") ở setUp: có Full access trên CONTRACT nhưng vẫn
-        // không được huỷ bản ghi. Đây là ranh giới mới, dễ bị xoá nhầm khi ai
-        // đó "dọn" requireAdmin về lại requireFullAccess cho đồng bộ.
+        // loginAs("Sales") ở setUp: có Full access trên CONTRACT nhưng hợp đồng
+        // ĐÃ KÝ thì vẫn không huỷ được. Ranh giới này dễ bị xoá nhầm khi ai đó
+        // "dọn" requireAdmin về lại requireFullAccess cho đồng bộ.
         verify(contractDAO, never()).voidRecord(anyInt(), anyInt(), anyString());
+    }
+
+    /**
+     * Bản NHÁP thì ai quản được hợp đồng cũng xoá được -- nó chưa ký, chưa là
+     * chứng cứ gì. Đây đúng là điều kiện của BR-46 cũ ("chưa ký"), thứ mà trước
+     * V24 không với tới được vì signing_date NOT NULL khiến mọi hợp đồng đều đã
+     * ký.
+     */
+    @Test
+    public void delete_salesRole_draftContract_isAllowed() throws Exception {
+        when(request.getParameter("action")).thenReturn("delete");
+        when(request.getParameter("id")).thenReturn("5");
+        when(request.getParameter("voidReason")).thenReturn("Soạn nhầm khách hàng");
+        when(contractDAO.findById(5)).thenReturn(contractWithProgress(ContractDAO.PROGRESS_DRAFT));
+        when(contractDAO.voidRecord(eq(5), anyInt(), anyString())).thenReturn(true);
+
+        controller.doPost(request, response);
+
+        verify(contractDAO).voidRecord(5, 99, "Soạn nhầm khách hàng");
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract");
     }
 
     @Test
@@ -410,7 +755,7 @@ public class ContractControllerTest {
         when(request.getParameter("action")).thenReturn("delete");
         when(request.getParameter("id")).thenReturn("5");
         when(request.getParameter("voidReason")).thenReturn("Nhập trùng với HD-0042");
-        when(contractDAO.findById(5)).thenReturn(new Contract());
+        when(contractDAO.findById(5)).thenReturn(contractWithProgress(ContractDAO.PROGRESS_SIGNED));
         when(contractDAO.voidRecord(eq(5), anyInt(), anyString())).thenReturn(true);
 
         controller.doPost(request, response);
@@ -447,7 +792,7 @@ public class ContractControllerTest {
         controller.doPost(request, response);
 
         verify(contractDAO, never()).insertProducts(anyInt(), anyList(), anyInt());
-        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=view&id=5&error=add_product_invalid");
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=edit&id=5&error=add_product_invalid");
     }
 
     /**
@@ -471,7 +816,7 @@ public class ContractControllerTest {
 
         verify(contractDAO).insertProducts(eq(5), argThat((java.util.List<ContractProduct> items) ->
                 items.size() == 1 && items.get(0).getQuantity() == 1000), anyInt());
-        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=view&id=5");
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=edit&id=5");
     }
 
     @Test
@@ -488,7 +833,7 @@ public class ContractControllerTest {
         controller.doPost(request, response);
 
         verify(contractDAO, never()).insertProducts(anyInt(), anyList(), anyInt());
-        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=view&id=5&error=add_product_invalid");
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=edit&id=5&error=add_product_invalid");
     }
 
     @Test
@@ -500,11 +845,11 @@ public class ContractControllerTest {
 
         controller.doPost(request, response);
 
-        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=view&id=5&error=remove_product_failed");
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=edit&id=5&error=remove_product_failed");
     }
 
     @Test
-    public void removeProduct_daoSucceeds_redirectsToDetail() throws Exception {
+    public void removeProduct_daoSucceeds_returnsToTheEditPage() throws Exception {
         when(request.getParameter("action")).thenReturn("removeProduct");
         when(request.getParameter("contractId")).thenReturn("5");
         when(request.getParameter("contractProductId")).thenReturn("42");
@@ -512,7 +857,7 @@ public class ContractControllerTest {
 
         controller.doPost(request, response);
 
-        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=view&id=5");
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=edit&id=5");
     }
 
     // ------------------------------------------------------------------
