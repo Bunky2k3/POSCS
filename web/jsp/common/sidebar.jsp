@@ -10,9 +10,11 @@
     | changerequest | systemLog.
     Không set thì không mục nào được tô sáng (không lỗi, chỉ mất highlight).
 
-    Riêng "contract" cũng có hai mục con; trang set thêm
+    Riêng "contract" có ba mục con; trang set thêm
         <c:set var="activeContractKind" value="${kind}" scope="request"/>
-    với giá trị sell | buy. Thiếu thì mặc định sáng "Hợp đồng bán".
+    với giá trị sell | buy | handover. Thiếu thì mặc định sáng "Hợp đồng bán"
+    -- nên trang chi tiết/sửa hợp đồng PHẢI set theo chiều của chính hợp đồng
+    đang mở, không thì mở hợp đồng mua vẫn thấy sáng "Hợp đồng bán".
 
     Riêng "customer" có hai mục con; trang cần set thêm
         <c:set var="activeCustomerKind" value="${kind}" scope="request"/>
@@ -33,12 +35,16 @@
          với vai khách hàng bị CHÉO: hợp đồng BÁN ký với "Khách hàng mua". --%>
     <div class="sidebar-group-label"><i class="fa-solid fa-file-contract"></i><span>Hợp đồng</span></div>
     <div class="sidebar-sub">
-        <a href="${pageContext.request.contextPath}/contract?kind=sell" class="sidebar-link ${activeNav == 'contract' and activeContractKind != 'buy' ? 'active' : ''}"><i class="fa-solid fa-file-export"></i><span>Hợp đồng bán</span></a>
+        <%-- Chỉ "khác buy" thôi là chưa đủ: hàng đợi bàn giao cũng đặt activeNav
+             = contract (kèm kind = handover), nên mục này từng sáng CÙNG LÚC với
+             "Bàn giao xử lý" -- hai mục active một lượt thì không còn đọc ra
+             mình đang đứng ở đâu. Phải loại trừ cả handover. --%>
+        <a href="${pageContext.request.contextPath}/contract?kind=sell" class="sidebar-link ${activeNav == 'contract' and activeContractKind != 'buy' and activeContractKind != 'handover' ? 'active' : ''}"><i class="fa-solid fa-file-export"></i><span>Hợp đồng bán</span></a>
         <a href="${pageContext.request.contextPath}/contract?kind=buy" class="sidebar-link ${activeNav == 'contract' and activeContractKind == 'buy' ? 'active' : ''}"><i class="fa-solid fa-file-import"></i><span>Hợp đồng mua</span></a>
         <%-- Hàng đợi bàn giao: hợp đồng đang nằm chờ ở Kế toán / Dự án. Để
              trong mục Hợp đồng vì đó là việc của hợp đồng, nhưng KHÔNG mang
              tham số kind -- nó không thuộc chiều bán hay mua nào cả. --%>
-        <a href="${pageContext.request.contextPath}/contract?action=handovers" class="sidebar-link ${activeContractKind == 'handover' ? 'active' : ''}"><i class="fa-solid fa-share-from-square"></i><span>Bàn giao xử lý</span></a>
+        <a href="${pageContext.request.contextPath}/contract?action=handovers" class="sidebar-link ${activeNav == 'contract' and activeContractKind == 'handover' ? 'active' : ''}"><i class="fa-solid fa-share-from-square"></i><span>Bàn giao xử lý</span></a>
     </div>
     <a href="${pageContext.request.contextPath}/product" class="sidebar-link ${activeNav == 'product' ? 'active' : ''}"><i class="fa-solid fa-box"></i><span>Sản phẩm</span></a>
     <a href="${pageContext.request.contextPath}/ticket" class="sidebar-link ${activeNav == 'ticket' ? 'active' : ''}"><i class="fa-solid fa-headset"></i><span>Phiếu hỗ trợ</span></a>

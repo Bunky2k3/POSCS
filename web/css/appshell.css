@@ -157,3 +157,33 @@ body { font-family: 'Inter', sans-serif; background: #f3f4f6; min-height: 100vh;
 }
 
 .card-box { background: #fff; border-radius: 16px; box-shadow: 0 10px 30px rgba(0, 40, 80, 0.08); }
+
+/* ===== Hai nút hành động dùng chung =====
+   Trước đây mỗi trang tự chép lại y hệt hai khối này vào <style> riêng, và
+   trang nào quên chép thì nút hiện ra dưới dạng mặc định của trình duyệt --
+   handoverqueue.jsp (nút "Xong", link "Danh sách hợp đồng") và updatecontract.jsp
+   (nút "Xem"/"Gỡ" ở bảng hợp đồng liên kết) đều đã dính đúng lỗi đó.
+
+   Lưu ý .btn-primary: Bootstrap 5.3 chỉ đặt biến --bs-btn-* trong .btn-primary,
+   phần vẽ thật nằm ở .btn. Viết class="btn-primary" mà thiếu "btn" thì Bootstrap
+   KHÔNG vẽ gì cả -- mà 20/24 chỗ trong dự án đang viết đúng kiểu thiếu đó. Nên
+   rule dưới đây phải tự đủ (nền, viền, bo, padding, màu chữ), không dựa vào .btn.
+
+   Trang nào đã có định nghĩa riêng thì <style> của trang vẫn thắng (cùng độ ưu
+   tiên nhưng đứng sau) -- giá trị lại trùng nhau nên nhìn không đổi gì. */
+.btn-primary {
+    background: linear-gradient(120deg, var(--primary), var(--primary-light));
+    border: none; border-radius: 10px; padding: 0.6rem 1.4rem;
+    font-weight: 600; font-size: 0.9rem; color: #fff;
+    cursor: pointer; text-decoration: none;
+    box-shadow: 0 6px 16px rgba(5, 104, 166, 0.3);
+}
+.btn-primary:hover, .btn-primary:focus { background: linear-gradient(120deg, var(--primary-dark), var(--primary)); color: #fff; }
+
+.btn-outline-action {
+    background: #fff; color: var(--primary); border: 1.5px solid #e5e7eb; border-radius: 10px;
+    padding: 9px 18px; font-weight: 600; font-size: 0.87rem; text-decoration: none;
+    display: inline-flex; align-items: center; gap: 8px; white-space: nowrap;
+    cursor: pointer;
+}
+.btn-outline-action:hover { background: #eaf6ff; color: var(--primary-dark); border-color: var(--primary-light); }

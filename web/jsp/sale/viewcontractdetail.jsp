@@ -54,8 +54,19 @@
 
         .status-pill { display: inline-flex; align-items: center; gap: 5px; padding: 3px 11px; border-radius: 20px; font-size: 0.72rem; font-weight: 600; white-space: nowrap; margin-left: 8px; }
         .status-pill .dot { width: 6px; height: 6px; border-radius: 50%; }
+        /* Bốn trạng thái, KHÔNG chỉ một: trang này từng chỉ định nghĩa
+           .status-soon, nên ba trạng thái còn lại hiện ra nhãn trong suốt kèm
+           chấm tròn vô hình -- chữ trôi nổi cạnh tiêu đề, không ra hình viên
+           nhãn nào. Bảng màu lấy đúng của listcontract.jsp để cùng một hợp
+           đồng nhìn ở danh sách hay ở chi tiết đều một màu. */
+        .status-active { background: #e8faf3; color: var(--success); }
+        .status-active .dot { background: var(--success); }
         .status-soon { background: #fff4e0; color: var(--warning); }
         .status-soon .dot { background: var(--warning); }
+        .status-expired { background: #fdecef; color: var(--danger); }
+        .status-expired .dot { background: var(--danger); }
+        .status-draft { background: #eef2f6; color: #6b7280; }
+        .status-draft .dot { background: #9ca3af; }
 
         /* Nhãn trục TIẾN ĐỘ -- viền nét đứt để mắt phân biệt ngay với nhãn
            trục lịch đặc bên cạnh, vì hai nhãn nói hai chuyện khác nhau. */
@@ -194,6 +205,10 @@
     <%@ include file="/jsp/common/topbar.jsp" %>
     <div class="app-shell">
         <c:set var="activeNav" value="contract" scope="request"/>
+        <%-- Lấy theo chiều của chính hợp đồng đang mở, không theo tham số URL:
+             showDetail không đặt attribute "kind", nên thiếu dòng này thì mở
+             hợp đồng MUA sidebar vẫn sáng mục "Hợp đồng bán". --%>
+        <c:set var="activeContractKind" value="${contract.direction == 'Mua' ? 'buy' : 'sell'}" scope="request"/>
         <%@ include file="/jsp/common/sidebar.jsp" %>
         <div class="main-content">
 

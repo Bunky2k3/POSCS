@@ -53,6 +53,23 @@
         .btn-cancel { background: #fff; border: 1.5px solid #e5e7eb; color: #6b7280; border-radius: 10px; padding: 0.6rem 1.4rem; font-weight: 600; font-size: 0.9rem; text-decoration: none; display: inline-flex; align-items: center; }
         .btn-cancel:hover { background: #f3f4f6; color: #6b7280; }
 
+        /* Hai khối dưới đây trang này CÓ DÙNG nhưng chưa bao giờ định nghĩa:
+           .lc-alert ở cảnh báo "còn phòng chưa báo xử lý xong" (chép ý tưởng từ
+           viewcontractdetail.jsp) và .filter-toggle ở các ô chọn phòng bàn giao
+           (từ listcontract.jsp). Thiếu chúng thì cảnh báo hiện ra như một dòng
+           chữ đen trơn, còn ô chọn phòng thành checkbox trần -- giá trị giữ
+           nguyên của hai trang gốc để ba chỗ nhìn như một. */
+        .lc-alert {
+            display: flex; align-items: flex-start; gap: 10px; margin: 16px 0 12px;
+            background: #fff8ec; border: 1px solid #f5d9a8; border-radius: 10px;
+            padding: 11px 14px; font-size: 0.84rem; color: #8a5a00;
+        }
+        .filter-toggle {
+            display: inline-flex; align-items: center; gap: 7px; font-size: 0.84rem; color: #374151;
+            padding: 9px 12px; border-radius: 10px; border: 1px solid #e5e7eb; background: #f9fafb; cursor: pointer;
+        }
+        .filter-toggle input { accent-color: var(--primary); cursor: pointer; }
+
         .section-header { display: flex; justify-content: space-between; align-items: center; margin: 0 0 16px; padding-bottom: 10px; border-bottom: 1.5px solid #eef2f6; }
         .section-header h5 { font-weight: 700; color: var(--primary-dark); font-size: 0.98rem; margin: 0; }
         .item-table { width: 100%; }
