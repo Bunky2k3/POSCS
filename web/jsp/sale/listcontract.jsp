@@ -247,7 +247,7 @@
                 <%-- Xuất Excel là thao tác ĐỌC: chỉ lấy đúng dữ liệu vai trò này vốn đã
                      xem được trên màn hình, đổi sang dạng file. Nên KHÔNG khoá theo
                      canManage -- xem PERMISSIONS.md. --%>
-                <a href="${pageContext.request.contextPath}/contract?action=exportExcel&kind=${kind}&keyword=${fn:escapeXml(keyword)}&status=${fn:escapeXml(statusFilter)}&progress=${fn:escapeXml(progressFilter)}&scope=${fn:escapeXml(scopeFilter)}&type=${fn:escapeXml(typeFilter)}&provinceId=${provinceFilter}&year=${yearFilter}&period=${periodFilter}" class="btn-outline-action"><i class="fa-solid fa-file-excel"></i> Xuất Excel</a>
+                <a href="${pageContext.request.contextPath}/contract?action=exportExcel&kind=${kind}&keyword=${fn:escapeXml(keyword)}&status=${fn:escapeXml(statusFilter)}&progress=${fn:escapeXml(progressFilter)}&scope=${fn:escapeXml(scopeFilter)}&type=${fn:escapeXml(typeFilter)}&provinceId=${provinceFilter}&year=${yearFilter}&period=${periodFilter}&waitingDept=${waitingDeptFilter}" class="btn-outline-action"><i class="fa-solid fa-file-excel"></i> Xuất Excel</a>
                 <%-- Nhập PDF thì ngược lại: nó TẠO hợp đồng mới, nên vẫn khoá. --%>
                 <c:if test="${canManage}">
                     <a href="${pageContext.request.contextPath}/contract?action=importForm" class="btn-outline-action"><i class="fa-solid fa-file-pdf"></i> Nhập PDF</a>
@@ -357,6 +357,20 @@
                      (năm, kỳ), chọn "Quý 3" mà không năm thì Period.parse trả null
                      và không lọc gì cả -- một ô bấm vào không có chuyện gì xảy ra
                      thì thà đừng hiện. --%>
+                <%-- "Đang chờ ở phòng nào" -- câu hỏi của giám đốc, hỏi ngay trên
+                     danh sách chứ không phải mở từng hợp đồng. Chỉ liệt kê các
+                     phòng nhận bàn giao, không đổ cả danh mục phòng ban. --%>
+                <select id="filterWaitingDept" name="waitingDept">
+                    <option value="">Mọi chặng xử lý</option>
+                    <c:forEach var="dept" items="${departmentList}">
+                        <c:if test="${dept.departmentName == 'Kế toán' or dept.departmentName == 'Dự án'
+                                      or dept.departmentName == 'Kỹ thuật'}">
+                            <option value="${dept.departmentId}" ${waitingDeptFilter == dept.departmentId ? 'selected' : ''}>
+                                Đang chờ: ${fn:escapeXml(dept.departmentName)}
+                            </option>
+                        </c:if>
+                    </c:forEach>
+                </select>
                 <c:if test="${not empty yearFilter}">
                     <select id="filterPeriod" name="period">
                         <option value="">Cả năm</option>
@@ -458,6 +472,18 @@
                                     <span class="progress-pill progress-${contract.draft ? 'draft' : (contract.frozen ? 'frozen' : 'signed')}">
                                         ${fn:escapeXml(contract.progressStatus)}
                                     </span>
+                                    <%-- Đang nằm chờ ở phòng nào, bao nhiêu ngày. Đặt ngay dưới
+                                         tiến độ vì hai thứ trả lời cùng một câu "hợp đồng này
+                                         đang ở đâu" -- một cột riêng thì bảng phải co thêm lần
+                                         nữa, mà phần lớn hợp đồng không có chặng nào đang mở.
+
+                                         Màu theo ngưỡng 7 và 14 ngày, giống màn hình hàng đợi. --%>
+                                    <c:if test="${contract.waitingAtDepartment}">
+                                        <div style="font-size:0.74rem; margin-top:4px; color:${contract.pendingHandoverDays >= 14 ? 'var(--danger)' : (contract.pendingHandoverDays >= 7 ? '#8a5a00' : '#6b7280')};">
+                                            <i class="fa-solid fa-hourglass-half"></i>
+                                            Chờ ${fn:escapeXml(contract.pendingDepartments)} &middot; ${contract.pendingHandoverDays} ngày
+                                        </div>
+                                    </c:if>
                                 </td>
                                 <td>
                                     <c:choose>
@@ -497,11 +523,11 @@
                 <span class="pagination-info">Hiển thị ${fn:length(contractList)} trong tổng số ${totalCount} hợp đồng</span>
                 <nav>
                     <ul class="pagination pagination-sm mb-0">
-                        <li class="page-item ${currentPage <= 1 ? 'disabled' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/contract?action=list&kind=${kind}&page=${currentPage - 1}&keyword=${fn:escapeXml(keyword)}&status=${fn:escapeXml(statusFilter)}&progress=${fn:escapeXml(progressFilter)}&scope=${fn:escapeXml(scopeFilter)}&type=${fn:escapeXml(typeFilter)}&provinceId=${provinceFilter}&year=${yearFilter}&period=${periodFilter}">Trước</a></li>
+                        <li class="page-item ${currentPage <= 1 ? 'disabled' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/contract?action=list&kind=${kind}&page=${currentPage - 1}&keyword=${fn:escapeXml(keyword)}&status=${fn:escapeXml(statusFilter)}&progress=${fn:escapeXml(progressFilter)}&scope=${fn:escapeXml(scopeFilter)}&type=${fn:escapeXml(typeFilter)}&provinceId=${provinceFilter}&year=${yearFilter}&period=${periodFilter}&waitingDept=${waitingDeptFilter}">Trước</a></li>
                         <c:forEach begin="1" end="${totalPages}" var="p">
-                            <li class="page-item ${p == currentPage ? 'active' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/contract?action=list&kind=${kind}&page=${p}&keyword=${fn:escapeXml(keyword)}&status=${fn:escapeXml(statusFilter)}&progress=${fn:escapeXml(progressFilter)}&scope=${fn:escapeXml(scopeFilter)}&type=${fn:escapeXml(typeFilter)}&provinceId=${provinceFilter}&year=${yearFilter}&period=${periodFilter}">${p}</a></li>
+                            <li class="page-item ${p == currentPage ? 'active' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/contract?action=list&kind=${kind}&page=${p}&keyword=${fn:escapeXml(keyword)}&status=${fn:escapeXml(statusFilter)}&progress=${fn:escapeXml(progressFilter)}&scope=${fn:escapeXml(scopeFilter)}&type=${fn:escapeXml(typeFilter)}&provinceId=${provinceFilter}&year=${yearFilter}&period=${periodFilter}&waitingDept=${waitingDeptFilter}">${p}</a></li>
                         </c:forEach>
-                        <li class="page-item ${currentPage >= totalPages ? 'disabled' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/contract?action=list&kind=${kind}&page=${currentPage + 1}&keyword=${fn:escapeXml(keyword)}&status=${fn:escapeXml(statusFilter)}&progress=${fn:escapeXml(progressFilter)}&scope=${fn:escapeXml(scopeFilter)}&type=${fn:escapeXml(typeFilter)}&provinceId=${provinceFilter}&year=${yearFilter}&period=${periodFilter}">Sau</a></li>
+                        <li class="page-item ${currentPage >= totalPages ? 'disabled' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/contract?action=list&kind=${kind}&page=${currentPage + 1}&keyword=${fn:escapeXml(keyword)}&status=${fn:escapeXml(statusFilter)}&progress=${fn:escapeXml(progressFilter)}&scope=${fn:escapeXml(scopeFilter)}&type=${fn:escapeXml(typeFilter)}&provinceId=${provinceFilter}&year=${yearFilter}&period=${periodFilter}&waitingDept=${waitingDeptFilter}">Sau</a></li>
                     </ul>
                 </nav>
             </div>
@@ -558,7 +584,8 @@
         // tồn tại khi chưa chọn năm, mà gắn sự kiện lên null thì vỡ cả đoạn
         // script phía sau -- kể cả các bộ lọc khác.
         var filterForm = document.getElementById('filterForm');
-        ['filterProgress', 'filterScope', 'filterType', 'filterProvince', 'filterYear', 'filterPeriod']
+        ['filterProgress', 'filterScope', 'filterType', 'filterProvince', 'filterYear', 'filterPeriod',
+         'filterWaitingDept']
             .forEach(function (id) {
                 var el = document.getElementById(id);
                 if (el) { el.addEventListener('change', function () { filterForm.submit(); }); }

@@ -21,6 +21,7 @@ import poscs.common.Period;
 import poscs.common.SqlFilters;
 import poscs.model.Address;
 import poscs.model.Contract;
+import poscs.model.ContractHandover;
 import poscs.model.ContractHistory;
 import poscs.model.ContractLink;
 import poscs.model.ContractPayment;
@@ -161,6 +162,23 @@ public class ContractDAO {
         "(SELECT COALESCE(SUM(ch.contract_value), 0) FROM contracts ch " +
         " WHERE ch.parent_contract_id = c.contract_id AND ch.is_deleted = 0 AND NOT " + AMENDMENT_IS_SIGNED_SQL + ")";
 
+    /**
+     * Các phòng đang giữ hợp đồng, gom thành một chuỗi -- nhãn "đang chờ: Kế
+     * toán, Dự án" trên danh sách.
+     *
+     * <p>GROUP_CONCAT trong một câu con thay vì tra thêm cho từng dòng: mười
+     * dòng một trang là mười lượt đi CSDL cho một nhãn nhỏ.
+     */
+    private static final String PENDING_DEPARTMENTS_SQL =
+        "(SELECT GROUP_CONCAT(pd.department_name ORDER BY pd.department_name SEPARATOR ', ') "
+        + " FROM contract_handovers ph JOIN departments pd ON pd.department_id = ph.department_id "
+        + " WHERE ph.contract_id = c.contract_id AND ph.done_at IS NULL)";
+
+    /** Số ngày của chặng đang chờ LÂU NHẤT -- thứ giám đốc quét mắt tìm điểm nghẽn. */
+    private static final String PENDING_DAYS_SQL =
+        "(SELECT COALESCE(MAX(DATEDIFF(NOW(), ph.handed_at)), 0) FROM contract_handovers ph "
+        + " WHERE ph.contract_id = c.contract_id AND ph.done_at IS NULL)";
+
     private static final String SELECT_BASE =
         "SELECT c.contract_id, c.contract_code, c.title, c.contract_type, c.direction, c.signing_date, " +
         "       c.effective_date, c.end_date, c.enterprise_id, c.owner_id, c.attachment_url, " +
@@ -170,6 +188,8 @@ public class ContractDAO {
         "       " + AMENDMENT_COUNT_SQL + " AS amendment_count, " +
         "       " + AMENDMENT_VALUE_SIGNED_SQL + " AS amendment_value_signed, " +
         "       " + AMENDMENT_VALUE_PENDING_SQL + " AS amendment_value_pending, " +
+        "       " + PENDING_DEPARTMENTS_SQL + " AS pending_departments, " +
+        "       " + PENDING_DAYS_SQL + " AS pending_handover_days, " +
         "       e.enterprise_name, p.province_id, p.province_name, " +
         "       u.last_name AS owner_last_name, u.middle_name AS owner_middle_name, u.first_name AS owner_first_name " +
         "FROM contracts c " +
@@ -271,11 +291,26 @@ public class ContractDAO {
     public List<Contract> findAll(int page, int pageSize, String keyword, String statusFilter, String typeFilter,
             Integer provinceId, boolean sortByProvince, Period period, String direction, String progressFilter,
             boolean rootsOnly) {
+        return findAll(page, pageSize, keyword, statusFilter, typeFilter, provinceId, sortByProvince,
+                period, direction, progressFilter, rootsOnly, null);
+    }
+
+    /**
+     * Như trên, kèm {@code waitingDepartmentId}: chỉ lấy hợp đồng ĐANG NẰM CHỜ
+     * ở phòng đó (chặng bàn giao chưa đóng).
+     *
+     * <p>Chữ ký này đã dài tới mức khó đọc. Bộ lọc tiếp theo thì gom hết lại
+     * thành một đối tượng chứ đừng thêm tham số thứ mười ba -- chỗ nguy hiểm
+     * không phải là đọc khó, mà là truyền nhầm thứ tự hai tham số cùng kiểu.
+     */
+    public List<Contract> findAll(int page, int pageSize, String keyword, String statusFilter, String typeFilter,
+            Integer provinceId, boolean sortByProvince, Period period, String direction, String progressFilter,
+            boolean rootsOnly, Integer waitingDepartmentId) {
         List<Contract> result = new ArrayList<>();
         StringBuilder sql = new StringBuilder(SELECT_BASE);
         List<Object> params = new ArrayList<>();
         appendFilters(sql, params, keyword, statusFilter, typeFilter, provinceId, period, direction, progressFilter,
-                rootsOnly);
+                rootsOnly, waitingDepartmentId);
         sql.append(sortByProvince
                 ? " ORDER BY p.province_name IS NULL, " + AddressDAO.PROVINCE_SHORT_NAME_ORDER
                         + ", c.contract_id DESC LIMIT ? OFFSET ?"
@@ -316,12 +351,19 @@ public class ContractDAO {
     /** Như trên, kèm {@code rootsOnly} -- phải đi cặp với findAll, nếu không phân trang đếm một đằng liệt kê một nẻo. */
     public int countAll(String keyword, String statusFilter, String typeFilter, Integer provinceId, Period period,
             String direction, String progressFilter, boolean rootsOnly) {
+        return countAll(keyword, statusFilter, typeFilter, provinceId, period, direction, progressFilter,
+                rootsOnly, null);
+    }
+
+    /** Như trên, kèm bộ lọc "đang chờ ở phòng" -- phải đi cặp với findAll. */
+    public int countAll(String keyword, String statusFilter, String typeFilter, Integer provinceId, Period period,
+            String direction, String progressFilter, boolean rootsOnly, Integer waitingDepartmentId) {
         StringBuilder sql = new StringBuilder(
             "SELECT COUNT(*) FROM contracts c LEFT JOIN enterprises e ON c.enterprise_id = e.enterprise_id "
             + JOIN_PROVINCE_OF_ENTERPRISE);
         List<Object> params = new ArrayList<>();
         appendFilters(sql, params, keyword, statusFilter, typeFilter, provinceId, period, direction, progressFilter,
-                rootsOnly);
+                rootsOnly, waitingDepartmentId);
 
         try (Connection conn = DBContext.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql.toString())) {
@@ -1046,6 +1088,244 @@ public class ContractDAO {
             }
             return false;
         }
+    }
+
+    // ==================================================================
+    // Bàn giao hợp đồng giữa các phòng
+    // ==================================================================
+    //
+    // Kinh doanh soạn xong thì chuyển xuống Kế toán và Dự án CÙNG LÚC, mỗi
+    // phòng tự báo xong. Thứ khách hàng (giám đốc) hỏi là "đang nằm ở đâu, bao
+    // lâu rồi", nên mỗi lượt giao là một dòng có mốc thời gian -- xem V32.
+
+    /** Phòng đó đang còn giữ hợp đồng, không giao lại lượt mới được. */
+    public static final int HANDOVER_ALREADY_PENDING = -1;
+
+    private static final String HANDOVER_SELECT =
+        "SELECT h.handover_id, h.contract_id, h.department_id, h.handed_at, h.handed_by, "
+        + "       h.done_at, h.done_by, h.handover_note, h.done_note, "
+        + "       d.department_name, c.contract_code, c.title AS contract_title, "
+        + "       hb.last_name AS hb_last, hb.middle_name AS hb_mid, hb.first_name AS hb_first, "
+        + "       db.last_name AS db_last, db.middle_name AS db_mid, db.first_name AS db_first, "
+        + "       ow.last_name AS ow_last, ow.middle_name AS ow_mid, ow.first_name AS ow_first "
+        + "FROM contract_handovers h "
+        + "JOIN departments d ON d.department_id = h.department_id "
+        + "JOIN contracts c ON c.contract_id = h.contract_id "
+        + "LEFT JOIN users hb ON hb.user_id = h.handed_by "
+        + "LEFT JOIN users db ON db.user_id = h.done_by "
+        + "LEFT JOIN users ow ON ow.user_id = c.owner_id ";
+
+    /**
+     * Bàn giao một hợp đồng cho nhiều phòng CÙNG LÚC (Kế toán + Dự án là mặc
+     * định của luồng). Một transaction cho cả lô: giao được nửa rồi hỏng thì
+     * hợp đồng nằm ở trạng thái không ai mô tả nổi.
+     *
+     * @return số chặng mở ra, hoặc {@link #HANDOVER_ALREADY_PENDING} nếu MỘT
+     *         trong các phòng đó đang còn giữ hợp đồng này
+     */
+    public int handOverToDepartments(int contractId, List<Integer> departmentIds, String note, int actorId) {
+        if (departmentIds == null || departmentIds.isEmpty()) {
+            return 0;
+        }
+        try (Connection conn = DBContext.getConnection()) {
+            conn.setAutoCommit(false);
+            boolean committed = false;
+            try {
+                Contract contract = lockForUpdate(conn, contractId);
+                if (contract == null) {
+                    return -2;
+                }
+                // Giao lại khi phòng đó CHƯA báo xong là đẻ ra hai chặng mở của
+                // cùng một phòng -- "đang chờ bao lâu" lúc đó không có câu trả
+                // lời. Bị trả về sửa rồi giao lại thì được, vì lượt cũ đã đóng.
+                for (Integer departmentId : departmentIds) {
+                    if (hasPendingHandover(conn, contractId, departmentId)) {
+                        return HANDOVER_ALREADY_PENDING;
+                    }
+                }
+
+                String trimmed = note == null || note.trim().isEmpty() ? null : note.trim();
+                for (Integer departmentId : departmentIds) {
+                    try (PreparedStatement ps = conn.prepareStatement(
+                            "INSERT INTO contract_handovers (contract_id, department_id, handed_by, handover_note) "
+                            + "VALUES (?, ?, ?, ?)")) {
+                        ps.setInt(1, contractId);
+                        ps.setInt(2, departmentId);
+                        ps.setInt(3, actorId);
+                        ps.setString(4, trimmed);
+                        ps.executeUpdate();
+                    }
+                    insertHistory(conn, contractId, ContractHistory.EVENT_HANDOVER,
+                            "Bàn giao cho phòng " + departmentName(conn, departmentId), actorId, trimmed);
+                }
+
+                conn.commit();
+                committed = true;
+                return departmentIds.size();
+            } finally {
+                finishTransaction(conn, committed, "ban giao hop dong", contractId);
+            }
+        } catch (SQLException ex) {
+            LOG.error("Loi ban giao hop dong (contractId={})", contractId, ex);
+            return -2;
+        }
+    }
+
+    /**
+     * Phòng nhận báo đã xử lý xong. Ghi chú BẮT BUỘC: một chặng đóng lại mà
+     * không ai nói đã làm gì thì về sau không phân biệt được với việc bấm cho
+     * xong -- đúng lý do thanh lý hợp đồng cũng bắt nhập lý do.
+     */
+    public boolean completeHandover(int handoverId, int actorId, String doneNote) {
+        if (doneNote == null || doneNote.trim().isEmpty()) {
+            return false;
+        }
+        try (Connection conn = DBContext.getConnection()) {
+            conn.setAutoCommit(false);
+            boolean committed = false;
+            try {
+                int contractId;
+                int departmentId;
+                try (PreparedStatement ps = conn.prepareStatement(
+                        "SELECT contract_id, department_id FROM contract_handovers "
+                        + "WHERE handover_id = ? AND done_at IS NULL FOR UPDATE")) {
+                    ps.setInt(1, handoverId);
+                    try (ResultSet rs = ps.executeQuery()) {
+                        if (!rs.next()) {
+                            // Không tồn tại, hoặc người khác vừa xác nhận xong.
+                            return false;
+                        }
+                        contractId = rs.getInt("contract_id");
+                        departmentId = rs.getInt("department_id");
+                    }
+                }
+
+                try (PreparedStatement ps = conn.prepareStatement(
+                        "UPDATE contract_handovers SET done_at = NOW(), done_by = ?, done_note = ? "
+                        + "WHERE handover_id = ? AND done_at IS NULL")) {
+                    ps.setInt(1, actorId);
+                    ps.setString(2, doneNote.trim());
+                    ps.setInt(3, handoverId);
+                    if (ps.executeUpdate() == 0) {
+                        return false;
+                    }
+                }
+
+                insertHistory(conn, contractId, ContractHistory.EVENT_HANDOVER,
+                        "Phòng " + departmentName(conn, departmentId) + " báo đã xử lý xong",
+                        actorId, doneNote.trim());
+
+                conn.commit();
+                committed = true;
+            } finally {
+                finishTransaction(conn, committed, "xac nhan xong chang ban giao", handoverId);
+            }
+            return committed;
+        } catch (SQLException ex) {
+            LOG.error("Loi xac nhan xong chang ban giao (handoverId={})", handoverId, ex);
+            return false;
+        }
+    }
+
+    /** Các chặng của một hợp đồng, lượt mới nhất đứng trước. */
+    public List<ContractHandover> findHandoversOf(int contractId) {
+        List<ContractHandover> result = new ArrayList<>();
+        String sql = HANDOVER_SELECT + "WHERE h.contract_id = ? ORDER BY h.handed_at DESC, h.handover_id DESC";
+        try (Connection conn = DBContext.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, contractId);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    result.add(mapHandoverRow(rs));
+                }
+            }
+        } catch (SQLException ex) {
+            LOG.error("Loi truy van chang ban giao (contractId={})", contractId, ex);
+        }
+        return result;
+    }
+
+    /**
+     * Mọi chặng CHƯA XONG của toàn hệ thống, phòng nào để lâu nhất đứng trước
+     * -- màn hình theo dõi của giám đốc.
+     *
+     * @param ownerIds giới hạn theo người phụ trách hợp đồng (rỗng/null = tất cả)
+     */
+    public List<ContractHandover> findPendingHandovers(List<Integer> ownerIds) {
+        List<ContractHandover> result = new ArrayList<>();
+        String sql = HANDOVER_SELECT
+                + "WHERE h.done_at IS NULL AND c.is_deleted = 0"
+                + SqlFilters.inClause("c.owner_id", ownerIds)
+                + " ORDER BY h.handed_at ASC";
+        try (Connection conn = DBContext.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            SqlFilters.bind(ps, 1, ownerIds);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    result.add(mapHandoverRow(rs));
+                }
+            }
+        } catch (SQLException ex) {
+            LOG.error("Loi truy van chang ban giao dang cho", ex);
+        }
+        return result;
+    }
+
+    private boolean hasPendingHandover(Connection conn, int contractId, int departmentId) throws SQLException {
+        try (PreparedStatement ps = conn.prepareStatement(
+                "SELECT 1 FROM contract_handovers "
+                + "WHERE contract_id = ? AND department_id = ? AND done_at IS NULL")) {
+            ps.setInt(1, contractId);
+            ps.setInt(2, departmentId);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next();
+            }
+        }
+    }
+
+    /** Tên phòng, để câu nhật ký đọc được thay vì "phòng #5". */
+    private String departmentName(Connection conn, int departmentId) throws SQLException {
+        try (PreparedStatement ps = conn.prepareStatement(
+                "SELECT department_name FROM departments WHERE department_id = ?")) {
+            ps.setInt(1, departmentId);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next() ? rs.getString(1) : "#" + departmentId;
+            }
+        }
+    }
+
+    private ContractHandover mapHandoverRow(ResultSet rs) throws SQLException {
+        ContractHandover h = new ContractHandover();
+        h.setHandoverId(rs.getInt("handover_id"));
+        h.setContractId(rs.getInt("contract_id"));
+        h.setDepartmentId(rs.getInt("department_id"));
+        h.setDepartmentName(rs.getString("department_name"));
+        h.setHandedAt(rs.getTimestamp("handed_at"));
+        h.setHandedBy(rs.getInt("handed_by"));
+        h.setDoneAt(rs.getTimestamp("done_at"));
+        int doneBy = rs.getInt("done_by");
+        h.setDoneBy(rs.wasNull() ? null : doneBy);
+        h.setHandoverNote(rs.getString("handover_note"));
+        h.setDoneNote(rs.getString("done_note"));
+        h.setContractCode(rs.getString("contract_code"));
+        h.setContractTitle(rs.getString("contract_title"));
+        h.setHandedByName(fullName(rs, "hb_last", "hb_mid", "hb_first"));
+        h.setDoneByName(fullName(rs, "db_last", "db_mid", "db_first"));
+        h.setOwnerName(fullName(rs, "ow_last", "ow_mid", "ow_first"));
+        return h;
+    }
+
+    /** Ghép họ tên từ ba cột đã join; null khi không có người. */
+    private static String fullName(ResultSet rs, String lastCol, String midCol, String firstCol) throws SQLException {
+        String last = rs.getString(lastCol);
+        if (last == null) {
+            return null;
+        }
+        User u = new User();
+        u.setLastName(last);
+        u.setMiddleName(rs.getString(midCol));
+        u.setFirstName(rs.getString(firstCol));
+        return u.getFullName();
     }
 
     // ==================================================================
@@ -2014,7 +2294,7 @@ public class ContractDAO {
 
     private void appendFilters(StringBuilder sql, List<Object> params, String keyword, String statusFilter,
             String typeFilter, Integer provinceId, Period period, String direction, String progressFilter,
-            boolean rootsOnly) {
+            boolean rootsOnly, Integer waitingDepartmentId) {
         List<String> conditions = new ArrayList<>();
         conditions.add("c.is_deleted = 0");
 
@@ -2024,6 +2304,16 @@ public class ContractDAO {
         // sách hợp đồng gốc khi cần đếm "bao nhiêu hợp đồng" theo nghĩa thường.
         if (rootsOnly) {
             conditions.add("c.parent_contract_id IS NULL");
+        }
+
+        // "Đang chờ ở phòng X": có chặng bàn giao CHƯA ĐÓNG ở phòng đó. EXISTS
+        // chứ không JOIN -- một hợp đồng chờ ở hai phòng thì JOIN nhân đôi dòng,
+        // và phân trang đếm một đằng liệt kê một nẻo.
+        if (waitingDepartmentId != null) {
+            conditions.add("EXISTS (SELECT 1 FROM contract_handovers wh "
+                    + "WHERE wh.contract_id = c.contract_id AND wh.done_at IS NULL "
+                    + "AND wh.department_id = ?)");
+            params.add(waitingDepartmentId);
         }
 
         if (keyword != null && !keyword.trim().isEmpty()) {
@@ -2141,6 +2431,8 @@ public class ContractDAO {
         c.setAmendmentCount(rs.getInt("amendment_count"));
         c.setAmendmentValueSigned(rs.getBigDecimal("amendment_value_signed"));
         c.setAmendmentValuePending(rs.getBigDecimal("amendment_value_pending"));
+        c.setPendingDepartments(rs.getString("pending_departments"));
+        c.setPendingHandoverDays(rs.getInt("pending_handover_days"));
 
         String enterpriseName = rs.getString("enterprise_name");
         if (enterpriseName != null) {

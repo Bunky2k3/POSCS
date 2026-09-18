@@ -151,6 +151,27 @@ public final class AccessControl {
      * hướng nằm trong danh sách đó vì theo yêu cầu khách hàng, cả mạch chẩn
      * đoán lẫn hướng xử lý đều là phần do chính nhân viên kỹ thuật đánh giá.
      */
+    /**
+     * true nếu người này được xác nhận "đã xử lý xong" cho chặng bàn giao của
+     * một phòng.
+     *
+     * <p>Kiểm theo PHÒNG BAN chứ không theo vai trò, khác mọi chỗ còn lại của
+     * lớp này. Lý do: Kế toán và Dự án là hai phòng trong luồng bàn giao nhưng
+     * KHÔNG có vai trò tương ứng trong `roles` -- người của hai phòng đó vẫn
+     * mang một trong bốn vai cũ. Bắt theo vai thì hoặc phải đẻ thêm vai, hoặc
+     * mở quyền hợp đồng cho cả những người không liên quan.
+     *
+     * <p>Admin xác nhận được mọi phòng: hai phòng mới hiện chưa có nhân sự nào,
+     * mà luồng phải chạy được ngay hôm nay.
+     */
+    public static boolean canCompleteHandover(HttpServletRequest request, int departmentId) {
+        User user = currentUser(request);
+        if (user == null) {
+            return false;
+        }
+        return isAdmin(request) || user.getDepartmentId() == departmentId;
+    }
+
     public static boolean canUpdateAssignedTicket(HttpServletRequest request, TechnicalRequest ticket) {
         User user = currentUser(request);
         if (user == null || user.getRole() == null || ticket == null) {
