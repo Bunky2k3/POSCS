@@ -343,7 +343,7 @@ public class ContractStatusIntegrationTest {
         // Đây là điều khiến cả phần này đáng làm: trước đó sumInvoiceAmount*
         // đọc một bảng không màn hình nào ghi vào được.
         assertEquals(new java.math.BigDecimal("450000000.00"),
-                contractDAO.sumInvoiceAmountByContractId(2));
+                contractDAO.sumScheduledPaymentsForCluster(2));
     }
 
     @Test
@@ -562,6 +562,113 @@ public class ContractStatusIntegrationTest {
         assertEquals("Còn phụ lục thì đang hiệu lực", ACTIVE, statusOf("HD-0004/PL01"));
     }
 
+    /**
+     * Giá trị hợp đồng CÓ cộng dồn theo phụ lục -- ngược với trục lịch ở test
+     * ngay trên. Phép cộng nằm trong một câu SQL con của SELECT_BASE, nên test
+     * mock không chạm tới được: ở đó không có SQL nào được thực thi.
+     *
+     * <p>Ba điều kiện của phép cộng đều được đo ở đây, vì mỗi cái hỏng một kiểu
+     * riêng: phụ lục NHÁP chưa được tính (chưa ai ký mà tiền đã đổi), phụ lục
+     * ĐÃ KÝ được tính, và phụ lục GIẢM TRỪ phải trừ đi chứ không cộng trị tuyệt
+     * đối.
+     */
+    @Test
+    public void amendmentValues_addUpOnTheParentOnlyAfterSigning() throws Exception {
+        IntegrationDb.assumeAvailable();
+
+        IntegrationDb.exec("UPDATE contracts SET contract_value = 1000000000 WHERE contract_id = 2");
+        assertEquals("Chưa có phụ lục thì giá trị hiện hành là chính nó",
+                0, new java.math.BigDecimal("1000000000.00")
+                        .compareTo(contractDAO.findById(2).getCurrentValue()));
+
+        // Có thời hạn thì mới ký được -- amendmentOf() để trống hai mốc đó.
+        Contract addition = withTerm(amendmentOf(2, "HD-0002/PL01"));
+        addition.setContractValue(new java.math.BigDecimal("250000000"));
+        int additionId = contractDAO.insert(addition, Fixtures.USER_ID);
+        assertTrue(additionId > 0);
+
+        assertEquals("Phụ lục còn NHÁP thì chưa đổi được giá trị hợp đồng",
+                0, new java.math.BigDecimal("1000000000.00")
+                        .compareTo(contractDAO.findById(2).getCurrentValue()));
+        assertEquals("...nhưng phải thấy được là có cái đang treo",
+                0, new java.math.BigDecimal("250000000.00")
+                        .compareTo(contractDAO.findById(2).getAmendmentValuePending()));
+
+        assertTrue(contractDAO.changeProgressStatus(additionId, ContractDAO.PROGRESS_SIGNED,
+                Fixtures.USER_ID, null));
+        assertEquals("Ký xong thì cộng vào", 0, new java.math.BigDecimal("1250000000.00")
+                .compareTo(contractDAO.findById(2).getCurrentValue()));
+        assertEquals("Bản ghi cha giữ nguyên con số đã ký", 0,
+                new java.math.BigDecimal("1000000000.00")
+                        .compareTo(contractDAO.findById(2).getContractValue()));
+        assertEquals("Ký phụ lục có giá trị để lại vết trên hợp đồng CHA", 1,
+                IntegrationDb.count("contract_history",
+                        "contract_id = 2 AND event_type = N'Điều chỉnh giá trị'"));
+
+        // Giảm trừ: phải TRỪ đi, không phải cộng trị tuyệt đối.
+        Contract reduction = withTerm(amendmentOf(2, "HD-0002/PL02"));
+        reduction.setContractValue(new java.math.BigDecimal("-50000000"));
+        int reductionId = contractDAO.insert(reduction, Fixtures.USER_ID);
+        assertTrue(reductionId > 0);
+        assertTrue(contractDAO.changeProgressStatus(reductionId, ContractDAO.PROGRESS_SIGNED,
+                Fixtures.USER_ID, null));
+        assertEquals("1 tỷ + 250tr - 50tr", 0, new java.math.BigDecimal("1200000000.00")
+                .compareTo(contractDAO.findById(2).getCurrentValue()));
+
+        // Huỷ bản ghi một phụ lục đã ký rút luôn phần tiền của nó ra.
+        assertTrue(contractDAO.voidRecord(reductionId, Fixtures.USER_ID, "lập nhầm"));
+        assertEquals("Huỷ phụ lục giảm trừ thì giá trị quay lại", 0,
+                new java.math.BigDecimal("1250000000.00")
+                        .compareTo(contractDAO.findById(2).getCurrentValue()));
+        // Ba dòng: ký PL01, ký PL02, rồi huỷ PL02. Mỗi lần giá trị hợp đồng đổi
+        // là một dòng -- kể cả lần đổi ngược trở lại.
+        assertEquals("Và việc đó cũng phải có vết trên hợp đồng cha", 3,
+                IntegrationDb.count("contract_history",
+                        "contract_id = 2 AND event_type = N'Điều chỉnh giá trị'"));
+    }
+
+    /**
+     * Phụ lục giảm trừ quá số tiền còn lại bị từ chối ngay trong transaction.
+     * Chặn ở DAO chứ không chỉ ở form: giá trị hợp đồng âm không có nghĩa, và
+     * lọt vào thì nó âm thầm trừ đi trong mọi phép cộng về sau.
+     */
+    @Test
+    public void amendmentValue_reducingBelowZero_isRefusedByTheDao() throws Exception {
+        IntegrationDb.assumeAvailable();
+
+        IntegrationDb.exec("UPDATE contracts SET contract_value = 100000000 WHERE contract_id = 2");
+
+        Contract tooMuch = amendmentOf(2, "HD-0002/PL01");
+        tooMuch.setContractValue(new java.math.BigDecimal("-150000000"));
+        assertEquals(ContractDAO.INVALID_VALUE, contractDAO.insert(tooMuch, Fixtures.USER_ID));
+        assertEquals("Bị từ chối thì không để lại bản ghi nào",
+                0, IntegrationDb.count("contracts", "contract_code = 'HD-0002/PL01'"));
+    }
+
+    /**
+     * Tổng các kỳ thanh toán đối chiếu theo CẢ CỤM: kỳ lập trên phụ lục cũng
+     * phải vào tổng, nếu không thì cảnh báo "lệch giá trị hợp đồng" nổ ở mọi
+     * hợp đồng có phụ lục.
+     */
+    @Test
+    public void scheduledPayments_areSummedAcrossTheWholeCluster() throws Exception {
+        IntegrationDb.assumeAvailable();
+
+        Contract addition = amendmentOf(2, "HD-0002/PL01");
+        addition.setContractValue(new java.math.BigDecimal("250000000"));
+        int additionId = contractDAO.insert(addition, Fixtures.USER_ID);
+        assertTrue(additionId > 0);
+
+        assertTrue(contractDAO.insertPayment(2, payment("1000000000", java.time.LocalDate.now()),
+                Fixtures.USER_ID));
+        assertTrue(contractDAO.insertPayment(additionId, payment("250000000", java.time.LocalDate.now()),
+                Fixtures.USER_ID));
+
+        assertEquals("Kỳ của phụ lục cũng là tiền của hợp đồng này",
+                new java.math.BigDecimal("1250000000.00"),
+                contractDAO.sumScheduledPaymentsForCluster(2));
+    }
+
     /** Ô lọc "Chỉ hợp đồng gốc": danh sách và bộ đếm phân trang phải đi cặp. */
     @Test
     public void rootsOnlyFilter_keepsListAndCountInStep() throws Exception {
@@ -590,6 +697,13 @@ public class ContractStatusIntegrationTest {
         int id = contractDAO.insert(draft, Fixtures.USER_ID);
         assertTrue(id > 0);
         return id;
+    }
+
+    /** Gắn thời hạn cho một phụ lục -- thiếu nó thì changeProgressStatus từ chối ký. */
+    private static Contract withTerm(Contract c) {
+        c.setEffectiveDate(java.sql.Date.valueOf(java.time.LocalDate.now()));
+        c.setEndDate(java.sql.Date.valueOf(java.time.LocalDate.now().plusYears(1)));
+        return c;
     }
 
     private static Contract amendmentOf(int parentId, String code) {

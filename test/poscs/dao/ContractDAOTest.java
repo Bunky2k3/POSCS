@@ -788,28 +788,36 @@ public class ContractDAOTest {
     }
 
     // ------------------------------------------------------------------
-    // sumInvoiceAmountByContractId
+    // sumScheduledPaymentsForCluster
     // ------------------------------------------------------------------
 
+    /**
+     * Cộng kỳ thanh toán của CẢ CỤM: hợp đồng gốc và các phụ lục của nó. Cùng
+     * một id đi vào hai tham số -- câu lệnh hỏi "contract_id = ? HOẶC
+     * parent_contract_id = ?" -- nên test canh cả hai, thiếu một cái là cụm chỉ
+     * còn một nửa mà không ai biết.
+     */
     @Test
-    public void sumInvoiceAmountByContractId_returnsSum() throws Exception {
+    public void sumScheduledPaymentsForCluster_returnsSumOfRootAndAmendments() throws Exception {
         PreparedStatement ps = statementReturning(singleRow(row("total", new BigDecimal("42000"))));
         Connection conn = connectionReturning(ps);
 
         try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
             db.when(DBContext::getConnection).thenReturn(conn);
 
-            assertEquals(new BigDecimal("42000"), dao.sumInvoiceAmountByContractId(11));
+            assertEquals(new BigDecimal("42000"), dao.sumScheduledPaymentsForCluster(11));
             verify(ps).setInt(1, 11);
+            verify(ps).setInt(2, 11);
         }
     }
 
     @Test
-    public void sumInvoiceAmountByContractId_sqlError_returnsZero() throws Exception {
+    public void sumScheduledPaymentsForCluster_sqlError_returnsZero() throws Exception {
         try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
             db.when(DBContext::getConnection).thenThrow(new SQLException("hỏng"));
 
-            assertEquals(BigDecimal.ZERO, dao.sumInvoiceAmountByContractId(11));
+            // Màn hình so con số này với giá trị hợp đồng để báo lệch; null sẽ nổ.
+            assertEquals(BigDecimal.ZERO, dao.sumScheduledPaymentsForCluster(11));
         }
     }
 
@@ -1093,6 +1101,130 @@ public class ContractDAOTest {
     // ------------------------------------------------------------------
 
     /** Một dòng contracts đủ để lockForUpdate dựng lại được hợp đồng cha. */
+    // ------------------------------------------------------------------
+    // Giá trị hợp đồng khi có phụ lục
+    // ------------------------------------------------------------------
+
+    /**
+     * Phụ lục giảm trừ nhiều hơn số tiền còn lại thì bị TỪ CHỐI: giá trị hợp
+     * đồng âm không có nghĩa gì, và gần như luôn là gõ nhầm dấu hoặc gõ TỔNG
+     * giá trị mới vào ô chênh lệch.
+     *
+     * <p>Mã trả về tách riêng khỏi -1: "lưu thất bại" thì người dùng không sửa
+     * được gì, còn cái này thì sửa ô tiền là xong.
+     */
+    @Test
+    public void insert_amendmentReducingBelowZero_rejected() throws Exception {
+        java.util.Map<String, Object> parent = parentRow(ContractDAO.PROGRESS_SIGNED, null);
+        parent.put("contract_value", new BigDecimal("1000000"));
+        ResultSet parentRs = singleRow(parent);
+        // Đã có một phụ lục giảm trừ 300k được ký trước đó -> còn lại 700k.
+        ResultSet signedSoFar = singleRow(row("total", new BigDecimal("-300000")));
+        PreparedStatement ps = mock(PreparedStatement.class);
+        when(ps.executeQuery()).thenReturn(parentRs, signedSoFar);
+        Connection conn = connectionReturning(ps);
+
+        Contract child = amendmentOf(3);
+        child.setContractValue(new BigDecimal("-800000"));
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            assertEquals(ContractDAO.INVALID_VALUE, dao.insert(child, ACTOR));
+            verify(ps, never()).executeUpdate();
+            verify(conn).rollback();
+        }
+    }
+
+    /** Phụ lục BỔ SUNG thì bao nhiêu cũng hợp lệ -- không có trần nào cả. */
+    @Test
+    public void insert_amendmentAddingValue_isAccepted() throws Exception {
+        ResultSet parentRs = singleRow(parentRow(ContractDAO.PROGRESS_SIGNED, null));
+        ResultSet keys = singleRow(row("GENERATED_KEY", 77));
+        PreparedStatement historyPs = mock(PreparedStatement.class);
+        PreparedStatement contractPs = mock(PreparedStatement.class);
+        when(contractPs.executeQuery()).thenReturn(parentRs);
+        when(contractPs.executeUpdate()).thenReturn(1);
+        when(contractPs.getGeneratedKeys()).thenReturn(keys);
+        Connection conn = connectionRoutingOn("contract_history", historyPs, contractPs);
+
+        Contract child = amendmentOf(3);
+        // Hợp đồng cha chưa chốt giá (parentRow không có contract_value) mà phụ
+        // lục vẫn bổ sung được: phép kiểm chỉ chặn phần ÂM.
+        child.setContractValue(new BigDecimal("250000000"));
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            assertEquals(77, dao.insert(child, ACTOR));
+            verify(conn).commit();
+        }
+    }
+
+    /**
+     * KÝ một phụ lục có giá trị sinh dòng nhật ký trên HỢP ĐỒNG CHA.
+     *
+     * <p>Đây là khoảnh khắc giá trị hợp đồng thật sự đổi -- trước đó phụ lục
+     * mới là bản nháp ai cũng sửa được. Không có dòng này thì con số trên màn
+     * hình đổi mà không chỗ nào giải thích được vì sao.
+     */
+    @Test
+    public void changeProgressStatus_signingAmendmentWithValue_logsOnParent() throws Exception {
+        java.util.Map<String, Object> amendment = parentRow(ContractDAO.PROGRESS_DRAFT, 3);
+        amendment.put("contract_id", 77);
+        amendment.put("contract_code", "01/2026/HĐMB-POSTEF/PL01");
+        amendment.put("contract_value", new BigDecimal("250000000"));
+        amendment.put("effective_date", java.sql.Date.valueOf("2026-01-01"));
+        amendment.put("end_date", java.sql.Date.valueOf("2026-12-31"));
+        ResultSet amendmentRs = singleRow(amendment);
+        ResultSet parentValue = singleRow(row("contract_value", new BigDecimal("1500000000")));
+        ResultSet signedTotal = singleRow(row("total", new BigDecimal("250000000")));
+
+        PreparedStatement historyPs = mock(PreparedStatement.class);
+        PreparedStatement contractPs = mock(PreparedStatement.class);
+        when(contractPs.executeQuery()).thenReturn(amendmentRs, parentValue, signedTotal);
+        when(contractPs.executeUpdate()).thenReturn(1);
+        Connection conn = connectionRoutingOn("contract_history", historyPs, contractPs);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            assertTrue(dao.changeProgressStatus(77, ContractDAO.PROGRESS_SIGNED, ACTOR, null));
+
+            // Dòng mốc "Ký hợp đồng" nằm trên phụ lục (77); dòng giá trị nằm
+            // trên hợp đồng CHA (3).
+            verify(historyPs).setInt(1, 77);
+            verify(historyPs).setInt(1, 3);
+            verify(historyPs).setString(2, ContractHistory.EVENT_VALUE_ADJUSTED);
+            verify(conn).commit();
+        }
+    }
+
+    /** Phụ lục KHÔNG đổi tiền thì không sinh dòng giá trị nào trên hợp đồng cha. */
+    @Test
+    public void changeProgressStatus_signingAmendmentWithoutValue_doesNotLogValueOnParent() throws Exception {
+        java.util.Map<String, Object> amendment = parentRow(ContractDAO.PROGRESS_DRAFT, 3);
+        amendment.put("contract_id", 77);
+        amendment.put("effective_date", java.sql.Date.valueOf("2026-01-01"));
+        amendment.put("end_date", java.sql.Date.valueOf("2026-12-31"));
+        // ResultSet dựng TRƯỚC: singleRow() tự nó stub một mock, mà gọi nó bên
+        // trong when(...) là dựng mock giữa chừng một lần stubbing khác.
+        ResultSet amendmentRs = singleRow(amendment);
+        PreparedStatement historyPs = mock(PreparedStatement.class);
+        PreparedStatement contractPs = mock(PreparedStatement.class);
+        when(contractPs.executeQuery()).thenReturn(amendmentRs);
+        when(contractPs.executeUpdate()).thenReturn(1);
+        Connection conn = connectionRoutingOn("contract_history", historyPs, contractPs);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            assertTrue(dao.changeProgressStatus(77, ContractDAO.PROGRESS_SIGNED, ACTOR, null));
+
+            verify(historyPs, never()).setString(2, ContractHistory.EVENT_VALUE_ADJUSTED);
+        }
+    }
+
     private static java.util.Map<String, Object> parentRow(String progressStatus, Integer ownParentId) {
         return row("contract_id", 3,
                 "contract_code", "01/2026/HĐMB-POSTEF",

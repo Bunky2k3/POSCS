@@ -328,6 +328,163 @@ public class ContractControllerTest {
         verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=view&id=3&error=amendment_not_allowed");
     }
 
+    // ------------------------------------------------------------------
+    // Giá trị của phụ lục: ô số dương + ô chọn dấu
+    // ------------------------------------------------------------------
+
+    /**
+     * "Giảm trừ" biến con số dương trên form thành một CHÊNH LỆCH ÂM.
+     *
+     * <p>Dấu nhập bằng ô chọn chứ không bắt gõ dấu trừ, nên chỗ ghép dấu là ở
+     * controller -- và nếu nó ghép sai thì một phụ lục giảm trừ sẽ lặng lẽ CỘNG
+     * thêm tiền vào hợp đồng.
+     */
+    @Test
+    public void createAmendment_decreaseAdjustment_storesNegativeValue() throws Exception {
+        Contract parent = signedContract();
+        parent.setContractId(3);
+        parent.setEnterpriseId(10);
+        parent.setContractValue(new java.math.BigDecimal("1000000000"));
+        when(request.getParameter("action")).thenReturn("createAmendment");
+        when(request.getParameter("parentId")).thenReturn("3");
+        when(contractDAO.findById(3)).thenReturn(parent);
+        stubValidContractFields();
+        when(request.getParameter("contractValue")).thenReturn("80.000.000");
+        when(request.getParameter("valueAdjustment")).thenReturn("decrease");
+        when(contractDAO.insert(any(Contract.class), anyInt())).thenReturn(90);
+
+        controller.doPost(request, response);
+
+        verify(contractDAO).insert(argThat((Contract c) ->
+                new java.math.BigDecimal("-80000000").compareTo(c.getContractValue()) == 0), anyInt());
+    }
+
+    /** "Không đổi giá trị" thắng cả con số còn sót trong ô: phụ lục đó không đụng tới tiền. */
+    @Test
+    public void createAmendment_noAdjustment_ignoresTypedAmount() throws Exception {
+        Contract parent = signedContract();
+        parent.setContractId(3);
+        parent.setEnterpriseId(10);
+        when(request.getParameter("action")).thenReturn("createAmendment");
+        when(request.getParameter("parentId")).thenReturn("3");
+        when(contractDAO.findById(3)).thenReturn(parent);
+        stubValidContractFields();
+        when(request.getParameter("contractValue")).thenReturn("250.000.000");
+        when(request.getParameter("valueAdjustment")).thenReturn("none");
+        when(contractDAO.insert(any(Contract.class), anyInt())).thenReturn(90);
+
+        controller.doPost(request, response);
+
+        verify(contractDAO).insert(argThat((Contract c) -> c.getContractValue() == null), anyInt());
+    }
+
+    /**
+     * Giảm trừ nhiều hơn giá trị còn lại thì dừng ngay ở controller, không gọi
+     * xuống DAO -- người dùng nhận đúng lý do thay vì một "lưu thất bại".
+     */
+    @Test
+    public void createAmendment_decreaseBeyondRemainingValue_rejected() throws Exception {
+        Contract parent = signedContract();
+        parent.setContractId(3);
+        parent.setEnterpriseId(10);
+        parent.setContractValue(new java.math.BigDecimal("100000000"));
+        when(request.getParameter("action")).thenReturn("createAmendment");
+        when(request.getParameter("parentId")).thenReturn("3");
+        when(contractDAO.findById(3)).thenReturn(parent);
+        stubValidContractFields();
+        when(request.getParameter("contractValue")).thenReturn("150.000.000");
+        when(request.getParameter("valueAdjustment")).thenReturn("decrease");
+
+        controller.doPost(request, response);
+
+        verify(contractDAO, never()).insert(any(Contract.class), anyInt());
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=newAmendment&parentId=3&error=value_negative");
+    }
+
+    /**
+     * Phụ lục ĐÃ KÝ của hợp đồng cha nới thêm chỗ cho khoản giảm trừ: giá trị
+     * hiện hành mới là thứ đem ra so, không phải con số trên bản gốc.
+     */
+    @Test
+    public void createAmendment_decreaseWithinCurrentValue_isAccepted() throws Exception {
+        Contract parent = signedContract();
+        parent.setContractId(3);
+        parent.setEnterpriseId(10);
+        parent.setContractValue(new java.math.BigDecimal("100000000"));
+        parent.setAmendmentValueSigned(new java.math.BigDecimal("100000000"));
+        when(request.getParameter("action")).thenReturn("createAmendment");
+        when(request.getParameter("parentId")).thenReturn("3");
+        when(contractDAO.findById(3)).thenReturn(parent);
+        stubValidContractFields();
+        when(request.getParameter("contractValue")).thenReturn("150.000.000");
+        when(request.getParameter("valueAdjustment")).thenReturn("decrease");
+        when(contractDAO.insert(any(Contract.class), anyInt())).thenReturn(90);
+
+        controller.doPost(request, response);
+
+        verify(contractDAO).insert(any(Contract.class), anyInt());
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=view&id=90");
+    }
+
+    /** DAO từ chối vì một phụ lục giảm trừ khác vừa được ký -> báo đúng lý do đó. */
+    @Test
+    public void createAmendment_daoRejectsValue_redirectsWithValueError() throws Exception {
+        Contract parent = signedContract();
+        parent.setContractId(3);
+        parent.setEnterpriseId(10);
+        parent.setContractValue(new java.math.BigDecimal("1000000000"));
+        when(request.getParameter("action")).thenReturn("createAmendment");
+        when(request.getParameter("parentId")).thenReturn("3");
+        when(contractDAO.findById(3)).thenReturn(parent);
+        stubValidContractFields();
+        when(request.getParameter("contractValue")).thenReturn("80.000.000");
+        when(request.getParameter("valueAdjustment")).thenReturn("decrease");
+        when(contractDAO.insert(any(Contract.class), anyInt())).thenReturn(ContractDAO.INVALID_VALUE);
+
+        controller.doPost(request, response);
+
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=newAmendment&parentId=3&error=value_negative");
+    }
+
+    /** Form hợp đồng GỐC không gửi ô chọn dấu, nên con số đi thẳng vào như cũ. */
+    @Test
+    public void create_withoutAdjustmentParam_keepsValueAsTyped() throws Exception {
+        when(request.getParameter("action")).thenReturn("create");
+        stubValidContractFields();
+        when(request.getParameter("contractValue")).thenReturn("1.500.000.000");
+        when(contractDAO.insert(any(Contract.class), anyInt())).thenReturn(90);
+
+        controller.doPost(request, response);
+
+        verify(contractDAO).insert(argThat((Contract c) ->
+                new java.math.BigDecimal("1500000000").compareTo(c.getContractValue()) == 0), anyInt());
+    }
+
+    /**
+     * Đối chiếu tiền ở trang hợp đồng làm theo CỤM: giá trị hiện hành (đã cộng
+     * phụ lục) so với tổng kỳ của cả cụm. So riêng bản ghi gốc thì cảnh báo
+     * "không khớp" nổ ở mọi hợp đồng có phụ lục.
+     */
+    @Test
+    public void view_paymentMismatch_comparesClusterValueWithClusterSchedule() throws Exception {
+        Contract contract = signedContract();
+        contract.setContractValue(new java.math.BigDecimal("1500000000"));
+        contract.setAmendmentValueSigned(new java.math.BigDecimal("250000000"));
+        contract.setAmendmentCount(1);
+        when(request.getParameter("action")).thenReturn("view");
+        when(request.getParameter("id")).thenReturn("5");
+        when(contractDAO.findById(5)).thenReturn(contract);
+        when(contractDAO.sumScheduledPaymentsForCluster(5))
+                .thenReturn(new java.math.BigDecimal("1750000000"));
+        when(request.getRequestDispatcher(anyString())).thenReturn(mock(RequestDispatcher.class));
+
+        controller.doGet(request, response);
+
+        verify(request).setAttribute("paymentMismatch", false);
+        verify(request).setAttribute(eq("clusterValue"),
+                argThat((java.math.BigDecimal v) -> new java.math.BigDecimal("1750000000").compareTo(v) == 0));
+    }
+
     /** Hợp đồng đã ký với đối tác giữ đúng vai -- dùng cho nhóm test siết form. */
     private static Contract signedContract() {
         Contract c = new Contract();

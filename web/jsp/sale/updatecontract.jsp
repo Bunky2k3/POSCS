@@ -144,6 +144,7 @@
                         <c:when test="${param.error == 'update_failed'}">Không lưu được thay đổi. Vui lòng thử lại.</c:when>
                         <c:when test="${param.error == 'missing_reason'}">Sửa sai sót trên hợp đồng đã ký thì bắt buộc phải nêu lý do.</c:when>
                         <c:when test="${param.error == 'amendment_not_allowed'}">Hợp đồng này không lập phụ lục được: nó phải đã ký và chưa thanh lý, và bản thân nó không được là phụ lục.</c:when>
+                        <c:when test="${param.error == 'value_negative'}">Khoản giảm trừ lớn hơn giá trị còn lại của hợp đồng gốc — giá trị hợp đồng sẽ âm. Ô này nhập phần CHÊNH LỆCH, không phải tổng giá trị mới.</c:when>
                         <c:otherwise>Đã có lỗi xảy ra. Vui lòng thử lại.</c:otherwise>
                     </c:choose>
                 </div>
@@ -272,13 +273,44 @@
                         <input type="text" class="form-control" id="signingPlace" name="signingPlace"
                                maxlength="255" placeholder="VD: Hà Nội" value="${fn:escapeXml(contract.signingPlace)}" ${canEditTerms ? '' : 'disabled'} data-term="1">
                     </div>
+                    <%-- Trên một PHỤ LỤC, ô này mang phần CHÊNH LỆCH chứ không phải
+                         tổng giá trị -- xem ghi chú ở addnewcontract.jsp. Ô chọn dấu
+                         chỉ hiện khi còn sửa được: ký xong thì giá trị là điều khoản
+                         đã khoá, đổi phải qua một phụ lục khác. --%>
+                    <c:if test="${contract.amendment and canEditTerms}">
+                        <div class="col-md-6 field-row">
+                            <label>Điều chỉnh giá trị</label>
+                            <select class="form-control" id="valueAdjustment" name="valueAdjustment" data-term="1">
+                                <option value="increase" ${contract.contractValue != null and contract.contractValue.signum() > 0 ? 'selected' : ''}>Bổ sung (cộng vào giá trị hợp đồng)</option>
+                                <option value="decrease" ${contract.contractValue != null and contract.contractValue.signum() < 0 ? 'selected' : ''}>Giảm trừ (trừ khỏi giá trị hợp đồng)</option>
+                                <option value="none" ${contract.contractValue == null ? 'selected' : ''}>Không đổi giá trị</option>
+                            </select>
+                        </div>
+                    </c:if>
                     <div class="col-md-6 field-row">
-                        <label>Giá trị hợp đồng (VNĐ)</label>
+                        <label>${contract.amendment ? 'Số tiền điều chỉnh (VNĐ)' : 'Giá trị hợp đồng (VNĐ)'}</label>
+                        <%-- Ô nhập luôn hiện số DƯƠNG: dấu nằm ở ô chọn bên cạnh. Gửi
+                             lên dấu trừ lẫn "Giảm trừ" thì controller sẽ đảo dấu một
+                             khoản vốn đã âm. --%>
                         <input type="text" class="form-control" id="contractValue" name="contractValue"
-                               inputmode="numeric" placeholder="VD: 1.500.000.000" value="${contract.contractValue}" ${canEditTerms ? '' : 'disabled'} data-term="1">
+                               inputmode="numeric" placeholder="VD: 1.500.000.000"
+                               value="${contract.amendment and contract.contractValue != null ? contract.contractValue.abs() : contract.contractValue}" ${canEditTerms ? '' : 'disabled'} data-term="1">
                         <span style="font-size:0.78rem; color:#9ca3af; display:block; margin-top:6px;">
-                            Giá trị theo điều khoản. Số tiền thực thu ghi ở mục Kỳ thanh toán — hai
-                            con số lệch nhau chính là công nợ.
+                            <c:choose>
+                                <c:when test="${contract.amendment}">
+                                    Phần chênh lệch cộng vào hợp đồng gốc
+                                    <strong>${fn:escapeXml(contract.parentContractCode)}</strong>, tính từ lúc phụ lục này được ký.
+                                </c:when>
+                                <c:when test="${contract.valueAdjusted}">
+                                    Giá trị theo bản gốc đã ký. Sau ${contract.amendmentCount} phụ lục, giá trị hiện hành là
+                                    <strong class="money-vnd" data-vnd="${contract.currentValue}">&mdash;</strong>
+                                    (điều chỉnh <span class="money-signed" data-vnd="${contract.amendmentValueSigned}">&mdash;</span>).
+                                </c:when>
+                                <c:otherwise>
+                                    Giá trị theo điều khoản. Số tiền thực thu ghi ở mục Kỳ thanh toán — hai
+                                    con số lệch nhau chính là công nợ.
+                                </c:otherwise>
+                            </c:choose>
                         </span>
                     </div>
                                         <%-- THỜI HẠN tách thành khối riêng, không nằm chung "Thông tin
@@ -457,6 +489,7 @@
                                     <th>Mã phụ lục</th>
                                     <th>Tiêu đề</th>
                                     <th>Thời hạn</th>
+                                    <th class="text-end">Điều chỉnh giá trị</th>
                                     <th>Tiến độ</th>
                                     <th></th>
                                 </tr>
@@ -477,6 +510,12 @@
                                                 </c:otherwise>
                                             </c:choose>
                                         </td>
+                                        <td class="text-end">
+                                            <span class="money-signed" data-vnd="${pl.contractValue}">&mdash;</span>
+                                            <c:if test="${pl.draft and pl.contractValue != null}">
+                                                <div style="font-size:0.74rem; color:#9ca3af;">chưa ký, chưa tính</div>
+                                            </c:if>
+                                        </td>
                                         <td>${fn:escapeXml(pl.progressStatus)}</td>
                                         <td class="text-end">
                                             <a href="${pageContext.request.contextPath}/contract?action=view&id=${pl.contractId}"
@@ -494,6 +533,14 @@
                     <p style="font-size:0.8rem; color:#9ca3af; margin:4px 0 14px;">
                         Phụ lục gia hạn không đổi ngày kết thúc của hợp đồng gốc — bản ghi gốc giữ nguyên
                         những gì đã ký, thời hạn mới nằm trên chính phụ lục.
+                        <%-- GIÁ TRỊ thì ngược lại: nó CÓ cộng dồn. Hai luật khác nhau
+                             trên cùng một bảng, nên phải nói ra cả hai ở đúng chỗ
+                             người dùng đang nhìn, nếu không thì cái này bị suy ra từ
+                             cái kia. --%>
+                        <c:if test="${contract.valueAdjusted}">
+                            Giá trị thì có: sau ${contract.amendmentCount} phụ lục đã ký, hợp đồng này hiện là
+                            <strong class="money-vnd" data-vnd="${contract.currentValue}">&mdash;</strong>.
+                        </c:if>
                     </p>
                 </c:otherwise>
             </c:choose>
@@ -753,6 +800,14 @@
         }
 
         // Số tiền render ở client để dùng đúng cách gom nhóm của tiếng Việt.
+        // Giá trị trên dòng PHỤ LỤC là chênh lệch, nên phải mang dấu:
+        // "+250.000.000" đọc ra ngay là bổ sung, "250.000.000" thì không.
+        document.querySelectorAll('.money-signed').forEach(function (el) {
+            var n = Number(el.dataset.vnd);
+            if (el.dataset.vnd === '' || isNaN(n)) { el.textContent = 'không đổi'; return; }
+            el.textContent = (n > 0 ? '+' : '') + n.toLocaleString('vi-VN', { maximumFractionDigits: 0 }) + ' ₫';
+            el.style.color = n < 0 ? '#b45309' : '#2f6b34';
+        });
         document.querySelectorAll('.money-vnd').forEach(function (el) {
             var n = Number(el.dataset.vnd);
             el.textContent = isNaN(n) ? '\u2014' : n.toLocaleString('vi-VN', { maximumFractionDigits: 0 }) + ' \u20ab';

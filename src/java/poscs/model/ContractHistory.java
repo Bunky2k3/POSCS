@@ -54,6 +54,16 @@ public class ContractHistory {
     public static final String EVENT_AMENDMENT_CREATED = "Lập phụ lục";
 
     /**
+     * Giá trị hợp đồng đổi vì một phụ lục được KÝ (hoặc bị huỷ bản ghi). Ghi
+     * lên HỢP ĐỒNG GỐC, không lên phụ lục: câu "vì sao hợp đồng này giờ là 1,75
+     * tỷ chứ không phải 1,5 tỷ" được hỏi khi đang mở hợp đồng gốc.
+     *
+     * <p>Tách khỏi {@link #EVENT_AMENDMENT_CREATED}: lập phụ lục mới chỉ là
+     * soạn một bản nháp, còn tiền chỉ đổi khi bản nháp đó được ký.
+     */
+    public static final String EVENT_VALUE_ADJUSTED = "Điều chỉnh giá trị";
+
+    /**
      * Admin chữa một sai sót NHẬP LIỆU trên hợp đồng đã ký.
      *
      * <p>Tách hẳn khỏi {@link #EVENT_UPDATED}: sửa một bản nháp là chuyện bình

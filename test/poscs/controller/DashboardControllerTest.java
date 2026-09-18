@@ -102,18 +102,42 @@ public class DashboardControllerTest {
         Contract c = new Contract();
         c.setContractId(9);
         c.setEndDate(Date.valueOf(today.plusDays(10)));
+        c.setContractValue(BigDecimal.valueOf(5_000_000));
         List<Contract> expiring = Arrays.asList(c);
         when(contractDAO.findExpiringSoon(anyInt(), nullable(Integer.class))).thenReturn(expiring);
-        when(contractDAO.sumInvoiceAmountByContractId(9)).thenReturn(BigDecimal.valueOf(5_000_000));
         when(contractDAO.sumInvoiceAmountByMonth(anyInt(), anyInt(), nullable(Integer.class))).thenReturn(BigDecimal.ZERO);
 
         controller.doGet(request, response);
 
         verify(request).setAttribute(eq("expiringContracts"), eq(expiring));
         verify(request).setAttribute(eq("contractValues"),
-                argThat((Map<Integer, BigDecimal> m) -> BigDecimal.valueOf(5_000_000).equals(m.get(9))));
+                argThat((Map<Integer, BigDecimal> m) -> BigDecimal.valueOf(5_000_000).compareTo(m.get(9)) == 0));
         verify(request).setAttribute(eq("daysRemaining"),
                 argThat((Map<Integer, Long> m) -> Long.valueOf(10L).equals(m.get(9))));
+    }
+
+    /**
+     * Cột "Giá trị" ở bảng hợp đồng sắp hết hạn là giá trị theo ĐIỀU KHOẢN đã
+     * cộng phụ lục, không phải tổng các kỳ thanh toán như trước V27. Hai thứ đó
+     * lệch nhau đúng bằng công nợ, và hợp đồng vừa được phụ lục bổ sung mà vẫn
+     * hiện con số cũ là thứ người dùng báo lại đầu tiên.
+     */
+    @Test
+    public void expiringContracts_valueIncludesSignedAmendments() throws Exception {
+        LocalDate today = LocalDate.now();
+        Contract c = new Contract();
+        c.setContractId(9);
+        c.setEndDate(Date.valueOf(today.plusDays(10)));
+        c.setContractValue(BigDecimal.valueOf(1_500_000_000L));
+        c.setAmendmentValueSigned(BigDecimal.valueOf(250_000_000L));
+        when(contractDAO.findExpiringSoon(anyInt(), nullable(Integer.class))).thenReturn(Arrays.asList(c));
+        when(contractDAO.sumInvoiceAmountByMonth(anyInt(), anyInt(), nullable(Integer.class))).thenReturn(BigDecimal.ZERO);
+
+        controller.doGet(request, response);
+
+        verify(request).setAttribute(eq("contractValues"),
+                argThat((Map<Integer, BigDecimal> m) ->
+                        BigDecimal.valueOf(1_750_000_000L).compareTo(m.get(9)) == 0));
     }
 
     @Test
