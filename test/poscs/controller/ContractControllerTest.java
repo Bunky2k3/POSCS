@@ -679,6 +679,119 @@ public class ContractControllerTest {
         assertEquals("Quý 2/2026", period.getValue().getLabel());
     }
 
+    /**
+     * Dải KPI phải đếm CÙNG phạm vi với bảng bên dưới. Trước bản này
+     * {@code direction} được truyền xuống DAO nhưng câu lệnh bỏ quên nó, nên
+     * đứng ở mục Hợp đồng mua vẫn thấy bốn con số của cả hợp đồng bán -- hai
+     * con số cạnh nhau không khớp mà không gì trên màn hình giải thích nổi.
+     */
+    @Test
+    public void list_kpiDemTheoDungChieuVaPhamViPhuLuc() throws Exception {
+        RequestDispatcher dispatcher = mock(RequestDispatcher.class);
+        when(request.getRequestDispatcher("/jsp/sale/listcontract.jsp")).thenReturn(dispatcher);
+        when(request.getParameter("kind")).thenReturn("buy");
+        when(request.getParameter("scope")).thenReturn("root");
+
+        controller.doGet(request, response);
+
+        verify(contractDAO).countStatusSummary(nullable(Integer.class), nullable(Period.class), eq("Mua"), eq(true));
+    }
+
+    /** Bốn ô trạng thái là đường lọc; link của ô ĐANG BẬT phải là link TẮT nó đi. */
+    @Test
+    public void list_oTrangThaiDangBat_mangLinkTatLoc() throws Exception {
+        RequestDispatcher dispatcher = mock(RequestDispatcher.class);
+        when(request.getRequestDispatcher("/jsp/sale/listcontract.jsp")).thenReturn(dispatcher);
+        when(request.getParameter("status")).thenReturn("Đang hiệu lực");
+
+        controller.doGet(request, response);
+
+        ArgumentCaptor<List<ContractController.FilterChip>> chips = ArgumentCaptor.forClass(List.class);
+        verify(request).setAttribute(eq("statusChips"), chips.capture());
+        ContractController.FilterChip active = chips.getValue().stream()
+                .filter(ContractController.FilterChip::isOn).findFirst().orElse(null);
+        assertNotNull("phải có đúng ô 'Đang hiệu lực' đang bật", active);
+        assertFalse("link của ô đang bật phải BỎ status đi", active.getQuery().contains("status="));
+        ContractController.FilterChip other = chips.getValue().stream()
+                .filter(c -> !c.isOn()).findFirst().orElse(null);
+        assertTrue("ô chưa bật thì link BẬT nó", other.getQuery().contains("status="));
+    }
+
+    /** Link của ô trạng thái phải mang theo mọi lọc khác, nếu không bấm vào là mất sạch. */
+    @Test
+    public void list_linkOTrangThai_giuNguyenCacLocKhac() throws Exception {
+        RequestDispatcher dispatcher = mock(RequestDispatcher.class);
+        when(request.getRequestDispatcher("/jsp/sale/listcontract.jsp")).thenReturn(dispatcher);
+        when(request.getParameter("progress")).thenReturn("Đã ký");
+        when(request.getParameter("scope")).thenReturn("root");
+
+        controller.doGet(request, response);
+
+        ArgumentCaptor<List<ContractController.FilterChip>> chips = ArgumentCaptor.forClass(List.class);
+        verify(request).setAttribute(eq("statusChips"), chips.capture());
+        String query = chips.getValue().get(0).getQuery();
+        assertTrue(query, query.contains("progress="));
+        assertTrue(query, query.contains("scope=root"));
+    }
+
+    /**
+     * Chip "đang lọc" mang link BỎ CHÍNH NÓ và giữ các lọc còn lại -- trước đây
+     * muốn bỏ một điều kiện phải nhớ nó nằm ở ô nào rồi trả ô đó về "Tất cả".
+     */
+    @Test
+    public void list_chipDangLoc_moiCaiMangLinkBoChinhNo() throws Exception {
+        RequestDispatcher dispatcher = mock(RequestDispatcher.class);
+        when(request.getRequestDispatcher("/jsp/sale/listcontract.jsp")).thenReturn(dispatcher);
+        when(request.getParameter("progress")).thenReturn("Đã ký");
+        when(request.getParameter("scope")).thenReturn("root");
+
+        controller.doGet(request, response);
+
+        ArgumentCaptor<List<ContractController.FilterChip>> chips = ArgumentCaptor.forClass(List.class);
+        verify(request).setAttribute(eq("activeFilters"), chips.capture());
+        assertEquals(2, chips.getValue().size());
+        ContractController.FilterChip progressChip = chips.getValue().stream()
+                .filter(c -> c.getLabel().startsWith("Tiến độ")).findFirst().orElseThrow();
+        assertFalse("bỏ tiến độ", progressChip.getQuery().contains("progress="));
+        assertTrue("nhưng giữ phạm vi", progressChip.getQuery().contains("scope=root"));
+    }
+
+    /**
+     * Bỏ NĂM thì bỏ luôn kỳ: Period.parse cần cả hai, nên để lại một mình
+     * "quý 3" trên URL chỉ tạo ra một bộ lọc không lọc gì cả.
+     */
+    @Test
+    public void list_boNam_thiBoLuonKy() throws Exception {
+        RequestDispatcher dispatcher = mock(RequestDispatcher.class);
+        when(request.getRequestDispatcher("/jsp/sale/listcontract.jsp")).thenReturn(dispatcher);
+        when(request.getParameter("year")).thenReturn("2026");
+        when(request.getParameter("period")).thenReturn("q3");
+
+        controller.doGet(request, response);
+
+        ArgumentCaptor<List<ContractController.FilterChip>> chips = ArgumentCaptor.forClass(List.class);
+        verify(request).setAttribute(eq("activeFilters"), chips.capture());
+        String query = chips.getValue().get(0).getQuery();
+        assertFalse(query, query.contains("year="));
+        assertFalse(query, query.contains("period="));
+    }
+
+    /** Số trên nút "Lọc thêm" đếm đúng ba ô nằm trong đó, không đếm cả thanh lọc. */
+    @Test
+    public void list_demSoLocNangCaoDangBat() throws Exception {
+        RequestDispatcher dispatcher = mock(RequestDispatcher.class);
+        when(request.getRequestDispatcher("/jsp/sale/listcontract.jsp")).thenReturn(dispatcher);
+        when(request.getParameter("type")).thenReturn("Thi công lắp đặt");
+        when(request.getParameter("year")).thenReturn("2026");
+        // Hai cái dưới đây nằm NGOÀI khối "Lọc thêm" nên không được tính.
+        when(request.getParameter("progress")).thenReturn("Đã ký");
+        when(request.getParameter("keyword")).thenReturn("POSTEF");
+
+        controller.doGet(request, response);
+
+        verify(request).setAttribute("advancedFilterCount", 2);
+    }
+
     @Test
     public void list_thieuKind_macDinhLaHopDongBan() throws Exception {
         RequestDispatcher dispatcher = mock(RequestDispatcher.class);

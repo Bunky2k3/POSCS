@@ -1102,6 +1102,72 @@ public class ContractDAOTest {
 
     /** Một dòng contracts đủ để lockForUpdate dựng lại được hợp đồng cha. */
     // ------------------------------------------------------------------
+    // countStatusSummary -- phạm vi đếm
+    // ------------------------------------------------------------------
+
+    /**
+     * Chiều phải đi VÀO câu lệnh, không chỉ nằm trong chữ ký.
+     *
+     * <p>Đây là lỗi đã có thật: tham số {@code direction} được nhận rồi bỏ quên,
+     * nên dải KPI ở mục Hợp đồng mua đếm cả hợp đồng bán. Tham số có mà không
+     * dùng còn nguy hơn không có -- bên gọi tưởng đã lọc rồi.
+     */
+    @Test
+    public void countStatusSummary_locTheoChieu() throws Exception {
+        ResultSet rs = singleRow(row("draft_count", 1, "expired_count", 2, "soon_count", 3, "active_count", 4));
+        PreparedStatement ps = statementReturning(rs);
+        Connection conn = connectionReturning(ps);
+        ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            dao.countStatusSummary(null, null, "Mua", false);
+
+            verify(conn).prepareStatement(sql.capture());
+            assertTrue(sql.getValue(), sql.getValue().contains("c.direction = ?"));
+            verify(ps).setString(1, "Mua");
+        }
+    }
+
+    /** rootsOnly: bốn con số phải đếm đúng tập mà bảng bên dưới liệt kê. */
+    @Test
+    public void countStatusSummary_rootsOnly_boPhuLucRaKhoiPhepDem() throws Exception {
+        ResultSet rs = singleRow(row("draft_count", 1, "expired_count", 2, "soon_count", 3, "active_count", 4));
+        PreparedStatement ps = statementReturning(rs);
+        Connection conn = connectionReturning(ps);
+        ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            dao.countStatusSummary(null, null, null, true);
+
+            verify(conn).prepareStatement(sql.capture());
+            assertTrue(sql.getValue(), sql.getValue().contains("c.parent_contract_id IS NULL"));
+        }
+    }
+
+    /** Không lọc gì thì không thêm mệnh đề nào -- tránh câu lệnh tự thu hẹp âm thầm. */
+    @Test
+    public void countStatusSummary_khongLoc_khongThemMenhDe() throws Exception {
+        ResultSet rs = singleRow(row("draft_count", 0, "expired_count", 0, "soon_count", 0, "active_count", 0));
+        PreparedStatement ps = statementReturning(rs);
+        Connection conn = connectionReturning(ps);
+        ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            dao.countStatusSummary(null, null, null, false);
+
+            verify(conn).prepareStatement(sql.capture());
+            assertFalse(sql.getValue().contains("c.direction"));
+            assertFalse(sql.getValue().contains("parent_contract_id"));
+        }
+    }
+
+    // ------------------------------------------------------------------
     // Giá trị hợp đồng khi có phụ lục
     // ------------------------------------------------------------------
 
