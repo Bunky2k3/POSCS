@@ -37,6 +37,22 @@
         }
         .page-header-row h2 { font-weight: 700; color: var(--primary-dark); font-size: 1.4rem; margin-bottom: 4px; }
         .page-header-row p { color: #6b7280; font-size: 0.9rem; }
+        /* Dải nói rõ danh sách đang bị thu hẹp tới đâu. BẮT BUỘC phải có: con số
+           "tổng số N" bên dưới giờ là tổng CỦA PHẠM VI chứ không phải của toàn chi
+           nhánh -- không nói ra thì người dùng tưởng mất dữ liệu. Lấy đúng bảng màu
+           của .scope-note trên Dashboard để hai chỗ đọc ra cùng một ý. */
+        .scope-note {
+            display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+            background: #eaf6ff; border: 1px solid #cfe8fb; border-radius: 10px;
+            padding: 10px 16px; margin-bottom: 16px;
+            font-size: 0.84rem; color: var(--primary-dark);
+        }
+        .scope-note i { color: var(--primary); }
+        .scope-note .sep { color: #9ca3af; }
+        .scope-note a { color: var(--primary); font-weight: 600; text-decoration: none; }
+        .scope-note a:hover { text-decoration: underline; }
+        .scope-note .spacer { margin-left: auto; }
+
 
         .btn-add {
             background: linear-gradient(120deg, var(--primary), var(--primary-light));
@@ -285,6 +301,30 @@
         </div>
 
         <!-- ===== Bộ lọc / tìm kiếm ===== -->
+        <c:if test="${viewNarrowed or viewFilter == 'all'}">
+            <div class="scope-note">
+                <i class="fa-solid fa-user-check"></i>
+                <c:choose>
+                    <c:when test="${viewNarrowed and viewProvinceCount > 0}">
+                        Đang xem <strong>khách bạn phụ trách và khách trong ${viewProvinceCount} tỉnh địa bàn của bạn</strong>.
+                    </c:when>
+                    <c:when test="${viewNarrowed}">
+                        Đang xem <strong>khách bạn phụ trách</strong>.
+                        <span class="sep">&middot;</span>
+                        <span style="color:#6b7280;">Bạn chưa được giao tỉnh địa bàn nào</span>
+                    </c:when>
+                    <c:otherwise>Đang xem <strong>toàn chi nhánh</strong>.</c:otherwise>
+                </c:choose>
+                <a class="spacer" href="${fn:escapeXml(viewToggleUrl)}">
+                    <c:choose>
+                        <c:when test="${viewNarrowed}">Xem toàn chi nhánh</c:when>
+                        <c:otherwise>Chỉ phần việc của tôi</c:otherwise>
+                    </c:choose>
+                    <i class="fa-solid fa-arrow-right-long"></i>
+                </a>
+            </div>
+        </c:if>
+
         <form class="filter-bar card-box" method="GET" action="${pageContext.request.contextPath}/customer" id="filterForm">
             <input type="hidden" name="action" value="list">
             <%-- Lọc xong phải ở lại đúng danh sách vừa đứng, không rơi về khách mua. --%>
@@ -358,7 +398,7 @@
                                             </c:choose>
                                         </div>
                                         <div class="cell-2line">
-                                            <a href="${pageContext.request.contextPath}/customer?action=view&id=${customer.enterpriseId}" class="customer-name-link">${fn:escapeXml(customer.enterpriseName)}</a>
+                                            <a href="${pageContext.request.contextPath}/customer?action=view&id=${customer.enterpriseId}&kind=${kind}" class="customer-name-link">${fn:escapeXml(customer.enterpriseName)}</a>
                                             <span class="cell-sub">${fn:escapeXml(customer.email)}</span>
                                         </div>
                                     </div>
@@ -386,7 +426,7 @@
                                 </td>
                                 <td>
                                     <div class="action-icons">
-                                        <button class="act-view" title="Xem chi tiết" onclick="location.href='${pageContext.request.contextPath}/customer?action=view&id=${customer.enterpriseId}'"><i class="fa-regular fa-eye"></i></button>
+                                        <button class="act-view" title="Xem chi tiết" onclick="location.href='${pageContext.request.contextPath}/customer?action=view&id=${customer.enterpriseId}&kind=${kind}'"><i class="fa-regular fa-eye"></i></button>
                                         <c:if test="${canManage}">
                                             <button class="act-edit" title="Sửa" onclick="location.href='${pageContext.request.contextPath}/customer?action=edit&id=${customer.enterpriseId}'"><i class="fa-solid fa-pen"></i></button>
                                             <button class="act-delete" title="Xóa" onclick="openDeleteModal(${customer.enterpriseId}, '${fn:escapeXml(customer.enterpriseName)}')"><i class="fa-solid fa-trash"></i></button>

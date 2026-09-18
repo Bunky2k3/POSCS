@@ -193,18 +193,28 @@
     <%@ include file="/jsp/common/topbar.jsp" %>
     <div class="app-shell">
         <c:set var="activeNav" value="customer" scope="request"/>
-        <%-- Trang này không có tham số kind trên URL, nên suy mục con cần tô
-             sáng từ chính vai của khách: chỉ khi khách CHỈ là bên bán mới sáng
-             "Nhà cung cấp". Khách hai vai thì sáng "Khách hàng mua" -- phải
-             chọn một, và đó là danh sách mặc định. --%>
+        <%-- Ưu tiên kind trên URL: danh sách đính kèm tham số này vào link từng
+             dòng, nên nó cho biết người dùng ĐI RA TỪ đâu -- chính xác hơn mọi suy
+             luận từ dữ liệu, và là thứ duy nhất phân biệt được với khách hai vai.
+
+             Không có tham số (vào thẳng bằng link dán tay, hay từ dữ liệu cũ) thì
+             suy từ vai của khách: chỉ khi khách CHỈ là bên bán mới ra "Nhà cung cấp".
+             Khách hai vai rơi về "Khách hàng mua" -- phải chọn một, và đó là danh
+             sách mặc định. --%>
         <c:set var="activeCustomerKind" scope="request"
-               value="${not empty customerRoles and customerRoles.contains('Nhà cung cấp') and not customerRoles.contains('Khách mua') ? 'supplier' : 'buyer'}"/>
+               value="${not empty param.kind
+                        ? (param.kind == 'supplier' ? 'supplier' : 'buyer')
+                        : (not empty customerRoles and customerRoles.contains('Nhà cung cấp') and not customerRoles.contains('Khách mua') ? 'supplier' : 'buyer')}"/>
         <%@ include file="/jsp/common/sidebar.jsp" %>
         <div class="main-content">
 
 
     <div class="page-container">
-        <a href="${pageContext.request.contextPath}/customer" class="back-link-top"><i class="fa-solid fa-arrow-left-long"></i> Quay lại danh sách</a>
+        <%-- Quay về ĐÚNG danh sách vừa đi ra. Thiếu tham số kind thì controller
+             coi như chiều mặc định (Khách hàng mua), nên bấm quay lại từ một
+             bản ghi chiều kia là rơi sang danh sách khác hẳn. Dùng lại đúng biến đã
+             tính cho sidebar ở trên, để mục đang sáng và danh sách quay về luôn khớp. --%>
+        <a href="${pageContext.request.contextPath}/customer?kind=${activeCustomerKind}" class="back-link-top"><i class="fa-solid fa-arrow-left-long"></i> Quay lại danh sách</a>
 
         <!-- ===== Header ===== -->
         <div class="detail-header card-box">
@@ -578,6 +588,10 @@
         <input type="hidden" name="csrfToken" value="${csrfToken}">
         <input type="hidden" name="action" value="delete">
         <input type="hidden" name="id" value="${customer.enterpriseId}">
+        <%-- Xoá xong controller đẩy về danh sách, mà lúc đó bản ghi đã bị ẩn nên
+             không đọc được vai của nó nữa -- gửi kèm chiều đang đứng ở đây để
+             xoá một nhà cung cấp không bị ném sang danh sách khách hàng mua. --%>
+        <input type="hidden" name="kind" value="${activeCustomerKind}">
     </form>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>

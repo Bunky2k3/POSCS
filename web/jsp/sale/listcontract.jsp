@@ -31,6 +31,22 @@
         .page-header-row { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 22px; flex-wrap: wrap; gap: 14px; }
         .page-header-row h2 { font-weight: 700; color: var(--primary-dark); font-size: 1.4rem; margin-bottom: 4px; }
         .page-header-row p { color: #6b7280; font-size: 0.9rem; }
+        /* Dải nói rõ danh sách đang bị thu hẹp tới đâu. BẮT BUỘC phải có: con số
+           "tổng số N" bên dưới giờ là tổng CỦA PHẠM VI chứ không phải của toàn chi
+           nhánh -- không nói ra thì người dùng tưởng mất dữ liệu. Lấy đúng bảng màu
+           của .scope-note trên Dashboard để hai chỗ đọc ra cùng một ý. */
+        .scope-note {
+            display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+            background: #eaf6ff; border: 1px solid #cfe8fb; border-radius: 10px;
+            padding: 10px 16px; margin-bottom: 16px;
+            font-size: 0.84rem; color: var(--primary-dark);
+        }
+        .scope-note i { color: var(--primary); }
+        .scope-note .sep { color: #9ca3af; }
+        .scope-note a { color: var(--primary); font-weight: 600; text-decoration: none; }
+        .scope-note a:hover { text-decoration: underline; }
+        .scope-note .spacer { margin-left: auto; }
+
 
         .btn-add {
             background: linear-gradient(120deg, var(--primary), var(--primary-light));
@@ -247,7 +263,7 @@
                 <%-- Xuất Excel là thao tác ĐỌC: chỉ lấy đúng dữ liệu vai trò này vốn đã
                      xem được trên màn hình, đổi sang dạng file. Nên KHÔNG khoá theo
                      canManage -- xem PERMISSIONS.md. --%>
-                <a href="${pageContext.request.contextPath}/contract?action=exportExcel&kind=${kind}&keyword=${fn:escapeXml(keyword)}&status=${fn:escapeXml(statusFilter)}&progress=${fn:escapeXml(progressFilter)}&scope=${fn:escapeXml(scopeFilter)}&type=${fn:escapeXml(typeFilter)}&provinceId=${provinceFilter}&year=${yearFilter}&period=${periodFilter}&waitingDept=${waitingDeptFilter}" class="btn-outline-action"><i class="fa-solid fa-file-excel"></i> Xuất Excel</a>
+                <a href="${pageContext.request.contextPath}/contract?action=exportExcel&kind=${kind}&keyword=${fn:escapeXml(keyword)}&status=${fn:escapeXml(statusFilter)}&progress=${fn:escapeXml(progressFilter)}&scope=${fn:escapeXml(scopeFilter)}&type=${fn:escapeXml(typeFilter)}&provinceId=${provinceFilter}&year=${yearFilter}&period=${periodFilter}&waitingDept=${waitingDeptFilter}&waiting=${waitingAnyFilter ? '1' : ''}" class="btn-outline-action"><i class="fa-solid fa-file-excel"></i> Xuất Excel</a>
                 <%-- Nhập PDF thì ngược lại: nó TẠO hợp đồng mới, nên vẫn khoá. --%>
                 <c:if test="${canManage}">
                     <a href="${pageContext.request.contextPath}/contract?action=importForm" class="btn-outline-action"><i class="fa-solid fa-file-pdf"></i> Nhập PDF</a>
@@ -266,6 +282,45 @@
              bên dưới không còn ô chọn trạng thái nữa. Link mang theo mọi lọc
              khác và được dựng ở ContractController.FilterState -- ghép chuỗi
              tại đây nghĩa là chép cùng một danh sách tham số ra bốn chỗ. --%>
+        <%-- Hai chiều thu hẹp nằm chung MỘT dải: của ai, và trong khoảng nào. Tách
+             làm hai dải thì chiếm hai dòng cho cùng một loại thông tin. --%>
+        <c:if test="${viewNarrowed or viewFilter == 'all' or not empty monthLabel}">
+            <div class="scope-note">
+                <i class="fa-solid fa-calendar-check"></i>
+                <c:choose>
+                    <c:when test="${viewNarrowed and viewProvinceCount > 0}">
+                        <strong>Hợp đồng bạn phụ trách + ${viewProvinceCount} tỉnh địa bàn của bạn</strong>
+                    </c:when>
+                    <c:when test="${viewNarrowed}"><strong>Hợp đồng bạn phụ trách</strong></c:when>
+                    <c:otherwise><strong>Toàn chi nhánh</strong></c:otherwise>
+                </c:choose>
+                <span class="sep">&middot;</span>
+                <c:choose>
+                    <c:when test="${not empty monthLabel}">
+                        còn hiệu lực trong <strong>${fn:escapeXml(monthLabel)}</strong>
+                    </c:when>
+                    <c:otherwise>mọi thời điểm</c:otherwise>
+                </c:choose>
+                <span class="spacer"></span>
+                <c:if test="${viewNarrowed or viewFilter == 'all'}">
+                    <a href="${fn:escapeXml(viewToggleUrl)}">
+                        <c:choose>
+                            <c:when test="${viewNarrowed}">Xem toàn chi nhánh</c:when>
+                            <c:otherwise>Chỉ của tôi</c:otherwise>
+                        </c:choose>
+                    </a>
+                    <span class="sep">&middot;</span>
+                </c:if>
+                <a href="${fn:escapeXml(monthToggleUrl)}">
+                    <c:choose>
+                        <c:when test="${not empty monthLabel}">Xem mọi thời điểm</c:when>
+                        <c:otherwise>Chỉ tháng này</c:otherwise>
+                    </c:choose>
+                    <i class="fa-solid fa-arrow-right-long"></i>
+                </a>
+            </div>
+        </c:if>
+
         <div class="status-strip">
             <%-- Bấm lại ô ĐANG BẬT thì bỏ lọc: không có nút "tắt" nào khác ở đây,
                  và người dùng sẽ bấm lại nó theo phản xạ. --%>
@@ -316,6 +371,15 @@
             <label class="filter-toggle" for="filterScope">
                 <input type="checkbox" id="filterScope" name="scope" value="root" ${scopeFilter == 'root' ? 'checked' : ''}>
                 Chỉ hợp đồng gốc
+            </label>
+            <%-- "Đang bàn giao" đứng ở thanh chính chứ không nằm trong "Lọc thêm" như ô
+                 chọn từng phòng: đây là câu hỏi hỏi hàng ngày ("còn gì đang nằm ở các
+                 phòng"), còn "đang chờ ở phòng NÀO" là câu hỏi hẹp hơn, hỏi thưa hơn.
+
+                 Hai ô cùng bật thì phòng cụ thể thắng -- xem ghi chú ở showList. --%>
+            <label class="filter-toggle" for="filterWaitingAny">
+                <input type="checkbox" id="filterWaitingAny" name="waiting" value="1" ${waitingAnyFilter ? 'checked' : ''}>
+                Đang bàn giao
             </label>
             <%-- Ba ô ít dùng nhất gom sau một nút. Chúng vẫn nằm TRONG form và vẫn
                  gửi lên như thường -- giấu ở đây là chuyện của giao diện, không
@@ -523,11 +587,11 @@
                 <span class="pagination-info">Hiển thị ${fn:length(contractList)} trong tổng số ${totalCount} hợp đồng</span>
                 <nav>
                     <ul class="pagination pagination-sm mb-0">
-                        <li class="page-item ${currentPage <= 1 ? 'disabled' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/contract?action=list&kind=${kind}&page=${currentPage - 1}&keyword=${fn:escapeXml(keyword)}&status=${fn:escapeXml(statusFilter)}&progress=${fn:escapeXml(progressFilter)}&scope=${fn:escapeXml(scopeFilter)}&type=${fn:escapeXml(typeFilter)}&provinceId=${provinceFilter}&year=${yearFilter}&period=${periodFilter}&waitingDept=${waitingDeptFilter}">Trước</a></li>
+                        <li class="page-item ${currentPage <= 1 ? 'disabled' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/contract?action=list&kind=${kind}&page=${currentPage - 1}&keyword=${fn:escapeXml(keyword)}&status=${fn:escapeXml(statusFilter)}&progress=${fn:escapeXml(progressFilter)}&scope=${fn:escapeXml(scopeFilter)}&type=${fn:escapeXml(typeFilter)}&provinceId=${provinceFilter}&year=${yearFilter}&period=${periodFilter}&waitingDept=${waitingDeptFilter}&waiting=${waitingAnyFilter ? '1' : ''}">Trước</a></li>
                         <c:forEach begin="1" end="${totalPages}" var="p">
-                            <li class="page-item ${p == currentPage ? 'active' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/contract?action=list&kind=${kind}&page=${p}&keyword=${fn:escapeXml(keyword)}&status=${fn:escapeXml(statusFilter)}&progress=${fn:escapeXml(progressFilter)}&scope=${fn:escapeXml(scopeFilter)}&type=${fn:escapeXml(typeFilter)}&provinceId=${provinceFilter}&year=${yearFilter}&period=${periodFilter}&waitingDept=${waitingDeptFilter}">${p}</a></li>
+                            <li class="page-item ${p == currentPage ? 'active' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/contract?action=list&kind=${kind}&page=${p}&keyword=${fn:escapeXml(keyword)}&status=${fn:escapeXml(statusFilter)}&progress=${fn:escapeXml(progressFilter)}&scope=${fn:escapeXml(scopeFilter)}&type=${fn:escapeXml(typeFilter)}&provinceId=${provinceFilter}&year=${yearFilter}&period=${periodFilter}&waitingDept=${waitingDeptFilter}&waiting=${waitingAnyFilter ? '1' : ''}">${p}</a></li>
                         </c:forEach>
-                        <li class="page-item ${currentPage >= totalPages ? 'disabled' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/contract?action=list&kind=${kind}&page=${currentPage + 1}&keyword=${fn:escapeXml(keyword)}&status=${fn:escapeXml(statusFilter)}&progress=${fn:escapeXml(progressFilter)}&scope=${fn:escapeXml(scopeFilter)}&type=${fn:escapeXml(typeFilter)}&provinceId=${provinceFilter}&year=${yearFilter}&period=${periodFilter}&waitingDept=${waitingDeptFilter}">Sau</a></li>
+                        <li class="page-item ${currentPage >= totalPages ? 'disabled' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/contract?action=list&kind=${kind}&page=${currentPage + 1}&keyword=${fn:escapeXml(keyword)}&status=${fn:escapeXml(statusFilter)}&progress=${fn:escapeXml(progressFilter)}&scope=${fn:escapeXml(scopeFilter)}&type=${fn:escapeXml(typeFilter)}&provinceId=${provinceFilter}&year=${yearFilter}&period=${periodFilter}&waitingDept=${waitingDeptFilter}&waiting=${waitingAnyFilter ? '1' : ''}">Sau</a></li>
                     </ul>
                 </nav>
             </div>
@@ -584,8 +648,11 @@
         // tồn tại khi chưa chọn năm, mà gắn sự kiện lên null thì vỡ cả đoạn
         // script phía sau -- kể cả các bộ lọc khác.
         var filterForm = document.getElementById('filterForm');
-        ['filterProgress', 'filterScope', 'filterType', 'filterProvince', 'filterYear', 'filterPeriod',
-         'filterWaitingDept']
+        // Thêm ô lọc MỚI thì phải thêm id vào đây, nếu không tích vào không có gì
+        // xảy ra -- form chỉ gửi khi gõ Enter ở ô tìm kiếm. Đã dính với
+        // 'filterWaitingAny' đúng một lần.
+        ['filterProgress', 'filterScope', 'filterWaitingAny', 'filterType', 'filterProvince',
+         'filterYear', 'filterPeriod', 'filterWaitingDept']
             .forEach(function (id) {
                 var el = document.getElementById(id);
                 if (el) { el.addEventListener('change', function () { filterForm.submit(); }); }

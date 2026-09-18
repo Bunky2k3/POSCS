@@ -14,6 +14,7 @@ import poscs.common.SqlFilters;
 import poscs.model.Address;
 import poscs.model.CustomerLifecycleEvent;
 import poscs.model.District;
+import poscs.common.ListScope;
 import poscs.model.Enterprise;
 import poscs.model.EnterpriseContact;
 import poscs.model.Province;
@@ -67,10 +68,22 @@ public class CustomerDAO {
      */
     public List<Enterprise> findAll(int page, int pageSize, String keyword, String customerType,
             Integer accountOwnerId, Integer provinceId, boolean sortByProvince, String role) {
+        return findAll(page, pageSize, keyword, customerType, accountOwnerId, provinceId, sortByProvince,
+                role, ListScope.all());
+    }
+
+    /**
+     * Như trên nhưng thu hẹp về phần việc của người đang đăng nhập.
+     *
+     * @param scope {@link ListScope#all()} = không thu hẹp (Admin, hoặc người dùng
+     *              tự bấm "xem toàn chi nhánh")
+     */
+    public List<Enterprise> findAll(int page, int pageSize, String keyword, String customerType,
+            Integer accountOwnerId, Integer provinceId, boolean sortByProvince, String role, ListScope scope) {
         List<Enterprise> result = new ArrayList<>();
         StringBuilder sql = new StringBuilder(SELECT_ENTERPRISE_BASE);
         List<Object> params = new ArrayList<>();
-        appendFilters(sql, params, keyword, customerType, accountOwnerId, provinceId, role);
+        appendFilters(sql, params, keyword, customerType, accountOwnerId, provinceId, role, scope);
         // "p.province_name IS NULL" đứng đầu để dồn khách chưa có địa chỉ xuống
         // cuối file -- mặc định MySQL xếp NULL lên đầu khi ORDER BY tăng dần.
         sql.append(sortByProvince
@@ -101,13 +114,20 @@ public class CustomerDAO {
 
     /** Như {@link #countAll(String, String, Integer)} nhưng lọc thêm theo tỉnh/thành. */
     public int countAll(String keyword, String customerType, Integer accountOwnerId, Integer provinceId, String role) {
+        return countAll(keyword, customerType, accountOwnerId, provinceId, role, ListScope.all());
+    }
+
+    /** Như trên nhưng thu hẹp theo phạm vi -- phải KHỚP với findAll, nếu không thì
+     *  số trên thanh phân trang nói một đằng, danh sách liệt kê một nẻo. */
+    public int countAll(String keyword, String customerType, Integer accountOwnerId, Integer provinceId,
+            String role, ListScope scope) {
         // Phải JOIN tới districts thì mới lọc được theo tỉnh; districts đã có sẵn
         // province_id nên không cần join thêm bảng provinces chỉ để đếm.
         StringBuilder sql = new StringBuilder("SELECT COUNT(*) FROM enterprises e "
                 + "LEFT JOIN addresses a ON e.address_id = a.address_id "
                 + "LEFT JOIN districts d ON a.districts_id = d.districts_id ");
         List<Object> params = new ArrayList<>();
-        appendFilters(sql, params, keyword, customerType, accountOwnerId, provinceId, role);
+        appendFilters(sql, params, keyword, customerType, accountOwnerId, provinceId, role, scope);
 
         try (Connection conn = DBContext.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql.toString())) {
@@ -482,9 +502,20 @@ public class CustomerDAO {
     // ------------------------------------------------------------------
 
     private void appendFilters(StringBuilder sql, List<Object> params, String keyword, String customerType,
-            Integer accountOwnerId, Integer provinceId, String role) {
+            Integer accountOwnerId, Integer provinceId, String role, ListScope scope) {
         List<String> conditions = new ArrayList<>();
         conditions.add("e.is_deleted = 0");
+
+        // Phạm vi "phần việc của tôi" đứng TÁCH khỏi ô lọc accountOwnerId ngay bên
+        // dưới, dù hai thứ cùng soi một cột: ô lọc là lựa chọn của người dùng, còn
+        // phạm vi là trần hệ thống đặt sẵn. Gộp làm một thì chọn một đồng nghiệp ở
+        // ô lọc sẽ GHI ĐÈ trần đó và xem được phần không thuộc mình.
+        if (scope != null) {
+            String scopeClause = scope.predicate("e.account_owner_id", "d.province_id", params);
+            if (scopeClause != null) {
+                conditions.add(scopeClause);
+            }
+        }
 
         if (keyword != null && !keyword.trim().isEmpty()) {
             conditions.add("(e.enterprise_name LIKE ? OR e.enterprise_code LIKE ? OR e.phone LIKE ?)");

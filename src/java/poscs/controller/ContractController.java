@@ -7,7 +7,9 @@ import java.io.InputStream;
 import java.sql.Date;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.time.LocalDate;
 import java.util.List;
+import java.util.stream.Collectors;
 import java.util.Map;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.MultipartConfig;
@@ -24,10 +26,12 @@ import org.apache.pdfbox.pdmodel.interactive.form.PDAcroForm;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import poscs.common.AccessControl;
+import poscs.common.ListScope;
 import poscs.common.ExcelUtil;
 import poscs.common.Logs;
 import poscs.common.PdfUtil;
 import poscs.common.Period;
+import poscs.common.QueryStrings;
 import poscs.common.TextRules;
 import poscs.dao.AddressDAO;
 import poscs.dao.ContractDAO;
@@ -36,6 +40,7 @@ import poscs.dao.EmployeeDAO;
 import poscs.dao.ProductDAO;
 import poscs.model.Address;
 import poscs.model.Contract;
+import poscs.model.Department;
 import poscs.model.ContractHandover;
 import poscs.model.ContractHistory;
 import poscs.model.ContractLink;
@@ -66,6 +71,15 @@ public class ContractController extends HttpServlet {
     private static final int PAGE_SIZE = 10;
     /** Vai được giao phụ trách hợp đồng -- khớp roles.role_name, xem AccessControl. */
     private static final String SALES_ROLE = "Sales";
+
+    /** Giá trị tham số "month" để bỏ cửa sổ tháng mặc định. */
+    private static final String MONTH_ALL = "all";
+
+    /** Tháng đang chạy, quy về khoảng ngày bằng chính {@link Period} của bộ lọc kỳ. */
+    private static Period currentMonth() {
+        LocalDate today = LocalDate.now();
+        return Period.parse(String.valueOf(today.getYear()), "m" + today.getMonthValue());
+    }
 
     /**
      * Chiều hợp đồng, khớp contracts.direction (xem ghi chú đầu V21).
@@ -274,17 +288,51 @@ public class ContractController extends HttpServlet {
         // "Đang chờ ở phòng nào" -- câu hỏi của giám đốc, hỏi ngay trên danh
         // sách hợp đồng chứ không phải mở từng hợp đồng ra xem.
         Integer waitingDepartment = parseIntOrNull(request.getParameter("waitingDept"));
+        // Ô tích "Đang bàn giao" trên thanh lọc chính: chờ ở phòng nào cũng tính.
+        // Chọn HẲN một phòng ở khối "Lọc thêm" thì phòng đó thắng — nó hẹp hơn, và
+        // hai thứ cùng bật nghĩa là người dùng vừa chọn cụ thể hơn.
+        boolean waitingAny = "1".equals(request.getParameter("waiting"));
+        if (waitingDepartment == null && waitingAny) {
+            waitingDepartment = ContractDAO.WAITING_ANY_DEPARTMENT;
+        }
+
+        // ===== Phạm vi mặc định của màn hình =====
+        // Hai chiều, đều là MẶC ĐỊNH chứ không phải rào quyền:
+        //   - ai: Sales thấy hợp đồng mình phụ trách HOẶC thuộc địa bàn mình giữ
+        //   - khi nào: hợp đồng CÒN HIỆU LỰC trong tháng hiện tại
+        //
+        // Cửa sổ tháng áp cho MỌI vai (kể cả Admin): nó trả lời "tháng này đang làm
+        // gì", không phải "được phép thấy gì". Bấm "mọi thời điểm" là bỏ.
+        //
+        // KHÁC bộ lọc "kỳ" ngay bên dưới: kỳ lọc theo NGÀY KÝ nên bản nháp rơi ra
+        // ngoài, cái này lọc theo THỜI HẠN nên những gì đang chạy đều ở lại.
+        boolean allTime = MONTH_ALL.equals(request.getParameter("month"));
+        Period activeWindow = allTime ? null : currentMonth();
+        ListScope scope = AccessControl.listScope(request,
+                () -> employeeDAO.findTeamUserIds(AccessControl.currentUser(request).getUserId()),
+                () -> employeeDAO.findProvincesOf(AccessControl.currentUser(request).getUserId())
+                        .stream().map(Province::getProvinceId).collect(Collectors.toList()))
+                .withActiveWindow(activeWindow);
+        request.setAttribute("viewFilter", AccessControl.defaultView(request));
+        request.setAttribute("viewNarrowed", scope.isNarrowed());
+        request.setAttribute("viewProvinceCount", scope.getProvinceIds().size());
+        request.setAttribute("monthFilter", allTime ? MONTH_ALL : null);
+        request.setAttribute("monthLabel", activeWindow != null ? activeWindow.getLabel() : null);
+        request.setAttribute("viewToggleUrl", QueryStrings.with(request, "view",
+                AccessControl.VIEW_MINE.equals(AccessControl.defaultView(request))
+                        ? AccessControl.VIEW_ALL : AccessControl.VIEW_MINE));
+        request.setAttribute("monthToggleUrl", QueryStrings.with(request, "month", allTime ? null : MONTH_ALL));
 
         List<Contract> contractList = contractDAO.findAll(page, PAGE_SIZE, keyword, statusFilter, typeFilter,
-                provinceFilter, false, period, direction, progressFilter, rootsOnly, waitingDepartment);
+                provinceFilter, false, period, direction, progressFilter, rootsOnly, waitingDepartment, scope);
         int totalCount = contractDAO.countAll(keyword, statusFilter, typeFilter, provinceFilter, period, direction,
-                progressFilter, rootsOnly, waitingDepartment);
+                progressFilter, rootsOnly, waitingDepartment, scope);
         int totalPages = Math.max(1, (int) Math.ceil(totalCount / (double) PAGE_SIZE));
         // Dải KPI trạng thái phải đếm CÙNG phạm vi với bảng bên dưới: đứng ở
         // Hợp đồng mua mà KPI gộp cả hợp đồng bán thì hai con số cạnh nhau
         // không khớp, và không có gì trên màn hình giải thích vì sao.
         Map<String, Integer> statusSummary = contractDAO.countStatusSummary(provinceFilter, period, direction,
-                rootsOnly);
+                rootsOnly, null, scope, waitingDepartment);
 
         request.setAttribute("contractList", contractList);
         request.setAttribute("statusSummary", statusSummary);
@@ -298,8 +346,12 @@ public class ContractController extends HttpServlet {
         request.setAttribute("statusFilter", statusFilter);
         request.setAttribute("progressFilter", progressFilter);
         request.setAttribute("scopeFilter", rootsOnly ? "root" : null);
-        request.setAttribute("waitingDeptFilter", waitingDepartment);
-        request.setAttribute("departmentList", employeeDAO.findAllDepartments());
+        request.setAttribute("waitingDeptFilter",
+                waitingDepartment != null && waitingDepartment == ContractDAO.WAITING_ANY_DEPARTMENT
+                        ? null : waitingDepartment);
+        request.setAttribute("waitingAnyFilter", waitingAny);
+        List<Department> departments = employeeDAO.findAllDepartments();
+        request.setAttribute("departmentList", departments);
         // Loại hợp đồng khác nhau theo chiều -- xem SELL_CONTRACT_TYPES /
         // BUY_CONTRACT_TYPES. JSP dựng dropdown từ đây thay vì chép cứng.
         request.setAttribute("contractTypeOptions", contractTypesFor(direction));
@@ -318,7 +370,8 @@ public class ContractController extends HttpServlet {
         String kindParam = DIRECTION_BUY.equals(direction) ? "buy" : "sell";
         FilterState state = new FilterState(kindParam, keyword, statusFilter, progressFilter,
                 rootsOnly ? "root" : null, typeFilter, provinceFilter,
-                request.getParameter("year"), request.getParameter("period"), waitingDepartment);
+                request.getParameter("year"), request.getParameter("period"), waitingDepartment,
+                departmentNameOf(departments, waitingDepartment), waitingAny);
         List<FilterChip> statusChips = new ArrayList<>();
         statusChips.add(state.statusChip(ContractDAO.STATUS_ACTIVE, "Đang hiệu lực", "var(--success)",
                 countOf(statusSummary, ContractDAO.STATUS_ACTIVE)));
@@ -336,6 +389,37 @@ public class ContractController extends HttpServlet {
         request.setAttribute("advancedFilterCount", state.advancedCount());
 
         request.getRequestDispatcher(LIST_VIEW).forward(request, response);
+    }
+
+    /**
+     * Cùng phép đọc bộ lọc bàn giao với showList -- file Excel phải ra đúng thứ
+     * đang nhìn thấy, kể cả khi lọc bằng ô tích chứ không bằng dropdown.
+     */
+    private Integer waitingDepartmentForExport(HttpServletRequest request) {
+        Integer dept = parseIntOrNull(request.getParameter("waitingDept"));
+        if (dept == null && "1".equals(request.getParameter("waiting"))) {
+            return ContractDAO.WAITING_ANY_DEPARTMENT;
+        }
+        return dept;
+    }
+
+    /**
+     * Tên phòng ứng với id, tra trong danh sách ĐÃ nạp sẵn cho dropdown.
+     *
+     * <p>Không gọi thêm câu truy vấn nào: danh sách phòng vốn đã phải lấy để dựng
+     * ô lọc, dùng lại chính nó. Không tìm thấy thì trả null và chip rơi về câu
+     * chữ chung -- id rác trên URL không đáng làm vỡ cả trang danh sách.
+     */
+    private static String departmentNameOf(List<Department> departments, Integer id) {
+        if (id == null || departments == null) {
+            return null;
+        }
+        for (Department d : departments) {
+            if (d.getDepartmentId() == id) {
+                return d.getDepartmentName();
+            }
+        }
+        return null;
     }
 
     private void showDetail(HttpServletRequest request, HttpServletResponse response)
@@ -396,10 +480,18 @@ public class ContractController extends HttpServlet {
         // Ô "Cả phụ lục / Chỉ hợp đồng gốc" phải đi theo sang file: xuất ra một
         // danh sách khác thứ đang nhìn thấy là cách chắc chắn nhất để hai con số
         // trong cùng một cuộc họp không khớp nhau.
+        // Xuất ĐÚNG thứ đang nhìn thấy: cùng phạm vi mặc định với danh sách trên
+        // màn hình. Thiếu dòng này thì bấm "Xuất Excel" ở màn hình 4 dòng lại ra file
+        // 12 dòng, mà người xuất không cách nào biết file sai.
+        ListScope scope = AccessControl.listScope(request,
+                () -> employeeDAO.findTeamUserIds(AccessControl.currentUser(request).getUserId()),
+                () -> employeeDAO.findProvincesOf(AccessControl.currentUser(request).getUserId())
+                        .stream().map(Province::getProvinceId).collect(Collectors.toList()))
+                .withActiveWindow(MONTH_ALL.equals(request.getParameter("month")) ? null : currentMonth());
         List<Contract> all = contractDAO.findAll(1, Integer.MAX_VALUE, keyword, statusFilter, typeFilter,
                 provinceFilter, true, period, direction, request.getParameter("progress"),
                 "root".equals(request.getParameter("scope")),
-                parseIntOrNull(request.getParameter("waitingDept")));
+                waitingDepartmentForExport(request), scope);
         // Giữ cột "Mã HĐ" trong file dù danh sách trên màn hình đã bỏ -- xem lý do
         // ở CustomerController.exportExcel: STT chỉ đúng trong phạm vi một file.
         //
@@ -1644,6 +1736,10 @@ public class ContractController extends HttpServlet {
             response.sendRedirect(request.getContextPath() + back + "&error=handover_pending");
             return;
         }
+        if (result == ContractDAO.HANDOVER_FROZEN) {
+            response.sendRedirect(request.getContextPath() + back + "&error=handover_frozen");
+            return;
+        }
         if (result <= 0) {
             LOG.warn("Ban giao hop dong that bai (actor={}, contractId={})", Logs.actor(request), contractId);
             response.sendRedirect(request.getContextPath() + back + "&error=handover_failed");
@@ -2199,10 +2295,17 @@ public class ContractController extends HttpServlet {
         private final String year;
         private final String period;
         private final Integer waitingDepartmentId;
+        /** Tên phòng, chỉ để hiện trên chip -- lọc vẫn chạy bằng id. */
+        private final String waitingDepartmentName;
+        /** Ô tích "Đang bàn giao" (không nêu phòng) -- tham số riêng trên URL. */
+        private final boolean waitingAny;
 
         FilterState(String kind, String keyword, String status, String progress, String scope,
-                String type, Integer provinceId, String year, String period, Integer waitingDepartmentId) {
+                String type, Integer provinceId, String year, String period, Integer waitingDepartmentId,
+                String waitingDepartmentName, boolean waitingAny) {
             this.waitingDepartmentId = waitingDepartmentId;
+            this.waitingDepartmentName = waitingDepartmentName;
+            this.waitingAny = waitingAny;
             this.kind = kind;
             this.keyword = keyword;
             this.status = status;
@@ -2230,8 +2333,14 @@ public class ContractController extends HttpServlet {
             // mình "quý 3" trên URL chỉ tạo ra một chip lọc không lọc gì cả.
             String nextYear = "year".equals(name) ? value : year;
             put(sb, "period", isBlank(nextYear) ? null : ("period".equals(name) ? value : period));
+            // waitingDept chỉ ghi ra khi là MỘT PHÒNG thật; giá trị canh
+            // WAITING_ANY_DEPARTMENT thuộc về tham số "waiting" bên dưới.
+            boolean anyDept = waitingDepartmentId != null
+                    && waitingDepartmentId == ContractDAO.WAITING_ANY_DEPARTMENT;
             put(sb, "waitingDept", "waitingDept".equals(name) ? value
-                    : (waitingDepartmentId == null ? null : String.valueOf(waitingDepartmentId)));
+                    : (waitingDepartmentId == null || anyDept ? null
+                                                              : String.valueOf(waitingDepartmentId)));
+            put(sb, "waiting", "waiting".equals(name) ? value : (waitingAny ? "1" : null));
             return sb.toString();
         }
 
@@ -2277,7 +2386,17 @@ public class ContractController extends HttpServlet {
                 chips.add(new FilterChip(periodLabel(), queryWith("year", null), null, true, 0));
             }
             if (waitingDepartmentId != null) {
-                chips.add(new FilterChip("Đang chờ ở một phòng", queryWith("waitingDept", null), null, true, 0));
+                // Gọi tên phòng ra chứ không nói chung chung: chip là thứ duy nhất
+                // hiện ra khi khối "Lọc thêm" đang đóng, mà "đang chờ ở một phòng"
+                // thì người đọc vẫn phải mở khối đó ra mới biết là phòng nào.
+                if (waitingDepartmentId == ContractDAO.WAITING_ANY_DEPARTMENT) {
+                    chips.add(new FilterChip("Đang bàn giao", queryWith("waiting", null), null, true, 0));
+                } else {
+                    chips.add(new FilterChip(
+                            isBlank(waitingDepartmentName) ? "Đang chờ ở một phòng"
+                                                           : "Đang chờ: " + waitingDepartmentName,
+                            queryWith("waitingDept", null), null, true, 0));
+                }
             }
             return chips;
         }
@@ -2293,7 +2412,11 @@ public class ContractController extends HttpServlet {
             if (!isBlank(type)) { n++; }
             if (provinceId != null) { n++; }
             if (!isBlank(year)) { n++; }
-            if (waitingDepartmentId != null) { n++; }
+            // Chỉ đếm khi là MỘT PHÒNG cụ thể: ô tích "Đang bàn giao" nằm ngoài
+            // thanh lọc chính, đếm nó vào đây thì nút "Lọc thêm" báo có bộ lọc
+            // đang bật mà mở ra không thấy gì.
+            if (waitingDepartmentId != null
+                    && waitingDepartmentId != ContractDAO.WAITING_ANY_DEPARTMENT) { n++; }
             return n;
         }
     }

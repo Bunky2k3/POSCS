@@ -37,7 +37,10 @@
         .page-header-row h2 { font-weight: 700; color: var(--primary-dark); font-size: 1.4rem; margin-bottom: 4px; }
         .page-header-row p { color: #6b7280; font-size: 0.9rem; }
 
-        .card-box { background: #fff; border-radius: 14px; box-shadow: 0 2px 12px rgba(16,24,40,.06); padding: 18px 20px; }
+        /* Chỉ đặt padding. Nền/bo góc/đổ bóng lấy từ .card-box của appshell.css --
+           trang này từng khai lại cả ba với giá trị khác (bo 14px, bóng nhạt
+           hơn), nên thẻ ở đây trông "phẳng" hơn hẳn thẻ ở mọi trang khác. */
+        .card-box { padding: 18px 20px; }
 
         .dept-strip { display: flex; gap: 14px; margin-bottom: 20px; flex-wrap: wrap; }
         .dept-chip { flex: 1 1 200px; display: flex; align-items: center; gap: 12px; }

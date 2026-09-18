@@ -17,6 +17,7 @@ import java.util.Map;
 import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import poscs.common.ListScope;
 import poscs.common.Period;
 import poscs.common.SqlFilters;
 import poscs.model.Address;
@@ -306,11 +307,24 @@ public class ContractDAO {
     public List<Contract> findAll(int page, int pageSize, String keyword, String statusFilter, String typeFilter,
             Integer provinceId, boolean sortByProvince, Period period, String direction, String progressFilter,
             boolean rootsOnly, Integer waitingDepartmentId) {
+        return findAll(page, pageSize, keyword, statusFilter, typeFilter, provinceId, sortByProvince, period,
+                direction, progressFilter, rootsOnly, waitingDepartmentId, ListScope.all());
+    }
+
+    /**
+     * Như trên nhưng kèm phạm vi mặc định của màn hình (của ai + còn hiệu lực trong
+     * khoảng nào). Đây là tham số thứ mười ba mà ghi chú trên bảo đừng thêm -- nên nó
+     * là MỘT đối tượng gom cả hai chiều chứ không phải hai tham số rời. Bộ lọc tiếp
+     * theo nữa thì phải gom nốt mười hai cái còn lại vào đây.
+     */
+    public List<Contract> findAll(int page, int pageSize, String keyword, String statusFilter, String typeFilter,
+            Integer provinceId, boolean sortByProvince, Period period, String direction, String progressFilter,
+            boolean rootsOnly, Integer waitingDepartmentId, ListScope scope) {
         List<Contract> result = new ArrayList<>();
         StringBuilder sql = new StringBuilder(SELECT_BASE);
         List<Object> params = new ArrayList<>();
         appendFilters(sql, params, keyword, statusFilter, typeFilter, provinceId, period, direction, progressFilter,
-                rootsOnly, waitingDepartmentId);
+                rootsOnly, waitingDepartmentId, scope);
         sql.append(sortByProvince
                 ? " ORDER BY p.province_name IS NULL, " + AddressDAO.PROVINCE_SHORT_NAME_ORDER
                         + ", c.contract_id DESC LIMIT ? OFFSET ?"
@@ -358,12 +372,21 @@ public class ContractDAO {
     /** Như trên, kèm bộ lọc "đang chờ ở phòng" -- phải đi cặp với findAll. */
     public int countAll(String keyword, String statusFilter, String typeFilter, Integer provinceId, Period period,
             String direction, String progressFilter, boolean rootsOnly, Integer waitingDepartmentId) {
+        return countAll(keyword, statusFilter, typeFilter, provinceId, period, direction, progressFilter,
+                rootsOnly, waitingDepartmentId, ListScope.all());
+    }
+
+    /** Như trên kèm phạm vi -- phải KHỚP với findAll, nếu không thì thanh phân trang
+     *  nói một đằng còn bảng liệt kê một nẻo. */
+    public int countAll(String keyword, String statusFilter, String typeFilter, Integer provinceId, Period period,
+            String direction, String progressFilter, boolean rootsOnly, Integer waitingDepartmentId,
+            ListScope scope) {
         StringBuilder sql = new StringBuilder(
             "SELECT COUNT(*) FROM contracts c LEFT JOIN enterprises e ON c.enterprise_id = e.enterprise_id "
             + JOIN_PROVINCE_OF_ENTERPRISE);
         List<Object> params = new ArrayList<>();
         appendFilters(sql, params, keyword, statusFilter, typeFilter, provinceId, period, direction, progressFilter,
-                rootsOnly, waitingDepartmentId);
+                rootsOnly, waitingDepartmentId, scope);
 
         try (Connection conn = DBContext.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql.toString())) {
@@ -415,6 +438,32 @@ public class ContractDAO {
      */
     public Map<String, Integer> countStatusSummary(Integer provinceId, Period period, String direction,
             boolean rootsOnly, List<Integer> ownerIds) {
+        return countStatusSummary(provinceId, period, direction, rootsOnly, ownerIds, ListScope.all());
+    }
+
+    /**
+     * Như trên nhưng kèm phạm vi mặc định của màn hình danh sách.
+     *
+     * <p>Bốn con số này PHẢI đếm đúng tập mà bảng bên dưới đang liệt kê. Thiếu phạm
+     * vi ở đây thì nhân viên thấy "12 đang hiệu lực" trong khi bảng chỉ có 4 dòng, và
+     * không chỗ nào trên màn hình giải thích nổi chên lệch đó.
+     *
+     * <p>{@code ownerIds} (Dashboard) và {@code scope} (danh sách) cùng tồn tại vì chúng
+     * là hai phép KHÁC nhau: cái trước chỉ soi người phụ trách, cái sau là "người
+     * phụ trách HOẶC địa bàn" kèm cửa sổ thời gian.
+     */
+    public Map<String, Integer> countStatusSummary(Integer provinceId, Period period, String direction,
+            boolean rootsOnly, List<Integer> ownerIds, ListScope scope) {
+        return countStatusSummary(provinceId, period, direction, rootsOnly, ownerIds, scope, null);
+    }
+
+    /**
+     * Như trên, kèm bộ lọc bàn giao -- bốn con số phải đếm ĐÚNG tập mà bảng bên
+     * dưới đang liệt kê. Thiếu tham số này thì bật ô "Đang bàn giao" ra bảng 3 dòng
+     * mà dải KPI trên vẫn cộng thành 18.
+     */
+    public Map<String, Integer> countStatusSummary(Integer provinceId, Period period, String direction,
+            boolean rootsOnly, List<Integer> ownerIds, ListScope scope, Integer waitingDepartmentId) {
         Map<String, Integer> summary = new HashMap<>();
         summary.put(STATUS_ACTIVE, 0);
         summary.put(STATUS_SOON, 0);
@@ -439,7 +488,28 @@ public class ContractDAO {
             + (period != null ? " AND c.signing_date BETWEEN ? AND ?" : "")
             + (direction != null ? " AND c.direction = ?" : "")
             + (rootsOnly ? " AND c.parent_contract_id IS NULL" : "")
+            + (waitingDepartmentId == null ? ""
+                    : waitingDepartmentId == WAITING_ANY_DEPARTMENT
+                        ? " AND EXISTS (SELECT 1 FROM contract_handovers wh"
+                          + " WHERE wh.contract_id = c.contract_id AND wh.done_at IS NULL)"
+                        : " AND EXISTS (SELECT 1 FROM contract_handovers wh"
+                          + " WHERE wh.contract_id = c.contract_id AND wh.done_at IS NULL"
+                          + " AND wh.department_id = ?)")
             + SqlFilters.inClause("c.owner_id", ownerIds);
+
+        // Hai mệnh đề của phạm vi ghi tham số vào scopeParams theo đúng thứ tự dấu hỏi
+        // của chính chúng, nên chỉ cần nối vào cuối câu và bind lần lượt.
+        List<Object> scopeParams = new ArrayList<>();
+        if (scope != null) {
+            String scopeClause = scope.predicate("c.owner_id", "d.province_id", scopeParams);
+            if (scopeClause != null) {
+                sql += " AND " + scopeClause;
+            }
+            String windowClause = scope.activeWindowPredicate("c.effective_date", "c.end_date", scopeParams);
+            if (windowClause != null) {
+                sql += " AND " + windowClause;
+            }
+        }
 
         try (Connection conn = DBContext.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -454,7 +524,13 @@ public class ContractDAO {
             if (direction != null) {
                 ps.setString(param++, direction);
             }
-            SqlFilters.bind(ps, param, ownerIds);
+            if (waitingDepartmentId != null && waitingDepartmentId != WAITING_ANY_DEPARTMENT) {
+                ps.setInt(param++, waitingDepartmentId);
+            }
+            param = SqlFilters.bind(ps, param, ownerIds);
+            for (Object value : scopeParams) {
+                ps.setObject(param++, value);
+            }
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
                     summary.put(STATUS_DRAFT, rs.getInt("draft_count"));
@@ -1101,6 +1177,20 @@ public class ContractDAO {
     /** Phòng đó đang còn giữ hợp đồng, không giao lại lượt mới được. */
     public static final int HANDOVER_ALREADY_PENDING = -1;
 
+    /**
+     * Truyền vào chỗ {@code waitingDepartmentId} để lọc "đang chờ ở BẤT KỲ phòng
+     * nào" thay vì một phòng cụ thể.
+     *
+     * <p>Dùng giá trị canh thay vì thêm tham số thứ mười bốn cho findAll: câu hỏi
+     * là CÙNG một câu ("hợp đồng nào đang nằm chờ"), chỉ khác ở chỗ có nêu tên
+     * phòng hay không. {@code departments.department_id} là AUTO_INCREMENT nên
+     * số âm không bao giờ đụng một id thật.
+     */
+    public static final int WAITING_ANY_DEPARTMENT = -1;
+
+    /** Hợp đồng đã thanh lý / chấm dứt sớm -- không mở lượt bàn giao mới nữa. */
+    public static final int HANDOVER_FROZEN = -3;
+
     private static final String HANDOVER_SELECT =
         "SELECT h.handover_id, h.contract_id, h.department_id, h.handed_at, h.handed_by, "
         + "       h.done_at, h.done_by, h.handover_note, h.done_note, "
@@ -1120,8 +1210,18 @@ public class ContractDAO {
      * định của luồng). Một transaction cho cả lô: giao được nửa rồi hỏng thì
      * hợp đồng nằm ở trạng thái không ai mô tả nổi.
      *
-     * @return số chặng mở ra, hoặc {@link #HANDOVER_ALREADY_PENDING} nếu MỘT
-     *         trong các phòng đó đang còn giữ hợp đồng này
+     * <p>CHẶN khi hợp đồng đã đóng băng. Chặn ở ĐÂY chứ không chỉ ẩn nút, cùng lẽ
+     * với {@code update} / {@code insertProducts} / {@code deleteProductLine}: ẩn
+     * nút chỉ là tầng hiển thị, một request gửi thẳng vẫn đi qua.
+     *
+     * <p>Chỉ chặn MỞ lượt MỚI. ĐÓNG một chặng đang treo thì VẪN được
+     * ({@code completeHandover}) -- khoá cả hai thì chặng nào lệch nhịp với lúc thanh
+     * lý sẽ treo vĩnh viễn, và hàng đợi bàn giao đếm ngày chờ tăng mãi không ai
+     * dọn được.
+     *
+     * @return số chặng mở ra, {@link #HANDOVER_ALREADY_PENDING} nếu MỘT trong các
+     *         phòng đó đang còn giữ hợp đồng này, hoặc {@link #HANDOVER_FROZEN}
+     *         khi hợp đồng đã thanh lý / chấm dứt sớm
      */
     public int handOverToDepartments(int contractId, List<Integer> departmentIds, String note, int actorId) {
         if (departmentIds == null || departmentIds.isEmpty()) {
@@ -1134,6 +1234,12 @@ public class ContractDAO {
                 Contract contract = lockForUpdate(conn, contractId);
                 if (contract == null) {
                     return -2;
+                }
+                // Đã thanh lý thì không còn việc để giao: hợp đồng đóng lại rồi, phát
+                // sinh sau thời điểm đó phải lập hợp đồng mới chứ không nối tiếp vào
+                // cái cũ. Dùng chính bản đã khoá ở trên, không hỏi lại CSDL lần nữa.
+                if (contract.isFrozen()) {
+                    return HANDOVER_FROZEN;
                 }
                 // Giao lại khi phòng đó CHƯA báo xong là đẻ ra hai chặng mở của
                 // cùng một phòng -- "đang chờ bao lâu" lúc đó không có câu trả
@@ -2294,9 +2400,24 @@ public class ContractDAO {
 
     private void appendFilters(StringBuilder sql, List<Object> params, String keyword, String statusFilter,
             String typeFilter, Integer provinceId, Period period, String direction, String progressFilter,
-            boolean rootsOnly, Integer waitingDepartmentId) {
+            boolean rootsOnly, Integer waitingDepartmentId, ListScope scope) {
         List<String> conditions = new ArrayList<>();
         conditions.add("c.is_deleted = 0");
+
+        // Phạm vi mặc định của màn hình: của ai, và còn hiệu lực trong khoảng nào.
+        // Đứng TÁCH khỏi các ô lọc ngay dưới dù soi cùng cột: ô lọc là lựa chọn của
+        // người dùng, phạm vi là trần hệ thống đặt sẵn -- gộp làm một thì chọn một đồng
+        // nghiệp ở ô lọc sẽ ghi đè trần đó.
+        if (scope != null) {
+            String scopeClause = scope.predicate("c.owner_id", "d.province_id", params);
+            if (scopeClause != null) {
+                conditions.add(scopeClause);
+            }
+            String windowClause = scope.activeWindowPredicate("c.effective_date", "c.end_date", params);
+            if (windowClause != null) {
+                conditions.add(windowClause);
+            }
+        }
 
         // Phụ lục nằm CÙNG bảng và mặc định hiện thành dòng riêng trên danh
         // sách: chính nó cũng phải được ký, nên phải tới được bằng tìm kiếm chứ
@@ -2310,10 +2431,16 @@ public class ContractDAO {
         // chứ không JOIN -- một hợp đồng chờ ở hai phòng thì JOIN nhân đôi dòng,
         // và phân trang đếm một đằng liệt kê một nẻo.
         if (waitingDepartmentId != null) {
-            conditions.add("EXISTS (SELECT 1 FROM contract_handovers wh "
-                    + "WHERE wh.contract_id = c.contract_id AND wh.done_at IS NULL "
-                    + "AND wh.department_id = ?)");
-            params.add(waitingDepartmentId);
+            if (waitingDepartmentId == WAITING_ANY_DEPARTMENT) {
+                // Ô tích "Đang bàn giao": chờ ở phòng nào cũng tính.
+                conditions.add("EXISTS (SELECT 1 FROM contract_handovers wh "
+                        + "WHERE wh.contract_id = c.contract_id AND wh.done_at IS NULL)");
+            } else {
+                conditions.add("EXISTS (SELECT 1 FROM contract_handovers wh "
+                        + "WHERE wh.contract_id = c.contract_id AND wh.done_at IS NULL "
+                        + "AND wh.department_id = ?)");
+                params.add(waitingDepartmentId);
+            }
         }
 
         if (keyword != null && !keyword.trim().isEmpty()) {
