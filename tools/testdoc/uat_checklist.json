@@ -270,6 +270,92 @@
       ]
     },
     {
+      "m": "Quản lý hợp đồng",
+      "c": "Giá trị hợp đồng cộng theo phụ lục: bản gốc giữ nguyên con số đã ký, giá trị hiện hành là con số đã cộng mọi phụ lục ĐÃ KÝ, và cả hai đều nhìn thấy được trên màn hình",
+      "ref": [
+        "TC_CTRPL_017",
+        "TC_CTRPL_018",
+        "TC_CTRPL_023",
+        "TC_CTRVIEW_009"
+      ]
+    },
+    {
+      "m": "Quản lý hợp đồng",
+      "c": "Phụ lục còn nháp chưa làm đổi tiền mà hiện riêng thành \"đang chờ ký\"; giảm trừ quá số tiền còn lại bị từ chối ở cả lúc lập lẫn lúc sửa",
+      "ref": [
+        "TC_CTRPL_016",
+        "TC_CTRPL_020",
+        "TC_CTRPL_021"
+      ]
+    },
+    {
+      "m": "Quản lý hợp đồng",
+      "c": "Mỗi lần giá trị hợp đồng đổi vì phụ lục đều để lại một dòng \"Điều chỉnh giá trị\" trên hợp đồng gốc, kể cả khi huỷ bản ghi phụ lục đã ký",
+      "ref": [
+        "TC_CTRPL_025",
+        "TC_CTRHIS_007"
+      ]
+    },
+    {
+      "m": "Quản lý hợp đồng",
+      "c": "Đối chiếu kỳ thanh toán tính theo cả cụm hợp đồng (bản gốc + phụ lục), không cảnh báo lệch chỉ vì kỳ thu của phần bổ sung nằm trên phụ lục",
+      "ref": [
+        "TC_CTRPL_026",
+        "TC_CTRPL_027"
+      ]
+    },
+    {
+      "m": "Quản lý hợp đồng",
+      "c": "Nối được hợp đồng bán với các đơn mua sinh ra vì nó, nối từ cả hai phía, một đơn mua gom phục vụ được nhiều hợp đồng bán; nối và gỡ đều ghi nhật ký ở cả hai hợp đồng",
+      "ref": [
+        "TC_CTRLINK_004",
+        "TC_CTRLINK_005",
+        "TC_CTRLINK_010",
+        "TC_CTRLINK_015",
+        "TC_CTRLINK_016"
+      ]
+    },
+    {
+      "m": "Quản lý hợp đồng",
+      "c": "Chỉ nối được Bán với Mua và chỉ giữa hai hợp đồng gốc; nối trùng một cặp bị chặn",
+      "ref": [
+        "TC_CTRLINK_003",
+        "TC_CTRLINK_006",
+        "TC_CTRLINK_007",
+        "TC_CTRLINK_008"
+      ]
+    },
+    {
+      "m": "Quản lý hợp đồng",
+      "c": "Phía bán đối chiếu được tiền: giá trị bán ra trừ tổng đầu vào đã nối ra chênh lệch thô, và đơn mua dùng chung được nêu rõ vì hệ thống không tự chia tỉ lệ",
+      "ref": [
+        "TC_CTRLINK_011",
+        "TC_CTRLINK_012",
+        "TC_CTRLINK_013",
+        "TC_CTRLINK_014"
+      ]
+    },
+    {
+      "m": "Quản lý hợp đồng",
+      "c": "Lọc danh sách hợp đồng bằng chính bốn ô số ở đầu trang, bỏ lọc bằng cách bấm lại; các điều kiện đang lọc hiện thành chip có dấu × và xoá được hết trong một lần bấm",
+      "ref": [
+        "TC_CTRLIST_012",
+        "TC_CTRLIST_013",
+        "TC_CTRLIST_019",
+        "TC_CTRLIST_020",
+        "TC_CTRLIST_021",
+        "TC_CTRLIST_022"
+      ]
+    },
+    {
+      "m": "Quản lý hợp đồng",
+      "c": "Bốn ô số đếm đúng phạm vi đang xem — theo chiều bán/mua và theo lựa chọn \"Chỉ hợp đồng gốc\" — nên cộng lại bằng đúng tổng ở thanh phân trang",
+      "ref": [
+        "TC_CTRLIST_014",
+        "TC_CTRLIST_015"
+      ]
+    },
+    {
       "m": "Quản lý sản phẩm",
       "c": "Thêm, sửa, xoá sản phẩm theo cây danh mục nhiều cấp",
       "ref": [
@@ -544,6 +630,25 @@
       ]
     },
     {
+      "m": "Báo cáo & thông báo",
+      "c": "Bảng điều khiển xem được theo phạm vi \"Của tôi\" hoặc \"Toàn chi nhánh\": nhân viên mở ra thấy phần việc của mình trước, Admin thấy toàn chi nhánh, và ai cũng đổi qua lại được",
+      "ref": [
+        "TC_DASH_010",
+        "TC_DASH_011",
+        "TC_DASH_012",
+        "TC_DASH_013"
+      ]
+    },
+    {
+      "m": "Báo cáo & thông báo",
+      "c": "Phạm vi \"Của tôi\" gồm cả nhân viên cấp dưới trực tiếp và áp cho mọi khối số liệu của trang, kể cả hai bảng cuối trang",
+      "ref": [
+        "TC_DASH_016",
+        "TC_DASH_017",
+        "TC_DASH_018"
+      ]
+    },
+    {
       "m": "Vận hành & bàn giao",
       "c": "Triển khai được lên Apache Tomcat bằng file WAR, cấu hình kết nối qua biến môi trường"
     },
@@ -562,6 +667,17 @@
     {
       "m": "Vận hành & bàn giao",
       "c": "Tài liệu hướng dẫn sử dụng và hướng dẫn triển khai đầy đủ để bàn giao"
+    },
+    {
+      "m": "Vận hành & bàn giao",
+      "c": "Bộ dữ liệu demo bàn giao kèm đủ tình huống nghiệp vụ: 17 hợp đồng gốc và 7 phụ lục ở đủ các trạng thái, có liên kết bán - mua, mốc thời gian tính từ ngày chạy nên không tự trôi thành hết hạn",
+      "ref": [
+        "TC_CTRLIST_024",
+        "TC_CTRLIST_025",
+        "TC_CTRLIST_026",
+        "TC_CTRPL_029",
+        "TC_CTRLINK_019"
+      ]
     },
     {
       "m": "Chức năng dùng chung",

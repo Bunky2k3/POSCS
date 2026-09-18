@@ -90,6 +90,116 @@
           ],
           "t": "-",
           "e": "Cả bốn vai trò đều xem được Dashboard"
+        },
+        {
+          "d": "Ô chọn phạm vi \"Của tôi / Toàn chi nhánh\"",
+          "s": [
+            "Mở Dashboard",
+            "Xem hàng bộ lọc góc phải"
+          ],
+          "t": "-",
+          "e": "Ô chọn phạm vi đứng TRƯỚC ô tỉnh và ô kỳ, có đúng hai lựa chọn \"Của tôi\" và \"Toàn chi nhánh\"; đổi lựa chọn là trang tự nạp lại, không cần nút Lọc"
+        },
+        {
+          "d": "Nhân viên mở trang lần đầu thấy phần việc của mình",
+          "s": [
+            "Đăng nhập bằng một tài khoản nhân viên (Sales/Kỹ thuật/CSKH)",
+            "Mở Dashboard"
+          ],
+          "p": "Tài khoản nhân viên có khách hàng và hợp đồng đứng tên",
+          "t": "Tài khoản: sales2",
+          "e": "Ô phạm vi đang ở \"Của tôi\"; các ô số nhỏ hơn hẳn số toàn chi nhánh và khớp với phần việc của chính người đó (trên bộ demo: 2 khách hàng, 3 hợp đồng đang hiệu lực)"
+        },
+        {
+          "d": "Admin mở trang lần đầu thấy toàn chi nhánh",
+          "s": [
+            "Đăng nhập bằng Admin",
+            "Mở Dashboard"
+          ],
+          "t": "Tài khoản: admin",
+          "e": "Ô phạm vi đang ở \"Toàn chi nhánh\"; số liệu là của cả chi nhánh (trên bộ demo: 16 khách hàng, 15 hợp đồng)",
+          "n": "Admin không đứng tên hợp đồng nào, mặc định \"Của tôi\" sẽ cho ra trang trống trơn"
+        },
+        {
+          "d": "Ai cũng đổi được sang phạm vi kia",
+          "s": [
+            "Đăng nhập bằng tài khoản nhân viên, mở Dashboard",
+            "Đổi ô phạm vi sang \"Toàn chi nhánh\""
+          ],
+          "p": "Đăng nhập bằng tài khoản nhân viên",
+          "t": "Phạm vi: Toàn chi nhánh",
+          "e": "Số liệu đổi thành của cả chi nhánh, không bị chặn quyền",
+          "n": "Đây là mặc định theo vai trò chứ KHÔNG phải phạm vi quyền — PERMISSIONS.md cho mọi vai trò xem số liệu chi nhánh"
+        },
+        {
+          "d": "Admin chọn \"Của tôi\"",
+          "s": [
+            "Đăng nhập Admin, đổi ô phạm vi sang \"Của tôi\""
+          ],
+          "p": "Admin không đứng tên khách hàng, hợp đồng hay phiếu nào",
+          "t": "Phạm vi: Của tôi",
+          "e": "Các ô hiện 0 và hai bảng cuối trang rỗng, trang không báo lỗi",
+          "n": "Không phải lỗi: đúng là Admin không phụ trách bản ghi nào"
+        },
+        {
+          "d": "Dòng dưới lời chào nói rõ đang tính trên phạm vi nào",
+          "s": [
+            "Mở Dashboard ở từng phạm vi và đọc dòng ngay dưới lời chào"
+          ],
+          "t": "-",
+          "e": "\"Của tôi\" một mình: \"Số liệu phần việc bạn đang phụ trách.\"; \"Của tôi\" khi có cấp dưới: \"Số liệu của bạn và N nhân viên cấp dưới.\"; toàn chi nhánh: \"Số liệu toàn chi nhánh — hoạt động kinh doanh và hỗ trợ kỹ thuật.\"",
+          "o": "Thiếu dòng này thì con số của nhân viên và của Admin khác nhau mà không ai biết vì đâu"
+        },
+        {
+          "d": "\"Của tôi\" gồm cả cấp dưới trực tiếp",
+          "s": [
+            "Admin gán một nhân viên làm cấp dưới của người đang thử",
+            "Đăng nhập bằng người đó, mở Dashboard ở phạm vi \"Của tôi\""
+          ],
+          "p": "Người đăng nhập có ít nhất một nhân viên cấp dưới trực tiếp, và cấp dưới đó có khách hàng/hợp đồng đứng tên",
+          "t": "-",
+          "e": "Số liệu gộp cả phần việc của cấp dưới; dòng dưới lời chào ghi \"bạn và N nhân viên cấp dưới\"",
+          "n": "Một tầng là đủ: người đã có cấp trên thì không được chọn làm cấp trên của ai, nên cây nhân sự chỉ sâu hai tầng"
+        },
+        {
+          "d": "Phạm vi áp cho mọi khối số liệu, không nửa vời",
+          "s": [
+            "Mở Dashboard ở phạm vi \"Của tôi\"",
+            "Đối chiếu từng khối với các màn hình danh sách đã lọc theo chính người đó"
+          ],
+          "p": "Người đăng nhập có dữ liệu ở cả bốn nhóm",
+          "t": "-",
+          "e": "Khách hàng đếm theo người phụ trách khách hàng, hợp đồng và doanh thu đếm theo người phụ trách hợp đồng, phiếu hỗ trợ đếm cả phiếu được giao lẫn phiếu do chính mình tạo; cả hai bảng cuối trang cũng thu theo phạm vi"
+        },
+        {
+          "d": "Phiếu hỗ trợ trong \"Của tôi\" tính theo hai vai",
+          "s": [
+            "Đăng nhập bằng tài khoản CSKH đã tạo phiếu nhưng giao cho kỹ thuật viên khác",
+            "Mở Dashboard ở phạm vi \"Của tôi\""
+          ],
+          "p": "Có phiếu do người này tạo nhưng giao cho người khác xử lý",
+          "t": "-",
+          "e": "Phiếu đó vẫn nằm trong số liệu của người tạo; kỹ thuật viên được giao mở Dashboard của mình cũng thấy phiếu đó",
+          "n": "Kỹ thuật và CSKH nhìn chung một trang mà \"phiếu của tôi\" với họ là hai nghĩa khác nhau"
+        },
+        {
+          "d": "Phạm vi dùng chung với lọc tỉnh và lọc kỳ",
+          "s": [
+            "Ở phạm vi \"Của tôi\", chọn thêm một tỉnh và một quý"
+          ],
+          "p": "Người đăng nhập có hợp đồng ở tỉnh được chọn",
+          "t": "Phạm vi: Của tôi; Tỉnh: Quảng Ninh; Năm 2026 / Quý 3",
+          "e": "Số liệu thoả cả ba điều kiện cùng lúc; đổi một ô thì hai ô kia giữ nguyên lựa chọn"
+        },
+        {
+          "d": "Bảng hợp đồng sắp hết hạn chỉ liệt kê hợp đồng gốc",
+          "s": [
+            "Mở Dashboard, xem bảng \"Hợp đồng sắp hết hạn\""
+          ],
+          "p": "Có phụ lục sắp hết hạn cùng hợp đồng gốc của nó",
+          "t": "-",
+          "e": "Không có dòng phụ lục nào đứng riêng cạnh hợp đồng cha; cột Giá trị hiện giá trị theo điều khoản (đã cộng phụ lục đã ký), không phải tổng các kỳ thanh toán",
+          "n": "Phụ lục đứng riêng cạnh cha là đếm hai lần một việc, và cột giá trị thì cộng lần nữa phần tiền đã nằm trong giá trị hiện hành của cha"
         }
       ]
     },
