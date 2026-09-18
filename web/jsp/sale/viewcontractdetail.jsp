@@ -762,6 +762,83 @@
              contracts vẫn chưa có cột lưu điều khoản; khi nào có thì dựng lại
              thẻ này với dữ liệu thật. --%>
 
+        <!-- ===== Đầu ra kéo theo đầu vào ===== -->
+        <%-- CHỈ ĐỌC, như cả trang này: nối/gỡ nằm ở trang quản lý. --%>
+        <c:if test="${not empty contractLinks}">
+        <div class="info-card card-box">
+            <div class="section-header">
+                <h5>${linkIsSellSide ? 'Đầu vào phục vụ hợp đồng này' : 'Hợp đồng bán mà đơn mua này phục vụ'}</h5>
+            </div>
+            <c:if test="${linkIsSellSide}">
+                <div class="row g-2" style="margin-bottom:14px;">
+                    <div class="col-md-4">
+                        <div style="border:1px solid #eef2f6; border-radius:10px; padding:10px 14px; background:#f9fafb;">
+                            <div style="font-size:0.72rem; color:#6b7280; text-transform:uppercase; letter-spacing:.3px;">Giá trị bán ra</div>
+                            <div class="money-vnd" data-vnd="${contract.currentValue}" style="font-weight:700; color:#111827;">&mdash;</div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div style="border:1px solid #f5d9a8; border-radius:10px; padding:10px 14px; background:#fff8ec;">
+                            <div style="font-size:0.72rem; color:#8a5a00; text-transform:uppercase; letter-spacing:.3px;">Đầu vào đã nối</div>
+                            <div class="money-vnd" data-vnd="${linkedInputValue}" style="font-weight:700; color:#8a5a00;">&mdash;</div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div style="border:1px solid #cfe3d0; border-radius:10px; padding:10px 14px; background:#f3f7f3;">
+                            <div style="font-size:0.72rem; color:#2f6b34; text-transform:uppercase; letter-spacing:.3px;">Chênh lệch thô</div>
+                            <div class="money-signed" data-vnd="${linkedMargin}" style="font-weight:700;">&mdash;</div>
+                        </div>
+                    </div>
+                </div>
+                <p style="font-size:0.78rem; color:#9ca3af; margin:-6px 0 14px;">
+                    Chênh lệch thô = giá trị bán ra trừ tổng các đơn mua đã nối. Chưa trừ chi phí thi công,
+                    nhân công hay bảo hành — đừng đọc con số này thành lợi nhuận.
+                    Đơn mua gom được tính TRỌN VẸN vào từng hợp đồng bán mà nó phục vụ — hệ thống
+                    không tự chia tỉ lệ, vì chia thế nào là việc của người lập chứng từ.
+                </p>
+            </c:if>
+            <div class="table-responsive">
+                <table class="table align-middle" style="font-size:0.9rem;">
+                    <thead>
+                        <tr>
+                            <th>Mã hợp đồng</th>
+                            <th>Tiêu đề</th>
+                            <th>Đối tác</th>
+                            <th class="num">Giá trị</th>
+                            <th>Tiến độ</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <c:forEach var="lk" items="${contractLinks}">
+                            <tr>
+                                <td><strong>${fn:escapeXml(lk.other.contractCode)}</strong></td>
+                                <td>
+                                    ${fn:escapeXml(lk.other.title)}
+                                    <c:if test="${lk.shared}">
+                                        <div style="font-size:0.76rem; color:#8a5a00;">
+                                            <i class="fa-solid fa-code-branch"></i>
+                                            Đơn mua gom — còn phục vụ ${lk.sharedCount} hợp đồng bán khác
+                                        </div>
+                                    </c:if>
+                                    <c:if test="${not empty lk.note}">
+                                        <div style="font-size:0.78rem; color:#9ca3af;">${fn:escapeXml(lk.note)}</div>
+                                    </c:if>
+                                </td>
+                                <td>${lk.other.enterprise != null ? fn:escapeXml(lk.other.enterprise.enterpriseName) : '—'}</td>
+                                <td class="num"><span class="money-vnd" data-vnd="${lk.other.currentValue}">&mdash;</span></td>
+                                <td>${fn:escapeXml(lk.other.progressStatus)}</td>
+                                <td class="text-end">
+                                    <a href="${pageContext.request.contextPath}/contract?action=view&id=${lk.other.contractId}">Xem</a>
+                                </td>
+                            </tr>
+                        </c:forEach>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        </c:if>
+
         <!-- ===== Phụ lục ===== -->
         <%-- CHỈ ĐỌC, như cả trang này. Nút "Lập phụ lục" nằm ở trang quản lý
              (updatecontract.jsp) cùng mọi thao tác ghi khác -- xem ghi chú đầu

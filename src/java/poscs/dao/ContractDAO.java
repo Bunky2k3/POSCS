@@ -22,6 +22,7 @@ import poscs.common.SqlFilters;
 import poscs.model.Address;
 import poscs.model.Contract;
 import poscs.model.ContractHistory;
+import poscs.model.ContractLink;
 import poscs.model.ContractPayment;
 import poscs.model.ContractProduct;
 import poscs.model.District;
@@ -1045,6 +1046,292 @@ public class ContractDAO {
             }
             return false;
         }
+    }
+
+    // ==================================================================
+    // Liên kết hợp đồng bán <-> hợp đồng mua ("đầu ra kéo theo đầu vào")
+    // ==================================================================
+    //
+    // Yêu cầu của khách hàng: bán một hợp đồng thì phải biết nó kéo theo những
+    // đơn mua vào nào. Quan hệ NHIỀU-NHIỀU (mua gom chia cho nhiều hợp đồng
+    // bán), nằm ở bảng riêng contract_links -- KHÔNG dùng lại parent_contract_id,
+    // cột đó đang mang đúng một nghĩa "phụ lục của".
+
+    /**
+     * Chiều hợp đồng. Hằng ở đây chứ không mượn của controller: DAO là nơi cuối
+     * cùng chặn một liên kết sai chiều, không được phụ thuộc tầng trên để biết
+     * hai chữ đó viết thế nào.
+     */
+    public static final String DIRECTION_SELL = "Bán";
+    public static final String DIRECTION_BUY = "Mua";
+
+    /** {@link #linkContracts} thành công. */
+    public static final int LINK_OK = 1;
+
+    /**
+     * Hai hợp đồng không nối được: không tồn tại, cùng chiều, hoặc có cái là
+     * phụ lục. Tách khỏi -1 (lỗi chung) vì người dùng sửa được -- chọn lại đúng
+     * hợp đồng là xong.
+     */
+    public static final int LINK_INVALID = -1;
+
+    /** Cặp này đã nối rồi. Nối hai lần làm phép cộng giá trị đầu vào đếm đôi. */
+    public static final int LINK_DUPLICATE = -2;
+
+    /**
+     * Nối một hợp đồng BÁN với một hợp đồng MUA.
+     *
+     * <p>Ba điều kiện, kiểm TRONG transaction sau khi đã khoá cả hai dòng:
+     * đúng chiều (bán với mua, không phải hai cái cùng chiều), cả hai đều là
+     * hợp đồng GỐC (phụ lục là văn bản sửa đổi của một hợp đồng, đầu vào phục
+     * vụ cả hợp đồng chứ không phục vụ riêng một phụ lục), và chưa nối trước
+     * đó. Kiểm ở controller thôi thì hai người bấm cùng lúc không thấy nhau.
+     *
+     * <p>Bản NHÁP vẫn nối được, cố ý: đơn mua thường được chuẩn bị trước khi
+     * ký hợp đồng bán, bắt ký xong mới nối là bắt người ta nhớ quay lại làm sau.
+     */
+    public int linkContracts(int sellContractId, int buyContractId, String note, int actorId) {
+        try (Connection conn = DBContext.getConnection()) {
+            conn.setAutoCommit(false);
+            boolean committed = false;
+            try {
+                Contract sell = lockForUpdate(conn, sellContractId);
+                Contract buy = lockForUpdate(conn, buyContractId);
+                if (!canLink(sell, buy)) {
+                    return LINK_INVALID;
+                }
+
+                try (PreparedStatement ps = conn.prepareStatement(
+                        "INSERT INTO contract_links (sell_contract_id, buy_contract_id, note, created_by) "
+                        + "VALUES (?, ?, ?, ?)")) {
+                    ps.setInt(1, sellContractId);
+                    ps.setInt(2, buyContractId);
+                    ps.setString(3, note == null || note.trim().isEmpty() ? null : note.trim());
+                    ps.setInt(4, actorId);
+                    if (ps.executeUpdate() == 0) {
+                        return -1;
+                    }
+                }
+
+                // Hai dòng nhật ký, mỗi hợp đồng một dòng, mỗi dòng kể câu
+                // chuyện từ phía của nó.
+                insertHistory(conn, sellContractId, ContractHistory.EVENT_LINKED,
+                        "Nối với hợp đồng mua " + buy.getContractCode()
+                                + " — đầu vào phục vụ hợp đồng này", actorId, note);
+                insertHistory(conn, buyContractId, ContractHistory.EVENT_LINKED,
+                        "Phục vụ hợp đồng bán " + sell.getContractCode(), actorId, note);
+
+                conn.commit();
+                committed = true;
+                return LINK_OK;
+            } finally {
+                finishTransaction(conn, committed, "noi hop dong", sellContractId);
+            }
+        } catch (SQLException ex) {
+            if (isDuplicateKeyError(ex, "uq_contract_links_pair")) {
+                LOG.warn("Hai hop dong da noi voi nhau (sellId={}, buyId={})", sellContractId, buyContractId);
+                return LINK_DUPLICATE;
+            }
+            LOG.error("Loi noi hop dong (sellId={}, buyId={})", sellContractId, buyContractId, ex);
+            return -1;
+        }
+    }
+
+    /**
+     * true nếu hai hợp đồng này nối được với nhau.
+     *
+     * <p>Không kiểm trạng thái tiến độ: kể cả hợp đồng đã thanh lý vẫn phải
+     * xem được nó đã mua vào những gì, và nối muộn một đơn mua cho hợp đồng vừa
+     * xong là chuyện chép lại lịch sử chứ không phải sửa điều khoản.
+     */
+    private static boolean canLink(Contract sell, Contract buy) {
+        return sell != null && buy != null
+                && sell.getContractId() != buy.getContractId()
+                && DIRECTION_SELL.equals(sell.getDirection())
+                && DIRECTION_BUY.equals(buy.getDirection())
+                && !sell.isAmendment() && !buy.isAmendment();
+    }
+
+    /** Gỡ một liên kết, kèm dòng nhật ký ở cả hai hợp đồng. */
+    public boolean unlinkContracts(int linkId, int actorId) {
+        try (Connection conn = DBContext.getConnection()) {
+            conn.setAutoCommit(false);
+            boolean committed = false;
+            try {
+                // Đọc TRƯỚC khi xoá, cùng lẽ với deleteProductLine: sau lệnh
+                // xoá thì không còn gì để đọc ra mà kể lại trong nhật ký.
+                int sellId = 0;
+                int buyId = 0;
+                String sellCode = null;
+                String buyCode = null;
+                try (PreparedStatement ps = conn.prepareStatement(
+                        "SELECT l.sell_contract_id, l.buy_contract_id, s.contract_code AS sell_code, "
+                        + "       b.contract_code AS buy_code "
+                        + "FROM contract_links l "
+                        + "JOIN contracts s ON s.contract_id = l.sell_contract_id "
+                        + "JOIN contracts b ON b.contract_id = l.buy_contract_id "
+                        + "WHERE l.link_id = ? FOR UPDATE")) {
+                    ps.setInt(1, linkId);
+                    try (ResultSet rs = ps.executeQuery()) {
+                        if (!rs.next()) {
+                            return false;
+                        }
+                        sellId = rs.getInt("sell_contract_id");
+                        buyId = rs.getInt("buy_contract_id");
+                        sellCode = rs.getString("sell_code");
+                        buyCode = rs.getString("buy_code");
+                    }
+                }
+
+                try (PreparedStatement ps = conn.prepareStatement(
+                        "DELETE FROM contract_links WHERE link_id = ?")) {
+                    ps.setInt(1, linkId);
+                    if (ps.executeUpdate() == 0) {
+                        return false;
+                    }
+                }
+
+                insertHistory(conn, sellId, ContractHistory.EVENT_LINKED,
+                        "Gỡ liên kết với hợp đồng mua " + buyCode, actorId, null);
+                insertHistory(conn, buyId, ContractHistory.EVENT_LINKED,
+                        "Gỡ liên kết với hợp đồng bán " + sellCode, actorId, null);
+
+                conn.commit();
+                committed = true;
+            } finally {
+                finishTransaction(conn, committed, "go lien ket hop dong", linkId);
+            }
+            return committed;
+        } catch (SQLException ex) {
+            LOG.error("Loi go lien ket hop dong (linkId={})", linkId, ex);
+            return false;
+        }
+    }
+
+    /**
+     * Các hợp đồng nối với hợp đồng này, nhìn từ chính nó: mở một hợp đồng bán
+     * thì ra các đơn MUA phục vụ nó, mở đơn mua thì ra các hợp đồng BÁN mà nó
+     * phục vụ. Một câu duy nhất cho cả hai chiều -- hai câu thì hai màn hình
+     * sớm muộn lệch nhau.
+     *
+     * <p>Bỏ qua liên kết mà đầu kia đã bị huỷ bản ghi: liên kết tới một hợp
+     * đồng không còn trong danh sách nào thì người đọc không tra ra được gì.
+     */
+    public List<ContractLink> findLinksOf(int contractId) {
+        List<ContractLink> result = new ArrayList<>();
+        String sql =
+            "SELECT l.link_id, l.sell_contract_id, l.buy_contract_id, l.relation_type, l.note, "
+            + "       l.created_by, l.created_at, "
+            + "       o.contract_id AS other_id, o.contract_code AS other_code, o.title AS other_title, "
+            + "       o.direction AS other_direction, o.progress_status AS other_progress, "
+            + "       o.contract_value AS other_value, o.effective_date AS other_effective, "
+            + "       o.end_date AS other_end, e.enterprise_name AS other_enterprise, "
+            + "       u.last_name, u.middle_name, u.first_name, "
+            // Hợp đồng ở đầu kia cũng có thể có phụ lục, nên giá trị đem ra đối
+            // chiếu phải là giá trị HIỆN HÀNH chứ không phải con số trên bản gốc.
+            + "       (SELECT COALESCE(SUM(a.contract_value), 0) FROM contracts a "
+            + "         WHERE a.parent_contract_id = o.contract_id AND a.is_deleted = 0 "
+            + "           AND (a.progress_status IS NULL OR a.progress_status <> '" + PROGRESS_DRAFT + "')"
+            + "       ) AS other_amendment_value, "
+            // Đơn mua gom: bao nhiêu hợp đồng bán KHÁC cũng đang dùng nó. Câu
+            // này chỉ khớp khi đầu kia là hợp đồng MUA -- nhìn từ phía mua thì
+            // buy_contract_id không phải id của chính nó, nên tự ra 0.
+            + "       (SELECT COUNT(*) FROM contract_links l2 "
+            + "         WHERE l2.buy_contract_id = o.contract_id AND l2.link_id <> l.link_id) AS shared_count "
+            + "FROM contract_links l "
+            + "JOIN contracts o ON o.contract_id = CASE WHEN l.sell_contract_id = ? "
+            + "                                         THEN l.buy_contract_id ELSE l.sell_contract_id END "
+            + "LEFT JOIN enterprises e ON o.enterprise_id = e.enterprise_id "
+            + "LEFT JOIN users u ON l.created_by = u.user_id "
+            + "WHERE (l.sell_contract_id = ? OR l.buy_contract_id = ?) AND o.is_deleted = 0 "
+            + "ORDER BY l.created_at, l.link_id";
+        try (Connection conn = DBContext.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, contractId);
+            ps.setInt(2, contractId);
+            ps.setInt(3, contractId);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    result.add(mapLinkRow(rs));
+                }
+            }
+        } catch (SQLException ex) {
+            LOG.error("Loi truy van lien ket hop dong (contractId={})", contractId, ex);
+        }
+        return result;
+    }
+
+    private ContractLink mapLinkRow(ResultSet rs) throws SQLException {
+        ContractLink link = new ContractLink();
+        link.setLinkId(rs.getInt("link_id"));
+        link.setSellContractId(rs.getInt("sell_contract_id"));
+        link.setBuyContractId(rs.getInt("buy_contract_id"));
+        link.setRelationType(rs.getString("relation_type"));
+        link.setNote(rs.getString("note"));
+        link.setCreatedBy(rs.getInt("created_by"));
+        link.setCreatedAt(rs.getTimestamp("created_at"));
+
+        Contract other = new Contract();
+        other.setContractId(rs.getInt("other_id"));
+        other.setContractCode(rs.getString("other_code"));
+        other.setTitle(rs.getString("other_title"));
+        other.setDirection(rs.getString("other_direction"));
+        other.setProgressStatus(rs.getString("other_progress"));
+        other.setContractValue(rs.getBigDecimal("other_value"));
+        other.setAmendmentValueSigned(rs.getBigDecimal("other_amendment_value"));
+        other.setEffectiveDate(rs.getDate("other_effective"));
+        other.setEndDate(rs.getDate("other_end"));
+        other.setStatus(computeStatus(other.getEffectiveDate(), other.getEndDate()));
+        String enterpriseName = rs.getString("other_enterprise");
+        if (enterpriseName != null) {
+            Enterprise e = new Enterprise();
+            e.setEnterpriseName(enterpriseName);
+            other.setEnterprise(e);
+        }
+        link.setSharedCount(rs.getInt("shared_count"));
+        link.setOther(other);
+
+        String lastName = rs.getString("last_name");
+        if (lastName != null) {
+            User u = new User();
+            u.setUserId(link.getCreatedBy());
+            u.setLastName(lastName);
+            u.setMiddleName(rs.getString("middle_name"));
+            u.setFirstName(rs.getString("first_name"));
+            link.setCreatedByName(u.getFullName());
+        }
+        return link;
+    }
+
+    /**
+     * Tổng giá trị HIỆN HÀNH của các đơn mua đã nối vào một hợp đồng bán --
+     * vế "đầu vào" của phép đối chiếu trên màn hình.
+     *
+     * <p>Cộng cả phụ lục đã ký của từng đơn mua, cùng quy tắc với giá trị hiện
+     * hành ở mọi chỗ khác; đơn mua bị huỷ bản ghi thì không tính.
+     */
+    public BigDecimal sumLinkedBuyValue(int sellContractId) {
+        String sql =
+            "SELECT COALESCE(SUM(COALESCE(b.contract_value, 0) + ("
+            + "    SELECT COALESCE(SUM(a.contract_value), 0) FROM contracts a "
+            + "     WHERE a.parent_contract_id = b.contract_id AND a.is_deleted = 0 "
+            + "       AND (a.progress_status IS NULL OR a.progress_status <> '" + PROGRESS_DRAFT + "')"
+            + ")), 0) "
+            + "FROM contract_links l "
+            + "JOIN contracts b ON b.contract_id = l.buy_contract_id "
+            + "WHERE l.sell_contract_id = ? AND b.is_deleted = 0";
+        try (Connection conn = DBContext.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, sellContractId);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getBigDecimal(1);
+                }
+            }
+        } catch (SQLException ex) {
+            LOG.error("Loi tinh tong gia tri dau vao (sellContractId={})", sellContractId, ex);
+        }
+        return BigDecimal.ZERO;
     }
 
     /**

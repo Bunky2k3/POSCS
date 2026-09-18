@@ -152,7 +152,9 @@ public final class IntegrationDb {
      */
     public static void clearBusinessData() throws SQLException {
         String[] tables = {
-            "notifications", "customer_lifecycle_events", "contract_payments",
+            // contract_links phải đứng trước contracts: nó trỏ vào đó bằng HAI
+            // khoá ngoại và không có cascade.
+            "notifications", "customer_lifecycle_events", "contract_links", "contract_payments",
             "technicalrequestdevices", "technicalrequesthistory", "technicalrequests",
             "contract_history", "contractproducts", "contracts", "enterprisecontacts", "enterprises",
             "productimages", "productcatalogues", "products", "users", "addresses"

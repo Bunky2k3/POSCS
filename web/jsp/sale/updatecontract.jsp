@@ -145,6 +145,9 @@
                         <c:when test="${param.error == 'missing_reason'}">Sửa sai sót trên hợp đồng đã ký thì bắt buộc phải nêu lý do.</c:when>
                         <c:when test="${param.error == 'amendment_not_allowed'}">Hợp đồng này không lập phụ lục được: nó phải đã ký và chưa thanh lý, và bản thân nó không được là phụ lục.</c:when>
                         <c:when test="${param.error == 'value_negative'}">Khoản giảm trừ lớn hơn giá trị còn lại của hợp đồng gốc — giá trị hợp đồng sẽ âm. Ô này nhập phần CHÊNH LỆCH, không phải tổng giá trị mới.</c:when>
+                        <c:when test="${param.error == 'link_invalid'}">Không nối được hai hợp đồng này: phải là một hợp đồng bán với một hợp đồng mua, và cả hai đều phải là hợp đồng gốc (không phải phụ lục).</c:when>
+                        <c:when test="${param.error == 'link_duplicate'}">Hai hợp đồng này đã nối với nhau rồi.</c:when>
+                        <c:when test="${param.error == 'unlink_failed'}">Không gỡ được liên kết. Vui lòng thử lại.</c:when>
                         <c:otherwise>Đã có lỗi xảy ra. Vui lòng thử lại.</c:otherwise>
                     </c:choose>
                 </div>
@@ -459,6 +462,157 @@
                         nếu thật sự cần.</span>
                 </div>
             </c:if>
+        </div>
+        </c:if>
+
+        <!-- ===== Đầu ra kéo theo đầu vào ===== -->
+        <%-- Hợp đồng BÁN nối với các đơn MUA sinh ra vì nó, và ngược lại. Quan
+             hệ nhiều-nhiều nằm ở bảng contract_links, KHÁC hẳn phụ lục bên dưới
+             (phụ lục là văn bản sửa đổi của chính hợp đồng này).
+
+             Trên PHỤ LỤC thì khối này biến mất: đầu vào phục vụ cả hợp đồng
+             gốc, không phục vụ riêng một văn bản sửa đổi. --%>
+        <c:if test="${canLinkContracts}">
+        <div class="card-box" style="margin-top:20px;">
+            <div class="section-header">
+                <h5>${linkIsSellSide ? 'Đầu vào phục vụ hợp đồng này' : 'Hợp đồng bán mà đơn mua này phục vụ'}</h5>
+            </div>
+            <p style="font-size:0.86rem; color:#6b7280; margin:0 0 12px;">
+                <c:choose>
+                    <c:when test="${linkIsSellSide}">
+                        Các hợp đồng mua vào sinh ra vì hợp đồng bán này. Một đơn mua gom có thể
+                        phục vụ nhiều hợp đồng bán, nên nó xuất hiện ở nhiều nơi.
+                    </c:when>
+                    <c:otherwise>
+                        Các hợp đồng bán mà đơn mua này phục vụ.
+                    </c:otherwise>
+                </c:choose>
+            </p>
+
+            <%-- Đối chiếu tiền CHỈ ở phía bán: một đơn mua phục vụ nhiều hợp
+                 đồng bán, nên lấy giá trị bán trừ đi ở phía mua sẽ ra con số vô
+                 nghĩa. Đây là chênh lệch THÔ (chưa trừ chi phí nào khác) —
+                 màn hình nói rõ để không ai đọc nó thành lợi nhuận. --%>
+            <c:if test="${linkIsSellSide and not empty contractLinks}">
+                <div class="row g-2" style="margin-bottom:14px;">
+                    <div class="col-md-4">
+                        <div style="border:1px solid #eef2f6; border-radius:10px; padding:10px 14px; background:#f9fafb;">
+                            <div style="font-size:0.72rem; color:#6b7280; text-transform:uppercase; letter-spacing:.3px;">Giá trị bán ra</div>
+                            <div class="money-vnd" data-vnd="${contract.currentValue}" style="font-weight:700; color:#111827;">&mdash;</div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div style="border:1px solid #f5d9a8; border-radius:10px; padding:10px 14px; background:#fff8ec;">
+                            <div style="font-size:0.72rem; color:#8a5a00; text-transform:uppercase; letter-spacing:.3px;">Đầu vào đã nối</div>
+                            <div class="money-vnd" data-vnd="${linkedInputValue}" style="font-weight:700; color:#8a5a00;">&mdash;</div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div style="border:1px solid #cfe3d0; border-radius:10px; padding:10px 14px; background:#f3f7f3;">
+                            <div style="font-size:0.72rem; color:#2f6b34; text-transform:uppercase; letter-spacing:.3px;">Chênh lệch thô</div>
+                            <div class="money-signed" data-vnd="${linkedMargin}" style="font-weight:700;">&mdash;</div>
+                        </div>
+                    </div>
+                </div>
+                <p style="font-size:0.78rem; color:#9ca3af; margin:-6px 0 14px;">
+                    Chênh lệch thô = giá trị bán ra (đã cộng phụ lục) trừ tổng giá trị các đơn mua đã nối.
+                    Chưa trừ chi phí thi công, nhân công hay bảo hành — đừng đọc con số này thành lợi nhuận.
+                    Đơn mua gom được tính TRỌN VẸN vào từng hợp đồng bán mà nó phục vụ — hệ thống
+                    không tự chia tỉ lệ, vì chia thế nào là việc của người lập chứng từ.
+                </p>
+            </c:if>
+
+            <c:choose>
+                <c:when test="${empty contractLinks}">
+                    <p style="font-size:0.88rem; color:#9ca3af; margin:0 0 14px;">Chưa nối hợp đồng nào.</p>
+                </c:when>
+                <c:otherwise>
+                    <div class="table-responsive">
+                        <table class="table align-middle" style="font-size:0.9rem;">
+                            <thead>
+                                <tr>
+                                    <th>Mã hợp đồng</th>
+                                    <th>Tiêu đề</th>
+                                    <th>Đối tác</th>
+                                    <th class="text-end">Giá trị</th>
+                                    <th>Tiến độ</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <c:forEach var="lk" items="${contractLinks}">
+                                    <tr>
+                                        <td><strong>${fn:escapeXml(lk.other.contractCode)}</strong></td>
+                                        <td>
+                                            ${fn:escapeXml(lk.other.title)}
+                                            <%-- Đơn mua gom: giá trị của nó được tính TRỌN VẸN vào
+                                                 mỗi hợp đồng bán mà nó phục vụ, nên không nói ra thì
+                                                 "chênh lệch thô" âm ở đây bị đọc thành lỗ. --%>
+                                            <c:if test="${lk.shared}">
+                                                <div style="font-size:0.76rem; color:#8a5a00;">
+                                                    <i class="fa-solid fa-code-branch"></i>
+                                                    Đơn mua gom — còn phục vụ ${lk.sharedCount} hợp đồng bán khác
+                                                </div>
+                                            </c:if>
+                                            <c:if test="${not empty lk.note}">
+                                                <div style="font-size:0.78rem; color:#9ca3af;">${fn:escapeXml(lk.note)}</div>
+                                            </c:if>
+                                        </td>
+                                        <td>${lk.other.enterprise != null ? fn:escapeXml(lk.other.enterprise.enterpriseName) : '—'}</td>
+                                        <td class="text-end"><span class="money-vnd" data-vnd="${lk.other.currentValue}">&mdash;</span></td>
+                                        <td>${fn:escapeXml(lk.other.progressStatus)}</td>
+                                        <td class="text-end" style="white-space:nowrap;">
+                                            <a href="${pageContext.request.contextPath}/contract?action=view&id=${lk.other.contractId}"
+                                               class="btn-outline-action"><i class="fa-solid fa-eye"></i> Xem</a>
+                                            <form method="POST" action="${pageContext.request.contextPath}/contract"
+                                                  style="display:inline;"
+                                                  onsubmit="return confirm('Gỡ liên kết với hợp đồng ${fn:escapeXml(lk.other.contractCode)}?');">
+                                                <input type="hidden" name="csrfToken" value="${csrfToken}">
+                                                <input type="hidden" name="action" value="unlinkContract">
+                                                <input type="hidden" name="contractId" value="${contract.contractId}">
+                                                <input type="hidden" name="linkId" value="${lk.linkId}">
+                                                <button type="submit" class="btn-outline-action" style="color:var(--danger); border-color:#f3c7c7;">
+                                                    <i class="fa-solid fa-link-slash"></i> Gỡ
+                                                </button>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                </c:forEach>
+                            </tbody>
+                        </table>
+                    </div>
+                </c:otherwise>
+            </c:choose>
+
+            <%-- Nối được cả khi hợp đồng còn NHÁP và cả sau khi đã thanh lý:
+                 đơn mua thường chuẩn bị trước khi ký, còn nối muộn cho một hợp
+                 đồng vừa xong là chép lại lịch sử chứ không phải sửa điều khoản. --%>
+            <form method="POST" action="${pageContext.request.contextPath}/contract" class="row g-2 align-items-end">
+                <input type="hidden" name="csrfToken" value="${csrfToken}">
+                <input type="hidden" name="action" value="linkContract">
+                <input type="hidden" name="contractId" value="${contract.contractId}">
+                <div class="col-md-5">
+                    <label style="font-size:0.8rem; color:#6b7280;">
+                        ${linkIsSellSide ? 'Chọn hợp đồng mua' : 'Chọn hợp đồng bán'}
+                    </label>
+                    <select name="otherContractId" class="form-control" required>
+                        <option value="">-- Chọn hợp đồng --</option>
+                        <c:forEach var="cand" items="${linkCandidates}">
+                            <option value="${cand.contractId}">${fn:escapeXml(cand.contractCode)} — ${fn:escapeXml(cand.title)}</option>
+                        </c:forEach>
+                    </select>
+                </div>
+                <div class="col-md-5">
+                    <label style="font-size:0.8rem; color:#6b7280;">Ghi chú (không bắt buộc)</label>
+                    <input type="text" name="linkNote" class="form-control" maxlength="255"
+                           placeholder="VD: mua 20km cáp cho giai đoạn 1">
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn-primary" style="width:100%;">
+                        <i class="fa-solid fa-link me-1"></i> Nối
+                    </button>
+                </div>
+            </form>
         </div>
         </c:if>
 
