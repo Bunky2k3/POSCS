@@ -358,7 +358,7 @@
                                             </c:choose>
                                         </div>
                                         <div class="cell-2line">
-                                            <a href="${pageContext.request.contextPath}/customer?action=view&id=${customer.enterpriseId}" class="customer-name-link">${fn:escapeXml(customer.enterpriseName)}</a>
+                                            <a href="${pageContext.request.contextPath}/customer?action=view&id=${customer.enterpriseId}&kind=${kind}" class="customer-name-link">${fn:escapeXml(customer.enterpriseName)}</a>
                                             <span class="cell-sub">${fn:escapeXml(customer.email)}</span>
                                         </div>
                                     </div>
@@ -386,7 +386,7 @@
                                 </td>
                                 <td>
                                     <div class="action-icons">
-                                        <button class="act-view" title="Xem chi tiết" onclick="location.href='${pageContext.request.contextPath}/customer?action=view&id=${customer.enterpriseId}'"><i class="fa-regular fa-eye"></i></button>
+                                        <button class="act-view" title="Xem chi tiết" onclick="location.href='${pageContext.request.contextPath}/customer?action=view&id=${customer.enterpriseId}&kind=${kind}'"><i class="fa-regular fa-eye"></i></button>
                                         <c:if test="${canManage}">
                                             <button class="act-edit" title="Sửa" onclick="location.href='${pageContext.request.contextPath}/customer?action=edit&id=${customer.enterpriseId}'"><i class="fa-solid fa-pen"></i></button>
                                             <button class="act-delete" title="Xóa" onclick="openDeleteModal(${customer.enterpriseId}, '${fn:escapeXml(customer.enterpriseName)}')"><i class="fa-solid fa-trash"></i></button>

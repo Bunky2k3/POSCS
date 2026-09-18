@@ -121,7 +121,11 @@
 
 
     <div class="page-container">
-        <a href="${pageContext.request.contextPath}/customer" class="back-link-top"><i class="fa-solid fa-arrow-left-long"></i> Quay lại danh sách</a>
+        <%-- Quay về ĐÚNG danh sách vừa đi ra. Thiếu tham số kind thì controller
+             coi như chiều mặc định (Khách hàng mua), nên bấm quay lại từ một
+             bản ghi chiều kia là rơi sang danh sách khác hẳn. Dùng lại đúng biến đã
+             tính cho sidebar ở trên, để mục đang sáng và danh sách quay về luôn khớp. --%>
+        <a href="${pageContext.request.contextPath}/customer?kind=${activeCustomerKind}" class="back-link-top"><i class="fa-solid fa-arrow-left-long"></i> Quay lại danh sách</a>
 
         <div class="page-header-row">
             <div>
@@ -280,7 +284,7 @@
                 </div>
 
                 <div class="action-bar">
-                    <a href="${pageContext.request.contextPath}/customer" class="btn-cancel">Hủy</a>
+                    <a href="${pageContext.request.contextPath}/customer?kind=${activeCustomerKind}" class="btn-cancel">Hủy</a>
                     <button type="submit" class="btn-primary"><i class="fa-solid fa-check me-1"></i> Tạo khách hàng</button>
                 </div>
             </form>

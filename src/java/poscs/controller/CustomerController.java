@@ -492,7 +492,11 @@ public class CustomerController extends HttpServlet {
         }
 
         customerDAO.softDelete(id);
-        response.sendRedirect(request.getContextPath() + "/customer");
+        // Quay về đúng danh sách người dùng vừa đứng: form xoá ở viewcustomerdetail.jsp
+        // gửi kèm kind, vì sau softDelete thì không đọc lại được vai của bản ghi nữa.
+        // Thiếu tham số này thì xoá một nhà cung cấp xong bị đẩy sang danh sách khách mua.
+        String kind = ROLE_SUPPLIER.equals(roleFromKind(request.getParameter("kind"))) ? "supplier" : "buyer";
+        response.sendRedirect(request.getContextPath() + "/customer?kind=" + kind);
     }
 
     /**

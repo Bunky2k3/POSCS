@@ -74,6 +74,10 @@
              sao lệch nhau dần. --%>
         <c:choose>
             <c:when test="${not empty parentContract}">
+                <%-- Quay về ĐÚNG danh sách vừa đi ra. Thiếu tham số kind thì controller
+                     coi như chiều mặc định (Hợp đồng bán), nên bấm quay lại từ một
+                     bản ghi chiều kia là rơi sang danh sách khác hẳn. Dùng lại đúng biến đã
+                     tính cho sidebar ở trên, để mục đang sáng và danh sách quay về luôn khớp. --%>
                 <a href="${pageContext.request.contextPath}/contract?action=view&id=${parentContract.contractId}" class="back-link-top"><i class="fa-solid fa-arrow-left-long"></i> Quay lại hợp đồng gốc</a>
                 <div class="page-header-row">
                     <h2>Lập phụ lục hợp đồng</h2>
@@ -91,7 +95,7 @@
                 </div>
             </c:when>
             <c:otherwise>
-                <a href="${pageContext.request.contextPath}/contract" class="back-link-top"><i class="fa-solid fa-arrow-left-long"></i> Quay lại danh sách</a>
+                <a href="${pageContext.request.contextPath}/contract?kind=${activeContractKind}" class="back-link-top"><i class="fa-solid fa-arrow-left-long"></i> Quay lại danh sách</a>
                 <div class="page-header-row">
                     <h2>Tạo hợp đồng</h2>
                     <p>Khởi tạo hợp đồng mới với khách hàng doanh nghiệp</p>
@@ -326,7 +330,7 @@
 
 
                 <div class="action-bar">
-                    <a href="${pageContext.request.contextPath}/contract" class="btn-cancel">Hủy</a>
+                    <a href="${pageContext.request.contextPath}/contract?kind=${activeContractKind}" class="btn-cancel">Hủy</a>
                     <button type="submit" class="btn-primary"><i class="fa-solid fa-check me-1"></i> Tạo hợp đồng</button>
                 </div>
             </form>

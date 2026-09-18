@@ -269,7 +269,11 @@
     </c:if>
 
     <div class="page-container">
-        <a href="${pageContext.request.contextPath}/contract" class="back-link-top"><i class="fa-solid fa-arrow-left-long"></i> Quay lại danh sách</a>
+        <%-- Quay về ĐÚNG danh sách vừa đi ra. Thiếu tham số kind thì controller
+             coi như chiều mặc định (Hợp đồng bán), nên bấm quay lại từ một
+             bản ghi chiều kia là rơi sang danh sách khác hẳn. Dùng lại đúng biến đã
+             tính cho sidebar ở trên, để mục đang sáng và danh sách quay về luôn khớp. --%>
+        <a href="${pageContext.request.contextPath}/contract?kind=${activeContractKind}" class="back-link-top"><i class="fa-solid fa-arrow-left-long"></i> Quay lại danh sách</a>
 
         <!-- ===== Header ===== -->
         <div class="detail-header card-box">
