@@ -4709,117 +4709,383 @@ INSERT INTO enterprisecontacts (enterprise_id, contact_last_name, contact_middle
 INSERT INTO enterprisecontacts (enterprise_id, contact_last_name, contact_middle_name, contact_first_name, contact_phone, contact_email, position) VALUES
 ((SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0012'), 'Đặng', 'Thị', 'Nga', '0912000012', 'nga.dt@gpmxunghe.example.com', 'Giám đốc Chi nhánh');
 
--- ===== Hợp đồng (15) =====
--- Ngày tháng trải ra có chủ đích: tính tại thời điểm gieo (14/09/2026) thì
--- HD-0005, HD-0009 và HD-0014 nằm trong vùng sắp hết hạn (dưới 90 ngày), 12
--- hợp đồng còn lại đang chạy -- để ContractDAO.computeStatus có cái mà phân
--- loại, thay vì cả bảng cùng một màu.
+-- ===== Hợp đồng =====
+-- Bộ dữ liệu này gieo cùng nội dung với migration V30 (xem file đó để biết vì
+-- sao mỗi hợp đồng có mặt ở đây). Tóm tắt: mỗi dòng bày MỘT tình huống nghiệp
+-- vụ khác nhau -- đã ký, nháp chưa chốt gì, nháp đủ điều kiện ký, đã thanh lý,
+-- chấm dứt sớm, hết hạn mà chưa thanh lý, sắp hết hạn -- vì bộ cũ để cả bảng
+-- cùng một trạng thái thì không kiểm được màn hình có hiển thị đúng hay không.
 --
--- Cố ý KHÔNG gieo hợp đồng đã hết hạn: trạng thái là hàm thuần của ngày tháng
--- nên chỉ cần để yên, vài tháng nữa nhóm sắp hết hạn sẽ tự trôi sang hết hạn
--- mà không phải sửa dữ liệu. Gieo sẵn một hợp đồng "chết" chỉ để đủ màu thì
--- ngày mai nó vẫn chết, chẳng minh hoạ được chuyển biến nào.
--- HD-0015 giữ nguyên link Drive demo cho khách.
-INSERT INTO contracts (contract_code, title, contract_type, signing_date, effective_date, end_date, enterprise_id, owner_id, attachment_url, status) VALUES
-('HD-0001', 'Cung cấp ắc quy lithium cho 45 trạm BTS', 'Cung cấp thiết bị', '2026-01-15', '2026-02-01', '2027-01-31', (SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0001'), (SELECT user_id FROM users WHERE username = 'sales4'), NULL, 'Đang hiệu lực');
-INSERT INTO contracts (contract_code, title, contract_type, signing_date, effective_date, end_date, enterprise_id, owner_id, attachment_url, status) VALUES
-('HD-0002', 'Bảo trì hệ thống nguồn năm 2026', 'Bảo trì bảo dưỡng', '2026-02-20', '2026-03-01', '2026-12-31', (SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0001'), (SELECT user_id FROM users WHERE username = 'sales4'), NULL, 'Đang hiệu lực');
-INSERT INTO contracts (contract_code, title, contract_type, signing_date, effective_date, end_date, enterprise_id, owner_id, attachment_url, status) VALUES
-('HD-0003', 'Cung cấp thiết bị 5G CPE cho vùng phủ mới', 'Cung cấp thiết bị', '2026-03-10', '2026-03-15', '2027-03-14', (SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0002'), (SELECT user_id FROM users WHERE username = 'sales2'), NULL, 'Đang hiệu lực');
-INSERT INTO contracts (contract_code, title, contract_type, signing_date, effective_date, end_date, enterprise_id, owner_id, attachment_url, status) VALUES
-('HD-0004', 'Cung cấp tủ nguồn POSTEF cho nhà máy', 'Cung cấp thiết bị', '2026-04-05', '2026-04-15', '2027-04-14', (SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0003'), (SELECT user_id FROM users WHERE username = 'sales3'), NULL, 'Đang hiệu lực');
-INSERT INTO contracts (contract_code, title, contract_type, signing_date, effective_date, end_date, enterprise_id, owner_id, attachment_url, status) VALUES
-('HD-0005', 'Thi công tuyến cáp quang ADSS Hạ Long - Cẩm Phả', 'Thi công lắp đặt', '2026-05-12', '2026-06-01', '2026-11-30', (SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0004'), (SELECT user_id FROM users WHERE username = 'sales4'), NULL, 'Đang hiệu lực');
-INSERT INTO contracts (contract_code, title, contract_type, signing_date, effective_date, end_date, enterprise_id, owner_id, attachment_url, status) VALUES
-('HD-0006', 'Bảo trì hệ thống UPS 2026-2027', 'Bảo trì bảo dưỡng', '2026-06-01', '2026-06-15', '2027-06-14', (SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0004'), (SELECT user_id FROM users WHERE username = 'sales4'), NULL, 'Đang hiệu lực');
-INSERT INTO contracts (contract_code, title, contract_type, signing_date, effective_date, end_date, enterprise_id, owner_id, attachment_url, status) VALUES
-('HD-0007', 'Cung cấp hệ thống nguồn cho KCN Phố Nối', 'Cung cấp thiết bị', '2026-02-28', '2026-03-10', '2027-03-09', (SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0005'), (SELECT user_id FROM users WHERE username = 'sales5'), NULL, 'Đang hiệu lực');
-INSERT INTO contracts (contract_code, title, contract_type, signing_date, effective_date, end_date, enterprise_id, owner_id, attachment_url, status) VALUES
-('HD-0008', 'Cung cấp phụ kiện quang cho mạng truy nhập', 'Cung cấp thiết bị', '2026-07-01', '2026-07-10', '2027-07-09', (SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0006'), (SELECT user_id FROM users WHERE username = 'sales6'), NULL, 'Đang hiệu lực');
-INSERT INTO contracts (contract_code, title, contract_type, signing_date, effective_date, end_date, enterprise_id, owner_id, attachment_url, status) VALUES
-('HD-0009', 'Thi công hệ thống pin mặt trời trạm Việt Trì', 'Thi công lắp đặt', '2026-03-20', '2026-04-01', '2026-09-30', (SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0007'), (SELECT user_id FROM users WHERE username = 'sales4'), NULL, 'Đang hiệu lực');
-INSERT INTO contracts (contract_code, title, contract_type, signing_date, effective_date, end_date, enterprise_id, owner_id, attachment_url, status) VALUES
-('HD-0010', 'Cung cấp nguồn UNIPOWER cho khu sản xuất', 'Cung cấp thiết bị', '2025-12-10', '2026-01-01', '2026-12-31', (SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0008'), (SELECT user_id FROM users WHERE username = 'sales2'), NULL, 'Đang hiệu lực');
-INSERT INTO contracts (contract_code, title, contract_type, signing_date, effective_date, end_date, enterprise_id, owner_id, attachment_url, status) VALUES
-('HD-0011', 'Phân phối cáp quang khu vực Lạng Sơn', 'Cung cấp thiết bị', '2026-06-18', '2026-07-01', '2027-06-30', (SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0009'), (SELECT user_id FROM users WHERE username = 'sales3'), NULL, 'Đang hiệu lực');
-INSERT INTO contracts (contract_code, title, contract_type, signing_date, effective_date, end_date, enterprise_id, owner_id, attachment_url, status) VALUES
-('HD-0012', 'Phân phối dây thuê bao khu vực Lào Cai', 'Cung cấp thiết bị', '2026-05-05', '2026-05-15', '2027-05-14', (SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0010'), (SELECT user_id FROM users WHERE username = 'sales4'), NULL, 'Đang hiệu lực');
-INSERT INTO contracts (contract_code, title, contract_type, signing_date, effective_date, end_date, enterprise_id, owner_id, attachment_url, status) VALUES
-('HD-0013', 'Cung cấp UPS EATON cho hệ thống ven biển', 'Cung cấp thiết bị', '2026-04-22', '2026-05-01', '2027-04-30', (SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0011'), (SELECT user_id FROM users WHERE username = 'sales5'), NULL, 'Đang hiệu lực');
-INSERT INTO contracts (contract_code, title, contract_type, signing_date, effective_date, end_date, enterprise_id, owner_id, attachment_url, status) VALUES
-('HD-0014', 'Bảo trì hệ thống nguồn khu vực Nghệ An', 'Bảo trì bảo dưỡng', '2026-01-08', '2026-02-01', '2026-10-31', (SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0012'), (SELECT user_id FROM users WHERE username = 'sales6'), NULL, 'Đang hiệu lực');
-INSERT INTO contracts (contract_code, title, contract_type, signing_date, effective_date, end_date, enterprise_id, owner_id, attachment_url, status) VALUES
-('HD-0015', 'Cung cấp sợi quang G657A1 cho đại lý', 'Cung cấp thiết bị', '2026-08-01', '2026-08-15', '2027-08-14', (SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0009'), (SELECT user_id FROM users WHERE username = 'sales3'), 'https://drive.google.com/file/d/1lAoND44iEzSuLYnXEj7DfHNGJfHMDcBD/view?usp=sharing', 'Đang hiệu lực');
+-- MỐC THỜI GIAN TÍNH TỪ CURDATE(): trạng thái theo lịch là hàm của ngày tháng,
+-- nên ngày cứng nghĩa là vài tháng nữa cả bộ trôi sang "Đã hết hạn".
+--
+-- Chiều MUA không có ở đây: nhà cung cấp NCC-* và tài khoản sales1 do migration
+-- V28/V12 gieo, chưa tồn tại ở thời điểm file này chạy. Các khối bên dưới đều
+-- là INSERT ... SELECT ... JOIN nên dòng thiếu tham chiếu tự rơi ra.
+INSERT INTO contracts
+  (contract_code, title, contract_type, direction, progress_status, signing_date, effective_date, end_date,
+   enterprise_id, owner_id, status, contract_value,
+   signer_name, signer_position, counterparty_signer_name, counterparty_signer_position, signing_place)
+SELECT x.code, x.title, x.ctype, x.direction, x.progress, x.sign_date, x.eff_date, x.end_date,
+       e.enterprise_id, u.user_id, x.status, x.value,
+       x.signer, x.signer_pos, x.cp_signer, x.cp_signer_pos, x.place
+FROM (
+    -- 1. Thẳng thớm nhất: đã ký, đang chạy, kỳ thu khớp đúng giá trị.
+    SELECT N'01/2026/HĐKT-POSTEF' code, N'Cung cấp ắc quy lithium cho 45 trạm BTS' title,
+           N'Cung cấp thiết bị' ctype, N'Bán' direction, N'Đã ký' progress,
+           DATE_SUB(CURDATE(), INTERVAL 70 DAY) sign_date, DATE_SUB(CURDATE(), INTERVAL 60 DAY) eff_date,
+           DATE_ADD(CURDATE(), INTERVAL 200 DAY) end_date,
+           'KH-0001' kh, 'sales2' owner, N'Đang hiệu lực' status, 1200000000.00 value,
+           N'Nguyễn Văn Bình' signer, N'Phó Tổng Giám đốc' signer_pos,
+           N'Trần Văn Hùng' cp_signer, N'Tổng Giám đốc' cp_signer_pos, N'Hà Nội' place
+
+    -- 2. CÓ PHỤ LỤC BỔ SUNG: 1,5 tỷ + 250tr = 1,75 tỷ, kỳ thu lập đủ cho cả cụm.
+    UNION ALL SELECT N'02/2026/HĐKT-POSTEF', N'Cung cấp nguồn POSTEF cho 30 trạm vùng lõi',
+           N'Cung cấp thiết bị', N'Bán', N'Đã ký',
+           DATE_SUB(CURDATE(), INTERVAL 130 DAY), DATE_SUB(CURDATE(), INTERVAL 120 DAY),
+           DATE_ADD(CURDATE(), INTERVAL 240 DAY),
+           'KH-0001', 'sales2', N'Đang hiệu lực', 1500000000.00,
+           N'Nguyễn Văn Bình', N'Phó Tổng Giám đốc', N'Trần Văn Hùng', N'Tổng Giám đốc', N'Hà Nội'
+
+    -- 3. PHỤ LỤC GIẢM TRỪ: khách cắt bớt hạng mục, 900tr - 180tr = 720tr.
+    UNION ALL SELECT N'03/2026/HĐKT-POSTEF', N'Cung cấp tủ nguồn và ắc quy Gel cho tuyến trục',
+           N'Cung cấp thiết bị', N'Bán', N'Đã ký',
+           DATE_SUB(CURDATE(), INTERVAL 100 DAY), DATE_SUB(CURDATE(), INTERVAL 90 DAY),
+           DATE_ADD(CURDATE(), INTERVAL 150 DAY),
+           'KH-0002', 'sales3', N'Đang hiệu lực', 900000000.00,
+           N'Nguyễn Văn Bình', N'Phó Tổng Giám đốc', N'Đỗ Minh Khang', N'Giám đốc Kỹ thuật', N'Hải Phòng'
+
+    -- 4. PHỤ LỤC GIA HẠN KHÔNG ĐỔI TIỀN. Hợp đồng gốc sắp hết hạn theo lịch mà
+    --    phụ lục đã nối tiếp sang năm sau -- đúng chỗ người ta hay tưởng ngày
+    --    của cha phải chạy theo (nó KHÔNG, quyết định 2026-09-17).
+    UNION ALL SELECT N'04/2026/HĐKT-POSTEF', N'Bảo trì hệ thống nguồn 2026',
+           N'Bảo trì bảo dưỡng', N'Bán', N'Đã ký',
+           DATE_SUB(CURDATE(), INTERVAL 300 DAY), DATE_SUB(CURDATE(), INTERVAL 290 DAY),
+           DATE_ADD(CURDATE(), INTERVAL 20 DAY),
+           'KH-0003', 'sales3', N'Sắp hết hạn', 600000000.00,
+           N'Lê Thị Thanh', N'Giám đốc Kinh doanh', N'Phạm Quốc Bảo', N'Trưởng phòng Kỹ thuật', N'Bắc Ninh'
+
+    -- 5. PHỤ LỤC CÒN NHÁP: giá trị chưa đổi, nhưng phải thấy được là có cái đang treo.
+    UNION ALL SELECT N'05/2026/HĐKT-POSTEF', N'Cung cấp cáp quang ADSS tuyến liên tỉnh',
+           N'Cung cấp thiết bị', N'Bán', N'Đã ký',
+           DATE_SUB(CURDATE(), INTERVAL 50 DAY), DATE_SUB(CURDATE(), INTERVAL 40 DAY),
+           DATE_ADD(CURDATE(), INTERVAL 300 DAY),
+           'KH-0004', 'sales4', N'Đang hiệu lực', 2000000000.00,
+           N'Nguyễn Văn Bình', N'Phó Tổng Giám đốc', N'Vũ Hải Đăng', N'Tổng Giám đốc', N'Quảng Ninh'
+
+    -- 6. HAI PHỤ LỤC ĐÃ KÝ, một cộng một trừ: 1,8 tỷ + 300tr - 120tr = 1,98 tỷ.
+    UNION ALL SELECT N'06/2026/HĐKT-POSTEF', N'Thi công tuyến cáp quang Hạ Long - Cẩm Phả',
+           N'Thi công lắp đặt', N'Bán', N'Đã ký',
+           DATE_SUB(CURDATE(), INTERVAL 160 DAY), DATE_SUB(CURDATE(), INTERVAL 150 DAY),
+           DATE_ADD(CURDATE(), INTERVAL 120 DAY),
+           'KH-0005', 'sales4', N'Đang hiệu lực', 1800000000.00,
+           N'Lê Thị Thanh', N'Giám đốc Kinh doanh', N'Hoàng Trọng Nghĩa', N'Phó Giám đốc', N'Quảng Ninh'
+
+    -- 7. KỲ THU LỆCH GIÁ TRỊ: mới lập 500tr trên 750tr -- màn hình phải cảnh báo.
+    UNION ALL SELECT N'07/2026/HĐKT-POSTEF', N'Cung cấp UPS EATON cho trung tâm dữ liệu',
+           N'Cung cấp thiết bị', N'Bán', N'Đã ký',
+           DATE_SUB(CURDATE(), INTERVAL 30 DAY), DATE_SUB(CURDATE(), INTERVAL 20 DAY),
+           DATE_ADD(CURDATE(), INTERVAL 180 DAY),
+           'KH-0006', 'sales5', N'Đang hiệu lực', 750000000.00,
+           N'Nguyễn Văn Bình', N'Phó Tổng Giám đốc', N'Ngô Thị Vân', N'Giám đốc', N'Hà Nội'
+
+    -- 8. ĐÃ THANH LÝ: đóng băng, không sửa và không lập phụ lục được nữa.
+    UNION ALL SELECT N'08/2026/HĐKT-POSTEF', N'Cung cấp pin mặt trời cho trạm vùng sâu',
+           N'Cung cấp thiết bị', N'Bán', N'Đã thanh lý',
+           DATE_SUB(CURDATE(), INTERVAL 400 DAY), DATE_SUB(CURDATE(), INTERVAL 390 DAY),
+           DATE_SUB(CURDATE(), INTERVAL 10 DAY),
+           'KH-0007', 'sales4', N'Đã hết hạn', 450000000.00,
+           N'Lê Thị Thanh', N'Giám đốc Kinh doanh', N'Đinh Công Tráng', N'Giám đốc', N'Phú Thọ'
+
+    -- 9. CHẤM DỨT SỚM: theo lịch vẫn còn hiệu lực -- đúng chỗ hai trục lệch nhau.
+    UNION ALL SELECT N'09/2026/HĐKT-POSTEF', N'Cung cấp dây thuê bao đệm chặt',
+           N'Cung cấp thiết bị', N'Bán', N'Chấm dứt sớm',
+           DATE_SUB(CURDATE(), INTERVAL 120 DAY), DATE_SUB(CURDATE(), INTERVAL 110 DAY),
+           DATE_ADD(CURDATE(), INTERVAL 250 DAY),
+           'KH-0008', 'sales5', N'Đang hiệu lực', 1100000000.00,
+           N'Nguyễn Văn Bình', N'Phó Tổng Giám đốc', N'Tạ Quang Huy', N'Tổng Giám đốc', N'Thái Nguyên'
+
+    -- 10. NHÁP CHƯA CHỐT GÌ: không thời hạn, không giá (V26 cho phép) -- và vì
+    --     thế KHÔNG ký được. Bản nháp thật lúc mới soạn trông đúng như vậy.
+    UNION ALL SELECT N'10/2026/HĐKT-POSTEF', N'Cung cấp thiết bị đo kiểm tuyến quang (đang đàm phán)',
+           N'Cung cấp thiết bị', N'Bán', N'Nháp',
+           NULL, NULL, NULL,
+           'KH-0009', 'sales3', N'Chưa hiệu lực', NULL,
+           NULL, NULL, NULL, NULL, NULL
+
+    -- 11. NHÁP ĐÃ ĐỦ ĐIỀU KIỆN KÝ: có thời hạn, có giá -- bấm Ký là chạy.
+    UNION ALL SELECT N'11/2026/HĐKT-POSTEF', N'Cung cấp cáp quang kéo cống cho khu công nghiệp',
+           N'Cung cấp thiết bị', N'Bán', N'Nháp',
+           NULL, DATE_ADD(CURDATE(), INTERVAL 15 DAY), DATE_ADD(CURDATE(), INTERVAL 380 DAY),
+           'KH-0010', 'sales6', N'Chưa hiệu lực', 980000000.00,
+           NULL, NULL, NULL, NULL, NULL
+
+    -- 12. HẾT HẠN THEO LỊCH MÀ CHƯA THANH LÝ -- việc còn tồn, có cảnh báo riêng.
+    UNION ALL SELECT N'12/2026/HĐKT-POSTEF', N'Bảo trì hệ thống UPS 2025-2026',
+           N'Bảo trì bảo dưỡng', N'Bán', N'Đã ký',
+           DATE_SUB(CURDATE(), INTERVAL 380 DAY), DATE_SUB(CURDATE(), INTERVAL 370 DAY),
+           DATE_SUB(CURDATE(), INTERVAL 5 DAY),
+           'KH-0011', 'sales6', N'Đã hết hạn', 1350000000.00,
+           N'Lê Thị Thanh', N'Giám đốc Kinh doanh', N'Bùi Xuân Trường', N'Giám đốc', N'Thanh Hóa'
+
+    -- 13. SẮP HẾT HẠN: rơi vào bảng "hợp đồng sắp hết hạn" ở Dashboard.
+    UNION ALL SELECT N'13/2026/HĐKT-POSTEF', N'Thi công lắp đặt tuyến cáp treo nội thị',
+           N'Thi công lắp đặt', N'Bán', N'Đã ký',
+           DATE_SUB(CURDATE(), INTERVAL 200 DAY), DATE_SUB(CURDATE(), INTERVAL 190 DAY),
+           DATE_ADD(CURDATE(), INTERVAL 12 DAY),
+           'KH-0012', 'sales2', N'Sắp hết hạn', 820000000.00,
+           N'Nguyễn Văn Bình', N'Phó Tổng Giám đốc', N'Lương Thế Vinh', N'Phó Tổng Giám đốc', N'Nghệ An'
+
+    -- 14. Hợp đồng mang LINK DRIVE DEMO, và là hợp đồng duy nhất có UỶ QUYỀN:
+    --     người ký bên khách không phải đại diện pháp luật, nên ô "Căn cứ uỷ
+    --     quyền" mới có chỗ hiện ra (nó chỉ hiện khi có giá trị). Hai thứ đó
+    --     điền ở câu UPDATE ngay bên dưới.
+    UNION ALL SELECT N'14/2026/HĐKT-POSTEF', N'Cung cấp sợi quang G657A1 cho đại lý',
+           N'Cung cấp thiết bị', N'Bán', N'Đã ký',
+           DATE_SUB(CURDATE(), INTERVAL 45 DAY), DATE_SUB(CURDATE(), INTERVAL 35 DAY),
+           DATE_ADD(CURDATE(), INTERVAL 330 DAY),
+           'KH-0009', 'sales3', N'Đang hiệu lực', 1450000000.00,
+           N'Nguyễn Văn Bình', N'Phó Tổng Giám đốc', N'Hoàng Văn Phúc', N'Trưởng phòng Mua hàng', N'Lạng Sơn'
+
+    -- ===== Chiều MUA =====
+    -- Đối tác là NHÀ CUNG CẤP (NCC-*, seed ở V28), loại hợp đồng lấy từ
+    -- BUY_CONTRACT_TYPES, người phụ trách là sales1 -- nhóm mua vào không chia
+    -- theo địa bàn nên không rải cho đội bán hàng theo tỉnh.
+    -- 15. Mua vật tư đầu vào, đã ký, tiền trả theo hai kỳ.
+    UNION ALL SELECT N'01/2026/HĐMB-POSTEF', N'Mua sợi quang và vật liệu chế tạo cáp',
+           N'Mua vật tư', N'Mua', N'Đã ký',
+           DATE_SUB(CURDATE(), INTERVAL 140 DAY), DATE_SUB(CURDATE(), INTERVAL 130 DAY),
+           DATE_ADD(CURDATE(), INTERVAL 230 DAY),
+           'NCC-001', 'sales1', N'Đang hiệu lực', 3200000000.00,
+           N'Trần Đại Nghĩa', N'Giám đốc Cung ứng', N'Phan Văn Đông', N'Tổng Giám đốc', N'Hà Nội'
+
+    -- 16. Mua thiết bị + PHỤ LỤC BỔ SUNG -- phụ lục không phải chuyện riêng của
+    --     hợp đồng bán, nên bộ dữ liệu phải có ít nhất một cái ở chiều mua.
+    UNION ALL SELECT N'02/2026/HĐMB-POSTEF', N'Mua module quang và thiết bị đo kiểm',
+           N'Mua thiết bị', N'Mua', N'Đã ký',
+           DATE_SUB(CURDATE(), INTERVAL 90 DAY), DATE_SUB(CURDATE(), INTERVAL 80 DAY),
+           DATE_ADD(CURDATE(), INTERVAL 280 DAY),
+           'NCC-002', 'sales1', N'Đang hiệu lực', 1600000000.00,
+           N'Trần Đại Nghĩa', N'Giám đốc Cung ứng', N'Nguyễn Tân Tiến', N'Giám đốc', N'Hà Nội'
+
+    -- 17. Nháp chiều mua: bộ lọc theo kỳ lọc trên signing_date nên bản nháp rơi
+    --     ra ngoài -- đúng nghĩa, và cần có dữ liệu để nhìn thấy điều đó.
+    UNION ALL SELECT N'03/2026/HĐMB-POSTEF', N'Thuê bảo trì hệ thống máy nén khí (đang đàm phán)',
+           N'Thuê bảo trì', N'Mua', N'Nháp',
+           NULL, DATE_ADD(CURDATE(), INTERVAL 30 DAY), DATE_ADD(CURDATE(), INTERVAL 395 DAY),
+           'NCC-004', 'sales1', N'Chưa hiệu lực', 500000000.00,
+           NULL, NULL, NULL, NULL, NULL
+) x
+JOIN enterprises e ON e.enterprise_code = x.kh
+JOIN users u ON u.username = x.owner;
+
+-- Uỷ quyền + link đính kèm: chỉ một hợp đồng, nên đặt riêng cho gọn.
+-- LINK DEMO, CỐ Ý GIỮ: nó trỏ vào một PDF catalogue công khai trên Drive, dùng
+-- để trình diễn tính năng đính kèm cho khách. Đừng "dọn" nó đi.
+UPDATE contracts
+   SET authorization_ref = N'GUQ số 05/2026 ngày 10/01/2026',
+       attachment_url = 'https://drive.google.com/file/d/1lAoND44iEzSuLYnXEj7DfHNGJfHMDcBD/view'
+ WHERE contract_code = N'14/2026/HĐKT-POSTEF';
+
+-- Uỷ quyền + link Drive demo cho khách -- CỐ Ý GIỮ, không phải dữ liệu rác.
+UPDATE contracts
+   SET authorization_ref = N'GUQ số 05/2026 ngày 10/01/2026',
+       attachment_url = 'https://drive.google.com/file/d/1lAoND44iEzSuLYnXEj7DfHNGJfHMDcBD/view'
+ WHERE contract_code = N'14/2026/HĐKT-POSTEF';
+
+-- ===== Phụ lục =====
+-- contract_value trên dòng phụ lục là CHÊNH LỆCH CÓ DẤU: dương = bổ sung, âm =
+-- giảm trừ, NULL = không đụng tới tiền. Giá trị hiện hành của hợp đồng gốc
+-- được cộng lúc đọc; bản ghi cha giữ nguyên con số đã ký.
+INSERT INTO contracts
+  (parent_contract_id, contract_code, title, contract_type, direction, progress_status,
+   signing_date, effective_date, end_date, enterprise_id, owner_id, status, contract_value,
+   signer_name, signer_position, counterparty_signer_name, counterparty_signer_position, signing_place)
+SELECT p.contract_id, x.code, x.title, p.contract_type, p.direction, x.progress,
+       x.sign_date, x.eff_date, x.end_date, p.enterprise_id, p.owner_id, x.status, x.value,
+       p.signer_name, p.signer_position, p.counterparty_signer_name, p.counterparty_signer_position,
+       p.signing_place
+FROM (
+    -- Bổ sung 250tr: 1,5 tỷ -> 1,75 tỷ.
+    SELECT N'02/2026/HĐKT-POSTEF' parent, N'02/2026/HĐKT-POSTEF/PL01' code,
+           N'Phụ lục 01 — bổ sung 8 tủ nguồn ngoài trời' title, N'Đã ký' progress,
+           DATE_SUB(CURDATE(), INTERVAL 40 DAY) sign_date, DATE_SUB(CURDATE(), INTERVAL 35 DAY) eff_date,
+           DATE_ADD(CURDATE(), INTERVAL 240 DAY) end_date, N'Đang hiệu lực' status, 250000000.00 value
+
+    -- Giảm trừ 180tr: khách bỏ bớt hạng mục, 900tr -> 720tr.
+    UNION ALL SELECT N'03/2026/HĐKT-POSTEF', N'03/2026/HĐKT-POSTEF/PL01',
+           N'Phụ lục 01 — giảm trừ hạng mục ắc quy Gel', N'Đã ký',
+           DATE_SUB(CURDATE(), INTERVAL 25 DAY), DATE_SUB(CURDATE(), INTERVAL 20 DAY),
+           DATE_ADD(CURDATE(), INTERVAL 150 DAY), N'Đang hiệu lực', -180000000.00
+
+    -- Gia hạn thuần: KHÔNG đổi tiền (value NULL) và KHÔNG kéo dài ngày kết thúc
+    -- của hợp đồng cha -- thời hạn mới nằm trên chính phụ lục này.
+    UNION ALL SELECT N'04/2026/HĐKT-POSTEF', N'04/2026/HĐKT-POSTEF/PL01',
+           N'Phụ lục 01 — gia hạn bảo trì sang năm 2027', N'Đã ký',
+           DATE_SUB(CURDATE(), INTERVAL 10 DAY), DATE_ADD(CURDATE(), INTERVAL 21 DAY),
+           DATE_ADD(CURDATE(), INTERVAL 385 DAY), N'Chưa hiệu lực', NULL
+
+    -- CÒN NHÁP: chưa ai ký nên 400tr này CHƯA cộng vào hợp đồng gốc.
+    UNION ALL SELECT N'05/2026/HĐKT-POSTEF', N'05/2026/HĐKT-POSTEF/PL01',
+           N'Phụ lục 01 — bổ sung 12km cáp ADSS (chờ ký)', N'Nháp',
+           NULL, DATE_ADD(CURDATE(), INTERVAL 10 DAY),
+           DATE_ADD(CURDATE(), INTERVAL 300 DAY), N'Chưa hiệu lực', 400000000.00
+
+    -- Hai phụ lục trên cùng một hợp đồng: +300tr rồi -120tr.
+    UNION ALL SELECT N'06/2026/HĐKT-POSTEF', N'06/2026/HĐKT-POSTEF/PL01',
+           N'Phụ lục 01 — bổ sung 3km tuyến nhánh', N'Đã ký',
+           DATE_SUB(CURDATE(), INTERVAL 80 DAY), DATE_SUB(CURDATE(), INTERVAL 75 DAY),
+           DATE_ADD(CURDATE(), INTERVAL 120 DAY), N'Đang hiệu lực', 300000000.00
+    UNION ALL SELECT N'06/2026/HĐKT-POSTEF', N'06/2026/HĐKT-POSTEF/PL02',
+           N'Phụ lục 02 — giảm trừ phần hoàn trả mặt bằng', N'Đã ký',
+           DATE_SUB(CURDATE(), INTERVAL 15 DAY), DATE_SUB(CURDATE(), INTERVAL 10 DAY),
+           DATE_ADD(CURDATE(), INTERVAL 120 DAY), N'Đang hiệu lực', -120000000.00
+
+    -- Phụ lục ở chiều MUA.
+    UNION ALL SELECT N'02/2026/HĐMB-POSTEF', N'02/2026/HĐMB-POSTEF/PL01',
+           N'Phụ lục 01 — bổ sung 40 module quang 10G', N'Đã ký',
+           DATE_SUB(CURDATE(), INTERVAL 20 DAY), DATE_SUB(CURDATE(), INTERVAL 15 DAY),
+           DATE_ADD(CURDATE(), INTERVAL 280 DAY), N'Đang hiệu lực', 220000000.00
+) x
+JOIN contracts p ON p.contract_code = x.parent AND p.parent_contract_id IS NULL;
 
 -- ===== Hàng hoá trong hợp đồng =====
-INSERT INTO contractproducts (contract_id, product_id, quantity, unit, notes) VALUES
-((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0001'), 1, 45, 'Bình', 'Mỗi trạm BTS một bình');
-INSERT INTO contractproducts (contract_id, product_id, quantity, unit, notes) VALUES
-((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0001'), 6, 8, 'Tủ', 'Tủ nguồn đi kèm');
-INSERT INTO contractproducts (contract_id, product_id, quantity, unit, notes) VALUES
-((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0002'), 6, 12, 'Tủ', 'Thiết bị trong phạm vi bảo trì');
-INSERT INTO contractproducts (contract_id, product_id, quantity, unit, notes) VALUES
-((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0003'), 10, 4200, 'Mét', 'Cáp ADSS phục vụ đấu nối');
-INSERT INTO contractproducts (contract_id, product_id, quantity, unit, notes) VALUES
-((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0004'), 6, 15, 'Tủ', 'Tủ nguồn POSTEF');
-INSERT INTO contractproducts (contract_id, product_id, quantity, unit, notes) VALUES
-((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0004'), 4, 30, 'Bình', 'Ắc quy acid chì kín');
-INSERT INTO contractproducts (contract_id, product_id, quantity, unit, notes) VALUES
-((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0005'), 10, 12500, 'Mét', 'Cáp ADSS tuyến chính');
-INSERT INTO contractproducts (contract_id, product_id, quantity, unit, notes) VALUES
-((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0006'), 8, 6, 'Bộ', 'UPS trong phạm vi bảo trì');
-INSERT INTO contractproducts (contract_id, product_id, quantity, unit, notes) VALUES
-((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0007'), 6, 8, 'Tủ', 'Tủ nguồn khu công nghiệp');
-INSERT INTO contractproducts (contract_id, product_id, quantity, unit, notes) VALUES
-((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0007'), 2, 16, 'Bình', 'Ắc quy lưu động');
-INSERT INTO contractproducts (contract_id, product_id, quantity, unit, notes) VALUES
-((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0008'), 11, 6800, 'Mét', 'Cáp quang bọc chặt');
-INSERT INTO contractproducts (contract_id, product_id, quantity, unit, notes) VALUES
-((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0009'), 9, 120, 'Cái', 'Tấm pin mặt trời');
-INSERT INTO contractproducts (contract_id, product_id, quantity, unit, notes) VALUES
-((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0010'), 7, 10, 'Tủ', 'Nguồn UNIPOWER');
-INSERT INTO contractproducts (contract_id, product_id, quantity, unit, notes) VALUES
-((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0011'), 12, 15000, 'Mét', 'Cáp quang kéo cống');
-INSERT INTO contractproducts (contract_id, product_id, quantity, unit, notes) VALUES
-((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0012'), 14, 9000, 'Mét', 'Dây thuê bao đệm chặt');
-INSERT INTO contractproducts (contract_id, product_id, quantity, unit, notes) VALUES
-((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0013'), 8, 4, 'Bộ', 'UPS EATON');
-INSERT INTO contractproducts (contract_id, product_id, quantity, unit, notes) VALUES
-((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0014'), 6, 9, 'Tủ', 'Tủ nguồn trong phạm vi bảo trì');
-INSERT INTO contractproducts (contract_id, product_id, quantity, unit, notes) VALUES
-((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0015'), 13, 20000, 'Mét', 'Sợi quang G657A1');
+INSERT INTO contractproducts (contract_id, product_id, quantity, unit, notes)
+SELECT c.contract_id, p.product_id, x.qty, x.unit, x.note
+FROM (
+    SELECT N'01/2026/HĐKT-POSTEF' code, 'SP-0001' sp, 90 qty, N'Bình' unit, N'Ắc quy lithium 48V/100Ah' note
+    UNION ALL SELECT N'01/2026/HĐKT-POSTEF', 'SP-0006', 45, N'Bộ', N'Nguồn POSTEF cho trạm BTS'
+    UNION ALL SELECT N'02/2026/HĐKT-POSTEF', 'SP-0006', 30, N'Bộ', N'Nguồn POSTEF vùng lõi'
+    UNION ALL SELECT N'02/2026/HĐKT-POSTEF', 'SP-0007', 30, N'Bộ', N'Nguồn UNIPOWER dự phòng'
+    UNION ALL SELECT N'03/2026/HĐKT-POSTEF', 'SP-0003', 60, N'Bình', N'Ắc quy Gel'
+    UNION ALL SELECT N'04/2026/HĐKT-POSTEF', 'SP-0008', 12, N'Bộ', N'UPS EATON trong phạm vi bảo trì'
+    UNION ALL SELECT N'05/2026/HĐKT-POSTEF', 'SP-0010', 42000, N'Mét', N'Cáp ADSS tuyến liên tỉnh'
+    UNION ALL SELECT N'06/2026/HĐKT-POSTEF', 'SP-0010', 25000, N'Mét', N'Cáp ADSS tuyến Hạ Long - Cẩm Phả'
+    UNION ALL SELECT N'07/2026/HĐKT-POSTEF', 'SP-0008', 8, N'Bộ', N'UPS EATON cho trung tâm dữ liệu'
+    UNION ALL SELECT N'08/2026/HĐKT-POSTEF', 'SP-0009', 120, N'Tấm', N'Pin mặt trời cho trạm vùng sâu'
+    UNION ALL SELECT N'09/2026/HĐKT-POSTEF', 'SP-0014', 30000, N'Mét', N'Dây thuê bao đệm chặt'
+    UNION ALL SELECT N'11/2026/HĐKT-POSTEF', 'SP-0012', 18000, N'Mét', N'Cáp quang kéo cống'
+    UNION ALL SELECT N'12/2026/HĐKT-POSTEF', 'SP-0008', 20, N'Bộ', N'UPS trong phạm vi bảo trì'
+    UNION ALL SELECT N'13/2026/HĐKT-POSTEF', 'SP-0013', 22000, N'Mét', N'Cáp quang treo kim loại'
+    UNION ALL SELECT N'14/2026/HĐKT-POSTEF', 'SP-0013', 20000, N'Mét', N'Sợi quang G657A1'
+    UNION ALL SELECT N'01/2026/HĐMB-POSTEF', 'SP-0011', 60000, N'Mét', N'Cáp quang bọc chặt mua vào'
+    UNION ALL SELECT N'02/2026/HĐMB-POSTEF', 'SP-0012', 25000, N'Mét', N'Cáp quang kéo cống mua vào'
+    -- Hàng hoá của phụ lục treo vào chính PHỤ LỤC, không vào hợp đồng gốc: nội
+    -- dung hợp đồng đã ký là chứng cứ, phần bổ sung nằm ở văn bản sửa đổi.
+    UNION ALL SELECT N'02/2026/HĐKT-POSTEF/PL01', 'SP-0006', 8, N'Bộ', N'Tủ nguồn ngoài trời bổ sung'
+    UNION ALL SELECT N'06/2026/HĐKT-POSTEF/PL01', 'SP-0010', 3000, N'Mét', N'Tuyến nhánh bổ sung'
+    UNION ALL SELECT N'02/2026/HĐMB-POSTEF/PL01', 'SP-0012', 4000, N'Mét', N'Phần mua thêm theo phụ lục'
+) x
+JOIN contracts c ON c.contract_code = x.code
+JOIN products p ON p.product_code = x.sp;
 
 -- ===== Thanh toán =====
--- Có cả kỳ đã trả và kỳ chưa tới hạn để Dashboard doanh thu và cảnh báo công
--- nợ đều có dữ liệu.
-INSERT INTO contract_payments (contract_id, invoice_amount, due_date, paid_date) VALUES
-((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0001'), 850000000, '2026-03-01', '2026-02-26');
-INSERT INTO contract_payments (contract_id, invoice_amount, due_date, paid_date) VALUES
-((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0001'), 850000000, '2026-09-01', NULL);
-INSERT INTO contract_payments (contract_id, invoice_amount, due_date, paid_date) VALUES
-((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0003'), 1200000000, '2026-04-15', '2026-04-12');
-INSERT INTO contract_payments (contract_id, invoice_amount, due_date, paid_date) VALUES
-((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0004'), 640000000, '2026-05-15', '2026-05-10');
-INSERT INTO contract_payments (contract_id, invoice_amount, due_date, paid_date) VALUES
-((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0005'), 2100000000, '2026-07-01', '2026-06-28');
-INSERT INTO contract_payments (contract_id, invoice_amount, due_date, paid_date) VALUES
-((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0005'), 2100000000, '2026-10-01', NULL);
-INSERT INTO contract_payments (contract_id, invoice_amount, due_date, paid_date) VALUES
-((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0007'), 1750000000, '2026-04-10', '2026-04-05');
-INSERT INTO contract_payments (contract_id, invoice_amount, due_date, paid_date) VALUES
-((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0008'), 430000000, '2026-08-10', NULL);
-INSERT INTO contract_payments (contract_id, invoice_amount, due_date, paid_date) VALUES
-((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0009'), 980000000, '2026-05-01', '2026-04-28');
-INSERT INTO contract_payments (contract_id, invoice_amount, due_date, paid_date) VALUES
-((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0010'), 720000000, '2026-02-01', '2026-01-29');
-INSERT INTO contract_payments (contract_id, invoice_amount, due_date, paid_date) VALUES
-((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0011'), 560000000, '2026-08-01', '2026-07-30');
-INSERT INTO contract_payments (contract_id, invoice_amount, due_date, paid_date) VALUES
-((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0012'), 380000000, '2026-06-15', NULL);
-INSERT INTO contract_payments (contract_id, invoice_amount, due_date, paid_date) VALUES
-((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0013'), 890000000, '2026-06-01', '2026-05-27');
-INSERT INTO contract_payments (contract_id, invoice_amount, due_date, paid_date) VALUES
-((SELECT contract_id FROM contracts WHERE contract_code = 'HD-0015'), 1450000000, '2026-09-15', NULL);
+INSERT INTO contract_payments (contract_id, invoice_amount, due_date, paid_date)
+SELECT c.contract_id, x.amount, x.due, x.paid
+FROM (
+    -- 01: 1,2 tỷ = 700tr (đã thu) + 500tr (chưa tới hạn)
+    SELECT N'01/2026/HĐKT-POSTEF' code, 700000000.00 amount,
+           DATE_SUB(CURDATE(), INTERVAL 30 DAY) due, DATE_SUB(CURDATE(), INTERVAL 28 DAY) paid
+    UNION ALL SELECT N'01/2026/HĐKT-POSTEF', 500000000.00, DATE_ADD(CURDATE(), INTERVAL 60 DAY), NULL
+    -- 02: KHỚP CẢ CỤM -- 1,5 tỷ của hợp đồng gốc + 250tr lập trên phụ lục.
+    UNION ALL SELECT N'02/2026/HĐKT-POSTEF', 900000000.00, DATE_SUB(CURDATE(), INTERVAL 60 DAY), DATE_SUB(CURDATE(), INTERVAL 55 DAY)
+    UNION ALL SELECT N'02/2026/HĐKT-POSTEF', 600000000.00, DATE_ADD(CURDATE(), INTERVAL 30 DAY), NULL
+    UNION ALL SELECT N'02/2026/HĐKT-POSTEF/PL01', 250000000.00, DATE_ADD(CURDATE(), INTERVAL 90 DAY), NULL
+    -- 03: 720tr sau giảm trừ -- kỳ thu lập đúng phần còn lại.
+    UNION ALL SELECT N'03/2026/HĐKT-POSTEF', 720000000.00, DATE_ADD(CURDATE(), INTERVAL 20 DAY), NULL
+    -- 06: 1,98 tỷ sau hai phụ lục (1,2 tỷ + 600tr + 180tr).
+    UNION ALL SELECT N'06/2026/HĐKT-POSTEF', 1200000000.00, DATE_SUB(CURDATE(), INTERVAL 90 DAY), DATE_SUB(CURDATE(), INTERVAL 85 DAY)
+    UNION ALL SELECT N'06/2026/HĐKT-POSTEF', 600000000.00, DATE_ADD(CURDATE(), INTERVAL 45 DAY), NULL
+    UNION ALL SELECT N'06/2026/HĐKT-POSTEF/PL01', 180000000.00, DATE_ADD(CURDATE(), INTERVAL 60 DAY), NULL
+    -- 07: LẬP THIẾU -- 500tr trên giá trị 750tr, cảnh báo phải hiện ra.
+    UNION ALL SELECT N'07/2026/HĐKT-POSTEF', 500000000.00, DATE_ADD(CURDATE(), INTERVAL 15 DAY), NULL
+    -- 08: đã thanh lý, tiền về đủ. Khoản bảo hành giữ lại về SAU thanh lý -- cố
+    -- ý, vì ghi nhận tiền vẫn mở sau khi hợp đồng đóng băng.
+    UNION ALL SELECT N'08/2026/HĐKT-POSTEF', 400000000.00, DATE_SUB(CURDATE(), INTERVAL 200 DAY), DATE_SUB(CURDATE(), INTERVAL 195 DAY)
+    UNION ALL SELECT N'08/2026/HĐKT-POSTEF', 50000000.00, DATE_SUB(CURDATE(), INTERVAL 20 DAY), DATE_SUB(CURDATE(), INTERVAL 3 DAY)
+    -- 12: hết hạn mà chưa thanh lý, còn một kỳ quá hạn chưa thu.
+    UNION ALL SELECT N'12/2026/HĐKT-POSTEF', 900000000.00, DATE_SUB(CURDATE(), INTERVAL 150 DAY), DATE_SUB(CURDATE(), INTERVAL 145 DAY)
+    UNION ALL SELECT N'12/2026/HĐKT-POSTEF', 450000000.00, DATE_SUB(CURDATE(), INTERVAL 40 DAY), NULL
+    -- 13: sắp hết hạn, đã thu xong.
+    UNION ALL SELECT N'13/2026/HĐKT-POSTEF', 820000000.00, DATE_SUB(CURDATE(), INTERVAL 100 DAY), DATE_SUB(CURDATE(), INTERVAL 96 DAY)
+    -- 14: 1,45 tỷ, một kỳ đã thu một kỳ chưa.
+    UNION ALL SELECT N'14/2026/HĐKT-POSTEF', 1000000000.00, DATE_SUB(CURDATE(), INTERVAL 10 DAY), DATE_SUB(CURDATE(), INTERVAL 8 DAY)
+    UNION ALL SELECT N'14/2026/HĐKT-POSTEF', 450000000.00, DATE_ADD(CURDATE(), INTERVAL 80 DAY), NULL
+    -- Chiều MUA: đây là tiền mình đi TRẢ, nên không được vào doanh thu (câu
+    -- tính doanh thu lọc direction = 'Bán'); có dữ liệu ở đây để thấy điều đó.
+    UNION ALL SELECT N'01/2026/HĐMB-POSTEF', 2000000000.00, DATE_SUB(CURDATE(), INTERVAL 90 DAY), DATE_SUB(CURDATE(), INTERVAL 88 DAY)
+    UNION ALL SELECT N'01/2026/HĐMB-POSTEF', 1200000000.00, DATE_ADD(CURDATE(), INTERVAL 40 DAY), NULL
+    UNION ALL SELECT N'02/2026/HĐMB-POSTEF', 1600000000.00, DATE_SUB(CURDATE(), INTERVAL 30 DAY), DATE_SUB(CURDATE(), INTERVAL 25 DAY)
+    UNION ALL SELECT N'02/2026/HĐMB-POSTEF/PL01', 220000000.00, DATE_ADD(CURDATE(), INTERVAL 50 DAY), NULL
+) x
+JOIN contracts c ON c.contract_code = x.code;
+
+-- ===== Nhật ký hợp đồng =====
+-- Sinh theo QUY TẮC, đúng những dòng mà ContractDAO tự ghi khi các việc ấy diễn
+-- ra thật -- dữ liệu demo không được kể một câu chuyện khác với thứ hệ thống
+-- sinh ra.
+-- 1) Khởi tạo -- mọi hợp đồng đều có.
+INSERT INTO contract_history (contract_id, event_type, detail, changed_by, changed_at)
+SELECT c.contract_id, N'Khởi tạo',
+       CASE WHEN c.parent_contract_id IS NULL
+            THEN CONCAT(N'Tạo bản nháp ', c.contract_code, N' — hợp đồng ', LOWER(c.direction))
+            ELSE CONCAT(N'Tạo bản nháp phụ lục ', c.contract_code, N' — sửa đổi cho hợp đồng ',
+                        (SELECT p.contract_code FROM contracts p WHERE p.contract_id = c.parent_contract_id))
+       END,
+       c.owner_id,
+       COALESCE(c.signing_date - INTERVAL 7 DAY, CURDATE() - INTERVAL 7 DAY)
+FROM contracts c;
+
+-- 2) Ký hợp đồng -- mọi bản ghi không còn là bản nháp.
+INSERT INTO contract_history (contract_id, event_type, detail, from_status, to_status, changed_by, changed_at)
+SELECT c.contract_id, N'Ký hợp đồng', N'Nháp → Đã ký', N'Nháp', N'Đã ký', c.owner_id, c.signing_date
+FROM contracts c
+WHERE c.progress_status <> N'Nháp' AND c.signing_date IS NOT NULL;
+
+-- 3) Lập phụ lục -- ghi lên hợp đồng CHA, vì đó là chỗ người ta đi tìm.
+INSERT INTO contract_history (contract_id, event_type, detail, changed_by, changed_at)
+SELECT c.parent_contract_id, N'Lập phụ lục',
+       CONCAT(N'Lập phụ lục ', c.contract_code, N' — ', c.title),
+       c.owner_id, COALESCE(c.signing_date - INTERVAL 7 DAY, CURDATE() - INTERVAL 7 DAY)
+FROM contracts c
+WHERE c.parent_contract_id IS NOT NULL;
+
+-- 4) Điều chỉnh giá trị -- chỉ phụ lục ĐÃ KÝ và có tiền. Phụ lục còn nháp không
+--    sinh dòng này: chưa ai ký thì giá trị hợp đồng chưa đổi.
+--    Con số "hiện hành" cộng luỹ kế tới đúng phụ lục đó, nên hợp đồng có hai
+--    phụ lục để lại hai dòng kể đúng thứ tự tiền đã đổi.
+INSERT INTO contract_history (contract_id, event_type, detail, changed_by, changed_at)
+SELECT c.parent_contract_id, N'Điều chỉnh giá trị',
+       CONCAT(N'Phụ lục ', c.contract_code, N' được ký — điều chỉnh ',
+              CASE WHEN c.contract_value > 0 THEN '+' ELSE '' END,
+              REPLACE(FORMAT(c.contract_value, 0), ',', '.'), N' đ, giá trị hợp đồng hiện hành ',
+              REPLACE(FORMAT(p.contract_value + (
+                  SELECT COALESCE(SUM(s.contract_value), 0) FROM contracts s
+                  WHERE s.parent_contract_id = p.contract_id AND s.is_deleted = 0
+                    AND s.progress_status <> N'Nháp' AND s.contract_id <= c.contract_id), 0), ',', '.'),
+              N' đ (giá trị theo bản gốc đã ký: ',
+              REPLACE(FORMAT(p.contract_value, 0), ',', '.'), N' đ)'),
+       c.owner_id, c.signing_date
+FROM contracts c
+JOIN contracts p ON p.contract_id = c.parent_contract_id
+WHERE c.progress_status <> N'Nháp'
+  AND c.contract_value IS NOT NULL AND c.contract_value <> 0;
+
+-- 5) Thanh lý / chấm dứt sớm -- căn cứ (số biên bản) nằm ở cột note, đúng chỗ
+--    ContractDAO.changeProgressStatus đặt nó. KHÔNG có cột liquidated_at riêng:
+--    chính dòng này đã mang người làm và thời điểm.
+INSERT INTO contract_history (contract_id, event_type, detail, from_status, to_status, note, changed_by, changed_at)
+SELECT c.contract_id, N'Thanh lý', N'Đã ký → Đã thanh lý', N'Đã ký', N'Đã thanh lý',
+       N'Biên bản thanh lý số 12/2026/BBTL, nghiệm thu đợt cuối',
+       c.owner_id, CURDATE() - INTERVAL 8 DAY
+FROM contracts c WHERE c.progress_status = N'Đã thanh lý';
+
+INSERT INTO contract_history (contract_id, event_type, detail, from_status, to_status, note, changed_by, changed_at)
+SELECT c.contract_id, N'Chấm dứt sớm', N'Đã ký → Chấm dứt sớm', N'Đã ký', N'Chấm dứt sớm',
+       N'Hai bên thống nhất dừng do khách thay đổi quy hoạch tuyến',
+       c.owner_id, CURDATE() - INTERVAL 30 DAY
+FROM contracts c WHERE c.progress_status = N'Chấm dứt sớm';
+
 
 -- ===== Diễn biến quan hệ khách hàng =====
 INSERT INTO customer_lifecycle_events (enterprise_id, event_type, relationship_rating, is_auto_generated, description, event_date, recorded_by) VALUES
@@ -4877,37 +5143,37 @@ INSERT INTO customer_lifecycle_events (enterprise_id, event_type, relationship_r
 -- còn lại trong hạn -- để ô "sắp/đã quá hạn" trên dashboard và lịch nhắc của
 -- NotificationScheduler có việc mà làm.
 INSERT INTO technicalrequests (ticket_code, enterprise_id, contract_id, ticket_type, priority, reception_channel, sla_deadline, assigned_technician_id, created_by, created_date, description, root_cause, cause_category, is_warranty, status, resolution_summary, resolved_at) VALUES
-('TK-0001', (SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0001'), (SELECT contract_id FROM contracts WHERE contract_code = 'HD-0001'), 'Bảo hành', 'Cao', 'Điện thoại', '2026-09-20 10:00:00', (SELECT user_id FROM users WHERE username = 'kythuat2'), (SELECT user_id FROM users WHERE username = 'cskh4'), '2026-09-10', 'Ắc quy lithium tại trạm BTS Cầu Giấy báo lỗi không sạc đầy, dừng ở mức 80 phần trăm.', 'Vỏ cell ngăn số 3 nứt do va đập trong quá trình vận chuyển lên trạm, rò điện giải khiến mạch BMS chủ động ngắt sạc.', 'Do vận chuyển', 1, 'Đã đóng', 'Đã thay ngăn ắc quy bị nứt, nạp đầy và đo kiểm tải trong 2 giờ, trạm hoạt động bình thường.', '2026-09-12 16:30:00');
+('TK-0001', (SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0001'), (SELECT contract_id FROM contracts WHERE contract_code = N'01/2026/HĐKT-POSTEF'), 'Bảo hành', 'Cao', 'Điện thoại', '2026-09-20 10:00:00', (SELECT user_id FROM users WHERE username = 'kythuat2'), (SELECT user_id FROM users WHERE username = 'cskh4'), '2026-09-10', 'Ắc quy lithium tại trạm BTS Cầu Giấy báo lỗi không sạc đầy, dừng ở mức 80 phần trăm.', 'Vỏ cell ngăn số 3 nứt do va đập trong quá trình vận chuyển lên trạm, rò điện giải khiến mạch BMS chủ động ngắt sạc.', 'Do vận chuyển', 1, 'Đã đóng', 'Đã thay ngăn ắc quy bị nứt, nạp đầy và đo kiểm tải trong 2 giờ, trạm hoạt động bình thường.', '2026-09-12 16:30:00');
 INSERT INTO technicalrequests (ticket_code, enterprise_id, contract_id, ticket_type, priority, reception_channel, sla_deadline, assigned_technician_id, created_by, created_date, description, root_cause, cause_category, is_warranty, status, resolution_summary, resolved_at) VALUES
-('TK-0002', (SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0001'), (SELECT contract_id FROM contracts WHERE contract_code = 'HD-0002'), 'Bảo trì', 'Bình thường', 'Email', '2026-09-25 17:00:00', (SELECT user_id FROM users WHERE username = 'kythuat2'), (SELECT user_id FROM users WHERE username = 'cskh4'), '2026-09-05', 'Bảo trì định kỳ hệ thống nguồn quý 3 theo hợp đồng.', NULL, NULL, 0, 'Đã đóng', 'Đã vệ sinh tủ nguồn, thay 2 quạt tản nhiệt và siết lại toàn bộ đầu cốt.', '2026-09-08 16:00:00');
+('TK-0002', (SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0001'), (SELECT contract_id FROM contracts WHERE contract_code = N'02/2026/HĐKT-POSTEF'), 'Bảo trì', 'Bình thường', 'Email', '2026-09-25 17:00:00', (SELECT user_id FROM users WHERE username = 'kythuat2'), (SELECT user_id FROM users WHERE username = 'cskh4'), '2026-09-05', 'Bảo trì định kỳ hệ thống nguồn quý 3 theo hợp đồng.', NULL, NULL, 0, 'Đã đóng', 'Đã vệ sinh tủ nguồn, thay 2 quạt tản nhiệt và siết lại toàn bộ đầu cốt.', '2026-09-08 16:00:00');
 INSERT INTO technicalrequests (ticket_code, enterprise_id, contract_id, ticket_type, priority, reception_channel, sla_deadline, assigned_technician_id, created_by, created_date, description, root_cause, cause_category, is_warranty, status, resolution_summary, resolved_at) VALUES
-('TK-0003', (SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0002'), (SELECT contract_id FROM contracts WHERE contract_code = 'HD-0003'), 'Sửa chữa', 'Khẩn cấp', 'Điện thoại', '2026-09-13 09:00:00', (SELECT user_id FROM users WHERE username = 'kythuat3'), (SELECT user_id FROM users WHERE username = 'cskh2'), '2026-09-11', 'Thiết bị 5G CPE mất kết nối hoàn toàn tại 12 điểm lắp đặt sau cơn bão.', 'Nước mưa tràn vào hộp đấu nối do gioăng chống nước bị lắp ngược chiều tại cả 12 điểm.', 'Do lắp đặt', 1, 'Đang xử lý', NULL, NULL);
+('TK-0003', (SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0002'), (SELECT contract_id FROM contracts WHERE contract_code = N'03/2026/HĐKT-POSTEF'), 'Sửa chữa', 'Khẩn cấp', 'Điện thoại', '2026-09-13 09:00:00', (SELECT user_id FROM users WHERE username = 'kythuat3'), (SELECT user_id FROM users WHERE username = 'cskh2'), '2026-09-11', 'Thiết bị 5G CPE mất kết nối hoàn toàn tại 12 điểm lắp đặt sau cơn bão.', 'Nước mưa tràn vào hộp đấu nối do gioăng chống nước bị lắp ngược chiều tại cả 12 điểm.', 'Do lắp đặt', 1, 'Đang xử lý', NULL, NULL);
 INSERT INTO technicalrequests (ticket_code, enterprise_id, contract_id, ticket_type, priority, reception_channel, sla_deadline, assigned_technician_id, created_by, created_date, description, root_cause, cause_category, is_warranty, status, resolution_summary, resolved_at) VALUES
 ('TK-0004', (SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0002'), NULL, 'Tư vấn', 'Thấp', 'Website', '2026-09-30 17:00:00', (SELECT user_id FROM users WHERE username = 'kythuat2'), (SELECT user_id FROM users WHERE username = 'sales4'), '2026-09-02', 'Khách hàng hỏi giải pháp mở rộng vùng phủ 5G cho khu công nghiệp mới.', NULL, NULL, 0, 'Đã đóng', 'Đã tư vấn giải pháp 5G Outdoor kết hợp router mesh và gửi báo giá sơ bộ.', '2026-09-04 14:00:00');
 INSERT INTO technicalrequests (ticket_code, enterprise_id, contract_id, ticket_type, priority, reception_channel, sla_deadline, assigned_technician_id, created_by, created_date, description, root_cause, cause_category, is_warranty, status, resolution_summary, resolved_at) VALUES
-('TK-0005', (SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0003'), (SELECT contract_id FROM contracts WHERE contract_code = 'HD-0004'), 'Bảo hành', 'Cao', 'Điện thoại', '2026-09-15 12:00:00', (SELECT user_id FROM users WHERE username = 'kythuat4'), (SELECT user_id FROM users WHERE username = 'cskh3'), '2026-09-09', 'Tủ nguồn POSTEF báo lỗi quá nhiệt và tự ngắt 3 lần trong một tuần.', 'Quạt tản nhiệt hỏng bạc đạn sau 26 tháng chạy liên tục, lưu lượng gió đo được chỉ còn khoảng 40 phần trăm so với thiết kế.', 'Do thiết bị', 1, 'Đang xử lý', NULL, NULL);
+('TK-0005', (SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0003'), (SELECT contract_id FROM contracts WHERE contract_code = N'04/2026/HĐKT-POSTEF'), 'Bảo hành', 'Cao', 'Điện thoại', '2026-09-15 12:00:00', (SELECT user_id FROM users WHERE username = 'kythuat4'), (SELECT user_id FROM users WHERE username = 'cskh3'), '2026-09-09', 'Tủ nguồn POSTEF báo lỗi quá nhiệt và tự ngắt 3 lần trong một tuần.', 'Quạt tản nhiệt hỏng bạc đạn sau 26 tháng chạy liên tục, lưu lượng gió đo được chỉ còn khoảng 40 phần trăm so với thiết kế.', 'Do thiết bị', 1, 'Đang xử lý', NULL, NULL);
 INSERT INTO technicalrequests (ticket_code, enterprise_id, contract_id, ticket_type, priority, reception_channel, sla_deadline, assigned_technician_id, created_by, created_date, description, root_cause, cause_category, is_warranty, status, resolution_summary, resolved_at) VALUES
 ('TK-0006', (SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0003'), NULL, 'Sửa chữa', 'Bình thường', 'Trực tiếp', '2026-08-30 17:00:00', (SELECT user_id FROM users WHERE username = 'kythuat4'), (SELECT user_id FROM users WHERE username = 'cskh3'), '2026-08-25', 'Ắc quy Gel tại trạm Yên Phong sụt áp nhanh khi mất điện lưới.', 'Ắc quy đã hết tuổi thọ thiết kế 5 năm, dung lượng đo được còn 62 phần trăm so với danh định.', 'Do thiết bị', 0, 'Đã đóng', 'Đã thay mới toàn bộ 4 bình ắc quy Gel, cân bằng điện áp và bàn giao cho khách.', '2026-08-29 15:00:00');
 INSERT INTO technicalrequests (ticket_code, enterprise_id, contract_id, ticket_type, priority, reception_channel, sla_deadline, assigned_technician_id, created_by, created_date, description, root_cause, cause_category, is_warranty, status, resolution_summary, resolved_at) VALUES
-('TK-0007', (SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0004'), (SELECT contract_id FROM contracts WHERE contract_code = 'HD-0005'), 'Sửa chữa', 'Cao', 'Điện thoại', '2026-09-18 09:00:00', (SELECT user_id FROM users WHERE username = 'kythuat5'), (SELECT user_id FROM users WHERE username = 'cskh2'), '2026-09-12', 'Tuyến cáp quang ADSS Hạ Long - Cẩm Phả suy hao vượt ngưỡng cho phép.', 'Cáp bị uốn quá bán kính cho phép tại 2 điểm treo trong lúc kéo cáp, sợi bị vi uốn gây suy hao cục bộ.', 'Do lắp đặt', 1, 'Đang xử lý', NULL, NULL);
+('TK-0007', (SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0004'), (SELECT contract_id FROM contracts WHERE contract_code = N'05/2026/HĐKT-POSTEF'), 'Sửa chữa', 'Cao', 'Điện thoại', '2026-09-18 09:00:00', (SELECT user_id FROM users WHERE username = 'kythuat5'), (SELECT user_id FROM users WHERE username = 'cskh2'), '2026-09-12', 'Tuyến cáp quang ADSS Hạ Long - Cẩm Phả suy hao vượt ngưỡng cho phép.', 'Cáp bị uốn quá bán kính cho phép tại 2 điểm treo trong lúc kéo cáp, sợi bị vi uốn gây suy hao cục bộ.', 'Do lắp đặt', 1, 'Đang xử lý', NULL, NULL);
 INSERT INTO technicalrequests (ticket_code, enterprise_id, contract_id, ticket_type, priority, reception_channel, sla_deadline, assigned_technician_id, created_by, created_date, description, root_cause, cause_category, is_warranty, status, resolution_summary, resolved_at) VALUES
-('TK-0008', (SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0004'), (SELECT contract_id FROM contracts WHERE contract_code = 'HD-0006'), 'Bảo trì', 'Thấp', 'Email', '2026-10-05 17:00:00', (SELECT user_id FROM users WHERE username = 'kythuat5'), (SELECT user_id FROM users WHERE username = 'cskh4'), '2026-09-13', 'Khách đề nghị kiểm tra định kỳ hệ thống UPS theo chu kỳ 6 tháng.', NULL, NULL, 0, 'Mới tiếp nhận', NULL, NULL);
+('TK-0008', (SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0004'), (SELECT contract_id FROM contracts WHERE contract_code = N'05/2026/HĐKT-POSTEF'), 'Bảo trì', 'Thấp', 'Email', '2026-10-05 17:00:00', (SELECT user_id FROM users WHERE username = 'kythuat5'), (SELECT user_id FROM users WHERE username = 'cskh4'), '2026-09-13', 'Khách đề nghị kiểm tra định kỳ hệ thống UPS theo chu kỳ 6 tháng.', NULL, NULL, 0, 'Mới tiếp nhận', NULL, NULL);
 INSERT INTO technicalrequests (ticket_code, enterprise_id, contract_id, ticket_type, priority, reception_channel, sla_deadline, assigned_technician_id, created_by, created_date, description, root_cause, cause_category, is_warranty, status, resolution_summary, resolved_at) VALUES
-('TK-0009', (SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0005'), (SELECT contract_id FROM contracts WHERE contract_code = 'HD-0007'), 'Bảo hành', 'Khẩn cấp', 'Điện thoại', '2026-09-14 18:00:00', (SELECT user_id FROM users WHERE username = 'kythuat2'), (SELECT user_id FROM users WHERE username = 'cskh4'), '2026-09-13', 'Toàn bộ 8 tủ nguồn tại khu công nghiệp Phố Nối mất điện DC lúc 2 giờ sáng.', NULL, NULL, 1, 'Mới tiếp nhận', NULL, NULL);
+('TK-0009', (SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0005'), (SELECT contract_id FROM contracts WHERE contract_code = N'06/2026/HĐKT-POSTEF'), 'Bảo hành', 'Khẩn cấp', 'Điện thoại', '2026-09-14 18:00:00', (SELECT user_id FROM users WHERE username = 'kythuat2'), (SELECT user_id FROM users WHERE username = 'cskh4'), '2026-09-13', 'Toàn bộ 8 tủ nguồn tại khu công nghiệp Phố Nối mất điện DC lúc 2 giờ sáng.', NULL, NULL, 1, 'Mới tiếp nhận', NULL, NULL);
 INSERT INTO technicalrequests (ticket_code, enterprise_id, contract_id, ticket_type, priority, reception_channel, sla_deadline, assigned_technician_id, created_by, created_date, description, root_cause, cause_category, is_warranty, status, resolution_summary, resolved_at) VALUES
-('TK-0010', (SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0006'), (SELECT contract_id FROM contracts WHERE contract_code = 'HD-0008'), 'Sửa chữa', 'Bình thường', 'Trực tiếp', '2026-09-05 17:00:00', (SELECT user_id FROM users WHERE username = 'kythuat3'), (SELECT user_id FROM users WHERE username = 'cskh3'), '2026-08-28', 'Bộ chia quang bị vỡ vỏ, phát hiện ngay khi nhận hàng tại kho Ninh Bình.', 'Thùng hàng bị rơi trong lúc bốc dỡ, lớp xốp chèn không đủ dày so với quy cách đóng gói đã ban hành.', 'Do vận chuyển', 1, 'Đã đóng', 'Đã đổi bộ chia quang mới theo chính sách bảo hành vận chuyển và cập nhật quy cách đóng gói cho các lô sau.', '2026-09-02 11:00:00');
+('TK-0010', (SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0006'), (SELECT contract_id FROM contracts WHERE contract_code = N'07/2026/HĐKT-POSTEF'), 'Sửa chữa', 'Bình thường', 'Trực tiếp', '2026-09-05 17:00:00', (SELECT user_id FROM users WHERE username = 'kythuat3'), (SELECT user_id FROM users WHERE username = 'cskh3'), '2026-08-28', 'Bộ chia quang bị vỡ vỏ, phát hiện ngay khi nhận hàng tại kho Ninh Bình.', 'Thùng hàng bị rơi trong lúc bốc dỡ, lớp xốp chèn không đủ dày so với quy cách đóng gói đã ban hành.', 'Do vận chuyển', 1, 'Đã đóng', 'Đã đổi bộ chia quang mới theo chính sách bảo hành vận chuyển và cập nhật quy cách đóng gói cho các lô sau.', '2026-09-02 11:00:00');
 INSERT INTO technicalrequests (ticket_code, enterprise_id, contract_id, ticket_type, priority, reception_channel, sla_deadline, assigned_technician_id, created_by, created_date, description, root_cause, cause_category, is_warranty, status, resolution_summary, resolved_at) VALUES
-('TK-0011', (SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0007'), (SELECT contract_id FROM contracts WHERE contract_code = 'HD-0009'), 'Bảo hành', 'Cao', 'Email', '2026-09-19 17:00:00', (SELECT user_id FROM users WHERE username = 'kythuat4'), (SELECT user_id FROM users WHERE username = 'cskh4'), '2026-09-08', 'Hệ thống pin mặt trời tại trạm Việt Trì sụt hiệu suất khoảng 30 phần trăm.', 'Tấm pin được lắp nghiêng 12 độ thay vì 25 độ theo thiết kế, lại nằm trong vùng bóng cột anten che khoảng 3 giờ mỗi ngày.', 'Do lắp đặt', 1, 'Đã đóng', 'Đã chỉnh khung đỡ về đúng 25 độ và dịch vị trí 1,5 mét ra khỏi vùng bóng, hiệu suất phục hồi.', '2026-09-11 16:00:00');
+('TK-0011', (SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0007'), (SELECT contract_id FROM contracts WHERE contract_code = N'08/2026/HĐKT-POSTEF'), 'Bảo hành', 'Cao', 'Email', '2026-09-19 17:00:00', (SELECT user_id FROM users WHERE username = 'kythuat4'), (SELECT user_id FROM users WHERE username = 'cskh4'), '2026-09-08', 'Hệ thống pin mặt trời tại trạm Việt Trì sụt hiệu suất khoảng 30 phần trăm.', 'Tấm pin được lắp nghiêng 12 độ thay vì 25 độ theo thiết kế, lại nằm trong vùng bóng cột anten che khoảng 3 giờ mỗi ngày.', 'Do lắp đặt', 1, 'Đã đóng', 'Đã chỉnh khung đỡ về đúng 25 độ và dịch vị trí 1,5 mét ra khỏi vùng bóng, hiệu suất phục hồi.', '2026-09-11 16:00:00');
 INSERT INTO technicalrequests (ticket_code, enterprise_id, contract_id, ticket_type, priority, reception_channel, sla_deadline, assigned_technician_id, created_by, created_date, description, root_cause, cause_category, is_warranty, status, resolution_summary, resolved_at) VALUES
-('TK-0012', (SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0008'), (SELECT contract_id FROM contracts WHERE contract_code = 'HD-0010'), 'Sửa chữa', 'Cao', 'Điện thoại', '2026-08-20 09:00:00', (SELECT user_id FROM users WHERE username = 'kythuat5'), (SELECT user_id FROM users WHERE username = 'cskh2'), '2026-08-15', 'Nguồn UNIPOWER báo lỗi module rectifier số 2, hệ thống chạy thiếu dự phòng.', 'Module rectifier lỗi tụ đầu vào ngay từ nhà sản xuất, cùng lô với 3 ca đã ghi nhận trước đó.', 'Do thiết bị', 1, 'Đã đóng', 'Đã thay module rectifier mới và gửi module lỗi về hãng để đổi bảo hành.', '2026-08-19 14:30:00');
+('TK-0012', (SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0008'), (SELECT contract_id FROM contracts WHERE contract_code = N'09/2026/HĐKT-POSTEF'), 'Sửa chữa', 'Cao', 'Điện thoại', '2026-08-20 09:00:00', (SELECT user_id FROM users WHERE username = 'kythuat5'), (SELECT user_id FROM users WHERE username = 'cskh2'), '2026-08-15', 'Nguồn UNIPOWER báo lỗi module rectifier số 2, hệ thống chạy thiếu dự phòng.', 'Module rectifier lỗi tụ đầu vào ngay từ nhà sản xuất, cùng lô với 3 ca đã ghi nhận trước đó.', 'Do thiết bị', 1, 'Đã đóng', 'Đã thay module rectifier mới và gửi module lỗi về hãng để đổi bảo hành.', '2026-08-19 14:30:00');
 INSERT INTO technicalrequests (ticket_code, enterprise_id, contract_id, ticket_type, priority, reception_channel, sla_deadline, assigned_technician_id, created_by, created_date, description, root_cause, cause_category, is_warranty, status, resolution_summary, resolved_at) VALUES
-('TK-0013', (SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0009'), (SELECT contract_id FROM contracts WHERE contract_code = 'HD-0011'), 'Tư vấn', 'Thấp', 'Website', '2026-10-10 17:00:00', (SELECT user_id FROM users WHERE username = 'kythuat2'), (SELECT user_id FROM users WHERE username = 'cskh4'), '2026-09-13', 'Đại lý hỏi quy cách đóng gói cáp quang cho đơn hàng đi Cao Bằng.', NULL, NULL, 0, 'Mới tiếp nhận', NULL, NULL);
+('TK-0013', (SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0009'), (SELECT contract_id FROM contracts WHERE contract_code = N'14/2026/HĐKT-POSTEF'), 'Tư vấn', 'Thấp', 'Website', '2026-10-10 17:00:00', (SELECT user_id FROM users WHERE username = 'kythuat2'), (SELECT user_id FROM users WHERE username = 'cskh4'), '2026-09-13', 'Đại lý hỏi quy cách đóng gói cáp quang cho đơn hàng đi Cao Bằng.', NULL, NULL, 0, 'Mới tiếp nhận', NULL, NULL);
 INSERT INTO technicalrequests (ticket_code, enterprise_id, contract_id, ticket_type, priority, reception_channel, sla_deadline, assigned_technician_id, created_by, created_date, description, root_cause, cause_category, is_warranty, status, resolution_summary, resolved_at) VALUES
-('TK-0014', (SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0010'), (SELECT contract_id FROM contracts WHERE contract_code = 'HD-0012'), 'Bảo hành', 'Bình thường', 'Điện thoại', '2026-09-02 17:00:00', (SELECT user_id FROM users WHERE username = 'kythuat3'), (SELECT user_id FROM users WHERE username = 'cskh3'), '2026-08-26', 'Dây thuê bao đệm chặt bị đứt lõi khi bóc vỏ, tỉ lệ hỏng khoảng 8 phần trăm.', 'Cuộn cáp bị ép biến dạng do xếp chồng quá 4 tầng trên xe tải, lõi gãy ngầm bên trong mà nhìn ngoài không thấy.', 'Do vận chuyển', 1, 'Đã đóng', 'Đã thu hồi và đổi cuộn cáp mới, đồng thời phổ biến lại giới hạn xếp chồng cho đơn vị vận chuyển.', '2026-09-01 10:00:00');
+('TK-0014', (SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0010'), NULL, 'Bảo hành', 'Bình thường', 'Điện thoại', '2026-09-02 17:00:00', (SELECT user_id FROM users WHERE username = 'kythuat3'), (SELECT user_id FROM users WHERE username = 'cskh3'), '2026-08-26', 'Dây thuê bao đệm chặt bị đứt lõi khi bóc vỏ, tỉ lệ hỏng khoảng 8 phần trăm.', 'Cuộn cáp bị ép biến dạng do xếp chồng quá 4 tầng trên xe tải, lõi gãy ngầm bên trong mà nhìn ngoài không thấy.', 'Do vận chuyển', 1, 'Đã đóng', 'Đã thu hồi và đổi cuộn cáp mới, đồng thời phổ biến lại giới hạn xếp chồng cho đơn vị vận chuyển.', '2026-09-01 10:00:00');
 INSERT INTO technicalrequests (ticket_code, enterprise_id, contract_id, ticket_type, priority, reception_channel, sla_deadline, assigned_technician_id, created_by, created_date, description, root_cause, cause_category, is_warranty, status, resolution_summary, resolved_at) VALUES
-('TK-0015', (SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0011'), (SELECT contract_id FROM contracts WHERE contract_code = 'HD-0013'), 'Sửa chữa', 'Cao', 'Trực tiếp', '2026-09-16 09:00:00', (SELECT user_id FROM users WHERE username = 'kythuat4'), (SELECT user_id FROM users WHERE username = 'cskh4'), '2026-09-10', 'UPS EATON tại Sầm Sơn liên tục chuyển sang chế độ bypass.', 'Hơi muối biển và độ ẩm cao gây oxy hoá tiếp điểm contactor. Môi trường lắp đặt ven biển nằm ngoài điều kiện vận hành khuyến cáo của thiết bị.', 'Khác', 0, 'Đang xử lý', NULL, NULL);
+('TK-0015', (SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0011'), (SELECT contract_id FROM contracts WHERE contract_code = N'12/2026/HĐKT-POSTEF'), 'Sửa chữa', 'Cao', 'Trực tiếp', '2026-09-16 09:00:00', (SELECT user_id FROM users WHERE username = 'kythuat4'), (SELECT user_id FROM users WHERE username = 'cskh4'), '2026-09-10', 'UPS EATON tại Sầm Sơn liên tục chuyển sang chế độ bypass.', 'Hơi muối biển và độ ẩm cao gây oxy hoá tiếp điểm contactor. Môi trường lắp đặt ven biển nằm ngoài điều kiện vận hành khuyến cáo của thiết bị.', 'Khác', 0, 'Đang xử lý', NULL, NULL);
 INSERT INTO technicalrequests (ticket_code, enterprise_id, contract_id, ticket_type, priority, reception_channel, sla_deadline, assigned_technician_id, created_by, created_date, description, root_cause, cause_category, is_warranty, status, resolution_summary, resolved_at) VALUES
-('TK-0016', (SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0012'), (SELECT contract_id FROM contracts WHERE contract_code = 'HD-0014'), 'Bảo trì', 'Bình thường', 'Email', '2026-08-31 17:00:00', (SELECT user_id FROM users WHERE username = 'kythuat5'), (SELECT user_id FROM users WHERE username = 'cskh2'), '2026-08-24', 'Kiểm tra hệ thống nguồn sau sự cố mất điện lưới diện rộng toàn khu vực.', 'Mất điện lưới kéo dài 11 giờ, vượt mức dự phòng 8 giờ mà hệ thống ắc quy được thiết kế để gánh.', 'Khác', 0, 'Đã đóng', 'Đã nạp lại toàn bộ ắc quy, đo dung lượng còn 94 phần trăm và khuyến nghị bổ sung thêm 2 bình.', '2026-08-28 17:00:00');
+('TK-0016', (SELECT enterprise_id FROM enterprises WHERE enterprise_code = 'KH-0012'), (SELECT contract_id FROM contracts WHERE contract_code = N'13/2026/HĐKT-POSTEF'), 'Bảo trì', 'Bình thường', 'Email', '2026-08-31 17:00:00', (SELECT user_id FROM users WHERE username = 'kythuat5'), (SELECT user_id FROM users WHERE username = 'cskh2'), '2026-08-24', 'Kiểm tra hệ thống nguồn sau sự cố mất điện lưới diện rộng toàn khu vực.', 'Mất điện lưới kéo dài 11 giờ, vượt mức dự phòng 8 giờ mà hệ thống ắc quy được thiết kế để gánh.', 'Khác', 0, 'Đã đóng', 'Đã nạp lại toàn bộ ắc quy, đo dung lượng còn 94 phần trăm và khuyến nghị bổ sung thêm 2 bình.', '2026-08-28 17:00:00');
 
 -- ===== 2. Điền phương hướng xử lý cho dữ liệu demo =====
 -- Chỉ những phiếu đã có nguyên nhân mới có phương hướng: chưa biết vì sao
