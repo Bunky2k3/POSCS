@@ -26,7 +26,7 @@
     <link rel="stylesheet" href="${pageContext.request.contextPath}/css/appshell.css">
 
     <style>
-        .page-container { max-width: 980px; margin: 28px auto; padding: 0 20px 32px; }
+        .page-container { max-width: 1320px; margin: 28px auto; padding: 0 20px 32px; }
         .page-header-row { margin-bottom: 22px; }
         .page-header-row h2 { font-weight: 700; color: var(--primary-dark); font-size: 1.4rem; margin-bottom: 4px; }
         .page-header-row p { color: #6b7280; font-size: 0.9rem; }
@@ -150,6 +150,13 @@
                 </div>
             </div>
         </c:if>
+        <%-- MỌI THAO TÁC GHI CỦA HỢP ĐỒNG NẰM Ở TRANG NÀY.
+
+             Trang xem (viewcontractdetail.jsp) cố ý không có nút nào gây thay
+             đổi -- xem ghi chú ở đầu khối tiến trình bên đó. Các khối dưới đây
+             đứng NGOÀI form sửa thông tin ở trên: form lồng form là HTML không
+             hợp lệ, trình duyệt sẽ tự cắt và nút bấm gửi đi thiếu tham số. --%>
+
         <c:if test="${not contract.frozen}">
         <div class="card-box">
             <c:if test="${not empty param.error}">
@@ -390,7 +397,8 @@
 
                 <div class="section-header"><h5>Hạng mục sản phẩm / dịch vụ</h5></div>
                 <p style="font-size:0.86rem; color:#6b7280; margin:0 0 4px;">
-                    Hạng mục được thêm và gỡ ở trang chi tiết hợp đồng, không sửa tại đây.
+                    Hạng mục không sửa trong form này — nó có khối riêng
+                    <a href="#hang-hoa">ngay bên dưới</a>, vì thêm/gỡ là thao tác ghi ngay chứ không chờ bấm Lưu.
                 </p>
 
 
@@ -431,12 +439,275 @@
         </div>
         </c:if>
 
-        <%-- MỌI THAO TÁC GHI CỦA HỢP ĐỒNG NẰM Ở TRANG NÀY.
+        <%-- Form sửa thông tin đứng NGOÀI lưới hai cột, chiếm trọn bề ngang:
+             nó toàn ô nhập cạnh nhau, nhét vào cột hẹp thì chữ xuống dòng và thẻ
+             còn CAO HƠN lúc chưa chia (đo được: 1468px -> 1521px).
 
-             Trang xem (viewcontractdetail.jsp) cố ý không có nút nào gây thay
-             đổi -- xem ghi chú ở đầu khối tiến trình bên đó. Các khối dưới đây
-             đứng NGOÀI form sửa thông tin ở trên: form lồng form là HTML không
-             hợp lệ, trình duyệt sẽ tự cắt và nút bấm gửi đi thiếu tham số. --%>
+             Dưới nó mới là lưới hai cột, cùng quy ước với trang xem: TRÁI là bản
+             thân hợp đồng (hàng hoá, kỳ thu, phụ lục, hợp đồng nối kèm), PHẢI là
+             tiến trình và ai đang giữ việc. Cột phải ngắn nên dính theo màn hình. --%>
+        <div class="workspace">
+        <div class="ws-main">
+
+        <!-- ===== Hạng mục hàng hoá ===== -->
+        <div class="card-box" id="hang-hoa" style="margin-top:20px;">
+            <div class="section-header"><h5>Hạng mục sản phẩm / dịch vụ</h5></div>
+            <c:choose>
+                <c:when test="${empty contractProducts}">
+                    <div style="color:#9ca3af; font-size:0.87rem;">Chưa gắn hàng hoá nào.</div>
+                </c:when>
+                <c:otherwise>
+                    <%-- Bảng 4-5 cột: dưới ~500px nó rộng hơn màn hình và đẩy CẢ TRANG trượt ngang
+                     (đo được trên màn 375px: trang rộng 462px). Cho riêng bảng cuộn. --%>
+                    <div class="table-responsive">
+                        <table class="item-table">
+                            <thead><tr><th style="width:40px;">#</th><th>Sản phẩm</th><th style="width:110px;">Số lượng</th><th style="width:90px;">Đơn vị</th><th>Ghi chú</th><th style="width:60px;"></th></tr></thead>
+                            <tbody>
+                                <c:forEach var="cp" items="${contractProducts}" varStatus="row">
+                                    <tr>
+                                        <td>${row.index + 1}</td>
+                                        <td>${fn:escapeXml(cp.productName)}<div style="color:#9ca3af; font-size:0.78rem;">${fn:escapeXml(cp.productCode)}</div></td>
+                                        <td>${cp.quantity}</td>
+                                        <td>${fn:escapeXml(cp.unit)}</td>
+                                        <td>${not empty cp.notes ? fn:escapeXml(cp.notes) : '—'}</td>
+                                        <td>
+                                            <c:if test="${canEditProducts}">
+                                                <button type="button" class="btn-remove-item" title="Gỡ hàng hoá này"
+                                                        onclick="confirmRemoveProduct(${cp.contractProductId})">
+                                                    <i class="fa-solid fa-xmark"></i>
+                                                </button>
+                                            </c:if>
+                                        </td>
+                                    </tr>
+                                </c:forEach>
+                            </tbody>
+                        </table>
+                    </div>
+                </c:otherwise>
+            </c:choose>
+            <c:choose>
+                <c:when test="${canEditProducts}">
+                    <form class="inline-form" method="POST" action="${pageContext.request.contextPath}/contract">
+                        <input type="hidden" name="csrfToken" value="${csrfToken}">
+                        <input type="hidden" name="action" value="addProduct">
+                        <input type="hidden" name="contractId" value="${contract.contractId}">
+                        <div class="row g-2 align-items-end">
+                            <div class="col-md-4">
+                                <label class="form-label">Sản phẩm</label>
+                                <select class="form-select" name="productId" required>
+                                    <option value="">-- Chọn sản phẩm --</option>
+                                    <c:forEach var="pr" items="${productOptions}">
+                                        <option value="${pr.productId}">${fn:escapeXml(pr.productName)}</option>
+                                    </c:forEach>
+                                </select>
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label">Số lượng</label>
+                                <input type="text" class="form-control" name="quantity" placeholder="VD: 1.000" required>
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label">Đơn vị</label>
+                                <input type="text" class="form-control" name="unit" placeholder="Cái">
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label">Ghi chú</label>
+                                <input type="text" class="form-control" name="notes">
+                            </div>
+                            <div class="col-md-2">
+                                <button type="submit" class="btn-add-item"><i class="fa-solid fa-plus"></i> Thêm</button>
+                            </div>
+                        </div>
+                    </form>
+                </c:when>
+                <c:otherwise>
+                    <div class="inline-form locked-note">
+                        <i class="fa-solid fa-lock" style="margin-top:3px; color:#9ca3af;"></i>
+                        <span>Hợp đồng đã ký nên hạng mục hàng hoá đã chốt — đây là nội dung hợp đồng,
+                            không sửa thẳng được. Thay đổi phát sinh phải lập phụ lục.</span>
+                    </div>
+                </c:otherwise>
+            </c:choose>
+        </div>
+
+        <!-- ===== Kỳ thanh toán ===== -->
+        <div class="card-box" style="margin-top:20px;">
+            <div class="section-header"><h5>Kỳ thanh toán</h5></div>
+            <c:choose>
+                <c:when test="${empty contractPayments}">
+                    <div style="color:#9ca3af; font-size:0.87rem;">Chưa lập kỳ thanh toán nào.</div>
+                </c:when>
+                <c:otherwise>
+                    <%-- Bảng 4-5 cột: dưới ~500px nó rộng hơn màn hình và đẩy CẢ TRANG trượt ngang
+                     (đo được trên màn 375px: trang rộng 462px). Cho riêng bảng cuộn. --%>
+                    <div class="table-responsive">
+                        <table class="item-table">
+                            <thead><tr><th style="width:40px;">#</th><th>Số tiền</th><th style="width:130px;">Đến hạn</th><th style="width:170px;">Tình trạng</th><th style="width:170px;"></th></tr></thead>
+                            <tbody>
+                                <c:forEach var="pm" items="${contractPayments}" varStatus="row">
+                                    <tr>
+                                        <td>${row.index + 1}</td>
+                                        <td><strong class="money-vnd" data-vnd="${pm.invoiceAmount}">&mdash;</strong></td>
+                                        <td><fmt:formatDate value="${pm.dueDate}" pattern="dd/MM/yyyy"/></td>
+                                        <td>
+                                            <c:choose>
+                                                <c:when test="${pm.paidDate != null}">
+                                                    <span style="color:#2f6b34; font-weight:600;"><i class="fa-solid fa-circle-check"></i>
+                                                        Đã thu <fmt:formatDate value="${pm.paidDate}" pattern="dd/MM/yyyy"/></span>
+                                                </c:when>
+                                                <c:otherwise><span style="color:#9ca3af;">Chưa thu</span></c:otherwise>
+                                            </c:choose>
+                                        </td>
+                                        <td style="text-align:right;">
+                                            <c:if test="${pm.paidDate == null and canRecordPayment}">
+                                                <button type="button" class="btn-remove-item"
+                                                        style="width:auto; padding:0 10px; border-color:#cfe3d0; background:#f3f7f3; color:#2f6b34;"
+                                                        onclick="markPaid(${pm.paymentId})">
+                                                    <i class="fa-solid fa-check"></i> Đã thu
+                                                </button>
+                                            </c:if>
+                                            <c:if test="${canEditPayments}">
+                                                <button type="button" class="btn-remove-item" title="Xoá kỳ này"
+                                                        onclick="confirmRemovePayment(${pm.paymentId})">
+                                                    <i class="fa-solid fa-xmark"></i>
+                                                </button>
+                                            </c:if>
+                                        </td>
+                                    </tr>
+                                </c:forEach>
+                            </tbody>
+                        </table>
+                    </div>
+                </c:otherwise>
+            </c:choose>
+            <c:choose>
+                <c:when test="${canEditPayments}">
+                    <form class="inline-form" method="POST" action="${pageContext.request.contextPath}/contract">
+                        <input type="hidden" name="csrfToken" value="${csrfToken}">
+                        <input type="hidden" name="action" value="addPayment">
+                        <input type="hidden" name="contractId" value="${contract.contractId}">
+                        <div class="row g-2 align-items-end">
+                            <div class="col-md-4">
+                                <label class="form-label">Số tiền (VNĐ)</label>
+                                <input type="text" class="form-control" name="invoiceAmount" inputmode="numeric"
+                                       placeholder="VD: 450.000.000" required>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Đến hạn</label>
+                                <input type="date" class="form-control" name="dueDate" required>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Ngày đã thu (nếu có)</label>
+                                <input type="date" class="form-control" name="paidDate">
+                            </div>
+                            <div class="col-md-2">
+                                <button type="submit" class="btn-add-item"><i class="fa-solid fa-plus"></i> Lập kỳ</button>
+                            </div>
+                        </div>
+                    </form>
+                </c:when>
+                <c:otherwise>
+                    <div class="inline-form locked-note">
+                        <i class="fa-solid fa-lock" style="margin-top:3px; color:#9ca3af;"></i>
+                        <span>Hợp đồng đã đóng băng nên không lập thêm kỳ được. Tiền của kỳ đã lập thì
+                            vẫn ghi nhận được khi về — tiền bảo hành giữ lại thường về sau thanh lý.</span>
+                    </div>
+                </c:otherwise>
+            </c:choose>
+        </div>        <!-- ===== Phụ lục ===== -->
+        <%-- Hiện cả khi danh sách rỗng, MIỄN LÀ hợp đồng này nhận được phụ lục:
+             ở đó cái người dùng cần là cái nút, và một khối trống có nút nói rõ
+             hơn hẳn việc không có gì.
+
+             Trên chính một phụ lục thì khối này biến mất (canAddAmendment false
+             vì một tầng) và thay bằng đường ngược về hợp đồng gốc. --%>
+        <c:if test="${canAddAmendment or not empty amendments}">
+        <div class="card-box" style="margin-top:20px;">
+            <div class="section-header"><h5>Phụ lục</h5></div>
+            <p style="font-size:0.86rem; color:#6b7280; margin:0 0 12px;">
+                Hợp đồng đã ký không sửa thẳng được. Mọi thay đổi điều khoản đi qua một phụ lục —
+                hợp đồng con có mã riêng, thời hạn riêng, và cũng phải được ký.
+            </p>
+
+            <c:choose>
+                <c:when test="${empty amendments}">
+                    <p style="font-size:0.88rem; color:#9ca3af; margin:0 0 14px;">Chưa có phụ lục nào.</p>
+                </c:when>
+                <c:otherwise>
+                    <div class="table-responsive">
+                        <table class="table align-middle" style="font-size:0.9rem;">
+                            <thead>
+                                <tr>
+                                    <th>Mã phụ lục</th>
+                                    <th>Tiêu đề</th>
+                                    <th>Thời hạn</th>
+                                    <th class="text-end">Điều chỉnh giá trị</th>
+                                    <th>Tiến độ</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <c:forEach var="pl" items="${amendments}">
+                                    <tr>
+                                        <td><strong>${fn:escapeXml(pl.contractCode)}</strong></td>
+                                        <td>${fn:escapeXml(pl.title)}</td>
+                                        <td>
+                                            <c:choose>
+                                                <c:when test="${pl.effectiveDate == null or pl.endDate == null}">
+                                                    <span style="color:#9ca3af;">Chưa chốt</span>
+                                                </c:when>
+                                                <c:otherwise>
+                                                    <fmt:formatDate value="${pl.effectiveDate}" pattern="dd/MM/yyyy"/>
+                                                    — <fmt:formatDate value="${pl.endDate}" pattern="dd/MM/yyyy"/>
+                                                </c:otherwise>
+                                            </c:choose>
+                                        </td>
+                                        <td class="text-end">
+                                            <span class="money-signed" data-vnd="${pl.contractValue}">&mdash;</span>
+                                            <c:if test="${pl.draft and pl.contractValue != null}">
+                                                <div style="font-size:0.74rem; color:#9ca3af;">chưa ký, chưa tính</div>
+                                            </c:if>
+                                        </td>
+                                        <td>${fn:escapeXml(pl.progressStatus)}</td>
+                                        <td class="text-end">
+                                            <a href="${pageContext.request.contextPath}/contract?action=view&id=${pl.contractId}"
+                                               class="btn-outline-action"><i class="fa-solid fa-eye"></i> Xem</a>
+                                        </td>
+                                    </tr>
+                                </c:forEach>
+                            </tbody>
+                        </table>
+                    </div>
+                    <%-- Phụ lục KHÔNG kéo theo thời hạn của hợp đồng gốc: bản ghi cha
+                         là thứ ghi trên tờ giấy đã ký, và trạng thái theo lịch của nó
+                         vẫn tính từ ngày kết thúc của chính nó. Nói rõ ở đây, vì đó là
+                         chỗ người dùng sẽ thấy "kỳ lạ" trên trang danh sách. --%>
+                    <p style="font-size:0.8rem; color:#9ca3af; margin:4px 0 14px;">
+                        Phụ lục gia hạn không đổi ngày kết thúc của hợp đồng gốc — bản ghi gốc giữ nguyên
+                        những gì đã ký, thời hạn mới nằm trên chính phụ lục.
+                        <%-- GIÁ TRỊ thì ngược lại: nó CÓ cộng dồn. Hai luật khác nhau
+                             trên cùng một bảng, nên phải nói ra cả hai ở đúng chỗ
+                             người dùng đang nhìn, nếu không thì cái này bị suy ra từ
+                             cái kia. --%>
+                        <c:if test="${contract.valueAdjusted}">
+                            Giá trị thì có: sau ${contract.amendmentCount} phụ lục đã ký, hợp đồng này hiện là
+                            <strong class="money-vnd" data-vnd="${contract.currentValue}">&mdash;</strong>.
+                        </c:if>
+                    </p>
+                </c:otherwise>
+            </c:choose>
+
+            <c:if test="${canAddAmendment}">
+                <a href="${pageContext.request.contextPath}/contract?action=newAmendment&parentId=${contract.contractId}"
+                   class="btn-primary" style="display:inline-block; text-decoration:none;">
+                    <i class="fa-solid fa-file-circle-plus me-1"></i> Lập phụ lục
+                </a>
+            </c:if>
+        </div>
+        </c:if>
+
+        </div>
+
+        <div class="ws-side ws-sticky">
 
         <!-- ===== Bước tiến trình ===== -->
         <c:if test="${canSign or canClose or canVoid}">
@@ -618,6 +889,10 @@
             </form>
         </div>
 
+        <%-- Khối hợp đồng nối kèm đứng ở cột hẹp, giống trang xem. Đã thử cả hai
+             chỗ và đo: ở cột hẹp, hợp đồng KHÔNG có liên kết nào (đa số) cho trang
+             ngắn hơn 265px; đổi lại, hợp đồng có hai liên kết dài thêm 124px. Lấy
+             ca phổ biến. --%>
         <!-- ===== Đầu ra kéo theo đầu vào ===== -->
         <%-- Hợp đồng BÁN nối với các đơn MUA sinh ra vì nó, và ngược lại. Quan
              hệ nhiều-nhiều nằm ở bảng contract_links, KHÁC hẳn phụ lục bên dưới
@@ -769,255 +1044,9 @@
         </div>
         </c:if>
 
-        <!-- ===== Phụ lục ===== -->
-        <%-- Hiện cả khi danh sách rỗng, MIỄN LÀ hợp đồng này nhận được phụ lục:
-             ở đó cái người dùng cần là cái nút, và một khối trống có nút nói rõ
-             hơn hẳn việc không có gì.
-
-             Trên chính một phụ lục thì khối này biến mất (canAddAmendment false
-             vì một tầng) và thay bằng đường ngược về hợp đồng gốc. --%>
-        <c:if test="${canAddAmendment or not empty amendments}">
-        <div class="card-box" style="margin-top:20px;">
-            <div class="section-header"><h5>Phụ lục</h5></div>
-            <p style="font-size:0.86rem; color:#6b7280; margin:0 0 12px;">
-                Hợp đồng đã ký không sửa thẳng được. Mọi thay đổi điều khoản đi qua một phụ lục —
-                hợp đồng con có mã riêng, thời hạn riêng, và cũng phải được ký.
-            </p>
-
-            <c:choose>
-                <c:when test="${empty amendments}">
-                    <p style="font-size:0.88rem; color:#9ca3af; margin:0 0 14px;">Chưa có phụ lục nào.</p>
-                </c:when>
-                <c:otherwise>
-                    <div class="table-responsive">
-                        <table class="table align-middle" style="font-size:0.9rem;">
-                            <thead>
-                                <tr>
-                                    <th>Mã phụ lục</th>
-                                    <th>Tiêu đề</th>
-                                    <th>Thời hạn</th>
-                                    <th class="text-end">Điều chỉnh giá trị</th>
-                                    <th>Tiến độ</th>
-                                    <th></th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <c:forEach var="pl" items="${amendments}">
-                                    <tr>
-                                        <td><strong>${fn:escapeXml(pl.contractCode)}</strong></td>
-                                        <td>${fn:escapeXml(pl.title)}</td>
-                                        <td>
-                                            <c:choose>
-                                                <c:when test="${pl.effectiveDate == null or pl.endDate == null}">
-                                                    <span style="color:#9ca3af;">Chưa chốt</span>
-                                                </c:when>
-                                                <c:otherwise>
-                                                    <fmt:formatDate value="${pl.effectiveDate}" pattern="dd/MM/yyyy"/>
-                                                    — <fmt:formatDate value="${pl.endDate}" pattern="dd/MM/yyyy"/>
-                                                </c:otherwise>
-                                            </c:choose>
-                                        </td>
-                                        <td class="text-end">
-                                            <span class="money-signed" data-vnd="${pl.contractValue}">&mdash;</span>
-                                            <c:if test="${pl.draft and pl.contractValue != null}">
-                                                <div style="font-size:0.74rem; color:#9ca3af;">chưa ký, chưa tính</div>
-                                            </c:if>
-                                        </td>
-                                        <td>${fn:escapeXml(pl.progressStatus)}</td>
-                                        <td class="text-end">
-                                            <a href="${pageContext.request.contextPath}/contract?action=view&id=${pl.contractId}"
-                                               class="btn-outline-action"><i class="fa-solid fa-eye"></i> Xem</a>
-                                        </td>
-                                    </tr>
-                                </c:forEach>
-                            </tbody>
-                        </table>
-                    </div>
-                    <%-- Phụ lục KHÔNG kéo theo thời hạn của hợp đồng gốc: bản ghi cha
-                         là thứ ghi trên tờ giấy đã ký, và trạng thái theo lịch của nó
-                         vẫn tính từ ngày kết thúc của chính nó. Nói rõ ở đây, vì đó là
-                         chỗ người dùng sẽ thấy "kỳ lạ" trên trang danh sách. --%>
-                    <p style="font-size:0.8rem; color:#9ca3af; margin:4px 0 14px;">
-                        Phụ lục gia hạn không đổi ngày kết thúc của hợp đồng gốc — bản ghi gốc giữ nguyên
-                        những gì đã ký, thời hạn mới nằm trên chính phụ lục.
-                        <%-- GIÁ TRỊ thì ngược lại: nó CÓ cộng dồn. Hai luật khác nhau
-                             trên cùng một bảng, nên phải nói ra cả hai ở đúng chỗ
-                             người dùng đang nhìn, nếu không thì cái này bị suy ra từ
-                             cái kia. --%>
-                        <c:if test="${contract.valueAdjusted}">
-                            Giá trị thì có: sau ${contract.amendmentCount} phụ lục đã ký, hợp đồng này hiện là
-                            <strong class="money-vnd" data-vnd="${contract.currentValue}">&mdash;</strong>.
-                        </c:if>
-                    </p>
-                </c:otherwise>
-            </c:choose>
-
-            <c:if test="${canAddAmendment}">
-                <a href="${pageContext.request.contextPath}/contract?action=newAmendment&parentId=${contract.contractId}"
-                   class="btn-primary" style="display:inline-block; text-decoration:none;">
-                    <i class="fa-solid fa-file-circle-plus me-1"></i> Lập phụ lục
-                </a>
-            </c:if>
         </div>
-        </c:if>
-
-        <!-- ===== Hạng mục hàng hoá ===== -->
-        <div class="card-box" style="margin-top:20px;">
-            <div class="section-header"><h5>Hạng mục sản phẩm / dịch vụ</h5></div>
-            <c:choose>
-                <c:when test="${empty contractProducts}">
-                    <div style="color:#9ca3af; font-size:0.87rem;">Chưa gắn hàng hoá nào.</div>
-                </c:when>
-                <c:otherwise>
-                    <table class="item-table">
-                        <thead><tr><th style="width:40px;">#</th><th>Sản phẩm</th><th style="width:110px;">Số lượng</th><th style="width:90px;">Đơn vị</th><th>Ghi chú</th><th style="width:60px;"></th></tr></thead>
-                        <tbody>
-                            <c:forEach var="cp" items="${contractProducts}" varStatus="row">
-                                <tr>
-                                    <td>${row.index + 1}</td>
-                                    <td>${fn:escapeXml(cp.productName)}<div style="color:#9ca3af; font-size:0.78rem;">${fn:escapeXml(cp.productCode)}</div></td>
-                                    <td>${cp.quantity}</td>
-                                    <td>${fn:escapeXml(cp.unit)}</td>
-                                    <td>${not empty cp.notes ? fn:escapeXml(cp.notes) : '—'}</td>
-                                    <td>
-                                        <c:if test="${canEditProducts}">
-                                            <button type="button" class="btn-remove-item" title="Gỡ hàng hoá này"
-                                                    onclick="confirmRemoveProduct(${cp.contractProductId})">
-                                                <i class="fa-solid fa-xmark"></i>
-                                            </button>
-                                        </c:if>
-                                    </td>
-                                </tr>
-                            </c:forEach>
-                        </tbody>
-                    </table>
-                </c:otherwise>
-            </c:choose>
-            <c:choose>
-                <c:when test="${canEditProducts}">
-                    <form class="inline-form" method="POST" action="${pageContext.request.contextPath}/contract">
-                        <input type="hidden" name="csrfToken" value="${csrfToken}">
-                        <input type="hidden" name="action" value="addProduct">
-                        <input type="hidden" name="contractId" value="${contract.contractId}">
-                        <div class="row g-2 align-items-end">
-                            <div class="col-md-4">
-                                <label class="form-label">Sản phẩm</label>
-                                <select class="form-select" name="productId" required>
-                                    <option value="">-- Chọn sản phẩm --</option>
-                                    <c:forEach var="pr" items="${productOptions}">
-                                        <option value="${pr.productId}">${fn:escapeXml(pr.productName)}</option>
-                                    </c:forEach>
-                                </select>
-                            </div>
-                            <div class="col-md-2">
-                                <label class="form-label">Số lượng</label>
-                                <input type="text" class="form-control" name="quantity" placeholder="VD: 1.000" required>
-                            </div>
-                            <div class="col-md-2">
-                                <label class="form-label">Đơn vị</label>
-                                <input type="text" class="form-control" name="unit" placeholder="Cái">
-                            </div>
-                            <div class="col-md-2">
-                                <label class="form-label">Ghi chú</label>
-                                <input type="text" class="form-control" name="notes">
-                            </div>
-                            <div class="col-md-2">
-                                <button type="submit" class="btn-add-item"><i class="fa-solid fa-plus"></i> Thêm</button>
-                            </div>
-                        </div>
-                    </form>
-                </c:when>
-                <c:otherwise>
-                    <div class="inline-form locked-note">
-                        <i class="fa-solid fa-lock" style="margin-top:3px; color:#9ca3af;"></i>
-                        <span>Hợp đồng đã ký nên hạng mục hàng hoá đã chốt — đây là nội dung hợp đồng,
-                            không sửa thẳng được. Thay đổi phát sinh phải lập phụ lục.</span>
-                    </div>
-                </c:otherwise>
-            </c:choose>
         </div>
 
-        <!-- ===== Kỳ thanh toán ===== -->
-        <div class="card-box" style="margin-top:20px;">
-            <div class="section-header"><h5>Kỳ thanh toán</h5></div>
-            <c:choose>
-                <c:when test="${empty contractPayments}">
-                    <div style="color:#9ca3af; font-size:0.87rem;">Chưa lập kỳ thanh toán nào.</div>
-                </c:when>
-                <c:otherwise>
-                    <table class="item-table">
-                        <thead><tr><th style="width:40px;">#</th><th>Số tiền</th><th style="width:130px;">Đến hạn</th><th style="width:170px;">Tình trạng</th><th style="width:170px;"></th></tr></thead>
-                        <tbody>
-                            <c:forEach var="pm" items="${contractPayments}" varStatus="row">
-                                <tr>
-                                    <td>${row.index + 1}</td>
-                                    <td><strong class="money-vnd" data-vnd="${pm.invoiceAmount}">&mdash;</strong></td>
-                                    <td><fmt:formatDate value="${pm.dueDate}" pattern="dd/MM/yyyy"/></td>
-                                    <td>
-                                        <c:choose>
-                                            <c:when test="${pm.paidDate != null}">
-                                                <span style="color:#2f6b34; font-weight:600;"><i class="fa-solid fa-circle-check"></i>
-                                                    Đã thu <fmt:formatDate value="${pm.paidDate}" pattern="dd/MM/yyyy"/></span>
-                                            </c:when>
-                                            <c:otherwise><span style="color:#9ca3af;">Chưa thu</span></c:otherwise>
-                                        </c:choose>
-                                    </td>
-                                    <td style="text-align:right;">
-                                        <c:if test="${pm.paidDate == null and canRecordPayment}">
-                                            <button type="button" class="btn-remove-item"
-                                                    style="width:auto; padding:0 10px; border-color:#cfe3d0; background:#f3f7f3; color:#2f6b34;"
-                                                    onclick="markPaid(${pm.paymentId})">
-                                                <i class="fa-solid fa-check"></i> Đã thu
-                                            </button>
-                                        </c:if>
-                                        <c:if test="${canEditPayments}">
-                                            <button type="button" class="btn-remove-item" title="Xoá kỳ này"
-                                                    onclick="confirmRemovePayment(${pm.paymentId})">
-                                                <i class="fa-solid fa-xmark"></i>
-                                            </button>
-                                        </c:if>
-                                    </td>
-                                </tr>
-                            </c:forEach>
-                        </tbody>
-                    </table>
-                </c:otherwise>
-            </c:choose>
-            <c:choose>
-                <c:when test="${canEditPayments}">
-                    <form class="inline-form" method="POST" action="${pageContext.request.contextPath}/contract">
-                        <input type="hidden" name="csrfToken" value="${csrfToken}">
-                        <input type="hidden" name="action" value="addPayment">
-                        <input type="hidden" name="contractId" value="${contract.contractId}">
-                        <div class="row g-2 align-items-end">
-                            <div class="col-md-4">
-                                <label class="form-label">Số tiền (VNĐ)</label>
-                                <input type="text" class="form-control" name="invoiceAmount" inputmode="numeric"
-                                       placeholder="VD: 450.000.000" required>
-                            </div>
-                            <div class="col-md-3">
-                                <label class="form-label">Đến hạn</label>
-                                <input type="date" class="form-control" name="dueDate" required>
-                            </div>
-                            <div class="col-md-3">
-                                <label class="form-label">Ngày đã thu (nếu có)</label>
-                                <input type="date" class="form-control" name="paidDate">
-                            </div>
-                            <div class="col-md-2">
-                                <button type="submit" class="btn-add-item"><i class="fa-solid fa-plus"></i> Lập kỳ</button>
-                            </div>
-                        </div>
-                    </form>
-                </c:when>
-                <c:otherwise>
-                    <div class="inline-form locked-note">
-                        <i class="fa-solid fa-lock" style="margin-top:3px; color:#9ca3af;"></i>
-                        <span>Hợp đồng đã đóng băng nên không lập thêm kỳ được. Tiền của kỳ đã lập thì
-                            vẫn ghi nhận được khi về — tiền bảo hành giữ lại thường về sau thanh lý.</span>
-                    </div>
-                </c:otherwise>
-            </c:choose>
-        </div>
     </div>
 
         </div>

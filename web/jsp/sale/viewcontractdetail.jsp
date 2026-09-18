@@ -37,7 +37,7 @@
     <link rel="stylesheet" href="${pageContext.request.contextPath}/css/appshell.css">
 
     <style>
-        .page-container { max-width: 1080px; margin: 28px auto; padding: 0 20px 32px; }
+        .page-container { max-width: 1320px; margin: 28px auto; padding: 0 20px 32px; }
         .back-link-top { color: var(--primary); font-size: 0.85rem; text-decoration: none; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; margin-bottom: 16px; }
         .back-link-top:hover { text-decoration: underline; }
 
@@ -439,9 +439,23 @@
             </c:if>
         </div>
 
-        <!-- ===== Thông tin chung ===== -->
+        <%-- Hai cột: TRÁI là nội dung được ký, đọc tuần tự từ trên xuống
+             (là gì → ai ký → bao nhiêu tiền → gồm những gì → thu thế nào → sửa
+             đổi gì). PHẢI là hồ sơ và dấu vết: bản scan, ai đang giữ, ai đã đổi gì
+             -- đều là thứ tra cứu chứ không đọc tuần tự, nên hợp cột hẹp.
+             Dưới 1200px .workspace tự xếp về một cột, thứ tự đúng như viết ở đây. --%>
+        <div class="workspace">
+        <div class="ws-main">
+
+        <!-- ===== Thông tin hợp đồng ===== -->
+        <%-- Hai thẻ cũ "Thông tin chung" và "Ký kết & giá trị" gộp làm một:
+             chúng cùng một dạng nội dung (các ô nhãn/giá trị của chính bản hợp
+             đồng), để rời ra thì người đọc phải vượt một viền thẻ + một tiêu đề
+             giữa hai nửa của cùng một câu chuyện. Giờ là một thẻ, ngăn bằng nhãn
+             nhóm -- KHÔNG bỏ ô nào. --%>
         <div class="info-card card-box">
-            <div class="section-header"><h5>Thông tin chung</h5></div>
+            <div class="section-header"><h5>Thông tin hợp đồng</h5></div>
+            <div class="ws-subhead">Nhận dạng</div>
             <div class="row">
                 <%-- Một mã duy nhất, do người dùng nhập, chính là số ghi trên bản
                      giấy (V28). Trước đó có thêm một "mã hệ thống" HD-xxxx nữa --
@@ -512,11 +526,7 @@
                      ở đó nó là MỐC của quy trình chứ không phải một ô dữ liệu.
                      Cần bỏ cả chỗ đó thì nói. --%>
             </div>
-        </div>
-
-        <!-- ===== Ký kết & giá trị ===== -->
-        <div class="info-card card-box">
-            <div class="section-header"><h5>Ký kết &amp; giá trị</h5></div>
+            <div class="ws-subhead">Ký kết &amp; giá trị</div>
             <div class="row">
                 <div class="col-md-6 field-row">
                     <label>Người ký bên mình</label>
@@ -637,40 +647,44 @@
                     <div class="empty-mini" style="color:#9ca3af; font-size:0.87rem;">Chưa có sản phẩm nào được gắn vào hợp đồng này.</div>
                 </c:when>
                 <c:otherwise>
-                    <table class="item-table">
-                        <thead>
-                            <tr>
-                                <th style="width:36px;">#</th>
-                                <th>Sản phẩm</th>
-                                <th class="num" style="width:90px;">Số lượng</th>
-                                <th style="width:110px;">Đơn vị</th>
-                                <th>Ghi chú</th>
-                                <th style="width:40px;"></th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <c:forEach var="cp" items="${contractProducts}" varStatus="st">
+                    <%-- Bảng 4-5 cột: dưới ~500px nó rộng hơn màn hình và đẩy CẢ TRANG trượt ngang
+                     (đo được trên màn 375px: trang rộng 462px). Cho riêng bảng cuộn. --%>
+                    <div class="table-responsive">
+                        <table class="item-table">
+                            <thead>
                                 <tr>
-                                    <td>${st.index + 1}</td>
-                                    <td>
-                                        <a href="${pageContext.request.contextPath}/product?action=view&id=${cp.productId}" style="color:var(--primary); font-weight:600; text-decoration:none;">
-                                            ${fn:escapeXml(cp.productName)}
-                                        </a>
-                                        <div style="color:#9ca3af; font-size:0.78rem;">${fn:escapeXml(cp.productCode)}</div>
-                                    </td>
-                                    <td class="num">${cp.quantity}</td>
-                                    <td>${fn:escapeXml(cp.unit)}</td>
-                                    <td>${not empty cp.notes ? fn:escapeXml(cp.notes) : '—'}</td>
-                                    <td>
-                                        <%-- Nút này TRƯỚC ĐÂY không hề kiểm quyền: vai chỉ-xem
-                                             (Kỹ thuật, CSKH) mở trang cũng thấy nút gỡ, bấm vào
-                                             mới nhận 403. Giờ dùng chung đúng một điều kiện với
-                                             form thêm bên dưới. --%>
-                                    </td>
+                                    <th style="width:36px;">#</th>
+                                    <th>Sản phẩm</th>
+                                    <th class="num" style="width:90px;">Số lượng</th>
+                                    <th style="width:110px;">Đơn vị</th>
+                                    <th>Ghi chú</th>
+                                    <th style="width:40px;"></th>
                                 </tr>
-                            </c:forEach>
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody>
+                                <c:forEach var="cp" items="${contractProducts}" varStatus="st">
+                                    <tr>
+                                        <td>${st.index + 1}</td>
+                                        <td>
+                                            <a href="${pageContext.request.contextPath}/product?action=view&id=${cp.productId}" style="color:var(--primary); font-weight:600; text-decoration:none;">
+                                                ${fn:escapeXml(cp.productName)}
+                                            </a>
+                                            <div style="color:#9ca3af; font-size:0.78rem;">${fn:escapeXml(cp.productCode)}</div>
+                                        </td>
+                                        <td class="num">${cp.quantity}</td>
+                                        <td>${fn:escapeXml(cp.unit)}</td>
+                                        <td>${not empty cp.notes ? fn:escapeXml(cp.notes) : '—'}</td>
+                                        <td>
+                                            <%-- Nút này TRƯỚC ĐÂY không hề kiểm quyền: vai chỉ-xem
+                                                 (Kỹ thuật, CSKH) mở trang cũng thấy nút gỡ, bấm vào
+                                                 mới nhận 403. Giờ dùng chung đúng một điều kiện với
+                                                 form thêm bên dưới. --%>
+                                        </td>
+                                    </tr>
+                                </c:forEach>
+                            </tbody>
+                        </table>
+                    </div>
                 </c:otherwise>
             </c:choose>
 
@@ -737,39 +751,43 @@
                     <div class="empty-mini" style="color:#9ca3af; font-size:0.87rem;">Chưa lập kỳ thanh toán nào.</div>
                 </c:when>
                 <c:otherwise>
-                    <table class="item-table">
-                        <thead>
-                            <tr>
-                                <th style="width:40px;">#</th>
-                                <th>Số tiền</th>
-                                <th style="width:130px;">Đến hạn</th>
-                                <th style="width:160px;">Tình trạng</th>
-                                <th style="width:160px;"></th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <c:forEach var="p" items="${contractPayments}" varStatus="row">
+                    <%-- Bảng 4-5 cột: dưới ~500px nó rộng hơn màn hình và đẩy CẢ TRANG trượt ngang
+                     (đo được trên màn 375px: trang rộng 462px). Cho riêng bảng cuộn. --%>
+                    <div class="table-responsive">
+                        <table class="item-table">
+                            <thead>
                                 <tr>
-                                    <td>${row.index + 1}</td>
-                                    <td><strong class="money-vnd" data-vnd="${p.invoiceAmount}">&mdash;</strong></td>
-                                    <td><fmt:formatDate value="${p.dueDate}" pattern="dd/MM/yyyy"/></td>
-                                    <td>
-                                        <c:choose>
-                                            <c:when test="${p.paidDate != null}">
-                                                <span style="color:#2f6b34; font-weight:600;">
-                                                    <i class="fa-solid fa-circle-check"></i>
-                                                    Đã thu <fmt:formatDate value="${p.paidDate}" pattern="dd/MM/yyyy"/>
-                                                </span>
-                                            </c:when>
-                                            <c:otherwise><span style="color:#9ca3af;">Chưa thu</span></c:otherwise>
-                                        </c:choose>
-                                    </td>
-                                    <td style="text-align:right;">
-                                    </td>
+                                    <th style="width:40px;">#</th>
+                                    <th>Số tiền</th>
+                                    <th style="width:130px;">Đến hạn</th>
+                                    <th style="width:160px;">Tình trạng</th>
+                                    <th style="width:160px;"></th>
                                 </tr>
-                            </c:forEach>
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody>
+                                <c:forEach var="p" items="${contractPayments}" varStatus="row">
+                                    <tr>
+                                        <td>${row.index + 1}</td>
+                                        <td><strong class="money-vnd" data-vnd="${p.invoiceAmount}">&mdash;</strong></td>
+                                        <td><fmt:formatDate value="${p.dueDate}" pattern="dd/MM/yyyy"/></td>
+                                        <td>
+                                            <c:choose>
+                                                <c:when test="${p.paidDate != null}">
+                                                    <span style="color:#2f6b34; font-weight:600;">
+                                                        <i class="fa-solid fa-circle-check"></i>
+                                                        Đã thu <fmt:formatDate value="${p.paidDate}" pattern="dd/MM/yyyy"/>
+                                                    </span>
+                                                </c:when>
+                                                <c:otherwise><span style="color:#9ca3af;">Chưa thu</span></c:otherwise>
+                                            </c:choose>
+                                        </td>
+                                        <td style="text-align:right;">
+                                        </td>
+                                    </tr>
+                                </c:forEach>
+                            </tbody>
+                        </table>
+                    </div>
                 </c:otherwise>
             </c:choose>
 
@@ -780,6 +798,99 @@
              người dùng, và khi demo cho khách nó là thứ đập vào mắt đầu tiên.
              contracts vẫn chưa có cột lưu điều khoản; khi nào có thì dựng lại
              thẻ này với dữ liệu thật. --%>
+
+        <!-- ===== Phụ lục ===== -->
+        <%-- CHỈ ĐỌC, như cả trang này. Nút "Lập phụ lục" nằm ở trang quản lý
+             (updatecontract.jsp) cùng mọi thao tác ghi khác -- xem ghi chú đầu
+             khối tiến trình. Ở đây chỉ liệt kê, kèm đường sang từng phụ lục. --%>
+        <c:if test="${not empty amendments}">
+        <div class="info-card card-box">
+            <div class="section-header"><h5>Phụ lục</h5></div>
+            <p style="font-size:0.86rem; color:#6b7280; margin:0 0 14px;">
+                Các văn bản đã sửa đổi hợp đồng này. Mỗi phụ lục là một hợp đồng con có mã riêng,
+                thời hạn riêng và chữ ký riêng — thời hạn ghi trên phụ lục KHÔNG làm đổi ngày kết
+                thúc của bản hợp đồng gốc.
+            </p>
+            <div class="table-responsive">
+                <table class="table align-middle" style="font-size:0.9rem;">
+                    <thead>
+                        <tr>
+                            <th>Mã phụ lục</th>
+                            <th>Tiêu đề</th>
+                            <th>Thời hạn</th>
+                            <%-- Cột này là lý do giá trị hợp đồng ở khối trên không
+                                 còn là con số đã ký: cộng dọc nó ra đúng phần điều
+                                 chỉnh. Phụ lục chưa ký thì ghi rõ là chưa tính. --%>
+                            <th class="num">Điều chỉnh giá trị</th>
+                            <th>Tiến độ</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <c:forEach var="pl" items="${amendments}">
+                            <tr>
+                                <td><strong>${fn:escapeXml(pl.contractCode)}</strong></td>
+                                <td>${fn:escapeXml(pl.title)}</td>
+                                <td>
+                                    <c:choose>
+                                        <c:when test="${pl.effectiveDate == null or pl.endDate == null}">
+                                            <span style="color:#9ca3af;">Chưa chốt</span>
+                                        </c:when>
+                                        <c:otherwise>
+                                            <fmt:formatDate value="${pl.effectiveDate}" pattern="dd/MM/yyyy"/>
+                                            &mdash; <fmt:formatDate value="${pl.endDate}" pattern="dd/MM/yyyy"/>
+                                        </c:otherwise>
+                                    </c:choose>
+                                </td>
+                                <td class="num">
+                                    <span class="money-signed" data-vnd="${pl.contractValue}">&mdash;</span>
+                                    <c:if test="${pl.draft and pl.contractValue != null}">
+                                        <div style="font-size:0.74rem; color:#9ca3af;">chưa ký, chưa tính</div>
+                                    </c:if>
+                                </td>
+                                <td>${fn:escapeXml(pl.progressStatus)}</td>
+                                <td class="text-end">
+                                    <a href="${pageContext.request.contextPath}/contract?action=view&id=${pl.contractId}">Xem</a>
+                                </td>
+                            </tr>
+                        </c:forEach>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        </c:if>
+
+        </div>
+
+        <div class="ws-side">
+
+        <%-- ===== Bản PDF đã ký =====
+             Đứng ĐẦU cột phải: đây là bản gốc của mọi thứ bên trái, để cuối
+             trang như trước thì phải cuộn qua cả trang mới thấy. Khung nhúng cao
+             640px, trước đây không dám đặt giữa vì nó đẩy mọi khối sau ra khỏi
+             tầm mắt -- nằm riêng một cột thì không đẩy gì nữa.
+
+             Chỉ hiện khi link nhận ra được là file Drive (controller dựng sẵn
+             drivePreviewUrl). Link tới nơi khác vẫn còn nút "Mở PDF trên Drive"
+             ở đầu trang -- nhúng chúng dễ ra khung trắng vì site đó tự chặn. --%>
+        <c:if test="${not empty drivePreviewUrl}">
+            <div class="info-card card-box">
+                <div class="section-header">
+                    <h5>Bản PDF đã ký</h5>
+                    <a href="${fn:escapeXml(attachmentUrl)}" target="_blank" rel="noopener noreferrer"
+                       style="font-size:0.85rem; color:var(--primary); font-weight:600; text-decoration:none;">
+                        Mở trên Drive <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                    </a>
+                </div>
+                <iframe src="${fn:escapeXml(drivePreviewUrl)}"
+                        style="width:100%; height:640px; border:1px solid #eef2f6; border-radius:12px;"
+                        allow="autoplay" title="Bản PDF hợp đồng"></iframe>
+                <p style="font-size:0.78rem; color:#9ca3af; margin:10px 0 0;">
+                    Không thấy nội dung? File trên Drive có thể đang giới hạn quyền xem --
+                    hãy mở bằng link ở trên để đăng nhập Google và kiểm tra quyền truy cập.
+                </p>
+            </div>
+        </c:if>
 
         <!-- ===== Bàn giao phòng ban ===== -->
         <%-- CHỈ ĐỌC, như cả trang này. Nút "Đã xử lý xong" của phòng nhận nằm ở
@@ -844,6 +955,42 @@
             </div>
         </div>
         </c:if>
+
+        <!-- ===== Nhật ký thay đổi ===== -->
+        <div class="info-card card-box">
+            <div class="section-header"><h5>Nhật ký thay đổi</h5></div>
+            <c:choose>
+                <c:when test="${empty contractHistory}">
+                    <div class="empty-mini" style="color:#9ca3af; font-size:0.87rem;">Chưa có thay đổi nào được ghi lại.</div>
+                </c:when>
+                <c:otherwise>
+                    <%-- Dòng thời gian chứ không phải bảng: nhật ký này kể một
+                         câu chuyện theo thứ tự, mà bảng thì bắt người đọc tự
+                         ghép lại từ bốn cột. Mốc tiến trình (có from/to) được làm
+                         nổi hơn dòng sửa đổi -- để giống nhau thì mốc bị chìm
+                         giữa các lần sửa vặt. --%>
+                    <ul class="tl">
+                        <c:forEach var="h" items="${contractHistory}">
+                            <li class="tl-item ${h.statusChange ? 'milestone' : ''}">
+                                <div class="tl-head">
+                                    ${fn:escapeXml(h.eventType)}
+                                    <span class="tl-when"><fmt:formatDate value="${h.changedAt}" pattern="dd/MM/yyyy HH:mm"/>
+                                        &middot; ${fn:escapeXml(h.changedByUser.fullName)}</span>
+                                </div>
+                                <div class="tl-body">${fn:escapeXml(h.detail)}</div>
+                                <%-- note là chữ người dùng gõ, detail là chữ hệ thống sinh.
+                                     Tách hẳn dòng để không ai đọc nhầm lý do của người
+                                     thành ghi nhận của máy. --%>
+                                <c:if test="${not empty h.note}">
+                                    <div class="tl-note"><i class="fa-solid fa-quote-left" style="font-size:.7rem;"></i>
+                                        ${fn:escapeXml(h.note)}</div>
+                                </c:if>
+                            </li>
+                        </c:forEach>
+                    </ul>
+                </c:otherwise>
+            </c:choose>
+        </div>
 
         <!-- ===== Đầu ra kéo theo đầu vào ===== -->
         <%-- CHỈ ĐỌC, như cả trang này: nối/gỡ nằm ở trang quản lý. --%>
@@ -922,129 +1069,9 @@
         </div>
         </c:if>
 
-        <!-- ===== Phụ lục ===== -->
-        <%-- CHỈ ĐỌC, như cả trang này. Nút "Lập phụ lục" nằm ở trang quản lý
-             (updatecontract.jsp) cùng mọi thao tác ghi khác -- xem ghi chú đầu
-             khối tiến trình. Ở đây chỉ liệt kê, kèm đường sang từng phụ lục. --%>
-        <c:if test="${not empty amendments}">
-        <div class="info-card card-box">
-            <div class="section-header"><h5>Phụ lục</h5></div>
-            <p style="font-size:0.86rem; color:#6b7280; margin:0 0 14px;">
-                Các văn bản đã sửa đổi hợp đồng này. Mỗi phụ lục là một hợp đồng con có mã riêng,
-                thời hạn riêng và chữ ký riêng — thời hạn ghi trên phụ lục KHÔNG làm đổi ngày kết
-                thúc của bản hợp đồng gốc.
-            </p>
-            <div class="table-responsive">
-                <table class="table align-middle" style="font-size:0.9rem;">
-                    <thead>
-                        <tr>
-                            <th>Mã phụ lục</th>
-                            <th>Tiêu đề</th>
-                            <th>Thời hạn</th>
-                            <%-- Cột này là lý do giá trị hợp đồng ở khối trên không
-                                 còn là con số đã ký: cộng dọc nó ra đúng phần điều
-                                 chỉnh. Phụ lục chưa ký thì ghi rõ là chưa tính. --%>
-                            <th class="num">Điều chỉnh giá trị</th>
-                            <th>Tiến độ</th>
-                            <th></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <c:forEach var="pl" items="${amendments}">
-                            <tr>
-                                <td><strong>${fn:escapeXml(pl.contractCode)}</strong></td>
-                                <td>${fn:escapeXml(pl.title)}</td>
-                                <td>
-                                    <c:choose>
-                                        <c:when test="${pl.effectiveDate == null or pl.endDate == null}">
-                                            <span style="color:#9ca3af;">Chưa chốt</span>
-                                        </c:when>
-                                        <c:otherwise>
-                                            <fmt:formatDate value="${pl.effectiveDate}" pattern="dd/MM/yyyy"/>
-                                            &mdash; <fmt:formatDate value="${pl.endDate}" pattern="dd/MM/yyyy"/>
-                                        </c:otherwise>
-                                    </c:choose>
-                                </td>
-                                <td class="num">
-                                    <span class="money-signed" data-vnd="${pl.contractValue}">&mdash;</span>
-                                    <c:if test="${pl.draft and pl.contractValue != null}">
-                                        <div style="font-size:0.74rem; color:#9ca3af;">chưa ký, chưa tính</div>
-                                    </c:if>
-                                </td>
-                                <td>${fn:escapeXml(pl.progressStatus)}</td>
-                                <td class="text-end">
-                                    <a href="${pageContext.request.contextPath}/contract?action=view&id=${pl.contractId}">Xem</a>
-                                </td>
-                            </tr>
-                        </c:forEach>
-                    </tbody>
-                </table>
-            </div>
         </div>
-        </c:if>
-
-        <!-- ===== Nhật ký thay đổi ===== -->
-        <div class="info-card card-box">
-            <div class="section-header"><h5>Nhật ký thay đổi</h5></div>
-            <c:choose>
-                <c:when test="${empty contractHistory}">
-                    <div class="empty-mini" style="color:#9ca3af; font-size:0.87rem;">Chưa có thay đổi nào được ghi lại.</div>
-                </c:when>
-                <c:otherwise>
-                    <%-- Dòng thời gian chứ không phải bảng: nhật ký này kể một
-                         câu chuyện theo thứ tự, mà bảng thì bắt người đọc tự
-                         ghép lại từ bốn cột. Mốc tiến trình (có from/to) được làm
-                         nổi hơn dòng sửa đổi -- để giống nhau thì mốc bị chìm
-                         giữa các lần sửa vặt. --%>
-                    <ul class="tl">
-                        <c:forEach var="h" items="${contractHistory}">
-                            <li class="tl-item ${h.statusChange ? 'milestone' : ''}">
-                                <div class="tl-head">
-                                    ${fn:escapeXml(h.eventType)}
-                                    <span class="tl-when"><fmt:formatDate value="${h.changedAt}" pattern="dd/MM/yyyy HH:mm"/>
-                                        &middot; ${fn:escapeXml(h.changedByUser.fullName)}</span>
-                                </div>
-                                <div class="tl-body">${fn:escapeXml(h.detail)}</div>
-                                <%-- note là chữ người dùng gõ, detail là chữ hệ thống sinh.
-                                     Tách hẳn dòng để không ai đọc nhầm lý do của người
-                                     thành ghi nhận của máy. --%>
-                                <c:if test="${not empty h.note}">
-                                    <div class="tl-note"><i class="fa-solid fa-quote-left" style="font-size:.7rem;"></i>
-                                        ${fn:escapeXml(h.note)}</div>
-                                </c:if>
-                            </li>
-                        </c:forEach>
-                    </ul>
-                </c:otherwise>
-            </c:choose>
         </div>
 
-        <%-- ===== Bản PDF đã ký, xem ngay tại đây =====
-             Đặt CUỐI trang: khung nhúng cao 640px, để ở giữa thì nó đẩy mọi khối
-             bên dưới ra khỏi tầm mắt và người đọc phải cuộn qua cả trang PDF
-             mới tới được nhật ký.
-
-             Chỉ hiện khi link nhận ra được là file Drive (controller dựng sẵn
-             drivePreviewUrl). Link tới nơi khác vẫn còn nút "Mở PDF trên Drive"
-             ở đầu trang -- nhúng chúng dễ ra khung trắng vì site đó tự chặn. --%>
-        <c:if test="${not empty drivePreviewUrl}">
-            <div class="info-card card-box">
-                <div class="section-header">
-                    <h5>Bản PDF đã ký</h5>
-                    <a href="${fn:escapeXml(attachmentUrl)}" target="_blank" rel="noopener noreferrer"
-                       style="font-size:0.85rem; color:var(--primary); font-weight:600; text-decoration:none;">
-                        Mở trên Drive <i class="fa-solid fa-arrow-up-right-from-square"></i>
-                    </a>
-                </div>
-                <iframe src="${fn:escapeXml(drivePreviewUrl)}"
-                        style="width:100%; height:640px; border:1px solid #eef2f6; border-radius:12px;"
-                        allow="autoplay" title="Bản PDF hợp đồng"></iframe>
-                <p style="font-size:0.78rem; color:#9ca3af; margin:10px 0 0;">
-                    Không thấy nội dung? File trên Drive có thể đang giới hạn quyền xem --
-                    hãy mở bằng link ở trên để đăng nhập Google và kiểm tra quyền truy cập.
-                </p>
-            </div>
-        </c:if>
     </div>
 
         </div>

@@ -187,3 +187,51 @@ body { font-family: 'Inter', sans-serif; background: #f3f4f6; min-height: 100vh;
     cursor: pointer;
 }
 .btn-outline-action:hover { background: #eaf6ff; color: var(--primary-dark); border-color: var(--primary-light); }
+
+
+/* ===== Bố cục hai cột cho trang chi tiết / quản lý =====
+   Một màn hình có mười thẻ xếp chồng một cột thì không thẻ nào nổi hơn thẻ nào,
+   và trang dài gấp đôi mức cần. .workspace chia làm cột NỘI DUNG (rộng) và
+   cột TRA CỨU (hẹp). Không bỏ nội dung nào -- chỉ đổi chỗ đứng.
+
+   align-items:start để hai cột cao độc lập nhau; thẻ bên trong vẫn tự giãn
+   bằng margin-bottom của chính trang, không dùng gap dọc để khỏi cộng hai lần.
+   minmax(0,...) là bắt buộc: thiếu nó thì một cái bảng rộng bên trong sẽ nới
+   cột ra và phá vỡ tỉ lệ.
+
+   Dưới 1200px xếp về MỘT cột theo đúng thứ tự viết trong JSP -- nên cột chính
+   phải viết trước cột phụ trong mã nguồn. */
+.workspace { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr); column-gap: 20px; align-items: start; }
+.workspace > div { min-width: 0; }
+/* Ngưỡng tính theo VIEWPORT nên phải trừ sẵn 240px sidebar: ở 1280px thì khung
+   nội dung còn ~1000px, chia ra vẫn đủ thở; hẹp hơn là bóp chữ. */
+@media (max-width: 1279px) {
+    .workspace { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* Nhãn nhóm bên trong một thẻ đã gộp từ nhiều thẻ nhỏ -- nhẹ hơn một tiêu đề
+   thẻ thật, đủ để mắt tách đoạn mà không dựng thêm một viền thẻ nữa. */
+.ws-subhead {
+    font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;
+    color: #9ca3af; margin: 20px 0 12px; padding-top: 16px; border-top: 1px dashed #e5e7eb;
+}
+.ws-subhead:first-of-type { margin-top: 0; padding-top: 0; border-top: none; }
+
+/* DÍNH theo màn hình -- CHỈ dùng khi cột đó NGẮN hơn màn hình. position:sticky
+   ghim cạnh TRÊN của phần tử, nên một cột cao hơn viewport sẽ không bao giờ cuộn
+   tới được phần đáy của nó. Vì vậy trang xem (cột phải có khung PDF cao 640px)
+   KHÔNG dùng lớp này, còn trang quản lý (cột phải ~400px) thì có. */
+.ws-sticky { position: sticky; top: 86px; }
+@media (max-width: 1279px) {
+    .ws-sticky { position: static; }
+}
+
+/* Bootstrap chia cột theo BỀ NGANG MÀN HÌNH, không theo bề ngang thẻ cha -- nên
+   một .col-md-4 nằm trong cột tra cứu ~400px vẫn cố xếp ba ô ngang rồi tràn chữ ra
+   ngoài (đo được trên khối hợp đồng nối kèm: ô rộng 87px chứa con số cần 117px).
+   Trong cột hẹp thì mọi cột md/lg xếp dọc. Chỉ áp khi lưới đang thật sự hai cột --
+   dưới 1280px .ws-side rộng hết trang, lúc đó Bootstrap lại đúng. */
+@media (min-width: 1280px) {
+    .ws-side [class*="col-md-"],
+    .ws-side [class*="col-lg-"] { flex: 0 0 auto; width: 100%; }
+}

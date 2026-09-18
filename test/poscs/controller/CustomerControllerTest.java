@@ -164,7 +164,28 @@ public class CustomerControllerTest {
         controller.doPost(request, response);
 
         verify(customerDAO).softDelete(7);
-        verify(response).sendRedirect(CONTEXT_PATH + "/customer");
+        verify(response).sendRedirect(CONTEXT_PATH + "/customer?kind=buyer");
+    }
+
+    /**
+     * Xoá xong phải về ĐÚNG danh sách người dùng vừa đứng.
+     *
+     * <p>Sau softDelete thì không đọc lại được vai của bản ghi nữa, nên chiều phải
+     * đi theo tham số kind do form xoá gửi lên. Thiếu nó thì xoá một nhà cung cấp xong
+     * bị đẩy sang danh sách khách mua -- đúng lỗi đã gặp trên bản chạy thật.
+     */
+    @Test
+    public void delete_fromSupplierList_redirectsBackToSupplierList() throws Exception {
+        when(request.getParameter("action")).thenReturn("delete");
+        when(request.getParameter("id")).thenReturn("7");
+        when(request.getParameter("kind")).thenReturn("supplier");
+        when(customerDAO.findById(7)).thenReturn(new Enterprise());
+        when(customerDAO.hasActiveContracts(7)).thenReturn(false);
+
+        controller.doPost(request, response);
+
+        verify(customerDAO).softDelete(7);
+        verify(response).sendRedirect(CONTEXT_PATH + "/customer?kind=supplier");
     }
 
     // ------------------------------------------------------------------
