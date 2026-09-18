@@ -5386,4 +5386,30 @@ INSERT INTO technicalrequestdevices (ticket_id, product_id, device_name, serial_
 ((SELECT ticket_id FROM technicalrequests WHERE ticket_code = 'TK-0015'), (SELECT product_id FROM products WHERE product_code = 'SP-0008'), (SELECT product_name FROM products WHERE product_code = 'SP-0008'), 'EAT-2026-0550', 'Tiếp điểm contactor oxy hoá, máy liên tục nhảy bypass');
 
 
+-- ---------------------------------------------------------------------------
+-- Phân công địa bàn cho đội Sales (giống V33)
+--
+-- Danh sách khách hàng và hợp đồng thu hẹp mặc định về "phần việc của tôi", mà
+-- một vế của phép đó là địa bàn. Bảng này trống thì vế đó không bao giờ khớp,
+-- và bản dựng sạch không kiểm chứng được tính năng đó. Xem V33 để biết vì sao
+-- Bắc Ninh cố ý lệch chủ sở hữu.
+--
+-- sales1 do V12 gieo nên CHƯA tồn tại ở đây -- dòng của nó tự rơi ra, bản sạch
+-- ra 17 dòng thay vì 18. sales6 đang is_deleted = 1 nên cũng không được giao tỉnh;
+-- ba tỉnh của họ đã chuyển sang sales5, xem V33.
+-- ---------------------------------------------------------------------------
+INSERT INTO user_provinces (user_id, province_id)
+SELECT u.user_id, p.province_id
+FROM users u
+JOIN provinces p ON (
+        (u.username = 'sales1' AND p.province_name IN ('Tỉnh Lai Châu'))
+     OR (u.username = 'sales2' AND p.province_name IN ('Thành phố Hải Phòng', 'Tỉnh Thái Nguyên', 'Tỉnh Cao Bằng'))
+     OR (u.username = 'sales3' AND p.province_name IN ('Tỉnh Lạng Sơn', 'Tỉnh Tuyên Quang', 'Tỉnh Hà Tĩnh'))
+     OR (u.username = 'sales4' AND p.province_name IN ('Thành phố Hà Nội', 'Tỉnh Quảng Ninh', 'Tỉnh Phú Thọ', 'Tỉnh Lào Cai', 'Tỉnh Bắc Ninh'))
+     OR (u.username = 'sales5' AND p.province_name IN ('Tỉnh Hưng Yên', 'Tỉnh Thanh Hóa', 'Tỉnh Sơn La',
+                                                      'Tỉnh Ninh Bình', 'Tỉnh Nghệ An', 'Tỉnh Điện Biên'))
+)
+WHERE u.is_deleted = 0;
+
+
 SET FOREIGN_KEY_CHECKS = 1;
