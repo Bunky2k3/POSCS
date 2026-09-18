@@ -110,6 +110,154 @@
           "t": "keyword: 123/2026",
           "e": "Ra đúng hợp đồng mang số đó",
           "n": "Khách gọi điện đọc số trên giấy chứ không đọc mã HD-xxxx, nên đây là đường tra chính"
+        },
+        {
+          "d": "Bốn ô số ở đầu trang bấm được để lọc theo trạng thái",
+          "s": [
+            "Mở danh sách Hợp đồng bán",
+            "Bấm vào ô \"Sắp hết hạn (≤30 ngày)\""
+          ],
+          "t": "-",
+          "e": "Danh sách còn đúng các hợp đồng sắp hết hạn, số dòng bằng con số trên ô vừa bấm; ô đó sáng viền lên và hiện thêm dòng \"đang lọc · bấm để bỏ\"; thanh lọc không còn ô chọn \"Tất cả trạng thái\"",
+          "n": "Dải KPI trước đây chỉ để nhìn; giờ nó làm luôn việc của ô lọc trạng thái nên ô đó đã bỏ hẳn"
+        },
+        {
+          "d": "Bấm lại ô đang sáng thì bỏ lọc",
+          "s": [
+            "Đang lọc theo một trạng thái, bấm lại chính ô đó"
+          ],
+          "p": "Đang bật lọc theo một trạng thái lịch",
+          "t": "-",
+          "e": "Trở về danh sách đầy đủ, không ô nào còn sáng, tham số status biến mất khỏi URL",
+          "n": "Không có nút tắt nào khác, và người dùng sẽ bấm lại ô đang sáng theo phản xạ"
+        },
+        {
+          "d": "Bốn ô số đếm đúng chiều hợp đồng đang đứng",
+          "s": [
+            "Ghi lại bốn con số ở mục Hợp đồng bán và tổng ở thanh phân trang",
+            "Sang mục Hợp đồng mua, ghi lại bốn con số và tổng"
+          ],
+          "p": "CSDL có hợp đồng ở cả hai chiều",
+          "t": "-",
+          "e": "Ở mỗi mục, bốn con số cộng lại bằng đúng tổng ghi ở thanh phân trang của chính mục đó; hai mục cho ra hai bộ số khác nhau",
+          "n": "Trước bản này countStatusSummary nhận tham số chiều nhưng câu lệnh bỏ quên nó, nên đứng ở mục Mua vẫn thấy số của cả hợp đồng bán"
+        },
+        {
+          "d": "Bốn ô số đếm theo đúng phạm vi phụ lục đang chọn",
+          "s": [
+            "Ghi lại bốn con số khi chưa tích gì",
+            "Tích ô \"Chỉ hợp đồng gốc\" rồi ghi lại bốn con số"
+          ],
+          "t": "Phạm vi: Chỉ hợp đồng gốc",
+          "e": "Bốn con số giảm đi đúng phần phụ lục và vẫn cộng lại bằng tổng ở thanh phân trang"
+        },
+        {
+          "d": "Phạm vi phụ lục là một ô tích, không tích thì không gửi tham số",
+          "s": [
+            "Tích \"Chỉ hợp đồng gốc\" (danh sách tự nạp lại)",
+            "Bỏ tích"
+          ],
+          "t": "-",
+          "e": "Tích thì URL có scope=root và có chip \"Chỉ hợp đồng gốc\"; bỏ tích thì tham số scope biến mất khỏi URL và danh sách quay về gồm cả phụ lục"
+        },
+        {
+          "d": "Ô Quý/Tháng chỉ hiện khi đã chọn năm",
+          "s": [
+            "Mở khối \"Lọc thêm\" khi chưa chọn năm",
+            "Chọn một năm rồi mở lại khối đó"
+          ],
+          "t": "Năm: 2026",
+          "e": "Chưa chọn năm thì không có ô Quý/Tháng nào trong khối; chọn năm xong ô đó mới hiện ra kèm các lựa chọn Cả năm / Quý 1-4 / Tháng 1-12",
+          "n": "Bộ lọc kỳ dựng từ cặp (năm, kỳ); chọn \"Quý 3\" một mình thì bấm vào không có chuyện gì xảy ra"
+        },
+        {
+          "d": "Bỏ lọc năm thì bỏ luôn lọc kỳ",
+          "s": [
+            "Lọc theo Năm 2026 + Quý 3",
+            "Bấm dấu × trên chip \"Kỳ: Quý 3/2026\""
+          ],
+          "p": "Đang lọc theo năm và quý",
+          "t": "-",
+          "e": "Cả hai tham số year và period cùng biến mất khỏi URL; không còn chip kỳ nào sót lại"
+        },
+        {
+          "d": "Nút \"Lọc thêm\" đếm số lọc đang bật và mở sẵn khối khi có lọc",
+          "s": [
+            "Lọc theo loại hợp đồng và theo năm",
+            "Nạp lại trang"
+          ],
+          "t": "Loại hợp đồng: Cung cấp thiết bị; Năm: 2026",
+          "e": "Nút hiện \"Lọc thêm 2\"; khối loại hợp đồng / tỉnh / kỳ mở sẵn ngay khi vào trang, không phải bấm ra; bấm nút thì đóng lại",
+          "n": "Một bộ lọc đang thu hẹp kết quả mà bị giấu sau nút đóng thì không ai biết vì sao danh sách ngắn đi"
+        },
+        {
+          "d": "Chip \"đang lọc\" bỏ được từng điều kiện",
+          "s": [
+            "Lọc đồng thời theo từ khoá, tiến độ và loại hợp đồng",
+            "Bấm dấu × trên chip \"Tiến độ: Đã ký\""
+          ],
+          "t": "keyword: cáp; Tiến độ: Đã ký; Loại: Cung cấp thiết bị",
+          "e": "Chỉ điều kiện tiến độ bị bỏ; hai chip còn lại và kết quả lọc theo chúng vẫn nguyên",
+          "n": "Trước đây muốn bỏ một điều kiện phải nhớ nó nằm ở ô nào rồi trả ô đó về \"Tất cả\""
+        },
+        {
+          "d": "\"Xoá tất cả\" trả về danh sách đầy đủ của đúng mục đang đứng",
+          "s": [
+            "Ở mục Hợp đồng mua, bật vài bộ lọc",
+            "Bấm \"Xoá tất cả\""
+          ],
+          "p": "Đang ở mục Hợp đồng mua và có ít nhất một lọc đang bật",
+          "t": "-",
+          "e": "Mọi chip biến mất, danh sách trở lại đầy đủ và VẪN ở mục Hợp đồng mua (không nhảy sang hợp đồng bán)"
+        },
+        {
+          "d": "Bấm ô trạng thái giữ nguyên các lọc khác",
+          "s": [
+            "Lọc theo tiến độ \"Đã ký\" và tích \"Chỉ hợp đồng gốc\"",
+            "Bấm ô \"Đang hiệu lực\""
+          ],
+          "t": "Tiến độ: Đã ký; Phạm vi: Chỉ hợp đồng gốc",
+          "e": "Kết quả thoả cả ba điều kiện; hai chip cũ vẫn còn trên màn hình",
+          "n": "Link của từng ô dựng ở controller (FilterState) chứ không ghép chuỗi trong JSP — ghép ở đó thì chỗ nào quên một tham số là lọc đang bật lặng lẽ biến mất"
+        },
+        {
+          "d": "Mục Hợp đồng mua không có ô lọc tỉnh trong khối Lọc thêm",
+          "s": [
+            "Vào mục Hợp đồng mua, mở khối \"Lọc thêm\""
+          ],
+          "t": "-",
+          "e": "Chỉ có ô loại hợp đồng và ô năm; không có ô tỉnh địa bàn, và trang không lỗi JavaScript",
+          "n": "Tỉnh suy ra từ địa chỉ đối tác, mà đối tác của hợp đồng mua là nhà cung cấp — nhóm không chia theo địa bàn"
+        },
+        {
+          "d": "Bộ dữ liệu demo sau khi gieo lại",
+          "s": [
+            "Xem tổng số ở thanh phân trang của mục Hợp đồng bán và mục Hợp đồng mua"
+          ],
+          "p": "Migration V30 đã chạy",
+          "t": "-",
+          "e": "Tổng cộng 17 hợp đồng gốc và 7 phụ lục: mục Hợp đồng bán 20 dòng, mục Hợp đồng mua 4 dòng; tích \"Chỉ hợp đồng gốc\" thì còn 14 và 3"
+        },
+        {
+          "d": "Bộ dữ liệu demo bày đủ các trạng thái và tiến độ",
+          "s": [
+            "Bấm lần lượt bốn ô trạng thái",
+            "Chọn lần lượt bốn giá trị của ô Tiến độ"
+          ],
+          "p": "Migration V30 đã chạy",
+          "t": "-",
+          "e": "Không lần nào ra danh sách rỗng: có đủ hợp đồng Chưa hiệu lực / Đang hiệu lực / Sắp hết hạn / Đã hết hạn và đủ Nháp / Đã ký / Đã thanh lý / Chấm dứt sớm",
+          "o": "Bộ cũ gần như toàn bộ là \"Đã ký + Đang hiệu lực\" nên không kiểm được các nhánh còn lại"
+        },
+        {
+          "d": "Mốc thời gian của bộ demo tính từ ngày chạy",
+          "s": [
+            "Xem cột Thời hạn của các hợp đồng demo"
+          ],
+          "p": "Migration V30 đã chạy",
+          "t": "-",
+          "e": "Ngày hiệu lực và ngày kết thúc nằm quanh ngày hiện tại chứ không phải ngày cứng của một năm cũ; chạy lại sau vài tháng thì bốn nhóm trạng thái vẫn còn đủ",
+          "n": "Ngày ghi cứng nghĩa là vài tháng nữa cả bộ dữ liệu trôi hết sang \"Đã hết hạn\""
         }
       ]
     },
@@ -191,6 +339,16 @@
           "p": "Hợp đồng đã bị xoá mềm",
           "t": "URL chi tiết hợp đồng đã xoá",
           "e": "Không hiện dữ liệu, chuyển về danh sách kèm thông báo không tìm thấy"
+        },
+        {
+          "d": "Hợp đồng không có phụ lục thì không có dòng \"Giá trị hiện hành\"",
+          "s": [
+            "Mở chi tiết một hợp đồng chưa có phụ lục nào"
+          ],
+          "p": "Hợp đồng đã chốt giá và chưa có phụ lục",
+          "t": "-",
+          "e": "Khối Ký kết & giá trị chỉ có một ô \"Giá trị hợp đồng\"; không có ô \"Giá trị hiện hành\" và không có dải \"đang chờ ký\"",
+          "n": "Ca đối chứng cho nhóm giá trị theo phụ lục: ba dòng giá trị chỉ hiện khi thật sự có phụ lục đã ký làm đổi tiền"
         }
       ]
     },
@@ -826,6 +984,363 @@
           ],
           "t": "Phạm vi: Chỉ hợp đồng gốc",
           "e": "File xuất ra không có dòng phụ lục nào; file có cột \"Phụ lục của\", để trống ở hợp đồng gốc"
+        },
+        {
+          "d": "Form phụ lục hỏi giá trị bằng ô chọn Bổ sung / Giảm trừ / Không đổi",
+          "s": [
+            "Từ một hợp đồng Đã ký có giá trị, bấm \"Lập phụ lục\"",
+            "Xem hai ô cuối khối Ký kết & giá trị"
+          ],
+          "p": "Hợp đồng gốc đã ký và đã chốt giá trị",
+          "t": "-",
+          "e": "Có ô chọn \"Điều chỉnh giá trị\" với ba lựa chọn Bổ sung / Giảm trừ / Không đổi giá trị, mặc định đang ở \"Không đổi giá trị\"; ô tiền mang nhãn \"Số tiền điều chỉnh (VNĐ)\" kèm dòng nhắc \"Nhập số dương, phần CHÊNH LỆCH so với hợp đồng gốc — không phải tổng giá trị mới\" và in ra giá trị hiện hành của hợp đồng gốc",
+          "n": "Dấu nhập bằng ô chọn chứ không bắt gõ dấu trừ: một ô tiền âm in lên màn hình không cho biết nó là giảm trừ hay lỗi nhập liệu"
+        },
+        {
+          "d": "Phụ lục bổ sung còn nháp thì chưa cộng vào giá trị hợp đồng",
+          "s": [
+            "Lập phụ lục, chọn \"Bổ sung\" và nhập số tiền, bấm Lưu",
+            "Mở lại trang xem HỢP ĐỒNG GỐC"
+          ],
+          "p": "Hợp đồng gốc chưa có phụ lục nào đã ký",
+          "t": "Điều chỉnh giá trị: Bổ sung; Số tiền điều chỉnh: 400.000.000",
+          "e": "Ô \"Giá trị hợp đồng\" vẫn là con số cũ và KHÔNG có dòng \"Giá trị hiện hành\"; bên dưới hiện dải \"Đang có phụ lục chờ ký với điều chỉnh +400.000.000 ₫ — chưa ký thì chưa tính vào giá trị hợp đồng\"; dòng trong bảng Phụ lục ghi \"+400.000.000 ₫\" kèm chú \"chưa ký, chưa tính\""
+        },
+        {
+          "d": "Ký phụ lục mới là lúc giá trị hợp đồng đổi",
+          "s": [
+            "Mở phụ lục vừa lập, điền thời hạn rồi bấm Ký hợp đồng",
+            "Mở lại trang xem hợp đồng gốc"
+          ],
+          "p": "Có phụ lục còn nháp mang giá trị bổ sung",
+          "t": "Hợp đồng gốc 1.500.000.000; phụ lục bổ sung 250.000.000",
+          "e": "Hiện thêm ô \"Giá trị hiện hành\" 1.750.000.000 ₫ kèm dòng \"= giá trị theo bản gốc đã ký 1.500.000.000 ₫ +250.000.000 ₫ từ 1 phụ lục\"; ô \"Giá trị hợp đồng\" vẫn là 1.500.000.000 ₫; dải \"đang chờ ký\" biến mất",
+          "o": "Con số trên bản ghi gốc không bị ghi đè — chênh lệch giữa nó và giá trị hiện hành mới là thứ đi hỏi khi đối chiếu"
+        },
+        {
+          "d": "Phụ lục giảm trừ",
+          "s": [
+            "Lập phụ lục, chọn \"Giảm trừ\", nhập số DƯƠNG rồi lưu",
+            "Ký phụ lục đó",
+            "Mở lại hợp đồng gốc"
+          ],
+          "p": "Hợp đồng gốc đã ký, giá trị 900.000.000",
+          "t": "Điều chỉnh giá trị: Giảm trừ; Số tiền điều chỉnh: 180.000.000",
+          "e": "Dòng phụ lục hiện \"-180.000.000 ₫\"; giá trị hiện hành của hợp đồng gốc là 720.000.000 ₫",
+          "n": "Ô tiền luôn nhập số dương — dấu do ô chọn quyết định; gửi lên cả dấu trừ lẫn \"Giảm trừ\" là đảo dấu một khoản vốn đã âm"
+        },
+        {
+          "d": "Chọn \"Không đổi giá trị\" thì số còn sót trong ô tiền bị bỏ qua",
+          "s": [
+            "Ở form phụ lục, gõ một số vào ô Số tiền điều chỉnh",
+            "Đổi ô chọn về \"Không đổi giá trị\" rồi Lưu",
+            "Ký phụ lục và xem lại hợp đồng gốc"
+          ],
+          "t": "Điều chỉnh giá trị: Không đổi giá trị; Số tiền điều chỉnh: 250.000.000",
+          "e": "Trang xem phụ lục ghi \"không đổi giá trị\", dòng trong bảng Phụ lục ghi \"không đổi\", và giá trị hợp đồng gốc không đổi kể cả sau khi ký",
+          "n": "Phụ lục gia hạn hay đổi hàng hoá thì con số còn sót trong ô không được lặng lẽ cộng vào tiền hợp đồng"
+        },
+        {
+          "d": "Giảm trừ nhiều hơn số tiền còn lại bị từ chối",
+          "s": [
+            "Lập phụ lục, chọn \"Giảm trừ\" và nhập số lớn hơn giá trị hiện hành của hợp đồng gốc",
+            "Bấm Lưu"
+          ],
+          "p": "Hợp đồng gốc đã ký, giá trị 900.000.000",
+          "t": "Điều chỉnh giá trị: Giảm trừ; Số tiền điều chỉnh: 1.000.000.000",
+          "e": "Bị đưa lại form kèm thông báo \"Khoản giảm trừ lớn hơn giá trị còn lại của hợp đồng gốc — giá trị hợp đồng sẽ âm. Ô này nhập phần CHÊNH LỆCH, không phải tổng giá trị mới.\"; không bản ghi phụ lục nào được tạo",
+          "n": "Lỗi hay gặp nhất là gõ TỔNG giá trị mới vào ô chênh lệch, nên thông báo phải nói ra điều đó"
+        },
+        {
+          "d": "Sửa một phụ lục còn nháp thành giảm trừ vượt mức cũng bị chặn",
+          "s": [
+            "Lập một phụ lục bổ sung hợp lệ rồi Lưu",
+            "Mở trang quản lý của chính phụ lục đó, đổi sang \"Giảm trừ\" với số lớn hơn giá trị còn lại",
+            "Bấm Lưu"
+          ],
+          "p": "Có phụ lục còn NHÁP (chưa ký nên điều khoản chưa khoá)",
+          "t": "Điều chỉnh giá trị: Giảm trừ; Số tiền điều chỉnh: lớn hơn giá trị hiện hành của hợp đồng gốc",
+          "e": "Cùng thông báo như khi lập mới; phụ lục giữ nguyên con số cũ",
+          "n": "Chặn cả hai đường ghi — chỉ chặn lúc lập thì lập hợp lệ rồi sửa lại là đi vòng qua được luật"
+        },
+        {
+          "d": "Phụ lục đã ký thì số tiền điều chỉnh khoá lại",
+          "s": [
+            "Mở trang quản lý của một phụ lục ĐÃ KÝ"
+          ],
+          "p": "Có phụ lục đã ký mang giá trị",
+          "t": "-",
+          "e": "Không còn ô chọn \"Điều chỉnh giá trị\"; ô Số tiền điều chỉnh bị khoá cùng các điều khoản khác",
+          "o": "Đổi tiền trên một văn bản đã ký phải đi qua một phụ lục khác, đúng luật của hợp đồng gốc"
+        },
+        {
+          "d": "Nhiều phụ lục cộng dồn theo dấu",
+          "s": [
+            "Mở hợp đồng gốc có hai phụ lục đã ký, một bổ sung một giảm trừ",
+            "Cộng dọc cột \"Điều chỉnh giá trị\" trong bảng Phụ lục"
+          ],
+          "p": "Hợp đồng gốc 1.800.000.000 có hai phụ lục đã ký: +300.000.000 và -120.000.000",
+          "t": "-",
+          "e": "Giá trị hiện hành là 1.980.000.000 ₫, dòng giải thích ghi \"từ 2 phụ lục\"; tổng cột \"Điều chỉnh giá trị\" bằng đúng +180.000.000 ₫"
+        },
+        {
+          "d": "Phụ lục đã thanh lý hoặc chấm dứt sớm vẫn tính vào giá trị",
+          "s": [
+            "Ký một phụ lục có giá trị",
+            "Thanh lý chính phụ lục đó",
+            "Mở lại hợp đồng gốc"
+          ],
+          "p": "Có phụ lục đã ký mang giá trị",
+          "t": "-",
+          "e": "Giá trị hiện hành giữ nguyên phần điều chỉnh của phụ lục đó",
+          "n": "Trạng thái tiến trình nói về quy trình, không nói gì về tiền — loại trừ duy nhất là bản NHÁP vì chưa ai ký"
+        },
+        {
+          "d": "Huỷ bản ghi một phụ lục đã ký thì rút phần giá trị ra",
+          "s": [
+            "Đăng nhập Admin, mở trang quản lý của một phụ lục đã ký có giá trị",
+            "Bấm Huỷ bản ghi, nhập lý do",
+            "Mở lại hợp đồng gốc"
+          ],
+          "p": "Đăng nhập bằng Admin; phụ lục đã ký mang giá trị",
+          "t": "Lý do: nhập nhầm phụ lục của hợp đồng khác",
+          "e": "Giá trị hiện hành trở lại con số trước khi có phụ lục đó; nhật ký hợp đồng GỐC có thêm một dòng \"Điều chỉnh giá trị\" ghi chiều ngược lại kèm \"Huỷ bản ghi phụ lục <mã phụ lục>\"",
+          "o": "Giá trị đổi mà không dòng nào ghi lại thì đúng bằng việc sửa thẳng hợp đồng đã ký"
+        },
+        {
+          "d": "Đối chiếu kỳ thanh toán tính theo CẢ CỤM hợp đồng",
+          "s": [
+            "Mở hợp đồng gốc có phụ lục, xem khối Kỳ thanh toán"
+          ],
+          "p": "Hợp đồng gốc có phụ lục bổ sung, và kỳ thu của phần bổ sung được lập ngay trên phụ lục",
+          "t": "Gốc 1.500.000.000 (đã lập đủ kỳ) + phụ lục 250.000.000 (lập kỳ trên phụ lục)",
+          "e": "Không có cảnh báo lệch, dù ba ô ngay trên (tổng các kỳ của riêng bản ghi đang mở) nhỏ hơn giá trị hiện hành",
+          "n": "So riêng từng bản ghi thì cảnh báo \"không khớp\" nổ ở mọi hợp đồng có phụ lục và hết nói được điều gì"
+        },
+        {
+          "d": "Cảnh báo lệch kỳ thanh toán nói rõ là đã tính cả phụ lục",
+          "s": [
+            "Mở một hợp đồng có phụ lục nhưng chưa lập đủ kỳ thanh toán"
+          ],
+          "p": "Tổng các kỳ của cả cụm nhỏ hơn giá trị hiện hành",
+          "t": "-",
+          "e": "Dải cảnh báo ghi \"Tính cả phụ lục, tổng các kỳ đã lập (<số>) không khớp giá trị hợp đồng hiện hành (<số>)\"; hợp đồng KHÔNG có phụ lục thì vẫn dùng câu cũ"
+        },
+        {
+          "d": "Trang xem phụ lục gọi đúng tên con số của nó",
+          "s": [
+            "Mở trang xem một phụ lục có giá trị"
+          ],
+          "p": "Có phụ lục mang giá trị điều chỉnh",
+          "t": "-",
+          "e": "Ô tiền mang nhãn \"Điều chỉnh giá trị\" (không phải \"Giá trị hợp đồng\"), số hiện kèm dấu, dưới có dòng \"Cộng vào giá trị hợp đồng gốc khi phụ lục này được ký\"; phụ lục không đụng tới tiền thì ghi \"không đổi giá trị\"",
+          "n": "Nếu không thì một phụ lục 250 triệu trông như một hợp đồng 250 triệu"
+        },
+        {
+          "d": "Bộ dữ liệu demo có đủ các kiểu phụ lục",
+          "s": [
+            "Vào danh sách Hợp đồng bán và Hợp đồng mua, tìm các dòng có nhãn \"PL của ...\""
+          ],
+          "p": "Migration V30 đã chạy",
+          "t": "-",
+          "e": "Có 7 phụ lục, đủ các kiểu: bổ sung (02/2026/HĐKT-POSTEF/PL01, +250tr), giảm trừ (03/…/PL01, -180tr), gia hạn không đổi tiền (04/…/PL01), còn nháp chưa tính (05/…/PL01, +400tr), hai phụ lục trên cùng một hợp đồng (06/…/PL01 +300tr và PL02 -120tr) và một phụ lục ở chiều mua (02/2026/HĐMB-POSTEF/PL01, +220tr)",
+          "o": "Không có bộ dữ liệu này thì mỗi lần kiểm phải tự dựng tay sáu tình huống"
+        }
+      ]
+    },
+    {
+      "name": "Nối hợp đồng bán với hợp đồng mua",
+      "sheet": "ContractLink",
+      "prefix": "TC_CTRLINK",
+      "screen": "/POSCS/contract?action=edit&id=<id> — POST action=linkContract / unlinkContract",
+      "description": "\"Đầu ra kéo theo đầu vào\": một hợp đồng bán nối với những đơn mua sinh ra vì nó, và mở một đơn mua ra thì biết nó phục vụ hợp đồng bán nào. Quan hệ NHIỀU-NHIỀU ở bảng contract_links — KHÁC phụ lục: đây là hai hợp đồng độc lập với hai đối tác khác nhau, chỉ dính nhau ở chỗ cái này sinh ra vì cái kia. Nối được từ cả hai phía nhưng CSDL luôn lưu một chiều bán → mua.",
+      "precondition": "Đăng nhập bằng Admin hoặc Sales có quyền quản lý hợp đồng; migration V31 đã chạy; có hợp đồng gốc ở cả hai chiều",
+      "cases": [
+        {
+          "d": "Khối nối hợp đồng trên trang quản lý hợp đồng bán",
+          "s": [
+            "Mở trang quản lý của một hợp đồng bán"
+          ],
+          "p": "Hợp đồng gốc chiều Bán",
+          "t": "-",
+          "e": "Có khối \"Đầu vào phục vụ hợp đồng này\" kèm form chọn hợp đồng mua, ô Ghi chú và nút Nối; chưa nối gì thì ghi \"Chưa nối hợp đồng nào.\""
+        },
+        {
+          "d": "Đứng ở hợp đồng mua thì khối đổi tên và đổi phía",
+          "s": [
+            "Mở trang quản lý của một hợp đồng mua"
+          ],
+          "p": "Hợp đồng gốc chiều Mua",
+          "t": "-",
+          "e": "Khối mang tên \"Hợp đồng bán mà đơn mua này phục vụ\", ô chọn ghi \"Chọn hợp đồng bán\""
+        },
+        {
+          "d": "Danh sách chọn chỉ có chiều ngược lại và chỉ hợp đồng gốc",
+          "s": [
+            "Ở một hợp đồng mua, mở ô \"Chọn hợp đồng bán\"",
+            "Đối chiếu với danh sách hợp đồng"
+          ],
+          "p": "CSDL có cả hợp đồng bán, hợp đồng mua và phụ lục",
+          "t": "-",
+          "e": "Chỉ liệt kê hợp đồng BÁN và không có dòng phụ lục nào; trên bộ demo là 14 hợp đồng bán gốc",
+          "n": "Phụ lục là văn bản sửa đổi của một hợp đồng, còn đầu vào thì phục vụ cả hợp đồng đó"
+        },
+        {
+          "d": "Nối một cặp bán - mua",
+          "s": [
+            "Ở hợp đồng bán, chọn một hợp đồng mua, nhập ghi chú rồi bấm Nối"
+          ],
+          "t": "Ghi chú: mua 20km cáp cho giai đoạn 1",
+          "e": "Quay lại trang quản lý, bảng liên kết có thêm một dòng với mã, tiêu đề, đối tác, giá trị và tiến độ của hợp đồng mua vừa nối; ghi chú hiện dưới tiêu đề"
+        },
+        {
+          "d": "Nối từ phía mua ra cùng một quan hệ, không sinh bản ghi ngược",
+          "s": [
+            "Ở một hợp đồng MUA, chọn một hợp đồng bán rồi bấm Nối",
+            "Mở trang quản lý của chính hợp đồng bán đó"
+          ],
+          "t": "-",
+          "e": "Hợp đồng bán hiện đúng MỘT dòng trỏ về đơn mua kia, không phải hai dòng trùng nhau",
+          "n": "Màn hình cho nối từ cả hai phía nhưng controller tự xếp bên nào là bán, bên nào là mua trước khi ghi"
+        },
+        {
+          "d": "Nối trùng một cặp đã nối",
+          "s": [
+            "Chọn lại đúng hợp đồng đã nối trước đó rồi bấm Nối"
+          ],
+          "p": "Hai hợp đồng đã nối với nhau",
+          "t": "-",
+          "e": "Bị chặn kèm thông báo \"Hai hợp đồng này đã nối với nhau rồi.\"; bảng liên kết vẫn chỉ có một dòng",
+          "n": "Nối hai lần làm phép cộng giá trị đầu vào đếm đôi; khoá UNIQUE đặt trên cặp nên hai người bấm cùng lúc cũng không lọt"
+        },
+        {
+          "d": "Không nối được hai hợp đồng cùng chiều",
+          "s": [
+            "Gửi thẳng POST action=linkContract với otherContractId là một hợp đồng CÙNG chiều với hợp đồng đang mở"
+          ],
+          "t": "contractId: hợp đồng bán; otherContractId: một hợp đồng bán khác",
+          "e": "Bị từ chối kèm thông báo \"Không nối được hai hợp đồng này: phải là một hợp đồng bán với một hợp đồng mua, và cả hai đều phải là hợp đồng gốc (không phải phụ lục).\"; không bản ghi liên kết nào được tạo",
+          "n": "Ô chọn trên màn hình vốn chỉ đổ chiều ngược lại — phép kiểm này nằm ở DAO, trong transaction đã khoá hai dòng"
+        },
+        {
+          "d": "Phụ lục không nối được",
+          "s": [
+            "Mở trang quản lý của một phụ lục",
+            "Gửi thẳng POST action=linkContract với contractId là id của phụ lục đó"
+          ],
+          "p": "Có phụ lục trong CSDL",
+          "t": "-",
+          "e": "Trang quản lý phụ lục KHÔNG có khối nối hợp đồng; POST nặn tay cũng bị từ chối kèm thông báo link_invalid"
+        },
+        {
+          "d": "Bản nháp vẫn nối được",
+          "s": [
+            "Mở trang quản lý của một hợp đồng còn Nháp",
+            "Nối nó với một hợp đồng ở chiều ngược lại"
+          ],
+          "p": "Có hợp đồng gốc ở trạng thái Nháp",
+          "t": "-",
+          "e": "Nối thành công như hợp đồng đã ký",
+          "n": "Đơn mua thường được chuẩn bị trước khi ký hợp đồng bán; bắt ký xong mới nối là bắt người ta nhớ quay lại làm sau"
+        },
+        {
+          "d": "Một đơn mua phục vụ nhiều hợp đồng bán",
+          "s": [
+            "Nối cùng một đơn mua vào hai hợp đồng bán khác nhau",
+            "Mở trang xem của đơn mua đó"
+          ],
+          "t": "-",
+          "e": "Đơn mua liệt kê cả hai hợp đồng bán; trên bộ demo, 01/2026/HĐMB-POSTEF phục vụ 05/2026/HĐKT-POSTEF và 06/2026/HĐKT-POSTEF"
+        },
+        {
+          "d": "Đơn mua dùng chung tự khai ra",
+          "s": [
+            "Mở một hợp đồng bán có nối đơn mua đang phục vụ nhiều hợp đồng"
+          ],
+          "p": "Đơn mua đó còn được nối với hợp đồng bán khác",
+          "t": "-",
+          "e": "Dưới tiêu đề đơn mua có dòng \"Đơn mua gom — còn phục vụ N hợp đồng bán khác\" với N đếm đúng số hợp đồng bán CÒN LẠI",
+          "n": "Không nói ra thì \"chênh lệch thô\" âm ở đó bị đọc thành lỗ"
+        },
+        {
+          "d": "Ba ô đối chiếu tiền ở phía bán",
+          "s": [
+            "Mở một hợp đồng bán đã nối đầu vào"
+          ],
+          "p": "Hợp đồng bán đã nối ít nhất một đơn mua",
+          "t": "Bán ra 2.000.000.000; đầu vào đã nối 3.200.000.000",
+          "e": "Ba ô: Giá trị bán ra 2.000.000.000 ₫, Đầu vào đã nối 3.200.000.000 ₫, Chênh lệch thô -1.200.000.000 ₫; bên dưới có câu nói rõ đây là chênh lệch THÔ, chưa trừ chi phí, và hệ thống KHÔNG tự chia tỉ lệ đơn mua gom",
+          "o": "Đơn mua gom được tính TRỌN VẸN vào từng hợp đồng bán mà nó phục vụ — chia thế nào là việc của người lập chứng từ"
+        },
+        {
+          "d": "Phía mua không có ba ô đối chiếu tiền",
+          "s": [
+            "Mở một hợp đồng mua đã nối với hợp đồng bán"
+          ],
+          "p": "Hợp đồng mua đã nối ít nhất một hợp đồng bán",
+          "t": "-",
+          "e": "Chỉ có bảng liệt kê, không có ô Giá trị bán ra / Đầu vào đã nối / Chênh lệch thô",
+          "n": "Một đơn mua phục vụ nhiều hợp đồng bán nên lấy giá trị trừ đi ở phía này ra con số vô nghĩa"
+        },
+        {
+          "d": "Giá trị đem đối chiếu là giá trị HIỆN HÀNH của đầu kia",
+          "s": [
+            "Nối một hợp đồng đã có phụ lục đã ký",
+            "Xem cột Giá trị của dòng đó và ô \"Đầu vào đã nối\""
+          ],
+          "p": "Hợp đồng ở đầu kia có phụ lục đã ký làm đổi giá trị",
+          "t": "06/2026/HĐKT-POSTEF: 1.800.000.000 gốc + 300.000.000 - 120.000.000",
+          "e": "Cột Giá trị hiện 1.980.000.000 ₫ (đã cộng phụ lục), không phải con số trên bản gốc"
+        },
+        {
+          "d": "Nối và gỡ đều ghi nhật ký ở CẢ HAI hợp đồng",
+          "s": [
+            "Nối một cặp hợp đồng",
+            "Xem khối Nhật ký thay đổi của cả hai",
+            "Gỡ liên kết rồi xem lại nhật ký của cả hai"
+          ],
+          "t": "-",
+          "e": "Sau khi nối: hợp đồng bán có dòng \"Nối hợp đồng — Nối với hợp đồng mua <mã>\", hợp đồng mua có dòng \"Nối hợp đồng — Phục vụ hợp đồng bán <mã>\". Sau khi gỡ: mỗi bên có thêm một dòng \"Gỡ liên kết với ...\", tổng bốn dòng",
+          "o": "Câu \"vì sao có đơn mua này\" hỏi ở phía mua, còn \"đã mua vào gì cho đơn này\" hỏi ở phía bán"
+        },
+        {
+          "d": "Gỡ liên kết",
+          "s": [
+            "Ở bảng liên kết, bấm Gỡ trên một dòng",
+            "Xác nhận trên hộp thoại"
+          ],
+          "p": "Hợp đồng đang có ít nhất một liên kết",
+          "t": "-",
+          "e": "Có hộp thoại hỏi lại kèm mã hợp đồng sắp gỡ; đồng ý thì dòng đó biến mất, ba ô tiền tính lại theo phần còn lại; hai hợp đồng vẫn còn nguyên trong danh sách"
+        },
+        {
+          "d": "Trang xem hợp đồng chỉ đọc",
+          "s": [
+            "Mở trang xem (không phải trang quản lý) của một hợp đồng đã nối"
+          ],
+          "p": "Hợp đồng đã có liên kết",
+          "t": "-",
+          "e": "Có bảng liên kết và ba ô tiền (nếu là hợp đồng bán) nhưng không có form Nối và không có nút Gỡ; hợp đồng chưa nối gì thì cả khối không hiện"
+        },
+        {
+          "d": "Vai trò chỉ được xem thì không nối được",
+          "s": [
+            "Đăng nhập bằng tài khoản Kỹ thuật",
+            "Gửi POST action=linkContract"
+          ],
+          "p": "Đăng nhập bằng vai trò không có quyền sửa hợp đồng",
+          "t": "-",
+          "e": "Bị từ chối 403, không bản ghi liên kết nào được tạo"
+        },
+        {
+          "d": "Bộ dữ liệu demo có sẵn hai liên kết",
+          "s": [
+            "Mở 01/2026/HĐMB-POSTEF"
+          ],
+          "p": "Migration V31 đã chạy",
+          "t": "-",
+          "e": "Đơn mua này phục vụ hai hợp đồng bán (05 và 06/2026/HĐKT-POSTEF), mỗi dòng kèm ghi chú gieo sẵn; mở 05/2026/HĐKT-POSTEF thì thấy nhãn \"Đơn mua gom — còn phục vụ 1 hợp đồng bán khác\"",
+          "o": "Không có dòng nào thì khối này rỗng ở mọi hợp đồng và không ai kiểm được nó hiển thị đúng hay không"
         }
       ]
     },
@@ -985,6 +1500,27 @@
           "t": "id bản ghi vừa huỷ",
           "e": "Các dòng nhật ký vẫn còn nguyên",
           "n": "contract_history cố ý KHÔNG có ON DELETE CASCADE — lịch sử phải sống lâu hơn thứ nó nói về"
+        },
+        {
+          "d": "Ký phụ lục có giá trị sinh dòng nhật ký trên hợp đồng CHA",
+          "s": [
+            "Ký một phụ lục mang giá trị điều chỉnh",
+            "Mở khối Nhật ký thay đổi của HỢP ĐỒNG GỐC"
+          ],
+          "p": "Có phụ lục còn nháp mang giá trị",
+          "t": "Phụ lục bổ sung 250.000.000 trên hợp đồng gốc 1.500.000.000",
+          "e": "Hợp đồng gốc có dòng sự kiện \"Điều chỉnh giá trị\" nêu mã phụ lục, phần điều chỉnh (+250.000.000 đ), giá trị hiện hành mới (1.750.000.000 đ) và giá trị theo bản gốc đã ký",
+          "n": "Tách khỏi \"Lập phụ lục\": lập phụ lục mới chỉ là soạn một bản nháp, tiền chỉ đổi khi bản nháp đó được ký"
+        },
+        {
+          "d": "Nối và gỡ liên kết bán - mua ghi ở cả hai hợp đồng",
+          "s": [
+            "Nối một hợp đồng bán với một hợp đồng mua",
+            "Mở Nhật ký thay đổi của từng hợp đồng"
+          ],
+          "p": "Migration V31 đã chạy",
+          "t": "-",
+          "e": "Mỗi hợp đồng có một dòng sự kiện \"Nối hợp đồng\", nội dung kể từ phía của chính nó; gỡ liên kết thì mỗi bên thêm một dòng nữa"
         }
       ]
     },
