@@ -1157,6 +1157,9 @@ public class ContractDAO {
     /** Phòng đó đang còn giữ hợp đồng, không giao lại lượt mới được. */
     public static final int HANDOVER_ALREADY_PENDING = -1;
 
+    /** Hợp đồng đã thanh lý / chấm dứt sớm -- không mở lượt bàn giao mới nữa. */
+    public static final int HANDOVER_FROZEN = -3;
+
     private static final String HANDOVER_SELECT =
         "SELECT h.handover_id, h.contract_id, h.department_id, h.handed_at, h.handed_by, "
         + "       h.done_at, h.done_by, h.handover_note, h.done_note, "
@@ -1176,8 +1179,18 @@ public class ContractDAO {
      * định của luồng). Một transaction cho cả lô: giao được nửa rồi hỏng thì
      * hợp đồng nằm ở trạng thái không ai mô tả nổi.
      *
-     * @return số chặng mở ra, hoặc {@link #HANDOVER_ALREADY_PENDING} nếu MỘT
-     *         trong các phòng đó đang còn giữ hợp đồng này
+     * <p>CHẶN khi hợp đồng đã đóng băng. Chặn ở ĐÂY chứ không chỉ ẩn nút, cùng lẽ
+     * với {@code update} / {@code insertProducts} / {@code deleteProductLine}: ẩn
+     * nút chỉ là tầng hiển thị, một request gửi thẳng vẫn đi qua.
+     *
+     * <p>Chỉ chặn MỞ lượt MỚI. ĐÓNG một chặng đang treo thì VẪN được
+     * ({@code completeHandover}) -- khoá cả hai thì chặng nào lệch nhịp với lúc thanh
+     * lý sẽ treo vĩnh viễn, và hàng đợi bàn giao đếm ngày chờ tăng mãi không ai
+     * dọn được.
+     *
+     * @return số chặng mở ra, {@link #HANDOVER_ALREADY_PENDING} nếu MỘT trong các
+     *         phòng đó đang còn giữ hợp đồng này, hoặc {@link #HANDOVER_FROZEN}
+     *         khi hợp đồng đã thanh lý / chấm dứt sớm
      */
     public int handOverToDepartments(int contractId, List<Integer> departmentIds, String note, int actorId) {
         if (departmentIds == null || departmentIds.isEmpty()) {
@@ -1190,6 +1203,12 @@ public class ContractDAO {
                 Contract contract = lockForUpdate(conn, contractId);
                 if (contract == null) {
                     return -2;
+                }
+                // Đã thanh lý thì không còn việc để giao: hợp đồng đóng lại rồi, phát
+                // sinh sau thời điểm đó phải lập hợp đồng mới chứ không nối tiếp vào
+                // cái cũ. Dùng chính bản đã khoá ở trên, không hỏi lại CSDL lần nữa.
+                if (contract.isFrozen()) {
+                    return HANDOVER_FROZEN;
                 }
                 // Giao lại khi phòng đó CHƯA báo xong là đẻ ra hai chặng mở của
                 // cùng một phòng -- "đang chờ bao lâu" lúc đó không có câu trả

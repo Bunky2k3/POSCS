@@ -1692,6 +1692,10 @@ public class ContractController extends HttpServlet {
             response.sendRedirect(request.getContextPath() + back + "&error=handover_pending");
             return;
         }
+        if (result == ContractDAO.HANDOVER_FROZEN) {
+            response.sendRedirect(request.getContextPath() + back + "&error=handover_frozen");
+            return;
+        }
         if (result <= 0) {
             LOG.warn("Ban giao hop dong that bai (actor={}, contractId={})", Logs.actor(request), contractId);
             response.sendRedirect(request.getContextPath() + back + "&error=handover_failed");

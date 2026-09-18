@@ -829,6 +829,43 @@ public class ContractStatusIntegrationTest {
     }
 
     /**
+     * Thanh lý xong thì KHÔNG mở được lượt bàn giao mới, nhưng chặng đang treo
+     * thì VẪN đóng lại được.
+     *
+     * <p>Khoá cả hai thì chặng nào lệch nhịp với lúc thanh lý sẽ treo vĩnh viễn, và
+     * hàng đợi bàn giao đếm số ngày chờ tăng mãi mà không ai dọn được.
+     *
+     * <p>Chặn nằm ở DAO chứ không chỉ ẩn nút, nên test này gọi thẳng DAO -- đúng
+     * đường mà một request gửi tay sẽ đi.
+     */
+    @Test
+    public void handover_daThanhLyThiKhongGiaoThemNhungVanDongDuocChangCu() throws Exception {
+        IntegrationDb.assumeAvailable();
+
+        int ketToan = departmentId("Kế toán");
+        int duAn = departmentId("Dự án");
+        int kyThuat = departmentId("Kỹ thuật");
+
+        assertEquals(2, contractDAO.handOverToDepartments(3, List.of(ketToan, duAn), null, Fixtures.USER_ID));
+        // Hợp đồng gieo trong lớp này đã ở 'Đã ký' sẵn (insertContract ghi thẳng
+        // vào bảng), nên đi thẳng sang thanh lý chứ không ký lại.
+        assertTrue(contractDAO.changeProgressStatus(3, ContractDAO.PROGRESS_LIQUIDATED,
+                Fixtures.USER_ID, "biên bản thanh lý 01/TL"));
+
+        assertEquals("đã thanh lý thì không mở lượt mới",
+                ContractDAO.HANDOVER_FROZEN,
+                contractDAO.handOverToDepartments(3, List.of(kyThuat), null, Fixtures.USER_ID));
+        assertTrue("không được ghi thêm chặng nào",
+                contractDAO.findHandoversOf(3).stream().noneMatch(h -> h.getDepartmentId() == kyThuat));
+
+        // Chặng cũ vẫn đóng được -- nếu không thì nó treo vĩnh viễn ở hàng đợi.
+        int cu = contractDAO.findHandoversOf(3).stream()
+                .filter(h -> h.getDepartmentId() == ketToan).findFirst().orElseThrow().getHandoverId();
+        assertTrue("chặng đang treo phải đóng được sau thanh lý",
+                contractDAO.completeHandover(cu, Fixtures.USER_ID, "quyết toán xong"));
+    }
+
+    /**
      * Nhãn "đang chờ ở phòng nào, mấy ngày" đọc thẳng từ danh sách hợp đồng, và
      * bộ lọc theo phòng phải đi cặp với bộ đếm phân trang.
      *

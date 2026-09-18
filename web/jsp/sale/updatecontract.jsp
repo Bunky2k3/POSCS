@@ -144,7 +144,7 @@
             <div class="card-box" style="border-left:4px solid #2f6b34;">
                 <div style="display:flex; align-items:flex-start; gap:10px; font-size:0.88rem; color:#2f6b34;">
                     <i class="fa-solid fa-lock" style="margin-top:3px;"></i>
-                    <span><strong>Hợp đồng đã ${fn:escapeXml(contract.progressStatus)}.</strong>
+                    <span><strong>Hợp đồng ở trạng thái “${fn:escapeXml(contract.progressStatus)}”.</strong>
                         Nội dung không sửa được nữa, kể cả bởi quản trị viên — phát sinh sau thời điểm
                         này phải lập hợp đồng mới. Bên dưới chỉ còn phần ghi nhận tiền về.</span>
                 </div>
@@ -171,6 +171,7 @@
                         <c:when test="${param.error == 'value_negative'}">Khoản giảm trừ lớn hơn giá trị còn lại của hợp đồng gốc — giá trị hợp đồng sẽ âm. Ô này nhập phần CHÊNH LỆCH, không phải tổng giá trị mới.</c:when>
                         <c:when test="${param.error == 'handover_no_department'}">Chọn ít nhất một phòng để bàn giao.</c:when>
                         <c:when test="${param.error == 'handover_pending'}">Phòng đó đang còn giữ hợp đồng này — đợi họ báo xử lý xong rồi mới bàn giao lượt mới.</c:when>
+                        <c:when test="${param.error == 'handover_frozen'}">Hợp đồng đã thanh lý nên không mở được lượt bàn giao mới. Phát sinh sau thanh lý phải lập hợp đồng mới.</c:when>
                         <c:when test="${param.error == 'handover_failed'}">Không bàn giao được. Vui lòng thử lại.</c:when>
                         <c:when test="${param.error == 'link_invalid'}">Không nối được hai hợp đồng này: phải là một hợp đồng bán với một hợp đồng mua, và cả hai đều phải là hợp đồng gốc (không phải phụ lục).</c:when>
                         <c:when test="${param.error == 'link_duplicate'}">Hai hợp đồng này đã nối với nhau rồi.</c:when>
@@ -763,10 +764,26 @@
              việc nội bộ không suy ra nhau. --%>
         <div class="card-box" style="margin-top:20px;">
             <div class="section-header"><h5>Bàn giao xử lý</h5></div>
+            <%-- Câu này trước ghi "Soạn xong thì chuyển xuống..." -- đọc ra thành việc
+                 TRƯỚC khi ký, trái hẳn với thiết kế ghi ở đầu khối (bàn giao là trục
+                 RIÊNG, không suy ra từ trục tiến độ). Phần lớn việc của Kế toán và
+                 Dự án lại rơi vào SAU khi ký. --%>
             <p style="font-size:0.86rem; color:#6b7280; margin:0 0 12px;">
-                Soạn xong thì chuyển xuống các phòng liên quan. Mỗi phòng tự bấm
+                Chuyển hợp đồng xuống các phòng liên quan &mdash; lúc nào cũng được, trước hay sau khi ký,
+                vì đây là việc nội bộ chứ không phải một chặng của tiến trình ký kết. Mỗi phòng tự bấm
                 <strong>Đã xử lý xong</strong> kèm ghi chú, và thời gian nằm chờ ở từng phòng được đếm từ lúc bàn giao.
             </p>
+
+            <%-- Thanh lý xong thì không mở lượt mới nữa (chặn thật ở
+                 ContractDAO.handOverToDepartments). Danh sách chặng đã giao VẪN hiện --
+                 đó là hồ sơ, không phải nút bấm. --%>
+            <c:if test="${contract.frozen}">
+                <div class="lc-alert" style="margin-bottom:12px;">
+                    <i class="fa-solid fa-lock" style="margin-top:2px;"></i>
+                    <span>Hợp đồng ở trạng thái “${fn:escapeXml(contract.progressStatus)}” &mdash; không mở thêm lượt bàn giao nào nữa.
+                        Chặng nào còn đang treo thì phòng giữ vẫn đóng lại được.</span>
+                </div>
+            </c:if>
 
             <c:if test="${hasPendingHandover}">
                 <div class="lc-alert" style="margin-bottom:12px;">
@@ -855,38 +872,40 @@
                 </c:otherwise>
             </c:choose>
 
-            <%-- Mặc định tích sẵn Kế toán và Dự án: đó là luồng khách hàng mô
-                 tả. Vẫn cho bỏ tích, vì không phải hợp đồng nào cũng qua cả hai. --%>
-            <form method="POST" action="${pageContext.request.contextPath}/contract" class="row g-2 align-items-end">
-                <input type="hidden" name="csrfToken" value="${csrfToken}">
-                <input type="hidden" name="action" value="handOver">
-                <input type="hidden" name="contractId" value="${contract.contractId}">
-                <div class="col-md-5">
-                    <label style="font-size:0.8rem; color:#6b7280;">Bàn giao cho phòng</label>
-                    <div style="display:flex; flex-wrap:wrap; gap:12px; padding-top:6px;">
-                        <c:forEach var="dept" items="${departmentList}">
-                            <c:if test="${dept.departmentName == 'Kế toán' or dept.departmentName == 'Dự án'
-                                          or dept.departmentName == 'Kỹ thuật'}">
-                                <label class="filter-toggle" style="font-size:0.84rem;">
-                                    <input type="checkbox" name="departmentId" value="${dept.departmentId}"
-                                           ${dept.departmentName == 'Kế toán' or dept.departmentName == 'Dự án' ? 'checked' : ''}>
-                                    ${fn:escapeXml(dept.departmentName)}
-                                </label>
-                            </c:if>
-                        </c:forEach>
+            <c:if test="${not contract.frozen}">
+                <%-- Mặc định tích sẵn Kế toán và Dự án: đó là luồng khách hàng mô
+                     tả. Vẫn cho bỏ tích, vì không phải hợp đồng nào cũng qua cả hai. --%>
+                <form method="POST" action="${pageContext.request.contextPath}/contract" class="row g-2 align-items-end">
+                    <input type="hidden" name="csrfToken" value="${csrfToken}">
+                    <input type="hidden" name="action" value="handOver">
+                    <input type="hidden" name="contractId" value="${contract.contractId}">
+                    <div class="col-md-5">
+                        <label style="font-size:0.8rem; color:#6b7280;">Bàn giao cho phòng</label>
+                        <div style="display:flex; flex-wrap:wrap; gap:12px; padding-top:6px;">
+                            <c:forEach var="dept" items="${departmentList}">
+                                <c:if test="${dept.departmentName == 'Kế toán' or dept.departmentName == 'Dự án'
+                                              or dept.departmentName == 'Kỹ thuật'}">
+                                    <label class="filter-toggle" style="font-size:0.84rem;">
+                                        <input type="checkbox" name="departmentId" value="${dept.departmentId}"
+                                               ${dept.departmentName == 'Kế toán' or dept.departmentName == 'Dự án' ? 'checked' : ''}>
+                                        ${fn:escapeXml(dept.departmentName)}
+                                    </label>
+                                </c:if>
+                            </c:forEach>
+                        </div>
                     </div>
-                </div>
-                <div class="col-md-5">
-                    <label style="font-size:0.8rem; color:#6b7280;">Dặn phòng nhận (không bắt buộc)</label>
-                    <input type="text" name="handoverNote" class="form-control" maxlength="255"
-                           placeholder="VD: đã chốt giá, nhờ kiểm điều khoản thanh toán">
-                </div>
-                <div class="col-md-2">
-                    <button type="submit" class="btn-primary" style="width:100%;">
-                        <i class="fa-solid fa-share-from-square me-1"></i> Bàn giao
-                    </button>
-                </div>
-            </form>
+                    <div class="col-md-5">
+                        <label style="font-size:0.8rem; color:#6b7280;">Dặn phòng nhận (không bắt buộc)</label>
+                        <input type="text" name="handoverNote" class="form-control" maxlength="255"
+                               placeholder="VD: đã chốt giá, nhờ kiểm điều khoản thanh toán">
+                    </div>
+                    <div class="col-md-2">
+                        <button type="submit" class="btn-primary" style="width:100%;">
+                            <i class="fa-solid fa-share-from-square me-1"></i> Bàn giao
+                        </button>
+                    </div>
+                </form>
+            </c:if>
         </div>
 
         <%-- Khối hợp đồng nối kèm đứng ở cột hẹp, giống trang xem. Đã thử cả hai
