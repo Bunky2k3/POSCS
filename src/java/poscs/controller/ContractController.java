@@ -40,6 +40,7 @@ import poscs.dao.EmployeeDAO;
 import poscs.dao.ProductDAO;
 import poscs.model.Address;
 import poscs.model.Contract;
+import poscs.model.Department;
 import poscs.model.ContractHandover;
 import poscs.model.ContractHistory;
 import poscs.model.ContractLink;
@@ -339,7 +340,8 @@ public class ContractController extends HttpServlet {
         request.setAttribute("progressFilter", progressFilter);
         request.setAttribute("scopeFilter", rootsOnly ? "root" : null);
         request.setAttribute("waitingDeptFilter", waitingDepartment);
-        request.setAttribute("departmentList", employeeDAO.findAllDepartments());
+        List<Department> departments = employeeDAO.findAllDepartments();
+        request.setAttribute("departmentList", departments);
         // Loại hợp đồng khác nhau theo chiều -- xem SELL_CONTRACT_TYPES /
         // BUY_CONTRACT_TYPES. JSP dựng dropdown từ đây thay vì chép cứng.
         request.setAttribute("contractTypeOptions", contractTypesFor(direction));
@@ -358,7 +360,8 @@ public class ContractController extends HttpServlet {
         String kindParam = DIRECTION_BUY.equals(direction) ? "buy" : "sell";
         FilterState state = new FilterState(kindParam, keyword, statusFilter, progressFilter,
                 rootsOnly ? "root" : null, typeFilter, provinceFilter,
-                request.getParameter("year"), request.getParameter("period"), waitingDepartment);
+                request.getParameter("year"), request.getParameter("period"), waitingDepartment,
+                departmentNameOf(departments, waitingDepartment));
         List<FilterChip> statusChips = new ArrayList<>();
         statusChips.add(state.statusChip(ContractDAO.STATUS_ACTIVE, "Đang hiệu lực", "var(--success)",
                 countOf(statusSummary, ContractDAO.STATUS_ACTIVE)));
@@ -376,6 +379,25 @@ public class ContractController extends HttpServlet {
         request.setAttribute("advancedFilterCount", state.advancedCount());
 
         request.getRequestDispatcher(LIST_VIEW).forward(request, response);
+    }
+
+    /**
+     * Tên phòng ứng với id, tra trong danh sách ĐÃ nạp sẵn cho dropdown.
+     *
+     * <p>Không gọi thêm câu truy vấn nào: danh sách phòng vốn đã phải lấy để dựng
+     * ô lọc, dùng lại chính nó. Không tìm thấy thì trả null và chip rơi về câu
+     * chữ chung -- id rác trên URL không đáng làm vỡ cả trang danh sách.
+     */
+    private static String departmentNameOf(List<Department> departments, Integer id) {
+        if (id == null || departments == null) {
+            return null;
+        }
+        for (Department d : departments) {
+            if (d.getDepartmentId() == id) {
+                return d.getDepartmentName();
+            }
+        }
+        return null;
     }
 
     private void showDetail(HttpServletRequest request, HttpServletResponse response)
@@ -2251,10 +2273,14 @@ public class ContractController extends HttpServlet {
         private final String year;
         private final String period;
         private final Integer waitingDepartmentId;
+        /** Tên phòng, chỉ để hiện trên chip -- lọc vẫn chạy bằng id. */
+        private final String waitingDepartmentName;
 
         FilterState(String kind, String keyword, String status, String progress, String scope,
-                String type, Integer provinceId, String year, String period, Integer waitingDepartmentId) {
+                String type, Integer provinceId, String year, String period, Integer waitingDepartmentId,
+                String waitingDepartmentName) {
             this.waitingDepartmentId = waitingDepartmentId;
+            this.waitingDepartmentName = waitingDepartmentName;
             this.kind = kind;
             this.keyword = keyword;
             this.status = status;
@@ -2329,7 +2355,13 @@ public class ContractController extends HttpServlet {
                 chips.add(new FilterChip(periodLabel(), queryWith("year", null), null, true, 0));
             }
             if (waitingDepartmentId != null) {
-                chips.add(new FilterChip("Đang chờ ở một phòng", queryWith("waitingDept", null), null, true, 0));
+                // Gọi tên phòng ra chứ không nói chung chung: chip là thứ duy nhất
+                // hiện ra khi khối "Lọc thêm" đang đóng, mà "đang chờ ở một phòng"
+                // thì người đọc vẫn phải mở khối đó ra mới biết là phòng nào.
+                chips.add(new FilterChip(
+                        isBlank(waitingDepartmentName) ? "Đang chờ ở một phòng"
+                                                       : "Đang chờ: " + waitingDepartmentName,
+                        queryWith("waitingDept", null), null, true, 0));
             }
             return chips;
         }
