@@ -1021,7 +1021,7 @@ public class ContractControllerTest {
         controller.doGet(request, response);
 
         verify(contractDAO).countStatusSummary(nullable(Integer.class), nullable(Period.class), eq("Mua"),
-                eq(true), nullable(java.util.List.class), any());
+                eq(true), nullable(java.util.List.class), any(), nullable(Integer.class));
     }
 
     /** Bốn ô trạng thái là đường lọc; link của ô ĐANG BẬT phải là link TẮT nó đi. */

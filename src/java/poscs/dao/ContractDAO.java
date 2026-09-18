@@ -454,6 +454,16 @@ public class ContractDAO {
      */
     public Map<String, Integer> countStatusSummary(Integer provinceId, Period period, String direction,
             boolean rootsOnly, List<Integer> ownerIds, ListScope scope) {
+        return countStatusSummary(provinceId, period, direction, rootsOnly, ownerIds, scope, null);
+    }
+
+    /**
+     * Như trên, kèm bộ lọc bàn giao -- bốn con số phải đếm ĐÚNG tập mà bảng bên
+     * dưới đang liệt kê. Thiếu tham số này thì bật ô "Đang bàn giao" ra bảng 3 dòng
+     * mà dải KPI trên vẫn cộng thành 18.
+     */
+    public Map<String, Integer> countStatusSummary(Integer provinceId, Period period, String direction,
+            boolean rootsOnly, List<Integer> ownerIds, ListScope scope, Integer waitingDepartmentId) {
         Map<String, Integer> summary = new HashMap<>();
         summary.put(STATUS_ACTIVE, 0);
         summary.put(STATUS_SOON, 0);
@@ -478,6 +488,13 @@ public class ContractDAO {
             + (period != null ? " AND c.signing_date BETWEEN ? AND ?" : "")
             + (direction != null ? " AND c.direction = ?" : "")
             + (rootsOnly ? " AND c.parent_contract_id IS NULL" : "")
+            + (waitingDepartmentId == null ? ""
+                    : waitingDepartmentId == WAITING_ANY_DEPARTMENT
+                        ? " AND EXISTS (SELECT 1 FROM contract_handovers wh"
+                          + " WHERE wh.contract_id = c.contract_id AND wh.done_at IS NULL)"
+                        : " AND EXISTS (SELECT 1 FROM contract_handovers wh"
+                          + " WHERE wh.contract_id = c.contract_id AND wh.done_at IS NULL"
+                          + " AND wh.department_id = ?)")
             + SqlFilters.inClause("c.owner_id", ownerIds);
 
         // Hai mệnh đề của phạm vi ghi tham số vào scopeParams theo đúng thứ tự dấu hỏi
@@ -506,6 +523,9 @@ public class ContractDAO {
             }
             if (direction != null) {
                 ps.setString(param++, direction);
+            }
+            if (waitingDepartmentId != null && waitingDepartmentId != WAITING_ANY_DEPARTMENT) {
+                ps.setInt(param++, waitingDepartmentId);
             }
             param = SqlFilters.bind(ps, param, ownerIds);
             for (Object value : scopeParams) {
@@ -1156,6 +1176,17 @@ public class ContractDAO {
 
     /** Phòng đó đang còn giữ hợp đồng, không giao lại lượt mới được. */
     public static final int HANDOVER_ALREADY_PENDING = -1;
+
+    /**
+     * Truyền vào chỗ {@code waitingDepartmentId} để lọc "đang chờ ở BẤT KỲ phòng
+     * nào" thay vì một phòng cụ thể.
+     *
+     * <p>Dùng giá trị canh thay vì thêm tham số thứ mười bốn cho findAll: câu hỏi
+     * là CÙNG một câu ("hợp đồng nào đang nằm chờ"), chỉ khác ở chỗ có nêu tên
+     * phòng hay không. {@code departments.department_id} là AUTO_INCREMENT nên
+     * số âm không bao giờ đụng một id thật.
+     */
+    public static final int WAITING_ANY_DEPARTMENT = -1;
 
     /** Hợp đồng đã thanh lý / chấm dứt sớm -- không mở lượt bàn giao mới nữa. */
     public static final int HANDOVER_FROZEN = -3;
@@ -2400,10 +2431,16 @@ public class ContractDAO {
         // chứ không JOIN -- một hợp đồng chờ ở hai phòng thì JOIN nhân đôi dòng,
         // và phân trang đếm một đằng liệt kê một nẻo.
         if (waitingDepartmentId != null) {
-            conditions.add("EXISTS (SELECT 1 FROM contract_handovers wh "
-                    + "WHERE wh.contract_id = c.contract_id AND wh.done_at IS NULL "
-                    + "AND wh.department_id = ?)");
-            params.add(waitingDepartmentId);
+            if (waitingDepartmentId == WAITING_ANY_DEPARTMENT) {
+                // Ô tích "Đang bàn giao": chờ ở phòng nào cũng tính.
+                conditions.add("EXISTS (SELECT 1 FROM contract_handovers wh "
+                        + "WHERE wh.contract_id = c.contract_id AND wh.done_at IS NULL)");
+            } else {
+                conditions.add("EXISTS (SELECT 1 FROM contract_handovers wh "
+                        + "WHERE wh.contract_id = c.contract_id AND wh.done_at IS NULL "
+                        + "AND wh.department_id = ?)");
+                params.add(waitingDepartmentId);
+            }
         }
 
         if (keyword != null && !keyword.trim().isEmpty()) {

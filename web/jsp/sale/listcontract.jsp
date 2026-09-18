@@ -263,7 +263,7 @@
                 <%-- Xuất Excel là thao tác ĐỌC: chỉ lấy đúng dữ liệu vai trò này vốn đã
                      xem được trên màn hình, đổi sang dạng file. Nên KHÔNG khoá theo
                      canManage -- xem PERMISSIONS.md. --%>
-                <a href="${pageContext.request.contextPath}/contract?action=exportExcel&kind=${kind}&keyword=${fn:escapeXml(keyword)}&status=${fn:escapeXml(statusFilter)}&progress=${fn:escapeXml(progressFilter)}&scope=${fn:escapeXml(scopeFilter)}&type=${fn:escapeXml(typeFilter)}&provinceId=${provinceFilter}&year=${yearFilter}&period=${periodFilter}&waitingDept=${waitingDeptFilter}" class="btn-outline-action"><i class="fa-solid fa-file-excel"></i> Xuất Excel</a>
+                <a href="${pageContext.request.contextPath}/contract?action=exportExcel&kind=${kind}&keyword=${fn:escapeXml(keyword)}&status=${fn:escapeXml(statusFilter)}&progress=${fn:escapeXml(progressFilter)}&scope=${fn:escapeXml(scopeFilter)}&type=${fn:escapeXml(typeFilter)}&provinceId=${provinceFilter}&year=${yearFilter}&period=${periodFilter}&waitingDept=${waitingDeptFilter}&waiting=${waitingAnyFilter ? '1' : ''}" class="btn-outline-action"><i class="fa-solid fa-file-excel"></i> Xuất Excel</a>
                 <%-- Nhập PDF thì ngược lại: nó TẠO hợp đồng mới, nên vẫn khoá. --%>
                 <c:if test="${canManage}">
                     <a href="${pageContext.request.contextPath}/contract?action=importForm" class="btn-outline-action"><i class="fa-solid fa-file-pdf"></i> Nhập PDF</a>
@@ -371,6 +371,15 @@
             <label class="filter-toggle" for="filterScope">
                 <input type="checkbox" id="filterScope" name="scope" value="root" ${scopeFilter == 'root' ? 'checked' : ''}>
                 Chỉ hợp đồng gốc
+            </label>
+            <%-- "Đang bàn giao" đứng ở thanh chính chứ không nằm trong "Lọc thêm" như ô
+                 chọn từng phòng: đây là câu hỏi hỏi hàng ngày ("còn gì đang nằm ở các
+                 phòng"), còn "đang chờ ở phòng NÀO" là câu hỏi hẹp hơn, hỏi thưa hơn.
+
+                 Hai ô cùng bật thì phòng cụ thể thắng -- xem ghi chú ở showList. --%>
+            <label class="filter-toggle" for="filterWaitingAny">
+                <input type="checkbox" id="filterWaitingAny" name="waiting" value="1" ${waitingAnyFilter ? 'checked' : ''}>
+                Đang bàn giao
             </label>
             <%-- Ba ô ít dùng nhất gom sau một nút. Chúng vẫn nằm TRONG form và vẫn
                  gửi lên như thường -- giấu ở đây là chuyện của giao diện, không
@@ -578,11 +587,11 @@
                 <span class="pagination-info">Hiển thị ${fn:length(contractList)} trong tổng số ${totalCount} hợp đồng</span>
                 <nav>
                     <ul class="pagination pagination-sm mb-0">
-                        <li class="page-item ${currentPage <= 1 ? 'disabled' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/contract?action=list&kind=${kind}&page=${currentPage - 1}&keyword=${fn:escapeXml(keyword)}&status=${fn:escapeXml(statusFilter)}&progress=${fn:escapeXml(progressFilter)}&scope=${fn:escapeXml(scopeFilter)}&type=${fn:escapeXml(typeFilter)}&provinceId=${provinceFilter}&year=${yearFilter}&period=${periodFilter}&waitingDept=${waitingDeptFilter}">Trước</a></li>
+                        <li class="page-item ${currentPage <= 1 ? 'disabled' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/contract?action=list&kind=${kind}&page=${currentPage - 1}&keyword=${fn:escapeXml(keyword)}&status=${fn:escapeXml(statusFilter)}&progress=${fn:escapeXml(progressFilter)}&scope=${fn:escapeXml(scopeFilter)}&type=${fn:escapeXml(typeFilter)}&provinceId=${provinceFilter}&year=${yearFilter}&period=${periodFilter}&waitingDept=${waitingDeptFilter}&waiting=${waitingAnyFilter ? '1' : ''}">Trước</a></li>
                         <c:forEach begin="1" end="${totalPages}" var="p">
-                            <li class="page-item ${p == currentPage ? 'active' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/contract?action=list&kind=${kind}&page=${p}&keyword=${fn:escapeXml(keyword)}&status=${fn:escapeXml(statusFilter)}&progress=${fn:escapeXml(progressFilter)}&scope=${fn:escapeXml(scopeFilter)}&type=${fn:escapeXml(typeFilter)}&provinceId=${provinceFilter}&year=${yearFilter}&period=${periodFilter}&waitingDept=${waitingDeptFilter}">${p}</a></li>
+                            <li class="page-item ${p == currentPage ? 'active' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/contract?action=list&kind=${kind}&page=${p}&keyword=${fn:escapeXml(keyword)}&status=${fn:escapeXml(statusFilter)}&progress=${fn:escapeXml(progressFilter)}&scope=${fn:escapeXml(scopeFilter)}&type=${fn:escapeXml(typeFilter)}&provinceId=${provinceFilter}&year=${yearFilter}&period=${periodFilter}&waitingDept=${waitingDeptFilter}&waiting=${waitingAnyFilter ? '1' : ''}">${p}</a></li>
                         </c:forEach>
-                        <li class="page-item ${currentPage >= totalPages ? 'disabled' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/contract?action=list&kind=${kind}&page=${currentPage + 1}&keyword=${fn:escapeXml(keyword)}&status=${fn:escapeXml(statusFilter)}&progress=${fn:escapeXml(progressFilter)}&scope=${fn:escapeXml(scopeFilter)}&type=${fn:escapeXml(typeFilter)}&provinceId=${provinceFilter}&year=${yearFilter}&period=${periodFilter}&waitingDept=${waitingDeptFilter}">Sau</a></li>
+                        <li class="page-item ${currentPage >= totalPages ? 'disabled' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/contract?action=list&kind=${kind}&page=${currentPage + 1}&keyword=${fn:escapeXml(keyword)}&status=${fn:escapeXml(statusFilter)}&progress=${fn:escapeXml(progressFilter)}&scope=${fn:escapeXml(scopeFilter)}&type=${fn:escapeXml(typeFilter)}&provinceId=${provinceFilter}&year=${yearFilter}&period=${periodFilter}&waitingDept=${waitingDeptFilter}&waiting=${waitingAnyFilter ? '1' : ''}">Sau</a></li>
                     </ul>
                 </nav>
             </div>

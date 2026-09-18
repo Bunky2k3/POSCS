@@ -288,6 +288,13 @@ public class ContractController extends HttpServlet {
         // "Đang chờ ở phòng nào" -- câu hỏi của giám đốc, hỏi ngay trên danh
         // sách hợp đồng chứ không phải mở từng hợp đồng ra xem.
         Integer waitingDepartment = parseIntOrNull(request.getParameter("waitingDept"));
+        // Ô tích "Đang bàn giao" trên thanh lọc chính: chờ ở phòng nào cũng tính.
+        // Chọn HẲN một phòng ở khối "Lọc thêm" thì phòng đó thắng — nó hẹp hơn, và
+        // hai thứ cùng bật nghĩa là người dùng vừa chọn cụ thể hơn.
+        boolean waitingAny = "1".equals(request.getParameter("waiting"));
+        if (waitingDepartment == null && waitingAny) {
+            waitingDepartment = ContractDAO.WAITING_ANY_DEPARTMENT;
+        }
 
         // ===== Phạm vi mặc định của màn hình =====
         // Hai chiều, đều là MẶC ĐỊNH chứ không phải rào quyền:
@@ -325,7 +332,7 @@ public class ContractController extends HttpServlet {
         // Hợp đồng mua mà KPI gộp cả hợp đồng bán thì hai con số cạnh nhau
         // không khớp, và không có gì trên màn hình giải thích vì sao.
         Map<String, Integer> statusSummary = contractDAO.countStatusSummary(provinceFilter, period, direction,
-                rootsOnly, null, scope);
+                rootsOnly, null, scope, waitingDepartment);
 
         request.setAttribute("contractList", contractList);
         request.setAttribute("statusSummary", statusSummary);
@@ -339,7 +346,10 @@ public class ContractController extends HttpServlet {
         request.setAttribute("statusFilter", statusFilter);
         request.setAttribute("progressFilter", progressFilter);
         request.setAttribute("scopeFilter", rootsOnly ? "root" : null);
-        request.setAttribute("waitingDeptFilter", waitingDepartment);
+        request.setAttribute("waitingDeptFilter",
+                waitingDepartment != null && waitingDepartment == ContractDAO.WAITING_ANY_DEPARTMENT
+                        ? null : waitingDepartment);
+        request.setAttribute("waitingAnyFilter", waitingAny);
         List<Department> departments = employeeDAO.findAllDepartments();
         request.setAttribute("departmentList", departments);
         // Loại hợp đồng khác nhau theo chiều -- xem SELL_CONTRACT_TYPES /
@@ -361,7 +371,7 @@ public class ContractController extends HttpServlet {
         FilterState state = new FilterState(kindParam, keyword, statusFilter, progressFilter,
                 rootsOnly ? "root" : null, typeFilter, provinceFilter,
                 request.getParameter("year"), request.getParameter("period"), waitingDepartment,
-                departmentNameOf(departments, waitingDepartment));
+                departmentNameOf(departments, waitingDepartment), waitingAny);
         List<FilterChip> statusChips = new ArrayList<>();
         statusChips.add(state.statusChip(ContractDAO.STATUS_ACTIVE, "Đang hiệu lực", "var(--success)",
                 countOf(statusSummary, ContractDAO.STATUS_ACTIVE)));
@@ -379,6 +389,18 @@ public class ContractController extends HttpServlet {
         request.setAttribute("advancedFilterCount", state.advancedCount());
 
         request.getRequestDispatcher(LIST_VIEW).forward(request, response);
+    }
+
+    /**
+     * Cùng phép đọc bộ lọc bàn giao với showList -- file Excel phải ra đúng thứ
+     * đang nhìn thấy, kể cả khi lọc bằng ô tích chứ không bằng dropdown.
+     */
+    private Integer waitingDepartmentForExport(HttpServletRequest request) {
+        Integer dept = parseIntOrNull(request.getParameter("waitingDept"));
+        if (dept == null && "1".equals(request.getParameter("waiting"))) {
+            return ContractDAO.WAITING_ANY_DEPARTMENT;
+        }
+        return dept;
     }
 
     /**
@@ -469,7 +491,7 @@ public class ContractController extends HttpServlet {
         List<Contract> all = contractDAO.findAll(1, Integer.MAX_VALUE, keyword, statusFilter, typeFilter,
                 provinceFilter, true, period, direction, request.getParameter("progress"),
                 "root".equals(request.getParameter("scope")),
-                parseIntOrNull(request.getParameter("waitingDept")), scope);
+                waitingDepartmentForExport(request), scope);
         // Giữ cột "Mã HĐ" trong file dù danh sách trên màn hình đã bỏ -- xem lý do
         // ở CustomerController.exportExcel: STT chỉ đúng trong phạm vi một file.
         //
@@ -2275,12 +2297,15 @@ public class ContractController extends HttpServlet {
         private final Integer waitingDepartmentId;
         /** Tên phòng, chỉ để hiện trên chip -- lọc vẫn chạy bằng id. */
         private final String waitingDepartmentName;
+        /** Ô tích "Đang bàn giao" (không nêu phòng) -- tham số riêng trên URL. */
+        private final boolean waitingAny;
 
         FilterState(String kind, String keyword, String status, String progress, String scope,
                 String type, Integer provinceId, String year, String period, Integer waitingDepartmentId,
-                String waitingDepartmentName) {
+                String waitingDepartmentName, boolean waitingAny) {
             this.waitingDepartmentId = waitingDepartmentId;
             this.waitingDepartmentName = waitingDepartmentName;
+            this.waitingAny = waitingAny;
             this.kind = kind;
             this.keyword = keyword;
             this.status = status;
@@ -2308,8 +2333,14 @@ public class ContractController extends HttpServlet {
             // mình "quý 3" trên URL chỉ tạo ra một chip lọc không lọc gì cả.
             String nextYear = "year".equals(name) ? value : year;
             put(sb, "period", isBlank(nextYear) ? null : ("period".equals(name) ? value : period));
+            // waitingDept chỉ ghi ra khi là MỘT PHÒNG thật; giá trị canh
+            // WAITING_ANY_DEPARTMENT thuộc về tham số "waiting" bên dưới.
+            boolean anyDept = waitingDepartmentId != null
+                    && waitingDepartmentId == ContractDAO.WAITING_ANY_DEPARTMENT;
             put(sb, "waitingDept", "waitingDept".equals(name) ? value
-                    : (waitingDepartmentId == null ? null : String.valueOf(waitingDepartmentId)));
+                    : (waitingDepartmentId == null || anyDept ? null
+                                                              : String.valueOf(waitingDepartmentId)));
+            put(sb, "waiting", "waiting".equals(name) ? value : (waitingAny ? "1" : null));
             return sb.toString();
         }
 
@@ -2358,10 +2389,14 @@ public class ContractController extends HttpServlet {
                 // Gọi tên phòng ra chứ không nói chung chung: chip là thứ duy nhất
                 // hiện ra khi khối "Lọc thêm" đang đóng, mà "đang chờ ở một phòng"
                 // thì người đọc vẫn phải mở khối đó ra mới biết là phòng nào.
-                chips.add(new FilterChip(
-                        isBlank(waitingDepartmentName) ? "Đang chờ ở một phòng"
-                                                       : "Đang chờ: " + waitingDepartmentName,
-                        queryWith("waitingDept", null), null, true, 0));
+                if (waitingDepartmentId == ContractDAO.WAITING_ANY_DEPARTMENT) {
+                    chips.add(new FilterChip("Đang bàn giao", queryWith("waiting", null), null, true, 0));
+                } else {
+                    chips.add(new FilterChip(
+                            isBlank(waitingDepartmentName) ? "Đang chờ ở một phòng"
+                                                           : "Đang chờ: " + waitingDepartmentName,
+                            queryWith("waitingDept", null), null, true, 0));
+                }
             }
             return chips;
         }
@@ -2377,7 +2412,11 @@ public class ContractController extends HttpServlet {
             if (!isBlank(type)) { n++; }
             if (provinceId != null) { n++; }
             if (!isBlank(year)) { n++; }
-            if (waitingDepartmentId != null) { n++; }
+            // Chỉ đếm khi là MỘT PHÒNG cụ thể: ô tích "Đang bàn giao" nằm ngoài
+            // thanh lọc chính, đếm nó vào đây thì nút "Lọc thêm" báo có bộ lọc
+            // đang bật mà mở ra không thấy gì.
+            if (waitingDepartmentId != null
+                    && waitingDepartmentId != ContractDAO.WAITING_ANY_DEPARTMENT) { n++; }
             return n;
         }
     }
