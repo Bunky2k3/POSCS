@@ -115,7 +115,7 @@
                     <span>Đây là <strong>phụ lục</strong> của hợp đồng
                         <a href="${pageContext.request.contextPath}/contract?action=view&id=${contract.parentContractId}">
                             ${fn:escapeXml(contract.parentContractCode)}</a>.
-                        Nó có vòng đời riêng và phải được ký như một hợp đồng thường.</span>
+                        Nó có tiến trình riêng và phải được ký như một hợp đồng thường.</span>
                 </div>
             </div>
         </c:if>
@@ -379,14 +379,14 @@
         <%-- MỌI THAO TÁC GHI CỦA HỢP ĐỒNG NẰM Ở TRANG NÀY.
 
              Trang xem (viewcontractdetail.jsp) cố ý không có nút nào gây thay
-             đổi -- xem ghi chú ở đầu khối vòng đời bên đó. Các khối dưới đây
+             đổi -- xem ghi chú ở đầu khối tiến trình bên đó. Các khối dưới đây
              đứng NGOÀI form sửa thông tin ở trên: form lồng form là HTML không
              hợp lệ, trình duyệt sẽ tự cắt và nút bấm gửi đi thiếu tham số. --%>
 
-        <!-- ===== Bước vòng đời ===== -->
+        <!-- ===== Bước tiến trình ===== -->
         <c:if test="${canSign or canClose or canVoid}">
         <div class="card-box" style="margin-top:20px;">
-            <div class="section-header"><h5>Bước vòng đời</h5></div>
+            <div class="section-header"><h5>Bước tiến trình</h5></div>
             <div class="lifecycle-actions">
                 <c:if test="${canSign}">
                     <button type="button" class="btn-step primary"

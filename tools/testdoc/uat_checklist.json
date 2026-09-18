@@ -144,7 +144,7 @@
       ]
     },
     {
-      "m": "Vòng đời hợp đồng",
+      "m": "Tiến trình hợp đồng",
       "c": "Hợp đồng mới ra bản nháp chưa có ngày ký; ký là một bước riêng mà nhân viên có cấp trên không bấm được; thanh lý phải có căn cứ và sau đó không ai sửa được nữa, kể cả Admin",
       "ref": [
         "TC_CTRLIFE_001",
