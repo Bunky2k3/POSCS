@@ -27,6 +27,16 @@
     <link rel="stylesheet" href="${pageContext.request.contextPath}/css/appshell.css">
 
     <style>
+        /* ===== Modal xác nhận (giá trị lấy đúng của viewcustomerdetail.jsp) ===== */
+        .modal-content { border-radius: 16px; border: none; }
+        .modal-header { border-bottom: none; padding: 24px 24px 0; }
+        .modal-body { padding: 12px 24px 6px; color: #374151; font-size: 0.92rem; }
+        .modal-footer { border-top: none; padding: 18px 24px 24px; }
+        .btn-modal-cancel { background: #fff; border: 1.5px solid #e5e7eb; color: #6b7280; border-radius: 10px; padding: 8px 18px; font-weight: 600; font-size: 0.88rem; }
+        .btn-modal-danger { background: var(--danger); border: none; color: #fff; border-radius: 10px; padding: 8px 18px; font-weight: 600; font-size: 0.88rem; }
+        .modal-icon-warn { width: 52px; height: 52px; border-radius: 50%; background: #fdecef; color: var(--danger); display: flex; align-items: center; justify-content: center; font-size: 1.3rem; margin-bottom: 4px; }
+        .modal-title { font-weight: 700; color: var(--primary-dark); font-size: 1.05rem; }
+
         .page-container { max-width: 1080px; margin: 28px auto; padding: 0 20px 32px; }
         .back-link-top { color: var(--primary); font-size: 0.85rem; text-decoration: none; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; margin-bottom: 16px; }
         .back-link-top:hover { text-decoration: underline; }
@@ -361,13 +371,35 @@
         <input type="hidden" name="id" id="deleteFormId">
     </form>
 
+    <%-- Hỏi bằng modal trong trang, KHÔNG dùng confirm() của trình duyệt: hộp đó
+         không theo giao diện phần mềm và không đặt được nhãn tiếng Việt cho nút,
+         nên người dùng đọc "OK / Cancel" cho một thao tác xoá. --%>
+    <div class="modal fade" id="deleteModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <div class="modal-icon-warn"><i class="fa-solid fa-triangle-exclamation"></i></div>
+                </div>
+                <div class="modal-body">
+                    <h5 class="modal-title">Xoá phiếu hỗ trợ</h5>
+                    <div style="margin-top:8px;">Phiếu này sẽ biến khỏi danh sách. Xoá chứ?</div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn-modal-cancel" data-bs-dismiss="modal">Huỷ bỏ</button>
+                    <button type="button" class="btn-modal-danger" id="deleteOk">Xoá phiếu</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
         function confirmDelete(ticketId) {
-            if (confirm('Bạn có chắc chắn muốn xóa phiếu hỗ trợ này?')) {
-                document.getElementById('deleteFormId').value = ticketId;
-                document.getElementById('deleteForm').submit();
-            }
+            document.getElementById('deleteFormId').value = ticketId;
+            bootstrap.Modal.getOrCreateInstance(document.getElementById('deleteModal')).show();
         }
+        document.getElementById('deleteOk').addEventListener('click', function () {
+            document.getElementById('deleteForm').submit();
+        });
     </script>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>

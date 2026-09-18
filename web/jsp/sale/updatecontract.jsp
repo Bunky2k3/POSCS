@@ -39,6 +39,26 @@
         .section-header:first-child { margin-top: 0; }
         .section-header h5 { font-weight: 700; color: var(--primary-dark); font-size: 0.98rem; margin: 0; }
 
+        /* ===== Modal xác nhận (thay cho confirm/prompt/alert của trình duyệt) =====
+           Giá trị lấy đúng của viewcustomerdetail.jsp để hai màn hình nhìn như một. */
+        .modal-content { border-radius: 16px; border: none; }
+        .modal-header { border-bottom: none; padding: 24px 24px 0; }
+        .modal-body { padding: 12px 24px 6px; color: #374151; font-size: 0.92rem; }
+        .modal-footer { border-top: none; padding: 18px 24px 24px; }
+        .btn-modal-cancel { background: #fff; border: 1.5px solid #e5e7eb; color: #6b7280; border-radius: 10px; padding: 8px 18px; font-weight: 600; font-size: 0.88rem; }
+        .btn-modal-danger { background: var(--danger); border: none; color: #fff; border-radius: 10px; padding: 8px 18px; font-weight: 600; font-size: 0.88rem; }
+        .btn-modal-primary { background: linear-gradient(120deg, var(--primary), var(--primary-light)); border: none; color: #fff; border-radius: 10px; padding: 8px 18px; font-weight: 600; font-size: 0.88rem; }
+        .modal-icon-warn { width: 52px; height: 52px; border-radius: 50%; background: #fdecef; color: var(--danger); display: flex; align-items: center; justify-content: center; font-size: 1.3rem; margin-bottom: 4px; }
+        .modal-icon-ask { width: 52px; height: 52px; border-radius: 50%; background: #eaf6ff; color: var(--primary); display: flex; align-items: center; justify-content: center; font-size: 1.3rem; margin-bottom: 4px; }
+        .modal-title { font-weight: 700; color: var(--primary-dark); font-size: 1.05rem; }
+        .modal-body .form-label { font-weight: 600; font-size: 0.85rem; color: #374151; margin-bottom: 6px; display: block; }
+        .modal-body textarea.form-control {
+            width: 100%; padding: 0.6rem 0.9rem; border-radius: 10px; border: 1px solid #e5e7eb;
+            background-color: #f9fafb; font-size: 0.9rem;
+        }
+        .modal-msg { white-space: pre-line; margin-bottom: 14px; }
+        .modal-err { color: var(--danger); font-size: 0.82rem; margin-top: 6px; display: none; }
+
         /* ===== Thanh tab cho sáu khối thao tác ===== */
         .tab-wrap { margin-top: 20px; }
         .tab-wrap .nav-tabs {
@@ -1093,7 +1113,7 @@
                                                class="btn-outline-action"><i class="fa-solid fa-eye"></i> Xem</a>
                                             <form method="POST" action="${pageContext.request.contextPath}/contract"
                                                   style="display:inline;"
-                                                  onsubmit="return confirm('Gỡ liên kết với hợp đồng ${fn:escapeXml(lk.other.contractCode)}?');">
+                                                  data-confirm="Gỡ liên kết với hợp đồng ${fn:escapeXml(lk.other.contractCode)}?">
                                                 <input type="hidden" name="csrfToken" value="${csrfToken}">
                                                 <input type="hidden" name="action" value="unlinkContract">
                                                 <input type="hidden" name="contractId" value="${contract.contractId}">
@@ -1148,6 +1168,38 @@
 
     </div>
 
+        </div>
+    </div>
+
+    <%-- MỘT modal dùng chung cho mọi câu hỏi xác nhận của trang này.
+
+         Thay cho confirm()/prompt()/alert() của trình duyệt: những hộp đó không
+         theo giao diện của phần mềm, không xuống dòng được tử tế, không để được
+         nhãn tiếng Việt cho nút, và riêng prompt() thì một số trình duyệt đã chặn
+         hẳn -- lúc đó thao tác "nhập căn cứ thanh lý" im lặng không chạy.
+
+         Một modal chứ không phải mỗi thao tác một cái: phần khác nhau chỉ là chữ
+         và có hỏi lý do hay không, dựng sáu khối gần giống nhau là sớm muộn lệch. --%>
+    <div class="modal fade" id="askModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <div id="askIcon" class="modal-icon-ask"><i class="fa-solid fa-circle-question"></i></div>
+                </div>
+                <div class="modal-body">
+                    <h5 class="modal-title" id="askTitle">Xác nhận</h5>
+                    <div class="modal-msg" id="askMessage"></div>
+                    <div id="askNoteWrap" style="display:none;">
+                        <label class="form-label" for="askNote" id="askNoteLabel">Lý do</label>
+                        <textarea class="form-control" id="askNote" rows="3" maxlength="500"></textarea>
+                        <div class="modal-err" id="askNoteErr"></div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn-modal-cancel" data-bs-dismiss="modal">Huỷ bỏ</button>
+                    <button type="button" class="btn-modal-primary" id="askOk">Xác nhận</button>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -1248,58 +1300,134 @@
             el.textContent = isNaN(n) ? '\u2014' : n.toLocaleString('vi-VN', { maximumFractionDigits: 0 }) + ' \u20ab';
         });
 
+        // ===== Hỏi xác nhận bằng modal trong trang =====
+        //
+        // KHÔNG dùng confirm()/prompt()/alert() của trình duyệt nữa. Lý do cụ thể chứ
+        // không phải cho đẹp: prompt() bị một số trình duyệt chặn thẳng (Chrome chặn
+        // trong iframe, và chặn luôn khi người dùng tick "không hiện hộp thoại nữa")
+        // — lúc đó thao tác "nhập căn cứ thanh lý" im lặng không chạy mà không báo gì.
+        //
+        // ask(...) gọi cb(note) khi người dùng bấm Xác nhận; bấm Huỷ thì không gọi gì.
+        function ask(opts, cb) {
+            var el = document.getElementById('askModal');
+            var modal = bootstrap.Modal.getOrCreateInstance(el);
+            var note = document.getElementById('askNote');
+            var err = document.getElementById('askNoteErr');
+            var ok = document.getElementById('askOk');
+
+            document.getElementById('askTitle').textContent = opts.title;
+            document.getElementById('askMessage').textContent = opts.message || '';
+            var icon = document.getElementById('askIcon');
+            icon.className = opts.danger ? 'modal-icon-warn' : 'modal-icon-ask';
+            icon.innerHTML = opts.danger
+                ? '<i class="fa-solid fa-triangle-exclamation"></i>'
+                : '<i class="fa-solid fa-circle-question"></i>';
+            ok.className = opts.danger ? 'btn-modal-danger' : 'btn-modal-primary';
+            ok.textContent = opts.okLabel || 'Xác nhận';
+
+            document.getElementById('askNoteWrap').style.display = opts.noteLabel ? '' : 'none';
+            document.getElementById('askNoteLabel').textContent = opts.noteLabel || '';
+            note.value = '';
+            note.placeholder = opts.notePlaceholder || '';
+            err.style.display = 'none';
+
+            // Thay nút để bỏ mọi listener của lần gọi trước — không thì mở modal lần
+            // thứ hai sẽ chạy cả hành động của lần thứ nhất.
+            var fresh = ok.cloneNode(true);
+            ok.parentNode.replaceChild(fresh, ok);
+            fresh.addEventListener('click', function () {
+                if (opts.noteLabel && note.value.trim() === '') {
+                    err.textContent = opts.noteRequiredMsg || 'Phải nhập ô này thì mới tiếp tục được.';
+                    err.style.display = 'block';
+                    note.focus();
+                    return;
+                }
+                modal.hide();
+                cb(note.value.trim());
+            });
+
+            el.addEventListener('shown.bs.modal', function once() {
+                el.removeEventListener('shown.bs.modal', once);
+                if (opts.noteLabel) { note.focus(); }
+            });
+            modal.show();
+        }
+
         // requireNote=true với thanh lý và chấm dứt sớm: hai bước đó đóng băng
         // hợp đồng vĩnh viễn, không có đường quay lại, nên phải biết căn cứ.
         // Server kiểm lại cả hai điều (ContractDAO.changeProgressStatus).
         function changeProgress(toStatus, message, requireNote) {
-            var note = null;
-            if (requireNote) {
-                note = prompt(message);
-                if (note === null) { return; }
-                if (note.trim() === '') {
-                    alert('Phải nhập căn cứ thì mới thực hiện được — bước này không quay lại được.');
-                    return;
-                }
-            } else if (!confirm(message)) {
-                return;
-            }
-            document.getElementById('opToStatus').value = toStatus;
-            document.getElementById('opProgressNote').value = note === null ? '' : note.trim();
-            submitOp('changeProgress');
+            ask({
+                title: requireNote ? 'Bước này không quay lại được' : 'Xác nhận',
+                message: message,
+                danger: !!requireNote,
+                noteLabel: requireNote ? 'Căn cứ' : null,
+                notePlaceholder: 'VD: Biên bản thanh lý số 07 ngày 12/09/2026',
+                noteRequiredMsg: 'Phải nhập căn cứ thì mới thực hiện được — bước này không quay lại được.'
+            }, function (note) {
+                document.getElementById('opToStatus').value = toStatus;
+                document.getElementById('opProgressNote').value = note;
+                submitOp('changeProgress');
+            });
         }
 
         // Hỏi LÝ DO chứ không hỏi "có chắc không": bản ghi bị huỷ vẫn nằm trong
         // CSDL và vẫn có dòng nhật ký, nên thứ cần thu thập là vì sao.
         function confirmVoid() {
-            var reason = prompt('Huỷ bản ghi hợp đồng này khỏi danh sách.\n'
-                + 'Đây là thao tác sửa nhập liệu sai, không phải huỷ hợp đồng ngoài đời.\n\n'
-                + 'Nhập lý do:');
-            if (reason === null) { return; }
-            if (reason.trim() === '') {
-                alert('Phải có lý do thì mới huỷ được bản ghi.');
-                return;
-            }
-            document.getElementById('opVoidReason').value = reason.trim();
-            submitOp('delete');
+            ask({
+                title: 'Huỷ bản ghi hợp đồng',
+                message: 'Bản ghi này sẽ biến khỏi danh sách.\n'
+                    + 'Đây là thao tác sửa nhập liệu sai, không phải huỷ hợp đồng ngoài đời.',
+                danger: true,
+                okLabel: 'Huỷ bản ghi',
+                noteLabel: 'Lý do',
+                notePlaceholder: 'VD: nhập trùng với 06/2026/HĐKT-POSTEF',
+                noteRequiredMsg: 'Phải có lý do thì mới huỷ được bản ghi.'
+            }, function (reason) {
+                document.getElementById('opVoidReason').value = reason;
+                submitOp('delete');
+            });
         }
 
         function markPaid(paymentId) {
-            if (!confirm('Ghi nhận tiền của kỳ này đã về hôm nay?')) { return; }
-            document.getElementById('opPaymentId').value = paymentId;
-            submitOp('markPaid');
+            ask({ title: 'Ghi nhận đã thu', message: 'Ghi nhận tiền của kỳ này đã về hôm nay?' },
+                function () {
+                    document.getElementById('opPaymentId').value = paymentId;
+                    submitOp('markPaid');
+                });
         }
 
         function confirmRemovePayment(paymentId) {
-            if (!confirm('Xoá kỳ thanh toán này?')) { return; }
-            document.getElementById('opPaymentId').value = paymentId;
-            submitOp('removePayment');
+            ask({ title: 'Xoá kỳ thanh toán', message: 'Xoá kỳ thanh toán này?',
+                  danger: true, okLabel: 'Xoá' },
+                function () {
+                    document.getElementById('opPaymentId').value = paymentId;
+                    submitOp('removePayment');
+                });
         }
 
         function confirmRemoveProduct(contractProductId) {
-            if (!confirm('Gỡ hàng hoá này khỏi hợp đồng?')) { return; }
-            document.getElementById('opContractProductId').value = contractProductId;
-            submitOp('removeProduct');
+            ask({ title: 'Gỡ hàng hoá', message: 'Gỡ hàng hoá này khỏi hợp đồng?',
+                  danger: true, okLabel: 'Gỡ' },
+                function () {
+                    document.getElementById('opContractProductId').value = contractProductId;
+                    submitOp('removeProduct');
+                });
         }
+
+        // Gỡ liên kết bán-mua: form nằm sẵn trong bảng, chặn lại để hỏi rồi mới gửi.
+        document.querySelectorAll('form[data-confirm]').forEach(function (form) {
+            form.addEventListener('submit', function (e) {
+                if (form.dataset.confirmed === '1') { return; }
+                e.preventDefault();
+                ask({ title: 'Gỡ liên kết', message: form.dataset.confirm,
+                      danger: true, okLabel: 'Gỡ' },
+                    function () {
+                        form.dataset.confirmed = '1';
+                        form.submit();
+                    });
+            });
+        });
     </script>
 
     <script>
