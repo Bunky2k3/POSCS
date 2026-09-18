@@ -828,6 +828,40 @@ public class ContractStatusIntegrationTest {
                 0, IntegrationDb.count("contract_links", "1 = 1"));
     }
 
+    /**
+     * Nhãn "đang chờ ở phòng nào, mấy ngày" đọc thẳng từ danh sách hợp đồng, và
+     * bộ lọc theo phòng phải đi cặp với bộ đếm phân trang.
+     *
+     * <p>Cả hai nằm trong SQL (GROUP_CONCAT trong câu con, EXISTS trong mệnh đề
+     * lọc) nên test mock không chạm tới được.
+     */
+    @Test
+    public void handover_nhanChoVaBoLocHienTrenDanhSach() throws Exception {
+        IntegrationDb.assumeAvailable();
+
+        int ketToan = departmentId("Kế toán");
+        int duAn = departmentId("Dự án");
+        assertEquals(2, contractDAO.handOverToDepartments(2, List.of(ketToan, duAn), null, Fixtures.USER_ID));
+
+        Contract listed = contractDAO.findAll(1, 50, "HD-0002", null, null, null, false, null, null, null, false)
+                .stream().filter(c -> c.getContractId() == 2).findFirst().orElseThrow();
+        assertTrue("phải khai là đang chờ", listed.isWaitingAtDepartment());
+        assertEquals("Dự án, Kế toán", listed.getPendingDepartments());
+
+        // Lọc theo phòng: danh sách và bộ đếm phải ra cùng một con số, nếu
+        // không thì phân trang đếm một đằng liệt kê một nẻo.
+        int rows = contractDAO.findAll(1, 50, null, null, null, null, false, null, null, null, false, ketToan).size();
+        assertEquals(1, rows);
+        assertEquals(rows, contractDAO.countAll(null, null, null, null, null, null, null, false, ketToan));
+
+        // Đóng chặng Kế toán -> hợp đồng rơi khỏi bộ lọc đó, nhưng vẫn còn chờ Dự án.
+        int handoverId = contractDAO.findHandoversOf(2).stream()
+                .filter(h -> h.getDepartmentId() == ketToan).findFirst().orElseThrow().getHandoverId();
+        assertTrue(contractDAO.completeHandover(handoverId, Fixtures.USER_ID, "xong"));
+        assertEquals(0, contractDAO.countAll(null, null, null, null, null, null, null, false, ketToan));
+        assertEquals(1, contractDAO.countAll(null, null, null, null, null, null, null, false, duAn));
+    }
+
     /** Hợp đồng mua dựng qua DAO -- bốn hợp đồng gieo sẵn đều là chiều bán. */
     private int insertBuyContract(String code, String value) {
         Contract buy = new Contract();

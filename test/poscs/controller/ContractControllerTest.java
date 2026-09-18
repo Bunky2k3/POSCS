@@ -596,6 +596,95 @@ public class ContractControllerTest {
     }
 
     // ------------------------------------------------------------------
+    // Chặng bàn giao trên danh sách hợp đồng
+    // ------------------------------------------------------------------
+
+    /** Lọc "đang chờ ở phòng X" phải xuống CẢ findAll lẫn countAll, nếu không phân trang lệch. */
+    @Test
+    public void list_locTheoPhongDangCho_xuongCaHaiTruyVan() throws Exception {
+        RequestDispatcher dispatcher = mock(RequestDispatcher.class);
+        when(request.getRequestDispatcher("/jsp/sale/listcontract.jsp")).thenReturn(dispatcher);
+        when(request.getParameter("waitingDept")).thenReturn("5");
+
+        controller.doGet(request, response);
+
+        verify(contractDAO).findAll(anyInt(), anyInt(), any(), any(), any(), any(), anyBoolean(),
+                nullable(Period.class), any(), nullable(String.class), anyBoolean(), eq(5));
+        verify(contractDAO).countAll(any(), any(), any(), any(), nullable(Period.class), any(),
+                nullable(String.class), anyBoolean(), eq(5));
+        verify(request).setAttribute("waitingDeptFilter", 5);
+    }
+
+    /** Bộ lọc này nằm trong khối "Lọc thêm" nên phải được đếm vào badge của nút đó. */
+    @Test
+    public void list_locPhongDangCho_tinhVaoSoLocNangCao() throws Exception {
+        RequestDispatcher dispatcher = mock(RequestDispatcher.class);
+        when(request.getRequestDispatcher("/jsp/sale/listcontract.jsp")).thenReturn(dispatcher);
+        when(request.getParameter("waitingDept")).thenReturn("5");
+        when(request.getParameter("type")).thenReturn("Thi công lắp đặt");
+
+        controller.doGet(request, response);
+
+        verify(request).setAttribute("advancedFilterCount", 2);
+    }
+
+    /** Chip "đang lọc" của nó mang link bỏ chính nó và giữ các lọc khác. */
+    @Test
+    public void list_chipPhongDangCho_mangLinkBoChinhNo() throws Exception {
+        RequestDispatcher dispatcher = mock(RequestDispatcher.class);
+        when(request.getRequestDispatcher("/jsp/sale/listcontract.jsp")).thenReturn(dispatcher);
+        when(request.getParameter("waitingDept")).thenReturn("5");
+        when(request.getParameter("scope")).thenReturn("root");
+
+        controller.doGet(request, response);
+
+        ArgumentCaptor<List<ContractController.FilterChip>> chips = ArgumentCaptor.forClass(List.class);
+        verify(request).setAttribute(eq("activeFilters"), chips.capture());
+        ContractController.FilterChip chip = chips.getValue().stream()
+                .filter(c -> c.getLabel().startsWith("Đang chờ")).findFirst().orElseThrow();
+        assertFalse(chip.getQuery(), chip.getQuery().contains("waitingDept="));
+        assertTrue(chip.getQuery(), chip.getQuery().contains("scope=root"));
+    }
+
+    /** Xuất Excel phải theo đúng bộ lọc đang xem, kể cả bộ lọc mới này. */
+    @Test
+    public void exportExcel_mangTheoLocPhongDangCho() throws Exception {
+        when(request.getParameter("action")).thenReturn("exportExcel");
+        when(request.getParameter("waitingDept")).thenReturn("6");
+        when(response.getOutputStream()).thenReturn(mock(jakarta.servlet.ServletOutputStream.class));
+
+        controller.doGet(request, response);
+
+        verify(contractDAO).findAll(anyInt(), anyInt(), any(), any(), any(), any(), anyBoolean(),
+                nullable(Period.class), any(), nullable(String.class), anyBoolean(), eq(6));
+    }
+
+    /**
+     * Trang QUẢN LÝ thì ngược với trang xem: nút đóng chặng phải mọc được ở đó,
+     * nếu không cái form nằm trong JSP mà không bao giờ hiện ra.
+     */
+    @Test
+    public void edit_datCoXacNhanChangChoDungPhong() throws Exception {
+        Contract contract = signedContract();
+        when(request.getParameter("action")).thenReturn("edit");
+        when(request.getParameter("id")).thenReturn("5");
+        when(contractDAO.findById(5)).thenReturn(contract);
+        ContractHandover pending = new ContractHandover();
+        pending.setHandoverId(9);
+        pending.setDepartmentId(6);
+        when(contractDAO.findHandoversOf(5)).thenReturn(List.of(pending));
+        // Admin: vừa vào được trang quản lý (requireFullAccess), vừa xác nhận
+        // thay được cho mọi phòng. Người của phòng Kế toán/Dự án KHÔNG vào được
+        // trang này -- chỗ làm việc của họ là hàng đợi bàn giao.
+        dangNhapVoiPhongBan(1, "Admin");
+        when(request.getRequestDispatcher(anyString())).thenReturn(mock(RequestDispatcher.class));
+
+        controller.doGet(request, response);
+
+        verify(request).setAttribute("canCompleteHandover_9", true);
+    }
+
+    // ------------------------------------------------------------------
     // Bàn giao phòng ban
     // ------------------------------------------------------------------
 
@@ -911,7 +1000,7 @@ public class ContractControllerTest {
 
         ArgumentCaptor<Period> period = ArgumentCaptor.forClass(Period.class);
         verify(contractDAO).findAll(anyInt(), anyInt(), any(), any(), any(), any(), eq(false),
-                period.capture(), eq("Mua"), nullable(String.class), eq(false));
+                period.capture(), eq("Mua"), nullable(String.class), eq(false), nullable(Integer.class));
         assertNotNull("kỳ phải còn nguyên khi lọc theo chiều", period.getValue());
         assertEquals("Quý 2/2026", period.getValue().getLabel());
     }
@@ -1037,7 +1126,7 @@ public class ContractControllerTest {
         controller.doGet(request, response);
 
         verify(contractDAO).findAll(anyInt(), anyInt(), any(), any(), any(), any(), eq(false),
-                nullable(Period.class), eq("Bán"), nullable(String.class), eq(false));
+                nullable(Period.class), eq("Bán"), nullable(String.class), eq(false), nullable(Integer.class));
         verify(request).setAttribute("kind", "sell");
     }
 

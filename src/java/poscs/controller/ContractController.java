@@ -271,11 +271,14 @@ public class ContractController extends HttpServlet {
         // nên phải tìm thấy được bằng mã. Ô này để thu về danh sách hợp đồng
         // gốc khi người dùng muốn đếm "bao nhiêu hợp đồng" theo nghĩa thường.
         boolean rootsOnly = "root".equals(request.getParameter("scope"));
+        // "Đang chờ ở phòng nào" -- câu hỏi của giám đốc, hỏi ngay trên danh
+        // sách hợp đồng chứ không phải mở từng hợp đồng ra xem.
+        Integer waitingDepartment = parseIntOrNull(request.getParameter("waitingDept"));
 
         List<Contract> contractList = contractDAO.findAll(page, PAGE_SIZE, keyword, statusFilter, typeFilter,
-                provinceFilter, false, period, direction, progressFilter, rootsOnly);
+                provinceFilter, false, period, direction, progressFilter, rootsOnly, waitingDepartment);
         int totalCount = contractDAO.countAll(keyword, statusFilter, typeFilter, provinceFilter, period, direction,
-                progressFilter, rootsOnly);
+                progressFilter, rootsOnly, waitingDepartment);
         int totalPages = Math.max(1, (int) Math.ceil(totalCount / (double) PAGE_SIZE));
         // Dải KPI trạng thái phải đếm CÙNG phạm vi với bảng bên dưới: đứng ở
         // Hợp đồng mua mà KPI gộp cả hợp đồng bán thì hai con số cạnh nhau
@@ -295,6 +298,8 @@ public class ContractController extends HttpServlet {
         request.setAttribute("statusFilter", statusFilter);
         request.setAttribute("progressFilter", progressFilter);
         request.setAttribute("scopeFilter", rootsOnly ? "root" : null);
+        request.setAttribute("waitingDeptFilter", waitingDepartment);
+        request.setAttribute("departmentList", employeeDAO.findAllDepartments());
         // Loại hợp đồng khác nhau theo chiều -- xem SELL_CONTRACT_TYPES /
         // BUY_CONTRACT_TYPES. JSP dựng dropdown từ đây thay vì chép cứng.
         request.setAttribute("contractTypeOptions", contractTypesFor(direction));
@@ -313,7 +318,7 @@ public class ContractController extends HttpServlet {
         String kindParam = DIRECTION_BUY.equals(direction) ? "buy" : "sell";
         FilterState state = new FilterState(kindParam, keyword, statusFilter, progressFilter,
                 rootsOnly ? "root" : null, typeFilter, provinceFilter,
-                request.getParameter("year"), request.getParameter("period"));
+                request.getParameter("year"), request.getParameter("period"), waitingDepartment);
         List<FilterChip> statusChips = new ArrayList<>();
         statusChips.add(state.statusChip(ContractDAO.STATUS_ACTIVE, "Đang hiệu lực", "var(--success)",
                 countOf(statusSummary, ContractDAO.STATUS_ACTIVE)));
@@ -393,7 +398,8 @@ public class ContractController extends HttpServlet {
         // trong cùng một cuộc họp không khớp nhau.
         List<Contract> all = contractDAO.findAll(1, Integer.MAX_VALUE, keyword, statusFilter, typeFilter,
                 provinceFilter, true, period, direction, request.getParameter("progress"),
-                "root".equals(request.getParameter("scope")));
+                "root".equals(request.getParameter("scope")),
+                parseIntOrNull(request.getParameter("waitingDept")));
         // Giữ cột "Mã HĐ" trong file dù danh sách trên màn hình đã bỏ -- xem lý do
         // ở CustomerController.exportExcel: STT chỉ đúng trong phạm vi một file.
         //
@@ -958,6 +964,17 @@ public class ContractController extends HttpServlet {
         request.setAttribute("canCorrect", AccessControl.isAdmin(request) && contract.isSigned());
         // Lập phụ lục: chỉ từ hợp đồng gốc ĐÃ KÝ và chưa đóng băng.
         request.setAttribute("canAddAmendment", contract.isSigned() && !contract.isAmendment());
+
+        // Cờ đóng chặng bàn giao đặt Ở ĐÂY, không ở putContractWorkspace: nơi
+        // đó dùng chung với trang XEM, mà trang xem cố ý không mọc nút ghi nào.
+        // Thiếu dòng này thì cái form trong updatecontract.jsp nằm đấy mà không
+        // bao giờ hiện ra -- điều kiện luôn sai.
+        for (ContractHandover h : contractDAO.findHandoversOf(contract.getContractId())) {
+            if (h.isPending()) {
+                request.setAttribute("canCompleteHandover_" + h.getHandoverId(),
+                        AccessControl.canCompleteHandover(request, h.getDepartmentId()));
+            }
+        }
 
         // Danh sách để chọn khi nối hợp đồng: CHIỀU NGƯỢC LẠI với hợp đồng đang
         // mở, chỉ hợp đồng gốc. Đổ sẵn cả danh sách vì mỗi chiều chỉ vài chục
@@ -2181,9 +2198,11 @@ public class ContractController extends HttpServlet {
         private final Integer provinceId;
         private final String year;
         private final String period;
+        private final Integer waitingDepartmentId;
 
         FilterState(String kind, String keyword, String status, String progress, String scope,
-                String type, Integer provinceId, String year, String period) {
+                String type, Integer provinceId, String year, String period, Integer waitingDepartmentId) {
+            this.waitingDepartmentId = waitingDepartmentId;
             this.kind = kind;
             this.keyword = keyword;
             this.status = status;
@@ -2211,6 +2230,8 @@ public class ContractController extends HttpServlet {
             // mình "quý 3" trên URL chỉ tạo ra một chip lọc không lọc gì cả.
             String nextYear = "year".equals(name) ? value : year;
             put(sb, "period", isBlank(nextYear) ? null : ("period".equals(name) ? value : period));
+            put(sb, "waitingDept", "waitingDept".equals(name) ? value
+                    : (waitingDepartmentId == null ? null : String.valueOf(waitingDepartmentId)));
             return sb.toString();
         }
 
@@ -2255,6 +2276,9 @@ public class ContractController extends HttpServlet {
             if (!isBlank(year)) {
                 chips.add(new FilterChip(periodLabel(), queryWith("year", null), null, true, 0));
             }
+            if (waitingDepartmentId != null) {
+                chips.add(new FilterChip("Đang chờ ở một phòng", queryWith("waitingDept", null), null, true, 0));
+            }
             return chips;
         }
 
@@ -2269,6 +2293,7 @@ public class ContractController extends HttpServlet {
             if (!isBlank(type)) { n++; }
             if (provinceId != null) { n++; }
             if (!isBlank(year)) { n++; }
+            if (waitingDepartmentId != null) { n++; }
             return n;
         }
     }

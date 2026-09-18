@@ -162,6 +162,23 @@ public class ContractDAO {
         "(SELECT COALESCE(SUM(ch.contract_value), 0) FROM contracts ch " +
         " WHERE ch.parent_contract_id = c.contract_id AND ch.is_deleted = 0 AND NOT " + AMENDMENT_IS_SIGNED_SQL + ")";
 
+    /**
+     * Các phòng đang giữ hợp đồng, gom thành một chuỗi -- nhãn "đang chờ: Kế
+     * toán, Dự án" trên danh sách.
+     *
+     * <p>GROUP_CONCAT trong một câu con thay vì tra thêm cho từng dòng: mười
+     * dòng một trang là mười lượt đi CSDL cho một nhãn nhỏ.
+     */
+    private static final String PENDING_DEPARTMENTS_SQL =
+        "(SELECT GROUP_CONCAT(pd.department_name ORDER BY pd.department_name SEPARATOR ', ') "
+        + " FROM contract_handovers ph JOIN departments pd ON pd.department_id = ph.department_id "
+        + " WHERE ph.contract_id = c.contract_id AND ph.done_at IS NULL)";
+
+    /** Số ngày của chặng đang chờ LÂU NHẤT -- thứ giám đốc quét mắt tìm điểm nghẽn. */
+    private static final String PENDING_DAYS_SQL =
+        "(SELECT COALESCE(MAX(DATEDIFF(NOW(), ph.handed_at)), 0) FROM contract_handovers ph "
+        + " WHERE ph.contract_id = c.contract_id AND ph.done_at IS NULL)";
+
     private static final String SELECT_BASE =
         "SELECT c.contract_id, c.contract_code, c.title, c.contract_type, c.direction, c.signing_date, " +
         "       c.effective_date, c.end_date, c.enterprise_id, c.owner_id, c.attachment_url, " +
@@ -171,6 +188,8 @@ public class ContractDAO {
         "       " + AMENDMENT_COUNT_SQL + " AS amendment_count, " +
         "       " + AMENDMENT_VALUE_SIGNED_SQL + " AS amendment_value_signed, " +
         "       " + AMENDMENT_VALUE_PENDING_SQL + " AS amendment_value_pending, " +
+        "       " + PENDING_DEPARTMENTS_SQL + " AS pending_departments, " +
+        "       " + PENDING_DAYS_SQL + " AS pending_handover_days, " +
         "       e.enterprise_name, p.province_id, p.province_name, " +
         "       u.last_name AS owner_last_name, u.middle_name AS owner_middle_name, u.first_name AS owner_first_name " +
         "FROM contracts c " +
@@ -272,11 +291,26 @@ public class ContractDAO {
     public List<Contract> findAll(int page, int pageSize, String keyword, String statusFilter, String typeFilter,
             Integer provinceId, boolean sortByProvince, Period period, String direction, String progressFilter,
             boolean rootsOnly) {
+        return findAll(page, pageSize, keyword, statusFilter, typeFilter, provinceId, sortByProvince,
+                period, direction, progressFilter, rootsOnly, null);
+    }
+
+    /**
+     * Như trên, kèm {@code waitingDepartmentId}: chỉ lấy hợp đồng ĐANG NẰM CHỜ
+     * ở phòng đó (chặng bàn giao chưa đóng).
+     *
+     * <p>Chữ ký này đã dài tới mức khó đọc. Bộ lọc tiếp theo thì gom hết lại
+     * thành một đối tượng chứ đừng thêm tham số thứ mười ba -- chỗ nguy hiểm
+     * không phải là đọc khó, mà là truyền nhầm thứ tự hai tham số cùng kiểu.
+     */
+    public List<Contract> findAll(int page, int pageSize, String keyword, String statusFilter, String typeFilter,
+            Integer provinceId, boolean sortByProvince, Period period, String direction, String progressFilter,
+            boolean rootsOnly, Integer waitingDepartmentId) {
         List<Contract> result = new ArrayList<>();
         StringBuilder sql = new StringBuilder(SELECT_BASE);
         List<Object> params = new ArrayList<>();
         appendFilters(sql, params, keyword, statusFilter, typeFilter, provinceId, period, direction, progressFilter,
-                rootsOnly);
+                rootsOnly, waitingDepartmentId);
         sql.append(sortByProvince
                 ? " ORDER BY p.province_name IS NULL, " + AddressDAO.PROVINCE_SHORT_NAME_ORDER
                         + ", c.contract_id DESC LIMIT ? OFFSET ?"
@@ -317,12 +351,19 @@ public class ContractDAO {
     /** Như trên, kèm {@code rootsOnly} -- phải đi cặp với findAll, nếu không phân trang đếm một đằng liệt kê một nẻo. */
     public int countAll(String keyword, String statusFilter, String typeFilter, Integer provinceId, Period period,
             String direction, String progressFilter, boolean rootsOnly) {
+        return countAll(keyword, statusFilter, typeFilter, provinceId, period, direction, progressFilter,
+                rootsOnly, null);
+    }
+
+    /** Như trên, kèm bộ lọc "đang chờ ở phòng" -- phải đi cặp với findAll. */
+    public int countAll(String keyword, String statusFilter, String typeFilter, Integer provinceId, Period period,
+            String direction, String progressFilter, boolean rootsOnly, Integer waitingDepartmentId) {
         StringBuilder sql = new StringBuilder(
             "SELECT COUNT(*) FROM contracts c LEFT JOIN enterprises e ON c.enterprise_id = e.enterprise_id "
             + JOIN_PROVINCE_OF_ENTERPRISE);
         List<Object> params = new ArrayList<>();
         appendFilters(sql, params, keyword, statusFilter, typeFilter, provinceId, period, direction, progressFilter,
-                rootsOnly);
+                rootsOnly, waitingDepartmentId);
 
         try (Connection conn = DBContext.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql.toString())) {
@@ -2253,7 +2294,7 @@ public class ContractDAO {
 
     private void appendFilters(StringBuilder sql, List<Object> params, String keyword, String statusFilter,
             String typeFilter, Integer provinceId, Period period, String direction, String progressFilter,
-            boolean rootsOnly) {
+            boolean rootsOnly, Integer waitingDepartmentId) {
         List<String> conditions = new ArrayList<>();
         conditions.add("c.is_deleted = 0");
 
@@ -2263,6 +2304,16 @@ public class ContractDAO {
         // sách hợp đồng gốc khi cần đếm "bao nhiêu hợp đồng" theo nghĩa thường.
         if (rootsOnly) {
             conditions.add("c.parent_contract_id IS NULL");
+        }
+
+        // "Đang chờ ở phòng X": có chặng bàn giao CHƯA ĐÓNG ở phòng đó. EXISTS
+        // chứ không JOIN -- một hợp đồng chờ ở hai phòng thì JOIN nhân đôi dòng,
+        // và phân trang đếm một đằng liệt kê một nẻo.
+        if (waitingDepartmentId != null) {
+            conditions.add("EXISTS (SELECT 1 FROM contract_handovers wh "
+                    + "WHERE wh.contract_id = c.contract_id AND wh.done_at IS NULL "
+                    + "AND wh.department_id = ?)");
+            params.add(waitingDepartmentId);
         }
 
         if (keyword != null && !keyword.trim().isEmpty()) {
@@ -2380,6 +2431,8 @@ public class ContractDAO {
         c.setAmendmentCount(rs.getInt("amendment_count"));
         c.setAmendmentValueSigned(rs.getBigDecimal("amendment_value_signed"));
         c.setAmendmentValuePending(rs.getBigDecimal("amendment_value_pending"));
+        c.setPendingDepartments(rs.getString("pending_departments"));
+        c.setPendingHandoverDays(rs.getInt("pending_handover_days"));
 
         String enterpriseName = rs.getString("enterprise_name");
         if (enterpriseName != null) {

@@ -49,6 +49,19 @@ public class Contract {
     private java.math.BigDecimal amendmentValuePending = java.math.BigDecimal.ZERO;
 
     /**
+     * Tên các phòng ĐANG GIỮ hợp đồng này, ngăn bằng dấu phẩy; null khi không
+     * có chặng nào đang mở.
+     *
+     * <p>Gom ở SQL chứ không tra thêm một lượt cho mỗi dòng: danh sách hợp đồng
+     * hiện 10 dòng một trang, mỗi dòng một truy vấn là 10 lượt đi CSDL cho một
+     * nhãn nhỏ.
+     */
+    private String pendingDepartments;
+
+    /** Số ngày của chặng đang chờ LÂU NHẤT; 0 khi không có chặng nào đang mở. */
+    private int pendingHandoverDays;
+
+    /**
      * Mã hợp đồng, chính là số ghi trên bản giấy ("01/2026/HĐKT-POSTEF").
      *
      * <p>NGƯỜI DÙNG NHẬP, không sinh tự động (V28). Trước đó hệ thống sinh
@@ -173,6 +186,17 @@ public class Contract {
     public java.math.BigDecimal getAmendmentValuePending() { return amendmentValuePending; }
     public void setAmendmentValuePending(java.math.BigDecimal v) {
         this.amendmentValuePending = v == null ? java.math.BigDecimal.ZERO : v;
+    }
+
+    public String getPendingDepartments() { return pendingDepartments; }
+    public void setPendingDepartments(String pendingDepartments) { this.pendingDepartments = pendingDepartments; }
+
+    public int getPendingHandoverDays() { return pendingHandoverDays; }
+    public void setPendingHandoverDays(int pendingHandoverDays) { this.pendingHandoverDays = pendingHandoverDays; }
+
+    /** true nếu hợp đồng đang nằm chờ ở ít nhất một phòng. */
+    public boolean isWaitingAtDepartment() {
+        return pendingDepartments != null && !pendingDepartments.isEmpty();
     }
 
     /** true nếu có phụ lục đã ký làm đổi giá trị -- điều kiện để màn hình bày ba dòng giá trị. */
