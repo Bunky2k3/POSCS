@@ -39,6 +39,28 @@
         .section-header:first-child { margin-top: 0; }
         .section-header h5 { font-weight: 700; color: var(--primary-dark); font-size: 0.98rem; margin: 0; }
 
+        /* ===== Thanh tab cho sáu khối thao tác ===== */
+        .tab-wrap { margin-top: 20px; }
+        .tab-wrap .nav-tabs {
+            border-bottom: 1.5px solid #eef2f6; gap: 2px; flex-wrap: wrap;
+        }
+        .tab-wrap .nav-tabs .nav-link {
+            border: none; border-bottom: 2.5px solid transparent; border-radius: 0;
+            padding: 10px 16px; font-size: 0.87rem; font-weight: 600; color: #6b7280;
+            background: none;
+        }
+        .tab-wrap .nav-tabs .nav-link i { color: #9ca3af; }
+        .tab-wrap .nav-tabs .nav-link:hover { color: var(--primary-dark); }
+        .tab-wrap .nav-tabs .nav-link.active {
+            color: var(--primary-dark); border-bottom-color: var(--primary);
+        }
+        .tab-wrap .nav-tabs .nav-link.active i { color: var(--primary); }
+        /* Thẻ bên trong tab bỏ bo góc trên cho dính vào thanh tab, nhìn ra là MỘT khối
+           chứ không phải hai thứ rời nhau. */
+        .tab-wrap .tab-content > .tab-pane > .card-box {
+            border-top-left-radius: 0; border-top-right-radius: 0;
+        }
+
         .field-row { margin-bottom: 18px; }
         .field-row label { font-size: 0.75rem; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: .3px; margin-bottom: 6px; display: block; }
         .field-row label .req { color: var(--danger); }
@@ -232,7 +254,7 @@
                         <input type="text" class="form-control" id="title" name="title" value="${fn:escapeXml(contract.title)}" ${canEditTerms ? '' : 'disabled'} data-term="1">
                         <span class="error-text" id="err-title">Tiêu đề không được để trống.</span>
                     </div>
-                    <div class="col-md-6 field-row">
+                    <div class="col-md-4 field-row">
                         <label>Khách hàng <span class="req">*</span></label>
                         <select class="form-select" id="customer" name="enterpriseId" ${canEditTerms ? '' : 'disabled'} data-term="1">
                             <option value="">-- Chọn khách hàng --</option>
@@ -242,7 +264,7 @@
                         </select>
                         <span class="error-text" id="err-customer">Vui lòng chọn khách hàng.</span>
                     </div>
-                    <div class="col-md-6 field-row">
+                    <div class="col-md-4 field-row">
                         <label>Người phụ trách <span class="req">*</span></label>
                         <select class="form-select" id="owner" name="ownerId">
                             <option value="">-- Chọn nhân viên --</option>
@@ -252,7 +274,7 @@
                         </select>
                         <span class="error-text" id="err-owner">Vui lòng chọn người phụ trách.</span>
                     </div>
-                    <div class="col-md-6 field-row">
+                    <div class="col-md-4 field-row">
                         <label>Loại hợp đồng <span class="req">*</span></label>
                         <select class="form-select" id="contractType" name="contractType" ${canEditTerms ? '' : 'disabled'} data-term="1">
                             <option value="">-- Chọn loại hợp đồng --</option>
@@ -274,20 +296,20 @@
                             của công ty khách: có uỷ quyền thì hai người này khác nhau.
                         </div>
                     </div>
-                    <div class="col-md-6 field-row">
+                    <div class="col-md-3 field-row">
                         <label>Người ký bên mình</label>
                         <input type="text" class="form-control" id="signerName" name="signerName" maxlength="100" value="${fn:escapeXml(contract.signerName)}" ${canEditTerms ? '' : 'disabled'} data-term="1">
                     </div>
-                    <div class="col-md-6 field-row">
+                    <div class="col-md-3 field-row">
                         <label>Chức vụ</label>
                         <input type="text" class="form-control" id="signerPosition" name="signerPosition"
                                maxlength="100" placeholder="VD: Giám đốc chi nhánh" value="${fn:escapeXml(contract.signerPosition)}" ${canEditTerms ? '' : 'disabled'} data-term="1">
                     </div>
-                    <div class="col-md-6 field-row">
+                    <div class="col-md-3 field-row">
                         <label>Người ký bên đối tác</label>
                         <input type="text" class="form-control" id="counterpartySignerName" name="counterpartySignerName" maxlength="100" value="${fn:escapeXml(contract.counterpartySignerName)}" ${canEditTerms ? '' : 'disabled'} data-term="1">
                     </div>
-                    <div class="col-md-6 field-row">
+                    <div class="col-md-3 field-row">
                         <label>Chức vụ</label>
                         <input type="text" class="form-control" id="counterpartySignerPosition" name="counterpartySignerPosition" maxlength="100" value="${fn:escapeXml(contract.counterpartySignerPosition)}" ${canEditTerms ? '' : 'disabled'} data-term="1">
                     </div>
@@ -451,8 +473,57 @@
 
              Khối nào dài quá thì thu gọn bản thân nó, đừng bóp bề ngang cả trang. --%>
 
+        <%-- Sáu khối dưới đây gom vào TAB thay vì xếp dọc.
+
+             Lý do đo được: xếp dọc thì trang cao 3770px, mà chia hai cột để rút
+             ngắn thì bảng vỡ chữ (đã thử, xem ghi chú trên). Tab giữ được CẢ HAI:
+             mỗi lúc chỉ hiện một khối, và khối đó rộng hết khung.
+
+             ĐIỀU KIỆN c:if của NÚT và của KHỐI phải GIỐNG HỆT nhau -- lệch một cái là
+             ra nút bấm vào không có gì, hoặc khối không có đường nào tới. Tab đầu
+             (Hàng hoá) KHÔNG có điều kiện, cố ý: luôn phải còn ít nhất một tab để
+             mở sẵn, không thì người dùng nhìn vào một dãy nút mà bên dưới trống trơn.
+
+             POST xong (lập kỳ, bàn giao, nối hợp đồng...) controller chuyển hướng về
+             đúng trang này, không mang tab theo được -- script cuối file nhớ tab cuối
+             cùng bằng sessionStorage để quay lại đúng chỗ vừa làm. --%>
+        <div class="tab-wrap">
+            <ul class="nav nav-tabs" id="contractTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#pane-hang-hoa"
+                            type="button" role="tab"><i class="fa-solid fa-boxes-stacked me-2"></i>Hàng hoá</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#pane-ky-thu"
+                            type="button" role="tab"><i class="fa-solid fa-money-bill-wave me-2"></i>Kỳ thanh toán</button>
+                </li>
+                <c:if test="${canAddAmendment or not empty amendments}">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#pane-phu-luc"
+                            type="button" role="tab"><i class="fa-solid fa-file-circle-plus me-2"></i>Phụ lục</button>
+                </li>
+                </c:if>
+                <c:if test="${canSign or canClose or canVoid}">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#pane-tien-trinh"
+                            type="button" role="tab"><i class="fa-solid fa-diagram-project me-2"></i>Bước tiến trình</button>
+                </li>
+                </c:if>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#pane-ban-giao"
+                            type="button" role="tab"><i class="fa-solid fa-share-from-square me-2"></i>Bàn giao</button>
+                </li>
+                <c:if test="${canLinkContracts}">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#pane-noi-hd"
+                            type="button" role="tab"><i class="fa-solid fa-link me-2"></i>Nối bán – mua</button>
+                </li>
+                </c:if>
+            </ul>
+            <div class="tab-content">
+            <div class="tab-pane fade show active" id="pane-hang-hoa" role="tabpanel">
         <!-- ===== Hạng mục hàng hoá ===== -->
-        <div class="card-box" id="hang-hoa" style="margin-top:20px;">
+        <div class="card-box" id="hang-hoa">
             <div class="section-header"><h5>Hạng mục sản phẩm / dịch vụ</h5></div>
             <c:choose>
                 <c:when test="${empty contractProducts}">
@@ -531,8 +602,10 @@
             </c:choose>
         </div>
 
+            </div>
+            <div class="tab-pane fade" id="pane-ky-thu" role="tabpanel">
         <!-- ===== Kỳ thanh toán ===== -->
-        <div class="card-box" style="margin-top:20px;">
+        <div class="card-box">
             <div class="section-header"><h5>Kỳ thanh toán</h5></div>
             <c:choose>
                 <c:when test="${empty contractPayments}">
@@ -615,15 +688,19 @@
                     </div>
                 </c:otherwise>
             </c:choose>
-        </div>        <!-- ===== Phụ lục ===== -->
+        </div>
+
+            </div>
+            <c:if test="${canAddAmendment or not empty amendments}">
+            <div class="tab-pane fade" id="pane-phu-luc" role="tabpanel">
+        <!-- ===== Phụ lục ===== -->
         <%-- Hiện cả khi danh sách rỗng, MIỄN LÀ hợp đồng này nhận được phụ lục:
              ở đó cái người dùng cần là cái nút, và một khối trống có nút nói rõ
              hơn hẳn việc không có gì.
 
              Trên chính một phụ lục thì khối này biến mất (canAddAmendment false
              vì một tầng) và thay bằng đường ngược về hợp đồng gốc. --%>
-        <c:if test="${canAddAmendment or not empty amendments}">
-        <div class="card-box" style="margin-top:20px;">
+        <div class="card-box">
             <div class="section-header"><h5>Phụ lục</h5></div>
             <p style="font-size:0.86rem; color:#6b7280; margin:0 0 12px;">
                 Hợp đồng đã ký không sửa thẳng được. Mọi thay đổi điều khoản đi qua một phụ lục —
@@ -705,11 +782,13 @@
                 </a>
             </c:if>
         </div>
-        </c:if>
 
+            </div>
+            </c:if>
+            <c:if test="${canSign or canClose or canVoid}">
+            <div class="tab-pane fade" id="pane-tien-trinh" role="tabpanel">
         <!-- ===== Bước tiến trình ===== -->
-        <c:if test="${canSign or canClose or canVoid}">
-        <div class="card-box" style="margin-top:20px;">
+        <div class="card-box">
             <div class="section-header"><h5>Bước tiến trình</h5></div>
             <div class="lifecycle-actions">
                 <c:if test="${canSign}">
@@ -752,14 +831,16 @@
                 </div>
             </c:if>
         </div>
-        </c:if>
 
+            </div>
+            </c:if>
+            <div class="tab-pane fade" id="pane-ban-giao" role="tabpanel">
         <!-- ===== Bàn giao phòng ban ===== -->
         <%-- Kinh doanh soạn xong thì chuyển xuống Kế toán và Dự án CÙNG LÚC,
              mỗi phòng tự báo xong. Đây là trục thứ tư, đứng RIÊNG với trục tiến
              độ (Nháp/Đã ký/Thanh lý): trạng thái pháp lý của hợp đồng và công
              việc nội bộ không suy ra nhau. --%>
-        <div class="card-box" style="margin-top:20px;">
+        <div class="card-box">
             <div class="section-header"><h5>Bàn giao xử lý</h5></div>
             <%-- Câu này trước ghi "Soạn xong thì chuyển xuống..." -- đọc ra thành việc
                  TRƯỚC khi ký, trái hẳn với thiết kế ghi ở đầu khối (bàn giao là trục
@@ -909,6 +990,9 @@
              chỗ và đo: ở cột hẹp, hợp đồng KHÔNG có liên kết nào (đa số) cho trang
              ngắn hơn 265px; đổi lại, hợp đồng có hai liên kết dài thêm 124px. Lấy
              ca phổ biến. --%>
+            </div>
+            <c:if test="${canLinkContracts}">
+            <div class="tab-pane fade" id="pane-noi-hd" role="tabpanel">
         <!-- ===== Đầu ra kéo theo đầu vào ===== -->
         <%-- Hợp đồng BÁN nối với các đơn MUA sinh ra vì nó, và ngược lại. Quan
              hệ nhiều-nhiều nằm ở bảng contract_links, KHÁC hẳn phụ lục bên dưới
@@ -916,8 +1000,7 @@
 
              Trên PHỤ LỤC thì khối này biến mất: đầu vào phục vụ cả hợp đồng
              gốc, không phục vụ riêng một văn bản sửa đổi. --%>
-        <c:if test="${canLinkContracts}">
-        <div class="card-box" style="margin-top:20px;">
+        <div class="card-box">
             <div class="section-header">
                 <h5>${linkIsSellSide ? 'Đầu vào phục vụ hợp đồng này' : 'Hợp đồng bán mà đơn mua này phục vụ'}</h5>
             </div>
@@ -1058,7 +1141,10 @@
                 </div>
             </form>
         </div>
-        </c:if>
+            </div>
+            </c:if>
+            </div>
+        </div>
 
     </div>
 
@@ -1216,6 +1302,37 @@
         }
     </script>
 
+    <script>
+        // Nhớ tab đang mở qua các lần tải lại trang.
+        //
+        // Cần vì mọi thao tác ở đây đều là POST rồi chuyển hướng về chính trang này:
+        // lập một kỳ thu xong mà nhảy về tab Hàng hoá thì lần nào cũng phải bấm lại.
+        //
+        // sessionStorage chứ không phải localStorage: nhớ trong phiên làm việc thôi,
+        // mở lại hôm sau thì quay về tab đầu. Bọc try/catch vì trình duyệt chặn
+        // cookie/site data sẽ ném lỗi ngay ở lần đọc đầu tiên.
+        (function () {
+            var KEY = 'poscsContractTab';
+            var tabs = document.getElementById('contractTabs');
+            if (!tabs || !window.bootstrap) { return; }
+
+            try {
+                var saved = sessionStorage.getItem(KEY);
+                if (saved) {
+                    var btn = tabs.querySelector('[data-bs-target="' + saved + '"]');
+                    // Tab đã lưu có thể KHÔNG còn (vd vừa thanh lý xong thì tab Bước
+                    // tiến trình biến mất) -- lúc đó cứ để tab đầu.
+                    if (btn) { new bootstrap.Tab(btn).show(); }
+                }
+            } catch (e) { /* không đọc được thì mở tab đầu, không phải lỗi */ }
+
+            tabs.addEventListener('shown.bs.tab', function (e) {
+                try {
+                    sessionStorage.setItem(KEY, e.target.getAttribute('data-bs-target'));
+                } catch (err) { /* bỏ qua */ }
+            });
+        })();
+    </script>
     <script src="${pageContext.request.contextPath}/js/appshell.js"></script>
 </body>
 </html>
