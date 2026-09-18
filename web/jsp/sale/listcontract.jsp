@@ -51,12 +51,45 @@
 
         /* ===== KPI mini strip ===== */
         .status-strip { display: flex; gap: 14px; margin-bottom: 20px; flex-wrap: wrap; }
+        /* Dải này TRƯỚC ĐÂY chỉ để nhìn. Giờ mỗi ô là một đường lọc theo trạng
+           thái lịch, nên nó thay luôn ô chọn "Tất cả trạng thái" -- bớt một ô
+           trên thanh lọc, và bốn con số vốn đã ở đó thì bấm vào là dùng được. */
         .status-chip {
             flex: 1 1 200px; padding: 12px 15px; display: flex; align-items: center; gap: 12px;
+            text-decoration: none; color: inherit; border: 1px solid transparent; transition: all .15s;
         }
+        .status-chip:hover { border-color: var(--primary-light); transform: translateY(-1px); }
+        .status-chip.is-on { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(15, 158, 219, 0.15); }
         .status-chip .dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
         .status-chip .num { font-weight: 700; font-size: 1.15rem; color: #111827; }
         .status-chip .lbl { font-size: 0.78rem; color: #6b7280; }
+        .status-chip .off { font-size: 0.72rem; color: var(--primary); display: block; margin-top: 2px; }
+
+        /* ===== Lọc nâng cao + chip đang lọc ===== */
+        .filter-more {
+            padding: 9px 14px; border-radius: 10px; border: 1px solid #e5e7eb; background: #f9fafb;
+            font-size: 0.84rem; cursor: pointer; display: inline-flex; align-items: center; gap: 7px;
+        }
+        .filter-more:hover { border-color: var(--primary-light); }
+        .filter-more .badge-count {
+            background: var(--primary); color: #fff; border-radius: 999px; padding: 0 6px;
+            font-size: 0.72rem; font-weight: 700;
+        }
+        .filter-advanced { display: flex; flex-wrap: wrap; gap: 10px; width: 100%; padding-top: 4px; }
+        .filter-advanced[hidden] { display: none; }
+        .filter-toggle {
+            display: inline-flex; align-items: center; gap: 7px; font-size: 0.84rem; color: #374151;
+            padding: 9px 12px; border-radius: 10px; border: 1px solid #e5e7eb; background: #f9fafb; cursor: pointer;
+        }
+        .filter-toggle input { accent-color: var(--primary); cursor: pointer; }
+        .active-filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; width: 100%; }
+        .active-filters .fc {
+            display: inline-flex; align-items: center; gap: 6px; font-size: 0.78rem; color: #374151;
+            background: #eef6fb; border: 1px solid #cfe6f5; border-radius: 999px; padding: 3px 6px 3px 10px;
+        }
+        .active-filters .fc a { color: #6b7280; text-decoration: none; font-weight: 700; line-height: 1; padding: 0 3px; }
+        .active-filters .fc a:hover { color: var(--danger); }
+        .active-filters .clear-all { font-size: 0.78rem; color: var(--primary); text-decoration: none; margin-left: 2px; }
 
         /* ===== Filter bar ===== */
         .filter-bar { padding: 18px 20px; margin-bottom: 20px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
@@ -229,11 +262,24 @@
         </div>
 
         <!-- ===== Dải trạng thái tổng quan (BR-17) ===== -->
+        <%-- Bốn ô số này giờ là ĐƯỜNG LỌC theo trạng thái lịch, nên thanh lọc
+             bên dưới không còn ô chọn trạng thái nữa. Link mang theo mọi lọc
+             khác và được dựng ở ContractController.FilterState -- ghép chuỗi
+             tại đây nghĩa là chép cùng một danh sách tham số ra bốn chỗ. --%>
         <div class="status-strip">
-            <div class="card-box status-chip"><span class="dot" style="background:var(--success)"></span><div><div class="num">${statusSummary['Đang hiệu lực']}</div><div class="lbl">Đang hiệu lực</div></div></div>
-            <div class="card-box status-chip"><span class="dot" style="background:var(--warning)"></span><div><div class="num">${statusSummary['Sắp hết hạn']}</div><div class="lbl">Sắp hết hạn (≤30 ngày)</div></div></div>
-            <div class="card-box status-chip"><span class="dot" style="background:var(--danger)"></span><div><div class="num">${statusSummary['Đã hết hạn']}</div><div class="lbl">Đã hết hạn</div></div></div>
-            <div class="card-box status-chip"><span class="dot" style="background:#9ca3af"></span><div><div class="num">${statusSummary['Chưa hiệu lực']}</div><div class="lbl">Chưa hiệu lực</div></div></div>
+            <%-- Bấm lại ô ĐANG BẬT thì bỏ lọc: không có nút "tắt" nào khác ở đây,
+                 và người dùng sẽ bấm lại nó theo phản xạ. --%>
+            <c:forEach var="st" items="${statusChips}">
+                <a class="card-box status-chip ${st.on ? 'is-on' : ''}"
+                   href="${pageContext.request.contextPath}/contract?${st.query}">
+                    <span class="dot" style="background:${st.color}"></span>
+                    <div>
+                        <div class="num">${st.count}</div>
+                        <div class="lbl">${fn:escapeXml(st.label)}</div>
+                        <c:if test="${st.on}"><span class="off">đang lọc &middot; bấm để bỏ</span></c:if>
+                    </div>
+                </a>
+            </c:forEach>
         </div>
 
         <!-- ===== Bộ lọc / tìm kiếm ===== -->
@@ -245,13 +291,10 @@
                 <i class="fa-solid fa-magnifying-glass"></i>
                 <input type="text" id="searchInput" name="keyword" value="${fn:escapeXml(keyword)}" placeholder="Tìm theo mã HĐ, tiêu đề, khách hàng...">
             </div>
-            <select id="filterStatus" name="status">
-                <option value="">Tất cả trạng thái</option>
-                <option value="Đang hiệu lực" ${statusFilter == 'Đang hiệu lực' ? 'selected' : ''}>Đang hiệu lực</option>
-                <option value="Sắp hết hạn" ${statusFilter == 'Sắp hết hạn' ? 'selected' : ''}>Sắp hết hạn</option>
-                <option value="Đã hết hạn" ${statusFilter == 'Đã hết hạn' ? 'selected' : ''}>Đã hết hạn</option>
-                <option value="Chưa hiệu lực" ${statusFilter == 'Chưa hiệu lực' ? 'selected' : ''}>Chưa hiệu lực</option>
-            </select>
+            <%-- Trạng thái theo LỊCH không còn ô chọn: nó đã nằm ở bốn ô số bấm
+                 được phía trên. Giá trị vẫn phải đi theo form, nếu không thì đổi
+                 một ô lọc khác là trạng thái đang chọn biến mất. --%>
+            <input type="hidden" name="status" value="${fn:escapeXml(statusFilter)}">
             <%-- Trục TIẾN ĐỘ, đứng riêng với trục lịch ở trên. Chọn "Đã ký" rồi
                  thêm trạng thái lịch "Đã hết hạn" sẽ ra đúng danh sách hết hạn
                  mà chưa thanh lý — hàng đợi việc còn tồn. --%>
@@ -266,46 +309,82 @@
                  nó cũng phải được ký, nên phải tìm thấy được bằng mã. Ô này để
                  thu về danh sách hợp đồng gốc khi cần đếm "bao nhiêu hợp đồng"
                  theo nghĩa thường. --%>
-            <select id="filterScope" name="scope">
-                <option value="">Cả phụ lục</option>
-                <option value="root" ${scopeFilter == 'root' ? 'selected' : ''}>Chỉ hợp đồng gốc</option>
-            </select>
-            <select id="filterType" name="type">
-                <option value="">Tất cả loại hợp đồng</option>
-                <%-- Loại hợp đồng theo CHIỀU: hợp đồng mua không dùng chung bộ
-                     chữ với hợp đồng bán. Xem ContractController. --%>
-                <c:forEach var="ct" items="${contractTypeOptions}">
-                    <option value="${fn:escapeXml(ct)}" ${typeFilter == ct ? 'selected' : ''}>${fn:escapeXml(ct)}</option>
-                </c:forEach>
-            </select>
-<%-- Hợp đồng MUA không lọc theo tỉnh: tỉnh suy ra từ địa chỉ đối tác,
-                 mà đối tác của hợp đồng mua là nhà cung cấp -- nhóm không chia
-                 theo địa bàn. --%>
-            <c:if test="${showProvinceFilter}">
-                <select id="filterProvince" name="provinceId">
-                    <option value="">Tất cả tỉnh địa bàn</option>
-                    <c:forEach var="province" items="${provinceList}">
-                        <option value="${province.provinceId}" ${provinceFilter == province.provinceId ? 'selected' : ''}>${fn:escapeXml(province.shortName)}</option>
+            <%-- Hai lựa chọn thì một ô tích đủ, và đọc ra nghĩa ngay -- một select
+                 rộng 148px cho câu "có/không" là phí chỗ trên thanh lọc. Không
+                 tích thì trình duyệt không gửi tham số, tức là quay về mặc định
+                 "cả phụ lục" -- đúng thứ ta muốn. --%>
+            <label class="filter-toggle" for="filterScope">
+                <input type="checkbox" id="filterScope" name="scope" value="root" ${scopeFilter == 'root' ? 'checked' : ''}>
+                Chỉ hợp đồng gốc
+            </label>
+            <%-- Ba ô ít dùng nhất gom sau một nút. Chúng vẫn nằm TRONG form và vẫn
+                 gửi lên như thường -- giấu ở đây là chuyện của giao diện, không
+                 phải của dữ liệu. Mở sẵn khi có ít nhất một cái đang bật, nếu
+                 không thì người dùng thấy kết quả bị thu hẹp mà không hiểu vì đâu. --%>
+            <button type="button" class="filter-more" id="toggleAdvanced"
+                    aria-expanded="${advancedFilterCount > 0}" aria-controls="advancedFilters">
+                <i class="fa-solid fa-sliders"></i> Lọc thêm
+                <c:if test="${advancedFilterCount > 0}"><span class="badge-count">${advancedFilterCount}</span></c:if>
+            </button>
+
+            <div class="filter-advanced" id="advancedFilters" ${advancedFilterCount > 0 ? '' : 'hidden'}>
+                <select id="filterType" name="type">
+                    <option value="">Tất cả loại hợp đồng</option>
+                    <%-- Loại hợp đồng theo CHIỀU: hợp đồng mua không dùng chung bộ
+                         chữ với hợp đồng bán. Xem ContractController. --%>
+                    <c:forEach var="ct" items="${contractTypeOptions}">
+                        <option value="${fn:escapeXml(ct)}" ${typeFilter == ct ? 'selected' : ''}>${fn:escapeXml(ct)}</option>
                     </c:forEach>
                 </select>
+                <%-- Hợp đồng MUA không lọc theo tỉnh: tỉnh suy ra từ địa chỉ đối
+                     tác, mà đối tác của hợp đồng mua là nhà cung cấp -- nhóm
+                     không chia theo địa bàn. --%>
+                <c:if test="${showProvinceFilter}">
+                    <select id="filterProvince" name="provinceId">
+                        <option value="">Tất cả tỉnh địa bàn</option>
+                        <c:forEach var="province" items="${provinceList}">
+                            <option value="${province.provinceId}" ${provinceFilter == province.provinceId ? 'selected' : ''}>${fn:escapeXml(province.shortName)}</option>
+                        </c:forEach>
+                    </select>
+                </c:if>
+                <select id="filterYear" name="year">
+                    <option value="">Mọi thời điểm</option>
+                    <c:forEach var="y" items="${yearList}">
+                        <option value="${y}" ${yearFilter == y ? 'selected' : ''}>Năm ${y}</option>
+                    </c:forEach>
+                </select>
+                <%-- Quý/tháng chỉ có nghĩa khi đã chọn năm: bộ lọc kỳ dựng từ cặp
+                     (năm, kỳ), chọn "Quý 3" mà không năm thì Period.parse trả null
+                     và không lọc gì cả -- một ô bấm vào không có chuyện gì xảy ra
+                     thì thà đừng hiện. --%>
+                <c:if test="${not empty yearFilter}">
+                    <select id="filterPeriod" name="period">
+                        <option value="">Cả năm</option>
+                        <c:forEach var="q" begin="1" end="4">
+                            <c:set var="qVal" value="q${q}"/>
+                            <option value="${qVal}" ${periodFilter == qVal ? 'selected' : ''}>Quý ${q}</option>
+                        </c:forEach>
+                        <c:forEach var="m" begin="1" end="12">
+                            <c:set var="mVal" value="m${m}"/>
+                            <option value="${mVal}" ${periodFilter == mVal ? 'selected' : ''}>Tháng ${m}</option>
+                        </c:forEach>
+                    </select>
+                </c:if>
+            </div>
+
+            <%-- Chip những gì đang lọc. Trước đây muốn bỏ một điều kiện phải nhớ
+                 nó nằm ở ô nào rồi trả ô đó về "Tất cả" -- mà với ô đã bị gom vào
+                 "Lọc thêm" thì còn phải mở khối ra mới thấy. --%>
+            <c:if test="${not empty activeFilters}">
+                <div class="active-filters">
+                    <c:forEach var="f" items="${activeFilters}">
+                        <span class="fc">${fn:escapeXml(f.label)}
+                            <a href="${pageContext.request.contextPath}/contract?${f.query}" title="Bỏ lọc này">&times;</a>
+                        </span>
+                    </c:forEach>
+                    <a class="clear-all" href="${pageContext.request.contextPath}/contract?action=list&kind=${kind}">Xoá tất cả</a>
+                </div>
             </c:if>
-            <select id="filterYear" name="year">
-                <option value="">Mọi thời điểm</option>
-                <c:forEach var="y" items="${yearList}">
-                    <option value="${y}" ${yearFilter == y ? 'selected' : ''}>Năm ${y}</option>
-                </c:forEach>
-            </select>
-            <select id="filterPeriod" name="period">
-                <option value="">Cả năm</option>
-                <c:forEach var="q" begin="1" end="4">
-                    <c:set var="qVal" value="q${q}"/>
-                    <option value="${qVal}" ${periodFilter == qVal ? 'selected' : ''}>Quý ${q}</option>
-                </c:forEach>
-                <c:forEach var="m" begin="1" end="12">
-                    <c:set var="mVal" value="m${m}"/>
-                    <option value="${mVal}" ${periodFilter == mVal ? 'selected' : ''}>Tháng ${m}</option>
-                </c:forEach>
-            </select>
         </form>
 
         <!-- ===== Bảng danh sách ===== -->
@@ -474,18 +553,28 @@
             }, { passive: false });
         })();
 
-        // Tự động submit lại form lọc khi đổi trạng thái / loại hợp đồng
-        document.getElementById('filterStatus').addEventListener('change', function () { document.getElementById('filterForm').submit(); });
-        document.getElementById('filterProgress').addEventListener('change', function () { document.getElementById('filterForm').submit(); });
-        document.getElementById('filterType').addEventListener('change', function () { document.getElementById('filterForm').submit(); });
-        // Ô tỉnh không có ở mục Hợp đồng mua -- gắn sự kiện lên null là vỡ
-        // cả đoạn script phía sau, kể cả các bộ lọc khác.
-        var provinceSelect = document.getElementById('filterProvince');
-        if (provinceSelect) {
-            provinceSelect.addEventListener('change', function () { document.getElementById('filterForm').submit(); });
+        // Đổi bất kỳ ô lọc nào là submit lại luôn. Gắn theo DANH SÁCH id thay vì
+        // từng dòng một: ô tỉnh không tồn tại ở mục Hợp đồng mua và ô kỳ không
+        // tồn tại khi chưa chọn năm, mà gắn sự kiện lên null thì vỡ cả đoạn
+        // script phía sau -- kể cả các bộ lọc khác.
+        var filterForm = document.getElementById('filterForm');
+        ['filterProgress', 'filterScope', 'filterType', 'filterProvince', 'filterYear', 'filterPeriod']
+            .forEach(function (id) {
+                var el = document.getElementById(id);
+                if (el) { el.addEventListener('change', function () { filterForm.submit(); }); }
+            });
+
+        // Mở/đóng khối "Lọc thêm". Khi đang có lọc bật thì server đã cho hiện
+        // sẵn, nút chỉ còn việc đóng lại.
+        var advancedToggle = document.getElementById('toggleAdvanced');
+        var advancedBox = document.getElementById('advancedFilters');
+        if (advancedToggle && advancedBox) {
+            advancedToggle.addEventListener('click', function () {
+                var showing = advancedBox.hasAttribute('hidden');
+                if (showing) { advancedBox.removeAttribute('hidden'); } else { advancedBox.setAttribute('hidden', ''); }
+                advancedToggle.setAttribute('aria-expanded', String(showing));
+            });
         }
-        document.getElementById('filterYear').addEventListener('change', function () { document.getElementById('filterForm').submit(); });
-        document.getElementById('filterPeriod').addEventListener('change', function () { document.getElementById('filterForm').submit(); });
     </script>
 
     <script src="${pageContext.request.contextPath}/js/appshell.js"></script>

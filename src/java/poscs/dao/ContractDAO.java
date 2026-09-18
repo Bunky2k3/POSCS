@@ -347,6 +347,21 @@ public class ContractDAO {
 
     /** Như trên, kèm lọc theo kỳ (ngày ký) -- null = mọi thời điểm. */
     public Map<String, Integer> countStatusSummary(Integer provinceId, Period period, String direction) {
+        return countStatusSummary(provinceId, period, direction, false);
+    }
+
+    /**
+     * Như trên, kèm {@code rootsOnly} -- bốn con số của dải KPI phải đếm ĐÚNG
+     * tập mà bảng bên dưới đang liệt kê.
+     *
+     * <p>Trước bản này, {@code direction} được NHẬN nhưng không đi vào câu lệnh:
+     * đứng ở mục Hợp đồng mua vẫn thấy bốn con số của cả hợp đồng bán, mà không
+     * chỗ nào trên màn hình giải thích vì sao chúng không cộng lại thành tổng ở
+     * thanh phân trang. Tham số có mà không dùng thì nguy hơn là không có --
+     * bên gọi tưởng đã lọc rồi.
+     */
+    public Map<String, Integer> countStatusSummary(Integer provinceId, Period period, String direction,
+            boolean rootsOnly) {
         Map<String, Integer> summary = new HashMap<>();
         summary.put(STATUS_ACTIVE, 0);
         summary.put(STATUS_SOON, 0);
@@ -368,7 +383,9 @@ public class ContractDAO {
             "LEFT JOIN enterprises e ON c.enterprise_id = e.enterprise_id " +
             JOIN_PROVINCE_OF_ENTERPRISE +
             "WHERE c.is_deleted = 0" + (provinceId != null ? " AND d.province_id = ?" : "")
-            + (period != null ? " AND c.signing_date BETWEEN ? AND ?" : "");
+            + (period != null ? " AND c.signing_date BETWEEN ? AND ?" : "")
+            + (direction != null ? " AND c.direction = ?" : "")
+            + (rootsOnly ? " AND c.parent_contract_id IS NULL" : "");
 
         try (Connection conn = DBContext.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -378,7 +395,10 @@ public class ContractDAO {
             }
             if (period != null) {
                 ps.setDate(param++, period.getFrom());
-                ps.setDate(param, period.getTo());
+                ps.setDate(param++, period.getTo());
+            }
+            if (direction != null) {
+                ps.setString(param, direction);
             }
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {

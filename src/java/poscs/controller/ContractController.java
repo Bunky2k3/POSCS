@@ -1,6 +1,8 @@
 package poscs.controller;
 
 import java.io.IOException;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.io.InputStream;
 import java.sql.Date;
 import java.text.SimpleDateFormat;
@@ -260,7 +262,8 @@ public class ContractController extends HttpServlet {
         // Dải KPI trạng thái phải đếm CÙNG phạm vi với bảng bên dưới: đứng ở
         // Hợp đồng mua mà KPI gộp cả hợp đồng bán thì hai con số cạnh nhau
         // không khớp, và không có gì trên màn hình giải thích vì sao.
-        Map<String, Integer> statusSummary = contractDAO.countStatusSummary(provinceFilter, period, direction);
+        Map<String, Integer> statusSummary = contractDAO.countStatusSummary(provinceFilter, period, direction,
+                rootsOnly);
 
         request.setAttribute("contractList", contractList);
         request.setAttribute("statusSummary", statusSummary);
@@ -283,6 +286,31 @@ public class ContractController extends HttpServlet {
         request.setAttribute("kind", DIRECTION_BUY.equals(direction) ? "buy" : "sell");
         request.setAttribute("contractTypeOptions", contractTypesFor(direction));
         setPeriodAttributes(request, period);
+
+        // Bốn ô số ở đầu trang là ĐƯỜNG LỌC theo trạng thái lịch, không còn là
+        // một dải chỉ để nhìn -- nên ô chọn "Tất cả trạng thái" đã bỏ khỏi thanh
+        // lọc. Link của từng ô dựng ở đây thay vì ghép chuỗi trong JSP: ghép ở
+        // đó nghĩa là cùng một danh sách tham số được chép lại ở bốn chỗ, và
+        // chỗ nào quên một tham số thì bấm vào là mất bộ lọc đang bật.
+        String kindParam = DIRECTION_BUY.equals(direction) ? "buy" : "sell";
+        FilterState state = new FilterState(kindParam, keyword, statusFilter, progressFilter,
+                rootsOnly ? "root" : null, typeFilter, provinceFilter,
+                request.getParameter("year"), request.getParameter("period"));
+        List<FilterChip> statusChips = new ArrayList<>();
+        statusChips.add(state.statusChip(ContractDAO.STATUS_ACTIVE, "Đang hiệu lực", "var(--success)",
+                countOf(statusSummary, ContractDAO.STATUS_ACTIVE)));
+        statusChips.add(state.statusChip(ContractDAO.STATUS_SOON, "Sắp hết hạn (≤30 ngày)", "var(--warning)",
+                countOf(statusSummary, ContractDAO.STATUS_SOON)));
+        statusChips.add(state.statusChip(ContractDAO.STATUS_EXPIRED, "Đã hết hạn", "var(--danger)",
+                countOf(statusSummary, ContractDAO.STATUS_EXPIRED)));
+        statusChips.add(state.statusChip(ContractDAO.STATUS_DRAFT, "Chưa hiệu lực", "#9ca3af",
+                countOf(statusSummary, ContractDAO.STATUS_DRAFT)));
+        request.setAttribute("statusChips", statusChips);
+        request.setAttribute("activeFilters", state.activeFilters());
+        // Số lọc đang bật trong khối "Lọc thêm" -- vừa là con số trên nút, vừa là
+        // điều kiện để khối đó mở sẵn. Một bộ lọc đang thu hẹp kết quả mà bị giấu
+        // sau một cái nút đóng thì người dùng không có cách nào biết.
+        request.setAttribute("advancedFilterCount", state.advancedCount());
 
         request.getRequestDispatcher(LIST_VIEW).forward(request, response);
     }
@@ -773,7 +801,8 @@ public class ContractController extends HttpServlet {
         return value == null ? "" : value.trim().toLowerCase();
     }
 
-    private boolean isBlank(String value) {
+    // static: FilterState (lớp lồng static) cũng dùng chung phép kiểm này.
+    private static boolean isBlank(String value) {
         return value == null || value.trim().isEmpty();
     }
 
@@ -1828,6 +1857,155 @@ public class ContractController extends HttpServlet {
         District district = address != null ? address.getDistrict() : null;
         Province province = district != null ? district.getProvince() : null;
         return province != null ? province.getShortName() : "Chưa xác định";
+    }
+
+    /**
+     * Số của một ô trạng thái, 0 khi thiếu khoá.
+     *
+     * <p>DAO luôn trả đủ bốn khoá, kể cả khi truy vấn hỏng -- nhưng một ô KPI
+     * không đáng làm cả trang danh sách nổ NullPointerException nếu về sau có
+     * đường nào trả về map thiếu.
+     */
+    private static int countOf(Map<String, Integer> summary, String key) {
+        Integer value = summary == null ? null : summary.get(key);
+        return value == null ? 0 : value;
+    }
+
+    /**
+     * Một ô/chip lọc trên màn hình danh sách: nhãn để đọc, {@code query} là
+     * đường dẫn bấm vào, và {@code on} cho biết nó đang bật hay không.
+     */
+    public static final class FilterChip {
+        private final String label;
+        private final String query;
+        private final String color;
+        private final boolean on;
+        private final int count;
+
+        FilterChip(String label, String query, String color, boolean on, int count) {
+            this.label = label;
+            this.query = query;
+            this.color = color;
+            this.on = on;
+            this.count = count;
+        }
+
+        public String getLabel() { return label; }
+        public String getQuery() { return query; }
+        public String getColor() { return color; }
+        public boolean isOn() { return on; }
+        /** Số hợp đồng ở trạng thái này; 0 với chip "đang lọc" (nó không đếm gì). */
+        public int getCount() { return count; }
+    }
+
+    /**
+     * Bộ lọc hiện tại của màn hình danh sách, gom lại để dựng link.
+     *
+     * <p>Lý do tồn tại: mọi đường bấm trên trang (bốn ô trạng thái, dấu × trên
+     * từng chip) đều phải mang theo TẤT CẢ các lọc khác. Ghép chuỗi tại chỗ thì
+     * cùng một danh sách tham số bị chép lại ở năm sáu nơi, và chỗ nào thiếu
+     * một tham số thì bấm vào là lọc đang bật lặng lẽ biến mất.
+     */
+    private static final class FilterState {
+        private final String kind;
+        private final String keyword;
+        private final String status;
+        private final String progress;
+        private final String scope;
+        private final String type;
+        private final Integer provinceId;
+        private final String year;
+        private final String period;
+
+        FilterState(String kind, String keyword, String status, String progress, String scope,
+                String type, Integer provinceId, String year, String period) {
+            this.kind = kind;
+            this.keyword = keyword;
+            this.status = status;
+            this.progress = progress;
+            this.scope = scope;
+            this.type = type;
+            this.provinceId = provinceId;
+            this.year = year;
+            this.period = period;
+        }
+
+        /** Link giữ nguyên mọi lọc khác, chỉ thay đúng một tham số. */
+        private String queryWith(String name, String value) {
+            StringBuilder sb = new StringBuilder("action=list");
+            put(sb, "kind", "kind".equals(name) ? value : kind);
+            put(sb, "keyword", "keyword".equals(name) ? value : keyword);
+            put(sb, "status", "status".equals(name) ? value : status);
+            put(sb, "progress", "progress".equals(name) ? value : progress);
+            put(sb, "scope", "scope".equals(name) ? value : scope);
+            put(sb, "type", "type".equals(name) ? value : type);
+            put(sb, "provinceId", "provinceId".equals(name) ? value
+                    : (provinceId == null ? null : String.valueOf(provinceId)));
+            put(sb, "year", "year".equals(name) ? value : year);
+            // Bỏ năm thì kỳ mất nghĩa -- Period.parse cần cả hai, nên để lại một
+            // mình "quý 3" trên URL chỉ tạo ra một chip lọc không lọc gì cả.
+            String nextYear = "year".equals(name) ? value : year;
+            put(sb, "period", isBlank(nextYear) ? null : ("period".equals(name) ? value : period));
+            return sb.toString();
+        }
+
+        private static void put(StringBuilder sb, String name, String value) {
+            if (isBlank(value)) {
+                return;
+            }
+            sb.append('&').append(name).append('=')
+              .append(URLEncoder.encode(value, StandardCharsets.UTF_8));
+        }
+
+        /**
+         * Ô trạng thái lịch. Đang bật thì link của chính nó TẮT lọc đi: người
+         * dùng bấm lại ô đang sáng theo phản xạ, và không có nút tắt nào khác.
+         */
+        FilterChip statusChip(String key, String label, String color, int count) {
+            boolean on = key.equals(status);
+            // Nhãn hiển thị KHÁC key tra bảng đếm ("Sắp hết hạn (≤30 ngày)" vs
+            // "Sắp hết hạn"), nên con số đi kèm ngay trong chip chứ không để JSP
+            // tra lại bằng nhãn.
+            return new FilterChip(label, queryWith("status", on ? null : key), color, on, count);
+        }
+
+        /** Các lọc đang bật, mỗi cái kèm link BỎ chính nó. */
+        List<FilterChip> activeFilters() {
+            List<FilterChip> chips = new ArrayList<>();
+            if (!isBlank(keyword)) {
+                chips.add(new FilterChip("Từ khoá: " + keyword, queryWith("keyword", null), null, true, 0));
+            }
+            if (!isBlank(progress)) {
+                chips.add(new FilterChip("Tiến độ: " + progress, queryWith("progress", null), null, true, 0));
+            }
+            if (!isBlank(scope)) {
+                chips.add(new FilterChip("Chỉ hợp đồng gốc", queryWith("scope", null), null, true, 0));
+            }
+            if (!isBlank(type)) {
+                chips.add(new FilterChip("Loại: " + type, queryWith("type", null), null, true, 0));
+            }
+            if (provinceId != null) {
+                chips.add(new FilterChip("Theo tỉnh", queryWith("provinceId", null), null, true, 0));
+            }
+            if (!isBlank(year)) {
+                chips.add(new FilterChip(periodLabel(), queryWith("year", null), null, true, 0));
+            }
+            return chips;
+        }
+
+        private String periodLabel() {
+            Period parsed = Period.parse(year, period);
+            return parsed != null ? "Kỳ: " + parsed.getLabel() : "Kỳ: " + year;
+        }
+
+        /** Số lọc nằm trong khối "Lọc thêm" đang bật (loại hợp đồng, tỉnh, kỳ). */
+        int advancedCount() {
+            int n = 0;
+            if (!isBlank(type)) { n++; }
+            if (provinceId != null) { n++; }
+            if (!isBlank(year)) { n++; }
+            return n;
+        }
     }
 
     /**

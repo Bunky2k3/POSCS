@@ -669,6 +669,37 @@ public class ContractStatusIntegrationTest {
                 contractDAO.sumScheduledPaymentsForCluster(2));
     }
 
+    /**
+     * Dải KPI phải đếm đúng tập mà danh sách đang liệt kê: cùng chiều, cùng
+     * phạm vi phụ lục. Bốn con số cộng lại phải bằng tổng ở thanh phân trang --
+     * đó là phép kiểm mà người dùng làm bằng mắt mỗi lần mở trang.
+     */
+    @Test
+    public void statusSummary_demCungPhamViVoiDanhSach() throws Exception {
+        IntegrationDb.assumeAvailable();
+
+        assertTrue(contractDAO.insert(amendmentOf(2, "HD-0002/PL01"), Fixtures.USER_ID) > 0);
+
+        Map<String, Integer> all = contractDAO.countStatusSummary(null, null, N_BAN, false);
+        int allRows = contractDAO.findAll(1, 50, null, null, null, null, false, null, N_BAN, null, false).size();
+        assertEquals("KPI phải cộng lại bằng tổng danh sách", allRows, tong(all));
+
+        Map<String, Integer> roots = contractDAO.countStatusSummary(null, null, N_BAN, true);
+        int rootRows = contractDAO.findAll(1, 50, null, null, null, null, false, null, N_BAN, null, true).size();
+        assertEquals("Chọn 'chỉ hợp đồng gốc' thì KPI cũng phải bỏ phụ lục ra", rootRows, tong(roots));
+        assertEquals("...và chênh nhau đúng một phụ lục", tong(all) - 1, tong(roots));
+
+        // Chiều MUA: bộ dữ liệu gieo ở đây toàn hợp đồng bán, nên KPI phải ra 0.
+        assertEquals("KPI của chiều không có hợp đồng nào phải là 0, không phải tổng của chiều kia",
+                0, tong(contractDAO.countStatusSummary(null, null, "Mua", false)));
+    }
+
+    private static final String N_BAN = "Bán";
+
+    private static int tong(Map<String, Integer> summary) {
+        return summary.values().stream().mapToInt(Integer::intValue).sum();
+    }
+
     /** Ô lọc "Chỉ hợp đồng gốc": danh sách và bộ đếm phân trang phải đi cặp. */
     @Test
     public void rootsOnlyFilter_keepsListAndCountInStep() throws Exception {
