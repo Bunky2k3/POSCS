@@ -26,7 +26,7 @@
     <link rel="stylesheet" href="${pageContext.request.contextPath}/css/appshell.css">
 
     <style>
-        .page-container { max-width: 1320px; margin: 28px auto; padding: 0 20px 32px; }
+        .page-container { max-width: 1180px; margin: 28px auto; padding: 0 20px 32px; }
         .page-header-row { margin-bottom: 22px; }
         .page-header-row h2 { font-weight: 700; color: var(--primary-dark); font-size: 1.4rem; margin-bottom: 4px; }
         .page-header-row p { color: #6b7280; font-size: 0.9rem; }
@@ -440,15 +440,16 @@
         </div>
         </c:if>
 
-        <%-- Form sửa thông tin đứng NGOÀI lưới hai cột, chiếm trọn bề ngang:
-             nó toàn ô nhập cạnh nhau, nhét vào cột hẹp thì chữ xuống dòng và thẻ
-             còn CAO HƠN lúc chưa chia (đo được: 1468px -> 1521px).
+        <%-- TRANG NÀY ĐỂ MỘT CỘT, CỐ Ý -- đừng chia hai cột như trang xem.
 
-             Dưới nó mới là lưới hai cột, cùng quy ước với trang xem: TRÁI là bản
-             thân hợp đồng (hàng hoá, kỳ thu, phụ lục, hợp đồng nối kèm), PHẢI là
-             tiến trình và ai đang giữ việc. Cột phải ngắn nên dính theo màn hình. --%>
-        <div class="workspace">
-        <div class="ws-main">
+             Đã thử chia rồi và phải bỏ: trang xem toàn nhãn/giá trị nên cột hẹp đọc
+             được, còn trang quản lý thì MỌI khối đều là bảng nhiều cột kèm form.
+             Nhét vào cột ~430px thì bảng Phụ lục vỡ chữ từng ô (mã hợp đồng xuống 2
+             dòng, tiêu đề cột "Điều chỉnh giá trị" xuống 3 dòng), form lập kỳ bị ép,
+             còn các đoạn mô tả bên cột phải thành sợi dọc. Trang ngắn hơn nhưng
+             không đọc được thì không đáng.
+
+             Khối nào dài quá thì thu gọn bản thân nó, đừng bóp bề ngang cả trang. --%>
 
         <!-- ===== Hạng mục hàng hoá ===== -->
         <div class="card-box" id="hang-hoa" style="margin-top:20px;">
@@ -705,10 +706,6 @@
             </c:if>
         </div>
         </c:if>
-
-        </div>
-
-        <div class="ws-side ws-sticky">
 
         <!-- ===== Bước tiến trình ===== -->
         <c:if test="${canSign or canClose or canVoid}">
@@ -1062,9 +1059,6 @@
             </form>
         </div>
         </c:if>
-
-        </div>
-        </div>
 
     </div>
 

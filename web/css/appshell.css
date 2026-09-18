@@ -189,7 +189,9 @@ body { font-family: 'Inter', sans-serif; background: #f3f4f6; min-height: 100vh;
 .btn-outline-action:hover { background: #eaf6ff; color: var(--primary-dark); border-color: var(--primary-light); }
 
 
-/* ===== Bố cục hai cột cho trang chi tiết / quản lý =====
+/* ===== Bố cục hai cột cho trang XEM chi tiết hợp đồng =====
+   (Trang QUẢN LÝ đã thử rồi bỏ -- mọi khối bên đó là bảng nhiều cột kèm form,
+   nhét vào cột hẹp thì vỡ chữ. Xem ghi chú đầu updatecontract.jsp.)
    Một màn hình có mười thẻ xếp chồng một cột thì không thẻ nào nổi hơn thẻ nào,
    và trang dài gấp đôi mức cần. .workspace chia làm cột NỘI DUNG (rộng) và
    cột TRA CỨU (hẹp). Không bỏ nội dung nào -- chỉ đổi chỗ đứng.
@@ -217,14 +219,6 @@ body { font-family: 'Inter', sans-serif; background: #f3f4f6; min-height: 100vh;
 }
 .ws-subhead:first-of-type { margin-top: 0; padding-top: 0; border-top: none; }
 
-/* DÍNH theo màn hình -- CHỈ dùng khi cột đó NGẮN hơn màn hình. position:sticky
-   ghim cạnh TRÊN của phần tử, nên một cột cao hơn viewport sẽ không bao giờ cuộn
-   tới được phần đáy của nó. Vì vậy trang xem (cột phải có khung PDF cao 640px)
-   KHÔNG dùng lớp này, còn trang quản lý (cột phải ~400px) thì có. */
-.ws-sticky { position: sticky; top: 86px; }
-@media (max-width: 1279px) {
-    .ws-sticky { position: static; }
-}
 
 /* Bootstrap chia cột theo BỀ NGANG MÀN HÌNH, không theo bề ngang thẻ cha -- nên
    một .col-md-4 nằm trong cột tra cứu ~400px vẫn cố xếp ba ô ngang rồi tràn chữ ra
