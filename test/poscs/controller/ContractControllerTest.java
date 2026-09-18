@@ -18,6 +18,7 @@ import poscs.dao.CustomerDAO;
 import poscs.dao.EmployeeDAO;
 import poscs.dao.ProductDAO;
 import poscs.model.Contract;
+import poscs.model.ContractHandover;
 import poscs.model.ContractProduct;
 import poscs.model.Product;
 import poscs.model.Role;
@@ -592,6 +593,133 @@ public class ContractControllerTest {
         verify(request).setAttribute("linkIsSellSide", false);
         verify(request, never()).setAttribute(eq("linkedMargin"), any());
         verify(contractDAO, never()).sumLinkedBuyValue(anyInt());
+    }
+
+    // ------------------------------------------------------------------
+    // Bàn giao phòng ban
+    // ------------------------------------------------------------------
+
+    /** Form tích nhiều phòng thì giao cùng lúc cho tất cả, một lời gọi. */
+    @Test
+    public void handOver_giaoCungLucChoNhieuPhong() throws Exception {
+        when(request.getParameter("action")).thenReturn("handOver");
+        when(request.getParameter("contractId")).thenReturn("5");
+        when(request.getParameterValues("departmentId")).thenReturn(new String[]{"5", "6"});
+        when(contractDAO.findById(5)).thenReturn(signedContract());
+        when(contractDAO.handOverToDepartments(anyInt(), anyList(), any(), anyInt())).thenReturn(2);
+
+        controller.doPost(request, response);
+
+        verify(contractDAO).handOverToDepartments(eq(5), eq(List.of(5, 6)), any(), anyInt());
+    }
+
+    /** Không tích phòng nào thì báo lỗi chứ không gọi xuống DAO. */
+    @Test
+    public void handOver_khongChonPhong_baoLoi() throws Exception {
+        when(request.getParameter("action")).thenReturn("handOver");
+        when(request.getParameter("contractId")).thenReturn("5");
+        when(request.getParameterValues("departmentId")).thenReturn(null);
+        when(contractDAO.findById(5)).thenReturn(signedContract());
+
+        controller.doPost(request, response);
+
+        verify(contractDAO, never()).handOverToDepartments(anyInt(), anyList(), any(), anyInt());
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=edit&id=5&error=handover_no_department");
+    }
+
+    /**
+     * Xác nhận xong chặng kiểm theo PHÒNG BAN, không theo vai trò: người phòng
+     * khác bấm vào thì bị từ chối, kể cả khi họ có quyền ghi hợp đồng.
+     */
+    @Test
+    public void completeHandover_khongThuocPhongDo_biTuChoi() throws Exception {
+        when(request.getParameter("action")).thenReturn("completeHandover");
+        when(request.getParameter("contractId")).thenReturn("5");
+        when(request.getParameter("handoverId")).thenReturn("9");
+        when(request.getParameter("departmentId")).thenReturn("6");
+        dangNhapVoiPhongBan(2, "Sales");
+
+        controller.doPost(request, response);
+
+        verify(contractDAO, never()).completeHandover(anyInt(), anyInt(), any());
+        verify(response).sendRedirect(CONTEXT_PATH + "/error/403.jsp");
+    }
+
+    /** Người đúng phòng thì đóng được chặng của phòng mình. */
+    @Test
+    public void completeHandover_dungPhong_thiDongDuocChang() throws Exception {
+        when(request.getParameter("action")).thenReturn("completeHandover");
+        when(request.getParameter("contractId")).thenReturn("5");
+        when(request.getParameter("handoverId")).thenReturn("9");
+        when(request.getParameter("departmentId")).thenReturn("6");
+        when(request.getParameter("doneNote")).thenReturn("đã kiểm điều khoản");
+        dangNhapVoiPhongBan(6, "CSKH");
+        when(contractDAO.completeHandover(anyInt(), anyInt(), any())).thenReturn(true);
+
+        controller.doPost(request, response);
+
+        verify(contractDAO).completeHandover(eq(9), anyInt(), eq("đã kiểm điều khoản"));
+    }
+
+    /**
+     * Trang xem hợp đồng KHÔNG được mọc nút xác nhận: nó chỉ đọc, và chỗ phòng
+     * nhận đóng chặng là màn hình hàng đợi riêng.
+     */
+    @Test
+    public void view_khongDatCoXacNhanChang() throws Exception {
+        Contract contract = signedContract();
+        when(request.getParameter("action")).thenReturn("view");
+        when(request.getParameter("id")).thenReturn("5");
+        when(contractDAO.findById(5)).thenReturn(contract);
+        ContractHandover pending = new ContractHandover();
+        pending.setHandoverId(9);
+        pending.setDepartmentId(6);
+        when(contractDAO.findHandoversOf(5)).thenReturn(List.of(pending));
+        when(request.getRequestDispatcher(anyString())).thenReturn(mock(RequestDispatcher.class));
+
+        controller.doGet(request, response);
+
+        verify(request).setAttribute("hasPendingHandover", true);
+        verify(request, never()).setAttribute(eq("canCompleteHandover_9"), any());
+    }
+
+    /** Hàng đợi đếm theo phòng và chỉ ra chặng để lâu nhất -- hai con số giám đốc nhìn đầu tiên. */
+    @Test
+    public void handoverQueue_demTheoPhongVaChangLauNhat() throws Exception {
+        when(request.getParameter("action")).thenReturn("handovers");
+        ContractHandover a = new ContractHandover();
+        a.setHandoverId(1);
+        a.setDepartmentId(5);
+        a.setDepartmentName("Kế toán");
+        a.setHandedAt(new java.sql.Timestamp(System.currentTimeMillis() - 5L * 24 * 60 * 60 * 1000));
+        ContractHandover b = new ContractHandover();
+        b.setHandoverId(2);
+        b.setDepartmentId(6);
+        b.setDepartmentName("Dự án");
+        b.setHandedAt(new java.sql.Timestamp(System.currentTimeMillis() - 20L * 24 * 60 * 60 * 1000));
+        when(contractDAO.findPendingHandovers(any())).thenReturn(List.of(a, b));
+        when(request.getRequestDispatcher("/jsp/sale/handoverqueue.jsp"))
+                .thenReturn(mock(RequestDispatcher.class));
+
+        controller.doGet(request, response);
+
+        verify(request).setAttribute(eq("handoverCountByDepartment"),
+                argThat((java.util.Map<String, Integer> m) ->
+                        m.get("Kế toán") == 1 && m.get("Dự án") == 1));
+        verify(request).setAttribute("slowestHandoverDays", 20L);
+    }
+
+    /** Đăng nhập với một phòng ban cụ thể -- quyền đóng chặng kiểm theo cột này. */
+    private void dangNhapVoiPhongBan(int departmentId, String roleName) {
+        User user = new User();
+        user.setUserId(77);
+        user.setDepartmentId(departmentId);
+        Role role = new Role();
+        role.setRoleName(roleName);
+        user.setRole(role);
+        HttpSession session = mock(HttpSession.class);
+        when(session.getAttribute("currentUser")).thenReturn(user);
+        when(request.getSession(false)).thenReturn(session);
     }
 
     /** Hợp đồng đã ký với đối tác giữ đúng vai -- dùng cho nhóm test siết form. */

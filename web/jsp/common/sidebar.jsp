@@ -35,6 +35,10 @@
     <div class="sidebar-sub">
         <a href="${pageContext.request.contextPath}/contract?kind=sell" class="sidebar-link ${activeNav == 'contract' and activeContractKind != 'buy' ? 'active' : ''}"><i class="fa-solid fa-file-export"></i><span>Hợp đồng bán</span></a>
         <a href="${pageContext.request.contextPath}/contract?kind=buy" class="sidebar-link ${activeNav == 'contract' and activeContractKind == 'buy' ? 'active' : ''}"><i class="fa-solid fa-file-import"></i><span>Hợp đồng mua</span></a>
+        <%-- Hàng đợi bàn giao: hợp đồng đang nằm chờ ở Kế toán / Dự án. Để
+             trong mục Hợp đồng vì đó là việc của hợp đồng, nhưng KHÔNG mang
+             tham số kind -- nó không thuộc chiều bán hay mua nào cả. --%>
+        <a href="${pageContext.request.contextPath}/contract?action=handovers" class="sidebar-link ${activeContractKind == 'handover' ? 'active' : ''}"><i class="fa-solid fa-share-from-square"></i><span>Bàn giao xử lý</span></a>
     </div>
     <a href="${pageContext.request.contextPath}/product" class="sidebar-link ${activeNav == 'product' ? 'active' : ''}"><i class="fa-solid fa-box"></i><span>Sản phẩm</span></a>
     <a href="${pageContext.request.contextPath}/ticket" class="sidebar-link ${activeNav == 'ticket' ? 'active' : ''}"><i class="fa-solid fa-headset"></i><span>Phiếu hỗ trợ</span></a>

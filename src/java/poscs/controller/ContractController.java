@@ -36,6 +36,7 @@ import poscs.dao.EmployeeDAO;
 import poscs.dao.ProductDAO;
 import poscs.model.Address;
 import poscs.model.Contract;
+import poscs.model.ContractHandover;
 import poscs.model.ContractHistory;
 import poscs.model.ContractLink;
 import poscs.model.ContractPayment;
@@ -103,6 +104,7 @@ public class ContractController extends HttpServlet {
     private static final String DETAIL_VIEW = "/jsp/sale/viewcontractdetail.jsp";
     private static final String CREATE_VIEW = "/jsp/sale/addnewcontract.jsp";
     private static final String UPDATE_VIEW = "/jsp/sale/updatecontract.jsp";
+    private static final String HANDOVER_VIEW = "/jsp/sale/handoverqueue.jsp";
     private static final String IMPORT_VIEW = "/jsp/sale/importcontract.jsp";
 
     /** Số dòng sản phẩm tối đa trong hopdong_import_template.pdf (field product1..product15). */
@@ -163,6 +165,9 @@ public class ContractController extends HttpServlet {
             case "downloadImportTemplate":
                 downloadImportTemplate(request, response);
                 break;
+            case "handovers":
+                showHandoverQueue(request, response);
+                break;
             case "list":
             default:
                 showList(request, response);
@@ -213,6 +218,12 @@ public class ContractController extends HttpServlet {
                 break;
             case "removePayment":
                 handleRemovePayment(request, response);
+                break;
+            case "handOver":
+                handleHandOver(request, response);
+                break;
+            case "completeHandover":
+                handleCompleteHandover(request, response);
                 break;
             case "linkContract":
                 handleLinkContract(request, response);
@@ -1477,6 +1488,25 @@ public class ContractController extends HttpServlet {
         if (clusterScheduled == null) {
             clusterScheduled = java.math.BigDecimal.ZERO;
         }
+        // ===== Bàn giao phòng ban =====
+        List<ContractHandover> handovers = contractDAO.findHandoversOf(id);
+        request.setAttribute("handovers", handovers);
+        boolean pendingHandover = false;
+        for (ContractHandover h : handovers) {
+            if (h.isPending()) {
+                pendingHandover = true;
+            }
+        }
+        // Còn phòng chưa xong thì màn hình CẢNH BÁO chứ không chặn ký: chặn
+        // cứng lúc này dễ thành kẹt hơn là kiểm soát, và khách hàng chưa nói
+        // đó là điều kiện bắt buộc.
+        //
+        // KHÔNG đặt cờ "được xác nhận xong" ở đây: trang xem hợp đồng cố ý
+        // không mọc một nút ghi nào, và chỗ phòng nhận đóng chặng của mình là
+        // màn hình hàng đợi riêng (action=handovers).
+        request.setAttribute("hasPendingHandover", pendingHandover);
+        request.setAttribute("departmentList", employeeDAO.findAllDepartments());
+
         // ===== Liên kết bán <-> mua =====
         List<ContractLink> links = contractDAO.findLinksOf(id);
         request.setAttribute("contractLinks", links);
@@ -1515,6 +1545,129 @@ public class ContractController extends HttpServlet {
     // ------------------------------------------------------------------
     // Kỳ thanh toán
     // ------------------------------------------------------------------
+
+    /**
+     * Hàng đợi bàn giao: các chặng CHƯA XONG của toàn hệ thống, để lâu nhất
+     * đứng trước.
+     *
+     * <p>Một màn hình phục vụ hai người khác nhau, cố ý:
+     *
+     * <ul>
+     *   <li><b>Giám đốc</b> nhìn toàn cảnh -- hợp đồng nào đang nằm ở phòng
+     *       nào, bao nhiêu ngày rồi, của nhân viên nào. Đó là câu hỏi sinh ra
+     *       cả tính năng này.</li>
+     *   <li><b>Phòng nhận</b> (Kế toán, Dự án) thấy đúng phần việc của phòng
+     *       mình và đóng chặng ngay tại đây -- họ không có quyền ghi trên hợp
+     *       đồng nên trang quản lý hợp đồng không phải chỗ của họ.</li>
+     * </ul>
+     *
+     * <p>KHÔNG đi qua requireFullAccess(CONTRACT): người phòng Kế toán/Dự án
+     * phải vào được. Ai cũng xem được hàng đợi -- nó chỉ cho biết hợp đồng đang
+     * nằm đâu, còn nút bấm thì lọc theo phòng của từng người.
+     */
+    private void showHandoverQueue(HttpServletRequest request, HttpServletResponse response)
+            throws ServletException, IOException {
+        List<ContractHandover> pending = contractDAO.findPendingHandovers(null);
+        request.setAttribute("pendingHandovers", pending);
+
+        // Đếm theo phòng để có dải tổng quan: "Kế toán đang giữ 4, Dự án 7".
+        Map<String, Integer> byDepartment = new java.util.LinkedHashMap<>();
+        long slowest = 0;
+        for (ContractHandover h : pending) {
+            byDepartment.merge(h.getDepartmentName(), 1, Integer::sum);
+            slowest = Math.max(slowest, h.getDaysWaiting());
+            request.setAttribute("canCompleteHandover_" + h.getHandoverId(),
+                    AccessControl.canCompleteHandover(request, h.getDepartmentId()));
+        }
+        request.setAttribute("handoverCountByDepartment", byDepartment);
+        request.setAttribute("slowestHandoverDays", slowest);
+        request.getRequestDispatcher(HANDOVER_VIEW).forward(request, response);
+    }
+
+    // ------------------------------------------------------------------
+    // Bàn giao hợp đồng giữa các phòng
+    // ------------------------------------------------------------------
+
+    /**
+     * Bàn giao hợp đồng cho các phòng đã tích trên form (mặc định Kế toán và
+     * Dự án, hai phòng của luồng khách hàng mô tả).
+     *
+     * <p>Người bàn giao là người có quyền ghi trên hợp đồng -- đây là một bước
+     * của quy trình soạn thảo, không phải việc của phòng nhận.
+     */
+    private void handleHandOver(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        if (!AccessControl.requireFullAccess(request, response, AccessControl.Resource.CONTRACT)) {
+            return;
+        }
+        Integer contractId = parseIntOrNull(request.getParameter("contractId"));
+        if (contractId == null || contractDAO.findById(contractId) == null) {
+            response.sendRedirect(request.getContextPath() + "/contract?error=notfound");
+            return;
+        }
+        String back = "/contract?action=edit&id=" + contractId;
+
+        List<Integer> departmentIds = new ArrayList<>();
+        String[] raw = request.getParameterValues("departmentId");
+        if (raw != null) {
+            for (String value : raw) {
+                Integer id = parseIntOrNull(value);
+                if (id != null) {
+                    departmentIds.add(id);
+                }
+            }
+        }
+        if (departmentIds.isEmpty()) {
+            response.sendRedirect(request.getContextPath() + back + "&error=handover_no_department");
+            return;
+        }
+
+        int result = contractDAO.handOverToDepartments(contractId, departmentIds,
+                request.getParameter("handoverNote"), actorId(request));
+        if (result == ContractDAO.HANDOVER_ALREADY_PENDING) {
+            response.sendRedirect(request.getContextPath() + back + "&error=handover_pending");
+            return;
+        }
+        if (result <= 0) {
+            LOG.warn("Ban giao hop dong that bai (actor={}, contractId={})", Logs.actor(request), contractId);
+            response.sendRedirect(request.getContextPath() + back + "&error=handover_failed");
+            return;
+        }
+        response.sendRedirect(request.getContextPath() + back);
+    }
+
+    /**
+     * Phòng nhận báo đã xử lý xong.
+     *
+     * <p>KHÔNG đi qua {@code requireFullAccess(CONTRACT)}: người của phòng Kế
+     * toán hay Dự án không có quyền ghi hợp đồng, và cũng không nên có -- họ
+     * chỉ đóng đúng chặng của mình. Quyền kiểm theo PHÒNG BAN, xem
+     * AccessControl.canCompleteHandover.
+     */
+    private void handleCompleteHandover(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        Integer contractId = parseIntOrNull(request.getParameter("contractId"));
+        Integer handoverId = parseIntOrNull(request.getParameter("handoverId"));
+        Integer departmentId = parseIntOrNull(request.getParameter("departmentId"));
+        if (contractId == null || handoverId == null || departmentId == null) {
+            response.sendRedirect(request.getContextPath() + "/contract?error=notfound");
+            return;
+        }
+        if (!AccessControl.canCompleteHandover(request, departmentId)) {
+            LOG.warn("Tu choi xac nhan chang ban giao: khong thuoc phong do (actor={}, handoverId={})",
+                    Logs.actor(request), handoverId);
+            response.sendRedirect(request.getContextPath() + "/error/403.jsp");
+            return;
+        }
+        // Quay lại đúng chỗ vừa bấm: phòng nhận làm việc ở hàng đợi, còn người
+        // của Kinh doanh thì bấm từ trang quản lý hợp đồng.
+        String back = "from-queue".equals(request.getParameter("returnTo"))
+                ? "/contract?action=handovers"
+                : "/contract?action=edit&id=" + contractId;
+        if (!contractDAO.completeHandover(handoverId, actorId(request), request.getParameter("doneNote"))) {
+            response.sendRedirect(request.getContextPath() + back + "&error=handover_done_failed");
+            return;
+        }
+        response.sendRedirect(request.getContextPath() + back);
+    }
 
     // ------------------------------------------------------------------
     // Liên kết hợp đồng bán <-> mua ("đầu ra kéo theo đầu vào")

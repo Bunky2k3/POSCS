@@ -71,6 +71,15 @@ public class ContractHistory {
     public static final String EVENT_LINKED = "Nối hợp đồng";
 
     /**
+     * Bàn giao hợp đồng cho một phòng, và phòng đó báo đã xử lý xong.
+     *
+     * <p>Dùng chung một loại cho cả hai đầu của chặng: dòng nhật ký đọc theo
+     * thứ tự thời gian đã kể đủ câu chuyện ("bàn giao cho Kế toán" rồi "phòng
+     * Kế toán báo đã xử lý xong"), tách thành hai loại chỉ làm bộ lọc dài ra.
+     */
+    public static final String EVENT_HANDOVER = "Bàn giao phòng ban";
+
+    /**
      * Admin chữa một sai sót NHẬP LIỆU trên hợp đồng đã ký.
      *
      * <p>Tách hẳn khỏi {@link #EVENT_UPDATED}: sửa một bản nháp là chuyện bình

@@ -145,6 +145,9 @@
                         <c:when test="${param.error == 'missing_reason'}">Sửa sai sót trên hợp đồng đã ký thì bắt buộc phải nêu lý do.</c:when>
                         <c:when test="${param.error == 'amendment_not_allowed'}">Hợp đồng này không lập phụ lục được: nó phải đã ký và chưa thanh lý, và bản thân nó không được là phụ lục.</c:when>
                         <c:when test="${param.error == 'value_negative'}">Khoản giảm trừ lớn hơn giá trị còn lại của hợp đồng gốc — giá trị hợp đồng sẽ âm. Ô này nhập phần CHÊNH LỆCH, không phải tổng giá trị mới.</c:when>
+                        <c:when test="${param.error == 'handover_no_department'}">Chọn ít nhất một phòng để bàn giao.</c:when>
+                        <c:when test="${param.error == 'handover_pending'}">Phòng đó đang còn giữ hợp đồng này — đợi họ báo xử lý xong rồi mới bàn giao lượt mới.</c:when>
+                        <c:when test="${param.error == 'handover_failed'}">Không bàn giao được. Vui lòng thử lại.</c:when>
                         <c:when test="${param.error == 'link_invalid'}">Không nối được hai hợp đồng này: phải là một hợp đồng bán với một hợp đồng mua, và cả hai đều phải là hợp đồng gốc (không phải phụ lục).</c:when>
                         <c:when test="${param.error == 'link_duplicate'}">Hai hợp đồng này đã nối với nhau rồi.</c:when>
                         <c:when test="${param.error == 'unlink_failed'}">Không gỡ được liên kết. Vui lòng thử lại.</c:when>
@@ -464,6 +467,139 @@
             </c:if>
         </div>
         </c:if>
+
+        <!-- ===== Bàn giao phòng ban ===== -->
+        <%-- Kinh doanh soạn xong thì chuyển xuống Kế toán và Dự án CÙNG LÚC,
+             mỗi phòng tự báo xong. Đây là trục thứ tư, đứng RIÊNG với trục tiến
+             độ (Nháp/Đã ký/Thanh lý): trạng thái pháp lý của hợp đồng và công
+             việc nội bộ không suy ra nhau. --%>
+        <div class="card-box" style="margin-top:20px;">
+            <div class="section-header"><h5>Bàn giao xử lý</h5></div>
+            <p style="font-size:0.86rem; color:#6b7280; margin:0 0 12px;">
+                Soạn xong thì chuyển xuống các phòng liên quan. Mỗi phòng tự bấm
+                <strong>Đã xử lý xong</strong> kèm ghi chú, và thời gian nằm chờ ở từng phòng được đếm từ lúc bàn giao.
+            </p>
+
+            <c:if test="${hasPendingHandover}">
+                <div class="lc-alert" style="margin-bottom:12px;">
+                    <i class="fa-solid fa-triangle-exclamation" style="margin-top:2px;"></i>
+                    <span>Còn phòng chưa báo xử lý xong. Hợp đồng vẫn ký được &mdash; đây là
+                        cảnh báo để không ai quên, không phải điều kiện chặn.</span>
+                </div>
+            </c:if>
+
+            <c:choose>
+                <c:when test="${empty handovers}">
+                    <p style="font-size:0.88rem; color:#9ca3af; margin:0 0 14px;">Chưa bàn giao cho phòng nào.</p>
+                </c:when>
+                <c:otherwise>
+                    <div class="table-responsive">
+                        <table class="table align-middle" style="font-size:0.9rem;">
+                            <thead>
+                                <tr>
+                                    <th>Phòng</th>
+                                    <th>Bàn giao</th>
+                                    <th>Tình trạng</th>
+                                    <th>Ghi chú</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <c:forEach var="hv" items="${handovers}">
+                                    <tr>
+                                        <td><strong>${fn:escapeXml(hv.departmentName)}</strong></td>
+                                        <td>
+                                            <fmt:formatDate value="${hv.handedAt}" pattern="dd/MM/yyyy"/>
+                                            <div style="font-size:0.78rem; color:#9ca3af;">${fn:escapeXml(hv.handedByName)}</div>
+                                        </td>
+                                        <td>
+                                            <c:choose>
+                                                <c:when test="${hv.pending}">
+                                                    <span style="color:#8a5a00; font-weight:600;">
+                                                        Đang chờ &middot; ${hv.daysWaiting} ngày
+                                                    </span>
+                                                </c:when>
+                                                <c:otherwise>
+                                                    <span style="color:#2f6b34; font-weight:600;">
+                                                        <i class="fa-solid fa-circle-check"></i>
+                                                        Xong sau ${hv.daysWaiting} ngày
+                                                    </span>
+                                                    <div style="font-size:0.78rem; color:#9ca3af;">
+                                                        <fmt:formatDate value="${hv.doneAt}" pattern="dd/MM/yyyy"/>
+                                                        &middot; ${fn:escapeXml(hv.doneByName)}
+                                                    </div>
+                                                </c:otherwise>
+                                            </c:choose>
+                                        </td>
+                                        <td>
+                                            <c:if test="${not empty hv.handoverNote}">
+                                                <div style="font-size:0.82rem;">${fn:escapeXml(hv.handoverNote)}</div>
+                                            </c:if>
+                                            <c:if test="${not empty hv.doneNote}">
+                                                <div style="font-size:0.82rem; color:#2f6b34;">&rarr; ${fn:escapeXml(hv.doneNote)}</div>
+                                            </c:if>
+                                            <%-- Nút chỉ mọc ở phòng của chính người đang xem. Chốt chặn
+                                                 thật nằm ở AccessControl.canCompleteHandover. --%>
+                                            <c:if test="${hv.pending and requestScope['canCompleteHandover_'.concat(hv.handoverId)]}">
+                                                <form method="POST" action="${pageContext.request.contextPath}/contract"
+                                                      class="row g-2" style="margin-top:6px;">
+                                                    <input type="hidden" name="csrfToken" value="${csrfToken}">
+                                                    <input type="hidden" name="action" value="completeHandover">
+                                                    <input type="hidden" name="contractId" value="${contract.contractId}">
+                                                    <input type="hidden" name="handoverId" value="${hv.handoverId}">
+                                                    <input type="hidden" name="departmentId" value="${hv.departmentId}">
+                                                    <div class="col-8">
+                                                        <input type="text" name="doneNote" class="form-control" required
+                                                               maxlength="500" placeholder="Phòng bạn đã làm gì? (bắt buộc)">
+                                                    </div>
+                                                    <div class="col-4">
+                                                        <button type="submit" class="btn-primary" style="width:100%;">
+                                                            <i class="fa-solid fa-check me-1"></i> Đã xử lý xong
+                                                        </button>
+                                                    </div>
+                                                </form>
+                                            </c:if>
+                                        </td>
+                                    </tr>
+                                </c:forEach>
+                            </tbody>
+                        </table>
+                    </div>
+                </c:otherwise>
+            </c:choose>
+
+            <%-- Mặc định tích sẵn Kế toán và Dự án: đó là luồng khách hàng mô
+                 tả. Vẫn cho bỏ tích, vì không phải hợp đồng nào cũng qua cả hai. --%>
+            <form method="POST" action="${pageContext.request.contextPath}/contract" class="row g-2 align-items-end">
+                <input type="hidden" name="csrfToken" value="${csrfToken}">
+                <input type="hidden" name="action" value="handOver">
+                <input type="hidden" name="contractId" value="${contract.contractId}">
+                <div class="col-md-5">
+                    <label style="font-size:0.8rem; color:#6b7280;">Bàn giao cho phòng</label>
+                    <div style="display:flex; flex-wrap:wrap; gap:12px; padding-top:6px;">
+                        <c:forEach var="dept" items="${departmentList}">
+                            <c:if test="${dept.departmentName == 'Kế toán' or dept.departmentName == 'Dự án'
+                                          or dept.departmentName == 'Kỹ thuật'}">
+                                <label class="filter-toggle" style="font-size:0.84rem;">
+                                    <input type="checkbox" name="departmentId" value="${dept.departmentId}"
+                                           ${dept.departmentName == 'Kế toán' or dept.departmentName == 'Dự án' ? 'checked' : ''}>
+                                    ${fn:escapeXml(dept.departmentName)}
+                                </label>
+                            </c:if>
+                        </c:forEach>
+                    </div>
+                </div>
+                <div class="col-md-5">
+                    <label style="font-size:0.8rem; color:#6b7280;">Dặn phòng nhận (không bắt buộc)</label>
+                    <input type="text" name="handoverNote" class="form-control" maxlength="255"
+                           placeholder="VD: đã chốt giá, nhờ kiểm điều khoản thanh toán">
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn-primary" style="width:100%;">
+                        <i class="fa-solid fa-share-from-square me-1"></i> Bàn giao
+                    </button>
+                </div>
+            </form>
+        </div>
 
         <!-- ===== Đầu ra kéo theo đầu vào ===== -->
         <%-- Hợp đồng BÁN nối với các đơn MUA sinh ra vì nó, và ngược lại. Quan

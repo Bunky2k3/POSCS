@@ -762,6 +762,70 @@
              contracts vẫn chưa có cột lưu điều khoản; khi nào có thì dựng lại
              thẻ này với dữ liệu thật. --%>
 
+        <!-- ===== Bàn giao phòng ban ===== -->
+        <%-- CHỈ ĐỌC, như cả trang này. Nút "Đã xử lý xong" của phòng nhận nằm ở
+             màn hình riêng /contract?action=handovers -- người phòng Kế toán và
+             Dự án không có quyền ghi trên hợp đồng, nên chỗ làm việc của họ là
+             hàng đợi của phòng mình chứ không phải trang hợp đồng. --%>
+        <c:if test="${not empty handovers}">
+        <div class="info-card card-box">
+            <div class="section-header"><h5>Bàn giao xử lý</h5></div>
+            <c:if test="${hasPendingHandover}">
+                <div class="lc-alert" style="margin-bottom:12px;">
+                    <i class="fa-solid fa-triangle-exclamation" style="margin-top:2px;"></i>
+                    <span>Còn phòng chưa báo xử lý xong.</span>
+                </div>
+            </c:if>
+            <div class="table-responsive">
+                <table class="table align-middle" style="font-size:0.9rem;">
+                    <thead>
+                        <tr>
+                            <th>Phòng</th>
+                            <th>Bàn giao</th>
+                            <th>Tình trạng</th>
+                            <th>Ghi chú</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <c:forEach var="hv" items="${handovers}">
+                            <tr>
+                                <td><strong>${fn:escapeXml(hv.departmentName)}</strong></td>
+                                <td>
+                                    <fmt:formatDate value="${hv.handedAt}" pattern="dd/MM/yyyy"/>
+                                    <div style="font-size:0.78rem; color:#9ca3af;">${fn:escapeXml(hv.handedByName)}</div>
+                                </td>
+                                <td>
+                                    <c:choose>
+                                        <c:when test="${hv.pending}">
+                                            <span style="color:#8a5a00; font-weight:600;">Đang chờ &middot; ${hv.daysWaiting} ngày</span>
+                                        </c:when>
+                                        <c:otherwise>
+                                            <span style="color:#2f6b34; font-weight:600;">
+                                                <i class="fa-solid fa-circle-check"></i> Xong sau ${hv.daysWaiting} ngày
+                                            </span>
+                                            <div style="font-size:0.78rem; color:#9ca3af;">
+                                                <fmt:formatDate value="${hv.doneAt}" pattern="dd/MM/yyyy"/>
+                                                &middot; ${fn:escapeXml(hv.doneByName)}
+                                            </div>
+                                        </c:otherwise>
+                                    </c:choose>
+                                </td>
+                                <td>
+                                    <c:if test="${not empty hv.handoverNote}">
+                                        <div style="font-size:0.82rem;">${fn:escapeXml(hv.handoverNote)}</div>
+                                    </c:if>
+                                    <c:if test="${not empty hv.doneNote}">
+                                        <div style="font-size:0.82rem; color:#2f6b34;">&rarr; ${fn:escapeXml(hv.doneNote)}</div>
+                                    </c:if>
+                                </td>
+                            </tr>
+                        </c:forEach>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        </c:if>
+
         <!-- ===== Đầu ra kéo theo đầu vào ===== -->
         <%-- CHỈ ĐỌC, như cả trang này: nối/gỡ nằm ở trang quản lý. --%>
         <c:if test="${not empty contractLinks}">

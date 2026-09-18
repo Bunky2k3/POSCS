@@ -3462,7 +3462,12 @@ INSERT INTO `departments` (`department_name`) VALUES
 ('Ban giám đốc'),
 ('Kinh doanh'),
 ('Kỹ thuật'),
-('Chăm sóc khách hàng');
+('Chăm sóc khách hàng'),
+-- Hai phòng của luồng bàn giao (V32). Chưa có vai trò tương ứng trong `roles`
+-- và chưa có nhân sự nào -- cố ý: bàn giao là giao cho PHÒNG, và Admin xác
+-- nhận thay được cho tới khi có người.
+('Kế toán'),
+('Dự án');
 
 DROP TABLE IF EXISTS `users`;
 CREATE TABLE `users` (
@@ -4540,6 +4545,39 @@ CREATE TABLE `contract_history` (
   -- nó nói về. Xem đầu V23 để biết vì sao.
   CONSTRAINT `fk_contract_history_contract` FOREIGN KEY (`contract_id`) REFERENCES `contracts` (`contract_id`),
   CONSTRAINT `fk_contract_history_user` FOREIGN KEY (`changed_by`) REFERENCES `users` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+DROP TABLE IF EXISTS `contract_handovers`;
+-- Bàn giao hợp đồng giữa các phòng (V32): Kinh doanh soạn xong thì chuyển
+-- xuống Kế toán và Dự án CÙNG LÚC, mỗi phòng tự báo đã xử lý xong.
+--
+-- Mỗi lượt giao là một DÒNG có mốc thời gian, không phải một cột "phòng đang
+-- giữ": hai phòng nhận cùng lúc nên một cột không đủ, và cột thì mất sạch
+-- "đã chờ mấy ngày ở phòng nào" -- đúng con số khách hàng (giám đốc) hỏi.
+--
+-- Đây KHÔNG phải quan hệ phòng-phòng: bảng nối HỢP ĐỒNG với PHÒNG theo thời
+-- gian, mỗi dòng là một sự kiện bàn giao.
+CREATE TABLE `contract_handovers` (
+  `handover_id`   int NOT NULL AUTO_INCREMENT,
+  `contract_id`   int NOT NULL,
+  -- Giao cho PHÒNG, không cho người: ai trong phòng xác nhận cũng được.
+  `department_id` int NOT NULL,
+  `handed_at`     timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `handed_by`     int NOT NULL,
+  -- NULL = phòng đó đang còn giữ. Hiệu với handed_at = thời gian nằm chờ.
+  `done_at`       timestamp NULL DEFAULT NULL,
+  `done_by`       int DEFAULT NULL,
+  `handover_note` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `done_note`     varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  PRIMARY KEY (`handover_id`),
+  KEY `idx_handover_contract` (`contract_id`),
+  KEY `idx_handover_department_open` (`department_id`, `done_at`),
+  KEY `fk_handover_handed_by` (`handed_by`),
+  KEY `fk_handover_done_by` (`done_by`),
+  CONSTRAINT `fk_handover_contract` FOREIGN KEY (`contract_id`) REFERENCES `contracts` (`contract_id`),
+  CONSTRAINT `fk_handover_department` FOREIGN KEY (`department_id`) REFERENCES `departments` (`department_id`),
+  CONSTRAINT `fk_handover_handed_by` FOREIGN KEY (`handed_by`) REFERENCES `users` (`user_id`),
+  CONSTRAINT `fk_handover_done_by` FOREIGN KEY (`done_by`) REFERENCES `users` (`user_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 DROP TABLE IF EXISTS `contract_links`;
