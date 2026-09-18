@@ -123,6 +123,42 @@ public class ContractDAO {
     private static final String AMENDMENT_COUNT_SQL =
         "(SELECT COUNT(*) FROM contracts ch WHERE ch.parent_contract_id = c.contract_id AND ch.is_deleted = 0)";
 
+    /**
+     * Điều kiện "phụ lục này đã ký" dùng trong hai câu cộng bên dưới.
+     *
+     * <p>Không so bằng PROGRESS_SIGNED: thanh lý và chấm dứt sớm cũng là những
+     * phụ lục ĐÃ TỪNG ký, và tiền hai bên đã thoả thuận không mất đi vì về sau
+     * văn bản đóng lại. Trạng thái tiến trình nói về quy trình, không nói gì về
+     * giá trị -- nên loại trừ duy nhất là bản NHÁP (chưa ai ký).
+     *
+     * <p>{@code IS NULL} tính là đã ký, khớp {@code Contract.isTermsLocked()}:
+     * hàng nào không đọc ra trạng thái thì coi như đã khoá, fail-closed.
+     */
+    private static final String AMENDMENT_IS_SIGNED_SQL =
+        "(ch.progress_status IS NULL OR ch.progress_status <> '" + PROGRESS_DRAFT + "')";
+
+    /**
+     * Tổng điều chỉnh giá trị của các phụ lục ĐÃ KÝ -- cộng lúc đọc, cùng lẽ
+     * với AMENDMENT_COUNT_SQL.
+     *
+     * <p>Trên dòng PHỤ LỤC, {@code contract_value} mang nghĩa CHÊNH LỆCH có dấu
+     * (bổ sung thì dương, giảm trừ thì âm), không phải tổng giá trị mới. Đó là
+     * cách duy nhất diễn đạt được một phụ lục giảm trừ hạng mục bằng đúng cột
+     * đã có, và là lý do phép cộng ở đây là một câu SUM chứ không phải "lấy
+     * phụ lục ký gần nhất".
+     *
+     * <p>COALESCE: hợp đồng không có phụ lục nào thì SUM trả NULL, mà NULL cộng
+     * vào giá trị gốc sẽ xoá sạch nó.
+     */
+    private static final String AMENDMENT_VALUE_SIGNED_SQL =
+        "(SELECT COALESCE(SUM(ch.contract_value), 0) FROM contracts ch " +
+        " WHERE ch.parent_contract_id = c.contract_id AND ch.is_deleted = 0 AND " + AMENDMENT_IS_SIGNED_SQL + ")";
+
+    /** Như trên nhưng của phụ lục còn NHÁP -- chưa ký thì chưa đổi được giá trị hợp đồng. */
+    private static final String AMENDMENT_VALUE_PENDING_SQL =
+        "(SELECT COALESCE(SUM(ch.contract_value), 0) FROM contracts ch " +
+        " WHERE ch.parent_contract_id = c.contract_id AND ch.is_deleted = 0 AND NOT " + AMENDMENT_IS_SIGNED_SQL + ")";
+
     private static final String SELECT_BASE =
         "SELECT c.contract_id, c.contract_code, c.title, c.contract_type, c.direction, c.signing_date, " +
         "       c.effective_date, c.end_date, c.enterprise_id, c.owner_id, c.attachment_url, " +
@@ -130,6 +166,8 @@ public class ContractDAO {
         "       c.progress_status, c.created_at, c.updated_at, c.is_deleted, " +
         "       c.parent_contract_id, pc.contract_code AS parent_contract_code, " +
         "       " + AMENDMENT_COUNT_SQL + " AS amendment_count, " +
+        "       " + AMENDMENT_VALUE_SIGNED_SQL + " AS amendment_value_signed, " +
+        "       " + AMENDMENT_VALUE_PENDING_SQL + " AS amendment_value_pending, " +
         "       e.enterprise_name, p.province_id, p.province_name, " +
         "       u.last_name AS owner_last_name, u.middle_name AS owner_middle_name, u.first_name AS owner_first_name " +
         "FROM contracts c " +
@@ -367,6 +405,12 @@ public class ContractDAO {
         String sql = SELECT_BASE +
             "WHERE c.is_deleted = 0 AND CURDATE() BETWEEN c.effective_date AND c.end_date " +
             "AND DATEDIFF(c.end_date, CURDATE()) <= " + SOON_THRESHOLD_DAYS + " " +
+            // CHỈ hợp đồng gốc. Bảng này ở Dashboard trả lời "sắp tới phải lo
+            // những hợp đồng nào", mà một phụ lục gia hạn đứng riêng cạnh hợp
+            // đồng cha của nó là ĐẾM HAI LẦN một việc -- và cột giá trị bên
+            // cạnh thì cộng lần nữa phần tiền đã nằm trong giá trị hiện hành
+            // của cha. Phụ lục vẫn tìm được ở danh sách hợp đồng.
+            "AND c.parent_contract_id IS NULL " +
             (provinceId != null ? "AND d.province_id = ? " : "") +
             "ORDER BY c.end_date ASC LIMIT ?";
         try (Connection conn = DBContext.getConnection();
@@ -504,6 +548,16 @@ public class ContractDAO {
     public static final int INVALID_PARENT = -3;
 
     /**
+     * Giá trị trả về của {@link #insert} khi phụ lục giảm trừ nhiều hơn số tiền
+     * còn lại của hợp đồng gốc -- giá trị hiện hành sẽ âm.
+     *
+     * <p>Không phải lỗi kỹ thuật: nó là lỗi nhập liệu người dùng sửa được ngay
+     * (gõ nhầm dấu, hoặc gõ TỔNG giá trị mới vào ô chênh lệch), nên cần một câu
+     * trả lời riêng chứ không lẫn vào "lưu thất bại".
+     */
+    public static final int INVALID_VALUE = -4;
+
+    /**
      * Thêm hợp đồng mới kèm dòng nhật ký "Khởi tạo". Trả về contract_id vừa
      * tạo, hoặc -1 nếu lỗi.
      *
@@ -542,6 +596,15 @@ public class ContractDAO {
                         parent = lockForUpdate(conn, parentId);
                         if (!canTakeAmendment(parent)) {
                             return INVALID_PARENT;
+                        }
+                        // Giá trị trên dòng phụ lục là CHÊNH LỆCH có dấu, nên
+                        // một phụ lục giảm trừ có thể kéo giá trị hợp đồng
+                        // xuống dưới 0. Kiểm ở đây, trong transaction đã khoá
+                        // cha: controller kiểm trước chỉ để báo lỗi tử tế, còn
+                        // hai người cùng lập phụ lục giảm trừ thì chỉ chỗ này
+                        // thấy được cả hai.
+                        if (amendedValueWouldGoNegative(conn, parent, 0, contract.getContractValue())) {
+                            return INVALID_VALUE;
                         }
                     }
                     // Đối tác và chiều của phụ lục LẤY TỪ CHA, không lấy từ form:
@@ -783,6 +846,18 @@ public class ContractDAO {
                 boolean termsLocked = before.isTermsLocked();
                 Contract written = termsLocked ? withTermsFrom(before, contract) : contract;
 
+                // Phụ lục còn nháp thì giá trị của nó vẫn sửa được, nên đường
+                // này cũng đẩy được giá trị hợp đồng gốc xuống dưới 0 -- đúng
+                // thứ insert() đã chặn. Chặn cả hai đường, nếu không thì lập
+                // phụ lục hợp lệ rồi sửa lại là đi vòng qua được luật.
+                if (!termsLocked && before.isAmendment()
+                        && amendedValueWouldGoNegative(conn, before.getParentContractId(),
+                                before.getContractId(), written.getContractValue())) {
+                    LOG.warn("Tu choi sua phu luc vi gia tri hop dong se am (contractId={})",
+                            contract.getContractId());
+                    return false;
+                }
+
                 try (PreparedStatement ps = conn.prepareStatement(termsLocked ? SQL_UPDATE_ADMIN_FIELDS : SQL_UPDATE_ALL)) {
                     if (termsLocked) {
                         ps.setInt(1, written.getOwnerId());
@@ -996,6 +1071,9 @@ public class ContractDAO {
                 if (countLiveAmendments(conn, contractId) > 0) {
                     return false;
                 }
+                // Đọc TRƯỚC khi huỷ, cùng lẽ với deleteProductLine: sau lệnh
+                // ghi thì không còn gì để đọc ra mà kể lại trong nhật ký.
+                Contract voided = lockForUpdate(conn, contractId);
                 try (PreparedStatement ps = conn.prepareStatement(sql)) {
                     ps.setInt(1, contractId);
                     if (ps.executeUpdate() == 0) {
@@ -1005,6 +1083,16 @@ public class ContractDAO {
                 insertHistory(conn, contractId, ContractHistory.EVENT_VOIDED,
                         "Huỷ bản ghi khỏi danh sách (dữ liệu vẫn còn trong CSDL)",
                         actorId, reason.trim());
+
+                // Huỷ bản ghi một phụ lục ĐÃ KÝ rút luôn phần giá trị nó mang
+                // theo ra khỏi hợp đồng gốc (mọi câu cộng đều lọc is_deleted).
+                // Giá trị hợp đồng đổi mà không dòng nào ghi lại thì đúng bằng
+                // việc sửa thẳng -- thứ mà cả đợt này dựng ra để chặn.
+                if (voided != null && voided.isAmendment() && !voided.isDraft()
+                        && voided.getContractValue() != null && voided.getContractValue().signum() != 0) {
+                    logValueAdjustment(conn, voided.getParentContractId(), voided.getContractValue().negate(),
+                            actorId, "Huỷ bản ghi phụ lục " + voided.getContractCode());
+                }
                 conn.commit();
                 committed = true;
             } finally {
@@ -1089,6 +1177,16 @@ public class ContractDAO {
                 insertStatusChange(conn, contractId, fromStatus, toStatus, actorId,
                         note == null || note.trim().isEmpty() ? null : note.trim());
 
+                // KÝ một phụ lục có giá trị là khoảnh khắc giá trị hợp đồng gốc
+                // thật sự đổi -- trước đó nó mới chỉ là bản nháp ai cũng sửa
+                // được. Dòng này ghi lên HỢP ĐỒNG GỐC vì đó là chỗ người ta mở
+                // ra để hỏi "sao giờ nó không còn là con số đã ký nữa".
+                if (PROGRESS_SIGNED.equals(toStatus) && current.isAmendment()
+                        && current.getContractValue() != null && current.getContractValue().signum() != 0) {
+                    logValueAdjustment(conn, current.getParentContractId(), current.getContractValue(),
+                            actorId, "Phụ lục " + current.getContractCode() + " được ký");
+                }
+
                 conn.commit();
                 committed = true;
             } finally {
@@ -1133,6 +1231,100 @@ public class ContractDAO {
      */
     private static boolean canTakeAmendment(Contract parent) {
         return parent != null && parent.isSigned() && !parent.isAmendment();
+    }
+
+    /**
+     * Tổng điều chỉnh giá trị của các phụ lục ĐÃ KÝ, đọc trong transaction đang
+     * mở. {@code excludeAmendmentId} là phụ lục đang được sửa (0 khi đang lập
+     * mới) -- phải bỏ ra, nếu không thì giá trị cũ của chính nó bị cộng thêm
+     * một lần nữa vào phép kiểm.
+     */
+    private BigDecimal sumSignedAmendmentValue(Connection conn, int parentContractId, int excludeAmendmentId)
+            throws SQLException {
+        String sql = "SELECT COALESCE(SUM(contract_value), 0) FROM contracts " +
+                     "WHERE parent_contract_id = ? AND is_deleted = 0 AND contract_id <> ? " +
+                     "AND (progress_status IS NULL OR progress_status <> ?)";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, parentContractId);
+            ps.setInt(2, excludeAmendmentId);
+            ps.setString(3, PROGRESS_DRAFT);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next() ? rs.getBigDecimal(1) : BigDecimal.ZERO;
+            }
+        }
+    }
+
+    /**
+     * true nếu cộng thêm {@code delta} vào hợp đồng {@code parent} sẽ đẩy giá
+     * trị hiện hành xuống dưới 0.
+     *
+     * <p>Chỉ chặn phần ÂM: phụ lục bổ sung thì bao nhiêu cũng hợp lệ, còn hợp
+     * đồng gốc chưa chốt giá (null) thì mọi khoản giảm trừ đều là giảm trừ trên
+     * số 0 -- đó cũng là âm, và cũng vô nghĩa như nhau.
+     */
+    private boolean amendedValueWouldGoNegative(Connection conn, Contract parent, int excludeAmendmentId,
+            BigDecimal delta) throws SQLException {
+        if (delta == null || delta.signum() >= 0) {
+            return false;
+        }
+        BigDecimal base = parent.getContractValue() == null ? BigDecimal.ZERO : parent.getContractValue();
+        BigDecimal signedSoFar = sumSignedAmendmentValue(conn, parent.getContractId(), excludeAmendmentId);
+        return base.add(signedSoFar).add(delta).signum() < 0;
+    }
+
+    /**
+     * Như trên nhưng khi trong tay chỉ có id hợp đồng cha. Đọc giá trị cha bằng
+     * SELECT thường, KHÔNG {@code FOR UPDATE}: đường gọi duy nhất ({@link #update}
+     * sửa một phụ lục nháp) đã khoá dòng CON rồi, và khoá tiếp dòng CHA ở đây là
+     * đi ngược thứ tự khoá của {@link #insert} -- đúng công thức dựng ra deadlock.
+     * Cùng lắm là đọc phải một giá trị cha vừa đổi xong, mà giá trị của hợp đồng
+     * đã ký thì chỉ correct() của Admin mới đổi được.
+     */
+    private boolean amendedValueWouldGoNegative(Connection conn, int parentContractId, int excludeAmendmentId,
+            BigDecimal delta) throws SQLException {
+        if (delta == null || delta.signum() >= 0) {
+            return false;
+        }
+        Contract parent = new Contract();
+        parent.setContractId(parentContractId);
+        parent.setContractValue(readContractValue(conn, parentContractId));
+        return amendedValueWouldGoNegative(conn, parent, excludeAmendmentId, delta);
+    }
+
+    /**
+     * Ghi lên HỢP ĐỒNG GỐC một dòng nhật ký nói giá trị vừa đổi bao nhiêu và
+     * giờ là bao nhiêu. Gọi SAU khi thay đổi đã ghi xong, trong cùng transaction
+     * -- giá trị hiện hành được cộng lại từ CSDL chứ không tính tay từ hai biến
+     * trong bộ nhớ, nên nó luôn là con số mà màn hình sẽ hiện ra ngay sau đó.
+     *
+     * @param delta phần thay đổi để KỂ LẠI (đã đổi dấu sẵn khi là huỷ bản ghi);
+     *              chỉ dùng cho câu chữ, không dùng để tính tổng
+     */
+    private void logValueAdjustment(Connection conn, Integer parentContractId, BigDecimal delta, int actorId,
+            String prefix) throws SQLException {
+        if (parentContractId == null || delta == null) {
+            return;
+        }
+        BigDecimal base = readContractValue(conn, parentContractId);
+        BigDecimal current = (base == null ? BigDecimal.ZERO : base)
+                .add(sumSignedAmendmentValue(conn, parentContractId, 0));
+        insertHistory(conn, parentContractId, ContractHistory.EVENT_VALUE_ADJUSTED,
+                prefix + " — điều chỉnh " + formatSignedMoney(delta)
+                        + ", giá trị hợp đồng hiện hành " + formatMoney(current)
+                        + " (giá trị theo bản gốc đã ký: "
+                        + (base == null ? "chưa chốt" : formatMoney(base)) + ")",
+                actorId, null);
+    }
+
+    /** Giá trị theo điều khoản của một hợp đồng, đọc trong transaction đang mở; null khi chưa chốt giá. */
+    private BigDecimal readContractValue(Connection conn, int contractId) throws SQLException {
+        try (PreparedStatement ps = conn.prepareStatement(
+                "SELECT contract_value FROM contracts WHERE contract_id = ?")) {
+            ps.setInt(1, contractId);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next() ? rs.getBigDecimal("contract_value") : null;
+            }
+        }
     }
 
     /** Số phụ lục chưa bị huỷ bản ghi của một hợp đồng, đọc trong transaction đang mở. */
@@ -1621,6 +1813,8 @@ public class ContractDAO {
         c.setParentContractId(rs.wasNull() ? null : parentId);
         c.setParentContractCode(rs.getString("parent_contract_code"));
         c.setAmendmentCount(rs.getInt("amendment_count"));
+        c.setAmendmentValueSigned(rs.getBigDecimal("amendment_value_signed"));
+        c.setAmendmentValuePending(rs.getBigDecimal("amendment_value_pending"));
 
         String enterpriseName = rs.getString("enterprise_name");
         if (enterpriseName != null) {
@@ -1855,6 +2049,18 @@ public class ContractDAO {
         return String.format("%,.0f", amount).replace(',', '.') + " đ";
     }
 
+    /**
+     * Như trên nhưng có dấu, dùng cho phần ĐIỀU CHỈNH của phụ lục: "+250.000.000 đ"
+     * và "-80.000.000 đ" đọc ra ngay là bổ sung hay giảm trừ, còn con số trơ trọi
+     * thì phải tra sang chỗ khác mới biết.
+     */
+    private static String formatSignedMoney(BigDecimal amount) {
+        if (amount == null) {
+            return "";
+        }
+        return (amount.signum() > 0 ? "+" : "") + formatMoney(amount);
+    }
+
     // Kỳ thanh toán của hợp đồng (bảng contract_payments)
     // ==================================================================
     //
@@ -1946,20 +2152,35 @@ public class ContractDAO {
         return BigDecimal.ZERO;
     }
 
-    /** Tổng tiền đã lập hoá đơn (thu hoặc chưa thu) của 1 hợp đồng cụ thể -- dùng làm "Giá trị" hợp đồng. */
-    public BigDecimal sumInvoiceAmountByContractId(int contractId) {
-        String sql = "SELECT COALESCE(SUM(invoice_amount), 0) FROM contract_payments WHERE contract_id = ?";
+    /**
+     * Tổng tiền đã lập kỳ của CẢ CỤM hợp đồng: bản gốc cộng mọi phụ lục còn
+     * sống của nó.
+     *
+     * <p>Đây là con số duy nhất đối chiếu được với giá trị hiện hành. Kỳ thanh
+     * toán treo vào đúng bản ghi lập ra nó -- phần bổ sung theo phụ lục thường
+     * được lập kỳ ngay trên phụ lục -- nên so tổng kỳ của riêng hợp đồng gốc
+     * với giá trị đã cộng phụ lục thì cảnh báo "không khớp" nổ ở mọi hợp đồng
+     * có phụ lục, tức là nó hết nói được điều gì.
+     *
+     * @param rootContractId id hợp đồng GỐC (không phải phụ lục)
+     */
+    public BigDecimal sumScheduledPaymentsForCluster(int rootContractId) {
+        String sql = "SELECT COALESCE(SUM(p.invoice_amount), 0) FROM contract_payments p " +
+                     "JOIN contracts c ON p.contract_id = c.contract_id " +
+                     "WHERE c.is_deleted = 0 AND (c.contract_id = ? OR c.parent_contract_id = ?)";
         try (Connection conn = DBContext.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, contractId);
+            ps.setInt(1, rootContractId);
+            ps.setInt(2, rootContractId);
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
                     return rs.getBigDecimal(1);
                 }
             }
         } catch (SQLException ex) {
-            LOG.error("Loi tinh gia tri hop dong (contractId={})", contractId, ex);
+            LOG.error("Loi tinh tong ky thanh toan ca cum (rootContractId={})", rootContractId, ex);
         }
         return BigDecimal.ZERO;
     }
+
 }

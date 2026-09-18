@@ -30,6 +30,25 @@ public class Contract {
     private int amendmentCount;
 
     /**
+     * Tổng ĐIỀU CHỈNH giá trị mà các phụ lục ĐÃ KÝ mang lại cho hợp đồng này
+     * (0 khi không có phụ lục nào, hoặc khi đang đứng trên chính một phụ lục).
+     *
+     * <p>Cộng lúc đọc, cùng lý do với {@link #amendmentCount}: ghi ngược vào
+     * {@code contract_value} của hợp đồng gốc là xoá mất con số IN TRÊN TỜ GIẤY
+     * đã ký, mà chênh lệch giữa con số đó và giá trị hiện hành mới là thứ đi
+     * hỏi khi đối chiếu.
+     *
+     * <p>CÓ DẤU: phụ lục giảm trừ hạng mục mang giá trị âm.
+     */
+    private java.math.BigDecimal amendmentValueSigned = java.math.BigDecimal.ZERO;
+
+    /**
+     * Như trên nhưng của các phụ lục còn là bản NHÁP -- chưa ai ký nên chưa
+     * đổi được giá trị hợp đồng, nhưng vẫn phải thấy được là có cái đang treo.
+     */
+    private java.math.BigDecimal amendmentValuePending = java.math.BigDecimal.ZERO;
+
+    /**
      * Mã hợp đồng, chính là số ghi trên bản giấy ("01/2026/HĐKT-POSTEF").
      *
      * <p>NGƯỜI DÙNG NHẬP, không sinh tự động (V28). Trước đó hệ thống sinh
@@ -145,6 +164,36 @@ public class Contract {
 
     public int getAmendmentCount() { return amendmentCount; }
     public void setAmendmentCount(int amendmentCount) { this.amendmentCount = amendmentCount; }
+
+    public java.math.BigDecimal getAmendmentValueSigned() { return amendmentValueSigned; }
+    public void setAmendmentValueSigned(java.math.BigDecimal v) {
+        this.amendmentValueSigned = v == null ? java.math.BigDecimal.ZERO : v;
+    }
+
+    public java.math.BigDecimal getAmendmentValuePending() { return amendmentValuePending; }
+    public void setAmendmentValuePending(java.math.BigDecimal v) {
+        this.amendmentValuePending = v == null ? java.math.BigDecimal.ZERO : v;
+    }
+
+    /** true nếu có phụ lục đã ký làm đổi giá trị -- điều kiện để màn hình bày ba dòng giá trị. */
+    public boolean isValueAdjusted() {
+        return amendmentValueSigned.signum() != 0;
+    }
+
+    /**
+     * Giá trị hợp đồng HIỆN HÀNH: giá trị gốc cộng mọi điều chỉnh của phụ lục
+     * đã ký. Đây là con số trả lời câu "bây giờ hợp đồng này bao nhiêu tiền".
+     *
+     * <p>null khi hợp đồng chưa chốt giá VÀ chưa có phụ lục nào đổi giá -- giữ
+     * nguyên nghĩa "chưa chốt" của {@link #getContractValue()} thay vì hiện 0,
+     * vì 0 đồng là một điều khoản có thật, khác hẳn chỗ còn để trống.
+     */
+    public java.math.BigDecimal getCurrentValue() {
+        if (contractValue == null) {
+            return isValueAdjusted() ? amendmentValueSigned : null;
+        }
+        return contractValue.add(amendmentValueSigned);
+    }
 
     public String getContractCode() { return contractCode; }
     public void setContractCode(String contractCode) { this.contractCode = contractCode; }

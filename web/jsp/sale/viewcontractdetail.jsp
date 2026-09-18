@@ -538,8 +538,13 @@
                         </c:choose>
                     </div>
                 </div>
+                <%-- Trên PHỤ LỤC, ô này là số tiền phụ lục CỘNG THÊM (hoặc trừ
+                     bớt) cho hợp đồng gốc, không phải tổng giá trị mới -- xem
+                     ghi chú ở ContractDAO.AMENDMENT_VALUE_SIGNED_SQL. Nhãn phải
+                     nói đúng điều đó, nếu không thì một phụ lục 250 triệu trông
+                     như một hợp đồng 250 triệu. --%>
                 <div class="col-md-6 field-row">
-                    <label>Giá trị hợp đồng</label>
+                    <label>${contract.amendment ? 'Điều chỉnh giá trị' : 'Giá trị hợp đồng'}</label>
                     <div class="view-value">
                         <c:choose>
                             <c:when test="${contract.contractValue != null}">
@@ -548,12 +553,60 @@
                                      "1500000000.00". Định dạng ở client bằng vi-VN, giống
                                      cách dashboard đang làm -- ở đó hiện dạng rút gọn
                                      ("1,5 tỷ đ"), còn đây cần con số chính xác. --%>
-                                <strong class="money-vnd" data-vnd="${contract.contractValue}">&mdash;</strong>
+                                <strong class="${contract.amendment ? 'money-signed' : 'money-vnd'}"
+                                        data-vnd="${contract.contractValue}">&mdash;</strong>
+                                <c:if test="${contract.amendment}">
+                                    <div style="font-size:0.78rem; color:#6b7280; margin-top:4px;">
+                                        Cộng vào giá trị hợp đồng gốc khi phụ lục này được ký.
+                                    </div>
+                                </c:if>
                             </c:when>
-                            <c:otherwise><span style="color:#9ca3af;">chưa chốt</span></c:otherwise>
+                            <c:otherwise>
+                                <span style="color:#9ca3af;">${contract.amendment ? 'không đổi giá trị' : 'chưa chốt'}</span>
+                            </c:otherwise>
                         </c:choose>
                     </div>
                 </div>
+
+                <%-- Ba dòng, chỉ khi có phụ lục ĐÃ KÝ làm đổi tiền. Bản ghi gốc
+                     giữ nguyên con số in trên tờ giấy đã ký (không ghi đè, cùng
+                     lẽ với trục lịch); giá trị hiện hành là thứ cộng lại lúc
+                     đọc. Chênh lệch giữa hai con số đó chính là thứ đi hỏi khi
+                     đối chiếu, nên cả ba đều phải nhìn thấy được. --%>
+                <c:if test="${contract.valueAdjusted}">
+                    <div class="col-md-6 field-row">
+                        <label>Giá trị hiện hành</label>
+                        <div class="view-value">
+                            <strong class="money-vnd" data-vnd="${contract.currentValue}" style="color:var(--primary-dark);">&mdash;</strong>
+                            <div style="font-size:0.78rem; color:#6b7280; margin-top:4px;">
+                                <c:choose>
+                                    <c:when test="${contract.contractValue != null}">
+                                        = giá trị theo bản gốc đã ký
+                                        <span class="money-vnd" data-vnd="${contract.contractValue}">&mdash;</span>
+                                        <span class="money-signed" data-vnd="${contract.amendmentValueSigned}">&mdash;</span>
+                                        từ ${contract.amendmentCount} phụ lục.
+                                    </c:when>
+                                    <%-- Bản gốc chưa chốt giá mà phụ lục đã có số tiền: con số hiện
+                                         hành là tổng các phụ lục, và nói rõ là còn thiếu vế đầu --
+                                         nếu không thì nó trông như giá trị của cả hợp đồng. --%>
+                                    <c:otherwise>
+                                        Hợp đồng gốc chưa chốt giá; đây là tổng điều chỉnh của
+                                        ${contract.amendmentCount} phụ lục đã ký.
+                                    </c:otherwise>
+                                </c:choose>
+                            </div>
+                        </div>
+                    </div>
+                </c:if>
+                <c:if test="${contract.amendmentValuePending.signum() != 0}">
+                    <div class="col-12 field-row">
+                        <div style="font-size:0.82rem; color:#8a5a00; background:#fff8ec; border:1px solid #f5d9a8; border-radius:10px; padding:8px 12px;">
+                            Đang có phụ lục chờ ký với điều chỉnh
+                            <strong class="money-signed" data-vnd="${contract.amendmentValuePending}">&mdash;</strong>
+                            &mdash; chưa ký thì chưa tính vào giá trị hợp đồng.
+                        </div>
+                    </div>
+                </c:if>
             </div>
         </div>
 
@@ -636,12 +689,27 @@
                 </div>
             </div>
 
+            <%-- Đối chiếu theo CẢ CỤM hợp đồng (bản gốc + phụ lục), không theo
+                 riêng bản ghi đang mở: phần bổ sung theo phụ lục thường được lập
+                 kỳ ngay trên phụ lục, nên so riêng thì cảnh báo này nổ ở mọi hợp
+                 đồng có phụ lục và hết nói được điều gì. --%>
             <c:if test="${paymentMismatch}">
                 <div class="lc-alert">
                     <i class="fa-solid fa-triangle-exclamation" style="margin-top:2px;"></i>
-                    <span>Tổng các kỳ đã lập <strong>không khớp</strong> giá trị hợp đồng
-                        (<span class="money-vnd" data-vnd="${contract.contractValue}">&mdash;</span>).
-                        Có thể còn kỳ chưa nhập &mdash; kiểm lại trước khi đối chiếu công nợ.</span>
+                    <c:choose>
+                        <c:when test="${clusterHasAmendments}">
+                            <span>Tính cả phụ lục, tổng các kỳ đã lập
+                                (<span class="money-vnd" data-vnd="${clusterScheduled}">&mdash;</span>)
+                                <strong>không khớp</strong> giá trị hợp đồng hiện hành
+                                (<span class="money-vnd" data-vnd="${clusterValue}">&mdash;</span>).
+                                Có thể còn kỳ chưa nhập &mdash; kiểm lại trước khi đối chiếu công nợ.</span>
+                        </c:when>
+                        <c:otherwise>
+                            <span>Tổng các kỳ đã lập <strong>không khớp</strong> giá trị hợp đồng
+                                (<span class="money-vnd" data-vnd="${clusterValue}">&mdash;</span>).
+                                Có thể còn kỳ chưa nhập &mdash; kiểm lại trước khi đối chiếu công nợ.</span>
+                        </c:otherwise>
+                    </c:choose>
                 </div>
             </c:if>
 
@@ -713,6 +781,10 @@
                             <th>Mã phụ lục</th>
                             <th>Tiêu đề</th>
                             <th>Thời hạn</th>
+                            <%-- Cột này là lý do giá trị hợp đồng ở khối trên không
+                                 còn là con số đã ký: cộng dọc nó ra đúng phần điều
+                                 chỉnh. Phụ lục chưa ký thì ghi rõ là chưa tính. --%>
+                            <th class="num">Điều chỉnh giá trị</th>
                             <th>Tiến độ</th>
                             <th></th>
                         </tr>
@@ -732,6 +804,12 @@
                                             &mdash; <fmt:formatDate value="${pl.endDate}" pattern="dd/MM/yyyy"/>
                                         </c:otherwise>
                                     </c:choose>
+                                </td>
+                                <td class="num">
+                                    <span class="money-signed" data-vnd="${pl.contractValue}">&mdash;</span>
+                                    <c:if test="${pl.draft and pl.contractValue != null}">
+                                        <div style="font-size:0.74rem; color:#9ca3af;">chưa ký, chưa tính</div>
+                                    </c:if>
                                 </td>
                                 <td>${fn:escapeXml(pl.progressStatus)}</td>
                                 <td class="text-end">
@@ -819,7 +897,20 @@
         // mang Accept-Language.
         document.querySelectorAll('.money-vnd').forEach(function (el) {
             var n = Number(el.dataset.vnd);
-            el.textContent = isNaN(n) ? '—' : n.toLocaleString('vi-VN', { maximumFractionDigits: 0 }) + ' ₫';
+            // Ô TRỐNG phải giữ nguyên dấu gạch: Number('') là 0, nên thiếu phép
+            // kiểm này thì "chưa chốt giá" hiện ra thành "0 đ" -- mà 0 đồng là
+            // một điều khoản có thật, khác hẳn chỗ còn để trống.
+            if (el.dataset.vnd === '' || isNaN(n)) { return; }
+            el.textContent = n.toLocaleString('vi-VN', { maximumFractionDigits: 0 }) + ' ₫';
+        });
+        // Số của PHỤ LỤC là chênh lệch, nên nó phải mang dấu: "+250.000.000"
+        // và "-80.000.000" đọc ra ngay là bổ sung hay giảm trừ, còn
+        // "250.000.000" trơ trọi thì không.
+        document.querySelectorAll('.money-signed').forEach(function (el) {
+            var n = Number(el.dataset.vnd);
+            if (el.dataset.vnd === '' || isNaN(n)) { el.textContent = 'không đổi'; return; }
+            el.textContent = (n > 0 ? '+' : '') + n.toLocaleString('vi-VN', { maximumFractionDigits: 0 }) + ' ₫';
+            el.style.color = n < 0 ? '#b45309' : '#2f6b34';
         });
 
     </script>

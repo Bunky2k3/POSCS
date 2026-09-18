@@ -1014,6 +1014,16 @@ public class ContractController extends HttpServlet {
             response.sendRedirect(request.getContextPath() + "/contract?action=edit&id=" + id + "&error=invalid_drive_link");
             return;
         }
+        // Sửa một phụ lục còn nháp cũng đổi được con số điều chỉnh, nên đường
+        // này phải kiểm đúng thứ lúc lập phụ lục đã kiểm. Phụ lục đã ký thì
+        // termsLocked, giá trị không đi từ form vào nữa.
+        if (existing.isAmendment() && !existing.isTermsLocked()
+                && exceedsRemainingValue(contractDAO.findById(existing.getParentContractId()),
+                        c.getContractValue())) {
+            response.sendRedirect(request.getContextPath() + "/contract?action=edit&id=" + id
+                    + "&error=value_negative");
+            return;
+        }
 
         boolean ok = contractDAO.update(c, actorId(request));
         if (!ok) {
@@ -1066,8 +1076,18 @@ public class ContractController extends HttpServlet {
             response.sendRedirect(request.getContextPath() + back + "&error=duplicate_code");
             return;
         }
+        if (exceedsRemainingValue(parent, c.getContractValue())) {
+            response.sendRedirect(request.getContextPath() + back + "&error=value_negative");
+            return;
+        }
 
         int newId = contractDAO.insert(c, actorId(request));
+        if (newId == ContractDAO.INVALID_VALUE) {
+            // Lọt qua phép kiểm bên trên nghĩa là có phụ lục giảm trừ khác vừa
+            // được ký xong trong lúc form đang mở.
+            response.sendRedirect(request.getContextPath() + back + "&error=value_negative");
+            return;
+        }
         if (newId == ContractDAO.DUPLICATE_CODE) {
             response.sendRedirect(request.getContextPath() + back + "&error=duplicate_code");
             return;
@@ -1391,11 +1411,31 @@ public class ContractController extends HttpServlet {
         request.setAttribute("paymentScheduled", scheduled);
         request.setAttribute("paymentCollected", collected);
         request.setAttribute("paymentOutstanding", scheduled.subtract(collected));
+
+        // Đối chiếu tiền làm theo CỤM hợp đồng (bản gốc + các phụ lục), không
+        // theo từng bản ghi. Ba ô thống kê ngay trên vẫn là của riêng bản ghi
+        // đang mở -- chúng phải khớp cái bảng nằm ngay dưới chúng -- nhưng câu
+        // hỏi "đã lập đủ kỳ chưa" thì chỉ trả lời được ở mức cụm: phần bổ sung
+        // theo phụ lục thường được lập kỳ ngay trên phụ lục, nên so riêng hợp
+        // đồng gốc là cảnh báo nổ ở mọi hợp đồng có phụ lục.
+        Contract root = contract.isAmendment()
+                ? contractDAO.findById(contract.getParentContractId())
+                : contract;
+        java.math.BigDecimal clusterValue = root == null ? null : root.getCurrentValue();
+        java.math.BigDecimal clusterScheduled = root == null
+                ? scheduled
+                : contractDAO.sumScheduledPaymentsForCluster(root.getContractId());
+        request.setAttribute("rootContract", root == contract ? null : root);
+        request.setAttribute("clusterValue", clusterValue);
+        request.setAttribute("clusterScheduled", clusterScheduled);
+        // true khi cụm gồm nhiều hơn một bản ghi -- màn hình đổi câu chữ theo
+        // nó, vì "tổng các kỳ" lúc đó không còn là con số ngay bên trên nữa.
+        request.setAttribute("clusterHasAmendments",
+                contract.isAmendment() || contract.getAmendmentCount() > 0);
         // Tổng các kỳ lệch giá trị hợp đồng nghĩa là lập thiếu hoặc lập thừa.
         // CẢNH BÁO chứ không phải lỗi: có thể còn kỳ chưa nhập.
         request.setAttribute("paymentMismatch",
-                contract.getContractValue() != null
-                        && contract.getContractValue().compareTo(scheduled) != 0);
+                clusterValue != null && clusterValue.compareTo(clusterScheduled) != 0);
     }
 
     // ------------------------------------------------------------------
@@ -1679,8 +1719,54 @@ public class ContractController extends HttpServlet {
         c.setCounterpartySignerPosition(emptyToNull(request.getParameter("counterpartySignerPosition")));
         c.setAuthorizationRef(emptyToNull(request.getParameter("authorizationRef")));
         c.setSigningPlace(emptyToNull(request.getParameter("signingPlace")));
-        c.setContractValue(parseMoneyOrNull(request.getParameter("contractValue")));
+        c.setContractValue(parseContractValue(request));
         return c;
+    }
+
+    /** Các lựa chọn của ô "Điều chỉnh giá trị" trên form phụ lục. */
+    private static final String ADJUST_INCREASE = "increase";
+    private static final String ADJUST_DECREASE = "decrease";
+    private static final String ADJUST_NONE = "none";
+
+    /**
+     * Số tiền ghi trên văn bản đang nhập.
+     *
+     * <p>Trên form hợp đồng gốc đó là TỔNG giá trị theo điều khoản, đọc thẳng.
+     * Trên form phụ lục thì cột {@code contract_value} mang nghĩa CHÊNH LỆCH có
+     * dấu, nên form hỏi thêm một ô Tăng/Giảm/Không đổi và dấu được gắn ở đây --
+     * bắt người dùng tự gõ dấu trừ vừa dễ nhầm, vừa cho ra một ô tiền mà in lên
+     * màn hình thì không ai đọc được là bổ sung hay giảm trừ.
+     *
+     * <p>Không có tham số {@code valueAdjustment} = đang ở form hợp đồng gốc.
+     */
+    private java.math.BigDecimal parseContractValue(HttpServletRequest request) {
+        java.math.BigDecimal amount = parseMoneyOrNull(request.getParameter("contractValue"));
+        String adjustment = request.getParameter("valueAdjustment");
+        if (adjustment == null) {
+            return amount;
+        }
+        // "Không đổi" thắng cả ô số: phụ lục chỉ sửa hàng hoá hay gia hạn thì
+        // con số còn sót trong ô không được lặng lẽ cộng vào giá trị hợp đồng.
+        if (ADJUST_NONE.equals(adjustment) || amount == null) {
+            return null;
+        }
+        return ADJUST_DECREASE.equals(adjustment) ? amount.negate() : amount;
+    }
+
+    /**
+     * true nếu khoản giảm trừ {@code delta} kéo giá trị hiện hành của hợp đồng
+     * {@code parent} xuống dưới 0 -- gần như luôn là gõ nhầm dấu, hoặc gõ TỔNG
+     * giá trị mới vào ô chênh lệch.
+     *
+     * <p>Báo lỗi tử tế ở tầng này; chốt chặn thật nằm ở ContractDAO, nơi hợp
+     * đồng cha đã bị khoá trong transaction.
+     */
+    private boolean exceedsRemainingValue(Contract parent, java.math.BigDecimal delta) {
+        if (parent == null || delta == null || delta.signum() >= 0) {
+            return false;
+        }
+        java.math.BigDecimal current = parent.getCurrentValue();
+        return (current == null ? java.math.BigDecimal.ZERO : current).add(delta).signum() < 0;
     }
 
     /** BR-44: các trường bắt buộc phải có, và Ngày ký ≤ Ngày hiệu lực ≤ Ngày kết thúc. */

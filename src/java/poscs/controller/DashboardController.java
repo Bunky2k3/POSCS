@@ -125,7 +125,11 @@ public class DashboardController extends HttpServlet {
         Map<Integer, BigDecimal> contractValues = new HashMap<>();
         Map<Integer, Long> daysRemaining = new HashMap<>();
         for (Contract c : expiringContracts) {
-            contractValues.put(c.getContractId(), contractDAO.sumInvoiceAmountByContractId(c.getContractId()));
+            // Giá trị theo ĐIỀU KHOẢN, đã cộng các phụ lục đã ký -- không phải
+            // tổng các kỳ thanh toán như trước V27. Hai thứ đó khác nhau: hợp
+            // đồng chưa lập kỳ nào hiện ra 0 đồng, và hợp đồng vừa được phụ lục
+            // bổ sung thì vẫn hiện con số cũ.
+            contractValues.put(c.getContractId(), c.getCurrentValue());
             LocalDate endDate = c.getEndDate().toLocalDate();
             daysRemaining.put(c.getContractId(), ChronoUnit.DAYS.between(today, endDate));
         }

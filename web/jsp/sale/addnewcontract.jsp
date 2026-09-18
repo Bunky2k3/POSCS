@@ -108,6 +108,7 @@
                         <c:when test="${param.error == 'duplicate_code'}">Mã hợp đồng này đã có hợp đồng khác dùng. Kiểm lại số trên bản giấy hoặc nhập mã khác.</c:when>
                         <c:when test="${param.error == 'create_failed'}">Không lưu được hợp đồng. Vui lòng thử lại.</c:when>
                         <c:when test="${param.error == 'amendment_not_allowed'}">Hợp đồng gốc không nhận được phụ lục: nó phải đã ký và chưa thanh lý, và bản thân nó không được là phụ lục.</c:when>
+                        <c:when test="${param.error == 'value_negative'}">Khoản giảm trừ lớn hơn giá trị còn lại của hợp đồng gốc — giá trị hợp đồng sẽ âm. Ô này nhập phần CHÊNH LỆCH, không phải tổng giá trị mới.</c:when>
                         <c:otherwise>Đã có lỗi xảy ra. Vui lòng thử lại.</c:otherwise>
                     </c:choose>
                 </div>
@@ -258,13 +259,45 @@
                         <input type="text" class="form-control" id="signingPlace" name="signingPlace"
                                maxlength="255" placeholder="VD: Hà Nội">
                     </div>
+                    <%-- HAI CHẾ ĐỘ, như cả trang này. Với hợp đồng gốc, ô tiền là
+                         TỔNG giá trị theo điều khoản. Với phụ lục, nó là phần CHÊNH
+                         LỆCH cộng vào hợp đồng gốc -- phụ lục không mang một giá trị
+                         độc lập, nó sửa con số của hợp đồng kia.
+
+                         Dấu nhập bằng ô chọn chứ không bắt gõ dấu trừ: gõ dấu thì dễ
+                         nhầm, và một ô tiền âm in ra màn hình không nói được nó là
+                         giảm trừ hay lỗi nhập liệu. Controller ghép dấu vào (xem
+                         ContractController.parseContractValue). --%>
+                    <c:if test="${not empty parentContract}">
+                        <div class="col-md-6 field-row">
+                            <label>Điều chỉnh giá trị</label>
+                            <select class="form-control" id="valueAdjustment" name="valueAdjustment">
+                                <option value="increase">Bổ sung (cộng vào giá trị hợp đồng)</option>
+                                <option value="decrease">Giảm trừ (trừ khỏi giá trị hợp đồng)</option>
+                                <option value="none" selected>Không đổi giá trị</option>
+                            </select>
+                            <span style="font-size:0.78rem; color:#9ca3af; display:block; margin-top:6px;">
+                                Phụ lục chỉ gia hạn hoặc sửa hàng hoá thì chọn <strong>Không đổi giá trị</strong>.
+                            </span>
+                        </div>
+                    </c:if>
                     <div class="col-md-6 field-row">
-                        <label>Giá trị hợp đồng (VNĐ)</label>
+                        <label>${empty parentContract ? 'Giá trị hợp đồng (VNĐ)' : 'Số tiền điều chỉnh (VNĐ)'}</label>
                         <input type="text" class="form-control" id="contractValue" name="contractValue"
-                               inputmode="numeric" placeholder="VD: 1.500.000.000">
+                               inputmode="numeric" placeholder="VD: ${empty parentContract ? '1.500.000.000' : '250.000.000'}">
                         <span style="font-size:0.78rem; color:#9ca3af; display:block; margin-top:6px;">
-                            Giá trị theo điều khoản. Số tiền thực thu ghi ở mục Kỳ thanh toán — hai
-                            con số lệch nhau chính là công nợ.
+                            <c:choose>
+                                <c:when test="${not empty parentContract}">
+                                    Nhập số dương, phần CHÊNH LỆCH so với hợp đồng gốc — không phải tổng giá trị mới.
+                                    Giá trị hợp đồng gốc hiện là
+                                    <strong class="money-vnd" data-vnd="${parentContract.currentValue}">chưa chốt</strong>,
+                                    và chỉ đổi khi phụ lục này được <strong>ký</strong>.
+                                </c:when>
+                                <c:otherwise>
+                                    Giá trị theo điều khoản. Số tiền thực thu ghi ở mục Kỳ thanh toán — hai
+                                    con số lệch nhau chính là công nợ.
+                                </c:otherwise>
+                            </c:choose>
                         </span>
                     </div>
                     <div class="col-12 field-row">
@@ -305,6 +338,14 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+        // Số tiền định dạng ở client bằng vi-VN, giống viewcontractdetail.jsp:
+        // fmt:formatNumber gom nhóm theo locale của request, mà request không
+        // mang Accept-Language thì nó in ra số trần "1500000000.00".
+        document.querySelectorAll('.money-vnd').forEach(function (el) {
+            var n = Number(el.dataset.vnd);
+            if (el.dataset.vnd === '' || isNaN(n)) { return; }
+            el.textContent = n.toLocaleString('vi-VN', { maximumFractionDigits: 0 }) + ' ₫';
+        });
         function validateForm() {
             var valid = true;
             document.querySelectorAll('.error-text').forEach(function (el) { el.style.display = 'none'; });
