@@ -9,6 +9,7 @@ import jakarta.servlet.http.HttpSession;
 import jakarta.servlet.http.Part;
 import org.junit.Before;
 import org.junit.Test;
+import poscs.common.ListScope;
 import org.mockito.ArgumentCaptor;
 import org.mockito.MockedStatic;
 import poscs.common.FileStorage;
@@ -19,10 +20,13 @@ import poscs.dao.EmployeeDAO;
 import poscs.dao.TechnicalSupportTicketDAO;
 import poscs.model.CustomerLifecycleEvent;
 import poscs.model.Enterprise;
+import poscs.model.Province;
 import poscs.model.RelationshipRating;
 import poscs.model.Role;
 import poscs.model.User;
 
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertEquals;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
@@ -575,8 +579,8 @@ public class CustomerControllerTest {
 
         controller.doGet(request, response);
 
-        verify(customerDAO).findAll(anyInt(), anyInt(), any(), any(), any(), any(), eq(false), eq("Nhà cung cấp"));
-        verify(customerDAO).countAll(any(), any(), any(), any(), eq("Nhà cung cấp"));
+        verify(customerDAO).findAll(anyInt(), anyInt(), any(), any(), any(), any(), eq(false), eq("Nhà cung cấp"), any());
+        verify(customerDAO).countAll(any(), any(), any(), any(), eq("Nhà cung cấp"), any());
         verify(request).setAttribute("kind", "supplier");
     }
 
@@ -587,8 +591,85 @@ public class CustomerControllerTest {
 
         controller.doGet(request, response);
 
-        verify(customerDAO).findAll(anyInt(), anyInt(), any(), any(), any(), any(), eq(false), eq("Khách mua"));
+        verify(customerDAO).findAll(anyInt(), anyInt(), any(), any(), any(), any(), eq(false), eq("Khách mua"), any());
         verify(request).setAttribute("kind", "buyer");
+    }
+
+    // ------------------------------------------------------------------
+    // Phạm vi mặc định của danh sách (view=mine / view=all)
+    // ------------------------------------------------------------------
+
+    /**
+     * Sales mở danh sách ra phải thấy phần việc của mình, không phải của cả chi
+     * nhánh. Trước bản này một nhân viên giữ 4 khách mở ra thấy đủ 12 khách của
+     * mọi người, kèm nút sửa/xoá trên từng dòng.
+     */
+    @Test
+    public void list_vaiSales_macDinhThuHepVePhanViecCuaMinh() throws Exception {
+        RequestDispatcher dispatcher = mock(RequestDispatcher.class);
+        when(request.getRequestDispatcher("/jsp/sale/listcustomer.jsp")).thenReturn(dispatcher);
+        when(employeeDAO.findTeamUserIds(99)).thenReturn(List.of(99));
+        when(employeeDAO.findProvincesOf(99)).thenReturn(List.of());
+
+        controller.doGet(request, response);
+
+        ArgumentCaptor<ListScope> captor = ArgumentCaptor.forClass(ListScope.class);
+        verify(customerDAO).findAll(anyInt(), anyInt(), any(), any(), any(), any(), eq(false), any(),
+                captor.capture());
+        assertTrue("Sales phải bị thu hẹp", captor.getValue().isNarrowed());
+        assertEquals(List.of(99), captor.getValue().getOwnerIds());
+        verify(request).setAttribute("viewFilter", "mine");
+    }
+
+    /** Địa bàn được giao đi kèm người phụ trách, nối bằng HOẶC chứ không phải VÀ. */
+    @Test
+    public void list_vaiSales_comTheoCaDiaBanDuocGiao() throws Exception {
+        RequestDispatcher dispatcher = mock(RequestDispatcher.class);
+        when(request.getRequestDispatcher("/jsp/sale/listcustomer.jsp")).thenReturn(dispatcher);
+        when(employeeDAO.findTeamUserIds(99)).thenReturn(List.of(99));
+        when(employeeDAO.findProvincesOf(99)).thenReturn(List.of(new Province(7, "Tỉnh Lào Cai")));
+
+        controller.doGet(request, response);
+
+        ArgumentCaptor<ListScope> captor = ArgumentCaptor.forClass(ListScope.class);
+        verify(customerDAO).findAll(anyInt(), anyInt(), any(), any(), any(), any(), eq(false), any(),
+                captor.capture());
+        assertEquals(List.of(7), captor.getValue().getProvinceIds());
+    }
+
+    /**
+     * Admin không bị thu hẹp -- họ quản trị chứ không cầm khách, thu hẹp theo "khách
+     * của tôi" là họ thấy đúng 0 dòng.
+     */
+    @Test
+    public void list_vaiAdmin_khongThuHep() throws Exception {
+        loginAs("Admin");
+        RequestDispatcher dispatcher = mock(RequestDispatcher.class);
+        when(request.getRequestDispatcher("/jsp/sale/listcustomer.jsp")).thenReturn(dispatcher);
+
+        controller.doGet(request, response);
+
+        ArgumentCaptor<ListScope> captor = ArgumentCaptor.forClass(ListScope.class);
+        verify(customerDAO).findAll(anyInt(), anyInt(), any(), any(), any(), any(), eq(false), any(),
+                captor.capture());
+        assertFalse("Admin không bị thu hẹp", captor.getValue().isNarrowed());
+        verify(employeeDAO, never()).findTeamUserIds(anyInt());
+    }
+
+    /** Thu hẹp là MẶC ĐỊNH chứ không phải rào quyền: view=all nới lại được. */
+    @Test
+    public void list_viewAll_noiLaiToanChiNhanh() throws Exception {
+        RequestDispatcher dispatcher = mock(RequestDispatcher.class);
+        when(request.getRequestDispatcher("/jsp/sale/listcustomer.jsp")).thenReturn(dispatcher);
+        when(request.getParameter("view")).thenReturn("all");
+
+        controller.doGet(request, response);
+
+        ArgumentCaptor<ListScope> captor = ArgumentCaptor.forClass(ListScope.class);
+        verify(customerDAO).findAll(anyInt(), anyInt(), any(), any(), any(), any(), eq(false), any(),
+                captor.capture());
+        assertFalse(captor.getValue().isNarrowed());
+        verify(request).setAttribute("viewFilter", "all");
     }
 
     // ------------------------------------------------------------------

@@ -609,9 +609,9 @@ public class ContractControllerTest {
         controller.doGet(request, response);
 
         verify(contractDAO).findAll(anyInt(), anyInt(), any(), any(), any(), any(), anyBoolean(),
-                nullable(Period.class), any(), nullable(String.class), anyBoolean(), eq(5));
+                nullable(Period.class), any(), nullable(String.class), anyBoolean(), eq(5), any());
         verify(contractDAO).countAll(any(), any(), any(), any(), nullable(Period.class), any(),
-                nullable(String.class), anyBoolean(), eq(5));
+                nullable(String.class), anyBoolean(), eq(5), any());
         verify(request).setAttribute("waitingDeptFilter", 5);
     }
 
@@ -656,7 +656,7 @@ public class ContractControllerTest {
         controller.doGet(request, response);
 
         verify(contractDAO).findAll(anyInt(), anyInt(), any(), any(), any(), any(), anyBoolean(),
-                nullable(Period.class), any(), nullable(String.class), anyBoolean(), eq(6));
+                nullable(Period.class), any(), nullable(String.class), anyBoolean(), eq(6), any());
     }
 
     /**
@@ -1000,7 +1000,7 @@ public class ContractControllerTest {
 
         ArgumentCaptor<Period> period = ArgumentCaptor.forClass(Period.class);
         verify(contractDAO).findAll(anyInt(), anyInt(), any(), any(), any(), any(), eq(false),
-                period.capture(), eq("Mua"), nullable(String.class), eq(false), nullable(Integer.class));
+                period.capture(), eq("Mua"), nullable(String.class), eq(false), nullable(Integer.class), any());
         assertNotNull("kỳ phải còn nguyên khi lọc theo chiều", period.getValue());
         assertEquals("Quý 2/2026", period.getValue().getLabel());
     }
@@ -1020,7 +1020,8 @@ public class ContractControllerTest {
 
         controller.doGet(request, response);
 
-        verify(contractDAO).countStatusSummary(nullable(Integer.class), nullable(Period.class), eq("Mua"), eq(true));
+        verify(contractDAO).countStatusSummary(nullable(Integer.class), nullable(Period.class), eq("Mua"),
+                eq(true), nullable(java.util.List.class), any());
     }
 
     /** Bốn ô trạng thái là đường lọc; link của ô ĐANG BẬT phải là link TẮT nó đi. */
@@ -1126,7 +1127,7 @@ public class ContractControllerTest {
         controller.doGet(request, response);
 
         verify(contractDAO).findAll(anyInt(), anyInt(), any(), any(), any(), any(), eq(false),
-                nullable(Period.class), eq("Bán"), nullable(String.class), eq(false), nullable(Integer.class));
+                nullable(Period.class), eq("Bán"), nullable(String.class), eq(false), nullable(Integer.class), any());
         verify(request).setAttribute("kind", "sell");
     }
 

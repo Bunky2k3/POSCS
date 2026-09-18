@@ -31,6 +31,22 @@
         .page-header-row { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 22px; flex-wrap: wrap; gap: 14px; }
         .page-header-row h2 { font-weight: 700; color: var(--primary-dark); font-size: 1.4rem; margin-bottom: 4px; }
         .page-header-row p { color: #6b7280; font-size: 0.9rem; }
+        /* Dải nói rõ danh sách đang bị thu hẹp tới đâu. BẮT BUỘC phải có: con số
+           "tổng số N" bên dưới giờ là tổng CỦA PHẠM VI chứ không phải của toàn chi
+           nhánh -- không nói ra thì người dùng tưởng mất dữ liệu. Lấy đúng bảng màu
+           của .scope-note trên Dashboard để hai chỗ đọc ra cùng một ý. */
+        .scope-note {
+            display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+            background: #eaf6ff; border: 1px solid #cfe8fb; border-radius: 10px;
+            padding: 10px 16px; margin-bottom: 16px;
+            font-size: 0.84rem; color: var(--primary-dark);
+        }
+        .scope-note i { color: var(--primary); }
+        .scope-note .sep { color: #9ca3af; }
+        .scope-note a { color: var(--primary); font-weight: 600; text-decoration: none; }
+        .scope-note a:hover { text-decoration: underline; }
+        .scope-note .spacer { margin-left: auto; }
+
 
         .btn-add {
             background: linear-gradient(120deg, var(--primary), var(--primary-light));
@@ -266,6 +282,45 @@
              bên dưới không còn ô chọn trạng thái nữa. Link mang theo mọi lọc
              khác và được dựng ở ContractController.FilterState -- ghép chuỗi
              tại đây nghĩa là chép cùng một danh sách tham số ra bốn chỗ. --%>
+        <%-- Hai chiều thu hẹp nằm chung MỘT dải: của ai, và trong khoảng nào. Tách
+             làm hai dải thì chiếm hai dòng cho cùng một loại thông tin. --%>
+        <c:if test="${viewNarrowed or viewFilter == 'all' or not empty monthLabel}">
+            <div class="scope-note">
+                <i class="fa-solid fa-calendar-check"></i>
+                <c:choose>
+                    <c:when test="${viewNarrowed and viewProvinceCount > 0}">
+                        <strong>Hợp đồng bạn phụ trách + ${viewProvinceCount} tỉnh địa bàn của bạn</strong>
+                    </c:when>
+                    <c:when test="${viewNarrowed}"><strong>Hợp đồng bạn phụ trách</strong></c:when>
+                    <c:otherwise><strong>Toàn chi nhánh</strong></c:otherwise>
+                </c:choose>
+                <span class="sep">&middot;</span>
+                <c:choose>
+                    <c:when test="${not empty monthLabel}">
+                        còn hiệu lực trong <strong>${fn:escapeXml(monthLabel)}</strong>
+                    </c:when>
+                    <c:otherwise>mọi thời điểm</c:otherwise>
+                </c:choose>
+                <span class="spacer"></span>
+                <c:if test="${viewNarrowed or viewFilter == 'all'}">
+                    <a href="${fn:escapeXml(viewToggleUrl)}">
+                        <c:choose>
+                            <c:when test="${viewNarrowed}">Xem toàn chi nhánh</c:when>
+                            <c:otherwise>Chỉ của tôi</c:otherwise>
+                        </c:choose>
+                    </a>
+                    <span class="sep">&middot;</span>
+                </c:if>
+                <a href="${fn:escapeXml(monthToggleUrl)}">
+                    <c:choose>
+                        <c:when test="${not empty monthLabel}">Xem mọi thời điểm</c:when>
+                        <c:otherwise>Chỉ tháng này</c:otherwise>
+                    </c:choose>
+                    <i class="fa-solid fa-arrow-right-long"></i>
+                </a>
+            </div>
+        </c:if>
+
         <div class="status-strip">
             <%-- Bấm lại ô ĐANG BẬT thì bỏ lọc: không có nút "tắt" nào khác ở đây,
                  và người dùng sẽ bấm lại nó theo phản xạ. --%>

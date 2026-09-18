@@ -7,7 +7,9 @@ import java.io.InputStream;
 import java.sql.Date;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.time.LocalDate;
 import java.util.List;
+import java.util.stream.Collectors;
 import java.util.Map;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.MultipartConfig;
@@ -24,10 +26,12 @@ import org.apache.pdfbox.pdmodel.interactive.form.PDAcroForm;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import poscs.common.AccessControl;
+import poscs.common.ListScope;
 import poscs.common.ExcelUtil;
 import poscs.common.Logs;
 import poscs.common.PdfUtil;
 import poscs.common.Period;
+import poscs.common.QueryStrings;
 import poscs.common.TextRules;
 import poscs.dao.AddressDAO;
 import poscs.dao.ContractDAO;
@@ -66,6 +70,15 @@ public class ContractController extends HttpServlet {
     private static final int PAGE_SIZE = 10;
     /** Vai được giao phụ trách hợp đồng -- khớp roles.role_name, xem AccessControl. */
     private static final String SALES_ROLE = "Sales";
+
+    /** Giá trị tham số "month" để bỏ cửa sổ tháng mặc định. */
+    private static final String MONTH_ALL = "all";
+
+    /** Tháng đang chạy, quy về khoảng ngày bằng chính {@link Period} của bộ lọc kỳ. */
+    private static Period currentMonth() {
+        LocalDate today = LocalDate.now();
+        return Period.parse(String.valueOf(today.getYear()), "m" + today.getMonthValue());
+    }
 
     /**
      * Chiều hợp đồng, khớp contracts.direction (xem ghi chú đầu V21).
@@ -275,16 +288,43 @@ public class ContractController extends HttpServlet {
         // sách hợp đồng chứ không phải mở từng hợp đồng ra xem.
         Integer waitingDepartment = parseIntOrNull(request.getParameter("waitingDept"));
 
+        // ===== Phạm vi mặc định của màn hình =====
+        // Hai chiều, đều là MẶC ĐỊNH chứ không phải rào quyền:
+        //   - ai: Sales thấy hợp đồng mình phụ trách HOẶC thuộc địa bàn mình giữ
+        //   - khi nào: hợp đồng CÒN HIỆU LỰC trong tháng hiện tại
+        //
+        // Cửa sổ tháng áp cho MỌI vai (kể cả Admin): nó trả lời "tháng này đang làm
+        // gì", không phải "được phép thấy gì". Bấm "mọi thời điểm" là bỏ.
+        //
+        // KHÁC bộ lọc "kỳ" ngay bên dưới: kỳ lọc theo NGÀY KÝ nên bản nháp rơi ra
+        // ngoài, cái này lọc theo THỜI HẠN nên những gì đang chạy đều ở lại.
+        boolean allTime = MONTH_ALL.equals(request.getParameter("month"));
+        Period activeWindow = allTime ? null : currentMonth();
+        ListScope scope = AccessControl.listScope(request,
+                () -> employeeDAO.findTeamUserIds(AccessControl.currentUser(request).getUserId()),
+                () -> employeeDAO.findProvincesOf(AccessControl.currentUser(request).getUserId())
+                        .stream().map(Province::getProvinceId).collect(Collectors.toList()))
+                .withActiveWindow(activeWindow);
+        request.setAttribute("viewFilter", AccessControl.defaultView(request));
+        request.setAttribute("viewNarrowed", scope.isNarrowed());
+        request.setAttribute("viewProvinceCount", scope.getProvinceIds().size());
+        request.setAttribute("monthFilter", allTime ? MONTH_ALL : null);
+        request.setAttribute("monthLabel", activeWindow != null ? activeWindow.getLabel() : null);
+        request.setAttribute("viewToggleUrl", QueryStrings.with(request, "view",
+                AccessControl.VIEW_MINE.equals(AccessControl.defaultView(request))
+                        ? AccessControl.VIEW_ALL : AccessControl.VIEW_MINE));
+        request.setAttribute("monthToggleUrl", QueryStrings.with(request, "month", allTime ? null : MONTH_ALL));
+
         List<Contract> contractList = contractDAO.findAll(page, PAGE_SIZE, keyword, statusFilter, typeFilter,
-                provinceFilter, false, period, direction, progressFilter, rootsOnly, waitingDepartment);
+                provinceFilter, false, period, direction, progressFilter, rootsOnly, waitingDepartment, scope);
         int totalCount = contractDAO.countAll(keyword, statusFilter, typeFilter, provinceFilter, period, direction,
-                progressFilter, rootsOnly, waitingDepartment);
+                progressFilter, rootsOnly, waitingDepartment, scope);
         int totalPages = Math.max(1, (int) Math.ceil(totalCount / (double) PAGE_SIZE));
         // Dải KPI trạng thái phải đếm CÙNG phạm vi với bảng bên dưới: đứng ở
         // Hợp đồng mua mà KPI gộp cả hợp đồng bán thì hai con số cạnh nhau
         // không khớp, và không có gì trên màn hình giải thích vì sao.
         Map<String, Integer> statusSummary = contractDAO.countStatusSummary(provinceFilter, period, direction,
-                rootsOnly);
+                rootsOnly, null, scope);
 
         request.setAttribute("contractList", contractList);
         request.setAttribute("statusSummary", statusSummary);
@@ -396,10 +436,18 @@ public class ContractController extends HttpServlet {
         // Ô "Cả phụ lục / Chỉ hợp đồng gốc" phải đi theo sang file: xuất ra một
         // danh sách khác thứ đang nhìn thấy là cách chắc chắn nhất để hai con số
         // trong cùng một cuộc họp không khớp nhau.
+        // Xuất ĐÚNG thứ đang nhìn thấy: cùng phạm vi mặc định với danh sách trên
+        // màn hình. Thiếu dòng này thì bấm "Xuất Excel" ở màn hình 4 dòng lại ra file
+        // 12 dòng, mà người xuất không cách nào biết file sai.
+        ListScope scope = AccessControl.listScope(request,
+                () -> employeeDAO.findTeamUserIds(AccessControl.currentUser(request).getUserId()),
+                () -> employeeDAO.findProvincesOf(AccessControl.currentUser(request).getUserId())
+                        .stream().map(Province::getProvinceId).collect(Collectors.toList()))
+                .withActiveWindow(MONTH_ALL.equals(request.getParameter("month")) ? null : currentMonth());
         List<Contract> all = contractDAO.findAll(1, Integer.MAX_VALUE, keyword, statusFilter, typeFilter,
                 provinceFilter, true, period, direction, request.getParameter("progress"),
                 "root".equals(request.getParameter("scope")),
-                parseIntOrNull(request.getParameter("waitingDept")));
+                parseIntOrNull(request.getParameter("waitingDept")), scope);
         // Giữ cột "Mã HĐ" trong file dù danh sách trên màn hình đã bỏ -- xem lý do
         // ở CustomerController.exportExcel: STT chỉ đúng trong phạm vi một file.
         //

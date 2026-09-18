@@ -5,6 +5,7 @@ import java.sql.Date;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.MultipartConfig;
 import jakarta.servlet.annotation.WebServlet;
@@ -17,7 +18,9 @@ import org.slf4j.LoggerFactory;
 import poscs.common.AccessControl;
 import poscs.common.ExcelUtil;
 import poscs.common.FileStorage;
+import poscs.common.ListScope;
 import poscs.common.Logs;
+import poscs.common.QueryStrings;
 import poscs.dao.AddressDAO;
 import poscs.dao.ContractDAO;
 import poscs.dao.CustomerDAO;
@@ -180,9 +183,23 @@ public class CustomerController extends HttpServlet {
             provinceFilter = null;
         }
 
+        // Phạm vi mặc định: Sales mở trang ra thấy phần việc của mình (khách mình đứng
+        // tên HOẶC khách trong địa bàn mình giữ), các vai khác thấy toàn bộ. Vẫn nới ra
+        // được bằng view=all -- xem AccessControl.listScope.
+        ListScope scope = AccessControl.listScope(request,
+                () -> employeeDAO.findTeamUserIds(AccessControl.currentUser(request).getUserId()),
+                () -> employeeDAO.findProvincesOf(AccessControl.currentUser(request).getUserId())
+                        .stream().map(Province::getProvinceId).collect(Collectors.toList()));
+        request.setAttribute("viewFilter", AccessControl.defaultView(request));
+        request.setAttribute("viewNarrowed", scope.isNarrowed());
+        request.setAttribute("viewProvinceCount", scope.getProvinceIds().size());
+        request.setAttribute("viewToggleUrl", QueryStrings.with(request, "view",
+                AccessControl.VIEW_MINE.equals(AccessControl.defaultView(request))
+                        ? AccessControl.VIEW_ALL : AccessControl.VIEW_MINE));
+
         List<Enterprise> customerList = customerDAO.findAll(page, PAGE_SIZE, keyword, typeFilter, assigneeFilter,
-                provinceFilter, false, roleFilter);
-        int totalCount = customerDAO.countAll(keyword, typeFilter, assigneeFilter, provinceFilter, roleFilter);
+                provinceFilter, false, roleFilter, scope);
+        int totalCount = customerDAO.countAll(keyword, typeFilter, assigneeFilter, provinceFilter, roleFilter, scope);
         int totalPages = Math.max(1, (int) Math.ceil(totalCount / (double) PAGE_SIZE));
 
         request.setAttribute("customerList", customerList);
@@ -316,8 +333,15 @@ public class CustomerController extends HttpServlet {
         if (ROLE_SUPPLIER.equals(roleFilter)) {
             provinceFilter = null;
         }
+        // Xuất ĐÚNG thứ đang nhìn thấy: cùng phạm vi mặc định với danh sách trên
+        // màn hình. Thiếu dòng này thì bấm "Xuất Excel" ở màn hình 4 dòng lại ra file
+        // 12 dòng, mà người xuất không cách nào biết file sai.
+        ListScope scope = AccessControl.listScope(request,
+                () -> employeeDAO.findTeamUserIds(AccessControl.currentUser(request).getUserId()),
+                () -> employeeDAO.findProvincesOf(AccessControl.currentUser(request).getUserId())
+                        .stream().map(Province::getProvinceId).collect(Collectors.toList()));
         List<Enterprise> all = customerDAO.findAll(1, Integer.MAX_VALUE, keyword, typeFilter, assigneeFilter,
-                provinceFilter, true, roleFilter);
+                provinceFilter, true, roleFilter, scope);
         // File Excel vẫn giữ cột "Mã KH" dù danh sách trên màn hình đã bỏ: STT chỉ
         // là số thứ tự dòng trong chính file này, hai người mở hai file xuất ở hai
         // thời điểm sẽ có STT khác nhau cho cùng một khách -- cần một cột để đối

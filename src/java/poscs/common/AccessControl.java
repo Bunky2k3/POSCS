@@ -119,6 +119,56 @@ public final class AccessControl {
         return user != null && user.getRole() != null && ROLE_ADMIN.equals(user.getRole().getRoleName());
     }
 
+    /** Giá trị tham số "view" trên URL hai màn hình danh sách. */
+    public static final String VIEW_MINE = "mine";
+    public static final String VIEW_ALL = "all";
+
+    /** Vai duy nhất bị thu hẹp danh sách về phần việc của mình. */
+    private static final String ROLE_SALES = "Sales";
+
+    /**
+     * Phạm vi mặc định khi mở danh sách khách hàng / hợp đồng.
+     *
+     * <p>CHỈ Sales bị thu hẹp. Admin nhìn toàn bộ (họ quản trị, không cầm khách).
+     * Kỹ thuật và CSKH cũng nhìn toàn bộ: họ không đứng tên khách nào cả, thu hẹp
+     * theo "khách của tôi" là họ thấy đúng 0 dòng và hết làm việc được.
+     *
+     * <p>Thu hẹp này là MẶC ĐỊNH, KHÔNG phải rào quyền: còn {@code view=all} để xem
+     * toàn chi nhánh, và trang chi tiết từng bản ghi không chặn gì thêm. Ai cần rào
+     * thật thì phải chặn ở tầng quyền, không phải ở đây.
+     *
+     * @param request   để đọc người đăng nhập và tham số "view"
+     * @param teamIds   mình + cấp dưới (EmployeeDAO.findTeamUserIds)
+     * @param provinceIds địa bàn được giao; rỗng = chưa giao, không siết theo địa bàn
+     */
+    public static ListScope listScope(HttpServletRequest request,
+            java.util.function.Supplier<java.util.List<Integer>> teamIds,
+            java.util.function.Supplier<java.util.List<Integer>> provinceIds) {
+        if (!VIEW_MINE.equals(defaultView(request))) {
+            return ListScope.all();
+        }
+        return ListScope.of(teamIds.get(), provinceIds.get());
+    }
+
+    /**
+     * "mine" hay "all" cho lần hiển thị này. Không có tham số trên URL = lần đầu mở
+     * trang, lấy mặc định theo vai; có tham số thì nghe theo người dùng.
+     *
+     * <p>Cùng cách làm với tham số "scope" của Dashboard. Tên khác ("view") vì trên
+     * danh sách hợp đồng "scope" ĐÃ mang nghĩa khác -- {@code scope=root} là "chỉ hợp
+     * đồng gốc". Dùng lại là hai nghĩa chồng nhau trên cùng một URL.
+     */
+    public static String defaultView(HttpServletRequest request) {
+        String param = request.getParameter("view");
+        if (param != null) {
+            return VIEW_ALL.equals(param) ? VIEW_ALL : VIEW_MINE;
+        }
+        User user = currentUser(request);
+        boolean isSales = user != null && user.getRole() != null
+                && ROLE_SALES.equals(user.getRole().getRoleName());
+        return isSales ? VIEW_MINE : VIEW_ALL;
+    }
+
     /**
      * Chặn mọi vai trò trừ Admin -- trả về 403 và false.
      *
