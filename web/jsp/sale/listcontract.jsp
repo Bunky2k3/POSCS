@@ -648,8 +648,11 @@
         // tồn tại khi chưa chọn năm, mà gắn sự kiện lên null thì vỡ cả đoạn
         // script phía sau -- kể cả các bộ lọc khác.
         var filterForm = document.getElementById('filterForm');
-        ['filterProgress', 'filterScope', 'filterType', 'filterProvince', 'filterYear', 'filterPeriod',
-         'filterWaitingDept']
+        // Thêm ô lọc MỚI thì phải thêm id vào đây, nếu không tích vào không có gì
+        // xảy ra -- form chỉ gửi khi gõ Enter ở ô tìm kiếm. Đã dính với
+        // 'filterWaitingAny' đúng một lần.
+        ['filterProgress', 'filterScope', 'filterWaitingAny', 'filterType', 'filterProvince',
+         'filterYear', 'filterPeriod', 'filterWaitingDept']
             .forEach(function (id) {
                 var el = document.getElementById(id);
                 if (el) { el.addEventListener('change', function () { filterForm.submit(); }); }
