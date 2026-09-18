@@ -37,7 +37,7 @@
     <link rel="stylesheet" href="${pageContext.request.contextPath}/css/appshell.css">
 
     <style>
-        .page-container { max-width: 1320px; margin: 28px auto; padding: 0 20px 32px; }
+        .page-container { max-width: 1180px; margin: 28px auto; padding: 0 20px 32px; }
         .back-link-top { color: var(--primary); font-size: 0.85rem; text-decoration: none; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; margin-bottom: 16px; }
         .back-link-top:hover { text-decoration: underline; }
 
@@ -148,6 +148,34 @@
         }
 
         .info-card { padding: 22px 26px 26px; margin-bottom: 20px; }
+
+        /* Nhãn nhóm bên trong thẻ "Thông tin hợp đồng" (gộp từ hai thẻ cũ) --
+           nhẹ hơn một tiêu đề thẻ thật, đủ để mắt tách đoạn mà không dựng thêm
+           một viền thẻ nữa. Trước ở appshell.css, chuyển về đây khi bỏ lưới hai
+           cột: giờ chỉ còn trang này dùng. */
+        .ws-subhead {
+            font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;
+            color: #9ca3af; margin: 20px 0 12px; padding-top: 16px; border-top: 1px dashed #e5e7eb;
+        }
+        .ws-subhead:first-of-type { margin-top: 0; padding-top: 0; border-top: none; }
+
+        /* ===== Thanh tab ===== giá trị lấy đúng của updatecontract.jsp */
+        .tab-wrap { margin-top: 4px; }
+        .tab-wrap .nav-tabs { border-bottom: 1.5px solid #eef2f6; gap: 2px; flex-wrap: wrap; }
+        .tab-wrap .nav-tabs .nav-link {
+            border: none; border-bottom: 2.5px solid transparent; border-radius: 0;
+            padding: 10px 16px; font-size: 0.87rem; font-weight: 600; color: #6b7280;
+            background: none;
+        }
+        .tab-wrap .nav-tabs .nav-link i { color: #9ca3af; }
+        .tab-wrap .nav-tabs .nav-link:hover { color: var(--primary-dark); }
+        .tab-wrap .nav-tabs .nav-link.active { color: var(--primary-dark); border-bottom-color: var(--primary); }
+        .tab-wrap .nav-tabs .nav-link.active i { color: var(--primary); }
+        .tab-wrap .tab-content > .tab-pane > .card-box {
+            border-top-left-radius: 0; border-top-right-radius: 0;
+        }
+        /* Trong tab thì thẻ là thứ duy nhất, không cần đẩy xuống nữa. */
+        .tab-wrap .tab-content .info-card { margin-bottom: 0; }
         .section-header { display: flex; justify-content: space-between; align-items: center; margin: 0 0 16px; padding-bottom: 10px; border-bottom: 1.5px solid #eef2f6; }
         .section-header h5 { font-weight: 700; color: var(--primary-dark); font-size: 0.98rem; margin: 0; }
 
@@ -439,14 +467,64 @@
             </c:if>
         </div>
 
-        <%-- Hai cột: TRÁI là nội dung được ký, đọc tuần tự từ trên xuống
-             (là gì → ai ký → bao nhiêu tiền → gồm những gì → thu thế nào → sửa
-             đổi gì). PHẢI là hồ sơ và dấu vết: bản scan, ai đang giữ, ai đã đổi gì
-             -- đều là thứ tra cứu chứ không đọc tuần tự, nên hợp cột hẹp.
-             Dưới 1200px .workspace tự xếp về một cột, thứ tự đúng như viết ở đây. --%>
-        <div class="workspace">
-        <div class="ws-main">
 
+        <%-- Tám khối dưới đây gom vào TAB, cùng kiểu với trang quản lý.
+
+             Trước đó chia hai cột. Bỏ vì lý do người dùng nêu: trang vẫn quá dài,
+             mà nội dung thì nhiều chứ không thừa. Tab cắt được độ dài mà không phải
+             bỏ ô nào và không phải bóp bề ngang khối nào.
+
+             Mã hợp đồng, tên, khách hàng, hai nhãn trạng thái và thanh tiến trình
+             nằm NGOÀI tab (ở trên), nên dù đang đứng ở tab nào cũng biết mình đang
+             xem hợp đồng nào — đó là lý do để "Thông tin" nằm trong tab được.
+
+             ĐIỀU KIỆN c:if của NÚT và của KHỐI phải giống hệt nhau. Tab đầu
+             (Thông tin) không có điều kiện, cố ý: luôn phải còn một tab mở sẵn. --%>
+        <div class="tab-wrap">
+            <ul class="nav nav-tabs" id="contractTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#pane-thong-tin"
+                            type="button" role="tab"><i class="fa-solid fa-circle-info me-2"></i>Thông tin</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#pane-hang-hoa"
+                            type="button" role="tab"><i class="fa-solid fa-boxes-stacked me-2"></i>Hàng hoá</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#pane-ky-thu"
+                            type="button" role="tab"><i class="fa-solid fa-money-bill-wave me-2"></i>Kỳ thanh toán</button>
+                </li>
+                <c:if test="${not empty amendments}">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#pane-phu-luc"
+                            type="button" role="tab"><i class="fa-solid fa-file-circle-plus me-2"></i>Phụ lục</button>
+                </li>
+                </c:if>
+                <c:if test="${not empty drivePreviewUrl}">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#pane-ban-pdf"
+                            type="button" role="tab"><i class="fa-solid fa-file-pdf me-2"></i>Bản PDF</button>
+                </li>
+                </c:if>
+                <c:if test="${not empty handovers}">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#pane-ban-giao"
+                            type="button" role="tab"><i class="fa-solid fa-share-from-square me-2"></i>Bàn giao</button>
+                </li>
+                </c:if>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#pane-nhat-ky"
+                            type="button" role="tab"><i class="fa-solid fa-clock-rotate-left me-2"></i>Nhật ký</button>
+                </li>
+                <c:if test="${not empty contractLinks}">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#pane-noi-hd"
+                            type="button" role="tab"><i class="fa-solid fa-link me-2"></i>Nối bán – mua</button>
+                </li>
+                </c:if>
+            </ul>
+            <div class="tab-content">
+            <div class="tab-pane fade show active" id="pane-thong-tin" role="tabpanel">
         <!-- ===== Thông tin hợp đồng ===== -->
         <%-- Hai thẻ cũ "Thông tin chung" và "Ký kết & giá trị" gộp làm một:
              chúng cùng một dạng nội dung (các ô nhãn/giá trị của chính bản hợp
@@ -639,6 +717,8 @@
             </div>
         </div>
 
+            </div>
+            <div class="tab-pane fade" id="pane-hang-hoa" role="tabpanel">
         <!-- ===== Hạng mục sản phẩm / dịch vụ ===== -->
         <div class="info-card card-box">
             <div class="section-header"><h5>Hạng mục sản phẩm / dịch vụ</h5></div>
@@ -694,6 +774,8 @@
                  ContractDAO.insertProducts/deleteProductLine. --%>
         </div>
 
+            </div>
+            <div class="tab-pane fade" id="pane-ky-thu" role="tabpanel">
         <!-- ===== Kỳ thanh toán ===== -->
         <div class="info-card card-box">
             <div class="section-header"><h5>Kỳ thanh toán</h5></div>
@@ -799,11 +881,13 @@
              contracts vẫn chưa có cột lưu điều khoản; khi nào có thì dựng lại
              thẻ này với dữ liệu thật. --%>
 
+            </div>
+            <c:if test="${not empty amendments}">
+            <div class="tab-pane fade" id="pane-phu-luc" role="tabpanel">
         <!-- ===== Phụ lục ===== -->
         <%-- CHỈ ĐỌC, như cả trang này. Nút "Lập phụ lục" nằm ở trang quản lý
              (updatecontract.jsp) cùng mọi thao tác ghi khác -- xem ghi chú đầu
              khối tiến trình. Ở đây chỉ liệt kê, kèm đường sang từng phụ lục. --%>
-        <c:if test="${not empty amendments}">
         <div class="info-card card-box">
             <div class="section-header"><h5>Phụ lục</h5></div>
             <p style="font-size:0.86rem; color:#6b7280; margin:0 0 14px;">
@@ -858,12 +942,12 @@
                 </table>
             </div>
         </div>
-        </c:if>
 
-        </div>
 
-        <div class="ws-side">
-
+            </div>
+            </c:if>
+            <c:if test="${not empty drivePreviewUrl}">
+            <div class="tab-pane fade" id="pane-ban-pdf" role="tabpanel">
         <%-- ===== Bản PDF đã ký =====
              Đứng ĐẦU cột phải: đây là bản gốc của mọi thứ bên trái, để cuối
              trang như trước thì phải cuộn qua cả trang mới thấy. Khung nhúng cao
@@ -873,7 +957,6 @@
              Chỉ hiện khi link nhận ra được là file Drive (controller dựng sẵn
              drivePreviewUrl). Link tới nơi khác vẫn còn nút "Mở PDF trên Drive"
              ở đầu trang -- nhúng chúng dễ ra khung trắng vì site đó tự chặn. --%>
-        <c:if test="${not empty drivePreviewUrl}">
             <div class="info-card card-box">
                 <div class="section-header">
                     <h5>Bản PDF đã ký</h5>
@@ -890,14 +973,16 @@
                     hãy mở bằng link ở trên để đăng nhập Google và kiểm tra quyền truy cập.
                 </p>
             </div>
-        </c:if>
 
+            </div>
+            </c:if>
+            <c:if test="${not empty handovers}">
+            <div class="tab-pane fade" id="pane-ban-giao" role="tabpanel">
         <!-- ===== Bàn giao phòng ban ===== -->
         <%-- CHỈ ĐỌC, như cả trang này. Nút "Đã xử lý xong" của phòng nhận nằm ở
              màn hình riêng /contract?action=handovers -- người phòng Kế toán và
              Dự án không có quyền ghi trên hợp đồng, nên chỗ làm việc của họ là
              hàng đợi của phòng mình chứ không phải trang hợp đồng. --%>
-        <c:if test="${not empty handovers}">
         <div class="info-card card-box">
             <div class="section-header"><h5>Bàn giao xử lý</h5></div>
             <c:if test="${hasPendingHandover}">
@@ -954,8 +1039,10 @@
                 </table>
             </div>
         </div>
-        </c:if>
 
+            </div>
+            </c:if>
+            <div class="tab-pane fade" id="pane-nhat-ky" role="tabpanel">
         <!-- ===== Nhật ký thay đổi ===== -->
         <div class="info-card card-box">
             <div class="section-header"><h5>Nhật ký thay đổi</h5></div>
@@ -992,9 +1079,11 @@
             </c:choose>
         </div>
 
+            </div>
+            <c:if test="${not empty contractLinks}">
+            <div class="tab-pane fade" id="pane-noi-hd" role="tabpanel">
         <!-- ===== Đầu ra kéo theo đầu vào ===== -->
         <%-- CHỈ ĐỌC, như cả trang này: nối/gỡ nằm ở trang quản lý. --%>
-        <c:if test="${not empty contractLinks}">
         <div class="info-card card-box">
             <div class="section-header">
                 <h5>${linkIsSellSide ? 'Đầu vào phục vụ hợp đồng này' : 'Hợp đồng bán mà đơn mua này phục vụ'}</h5>
@@ -1067,8 +1156,9 @@
                 </table>
             </div>
         </div>
-        </c:if>
-
+            </div>
+            </c:if>
+            </div>
         </div>
         </div>
 
@@ -1104,6 +1194,27 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
+    <script>
+        // Nhớ tab đang mở trong phiên làm việc, giống trang quản lý: bấm sang trang
+        // khác rồi quay lại thì về đúng tab vừa xem, không nhảy về đầu.
+        // Bọc try/catch vì trình duyệt chặn site data sẽ ném lỗi ngay lần đọc đầu.
+        (function () {
+            var KEY = 'poscsContractViewTab';
+            var tabs = document.getElementById('contractTabs');
+            if (!tabs || !window.bootstrap) { return; }
+            try {
+                var saved = sessionStorage.getItem(KEY);
+                if (saved) {
+                    var btn = tabs.querySelector('[data-bs-target="' + saved + '"]');
+                    // Tab đã lưu có thể không còn (hợp đồng này không có phụ lục) -- để tab đầu.
+                    if (btn) { new bootstrap.Tab(btn).show(); }
+                }
+            } catch (e) { /* mở tab đầu, không phải lỗi */ }
+            tabs.addEventListener('shown.bs.tab', function (e) {
+                try { sessionStorage.setItem(KEY, e.target.getAttribute('data-bs-target')); } catch (err) { }
+            });
+        })();
+    </script>
     <script src="${pageContext.request.contextPath}/js/appshell.js"></script>
 </body>
 </html>
