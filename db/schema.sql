@@ -4542,6 +4542,39 @@ CREATE TABLE `contract_history` (
   CONSTRAINT `fk_contract_history_user` FOREIGN KEY (`changed_by`) REFERENCES `users` (`user_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+DROP TABLE IF EXISTS `contract_links`;
+-- Liên kết hợp đồng BÁN <-> hợp đồng MUA: "đầu ra kéo theo đầu vào" (V31).
+--
+-- Bảng RIÊNG chứ không dùng lại contracts.parent_contract_id: cột đó mang đúng
+-- một nghĩa "đây là phụ lục của hợp đồng kia", và mọi phép đếm phụ lục lẫn luật
+-- khoá điều khoản đều dựa vào nó.
+--
+-- NHIỀU-NHIỀU: mua gom chia cho nhiều hợp đồng bán, và một hợp đồng bán lớn
+-- cần nhiều đơn mua. Hướng lưu CỐ ĐỊNH (sell -> buy) dù màn hình cho nối từ cả
+-- hai phía, nếu không thì cùng một quan hệ có hai bản ghi ngược nhau.
+CREATE TABLE `contract_links` (
+  `link_id`          int NOT NULL AUTO_INCREMENT,
+  `sell_contract_id` int NOT NULL,
+  `buy_contract_id`  int NOT NULL,
+  -- Chuỗi tự do, không ENUM: bảng này về sau còn phải diễn đạt quan hệ
+  -- "nâng cấp cho" khi khách thay module phần cứng.
+  `relation_type`    varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL
+                         DEFAULT 'Đầu vào phục vụ đầu ra',
+  `note`             varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `created_by`       int NOT NULL,
+  `created_at`       timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`link_id`),
+  -- Nối trùng làm phép cộng giá trị đầu vào đếm đôi; hai người bấm cùng lúc
+  -- thì chỉ ràng buộc ở CSDL mới thấy nhau.
+  UNIQUE KEY `uq_contract_links_pair` (`sell_contract_id`, `buy_contract_id`),
+  KEY `idx_contract_links_buy` (`buy_contract_id`),
+  KEY `fk_contract_links_user` (`created_by`),
+  -- KHÔNG cascade, cùng lẽ với fk_contracts_parent: hợp đồng xoá MỀM.
+  CONSTRAINT `fk_contract_links_sell` FOREIGN KEY (`sell_contract_id`) REFERENCES `contracts` (`contract_id`),
+  CONSTRAINT `fk_contract_links_buy` FOREIGN KEY (`buy_contract_id`) REFERENCES `contracts` (`contract_id`),
+  CONSTRAINT `fk_contract_links_user` FOREIGN KEY (`created_by`) REFERENCES `users` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 DROP TABLE IF EXISTS `customer_evaluation_rules`;
 CREATE TABLE `customer_evaluation_rules` (
   `rule_id`     int NOT NULL AUTO_INCREMENT,

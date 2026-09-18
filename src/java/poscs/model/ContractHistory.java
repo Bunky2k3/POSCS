@@ -64,6 +64,13 @@ public class ContractHistory {
     public static final String EVENT_VALUE_ADJUSTED = "Điều chỉnh giá trị";
 
     /**
+     * Nối/gỡ liên kết giữa hợp đồng bán và hợp đồng mua ("đầu ra kéo theo đầu
+     * vào"). Ghi lên CẢ HAI hợp đồng: câu "vì sao có đơn mua này" hỏi ở phía
+     * mua, còn "đã mua vào gì cho đơn này" hỏi ở phía bán.
+     */
+    public static final String EVENT_LINKED = "Nối hợp đồng";
+
+    /**
      * Admin chữa một sai sót NHẬP LIỆU trên hợp đồng đã ký.
      *
      * <p>Tách hẳn khỏi {@link #EVENT_UPDATED}: sửa một bản nháp là chuyện bình

@@ -485,6 +485,115 @@ public class ContractControllerTest {
                 argThat((java.math.BigDecimal v) -> new java.math.BigDecimal("1750000000").compareTo(v) == 0));
     }
 
+    // ------------------------------------------------------------------
+    // Nối hợp đồng bán <-> mua
+    // ------------------------------------------------------------------
+
+    /**
+     * Form chỉ gửi id hợp đồng kia; controller tự xếp bên nào là bán, bên nào
+     * là mua -- bảng lưu một chiều cố định, và người dùng không phải nhớ thứ tự.
+     */
+    @Test
+    public void linkContract_dungTuPhiaBan_xepDungThuTu() throws Exception {
+        Contract sell = signedContract();
+        sell.setContractId(5);
+        sell.setDirection("Bán");
+        Contract buy = signedContract();
+        buy.setContractId(9);
+        buy.setDirection("Mua");
+        when(request.getParameter("action")).thenReturn("linkContract");
+        when(request.getParameter("contractId")).thenReturn("5");
+        when(request.getParameter("otherContractId")).thenReturn("9");
+        when(contractDAO.findById(5)).thenReturn(sell);
+        when(contractDAO.findById(9)).thenReturn(buy);
+        when(contractDAO.linkContracts(anyInt(), anyInt(), any(), anyInt())).thenReturn(ContractDAO.LINK_OK);
+
+        controller.doPost(request, response);
+
+        verify(contractDAO).linkContracts(eq(5), eq(9), any(), anyInt());
+    }
+
+    /** Đứng ở phía MUA mà nối thì thứ tự phải đảo lại, không phải nối ngược. */
+    @Test
+    public void linkContract_dungTuPhiaMua_vanXepBanTruoc() throws Exception {
+        Contract buy = signedContract();
+        buy.setContractId(9);
+        buy.setDirection("Mua");
+        Contract sell = signedContract();
+        sell.setContractId(5);
+        sell.setDirection("Bán");
+        when(request.getParameter("action")).thenReturn("linkContract");
+        when(request.getParameter("contractId")).thenReturn("9");
+        when(request.getParameter("otherContractId")).thenReturn("5");
+        when(contractDAO.findById(9)).thenReturn(buy);
+        when(contractDAO.findById(5)).thenReturn(sell);
+        when(contractDAO.linkContracts(anyInt(), anyInt(), any(), anyInt())).thenReturn(ContractDAO.LINK_OK);
+
+        controller.doPost(request, response);
+
+        verify(contractDAO).linkContracts(eq(5), eq(9), any(), anyInt());
+    }
+
+    /** DAO từ chối cặp trùng -> báo đúng lý do, không lẫn với "lưu thất bại". */
+    @Test
+    public void linkContract_capDaNoi_baoDungLyDo() throws Exception {
+        Contract sell = signedContract();
+        sell.setContractId(5);
+        sell.setDirection("Bán");
+        Contract buy = signedContract();
+        buy.setContractId(9);
+        buy.setDirection("Mua");
+        when(request.getParameter("action")).thenReturn("linkContract");
+        when(request.getParameter("contractId")).thenReturn("5");
+        when(request.getParameter("otherContractId")).thenReturn("9");
+        when(contractDAO.findById(5)).thenReturn(sell);
+        when(contractDAO.findById(9)).thenReturn(buy);
+        when(contractDAO.linkContracts(anyInt(), anyInt(), any(), anyInt()))
+                .thenReturn(ContractDAO.LINK_DUPLICATE);
+
+        controller.doPost(request, response);
+
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=edit&id=5&error=link_duplicate");
+    }
+
+    /**
+     * Đối chiếu tiền chỉ dựng ở phía BÁN: một đơn mua phục vụ nhiều hợp đồng
+     * bán, nên lấy giá trị bán trừ đi ở phía mua sẽ ra con số vô nghĩa.
+     */
+    @Test
+    public void view_phiaBan_dungDoiChieuDauVao() throws Exception {
+        Contract sell = signedContract();
+        sell.setDirection("Bán");
+        sell.setContractValue(new java.math.BigDecimal("1000000000"));
+        when(request.getParameter("action")).thenReturn("view");
+        when(request.getParameter("id")).thenReturn("5");
+        when(contractDAO.findById(5)).thenReturn(sell);
+        when(contractDAO.sumLinkedBuyValue(5)).thenReturn(new java.math.BigDecimal("600000000"));
+        when(request.getRequestDispatcher(anyString())).thenReturn(mock(RequestDispatcher.class));
+
+        controller.doGet(request, response);
+
+        verify(request).setAttribute("linkIsSellSide", true);
+        verify(request).setAttribute(eq("linkedMargin"),
+                argThat((java.math.BigDecimal v) -> new java.math.BigDecimal("400000000").compareTo(v) == 0));
+    }
+
+    @Test
+    public void view_phiaMua_khongDungDoiChieu() throws Exception {
+        Contract buy = signedContract();
+        buy.setDirection("Mua");
+        when(request.getParameter("action")).thenReturn("view");
+        when(request.getParameter("id")).thenReturn("5");
+        when(contractDAO.findById(5)).thenReturn(buy);
+        when(request.getRequestDispatcher(anyString())).thenReturn(mock(RequestDispatcher.class));
+
+        controller.doGet(request, response);
+
+        verify(request).setAttribute("linkIsSellSide", false);
+        verify(request, never()).setAttribute(eq("linkedMargin"), any());
+        verify(contractDAO, never()).sumLinkedBuyValue(anyInt());
+    }
+
     /** Hợp đồng đã ký với đối tác giữ đúng vai -- dùng cho nhóm test siết form. */
     private static Contract signedContract() {
         Contract c = new Contract();

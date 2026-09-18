@@ -37,6 +37,7 @@ import poscs.dao.ProductDAO;
 import poscs.model.Address;
 import poscs.model.Contract;
 import poscs.model.ContractHistory;
+import poscs.model.ContractLink;
 import poscs.model.ContractPayment;
 import poscs.model.ContractProduct;
 import poscs.model.District;
@@ -212,6 +213,12 @@ public class ContractController extends HttpServlet {
                 break;
             case "removePayment":
                 handleRemovePayment(request, response);
+                break;
+            case "linkContract":
+                handleLinkContract(request, response);
+                break;
+            case "unlinkContract":
+                handleUnlinkContract(request, response);
                 break;
             default:
                 response.sendRedirect(request.getContextPath() + "/contract");
@@ -941,6 +948,17 @@ public class ContractController extends HttpServlet {
         // Lập phụ lục: chỉ từ hợp đồng gốc ĐÃ KÝ và chưa đóng băng.
         request.setAttribute("canAddAmendment", contract.isSigned() && !contract.isAmendment());
 
+        // Danh sách để chọn khi nối hợp đồng: CHIỀU NGƯỢC LẠI với hợp đồng đang
+        // mở, chỉ hợp đồng gốc. Đổ sẵn cả danh sách vì mỗi chiều chỉ vài chục
+        // bản ghi; khi nào nhiều lên thì đổi thành ô tìm kiếm AJAX như ô khách
+        // hàng, không phải đổi gì ở tầng dưới.
+        if (!contract.isAmendment()) {
+            String otherDirection = DIRECTION_BUY.equals(contract.getDirection())
+                    ? DIRECTION_SELL : DIRECTION_BUY;
+            request.setAttribute("linkCandidates", contractDAO.findAll(1, Integer.MAX_VALUE, null, null, null,
+                    null, false, null, otherDirection, null, true));
+        }
+
         request.getRequestDispatcher(UPDATE_VIEW).forward(request, response);
     }
 
@@ -1454,6 +1472,33 @@ public class ContractController extends HttpServlet {
         java.math.BigDecimal clusterScheduled = root == null
                 ? scheduled
                 : contractDAO.sumScheduledPaymentsForCluster(root.getContractId());
+        // Không để một truy vấn hỏng làm nổ cả trang chi tiết: DAO trả ZERO khi
+        // lỗi, nhưng chỗ so sánh bên dưới thì không được phụ thuộc vào điều đó.
+        if (clusterScheduled == null) {
+            clusterScheduled = java.math.BigDecimal.ZERO;
+        }
+        // ===== Liên kết bán <-> mua =====
+        List<ContractLink> links = contractDAO.findLinksOf(id);
+        request.setAttribute("contractLinks", links);
+        boolean isSell = !DIRECTION_BUY.equals(contract.getDirection());
+        request.setAttribute("linkIsSellSide", isSell);
+        // Chỉ hợp đồng GỐC mới nối được: phụ lục là văn bản sửa đổi của một hợp
+        // đồng, còn đầu vào thì phục vụ cả hợp đồng đó.
+        request.setAttribute("canLinkContracts", !contract.isAmendment());
+        if (isSell) {
+            // Đối chiếu tiền chỉ có nghĩa ở phía BÁN: giá trị bán ra trừ đi
+            // tổng các đơn mua đã nối. Ở phía mua thì một đơn có thể phục vụ
+            // nhiều hợp đồng bán, nên trừ kiểu đó ra một con số vô nghĩa.
+            java.math.BigDecimal inputValue = contractDAO.sumLinkedBuyValue(id);
+            if (inputValue == null) {
+                inputValue = java.math.BigDecimal.ZERO;
+            }
+            request.setAttribute("linkedInputValue", inputValue);
+            java.math.BigDecimal outputValue = contract.getCurrentValue();
+            request.setAttribute("linkedMargin",
+                    outputValue == null ? null : outputValue.subtract(inputValue));
+        }
+
         request.setAttribute("rootContract", root == contract ? null : root);
         request.setAttribute("clusterValue", clusterValue);
         request.setAttribute("clusterScheduled", clusterScheduled);
@@ -1470,6 +1515,73 @@ public class ContractController extends HttpServlet {
     // ------------------------------------------------------------------
     // Kỳ thanh toán
     // ------------------------------------------------------------------
+
+    // ------------------------------------------------------------------
+    // Liên kết hợp đồng bán <-> mua ("đầu ra kéo theo đầu vào")
+    // ------------------------------------------------------------------
+
+    /**
+     * Nối hợp đồng đang mở với một hợp đồng ở chiều ngược lại.
+     *
+     * <p>Form chỉ gửi lên id hợp đồng kia; BÊN NÀO LÀ BÁN, bên nào là mua thì
+     * controller tự xếp theo chiều của hai bản ghi, vì bảng lưu một chiều cố
+     * định. Người dùng không phải nhớ thứ tự, và một POST nặn tay cũng không
+     * đảo được -- DAO kiểm lại chiều trong transaction.
+     */
+    private void handleLinkContract(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        if (!AccessControl.requireFullAccess(request, response, AccessControl.Resource.CONTRACT)) {
+            return;
+        }
+        Integer contractId = parseIntOrNull(request.getParameter("contractId"));
+        Integer otherId = parseIntOrNull(request.getParameter("otherContractId"));
+        Contract current = contractId == null ? null : contractDAO.findById(contractId);
+        Contract other = otherId == null ? null : contractDAO.findById(otherId);
+        if (current == null) {
+            response.sendRedirect(request.getContextPath() + "/contract?error=notfound");
+            return;
+        }
+        String back = "/contract?action=edit&id=" + contractId;
+        if (other == null) {
+            response.sendRedirect(request.getContextPath() + back + "&error=link_invalid");
+            return;
+        }
+
+        boolean currentIsSell = !DIRECTION_BUY.equals(current.getDirection());
+        int sellId = currentIsSell ? current.getContractId() : other.getContractId();
+        int buyId = currentIsSell ? other.getContractId() : current.getContractId();
+
+        int result = contractDAO.linkContracts(sellId, buyId, request.getParameter("linkNote"), actorId(request));
+        if (result == ContractDAO.LINK_DUPLICATE) {
+            response.sendRedirect(request.getContextPath() + back + "&error=link_duplicate");
+            return;
+        }
+        if (result != ContractDAO.LINK_OK) {
+            LOG.warn("Noi hop dong that bai (actor={}, contractId={}, otherId={})",
+                    Logs.actor(request), contractId, otherId);
+            response.sendRedirect(request.getContextPath() + back + "&error=link_invalid");
+            return;
+        }
+        response.sendRedirect(request.getContextPath() + back);
+    }
+
+    private void handleUnlinkContract(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        if (!AccessControl.requireFullAccess(request, response, AccessControl.Resource.CONTRACT)) {
+            return;
+        }
+        Integer contractId = parseIntOrNull(request.getParameter("contractId"));
+        Integer linkId = parseIntOrNull(request.getParameter("linkId"));
+        if (contractId == null || linkId == null) {
+            response.sendRedirect(request.getContextPath() + "/contract?error=notfound");
+            return;
+        }
+        if (!contractDAO.unlinkContracts(linkId, actorId(request))) {
+            LOG.warn("Go lien ket that bai (actor={}, linkId={})", Logs.actor(request), linkId);
+            response.sendRedirect(request.getContextPath()
+                    + "/contract?action=edit&id=" + contractId + "&error=unlink_failed");
+            return;
+        }
+        response.sendRedirect(request.getContextPath() + "/contract?action=edit&id=" + contractId);
+    }
 
     private void handleAddPayment(HttpServletRequest request, HttpServletResponse response) throws IOException {
         if (!AccessControl.requireFullAccess(request, response, AccessControl.Resource.CONTRACT)) {

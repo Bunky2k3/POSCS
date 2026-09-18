@@ -7,6 +7,7 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 import poscs.dao.ContractDAO;
 import poscs.model.Contract;
+import poscs.model.ContractLink;
 
 import static org.junit.Assert.*;
 
@@ -698,6 +699,149 @@ public class ContractStatusIntegrationTest {
 
     private static int tong(Map<String, Integer> summary) {
         return summary.values().stream().mapToInt(Integer::intValue).sum();
+    }
+
+    // ------------------------------------------------------------------
+    // Liên kết bán <-> mua (V31)
+    // ------------------------------------------------------------------
+
+    /**
+     * Vòng đầy đủ của "đầu ra kéo theo đầu vào" trên CSDL thật: nối, đọc được
+     * từ CẢ HAI phía, cộng đúng giá trị đầu vào, và gỡ ra thì sạch.
+     *
+     * <p>Phép cộng và câu đọc hai chiều nằm trong SQL (CASE trong mệnh đề JOIN,
+     * subquery cộng phụ lục), nên test mock không chạm tới được.
+     */
+    @Test
+    public void contractLinks_noiDocVaGoTrenCsdlThat() throws Exception {
+        IntegrationDb.assumeAvailable();
+
+        IntegrationDb.exec("UPDATE contracts SET contract_value = 1000000000 WHERE contract_id = 2");
+        int buyId = insertBuyContract("HD-MUA-0001", "600000000");
+
+        assertEquals(ContractDAO.LINK_OK, contractDAO.linkContracts(2, buyId, "mua cáp đợt 1", Fixtures.USER_ID));
+
+        // Đọc từ phía BÁN ra đơn mua, từ phía MUA ra hợp đồng bán -- cùng một
+        // câu truy vấn, đó là điểm của nó.
+        List<ContractLink> fromSell = contractDAO.findLinksOf(2);
+        assertEquals(1, fromSell.size());
+        assertEquals("HD-MUA-0001", fromSell.get(0).getOther().getContractCode());
+        List<ContractLink> fromBuy = contractDAO.findLinksOf(buyId);
+        assertEquals(1, fromBuy.size());
+        assertEquals("HD-0002", fromBuy.get(0).getOther().getContractCode());
+
+        assertEquals("Giá trị đầu vào cộng đúng", 0,
+                new java.math.BigDecimal("600000000.00").compareTo(contractDAO.sumLinkedBuyValue(2)));
+
+        assertEquals("Nối để lại vết ở CẢ HAI hợp đồng", 1,
+                IntegrationDb.count("contract_history",
+                        "contract_id = 2 AND event_type = N'Nối hợp đồng'"));
+        assertEquals(1, IntegrationDb.count("contract_history",
+                "contract_id = " + buyId + " AND event_type = N'Nối hợp đồng'"));
+
+        // Nối lại đúng cặp đó -> chặn ở ràng buộc UNIQUE của CSDL.
+        assertEquals(ContractDAO.LINK_DUPLICATE,
+                contractDAO.linkContracts(2, buyId, null, Fixtures.USER_ID));
+
+        int linkId = fromSell.get(0).getLinkId();
+        assertTrue(contractDAO.unlinkContracts(linkId, Fixtures.USER_ID));
+        assertTrue(contractDAO.findLinksOf(2).isEmpty());
+        assertEquals("Gỡ xong thì đầu vào về 0", 0,
+                java.math.BigDecimal.ZERO.compareTo(contractDAO.sumLinkedBuyValue(2)));
+    }
+
+    /**
+     * Một đơn mua gom phục vụ NHIỀU hợp đồng bán -- quan hệ nhiều-nhiều, đúng
+     * hình dạng khách hàng mô tả. Giá trị đầu vào của mỗi hợp đồng bán tính
+     * riêng, không chia đôi: hệ thống không biết chia thế nào, và đoán hộ thì
+     * ra một con số không ai đối chiếu được với chứng từ.
+     */
+    @Test
+    public void contractLinks_motDonMuaPhucVuNhieuHopDongBan() throws Exception {
+        IntegrationDb.assumeAvailable();
+
+        int buyId = insertBuyContract("HD-MUA-0002", "500000000");
+        assertEquals(ContractDAO.LINK_OK, contractDAO.linkContracts(2, buyId, null, Fixtures.USER_ID));
+        assertEquals(ContractDAO.LINK_OK, contractDAO.linkContracts(3, buyId, null, Fixtures.USER_ID));
+
+        assertEquals(2, contractDAO.findLinksOf(buyId).size());
+        assertEquals(0, new java.math.BigDecimal("500000000.00").compareTo(contractDAO.sumLinkedBuyValue(2)));
+        assertEquals(0, new java.math.BigDecimal("500000000.00").compareTo(contractDAO.sumLinkedBuyValue(3)));
+
+        // Nhìn từ phía BÁN, đơn mua này phải tự khai là đơn dùng chung: giá trị
+        // của nó tính trọn vẹn vào cả hai hợp đồng, nên không nói ra thì
+        // "chênh lệch thô" âm ở đó bị đọc thành lỗ.
+        assertTrue("đơn mua gom phải được đánh dấu", contractDAO.findLinksOf(2).get(0).isShared());
+        assertEquals(1, contractDAO.findLinksOf(2).get(0).getSharedCount());
+        // Nhìn từ phía MUA thì mỗi hợp đồng bán chỉ của riêng nó -- không có
+        // chuyện "hợp đồng bán dùng chung".
+        assertFalse(contractDAO.findLinksOf(buyId).get(0).isShared());
+    }
+
+    /** Giá trị đầu vào cộng cả PHỤ LỤC đã ký của đơn mua, như mọi chỗ khác. */
+    @Test
+    public void contractLinks_giaTriDauVaoGomCaPhuLucCuaDonMua() throws Exception {
+        IntegrationDb.assumeAvailable();
+
+        int buyId = insertBuyContract("HD-MUA-0003", "400000000");
+        assertEquals(ContractDAO.LINK_OK, contractDAO.linkContracts(2, buyId, null, Fixtures.USER_ID));
+
+        // Ký đơn mua trước: phụ lục chỉ treo được vào hợp đồng ĐÃ KÝ.
+        assertTrue(contractDAO.changeProgressStatus(buyId, ContractDAO.PROGRESS_SIGNED,
+                Fixtures.USER_ID, null));
+
+        Contract addition = withTerm(amendmentOf(buyId, "HD-MUA-0003/PL01"));
+        addition.setContractValue(new java.math.BigDecimal("150000000"));
+        int additionId = contractDAO.insert(addition, Fixtures.USER_ID);
+        assertTrue(additionId > 0);
+        assertEquals("Phụ lục chưa ký thì chưa tính", 0,
+                new java.math.BigDecimal("400000000.00").compareTo(contractDAO.sumLinkedBuyValue(2)));
+
+        assertTrue(contractDAO.changeProgressStatus(additionId, ContractDAO.PROGRESS_SIGNED,
+                Fixtures.USER_ID, null));
+        assertEquals("Ký xong thì cộng vào đầu vào", 0,
+                new java.math.BigDecimal("550000000.00").compareTo(contractDAO.sumLinkedBuyValue(2)));
+    }
+
+    /** Sai chiều, tự nối chính mình, hay nối vào phụ lục đều bị từ chối. */
+    @Test
+    public void contractLinks_tuChoiCapKhongHopLe() throws Exception {
+        IntegrationDb.assumeAvailable();
+
+        int buyId = insertBuyContract("HD-MUA-0004", "300000000");
+
+        assertEquals("Hai hợp đồng cùng chiều bán",
+                ContractDAO.LINK_INVALID, contractDAO.linkContracts(2, 3, null, Fixtures.USER_ID));
+        assertEquals("Tự nối chính mình",
+                ContractDAO.LINK_INVALID, contractDAO.linkContracts(2, 2, null, Fixtures.USER_ID));
+        assertEquals("Đảo ngược vai trò bán/mua",
+                ContractDAO.LINK_INVALID, contractDAO.linkContracts(buyId, 2, null, Fixtures.USER_ID));
+
+        Contract amendment = withTerm(amendmentOf(2, "HD-0002/PL-LINK"));
+        int amendmentId = contractDAO.insert(amendment, Fixtures.USER_ID);
+        assertTrue(amendmentId > 0);
+        assertEquals("Phụ lục không nối được: đầu vào phục vụ cả hợp đồng gốc",
+                ContractDAO.LINK_INVALID, contractDAO.linkContracts(amendmentId, buyId, null, Fixtures.USER_ID));
+
+        assertEquals("Bị từ chối thì không để lại liên kết nào",
+                0, IntegrationDb.count("contract_links", "1 = 1"));
+    }
+
+    /** Hợp đồng mua dựng qua DAO -- bốn hợp đồng gieo sẵn đều là chiều bán. */
+    private int insertBuyContract(String code, String value) {
+        Contract buy = new Contract();
+        buy.setContractCode(code);
+        buy.setTitle("Đơn mua " + code);
+        buy.setContractType("Mua vật tư");
+        buy.setDirection("Mua");
+        buy.setEffectiveDate(java.sql.Date.valueOf(java.time.LocalDate.now()));
+        buy.setEndDate(java.sql.Date.valueOf(java.time.LocalDate.now().plusYears(1)));
+        buy.setEnterpriseId(Fixtures.ENTERPRISE_ID);
+        buy.setOwnerId(Fixtures.USER_ID);
+        buy.setContractValue(new java.math.BigDecimal(value));
+        int id = contractDAO.insert(buy, Fixtures.USER_ID);
+        assertTrue(id > 0);
+        return id;
     }
 
     /** Ô lọc "Chỉ hợp đồng gốc": danh sách và bộ đếm phân trang phải đi cặp. */
