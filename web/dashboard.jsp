@@ -117,10 +117,34 @@
         <div class="welcome-row">
             <div>
                 <h2>Chào mừng trở lại, <c:out value="${sessionScope.currentUser.fullName}"/> 👋</h2>
-                <p>Đây là tổng quan hoạt động kinh doanh và hỗ trợ kỹ thuật của bạn</p>
+                <%-- Nói rõ trang đang tính trên phạm vi nào. Không có dòng này thì
+                     con số của một nhân viên và của Admin khác nhau mà chẳng ai
+                     biết vì đâu -- mặc định của hai vai trò vốn khác nhau. --%>
+                <p>
+                    <c:choose>
+                        <c:when test="${scopeFilter == 'mine' and teamSize > 1}">
+                            Số liệu của <strong>bạn và ${teamSize - 1} nhân viên cấp dưới</strong>.
+                        </c:when>
+                        <c:when test="${scopeFilter == 'mine'}">
+                            Số liệu phần việc <strong>bạn đang phụ trách</strong>.
+                        </c:when>
+                        <c:otherwise>
+                            Số liệu <strong>toàn chi nhánh</strong> &mdash; hoạt động kinh doanh và hỗ trợ kỹ thuật.
+                        </c:otherwise>
+                    </c:choose>
+                </p>
             </div>
             <div class="welcome-actions">
                 <form method="GET" action="${pageContext.request.contextPath}/dashboard" id="provinceFilterForm">
+                    <%-- Phạm vi người phụ trách. Đứng TRƯỚC các ô kia vì nó là ô
+                         đổi nghĩa cả trang, còn tỉnh và kỳ chỉ thu hẹp thêm.
+                         Mặc định khác nhau theo vai trò (nhân viên: của tôi,
+                         Admin: toàn chi nhánh) nên ô này luôn gửi giá trị rõ
+                         ràng, không để trống rồi đoán lại. --%>
+                    <select id="filterScope" name="scope" class="province-filter">
+                        <option value="mine" ${scopeFilter == 'mine' ? 'selected' : ''}>Của tôi</option>
+                        <option value="all" ${scopeFilter == 'all' ? 'selected' : ''}>Toàn chi nhánh</option>
+                    </select>
                     <select id="filterProvince" name="provinceId" class="province-filter">
                         <option value="">Toàn bộ 18 tỉnh địa bàn</option>
                         <c:forEach var="province" items="${provinceList}">
@@ -343,7 +367,7 @@
     <script>
         // Chọn tỉnh là nạp lại trang ngay, không cần nút "Lọc" -- giống bộ lọc
         // ở danh sách khách hàng/hợp đồng.
-        ['filterProvince', 'filterYear', 'filterPeriod'].forEach(function (id) {
+        ['filterScope', 'filterProvince', 'filterYear', 'filterPeriod'].forEach(function (id) {
             document.getElementById(id).addEventListener('change', function () {
                 document.getElementById('provinceFilterForm').submit();
             });

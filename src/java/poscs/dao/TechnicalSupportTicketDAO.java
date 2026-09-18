@@ -14,6 +14,7 @@ import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import poscs.common.Period;
+import poscs.common.SqlFilters;
 import poscs.model.Contract;
 import poscs.model.Enterprise;
 import poscs.model.TechnicalRequest;
@@ -164,6 +165,14 @@ public class TechnicalSupportTicketDAO {
     }
 
     /** Đếm số phiếu theo từng trạng thái + số phiếu ưu tiên khẩn cấp, phục vụ dải KPI ở đầu trang danh sách. */
+    /**
+     * Hai cột nói "phiếu này là của ai": người được giao xử lý và người tiếp
+     * nhận. Phạm vi "của tôi" trên Dashboard khớp CẢ HAI, vì Kỹ thuật nhìn vào
+     * cột thứ nhất còn CSKH nhìn vào cột thứ hai.
+     */
+    private static final List<String> OWNER_COLUMNS =
+            List.of("t.assigned_technician_id", "t.created_by");
+
     public Map<String, Integer> countStatusSummary() {
         return countStatusSummary(null);
     }
@@ -175,6 +184,15 @@ public class TechnicalSupportTicketDAO {
 
     /** Như trên, kèm lọc theo kỳ (ngày tạo phiếu). */
     public Map<String, Integer> countStatusSummary(Integer provinceId, Period period) {
+        return countStatusSummary(provinceId, period, null);
+    }
+
+    /**
+     * Như trên nhưng chỉ đếm phiếu "của" những người này: phiếu họ được giao xử
+     * lý HOẶC phiếu họ tiếp nhận -- hai vai trò khác nhau (Kỹ thuật và CSKH)
+     * cùng nhìn một trang Dashboard. Rỗng/null = toàn chi nhánh.
+     */
+    public Map<String, Integer> countStatusSummary(Integer provinceId, Period period, List<Integer> ownerIds) {
         Map<String, Integer> summary = new HashMap<>();
         summary.put(STATUS_NEW, 0);
         summary.put(STATUS_IN_PROGRESS, 0);
@@ -189,7 +207,8 @@ public class TechnicalSupportTicketDAO {
             "  SUM(CASE WHEN t.priority = 'Khẩn cấp' THEN 1 ELSE 0 END) AS urgent_count " +
             "FROM technicalrequests t " + JOIN_ENTERPRISE + JOIN_PROVINCE_OF_ENTERPRISE +
             "WHERE t.is_deleted = 0" + (provinceId != null ? " AND d.province_id = ?" : "")
-            + (period != null ? " AND t.created_date BETWEEN ? AND ?" : "");
+            + (period != null ? " AND t.created_date BETWEEN ? AND ?" : "")
+            + SqlFilters.inClauseAny(OWNER_COLUMNS, ownerIds);
 
         try (Connection conn = DBContext.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -202,8 +221,9 @@ public class TechnicalSupportTicketDAO {
             }
             if (period != null) {
                 ps.setDate(param++, period.getFrom());
-                ps.setDate(param, period.getTo());
+                ps.setDate(param++, period.getTo());
             }
+            SqlFilters.bind(ps, param, ownerIds, OWNER_COLUMNS.size());
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
                     summary.put(STATUS_NEW, rs.getInt("new_count"));
@@ -225,10 +245,16 @@ public class TechnicalSupportTicketDAO {
 
     /** Như {@link #findNeedingAttention(int)} nhưng chỉ lấy phiếu của khách thuộc 1 tỉnh (null = toàn quốc). */
     public List<TechnicalRequest> findNeedingAttention(int limit, Integer provinceId) {
+        return findNeedingAttention(limit, provinceId, null);
+    }
+
+    /** Như trên nhưng chỉ lấy phiếu "của" những người này (rỗng/null = tất cả). */
+    public List<TechnicalRequest> findNeedingAttention(int limit, Integer provinceId, List<Integer> ownerIds) {
         List<TechnicalRequest> result = new ArrayList<>();
         String sql = SELECT_BASE + JOIN_PROVINCE_OF_ENTERPRISE +
             "WHERE t.is_deleted = 0 AND t.status <> ? " +
             (provinceId != null ? "AND d.province_id = ? " : "") +
+            SqlFilters.inClauseAny(OWNER_COLUMNS, ownerIds) + " " +
             "ORDER BY FIELD(t.priority, 'Khẩn cấp', 'Cao', 'Bình thường', 'Thấp'), t.created_date ASC LIMIT ?";
         try (Connection conn = DBContext.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -237,6 +263,7 @@ public class TechnicalSupportTicketDAO {
             if (provinceId != null) {
                 ps.setInt(param++, provinceId);
             }
+            param = SqlFilters.bind(ps, param, ownerIds, OWNER_COLUMNS.size());
             ps.setInt(param, limit);
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
@@ -256,10 +283,16 @@ public class TechnicalSupportTicketDAO {
 
     /** Như {@link #countOverdueOrDueSoon()} nhưng chỉ đếm phiếu của khách thuộc 1 tỉnh (null = toàn quốc). */
     public int countOverdueOrDueSoon(Integer provinceId) {
+        return countOverdueOrDueSoon(provinceId, null);
+    }
+
+    /** Như trên nhưng chỉ đếm phiếu "của" những người này (rỗng/null = tất cả). */
+    public int countOverdueOrDueSoon(Integer provinceId, List<Integer> ownerIds) {
         String sql = "SELECT COUNT(*) FROM technicalrequests t " + JOIN_ENTERPRISE + JOIN_PROVINCE_OF_ENTERPRISE +
                      "WHERE t.is_deleted = 0 AND t.status <> ? " +
                      "AND t.sla_deadline IS NOT NULL AND t.sla_deadline <= DATE_ADD(NOW(), INTERVAL 24 HOUR)" +
-                     (provinceId != null ? " AND d.province_id = ?" : "");
+                     (provinceId != null ? " AND d.province_id = ?" : "") +
+                     SqlFilters.inClauseAny(OWNER_COLUMNS, ownerIds);
         try (Connection conn = DBContext.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, STATUS_CLOSED);

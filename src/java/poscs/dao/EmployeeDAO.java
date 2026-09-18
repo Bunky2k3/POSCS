@@ -842,6 +842,37 @@ public class EmployeeDAO {
     }
 
     /**
+     * Phạm vi "của tôi" trên Dashboard: chính người đó, cộng các cấp dưới trực
+     * tiếp của họ.
+     *
+     * <p>MỘT tầng là đủ, không phải đi đệ quy: người đã là cấp dưới thì không
+     * được chọn làm cấp trên của ai (xem điều kiện {@code manager_id IS NULL} ở
+     * danh sách chọn cấp trên), nên cây nhân sự chỉ sâu hai tầng. Nếu sau này
+     * luật đó nới ra thì đây là chỗ phải đổi.
+     *
+     * <p>Luôn chứa chính {@code userId}, kể cả khi người đó không quản lý ai --
+     * bên gọi dùng danh sách này làm mệnh đề IN, và trả về rỗng sẽ bị hiểu là
+     * "không lọc", tức là cho xem toàn bộ.
+     */
+    public List<Integer> findTeamUserIds(int userId) {
+        List<Integer> ids = new ArrayList<>();
+        ids.add(userId);
+        String sql = "SELECT user_id FROM users WHERE manager_id = ? AND is_deleted = 0";
+        try (Connection conn = DBContext.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, userId);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    ids.add(rs.getInt("user_id"));
+                }
+            }
+        } catch (SQLException ex) {
+            LOG.error("Loi truy van cap duoi (userId={})", userId, ex);
+        }
+        return ids;
+    }
+
+    /**
      * Địa bàn của một quản lý vùng: gộp tỉnh của tất cả cấp dưới trực tiếp.
      *
      * Suy ra chứ không lưu -- nên đổi cấp trên của một nhân viên là địa bàn

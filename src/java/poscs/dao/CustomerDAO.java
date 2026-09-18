@@ -10,6 +10,7 @@ import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import poscs.common.Period;
+import poscs.common.SqlFilters;
 import poscs.model.Address;
 import poscs.model.CustomerLifecycleEvent;
 import poscs.model.District;
@@ -129,7 +130,7 @@ public class CustomerDAO {
 
     /** Như {@link #countNewThisMonth()} nhưng chỉ đếm khách thuộc 1 tỉnh (null = toàn quốc). */
     public int countNewThisMonth(Integer provinceId) {
-        return countJoined(provinceId, null, false);
+        return countJoined(provinceId, null, false, null);
     }
 
     /**
@@ -137,7 +138,12 @@ public class CustomerDAO {
      * quay về nghĩa cũ "trong tháng hiện tại".
      */
     public int countNewInPeriod(Integer provinceId, Period period) {
-        return countJoined(provinceId, period, false);
+        return countJoined(provinceId, period, false, null);
+    }
+
+    /** Như trên nhưng chỉ đếm khách do những người này phụ trách (rỗng/null = tất cả). */
+    public int countNewInPeriod(Integer provinceId, Period period, List<Integer> ownerIds) {
+        return countJoined(provinceId, period, false, ownerIds);
     }
 
     /**
@@ -147,10 +153,15 @@ public class CustomerDAO {
      * trên cùng một trang. period null = đếm toàn bộ, không giới hạn thời gian.
      */
     public int countUpToEndOfPeriod(Integer provinceId, Period period) {
-        return countJoined(provinceId, period, true);
+        return countJoined(provinceId, period, true, null);
     }
 
-    private int countJoined(Integer provinceId, Period period, boolean cumulative) {
+    /** Như trên nhưng chỉ đếm khách do những người này phụ trách (rỗng/null = tất cả). */
+    public int countUpToEndOfPeriod(Integer provinceId, Period period, List<Integer> ownerIds) {
+        return countJoined(provinceId, period, true, ownerIds);
+    }
+
+    private int countJoined(Integer provinceId, Period period, boolean cumulative, List<Integer> ownerIds) {
         String dateCondition;
         if (period == null) {
             // Không chọn kỳ: luỹ kế = toàn bộ; "mới" = trong tháng hiện tại.
@@ -164,7 +175,10 @@ public class CustomerDAO {
                      "LEFT JOIN addresses a ON e.address_id = a.address_id " +
                      "LEFT JOIN districts d ON a.districts_id = d.districts_id " +
                      "WHERE e.is_deleted = 0" + dateCondition +
-                     (provinceId != null ? " AND d.province_id = ?" : "");
+                     (provinceId != null ? " AND d.province_id = ?" : "") +
+                     // "Khách của tôi" = khách mà tôi (hoặc cấp dưới của tôi) đứng
+                     // tên phụ trách, đúng cột mà màn hình khách hàng đang hiện.
+                     SqlFilters.inClause("e.account_owner_id", ownerIds);
         try (Connection conn = DBContext.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             int param = 1;
@@ -175,8 +189,9 @@ public class CustomerDAO {
                 ps.setDate(param++, period.getTo());
             }
             if (provinceId != null) {
-                ps.setInt(param, provinceId);
+                ps.setInt(param++, provinceId);
             }
+            SqlFilters.bind(ps, param, ownerIds);
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
                     return rs.getInt(1);
