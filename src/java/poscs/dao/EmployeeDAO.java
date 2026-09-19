@@ -873,6 +873,36 @@ public class EmployeeDAO {
     }
 
     /**
+     * Địa bàn mà Dashboard coi là "của tôi": tỉnh mình trực tiếp cầm CỘNG tỉnh
+     * của cấp dưới trực tiếp.
+     *
+     * <p>Gộp cả cấp dưới để khớp với ô "Của tôi" ngay cạnh nó -- ô đó vốn đã
+     * gộp cấp dưới (xem {@link #findTeamUserIds}). Lấy riêng tỉnh mình cầm thì
+     * trưởng nhóm mở trang ra thấy số người của cả nhóm mà địa bàn chỉ của
+     * mình, hai vế của cùng một phép lọc nói hai chuyện khác nhau.
+     *
+     * <p>MỘT câu lệnh chứ không gộp hai lời gọi ở tầng trên: DISTINCT phải do
+     * CSDL làm, người vừa tự cầm Hà Nội vừa có lính cầm Hà Nội thì gộp tay ra
+     * hai dòng trùng.
+     */
+    public List<Province> findProvincesCoveredBy(int userId) {
+        String sql = "SELECT DISTINCT p.province_id, p.province_name " +
+                     "FROM user_provinces up " +
+                     "JOIN users u ON u.user_id = up.user_id AND u.is_deleted = 0 " +
+                     "JOIN provinces p ON p.province_id = up.province_id " +
+                     "WHERE up.user_id = ? OR u.manager_id = ? ORDER BY p.province_name";
+        try (Connection conn = DBContext.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, userId);
+            ps.setInt(2, userId);
+            return readProvinces(ps);
+        } catch (SQLException ex) {
+            LOG.error("Loi tra dia ban cua nguoi dung (userId={})", userId, ex);
+            return new ArrayList<>();
+        }
+    }
+
+    /**
      * Địa bàn của một quản lý vùng: gộp tỉnh của tất cả cấp dưới trực tiếp.
      *
      * Suy ra chứ không lưu -- nên đổi cấp trên của một nhân viên là địa bàn
@@ -1024,17 +1054,23 @@ public class EmployeeDAO {
     }
 
     private List<Province> queryProvinces(String sql, int param) {
-        List<Province> result = new ArrayList<>();
         try (Connection conn = DBContext.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, param);
-            try (ResultSet rs = ps.executeQuery()) {
-                while (rs.next()) {
-                    result.add(new Province(rs.getInt("province_id"), rs.getString("province_name")));
-                }
-            }
+            return readProvinces(ps);
         } catch (SQLException ex) {
             LOG.error("Loi truy van dia ban (param={})", param, ex);
+            return new ArrayList<>();
+        }
+    }
+
+    /** Đọc kết quả thành danh sách tỉnh -- dùng chung cho các câu tra địa bàn. */
+    private static List<Province> readProvinces(PreparedStatement ps) throws SQLException {
+        List<Province> result = new ArrayList<>();
+        try (ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+                result.add(new Province(rs.getInt("province_id"), rs.getString("province_name")));
+            }
         }
         return result;
     }

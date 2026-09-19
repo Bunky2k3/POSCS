@@ -28,6 +28,12 @@ import poscs.model.User;
  */
 public class CustomerDAO {
 
+    /**
+     * Cột "ai đứng tên khách này" -- danh sách một phần tử vì
+     * {@link SqlFilters#scopeClause} nhận nhiều cột (phiếu hỗ trợ có hai).
+     */
+    private static final List<String> OWNER_COLUMNS = List.of("e.account_owner_id");
+
     private static final Logger LOG = LoggerFactory.getLogger(CustomerDAO.class);
 
     private static final String SELECT_ENTERPRISE_BASE =
@@ -47,6 +53,46 @@ public class CustomerDAO {
         "LEFT JOIN provinces p ON d.province_id = p.province_id " +
         "LEFT JOIN users u ON e.account_owner_id = u.user_id " +
         "LEFT JOIN users s ON e.support_owner_id = s.user_id ";
+
+    /**
+     * Khách hàng trong phạm vi Dashboard, mới nhất trước -- bảng "Khách hàng"
+     * cạnh bảng hợp đồng.
+     *
+     * <p>Lọc ĐÚNG như ô KPI "Tổng khách hàng" ngay phía trên (xem
+     * {@link #countUpToEndOfPeriod}): cùng phạm vi người/địa bàn, và cùng mốc
+     * "tham gia tính tới hết kỳ". Hai chỗ lệch điều kiện thì ô đếm 5 mà bảng
+     * liệt kê 7, không ai giải thích nổi.
+     *
+     * <p>{@code upTo} null = không giới hạn thời gian.
+     */
+    public List<Enterprise> findInScope(int limit, List<Integer> provinceIds, List<Integer> ownerIds, Period upTo) {
+        List<Enterprise> result = new ArrayList<>();
+        String sql = SELECT_ENTERPRISE_BASE +
+                "WHERE e.is_deleted = 0" +
+                (upTo != null ? " AND e.join_date <= ?" : "") +
+                SqlFilters.scopeClause(OWNER_COLUMNS, ownerIds, "d.province_id", provinceIds) +
+                // Chưa có ngày tham gia thì dồn xuống cuối chứ không lên đầu:
+                // NULL trong MySQL xếp trước ở DESC, mà một dòng trống ngày
+                // đứng đầu bảng "mới nhất trước" thì đọc ra là sai.
+                " ORDER BY e.join_date IS NULL, e.join_date DESC, e.enterprise_id DESC LIMIT ?";
+        try (Connection conn = DBContext.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            int param = 1;
+            if (upTo != null) {
+                ps.setDate(param++, upTo.getTo());
+            }
+            param = SqlFilters.bindScope(ps, param, OWNER_COLUMNS, ownerIds, provinceIds);
+            ps.setInt(param, limit);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    result.add(mapRow(rs));
+                }
+            }
+        } catch (SQLException ex) {
+            LOG.error("Loi truy van khach hang cho dashboard", ex);
+        }
+        return result;
+    }
 
     /**
      * Lấy danh sách khách hàng có phân trang + lọc, phục vụ listcustomer.jsp.
@@ -150,7 +196,7 @@ public class CustomerDAO {
 
     /** Như {@link #countNewThisMonth()} nhưng chỉ đếm khách thuộc 1 tỉnh (null = toàn quốc). */
     public int countNewThisMonth(Integer provinceId) {
-        return countJoined(provinceId, null, false, null);
+        return countJoined(SqlFilters.one(provinceId), null, false, null);
     }
 
     /**
@@ -158,12 +204,20 @@ public class CustomerDAO {
      * quay về nghĩa cũ "trong tháng hiện tại".
      */
     public int countNewInPeriod(Integer provinceId, Period period) {
-        return countJoined(provinceId, period, false, null);
+        return countJoined(SqlFilters.one(provinceId), period, false, null);
     }
 
-    /** Như trên nhưng chỉ đếm khách do những người này phụ trách (rỗng/null = tất cả). */
-    public int countNewInPeriod(Integer provinceId, Period period, List<Integer> ownerIds) {
-        return countJoined(provinceId, period, false, ownerIds);
+    /**
+     * Như trên nhưng thu hẹp theo NHIỀU tỉnh và theo người phụ trách -- bộ lọc
+     * của Dashboard (rỗng/null ở vế nào là không lọc vế đó).
+     *
+     * <p>Nhận danh sách tỉnh chứ không phải một tỉnh: thanh lọc Dashboard đã đổi
+     * sang ô tích nhiều tỉnh, mặc định là các tỉnh người đăng nhập phụ trách.
+     * Hai vế nối bằng VÀ, không phải HOẶC -- khác {@link poscs.common.ListScope}
+     * của màn hình danh sách, và đó là lựa chọn đã chốt với người dùng.
+     */
+    public int countNewInPeriod(List<Integer> provinceIds, Period period, List<Integer> ownerIds) {
+        return countJoined(provinceIds, period, false, ownerIds);
     }
 
     /**
@@ -173,15 +227,15 @@ public class CustomerDAO {
      * trên cùng một trang. period null = đếm toàn bộ, không giới hạn thời gian.
      */
     public int countUpToEndOfPeriod(Integer provinceId, Period period) {
-        return countJoined(provinceId, period, true, null);
+        return countJoined(SqlFilters.one(provinceId), period, true, null);
     }
 
-    /** Như trên nhưng chỉ đếm khách do những người này phụ trách (rỗng/null = tất cả). */
-    public int countUpToEndOfPeriod(Integer provinceId, Period period, List<Integer> ownerIds) {
-        return countJoined(provinceId, period, true, ownerIds);
+    /** Như trên nhưng thu hẹp theo nhiều tỉnh và theo người phụ trách -- xem countNewInPeriod. */
+    public int countUpToEndOfPeriod(List<Integer> provinceIds, Period period, List<Integer> ownerIds) {
+        return countJoined(provinceIds, period, true, ownerIds);
     }
 
-    private int countJoined(Integer provinceId, Period period, boolean cumulative, List<Integer> ownerIds) {
+    private int countJoined(List<Integer> provinceIds, Period period, boolean cumulative, List<Integer> ownerIds) {
         String dateCondition;
         if (period == null) {
             // Không chọn kỳ: luỹ kế = toàn bộ; "mới" = trong tháng hiện tại.
@@ -195,10 +249,10 @@ public class CustomerDAO {
                      "LEFT JOIN addresses a ON e.address_id = a.address_id " +
                      "LEFT JOIN districts d ON a.districts_id = d.districts_id " +
                      "WHERE e.is_deleted = 0" + dateCondition +
-                     (provinceId != null ? " AND d.province_id = ?" : "") +
-                     // "Khách của tôi" = khách mà tôi (hoặc cấp dưới của tôi) đứng
-                     // tên phụ trách, đúng cột mà màn hình khách hàng đang hiện.
-                     SqlFilters.inClause("e.account_owner_id", ownerIds);
+                     // "Khách của tôi" = khách tôi (hoặc cấp dưới) đứng tên,
+                     // HOẶC khách nằm trong địa bàn tôi giữ -- một mệnh đề, xem
+                     // SqlFilters.scopeClause.
+                     SqlFilters.scopeClause(OWNER_COLUMNS, ownerIds, "d.province_id", provinceIds);
         try (Connection conn = DBContext.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             int param = 1;
@@ -208,10 +262,7 @@ public class CustomerDAO {
                 }
                 ps.setDate(param++, period.getTo());
             }
-            if (provinceId != null) {
-                ps.setInt(param++, provinceId);
-            }
-            SqlFilters.bind(ps, param, ownerIds);
+            SqlFilters.bindScope(ps, param, OWNER_COLUMNS, ownerIds, provinceIds);
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
                     return rs.getInt(1);

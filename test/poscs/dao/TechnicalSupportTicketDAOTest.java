@@ -136,6 +136,81 @@ public class TechnicalSupportTicketDAOTest {
         }
     }
 
+    /**
+     * Mọi dấu hỏi sinh ra đều phải có người gán giá trị.
+     *
+     * <p>Ca này sinh ra từ một lỗi THẬT: countOverdueOrDueSoon ghép mệnh đề IN
+     * cho ownerIds nhưng phần bind bỏ quên chúng, nên hễ có người đăng nhập là
+     * JDBC ném "No value specified for parameter", DAO nuốt lỗi rồi trả 0 -- ô
+     * "sắp trễ hạn" trên Dashboard của mọi nhân viên luôn bằng 0 mà không báo
+     * gì. Đo được trên bản chạy thật: 0 trong khi CSDL có 2 phiếu.
+     *
+     * <p>Đếm theo SỐ LẦN gọi setInt chứ không theo vị trí: hai tỉnh một lần,
+     * hai người nhân hai cột chủ sở hữu (OWNER_COLUMNS) là bốn lần nữa.
+     */
+    @Test
+    public void countOverdueOrDueSoon_ganDuThamSoChoCaTinhLanNguoi() throws Exception {
+        PreparedStatement ps = statementReturning(singleRow(row("1", 5)));
+        Connection conn = connectionReturning(ps);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            dao.countOverdueOrDueSoon(java.util.List.of(3, 5), java.util.List.of(7, 8));
+
+            // Thứ tự của scopeClause: người trước (2 người x 2 cột = 4 dấu
+            // hỏi), tỉnh sau.
+            verify(ps).setInt(2, 7);
+            verify(ps).setInt(3, 8);
+            verify(ps).setInt(4, 7);
+            verify(ps).setInt(5, 8);
+            verify(ps).setInt(6, 3);
+            verify(ps).setInt(7, 5);
+        }
+    }
+
+    /** Nhiều tỉnh thì ra IN (?,?), không phải nhiều điều kiện = chồng lên nhau. */
+    @Test
+    public void countStatusSummary_nhieuTinh_sinhMenhDeIn() throws Exception {
+        PreparedStatement ps = statementReturning(singleRow(row(
+                "new_count", 1, "progress_count", 0, "closed_count", 0, "urgent_count", 0)));
+        Connection conn = connectionReturning(ps);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            dao.countStatusSummary(java.util.List.of(3, 5, 9), null, null);
+
+            verify(conn).prepareStatement(contains("d.province_id IN (?,?,?)"));
+            verify(ps).setInt(4, 3);
+            verify(ps).setInt(5, 5);
+            verify(ps).setInt(6, 9);
+        }
+    }
+
+    /**
+     * Hai vế của phạm vi nối bằng HOẶC, không phải VÀ.
+     *
+     * <p>Ca này canh đúng thứ đã đo sai trên bản chạy thật: ghép bằng VÀ thì
+     * nhân viên mất cả việc mình đứng tên ở tỉnh người khác lẫn việc trong địa
+     * bàn mình mà người khác đứng tên.
+     */
+    @Test
+    public void phamVi_noiNguoiVaTinhBangHoac() throws Exception {
+        PreparedStatement ps = statementReturning(singleRow(row(
+                "new_count", 0, "progress_count", 0, "closed_count", 0, "urgent_count", 0)));
+        Connection conn = connectionReturning(ps);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            dao.countStatusSummary(java.util.List.of(3), null, java.util.List.of(7));
+
+            verify(conn).prepareStatement(contains(
+                    "(t.assigned_technician_id IN (?) OR t.created_by IN (?) OR d.province_id IN (?))"));
+        }
+    }
+
     @Test
     public void countStatusSummary_emptyTable_stillReturnsAllFourKeysAtZero() throws Exception {
         PreparedStatement ps = statementReturning(emptyResultSet());
