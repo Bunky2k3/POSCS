@@ -61,6 +61,9 @@ public class DashboardController extends HttpServlet {
      * vừa sửa. Quá số này thì đã có link "Xem tất cả".
      */
     private static final int CONTRACTS_IN_WINDOW_LIMIT = 8;
+
+    /** Số dòng tối đa của bảng khách hàng -- bằng bảng hợp đồng để hai thẻ cân nhau. */
+    private static final int CUSTOMERS_IN_SCOPE_LIMIT = 8;
     private static final String[] WEEKDAY_VI = {
         "Chủ Nhật", "Thứ Hai", "Thứ Ba", "Thứ Tư", "Thứ Năm", "Thứ Sáu", "Thứ Bảy"
     };
@@ -209,6 +212,12 @@ public class DashboardController extends HttpServlet {
         }
         request.setAttribute("windowContracts", windowContracts);
         request.setAttribute("contractValues", contractValues);
+
+        // ===== Bảng khách hàng =====
+        // Cùng phạm vi và cùng mốc thời gian với ô KPI "Tổng khách hàng" ngay
+        // trên nó -- xem CustomerDAO.findInScope.
+        request.setAttribute("scopeCustomers",
+                customerDAO.findInScope(CUSTOMERS_IN_SCOPE_LIMIT, provinceFilters, ownerIds, period));
 
         request.getRequestDispatcher("/dashboard.jsp").forward(request, response);
     }

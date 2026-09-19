@@ -55,6 +55,46 @@ public class CustomerDAO {
         "LEFT JOIN users s ON e.support_owner_id = s.user_id ";
 
     /**
+     * Khách hàng trong phạm vi Dashboard, mới nhất trước -- bảng "Khách hàng"
+     * cạnh bảng hợp đồng.
+     *
+     * <p>Lọc ĐÚNG như ô KPI "Tổng khách hàng" ngay phía trên (xem
+     * {@link #countUpToEndOfPeriod}): cùng phạm vi người/địa bàn, và cùng mốc
+     * "tham gia tính tới hết kỳ". Hai chỗ lệch điều kiện thì ô đếm 5 mà bảng
+     * liệt kê 7, không ai giải thích nổi.
+     *
+     * <p>{@code upTo} null = không giới hạn thời gian.
+     */
+    public List<Enterprise> findInScope(int limit, List<Integer> provinceIds, List<Integer> ownerIds, Period upTo) {
+        List<Enterprise> result = new ArrayList<>();
+        String sql = SELECT_ENTERPRISE_BASE +
+                "WHERE e.is_deleted = 0" +
+                (upTo != null ? " AND e.join_date <= ?" : "") +
+                SqlFilters.scopeClause(OWNER_COLUMNS, ownerIds, "d.province_id", provinceIds) +
+                // Chưa có ngày tham gia thì dồn xuống cuối chứ không lên đầu:
+                // NULL trong MySQL xếp trước ở DESC, mà một dòng trống ngày
+                // đứng đầu bảng "mới nhất trước" thì đọc ra là sai.
+                " ORDER BY e.join_date IS NULL, e.join_date DESC, e.enterprise_id DESC LIMIT ?";
+        try (Connection conn = DBContext.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            int param = 1;
+            if (upTo != null) {
+                ps.setDate(param++, upTo.getTo());
+            }
+            param = SqlFilters.bindScope(ps, param, OWNER_COLUMNS, ownerIds, provinceIds);
+            ps.setInt(param, limit);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    result.add(mapRow(rs));
+                }
+            }
+        } catch (SQLException ex) {
+            LOG.error("Loi truy van khach hang cho dashboard", ex);
+        }
+        return result;
+    }
+
+    /**
      * Lấy danh sách khách hàng có phân trang + lọc, phục vụ listcustomer.jsp.
      * @param page 1-indexed
      */

@@ -182,6 +182,25 @@ public class DashboardControllerTest {
                         && w.getTo().toLocalDate().getMonthValue() == today.getMonthValue()));
     }
 
+    /**
+     * Bảng khách hàng lọc ĐÚNG như ô KPI "Tổng khách hàng" ngay trên nó: cùng
+     * phạm vi người/địa bàn, cùng mốc "tham gia tính tới hết kỳ".
+     *
+     * <p>Hai chỗ lệch điều kiện thì ô đếm một đằng, bảng liệt kê một nẻo, mà
+     * chúng đứng cách nhau đúng một màn hình.
+     */
+    @Test
+    public void bangKhachHang_dungPhamViVoiOTongKhachHang() throws Exception {
+        dangNhap(7, "Sales");
+        when(employeeDAO.findProvincesCoveredBy(7)).thenReturn(List.of(new Province(3, "Thanh pho Ha Noi")));
+
+        controller.doGet(request, response);
+
+        verify(customerDAO).findInScope(anyInt(), eq(List.of(3)), eq(List.of(7)), nullable(Period.class));
+        verify(customerDAO).countUpToEndOfPeriod(eq(List.of(3)), nullable(Period.class), eq(List.of(7)));
+        verify(request).setAttribute(eq("scopeCustomers"), any());
+    }
+
     /** Chọn kỳ thì bảng đi theo kỳ đó, không cứng ở tháng hiện tại. */
     @Test
     public void bangHopDong_chonKy_thiDiTheoKy() throws Exception {

@@ -1,6 +1,7 @@
 <%@page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
 <%@taglib prefix="c" uri="jakarta.tags.core"%>
 <%@taglib prefix="fn" uri="jakarta.tags.functions"%>
+<%@taglib prefix="fmt" uri="jakarta.tags.fmt"%>
 <!DOCTYPE html>
 <html lang="vi">
 <head>
@@ -510,7 +511,7 @@
              phiếu hỗ trợ và NotificationScheduler vẫn dùng), nên bật lại là
              dựng lại phần hiển thị chứ không phải viết lại truy vấn. --%>
         <div class="row g-4">
-            <div class="col-12">
+            <div class="col-lg-6">
                 <div class="card-box table-section h-100">
                     <div class="table-section-header">
                         <%-- Không còn lọc "sắp hết hạn": bảng liệt kê MỌI hợp đồng
@@ -575,6 +576,54 @@
                 </div>
             </div>
 
+            <div class="col-lg-6">
+                <div class="card-box table-section h-100">
+                    <div class="table-section-header">
+                        <%-- Lọc ĐÚNG như ô KPI "Tổng khách hàng" phía trên: cùng phạm
+                             vi người/địa bàn, cùng mốc "tham gia tính tới hết kỳ".
+                             Hai chỗ lệch điều kiện thì ô đếm 5 mà bảng liệt kê 7. --%>
+                        <h6>Khách hàng <span class="as-of-today">mới nhất trước</span></h6>
+                        <a href="${pageContext.request.contextPath}/customer">Xem tất cả</a>
+                    </div>
+                    <div class="table-responsive">
+                    <table class="mini-table">
+                        <thead><tr><th>Khách hàng</th><th>Địa bàn</th><th>Loại</th><th>Tham gia</th></tr></thead>
+                        <tbody>
+                            <c:choose>
+                                <c:when test="${empty scopeCustomers}">
+                                    <tr><td colspan="4" style="text-align:center; color:#9ca3af; padding:20px 8px;">Chưa có khách hàng nào trong phạm vi này.</td></tr>
+                                </c:when>
+                                <c:otherwise>
+                                    <c:forEach var="kh" items="${scopeCustomers}">
+                                        <tr>
+                                            <td><a href="${pageContext.request.contextPath}/customer?action=view&id=${kh.enterpriseId}" class="link">${fn:escapeXml(kh.enterpriseName)}</a></td>
+                                            <td>
+                                                <c:choose>
+                                                    <c:when test="${kh.address.district.province != null}">${fn:escapeXml(kh.address.district.province.shortName)}</c:when>
+                                                    <c:otherwise>&mdash;</c:otherwise>
+                                                </c:choose>
+                                            </td>
+                                            <td>
+                                                <c:choose>
+                                                    <c:when test="${not empty kh.customerType}">${fn:escapeXml(kh.customerType)}</c:when>
+                                                    <c:otherwise>&mdash;</c:otherwise>
+                                                </c:choose>
+                                            </td>
+                                            <td>
+                                                <c:choose>
+                                                    <c:when test="${kh.joinDate != null}"><fmt:formatDate value="${kh.joinDate}" pattern="dd/MM/yyyy"/></c:when>
+                                                    <c:otherwise>&mdash;</c:otherwise>
+                                                </c:choose>
+                                            </td>
+                                        </tr>
+                                    </c:forEach>
+                                </c:otherwise>
+                            </c:choose>
+                        </tbody>
+                    </table>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
