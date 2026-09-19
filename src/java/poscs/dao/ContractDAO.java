@@ -47,6 +47,9 @@ import poscs.model.User;
  */
 public class ContractDAO {
 
+    /** Cột "ai phụ trách hợp đồng này" -- xem {@link SqlFilters#scopeClause}. */
+    private static final List<String> DASHBOARD_OWNER_COLUMNS = List.of("c.owner_id");
+
     private static final Logger LOG = LoggerFactory.getLogger(ContractDAO.class);
 
     public static final String STATUS_DRAFT = "Chưa hiệu lực";
@@ -497,7 +500,7 @@ public class ContractDAO {
             "FROM contracts c " +
             "LEFT JOIN enterprises e ON c.enterprise_id = e.enterprise_id " +
             JOIN_PROVINCE_OF_ENTERPRISE +
-            "WHERE c.is_deleted = 0" + SqlFilters.inClause("d.province_id", provinceIds)
+            "WHERE c.is_deleted = 0"
             + (period != null ? " AND c.signing_date BETWEEN ? AND ?" : "")
             + (direction != null ? " AND c.direction = ?" : "")
             + (rootsOnly ? " AND c.parent_contract_id IS NULL" : "")
@@ -508,7 +511,8 @@ public class ContractDAO {
                         : " AND EXISTS (SELECT 1 FROM contract_handovers wh"
                           + " WHERE wh.contract_id = c.contract_id AND wh.done_at IS NULL"
                           + " AND wh.department_id = ?)")
-            + SqlFilters.inClause("c.owner_id", ownerIds);
+            // Phạm vi Dashboard: của tôi HOẶC trong địa bàn tôi giữ.
+            + SqlFilters.scopeClause(DASHBOARD_OWNER_COLUMNS, ownerIds, "d.province_id", provinceIds);
 
         // Hai mệnh đề của phạm vi ghi tham số vào scopeParams theo đúng thứ tự dấu hỏi
         // của chính chúng, nên chỉ cần nối vào cuối câu và bind lần lượt.
@@ -527,7 +531,6 @@ public class ContractDAO {
         try (Connection conn = DBContext.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             int param = 1;
-            param = SqlFilters.bind(ps, param, provinceIds);
             if (period != null) {
                 ps.setDate(param++, period.getFrom());
                 ps.setDate(param++, period.getTo());
@@ -538,7 +541,7 @@ public class ContractDAO {
             if (waitingDepartmentId != null && waitingDepartmentId != WAITING_ANY_DEPARTMENT) {
                 ps.setInt(param++, waitingDepartmentId);
             }
-            param = SqlFilters.bind(ps, param, ownerIds);
+            param = SqlFilters.bindScope(ps, param, DASHBOARD_OWNER_COLUMNS, ownerIds, provinceIds);
             for (Object value : scopeParams) {
                 ps.setObject(param++, value);
             }
@@ -581,14 +584,12 @@ public class ContractDAO {
             // cạnh thì cộng lần nữa phần tiền đã nằm trong giá trị hiện hành
             // của cha. Phụ lục vẫn tìm được ở danh sách hợp đồng.
             "AND c.parent_contract_id IS NULL " +
-            SqlFilters.inClause("d.province_id", provinceIds) + " " +
-            SqlFilters.inClause("c.owner_id", ownerIds) + " " +
+            SqlFilters.scopeClause(DASHBOARD_OWNER_COLUMNS, ownerIds, "d.province_id", provinceIds) + " " +
             "ORDER BY c.end_date ASC LIMIT ?";
         try (Connection conn = DBContext.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             int param = 1;
-            param = SqlFilters.bind(ps, param, provinceIds);
-            param = SqlFilters.bind(ps, param, ownerIds);
+            param = SqlFilters.bindScope(ps, param, DASHBOARD_OWNER_COLUMNS, ownerIds, provinceIds);
             ps.setInt(param, limit);
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
@@ -2853,15 +2854,13 @@ public class ContractDAO {
                      // thì hợp đồng MUA đầu tiên nhập vào là KPI tự cộng cả tiền
                      // mình đi trả, sai âm thầm cho tới lúc đối chiếu sổ sách.
                      "AND c.direction = 'Bán' " +
-                     SqlFilters.inClause("d.province_id", provinceIds) +
-                     SqlFilters.inClause("c.owner_id", ownerIds);
+                     SqlFilters.scopeClause(DASHBOARD_OWNER_COLUMNS, ownerIds, "d.province_id", provinceIds);
         try (Connection conn = DBContext.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setDate(1, period.getFrom());
             ps.setDate(2, period.getTo());
             int param = 3;
-            param = SqlFilters.bind(ps, param, provinceIds);
-            SqlFilters.bind(ps, param, ownerIds);
+            SqlFilters.bindScope(ps, param, DASHBOARD_OWNER_COLUMNS, ownerIds, provinceIds);
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
                     return rs.getBigDecimal(1);
@@ -2902,15 +2901,13 @@ public class ContractDAO {
                      // thì hợp đồng MUA đầu tiên nhập vào là KPI tự cộng cả tiền
                      // mình đi trả, sai âm thầm cho tới lúc đối chiếu sổ sách.
                      "AND c.direction = 'Bán' " +
-                     SqlFilters.inClause("d.province_id", provinceIds) +
-                     SqlFilters.inClause("c.owner_id", ownerIds);
+                     SqlFilters.scopeClause(DASHBOARD_OWNER_COLUMNS, ownerIds, "d.province_id", provinceIds);
         try (Connection conn = DBContext.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, year);
             ps.setInt(2, month);
             int param = 3;
-            param = SqlFilters.bind(ps, param, provinceIds);
-            SqlFilters.bind(ps, param, ownerIds);
+            SqlFilters.bindScope(ps, param, DASHBOARD_OWNER_COLUMNS, ownerIds, provinceIds);
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
                     return rs.getBigDecimal(1);

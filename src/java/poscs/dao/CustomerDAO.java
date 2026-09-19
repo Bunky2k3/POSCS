@@ -28,6 +28,12 @@ import poscs.model.User;
  */
 public class CustomerDAO {
 
+    /**
+     * Cột "ai đứng tên khách này" -- danh sách một phần tử vì
+     * {@link SqlFilters#scopeClause} nhận nhiều cột (phiếu hỗ trợ có hai).
+     */
+    private static final List<String> OWNER_COLUMNS = List.of("e.account_owner_id");
+
     private static final Logger LOG = LoggerFactory.getLogger(CustomerDAO.class);
 
     private static final String SELECT_ENTERPRISE_BASE =
@@ -203,10 +209,10 @@ public class CustomerDAO {
                      "LEFT JOIN addresses a ON e.address_id = a.address_id " +
                      "LEFT JOIN districts d ON a.districts_id = d.districts_id " +
                      "WHERE e.is_deleted = 0" + dateCondition +
-                     SqlFilters.inClause("d.province_id", provinceIds) +
-                     // "Khách của tôi" = khách mà tôi (hoặc cấp dưới của tôi) đứng
-                     // tên phụ trách, đúng cột mà màn hình khách hàng đang hiện.
-                     SqlFilters.inClause("e.account_owner_id", ownerIds);
+                     // "Khách của tôi" = khách tôi (hoặc cấp dưới) đứng tên,
+                     // HOẶC khách nằm trong địa bàn tôi giữ -- một mệnh đề, xem
+                     // SqlFilters.scopeClause.
+                     SqlFilters.scopeClause(OWNER_COLUMNS, ownerIds, "d.province_id", provinceIds);
         try (Connection conn = DBContext.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             int param = 1;
@@ -216,8 +222,7 @@ public class CustomerDAO {
                 }
                 ps.setDate(param++, period.getTo());
             }
-            param = SqlFilters.bind(ps, param, provinceIds);
-            SqlFilters.bind(ps, param, ownerIds);
+            SqlFilters.bindScope(ps, param, OWNER_COLUMNS, ownerIds, provinceIds);
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
                     return rs.getInt(1);

@@ -207,9 +207,11 @@ public class TechnicalSupportTicketDAO {
             "  SUM(CASE WHEN t.status = ? THEN 1 ELSE 0 END) AS closed_count, " +
             "  SUM(CASE WHEN t.priority = 'Khẩn cấp' THEN 1 ELSE 0 END) AS urgent_count " +
             "FROM technicalrequests t " + JOIN_ENTERPRISE + JOIN_PROVINCE_OF_ENTERPRISE +
-            "WHERE t.is_deleted = 0" + SqlFilters.inClause("d.province_id", provinceIds)
+            "WHERE t.is_deleted = 0"
             + (period != null ? " AND t.created_date BETWEEN ? AND ?" : "")
-            + SqlFilters.inClauseAny(OWNER_COLUMNS, ownerIds);
+            // Phạm vi Dashboard: phiếu của tôi HOẶC phiếu của khách trong địa
+            // bàn tôi giữ -- một mệnh đề, xem SqlFilters.scopeClause.
+            + SqlFilters.scopeClause(OWNER_COLUMNS, ownerIds, "d.province_id", provinceIds);
 
         try (Connection conn = DBContext.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -217,12 +219,11 @@ public class TechnicalSupportTicketDAO {
             ps.setString(2, STATUS_IN_PROGRESS);
             ps.setString(3, STATUS_CLOSED);
             int param = 4;
-            param = SqlFilters.bind(ps, param, provinceIds);
             if (period != null) {
                 ps.setDate(param++, period.getFrom());
                 ps.setDate(param++, period.getTo());
             }
-            SqlFilters.bind(ps, param, ownerIds, OWNER_COLUMNS.size());
+            SqlFilters.bindScope(ps, param, OWNER_COLUMNS, ownerIds, provinceIds);
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
                     summary.put(STATUS_NEW, rs.getInt("new_count"));
@@ -256,15 +257,13 @@ public class TechnicalSupportTicketDAO {
         List<TechnicalRequest> result = new ArrayList<>();
         String sql = SELECT_BASE + JOIN_PROVINCE_OF_ENTERPRISE +
             "WHERE t.is_deleted = 0 AND t.status <> ? " +
-            SqlFilters.inClause("d.province_id", provinceIds) + " " +
-            SqlFilters.inClauseAny(OWNER_COLUMNS, ownerIds) + " " +
+            SqlFilters.scopeClause(OWNER_COLUMNS, ownerIds, "d.province_id", provinceIds) + " " +
             "ORDER BY FIELD(t.priority, 'Khẩn cấp', 'Cao', 'Bình thường', 'Thấp'), t.created_date ASC LIMIT ?";
         try (Connection conn = DBContext.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             int param = 1;
             ps.setString(param++, STATUS_CLOSED);
-            param = SqlFilters.bind(ps, param, provinceIds);
-            param = SqlFilters.bind(ps, param, ownerIds, OWNER_COLUMNS.size());
+            param = SqlFilters.bindScope(ps, param, OWNER_COLUMNS, ownerIds, provinceIds);
             ps.setInt(param, limit);
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
@@ -299,14 +298,12 @@ public class TechnicalSupportTicketDAO {
         String sql = "SELECT COUNT(*) FROM technicalrequests t " + JOIN_ENTERPRISE + JOIN_PROVINCE_OF_ENTERPRISE +
                      "WHERE t.is_deleted = 0 AND t.status <> ? " +
                      "AND t.sla_deadline IS NOT NULL AND t.sla_deadline <= DATE_ADD(NOW(), INTERVAL 24 HOUR)" +
-                     SqlFilters.inClause("d.province_id", provinceIds) +
-                     SqlFilters.inClauseAny(OWNER_COLUMNS, ownerIds);
+                     SqlFilters.scopeClause(OWNER_COLUMNS, ownerIds, "d.province_id", provinceIds);
         try (Connection conn = DBContext.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             int param = 1;
             ps.setString(param++, STATUS_CLOSED);
-            param = SqlFilters.bind(ps, param, provinceIds);
-            SqlFilters.bind(ps, param, ownerIds, OWNER_COLUMNS.size());
+            SqlFilters.bindScope(ps, param, OWNER_COLUMNS, ownerIds, provinceIds);
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
                     return rs.getInt(1);

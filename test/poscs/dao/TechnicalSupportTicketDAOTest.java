@@ -158,13 +158,14 @@ public class TechnicalSupportTicketDAOTest {
 
             dao.countOverdueOrDueSoon(java.util.List.of(3, 5), java.util.List.of(7, 8));
 
-            verify(ps).setInt(2, 3);
-            verify(ps).setInt(3, 5);
-            // 2 người x 2 cột = 4 dấu hỏi nữa, không được thiếu cái nào.
+            // Thứ tự của scopeClause: người trước (2 người x 2 cột = 4 dấu
+            // hỏi), tỉnh sau.
+            verify(ps).setInt(2, 7);
+            verify(ps).setInt(3, 8);
             verify(ps).setInt(4, 7);
             verify(ps).setInt(5, 8);
-            verify(ps).setInt(6, 7);
-            verify(ps).setInt(7, 8);
+            verify(ps).setInt(6, 3);
+            verify(ps).setInt(7, 5);
         }
     }
 
@@ -184,6 +185,29 @@ public class TechnicalSupportTicketDAOTest {
             verify(ps).setInt(4, 3);
             verify(ps).setInt(5, 5);
             verify(ps).setInt(6, 9);
+        }
+    }
+
+    /**
+     * Hai vế của phạm vi nối bằng HOẶC, không phải VÀ.
+     *
+     * <p>Ca này canh đúng thứ đã đo sai trên bản chạy thật: ghép bằng VÀ thì
+     * nhân viên mất cả việc mình đứng tên ở tỉnh người khác lẫn việc trong địa
+     * bàn mình mà người khác đứng tên.
+     */
+    @Test
+    public void phamVi_noiNguoiVaTinhBangHoac() throws Exception {
+        PreparedStatement ps = statementReturning(singleRow(row(
+                "new_count", 0, "progress_count", 0, "closed_count", 0, "urgent_count", 0)));
+        Connection conn = connectionReturning(ps);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            dao.countStatusSummary(java.util.List.of(3), null, java.util.List.of(7));
+
+            verify(conn).prepareStatement(contains(
+                    "(t.assigned_technician_id IN (?) OR t.created_by IN (?) OR d.province_id IN (?))"));
         }
     }
 

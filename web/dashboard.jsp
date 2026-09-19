@@ -72,7 +72,13 @@
            hàng -- là đẩy ô lọc xuống, đúng thứ vừa bỏ đi. */
         .filter-bar .my-prov { flex: 1 1 240px; min-width: 0; }
 
-        .prov-pop { position: relative; }
+        /* CẢ HAI ô mở bảng đều phải là mốc định vị: bảng bên trong dùng
+           position:absolute, thiếu relative ở đây thì nó neo vào cả trang và
+           rơi lên góc trái, bẹp lại còn vài chục pixel. Đã dính đúng lỗi này
+           với .period-pop khi bỏ lớp .fb-field (lớp đó mới là chỗ mang
+           relative trước đây) -- nên hai ô viết CHUNG một rule, thêm ô thứ ba
+           thì thêm vào đây. */
+        .prov-pop, .period-pop { position: relative; }
         .prov-pop > button {
             cursor: pointer; text-align: left; display: flex; align-items: center; gap: 8px;
         }
@@ -412,8 +418,20 @@
                     <c:when test="${not empty provinceFilters}"><c:set var="provNote" value="${fn:length(provinceFilters)} tỉnh đang chọn"/></c:when>
                     <c:otherwise><c:set var="provNote" value=""/></c:otherwise>
                 </c:choose>
+                <%-- Câu chữ phải nói đúng phép ghép là HOẶC. Với người đang ở phạm
+                     vi "Của tôi" thì địa bàn KHÔNG cắt bớt việc của họ, nó CỘNG
+                     thêm việc trong tỉnh họ giữ -- viết "thu hẹp theo địa bàn" là
+                     nói ngược, và đó chính là thứ làm người dùng đi tìm mấy hợp
+                     đồng bị thiếu. --%>
                 <span>
-                    Số liệu đang thu hẹp theo<c:if test="${not empty provNote}"> <strong>${fn:escapeXml(provNote)}</strong></c:if><c:if test="${not empty provNote and not empty periodLabel}"> và</c:if><c:if test="${not empty periodLabel}"> <strong>${fn:escapeXml(periodLabel)}</strong></c:if>.
+                    <c:choose>
+                        <c:when test="${not empty provNote and scopeFilter == 'mine'}">
+                            Số liệu gồm <strong>phần việc của bạn</strong> và mọi việc trong <strong>${fn:escapeXml(provNote)}</strong><c:if test="${not empty periodLabel}">, tính trong <strong>${fn:escapeXml(periodLabel)}</strong></c:if>.
+                        </c:when>
+                        <c:otherwise>
+                            Số liệu đang thu hẹp theo<c:if test="${not empty provNote}"> <strong>${fn:escapeXml(provNote)}</strong></c:if><c:if test="${not empty provNote and not empty periodLabel}"> và</c:if><c:if test="${not empty periodLabel}"> <strong>${fn:escapeXml(periodLabel)}</strong></c:if>.
+                        </c:otherwise>
+                    </c:choose>
                     Riêng hai bảng cuối trang luôn tính tới hôm nay.
                 </span>
                 <%-- "Xem toàn chi nhánh" chứ không phải "Bỏ lọc": link trỏ /dashboard

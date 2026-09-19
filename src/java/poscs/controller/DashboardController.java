@@ -109,10 +109,14 @@ public class DashboardController extends HttpServlet {
         // không thì KPI "15 hợp đồng" nằm cạnh bảng chỉ có 4 dòng, không biết
         // tin số nào.
         //
-        // Ghép với phạm vi người bằng VÀ, không phải HOẶC: người dùng chốt như
-        // vậy (2026-09-19). Khác ListScope của hai màn hình danh sách -- bên đó
-        // là HOẶC. Hệ quả cố ý: hợp đồng bạn đứng tên ở tỉnh NGOÀI địa bàn sẽ
-        // không vào số liệu Dashboard khi các ô tỉnh còn tích. Bỏ tích là thấy.
+        // Ghép với phạm vi người bằng HOẶC, GIỐNG ListScope của hai màn hình
+        // danh sách: việc tôi đứng tên, cộng việc nằm trong địa bàn tôi giữ.
+        //
+        // Bản đầu ghép bằng VÀ (người dùng chốt thế), và nó sai ngay trên dữ
+        // liệu thật: sales4 mất 3 hợp đồng họ ĐỨNG TÊN vì khách ở Hưng Yên --
+        // tỉnh của người khác -- cộng 6 hợp đồng trong địa bàn họ giữ mà người
+        // khác đứng tên. Dashboard nói "1 hợp đồng đang hiệu lực" trong khi
+        // danh sách hợp đồng của chính họ liệt kê 10 dòng. Đừng đổi lại VÀ.
         List<Province> myProvinces = me == null ? null : employeeDAO.findProvincesCoveredBy(me.getUserId());
         if (myProvinces == null) {
             myProvinces = List.of();
