@@ -723,10 +723,11 @@ public class ContractDAOTest {
      *
      * <p>Bám theo THỨ TỰ CỘT của câu lệnh đó, nên thêm một cột vào giữa là
      * số này phải đổi theo -- đã dịch một lần khi thêm contract_number (V25),
-     * rồi dịch ngược lại khi gộp nó vào contract_code (V28).
+     * rồi dịch ngược lại khi gộp nó vào contract_code (V28), rồi dịch lần nữa
+     * khi bỏ cột attachment_url (V34).
      * Tách ra hằng số để lần sau chỉ sửa một chỗ thay vì năm chỗ.
      */
-    private static final int STATUS_PARAM_INDEX = 11;
+    private static final int STATUS_PARAM_INDEX = 10;
 
     /** Chạy insert() với cặp ngày cho trước rồi trả về statement để soi tham số đã bind. */
     private PreparedStatement captureStatusFor(Date effectiveDate, Date endDate) throws Exception {
@@ -947,7 +948,11 @@ public class ContractDAOTest {
     // ------------------------------------------------------------------
 
     /**
-     * Hợp đồng ĐÃ KÝ: chỉ owner_id và attachment_url đi xuống CSDL.
+     * Hợp đồng ĐÃ KÝ: chỉ owner_id đi xuống CSDL.
+     *
+     * <p>Trước V34 còn attachment_url, mở với lý do "bản PDF đã ký thường chỉ
+     * có SAU khi ký". Giấy tờ giờ nằm ở bảng riêng, thêm được ở mọi trạng thái
+     * -- nên câu UPDATE này gọn lại đúng một cột.
      *
      * <p>Chặn ở DAO chứ không chỉ ẩn ô: nút ẩn thì POST thẳng vào URL vẫn ghi
      * được, mà đây là ranh giới pháp lý chứ không phải chuyện giao diện.
@@ -964,7 +969,6 @@ public class ContractDAOTest {
         Contract submitted = new Contract();
         submitted.setContractId(5);
         submitted.setOwnerId(88);
-        submitted.setAttachmentUrl("https://drive.google.com/file/d/xyz");
         // Người dùng (hoặc một POST nặn tay) cố đổi điều khoản.
         submitted.setTitle("Tiêu đề bị đổi lén");
         submitted.setContractValue(new BigDecimal("1"));
@@ -979,7 +983,7 @@ public class ContractDAOTest {
             String updateSql = sql.getAllValues().stream()
                     .filter(q -> q.startsWith("UPDATE contracts SET"))
                     .findFirst().orElse("");
-            assertEquals("UPDATE contracts SET owner_id = ?, attachment_url = ? "
+            assertEquals("UPDATE contracts SET owner_id = ? "
                     + "WHERE contract_id = ? AND is_deleted = 0", updateSql);
         }
     }

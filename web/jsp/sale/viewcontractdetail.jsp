@@ -367,23 +367,18 @@
                      link thật sự trỏ tới file Drive. Link nội bộ công ty cũng
                      lưu được (isSafeHttpUrl chỉ đòi http/https), nên nói "trên
                      Drive" cho mọi link là sai sự thật. --%>
-                <%-- Dùng ${attachmentUrl} (đã được ContractController kiểm lại scheme)
-                     chứ KHÔNG dùng thẳng ${contract.attachmentUrl}: fn:escapeXml
-                     không vô hiệu hoá được "javascript:" trong href. --%>
-                <c:if test="${not empty attachmentUrl}">
-                    <a href="${fn:escapeXml(attachmentUrl)}" target="_blank" rel="noopener noreferrer"
+                <%-- Dùng ${primaryDocumentUrl} (ContractController đã kiểm lại scheme)
+                     chứ KHÔNG dùng thẳng giá trị trong CSDL: fn:escapeXml không vô
+                     hiệu hoá được "javascript:" trong href. Đây là giấy tờ loại
+                     "Hợp đồng đã ký" -- bản gốc của chính hợp đồng này. --%>
+                <c:if test="${not empty primaryDocumentUrl}">
+                    <a href="${fn:escapeXml(primaryDocumentUrl)}" target="_blank" rel="noopener noreferrer"
                        class="btn-delete-detail" style="cursor:pointer; color:var(--primary); border-color:#e5e7eb;">
                         <c:choose>
                             <c:when test="${not empty drivePreviewUrl}"><i class="fa-brands fa-google-drive"></i> Mở PDF trên Drive</c:when>
                             <c:otherwise><i class="fa-solid fa-up-right-from-square"></i> Mở file PDF</c:otherwise>
                         </c:choose>
                     </a>
-                </c:if>
-                <c:if test="${attachmentUnsafe}">
-                    <span class="btn-delete-detail" style="color:var(--danger); border-color:var(--danger); cursor:default;"
-                          title="Link đính kèm của hợp đồng này không phải http/https nên đã bị chặn hiển thị. Vào Sửa thông tin để nhập lại.">
-                        <i class="fa-solid fa-triangle-exclamation"></i> Link đính kèm không hợp lệ
-                    </span>
                 </c:if>
                 <a href="${pageContext.request.contextPath}/contract?action=exportPdf&id=${contract.contractId}" class="btn-delete-detail" style="cursor:pointer; color:var(--primary); border-color:#e5e7eb;"><i class="fa-solid fa-file-pdf"></i> Xuất PDF</a>
                 <%-- Link duy nhất dẫn tới nơi có thao tác. Mở được cả khi hợp
@@ -521,6 +516,13 @@
                 <li class="nav-item" role="presentation">
                     <button class="nav-link" data-bs-toggle="tab" data-bs-target="#pane-ban-pdf"
                             type="button" role="tab"><i class="fa-solid fa-file-pdf me-2"></i>Bản PDF</button>
+                </li>
+                </c:if>
+                <c:if test="${not empty contractDocuments}">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#pane-tai-lieu"
+                            type="button" role="tab"><i class="fa-solid fa-folder-open me-2"></i>Tài liệu
+                        (${fn:length(contractDocuments)})</button>
                 </li>
                 </c:if>
                 <c:if test="${not empty handovers}">
@@ -977,7 +979,7 @@
             <div class="info-card card-box">
                 <div class="section-header">
                     <h5>Bản PDF đã ký</h5>
-                    <a href="${fn:escapeXml(attachmentUrl)}" target="_blank" rel="noopener noreferrer"
+                    <a href="${fn:escapeXml(primaryDocumentUrl)}" target="_blank" rel="noopener noreferrer"
                        style="font-size:0.85rem; color:var(--primary); font-weight:600; text-decoration:none;">
                         Mở trên Drive <i class="fa-solid fa-arrow-up-right-from-square"></i>
                     </a>
@@ -1080,6 +1082,52 @@
                                             </div>
                                         </form>
                                     </c:if>
+                                </td>
+                            </tr>
+                        </c:forEach>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+            </div>
+            </c:if>
+            <c:if test="${not empty contractDocuments}">
+            <div class="tab-pane fade" id="pane-tai-lieu" role="tabpanel">
+        <%-- ===== Giấy tờ kèm theo (V34) =====
+             CHỈ ĐỌC ở trang này như mọi khối khác; treo thêm hoặc huỷ nằm ở trang
+             quản lý. Link mở tab mới kèm rel="noopener noreferrer" -- trang đích
+             là site ngoài (Drive), không cho nó cầm window.opener của mình.
+
+             Không kiểm lại scheme từng dòng ở đây được (chỉ bản "Hợp đồng đã ký"
+             đi qua controller), nên link nào cũng đi kèm rel và target như nhau;
+             chốt chặn thật là TextRules.isSafeHttpUrl lúc THÊM. --%>
+        <div class="info-card card-box">
+            <div class="section-header"><h5>Tài liệu kèm theo</h5></div>
+            <div class="table-responsive">
+                <table class="table align-middle" style="font-size:0.9rem;">
+                    <thead>
+                        <tr><th>Loại</th><th>Tên tài liệu</th><th>Người thêm</th><th>Ngày thêm</th><th></th></tr>
+                    </thead>
+                    <tbody>
+                        <c:forEach var="doc" items="${contractDocuments}">
+                            <tr>
+                                <td><span class="status-pill status-info">${fn:escapeXml(doc.docType)}</span></td>
+                                <td>
+                                    <div>${fn:escapeXml(doc.displayName)}</div>
+                                    <c:if test="${not empty doc.note}">
+                                        <div style="font-size:0.8rem; color:#9ca3af;">${fn:escapeXml(doc.note)}</div>
+                                    </c:if>
+                                </td>
+                                <td style="font-size:0.84rem;">${fn:escapeXml(doc.uploadedByName)}</td>
+                                <td style="font-size:0.84rem;">
+                                    <fmt:formatDate value="${doc.uploadedAt}" pattern="dd/MM/yyyy"/>
+                                </td>
+                                <td style="text-align:right;">
+                                    <a href="${fn:escapeXml(doc.fileUrl)}" target="_blank" rel="noopener noreferrer"
+                                       style="color:var(--primary); font-weight:600; font-size:0.84rem; text-decoration:none;">
+                                        Mở <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                                    </a>
                                 </td>
                             </tr>
                         </c:forEach>

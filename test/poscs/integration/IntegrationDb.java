@@ -152,9 +152,13 @@ public final class IntegrationDb {
      */
     public static void clearBusinessData() throws SQLException {
         String[] tables = {
-            // contract_links phải đứng trước contracts: nó trỏ vào đó bằng HAI
-            // khoá ngoại và không có cascade.
-            "notifications", "customer_lifecycle_events", "contract_handovers", "contract_links", "contract_payments",
+            // contract_links và contract_documents phải đứng TRƯỚC contracts: cả
+            // hai trỏ vào đó bằng khoá ngoại và không có cascade. Quên một bảng
+            // con ở đây thì dòng của nó sống sót qua clearBusinessData, rồi bám
+            // vào hợp đồng mang ĐÚNG id đó ở ca sau (AUTO_INCREMENT vừa reset
+            // về 1) -- test đổ vỡ ở chỗ chẳng liên quan gì tới nó.
+            "notifications", "customer_lifecycle_events", "contract_handovers", "contract_links",
+            "contract_documents", "contract_payments",
             "technicalrequestdevices", "technicalrequesthistory", "technicalrequests",
             "contract_history", "contractproducts", "contracts", "enterprisecontacts", "enterprises",
             "productimages", "productcatalogues", "products", "users", "addresses"

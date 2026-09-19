@@ -199,12 +199,19 @@
              đứng NGOÀI form sửa thông tin ở trên: form lồng form là HTML không
              hợp lệ, trình duyệt sẽ tự cắt và nút bấm gửi đi thiếu tham số. --%>
 
-        <c:if test="${not contract.frozen}">
-        <div class="card-box">
-            <c:if test="${not empty param.error}">
+        <%-- Thông báo lỗi đứng NGOÀI khối "chưa đóng băng" của form sửa.
+             Trước V34 nó nằm bên trong, và điều đó vừa đủ đúng vì hợp đồng đã
+             đóng băng thì chẳng còn thao tác nào ghi được. Giờ thì có: tài liệu
+             thêm/huỷ được ở MỌI trạng thái, nên lỗi của chúng cũng phải hiện
+             được ở mọi trạng thái -- để bên trong thì bấm hỏng trên một hợp
+             đồng đã thanh lý là màn hình đứng im không nói gì. --%>
+        <c:if test="${not empty param.error}">
+        <div class="card-box" style="padding:14px 18px;">
                 <div class="alert alert-danger py-2 px-3 mb-3" style="font-size: 0.9rem; border-radius: 12px;">
                     <c:choose>
-                        <c:when test="${param.error == 'invalid_drive_link'}">Link file PDF phải là địa chỉ bắt đầu bằng http:// hoặc https://. Vui lòng dán lại.</c:when>
+                        <c:when test="${param.error == 'document_invalid'}">Không thêm được tài liệu: link phải bắt đầu bằng http:// hoặc https://, và loại tài liệu phải chọn trong danh sách.</c:when>
+                        <c:when test="${param.error == 'document_reason_required'}">Phải nêu lý do thì mới huỷ được tài liệu.</c:when>
+                        <c:when test="${param.error == 'document_failed'}">Không thực hiện được trên tài liệu này. Vui lòng thử lại.</c:when>
                         <c:when test="${param.error == 'invalid'}">Thông tin hợp đồng chưa hợp lệ. Vui lòng kiểm tra lại các ô bắt buộc.</c:when>
                         <c:when test="${param.error == 'duplicate_code'}">Mã hợp đồng này đã có hợp đồng khác dùng. Kiểm lại số trên bản giấy hoặc nhập mã khác.</c:when>
                         <c:when test="${param.error == 'update_failed'}">Không lưu được thay đổi. Vui lòng thử lại.</c:when>
@@ -221,7 +228,11 @@
                         <c:otherwise>Đã có lỗi xảy ra. Vui lòng thử lại.</c:otherwise>
                     </c:choose>
                 </div>
-            </c:if>
+        </div>
+        </c:if>
+
+        <c:if test="${not contract.frozen}">
+        <div class="card-box">
 
             <form id="createContractForm" action="${pageContext.request.contextPath}/contract" method="POST" onsubmit="return validateForm();">
                 <input type="hidden" name="csrfToken" value="${csrfToken}">
@@ -427,15 +438,12 @@
                         <input type="date" class="form-control" id="endDate" name="endDate" value="<fmt:formatDate value="${contract.endDate}" pattern="yyyy-MM-dd"/>" ${canEditTerms ? '' : 'disabled'} data-term="1">
                     </div>
 
-                    <div class="col-12 field-row">
-                        <label>Link file PDF hợp đồng (Google Drive)</label>
-                        <input type="url" class="form-control" id="attachmentUrl" name="attachmentUrl"
-                               value="${fn:escapeXml(contract.attachmentUrl)}"
-                               placeholder="VD: https://drive.google.com/file/d/...">
-                        <span style="font-size:0.78rem; color:#9ca3af; display:block; margin-top:6px;">
-                            Tải bản PDF đã ký lên Drive rồi dán link vào đây. Để trống nếu chưa có.
-                        </span>
-                    </div>
+                    <%-- Ô "link file PDF" cũ đã bỏ (V34): giấy tờ giờ là danh sách
+                         nhiều dòng ở tab "Tài liệu", không còn là một trường của
+                         hợp đồng. Hệ quả kèm theo: sau khi KÝ, trường duy nhất còn
+                         sửa được ở form này là NGƯỜI PHỤ TRÁCH -- lý do cũ để mở ô
+                         link ("bản PDF đã ký thường chỉ có sau khi ký") giờ được
+                         phục vụ ở tab kia, nơi thêm được ở mọi trạng thái. --%>
                 </div>
 
                 <div class="section-header"><h5>Hạng mục sản phẩm / dịch vụ</h5></div>
@@ -532,6 +540,11 @@
                 <li class="nav-item" role="presentation">
                     <button class="nav-link" data-bs-toggle="tab" data-bs-target="#pane-ban-giao"
                             type="button" role="tab"><i class="fa-solid fa-share-from-square me-2"></i>Bàn giao</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#pane-tai-lieu"
+                            type="button" role="tab"><i class="fa-solid fa-folder-open me-2"></i>Tài liệu<c:if
+                            test="${not empty contractDocuments}"> (${fn:length(contractDocuments)})</c:if></button>
                 </li>
                 <c:if test="${canLinkContracts}">
                 <li class="nav-item" role="presentation">
@@ -1012,6 +1025,106 @@
              ca phổ biến. --%>
             </div>
             <c:if test="${canLinkContracts}">
+            <div class="tab-pane fade" id="pane-tai-lieu" role="tabpanel">
+        <!-- ===== Giấy tờ kèm theo (V34) ===== -->
+        <%-- CHỈ LƯU LINK, không tải file lên. Khách hàng chốt như vậy: hồ sơ của
+             họ đang nằm trên Drive và vẫn sẽ nằm ở đó. Nói thẳng điều đó ra trên
+             màn hình chứ không để người dùng tự đoán vì sao không có nút chọn file.
+
+             Khối này đứng NGOÀI form sửa (form lồng form là HTML không hợp lệ),
+             cùng lẽ với khối hàng hoá và kỳ thanh toán. --%>
+        <div class="card-box">
+            <div class="section-header"><h5>Tài liệu kèm theo</h5></div>
+            <p style="font-size:0.85rem; color:#6b7280; margin:0 0 14px;">
+                Treo biên bản nghiệm thu, biên bản bàn giao, biên bản thanh lý, hoá đơn… vào đúng hợp đồng này.
+                Hệ thống <strong>chỉ lưu link</strong> — tải file lên Drive (hoặc kho nội bộ) rồi dán link vào đây;
+                ai xoá file ở đó thì link này thành link chết.
+                <strong>Thêm được ở mọi trạng thái</strong>, kể cả sau khi đã thanh lý — phần lớn giấy tờ chỉ
+                sinh ra ở thời điểm đó.
+            </p>
+
+            <c:choose>
+                <c:when test="${empty contractDocuments}">
+                    <p style="font-size:0.88rem; color:#9ca3af; margin:0 0 14px;">Chưa có tài liệu nào.</p>
+                </c:when>
+                <c:otherwise>
+                    <div class="table-responsive">
+                        <table class="table align-middle" style="font-size:0.9rem;">
+                            <thead>
+                                <tr><th>Loại</th><th>Tên tài liệu</th><th>Người thêm</th><th>Ngày</th><th></th></tr>
+                            </thead>
+                            <tbody>
+                                <c:forEach var="doc" items="${contractDocuments}">
+                                    <tr>
+                                        <td><span class="status-pill status-info">${fn:escapeXml(doc.docType)}</span></td>
+                                        <td>
+                                            <div>${fn:escapeXml(doc.displayName)}</div>
+                                            <c:if test="${not empty doc.note}">
+                                                <div style="font-size:0.8rem; color:#9ca3af;">${fn:escapeXml(doc.note)}</div>
+                                            </c:if>
+                                        </td>
+                                        <td style="font-size:0.84rem;">${fn:escapeXml(doc.uploadedByName)}</td>
+                                        <td style="font-size:0.84rem;">
+                                            <fmt:formatDate value="${doc.uploadedAt}" pattern="dd/MM/yyyy"/>
+                                        </td>
+                                        <td style="text-align:right; white-space:nowrap;">
+                                            <a href="${fn:escapeXml(doc.fileUrl)}" target="_blank" rel="noopener noreferrer"
+                                               class="btn-outline-action" style="padding:4px 10px; font-size:0.8rem;">
+                                                Mở <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                                            </a>
+                                            <%-- Huỷ là xoá MỀM và bắt buộc có lý do -- nút chỉ mở modal,
+                                                 việc gửi do submitOp làm. --%>
+                                            <button type="button" class="btn-remove-item js-void-doc"
+                                                    data-doc-id="${doc.documentId}"
+                                                    data-doc-name="${fn:escapeXml(doc.displayName)}"
+                                                    title="Huỷ tài liệu này">
+                                                <i class="fa-solid fa-xmark"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                </c:forEach>
+                            </tbody>
+                        </table>
+                    </div>
+                </c:otherwise>
+            </c:choose>
+
+            <form method="POST" action="${pageContext.request.contextPath}/contract" class="row g-2 align-items-end"
+                  style="margin-top:16px; padding-top:16px; border-top:1.5px solid #eef2f6;">
+                <input type="hidden" name="csrfToken" value="${csrfToken}">
+                <input type="hidden" name="action" value="addDocument">
+                <input type="hidden" name="contractId" value="${contract.contractId}">
+                <div class="col-md-3">
+                    <label style="font-size:0.8rem; color:#6b7280;">Loại tài liệu</label>
+                    <select name="docType" class="form-control" required>
+                        <c:forEach var="t" items="${documentTypes}">
+                            <option value="${fn:escapeXml(t)}">${fn:escapeXml(t)}</option>
+                        </c:forEach>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label style="font-size:0.8rem; color:#6b7280;">Tên tài liệu</label>
+                    <input type="text" name="docTitle" class="form-control" maxlength="255"
+                           placeholder="VD: Biên bản nghiệm thu giai đoạn 1">
+                </div>
+                <div class="col-md-4">
+                    <label style="font-size:0.8rem; color:#6b7280;">Link tài liệu <span style="color:var(--danger);">*</span></label>
+                    <input type="url" name="fileUrl" class="form-control" required maxlength="500"
+                           placeholder="https://drive.google.com/file/d/...">
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn-primary" style="width:100%;">
+                        <i class="fa-solid fa-plus me-1"></i> Thêm
+                    </button>
+                </div>
+                <div class="col-12">
+                    <input type="text" name="docNote" class="form-control" maxlength="255"
+                           placeholder="Ghi chú (không bắt buộc) — vd: bản scan có dấu, ký ngày 10/9">
+                </div>
+            </form>
+        </div>
+
+            </div>
             <div class="tab-pane fade" id="pane-noi-hd" role="tabpanel">
         <!-- ===== Đầu ra kéo theo đầu vào ===== -->
         <%-- Hợp đồng BÁN nối với các đơn MUA sinh ra vì nó, và ngược lại. Quan
@@ -1214,6 +1327,8 @@
         <input type="hidden" name="voidReason" id="opVoidReason">
         <input type="hidden" name="paymentId" id="opPaymentId">
         <input type="hidden" name="contractProductId" id="opContractProductId">
+        <input type="hidden" name="documentId" id="opDocumentId">
+        <input type="hidden" name="reason" id="opDocReason">
     </form>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
@@ -1414,6 +1529,28 @@
                     submitOp('removeProduct');
                 });
         }
+
+        // Huỷ tài liệu: xoá MỀM nên BẮT BUỘC lý do -- dòng ở lại trong CSDL, và
+        // nhật ký phải nói được vì sao nó biến mất khỏi màn hình.
+        document.querySelectorAll('.js-void-doc').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                ask({
+                    title: 'Huỷ tài liệu',
+                    message: 'Huỷ "' + btn.dataset.docName + '" khỏi hồ sơ hợp đồng? '
+                           + 'Dòng này vẫn nằm trong nhật ký, kèm lý do bạn nhập.',
+                    // ask() coi noteLabel là "có ô ghi chú VÀ bắt buộc điền" --
+                    // không có cờ riêng, đừng thêm noteRequired cho có.
+                    noteLabel: 'Lý do huỷ (bắt buộc)',
+                    notePlaceholder: 'VD: dán nhầm link của hợp đồng khác',
+                    danger: true,
+                    okLabel: 'Huỷ tài liệu'
+                }, function (reason) {
+                    document.getElementById('opDocumentId').value = btn.dataset.docId;
+                    document.getElementById('opDocReason').value = reason;
+                    submitOp('voidDocument');
+                });
+            });
+        });
 
         // Gỡ liên kết bán-mua: form nằm sẵn trong bảng, chặn lại để hỏi rồi mới gửi.
         document.querySelectorAll('form[data-confirm]').forEach(function (form) {

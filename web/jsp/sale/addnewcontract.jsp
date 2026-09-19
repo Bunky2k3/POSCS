@@ -107,7 +107,6 @@
             <c:if test="${not empty param.error}">
                 <div class="alert alert-danger py-2 px-3 mb-3" style="font-size: 0.9rem; border-radius: 12px;">
                     <c:choose>
-                        <c:when test="${param.error == 'invalid_drive_link'}">Link file PDF phải là địa chỉ bắt đầu bằng http:// hoặc https://. Vui lòng dán lại.</c:when>
                         <c:when test="${param.error == 'invalid'}">Thông tin hợp đồng chưa hợp lệ. Vui lòng kiểm tra lại các ô bắt buộc.</c:when>
                         <c:when test="${param.error == 'duplicate_code'}">Mã hợp đồng này đã có hợp đồng khác dùng. Kiểm lại số trên bản giấy hoặc nhập mã khác.</c:when>
                         <c:when test="${param.error == 'create_failed'}">Không lưu được hợp đồng. Vui lòng thử lại.</c:when>
@@ -313,14 +312,10 @@
                         </div>
                     </div>
 
-                    <div class="col-12 field-row">
-                        <label>Link file PDF hợp đồng (Google Drive)</label>
-                        <input type="url" class="form-control" id="attachmentUrl" name="attachmentUrl"
-                               placeholder="VD: https://drive.google.com/file/d/...">
-                        <span style="font-size:0.78rem; color:#9ca3af; display:block; margin-top:6px;">
-                            Dán link bản thảo hoặc bản PDF đã ký trên Drive. Không bắt buộc, điền sau cũng được.
-                        </span>
-                    </div>
+                    <%-- Ô "link file PDF" cũ đã bỏ khỏi form TẠO (V34). Giấy tờ giờ
+                         là một danh sách nhiều dòng có loại/ghi chú/người thêm, mà
+                         dòng nào cũng cần contract_id -- thứ chỉ có SAU khi lưu.
+                         Treo giấy tờ ở trang quản lý, tab "Tài liệu". --%>
                 </div>
 
                 <div class="section-header"><h5>Hạng mục sản phẩm / dịch vụ</h5></div>
