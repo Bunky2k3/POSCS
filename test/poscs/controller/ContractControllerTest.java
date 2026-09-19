@@ -18,6 +18,7 @@ import poscs.dao.CustomerDAO;
 import poscs.dao.EmployeeDAO;
 import poscs.dao.ProductDAO;
 import poscs.model.Contract;
+import poscs.model.ContractDocument;
 import poscs.model.ContractHandover;
 import poscs.model.ContractProduct;
 import poscs.model.Product;
@@ -136,13 +137,24 @@ public class ContractControllerTest {
         verify(response).sendRedirect(CONTEXT_PATH + "/contract?error=notfound");
     }
 
-    /** Mở trang chi tiết của 1 hợp đồng có link đính kèm, trả về giá trị drivePreviewUrl đã dựng. */
-    private Object drivePreviewAttributeFor(String attachmentUrl) throws Exception {
+    /**
+     * Mở trang chi tiết của 1 hợp đồng có giấy tờ "Hợp đồng đã ký", trả về giá
+     * trị drivePreviewUrl đã dựng.
+     *
+     * <p>Từ V34 link không còn là một cột của hợp đồng mà là một dòng trong
+     * contract_documents -- khung xem nhúng lấy đúng dòng loại "Hợp đồng đã ký".
+     */
+    private Object drivePreviewAttributeFor(String documentUrl) throws Exception {
         when(request.getParameter("action")).thenReturn("view");
         when(request.getParameter("id")).thenReturn("5");
         Contract contract = new Contract();
         contract.setContractId(5);
-        contract.setAttachmentUrl(attachmentUrl);
+        ContractDocument doc = new ContractDocument();
+        doc.setDocumentId(1);
+        doc.setContractId(5);
+        doc.setDocType(ContractDocument.TYPE_SIGNED_CONTRACT);
+        doc.setFileUrl(documentUrl);
+        when(contractDAO.findDocumentsOf(5)).thenReturn(List.of(doc));
         when(contractDAO.findById(5)).thenReturn(contract);
         RequestDispatcher dispatcher = mock(RequestDispatcher.class);
         when(request.getRequestDispatcher("/jsp/sale/viewcontractdetail.jsp")).thenReturn(dispatcher);

@@ -7,6 +7,7 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 import poscs.dao.ContractDAO;
 import poscs.model.Contract;
+import poscs.model.ContractDocument;
 import poscs.model.ContractHandover;
 import poscs.model.ContractLink;
 
@@ -420,7 +421,7 @@ public class ContractStatusIntegrationTest {
         Contract edit = contractDAO.findById(2);
         edit.setTitle("Tiêu đề bị đổi lén");
         edit.setContractCode("HD-DOI-LEN");
-        edit.setAttachmentUrl("https://drive.google.com/file/d/abc/view");
+        edit.setOwnerId(Fixtures.USER_ID);
         assertTrue(contractDAO.update(edit, Fixtures.USER_ID));
 
         Contract after = contractDAO.findById(2);
@@ -428,14 +429,97 @@ public class ContractStatusIntegrationTest {
                 before.getTitle(), after.getTitle());
         assertEquals("Mã của hợp đồng đã ký không được đổi",
                 before.getContractCode(), after.getContractCode());
-        assertEquals("Link bản PDF thì vẫn phải dán được -- nó thường chỉ có SAU khi ký",
-                "https://drive.google.com/file/d/abc/view", after.getAttachmentUrl());
+        assertEquals("Người phụ trách thì vẫn đổi được -- nó là phân công nội bộ",
+                Fixtures.USER_ID, after.getOwnerId());
 
-        assertEquals("Nhật ký chỉ được kể về thứ thật sự đã ghi", 1,
+        assertEquals("Nhật ký không được kể về điều khoản bị bỏ qua", 0,
                 IntegrationDb.count("contract_history",
-                        "contract_id = 2 AND event_type = N'Sửa thông tin' AND detail LIKE '%Link đính kèm%'"));
-        assertEquals(0, IntegrationDb.count("contract_history",
-                "contract_id = 2 AND detail LIKE '%Tiêu đề%'"));
+                        "contract_id = 2 AND detail LIKE '%Tiêu đề%'"));
+    }
+
+    /** Dựng một hợp đồng ĐÃ KÝ để các ca giấy tờ có chỗ treo vào. */
+    private int newSignedContract(String code) {
+        Contract draft = new Contract();
+        draft.setContractCode(code);
+        draft.setTitle("Hợp đồng cho ca tài liệu");
+        draft.setContractType("Bán hàng");
+        draft.setDirection("Bán");
+        draft.setEffectiveDate(java.sql.Date.valueOf(java.time.LocalDate.now().minusDays(30)));
+        draft.setEndDate(java.sql.Date.valueOf(java.time.LocalDate.now().plusYears(1)));
+        draft.setEnterpriseId(Fixtures.ENTERPRISE_ID);
+        draft.setOwnerId(Fixtures.USER_ID);
+        int id = contractDAO.insert(draft, Fixtures.USER_ID);
+        assertTrue(id > 0);
+        assertTrue(contractDAO.changeProgressStatus(id, ContractDAO.PROGRESS_SIGNED, Fixtures.USER_ID, null));
+        return id;
+    }
+
+    /**
+     * Giấy tờ treo được vào hợp đồng ĐÃ THANH LÝ -- đóng băng là đóng băng
+     * ĐIỀU KHOẢN, không phải cấm ghi nhận hồ sơ.
+     *
+     * <p>Phần lớn giấy tờ chỉ sinh ra ở thời điểm đó: chính biên bản thanh lý
+     * là ví dụ. Cấm luôn thì không có chỗ nào treo nó.
+     */
+    @Test
+    public void taiLieu_treoDuocSauKhiThanhLy() throws Exception {
+        IntegrationDb.assumeAvailable();
+
+        int contractId = newSignedContract("HD-TL-TAILIEU");
+        assertTrue(contractDAO.changeProgressStatus(contractId, ContractDAO.PROGRESS_LIQUIDATED,
+                Fixtures.USER_ID, "BB thanh lý số 01"));
+
+        Contract frozen = contractDAO.findById(contractId);
+        assertTrue("Hợp đồng phải đang ở trạng thái đóng băng", frozen.isFrozen());
+
+        ContractDocument doc = new ContractDocument();
+        doc.setContractId(contractId);
+        doc.setDocType("Biên bản thanh lý");
+        doc.setTitle("BB thanh lý số 01");
+        doc.setFileUrl("https://drive.google.com/file/d/bbtl/view");
+        assertEquals(ContractDAO.DOC_OK, contractDAO.addDocument(doc, Fixtures.USER_ID));
+
+        List<ContractDocument> docs = contractDAO.findDocumentsOf(contractId);
+        assertEquals(1, docs.size());
+        assertEquals("Biên bản thanh lý", docs.get(0).getDocType());
+
+        assertEquals("Thêm tài liệu phải sinh một dòng nhật ký", 1,
+                IntegrationDb.count("contract_history",
+                        "contract_id = " + contractId + " AND event_type = N'Tài liệu'"));
+    }
+
+    /**
+     * Huỷ giấy tờ là xoá MỀM: dòng ở lại kèm lý do, và thôi hiện ở màn hình.
+     *
+     * <p>Thiếu lý do thì từ chối -- kiểm ở DAO chứ không chỉ ở controller, vì
+     * một POST nặn tay đi thẳng vào đây.
+     */
+    @Test
+    public void taiLieu_huyLaXoaMemVaBatBuocLyDo() throws Exception {
+        IntegrationDb.assumeAvailable();
+
+        int contractId = newSignedContract("HD-HUY-TAILIEU");
+        ContractDocument doc = new ContractDocument();
+        doc.setContractId(contractId);
+        doc.setDocType("Hoá đơn");
+        doc.setFileUrl("https://drive.google.com/file/d/hd01/view");
+        assertEquals(ContractDAO.DOC_OK, contractDAO.addDocument(doc, Fixtures.USER_ID));
+        int documentId = contractDAO.findDocumentsOf(contractId).get(0).getDocumentId();
+
+        assertFalse("Thiếu lý do thì không huỷ được",
+                contractDAO.voidDocument(documentId, Fixtures.USER_ID, "   "));
+        assertEquals(1, contractDAO.findDocumentsOf(contractId).size());
+
+        assertTrue(contractDAO.voidDocument(documentId, Fixtures.USER_ID, "Dán nhầm hoá đơn hợp đồng khác"));
+        assertEquals("Đã huỷ thì không còn trong danh sách", 0,
+                contractDAO.findDocumentsOf(contractId).size());
+        assertEquals("Nhưng dòng vẫn nằm trong CSDL, kèm lý do", 1,
+                IntegrationDb.count("contract_documents",
+                        "document_id = " + documentId + " AND is_deleted = 1 "
+                        + "AND delete_reason = N'Dán nhầm hoá đơn hợp đồng khác'"));
+
+        assertFalse("Huỷ lần hai không ăn -- tránh ghi đè lý do của người trước",
+                contractDAO.voidDocument(documentId, Fixtures.USER_ID, "lý do khác"));
     }
 
     /**

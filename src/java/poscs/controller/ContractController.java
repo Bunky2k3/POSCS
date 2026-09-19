@@ -40,6 +40,7 @@ import poscs.dao.EmployeeDAO;
 import poscs.dao.ProductDAO;
 import poscs.model.Address;
 import poscs.model.Contract;
+import poscs.model.ContractDocument;
 import poscs.model.Department;
 import poscs.model.ContractHandover;
 import poscs.model.ContractHistory;
@@ -239,6 +240,12 @@ public class ContractController extends HttpServlet {
             case "completeHandover":
                 handleCompleteHandover(request, response);
                 break;
+            case "addDocument":
+                handleAddDocument(request, response);
+                break;
+            case "voidDocument":
+                handleVoidDocument(request, response);
+                break;
             case "linkContract":
                 handleLinkContract(request, response);
                 break;
@@ -433,21 +440,6 @@ public class ContractController extends HttpServlet {
         }
 
         request.setAttribute("contract", contract);
-        // Link đính kèm được kiểm scheme LẠI ở đây, không chỉ lúc ghi.
-        //
-        // viewcontractdetail.jsp đổ giá trị này thẳng vào href; fn:escapeXml
-        // chặn được dấu ngoặc kép nhưng KHÔNG vô hiệu hoá scheme, nên một giá
-        // trị dạng "javascript:..." vẫn chạy trên origin của ứng dụng khi người
-        // dùng bấm vào. handleCreate/handleUpdate đã chặn, nhưng cột
-        // attachment_url không có ràng buộc nào ở CSDL và dữ liệu vẫn vào cột
-        // này ngoài hai đường đó (schema.sql seed thẳng, hoặc chạy tay câu
-        // UPDATE) -- view không nên phụ thuộc vào việc MỌI đường ghi từ trước
-        // tới nay đều đã đúng.
-        String attachmentUrl = contract.getAttachmentUrl();
-        boolean attachmentIsSafe = TextRules.isSafeHttpUrl(attachmentUrl);
-        request.setAttribute("attachmentUrl", attachmentIsSafe ? attachmentUrl : null);
-        request.setAttribute("attachmentUnsafe", attachmentUrl != null && !attachmentIsSafe);
-        request.setAttribute("drivePreviewUrl", attachmentIsSafe ? drivePreviewUrl(attachmentUrl) : null);
         // Trang xem đặt ĐÚNG MỘT cờ cho phép ghi: canCompleteHandover_<id>,
         // do putContractWorkspace đặt (xem lý do ở đó). Ngoài nó ra không một
         // cờ can* nào -- mọi thao tác sửa dữ liệu hợp đồng nằm ở trang Sửa
@@ -1093,10 +1085,6 @@ public class ContractController extends HttpServlet {
                     + "&error=invalid");
             return;
         }
-        if (!TextRules.isSafeHttpUrl(c.getAttachmentUrl())) {
-            response.sendRedirect(request.getContextPath() + "/contract?action=new&error=invalid_drive_link");
-            return;
-        }
         // Kiểm trùng TRƯỚC để báo đúng lý do. Chốt chặn thật vẫn là UNIQUE KEY
         // trên contract_code: hai người lưu cùng lúc cùng một mã thì chỉ ràng
         // buộc ở CSDL mới bắt được, và insert() trả DUPLICATE_CODE.
@@ -1150,7 +1138,6 @@ public class ContractController extends HttpServlet {
             if (ownerId != null) {
                 c.setOwnerId(ownerId);
             }
-            c.setAttachmentUrl(emptyToNull(request.getParameter("attachmentUrl")));
         } else {
             c = buildContractFromRequest(request, new Contract());
         }
@@ -1168,10 +1155,6 @@ public class ContractController extends HttpServlet {
         }
         if (contractDAO.contractCodeExists(c.getContractCode(), id)) {
             response.sendRedirect(request.getContextPath() + "/contract?action=edit&id=" + id + "&error=duplicate_code");
-            return;
-        }
-        if (!TextRules.isSafeHttpUrl(c.getAttachmentUrl())) {
-            response.sendRedirect(request.getContextPath() + "/contract?action=edit&id=" + id + "&error=invalid_drive_link");
             return;
         }
         // Sửa một phụ lục còn nháp cũng đổi được con số điều chỉnh, nên đường
@@ -1226,10 +1209,6 @@ public class ContractController extends HttpServlet {
 
         if (!isValid(c) || !counterpartyMatchesDirection(c)) {
             response.sendRedirect(request.getContextPath() + back + "&error=invalid");
-            return;
-        }
-        if (!TextRules.isSafeHttpUrl(c.getAttachmentUrl())) {
-            response.sendRedirect(request.getContextPath() + back + "&error=invalid_drive_link");
             return;
         }
         if (contractDAO.contractCodeExists(c.getContractCode(), 0)) {
@@ -1314,10 +1293,6 @@ public class ContractController extends HttpServlet {
         }
         if (contractDAO.contractCodeExists(c.getContractCode(), id)) {
             response.sendRedirect(request.getContextPath() + back + "&error=duplicate_code");
-            return;
-        }
-        if (!TextRules.isSafeHttpUrl(c.getAttachmentUrl())) {
-            response.sendRedirect(request.getContextPath() + back + "&error=invalid_drive_link");
             return;
         }
 
@@ -1641,6 +1616,22 @@ public class ContractController extends HttpServlet {
                     outputValue == null ? null : outputValue.subtract(inputValue));
         }
 
+        // ===== Giấy tờ kèm theo =====
+        List<ContractDocument> documents = contractDAO.findDocumentsOf(id);
+        request.setAttribute("contractDocuments", documents);
+        request.setAttribute("documentTypes", ContractDocument.TYPES);
+        // Bản PDF của CHÍNH hợp đồng -- cái duy nhất được nhúng khung xem.
+        // Kiểm scheme LẠI ở đây chứ không tin lúc ghi: dữ liệu vào bảng này còn
+        // qua migration V34 và các câu seed, không chỉ qua form.
+        for (ContractDocument d : documents) {
+            if (ContractDocument.TYPE_SIGNED_CONTRACT.equals(d.getDocType())
+                    && TextRules.isSafeHttpUrl(d.getFileUrl())) {
+                request.setAttribute("primaryDocumentUrl", d.getFileUrl());
+                request.setAttribute("drivePreviewUrl", drivePreviewUrl(d.getFileUrl()));
+                break;
+            }
+        }
+
         request.setAttribute("rootContract", root == contract ? null : root);
         request.setAttribute("clusterValue", clusterValue);
         request.setAttribute("clusterScheduled", clusterScheduled);
@@ -1787,6 +1778,91 @@ public class ContractController extends HttpServlet {
         }
         if (!contractDAO.completeHandover(handoverId, actorId(request), request.getParameter("doneNote"))) {
             response.sendRedirect(request.getContextPath() + back + "&error=handover_done_failed");
+            return;
+        }
+        response.sendRedirect(request.getContextPath() + back);
+    }
+
+    // ------------------------------------------------------------------
+    // Giấy tờ kèm theo hợp đồng (V34)
+    // ------------------------------------------------------------------
+
+    /**
+     * Treo một giấy tờ vào hợp đồng.
+     *
+     * <p>Link bắt buộc và phải là http/https -- {@code TextRules.isSafeHttpUrl}
+     * chặn "javascript:...", thứ sẽ chạy trên chính origin của ứng dụng khi
+     * người sau bấm vào dòng đó ở bảng giấy tờ.
+     *
+     * <p>Loại giấy tờ phải nằm trong danh mục: ô chọn trên form vốn chỉ có bấy
+     * nhiêu, nên một giá trị khác nghĩa là POST nặn tay. Chặn ở đây để danh
+     * mục còn là danh mục -- cột doc_type không ràng buộc gì ở CSDL.
+     *
+     * <p>KHÔNG kiểm trạng thái hợp đồng: thêm được ở mọi trạng thái, kể cả sau
+     * thanh lý. Phần lớn giấy tờ chỉ sinh ra lúc hoặc sau khi thanh lý -- chính
+     * biên bản thanh lý là ví dụ.
+     */
+    private void handleAddDocument(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        if (!AccessControl.requireFullAccess(request, response, AccessControl.Resource.CONTRACT)) {
+            return;
+        }
+        Integer contractId = parseIntOrNull(request.getParameter("contractId"));
+        if (contractId == null) {
+            response.sendRedirect(request.getContextPath() + "/contract?error=notfound");
+            return;
+        }
+        String back = "/contract?action=edit&id=" + contractId;
+        String url = emptyToNull(request.getParameter("fileUrl"));
+        String docType = emptyToNull(request.getParameter("docType"));
+        if (url == null || !TextRules.isSafeHttpUrl(url)
+                || docType == null || !ContractDocument.TYPES.contains(docType)) {
+            response.sendRedirect(request.getContextPath() + back + "&error=document_invalid");
+            return;
+        }
+
+        ContractDocument doc = new ContractDocument();
+        doc.setContractId(contractId);
+        doc.setDocType(docType);
+        doc.setTitle(emptyToNull(request.getParameter("docTitle")));
+        doc.setFileUrl(url);
+        doc.setNote(emptyToNull(request.getParameter("docNote")));
+
+        int result = contractDAO.addDocument(doc, actorId(request));
+        if (result != ContractDAO.DOC_OK) {
+            LOG.warn("Them tai lieu that bai (actor={}, contractId={}, result={})",
+                    Logs.actor(request), contractId, result);
+            response.sendRedirect(request.getContextPath() + back + "&error=document_failed");
+            return;
+        }
+        response.sendRedirect(request.getContextPath() + back);
+    }
+
+    /**
+     * Huỷ một giấy tờ -- xoá MỀM, bắt buộc có lý do.
+     *
+     * <p>Lý do kiểm ở CẢ hai tầng: ở đây để báo lỗi tử tế, và trong
+     * {@code ContractDAO.voidDocument} để một POST nặn tay cũng không gỡ được
+     * giấy tờ mà không để lại lời giải thích.
+     */
+    private void handleVoidDocument(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        if (!AccessControl.requireFullAccess(request, response, AccessControl.Resource.CONTRACT)) {
+            return;
+        }
+        Integer contractId = parseIntOrNull(request.getParameter("contractId"));
+        Integer documentId = parseIntOrNull(request.getParameter("documentId"));
+        if (contractId == null || documentId == null) {
+            response.sendRedirect(request.getContextPath() + "/contract?error=notfound");
+            return;
+        }
+        String back = "/contract?action=edit&id=" + contractId;
+        String reason = emptyToNull(request.getParameter("reason"));
+        if (reason == null) {
+            response.sendRedirect(request.getContextPath() + back + "&error=document_reason_required");
+            return;
+        }
+        if (!contractDAO.voidDocument(documentId, actorId(request), reason)) {
+            LOG.warn("Huy tai lieu that bai (actor={}, documentId={})", Logs.actor(request), documentId);
+            response.sendRedirect(request.getContextPath() + back + "&error=document_failed");
             return;
         }
         response.sendRedirect(request.getContextPath() + back);
@@ -2125,11 +2201,6 @@ public class ContractController extends HttpServlet {
         if (ownerId != null) {
             c.setOwnerId(ownerId);
         }
-        // Link tới bản PDF đã ký, thường là file trên Google Drive -- người
-        // dùng tự tải lên rồi dán link vào đây (giống cách catalogue sản phẩm
-        // đang lưu link Drive). Hệ thống không đụng tới file đó.
-        c.setAttachmentUrl(emptyToNull(request.getParameter("attachmentUrl")));
-
         c.setSignerName(emptyToNull(request.getParameter("signerName")));
         c.setSignerPosition(emptyToNull(request.getParameter("signerPosition")));
         c.setCounterpartySignerName(emptyToNull(request.getParameter("counterpartySignerName")));

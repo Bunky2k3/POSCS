@@ -80,6 +80,15 @@ public class ContractHistory {
     public static final String EVENT_HANDOVER = "Bàn giao phòng ban";
 
     /**
+     * Treo thêm hoặc huỷ một giấy tờ kèm theo hợp đồng (V34).
+     *
+     * <p>MỘT loại cho cả thêm lẫn huỷ, không tách đôi: hai việc này luôn đọc
+     * cùng nhau khi tra "hồ sơ hợp đồng này đã đi qua những gì", và câu detail
+     * đã nói rõ việc nào.
+     */
+    public static final String EVENT_DOCUMENT = "Tài liệu";
+
+    /**
      * Admin chữa một sai sót NHẬP LIỆU trên hợp đồng đã ký.
      *
      * <p>Tách hẳn khỏi {@link #EVENT_UPDATED}: sửa một bản nháp là chuyện bình

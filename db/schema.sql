@@ -4382,7 +4382,6 @@ CREATE TABLE `contracts` (
   -- Giá trị theo ĐIỀU KHOẢN. Khác tổng contract_payments (thực tế thu/chi) --
   -- chỗ lệch giữa hai con số chính là công nợ, gộp lại là mất khái niệm đó.
   `contract_value` decimal(15,2) DEFAULT NULL,
-  `attachment_url` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   -- Trục LỊCH: hàm thuần của effective_date/end_date, không ai đặt được.
   `status` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'Đang hiệu lực',
   -- Trục TIẾN ĐỘ: 'Nháp' | 'Đã ký' | 'Đã thanh lý' | 'Chấm dứt sớm'.
@@ -4583,6 +4582,42 @@ CREATE TABLE `contract_handovers` (
 DROP TABLE IF EXISTS `contract_links`;
 -- Liên kết hợp đồng BÁN <-> hợp đồng MUA: "đầu ra kéo theo đầu vào" (V31).
 --
+DROP TABLE IF EXISTS `contract_documents`;
+
+-- ===== Giấy tờ kèm theo hợp đồng (V34) =====
+-- Một hợp đồng thật kéo theo cả tập hồ sơ: biên bản nghiệm thu, bàn giao,
+-- thanh lý, báo giá, hoá đơn. Trước V34 chỗ treo duy nhất là MỘT ô
+-- contracts.attachment_url -- cột đó đã bỏ, dữ liệu cũ dời sang đây.
+--
+-- CHỈ LƯU LINK, không lưu file: hồ sơ của khách nằm trên Drive và vẫn ở đó.
+-- Hệ thống không giữ bản sao nào, và quyền xem file do Drive quyết.
+--
+-- doc_type là VARCHAR chứ không ENUM (cùng lẽ với event_type, relation_type):
+-- danh mục còn phải chốt với khách, thêm loại phải là thêm một chuỗi.
+CREATE TABLE `contract_documents` (
+  `document_id`   int NOT NULL AUTO_INCREMENT,
+  `contract_id`   int NOT NULL,
+  `doc_type`      varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `title`         varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `file_url`      varchar(500) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `note`          varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `uploaded_by`   int NOT NULL,
+  `uploaded_at`   timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  -- Xoá MỀM, bắt buộc lý do: giấy tờ là chứng cứ, gỡ cứng thì không tra ngược
+  -- được ai gỡ cái gì. Ba cột đi cùng nhau.
+  `is_deleted`    tinyint(1) NOT NULL DEFAULT '0',
+  `deleted_by`    int DEFAULT NULL,
+  `deleted_at`    timestamp NULL DEFAULT NULL,
+  `delete_reason` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  PRIMARY KEY (`document_id`),
+  KEY `idx_contract_documents_contract` (`contract_id`, `is_deleted`),
+  KEY `fk_contract_documents_uploader` (`uploaded_by`),
+  KEY `fk_contract_documents_deleter` (`deleted_by`),
+  CONSTRAINT `fk_contract_documents_contract` FOREIGN KEY (`contract_id`) REFERENCES `contracts` (`contract_id`),
+  CONSTRAINT `fk_contract_documents_uploader` FOREIGN KEY (`uploaded_by`) REFERENCES `users` (`user_id`),
+  CONSTRAINT `fk_contract_documents_deleter` FOREIGN KEY (`deleted_by`) REFERENCES `users` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- Bảng RIÊNG chứ không dùng lại contracts.parent_contract_id: cột đó mang đúng
 -- một nghĩa "đây là phụ lục của hợp đồng kia", và mọi phép đếm phụ lục lẫn luật
 -- khoá điều khoản đều dựa vào nó.
@@ -4950,19 +4985,20 @@ FROM (
 JOIN enterprises e ON e.enterprise_code = x.kh
 JOIN users u ON u.username = x.owner;
 
--- Uỷ quyền + link đính kèm: chỉ một hợp đồng, nên đặt riêng cho gọn.
--- LINK DEMO, CỐ Ý GIỮ: nó trỏ vào một PDF catalogue công khai trên Drive, dùng
--- để trình diễn tính năng đính kèm cho khách. Đừng "dọn" nó đi.
+-- Uỷ quyền: chỉ một hợp đồng, nên đặt riêng cho gọn.
 UPDATE contracts
-   SET authorization_ref = N'GUQ số 05/2026 ngày 10/01/2026',
-       attachment_url = 'https://drive.google.com/file/d/1lAoND44iEzSuLYnXEj7DfHNGJfHMDcBD/view'
+   SET authorization_ref = N'GUQ số 05/2026 ngày 10/01/2026'
  WHERE contract_code = N'14/2026/HĐKT-POSTEF';
 
--- Uỷ quyền + link Drive demo cho khách -- CỐ Ý GIỮ, không phải dữ liệu rác.
-UPDATE contracts
-   SET authorization_ref = N'GUQ số 05/2026 ngày 10/01/2026',
-       attachment_url = 'https://drive.google.com/file/d/1lAoND44iEzSuLYnXEj7DfHNGJfHMDcBD/view'
- WHERE contract_code = N'14/2026/HĐKT-POSTEF';
+-- LINK DEMO, CỐ Ý GIỮ: trỏ vào một PDF catalogue công khai trên Drive, dùng để
+-- trình diễn tính năng đính kèm cho khách. Đừng "dọn" nó đi. Trước V34 nó nằm
+-- ở cột contracts.attachment_url; giờ là một dòng trong contract_documents.
+INSERT INTO contract_documents (contract_id, doc_type, title, file_url, note, uploaded_by)
+SELECT c.contract_id, N'Hợp đồng đã ký', N'Bản PDF hợp đồng',
+       'https://drive.google.com/file/d/1lAoND44iEzSuLYnXEj7DfHNGJfHMDcBD/view',
+       N'Link demo để trình bày với khách.', c.owner_id
+FROM contracts c
+WHERE c.contract_code = N'14/2026/HĐKT-POSTEF';
 
 -- ===== Phụ lục =====
 -- contract_value trên dòng phụ lục là CHÊNH LỆCH CÓ DẤU: dương = bổ sung, âm =

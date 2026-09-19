@@ -88,8 +88,6 @@ public class Contract {
     private Enterprise enterprise;
     private User owner;
 
-    private String attachmentUrl;
-
     // ------------------------------------------------------------------
     // Người ký của CHÍNH hợp đồng này (V27).
     //
@@ -147,7 +145,7 @@ public class Contract {
     // Constructor có tham số
     public Contract(int contractId, String contractCode, String title, String contractType,
                      Date signingDate, Date effectiveDate, Date endDate, int enterpriseId,
-                     int ownerId, String attachmentUrl, String status, Timestamp createdAt,
+                     int ownerId, String status, Timestamp createdAt,
                      Timestamp updatedAt, boolean isDeleted) {
         this.contractId = contractId;
         this.contractCode = contractCode;
@@ -158,7 +156,6 @@ public class Contract {
         this.endDate = endDate;
         this.enterpriseId = enterpriseId;
         this.ownerId = ownerId;
-        this.attachmentUrl = attachmentUrl;
         this.status = status;
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
@@ -272,9 +269,6 @@ public class Contract {
 
     public java.math.BigDecimal getContractValue() { return contractValue; }
     public void setContractValue(java.math.BigDecimal contractValue) { this.contractValue = contractValue; }
-
-    public String getAttachmentUrl() { return attachmentUrl; }
-    public void setAttachmentUrl(String attachmentUrl) { this.attachmentUrl = attachmentUrl; }
 
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }
