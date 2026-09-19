@@ -1071,9 +1071,9 @@
                 </table>
             </div>
         </div>
+        </c:if>
 
             </div>
-            </c:if>
             <div class="tab-pane fade" id="pane-tai-lieu" role="tabpanel">
         <%-- ===== Giấy tờ kèm theo (V34) =====
              CHỈ ĐỌC ở trang này như mọi khối khác; treo thêm hoặc huỷ nằm ở trang
@@ -1272,8 +1272,8 @@
                 </table>
             </div>
         </div>
-            </div>
             </c:if>
+
             </div>
         </div>
         </div>
