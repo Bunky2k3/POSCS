@@ -529,7 +529,12 @@
             <div class="col-lg-6">
                 <div class="card-box table-section h-100">
                     <div class="table-section-header">
-                        <h6>Hợp đồng sắp hết hạn <span class="as-of-today">tính tới hôm nay</span></h6>
+                        <%-- Nói RÕ cửa sổ 30 ngày (ContractDAO.SOON_THRESHOLD_DAYS).
+                             "tính tới hôm nay" không trả lời được câu người dùng
+                             thật sự hỏi: "tôi đang có 8 hợp đồng còn hiệu lực, sao
+                             bảng chỉ hiện 1?". Vì 7 cái kia còn hạn hơn 30 ngày --
+                             chúng nằm ở ô KPI "Hợp đồng đang hiệu lực" ngay trên. --%>
+                        <h6>Hợp đồng sắp hết hạn <span class="as-of-today">trong 30 ngày tới</span></h6>
                         <a href="${pageContext.request.contextPath}/contract">Xem tất cả</a>
                     </div>
                     <%-- Bọc cuộn ngang: ở khổ điện thoại bảng 5 cột hẹp nhất cũng
