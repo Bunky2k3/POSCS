@@ -40,18 +40,39 @@
            18 tỉnh mà bày hết ra thanh lọc thì đẩy KPI xuống quá nửa màn hình,
            nên gói vào một nút mở ra bảng tích. Nút vẫn nói rõ đang chọn mấy
            tỉnh -- một nút câm thì người dùng không biết trang đang thu hẹp. */
+        /* ===== Thanh lọc =====
+           Trước đây bốn ô lọc nhét vào góc phải cạnh lời chào: chúng gãy thành
+           hai hàng lệch nhau, và bảng tích mở ra thì neo vào mép phải của một
+           cái nút đứng giữa trang. Giờ chúng có hàng riêng, xếp từ TRÁI sang,
+           mỗi ô có nhãn -- và bảng mở xuống thẳng dưới ô của nó. */
+        .filter-bar {
+            display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap;
+            background: #fff; border: 1px solid #eef2f6; border-radius: 14px;
+            box-shadow: 0 6px 18px rgba(0,40,80,0.06);
+            padding: 12px 16px; margin-bottom: 16px;
+        }
+        .filter-bar form { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; margin: 0; }
+        .fb-field { display: flex; flex-direction: column; gap: 5px; position: relative; }
+        .fb-field > label {
+            font-size: 0.72rem; font-weight: 700; color: #9ca3af;
+            text-transform: uppercase; letter-spacing: 0.04em;
+        }
+        .fb-field .province-filter { margin: 0; }
+
         .prov-pop { position: relative; }
         .prov-pop > button {
             cursor: pointer; text-align: left; display: flex; align-items: center; gap: 8px;
         }
         .prov-pop > button i.fa-chevron-down { margin-left: auto; font-size: 0.7rem; color: #9ca3af; }
-        .prov-panel {
-            display: none; position: absolute; z-index: 70; top: calc(100% + 6px); right: 0;
-            width: 320px; max-height: 340px; overflow-y: auto;
+        /* Neo vào mép TRÁI của chính ô lọc, không phải mép phải: ô nằm bên
+           trái màn hình nên right:0 đẩy bảng chạy ngược vào giữa trang. */
+        .prov-panel, .period-panel {
+            display: none; position: absolute; z-index: 70; top: calc(100% + 6px); left: 0;
             background: #fff; border: 1px solid #eef2f6; border-radius: 12px;
             box-shadow: 0 16px 40px rgba(0,40,80,0.18); padding: 12px;
         }
-        .prov-panel.open { display: block; }
+        .prov-panel { width: 320px; max-height: 340px; overflow-y: auto; }
+        .prov-panel.open, .period-panel.open { display: block; }
         .prov-panel .prov-actions {
             display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
             padding-bottom: 8px; margin-bottom: 8px; border-bottom: 1px solid #eef2f6;
@@ -73,6 +94,39 @@
         .prov-row .mine-tag {
             margin-left: auto; font-size: 0.68rem; font-weight: 700; color: var(--primary);
             background: #eaf6ff; border-radius: 6px; padding: 1px 6px;
+        }
+
+        /* ===== Bảng chọn kỳ =====
+           Gộp hai ô "năm" và "quý/tháng" làm một. Hai ô rời buộc người dùng
+           hiểu rằng chọn quý mà quên chọn năm thì KHÔNG lọc gì cả (Period.parse
+           bỏ qua khi thiếu năm) -- một cái bẫy im lặng. Ở đây năm luôn có sẵn,
+           và mỗi ô quý/tháng là một lựa chọn hoàn chỉnh. */
+        .period-panel { width: 300px; }
+        .period-nav {
+            display: flex; align-items: center; justify-content: space-between;
+            padding-bottom: 8px; margin-bottom: 8px; border-bottom: 1px solid #eef2f6;
+        }
+        .period-nav button {
+            background: #f3f4f6; border: none; border-radius: 8px; width: 28px; height: 28px;
+            cursor: pointer; color: #374151;
+        }
+        .period-nav button:disabled { opacity: 0.35; cursor: default; }
+        .period-nav .yr { font-weight: 700; color: var(--primary-dark); font-size: 0.95rem; }
+        .period-grid { display: grid; gap: 6px; margin-bottom: 8px; }
+        .period-grid.q { grid-template-columns: repeat(4, 1fr); }
+        .period-grid.m { grid-template-columns: repeat(4, 1fr); }
+        .period-grid button, .period-wide {
+            background: #fff; border: 1px solid #eef2f6; border-radius: 8px;
+            padding: 6px 0; font-size: 0.8rem; color: #374151; cursor: pointer; font-weight: 500;
+        }
+        .period-grid button:hover, .period-wide:hover { border-color: var(--primary-light); color: var(--primary-dark); }
+        .period-grid button.sel, .period-wide.sel {
+            background: var(--primary); border-color: var(--primary); color: #fff; font-weight: 700;
+        }
+        .period-wide { width: 100%; margin-bottom: 8px; padding: 7px 0; }
+        .period-lbl {
+            font-size: 0.7rem; font-weight: 700; color: #9ca3af;
+            text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 5px;
         }
 
         /* Chip địa bàn dưới lời chào -- trả lời "tôi đang phụ trách tỉnh nào". */
@@ -195,7 +249,20 @@
                 </c:if>
             </div>
             <div class="welcome-actions">
-                <form method="GET" action="${pageContext.request.contextPath}/dashboard" id="provinceFilterForm">
+                <div class="today-badge"><i class="fa-regular fa-calendar"></i>${todayLabel}</div>
+            </div>
+        </div>
+
+        <%-- Thanh lọc đứng RIÊNG một hàng, không nhét vào góc phải cạnh lời chào:
+             bốn ô ở đó gãy thành hai hàng lệch nhau, và bảng tích mở ra thì neo
+             vào mép phải của một cái nút đứng giữa trang. Hàng riêng cũng là chỗ
+             duy nhất đủ rộng để mỗi ô có nhãn -- "Của tôi" đứng trơ một mình
+             không nói được nó lọc theo cái gì. --%>
+        <div class="filter-bar">
+            <i class="fa-solid fa-sliders" style="color:#9ca3af; margin-bottom:9px;"></i>
+            <form method="GET" action="${pageContext.request.contextPath}/dashboard" id="provinceFilterForm">
+                <div class="fb-field">
+                    <label for="filterScope">Phạm vi</label>
                     <%-- Phạm vi người phụ trách. Đứng TRƯỚC các ô kia vì nó là ô
                          đổi nghĩa cả trang, còn tỉnh và kỳ chỉ thu hẹp thêm.
                          Mặc định khác nhau theo vai trò (nhân viên: của tôi,
@@ -205,13 +272,15 @@
                         <option value="mine" ${scopeFilter == 'mine' ? 'selected' : ''}>Của tôi</option>
                         <option value="all" ${scopeFilter == 'all' ? 'selected' : ''}>Toàn chi nhánh</option>
                     </select>
+                </div>
                     <%-- Ô tích NHIỀU tỉnh. provinceSet là cờ "form này có gửi phần
                          tỉnh lên": bỏ tích hết thì không có tham số provinceId nào,
                          giống hệt lần đầu mở trang -- không có cờ này thì controller
                          không phân biệt được "chưa chọn" với "đã bỏ hết" và sẽ tự
                          tích lại địa bàn của người dùng ngay sau khi họ vừa bỏ. --%>
                     <input type="hidden" name="provinceSet" value="1">
-                    <div class="prov-pop">
+                <div class="fb-field prov-pop">
+                    <label for="provToggle">Địa bàn</label>
                         <button type="button" class="province-filter" id="provToggle"
                                 aria-expanded="false" aria-controls="provPanel">
                             <i class="fa-solid fa-location-dot" style="color:#9ca3af;"></i>
@@ -255,26 +324,59 @@
                             </c:forEach>
                         </div>
                     </div>
-                    <select id="filterYear" name="year" class="province-filter">
-                        <option value="">Mọi thời điểm</option>
-                        <c:forEach var="y" items="${yearList}">
-                            <option value="${y}" ${yearFilter == y ? 'selected' : ''}>Năm ${y}</option>
-                        </c:forEach>
-                    </select>
-                    <select id="filterPeriod" name="period" class="province-filter">
-                        <option value="">Cả năm</option>
-                        <c:forEach var="q" begin="1" end="4">
-                            <c:set var="qVal" value="q${q}"/>
-                            <option value="${qVal}" ${periodFilter == qVal ? 'selected' : ''}>Quý ${q}</option>
-                        </c:forEach>
-                        <c:forEach var="m" begin="1" end="12">
-                            <c:set var="mVal" value="m${m}"/>
-                            <option value="${mVal}" ${periodFilter == mVal ? 'selected' : ''}>Tháng ${m}</option>
-                        </c:forEach>
-                    </select>
-                </form>
-                <div class="today-badge"><i class="fa-regular fa-calendar"></i>${todayLabel}</div>
-            </div>
+                <%-- MỘT ô cho cả năm lẫn quý/tháng. Hai ô rời trước đây có một
+                     cái bẫy im lặng: chọn "Quý 3" mà quên chọn năm thì Period.parse
+                     trả null, tức là KHÔNG lọc gì -- người dùng thấy ô đang hiện
+                     "Quý 3" và tin là trang đã thu hẹp. Ở đây năm luôn đi kèm, và
+                     mỗi ô quý/tháng là một lựa chọn hoàn chỉnh.
+
+                     Hai ô ẩn mới là thứ thật sự gửi lên; các nút chỉ ghi giá trị
+                     vào chúng rồi submit. Giữ đúng hai tham số year/period cũ nên
+                     link cũ và bookmark cũ vẫn mở đúng kỳ như trước. --%>
+                <input type="hidden" name="year" id="fYear" value="${yearFilter}">
+                <input type="hidden" name="period" id="fPeriod" value="${periodFilter}">
+                <div class="fb-field period-pop">
+                    <label for="periodToggle">Kỳ</label>
+                    <button type="button" class="province-filter" id="periodToggle"
+                            aria-expanded="false" aria-controls="periodPanel">
+                        <i class="fa-regular fa-calendar" style="color:#9ca3af;"></i>
+                        <span id="periodToggleLabel">
+                            <c:choose>
+                                <c:when test="${not empty periodLabel}">${fn:escapeXml(periodLabel)}</c:when>
+                                <c:otherwise>Mọi thời điểm</c:otherwise>
+                            </c:choose>
+                        </span>
+                        <i class="fa-solid fa-chevron-down"></i>
+                    </button>
+                    <%-- data-* để script biết năm nào đang chọn và năm nào được
+                         phép -- danh sách năm do Period.availableYears() quyết
+                         định, đừng đoán lại ở tầng JS. --%>
+                    <div class="period-panel" id="periodPanel"
+                         data-selected-year="${empty yearFilter ? '' : yearFilter}"
+                         data-selected-period="${empty periodFilter ? '' : fn:escapeXml(periodFilter)}"
+                         data-years="<c:forEach var="y" items="${yearList}" varStatus="st">${y}<c:if test="${not st.last}">,</c:if></c:forEach>">
+                        <div class="period-nav">
+                            <button type="button" id="yrPrev" aria-label="Năm trước">&lsaquo;</button>
+                            <span class="yr" id="yrLabel"></span>
+                            <button type="button" id="yrNext" aria-label="Năm sau">&rsaquo;</button>
+                        </div>
+                        <button type="button" class="period-wide" data-pick="any">Mọi thời điểm</button>
+                        <button type="button" class="period-wide" data-pick="year">Cả năm</button>
+                        <div class="period-lbl">Quý</div>
+                        <div class="period-grid q">
+                            <c:forEach var="q" begin="1" end="4">
+                                <button type="button" data-pick="q${q}">Q${q}</button>
+                            </c:forEach>
+                        </div>
+                        <div class="period-lbl">Tháng</div>
+                        <div class="period-grid m">
+                            <c:forEach var="m" begin="1" end="12">
+                                <button type="button" data-pick="m${m}">Th${m}</button>
+                            </c:forEach>
+                        </div>
+                    </div>
+                </div>
+            </form>
         </div>
 
         <c:if test="${not empty provinceFilters or not empty periodLabel}">
@@ -482,16 +584,15 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script>
-        // Đổi ô chọn là nạp lại trang ngay, không cần nút "Lọc" -- giống bộ lọc
-        // ở danh sách khách hàng/hợp đồng.
+        // Đổi ô Phạm vi là nạp lại trang ngay, không cần nút "Lọc" -- giống bộ
+        // lọc ở danh sách khách hàng/hợp đồng.
         //
-        // Ô TỈNH thì KHÔNG nằm trong danh sách này, cố ý: nó tích được nhiều
-        // tỉnh, nạp lại sau mỗi lần tích thì chọn ba tỉnh là ba lần tải trang
-        // và hai lần đầu ra số liệu chẳng ai cần. Nó có nút "Áp dụng" riêng.
-        ['filterScope', 'filterYear', 'filterPeriod'].forEach(function (id) {
-            document.getElementById(id).addEventListener('change', function () {
-                document.getElementById('provinceFilterForm').submit();
-            });
+        // Ô TỈNH thì KHÔNG, cố ý: nó tích được nhiều tỉnh, nạp lại sau mỗi lần
+        // tích thì chọn ba tỉnh là ba lần tải trang và hai lần đầu ra số liệu
+        // chẳng ai cần. Nó có nút "Áp dụng" riêng. Ô KỲ thì ngược lại -- mỗi lựa
+        // chọn ở đó là một kỳ hoàn chỉnh, nên bấm phát nào nạp lại phát đó.
+        document.getElementById('filterScope').addEventListener('change', function () {
+            document.getElementById('provinceFilterForm').submit();
         });
 
         // ===== Bảng tích tỉnh =====
@@ -532,6 +633,78 @@
                     apply(function (b) { b.checked = b.dataset.mine === 'true'; });
                 });
             }
+        })();
+
+        // ===== Bảng chọn kỳ (năm - quý - tháng trong MỘT ô) =====
+        (function () {
+            var toggle = document.getElementById('periodToggle');
+            var panel = document.getElementById('periodPanel');
+            if (!toggle || !panel) { return; }
+
+            var years = panel.dataset.years.split(',').map(Number).sort(function (a, b) { return a - b; });
+            var selYear = panel.dataset.selectedYear ? Number(panel.dataset.selectedYear) : null;
+            var selPeriod = panel.dataset.selectedPeriod || '';
+            // Đang xem năm nào: năm đã chọn, hoặc năm mới nhất khi chưa lọc gì.
+            var viewYear = selYear || years[years.length - 1];
+
+            var yrLabel = document.getElementById('yrLabel');
+            var prev = document.getElementById('yrPrev');
+            var next = document.getElementById('yrNext');
+
+            function render() {
+                yrLabel.textContent = 'Năm ' + viewYear;
+                prev.disabled = viewYear <= years[0];
+                next.disabled = viewYear >= years[years.length - 1];
+                // Tô đậm ô đang chọn -- CHỈ khi đang xem đúng năm đã chọn, nếu
+                // không thì bấm mũi tên sang năm khác vẫn thấy "Q3" sáng và
+                // tưởng mình đang xem quý 3 của năm đó.
+                panel.querySelectorAll('[data-pick]').forEach(function (b) {
+                    var pick = b.dataset.pick;
+                    var on;
+                    if (pick === 'any') {
+                        on = selYear === null;
+                    } else if (pick === 'year') {
+                        on = selYear === viewYear && selPeriod === '';
+                    } else {
+                        on = selYear === viewYear && selPeriod === pick;
+                    }
+                    b.classList.toggle('sel', on);
+                });
+            }
+
+            function setOpen(open) {
+                panel.classList.toggle('open', open);
+                toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+                if (open) { render(); }
+            }
+            toggle.addEventListener('click', function (e) {
+                e.stopPropagation();
+                setOpen(!panel.classList.contains('open'));
+            });
+            panel.addEventListener('click', function (e) { e.stopPropagation(); });
+            document.addEventListener('click', function () { setOpen(false); });
+            document.addEventListener('keydown', function (e) {
+                if (e.key === 'Escape') { setOpen(false); }
+            });
+
+            prev.addEventListener('click', function () {
+                if (viewYear > years[0]) { viewYear--; render(); }
+            });
+            next.addEventListener('click', function () {
+                if (viewYear < years[years.length - 1]) { viewYear++; render(); }
+            });
+
+            // Mỗi lựa chọn ghi thẳng vào hai ô ẩn rồi gửi form -- không có
+            // trạng thái nào sống riêng ở tầng JS, nên nạp lại trang thì thứ
+            // hiện ra luôn là thứ máy chủ đang thật sự lọc.
+            panel.querySelectorAll('[data-pick]').forEach(function (b) {
+                b.addEventListener('click', function () {
+                    var pick = b.dataset.pick;
+                    document.getElementById('fYear').value = pick === 'any' ? '' : viewYear;
+                    document.getElementById('fPeriod').value = (pick === 'any' || pick === 'year') ? '' : pick;
+                    document.getElementById('provinceFilterForm').submit();
+                });
+            });
         })();
 
         // ===== Định dạng tiền tệ rút gọn (tỷ / triệu đ) =====
