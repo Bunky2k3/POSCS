@@ -187,6 +187,3 @@ body { font-family: 'Inter', sans-serif; background: #f3f4f6; min-height: 100vh;
     cursor: pointer;
 }
 .btn-outline-action:hover { background: #eaf6ff; color: var(--primary-dark); border-color: var(--primary-light); }
-
-
-}
