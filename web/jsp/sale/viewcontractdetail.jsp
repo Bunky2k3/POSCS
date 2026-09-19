@@ -223,6 +223,10 @@
         }
         .btn-add-item:hover { opacity: 0.9; }
 
+        /* Dòng "chưa có gì" của một tab trống. Tab trống vẫn hiện (xem ghi chú
+           ở thanh tab), nên nó cần một câu tử tế chứ không phải khoảng trắng. */
+        .tab-empty { font-size: 0.88rem; color: #9ca3af; margin: 0; }
+
         @media (max-width: 768px) { .info-card, .detail-header { padding: 20px; } }
 
         .toast-msg {
@@ -506,41 +510,38 @@
                     <button class="nav-link" data-bs-toggle="tab" data-bs-target="#pane-ky-thu"
                             type="button" role="tab"><i class="fa-solid fa-money-bill-wave me-2"></i>Kỳ thanh toán</button>
                 </li>
-                <c:if test="${not empty amendments}">
+                <%-- MỌI tab đều hiện, kể cả khi chưa có dữ liệu. Trước đây tab nào
+                     trống thì biến mất, nên người xem không biết hợp đồng CÓ chỗ
+                     để phụ lục / tài liệu / bàn giao -- họ chỉ thấy nó sau khi ai
+                     đó đã thao tác bên trang quản lý. Tab trống giờ nói thẳng
+                     "chưa có gì", và đó là thông tin chứ không phải chỗ thừa.
+
+                     Số đếm chỉ hiện khi khác 0: "(0)" đọc ra nặng hơn là không có
+                     số nào. --%>
                 <li class="nav-item" role="presentation">
                     <button class="nav-link" data-bs-toggle="tab" data-bs-target="#pane-phu-luc"
-                            type="button" role="tab"><i class="fa-solid fa-file-circle-plus me-2"></i>Phụ lục</button>
+                            type="button" role="tab"><i class="fa-solid fa-file-circle-plus me-2"></i>Phụ lục<c:if
+                            test="${not empty amendments}"> (${fn:length(amendments)})</c:if></button>
                 </li>
-                </c:if>
-                <c:if test="${not empty drivePreviewUrl}">
-                <li class="nav-item" role="presentation">
-                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#pane-ban-pdf"
-                            type="button" role="tab"><i class="fa-solid fa-file-pdf me-2"></i>Bản PDF</button>
-                </li>
-                </c:if>
-                <c:if test="${not empty contractDocuments}">
                 <li class="nav-item" role="presentation">
                     <button class="nav-link" data-bs-toggle="tab" data-bs-target="#pane-tai-lieu"
-                            type="button" role="tab"><i class="fa-solid fa-folder-open me-2"></i>Tài liệu
-                        (${fn:length(contractDocuments)})</button>
+                            type="button" role="tab"><i class="fa-solid fa-folder-open me-2"></i>Tài liệu<c:if
+                            test="${not empty contractDocuments}"> (${fn:length(contractDocuments)})</c:if></button>
                 </li>
-                </c:if>
-                <c:if test="${not empty handovers}">
                 <li class="nav-item" role="presentation">
                     <button class="nav-link" data-bs-toggle="tab" data-bs-target="#pane-ban-giao"
-                            type="button" role="tab"><i class="fa-solid fa-share-from-square me-2"></i>Bàn giao</button>
+                            type="button" role="tab"><i class="fa-solid fa-share-from-square me-2"></i>Bàn giao<c:if
+                            test="${not empty handovers}"> (${fn:length(handovers)})</c:if></button>
                 </li>
-                </c:if>
                 <li class="nav-item" role="presentation">
                     <button class="nav-link" data-bs-toggle="tab" data-bs-target="#pane-nhat-ky"
                             type="button" role="tab"><i class="fa-solid fa-clock-rotate-left me-2"></i>Nhật ký</button>
                 </li>
-                <c:if test="${not empty contractLinks}">
                 <li class="nav-item" role="presentation">
                     <button class="nav-link" data-bs-toggle="tab" data-bs-target="#pane-noi-hd"
-                            type="button" role="tab"><i class="fa-solid fa-link me-2"></i>Nối bán – mua</button>
+                            type="button" role="tab"><i class="fa-solid fa-link me-2"></i>Nối bán – mua<c:if
+                            test="${not empty contractLinks}"> (${fn:length(contractLinks)})</c:if></button>
                 </li>
-                </c:if>
             </ul>
             <div class="tab-content">
             <div class="tab-pane fade show active" id="pane-thong-tin" role="tabpanel">
@@ -901,8 +902,14 @@
              thẻ này với dữ liệu thật. --%>
 
             </div>
-            <c:if test="${not empty amendments}">
             <div class="tab-pane fade" id="pane-phu-luc" role="tabpanel">
+        <c:if test="${empty amendments}">
+        <div class="info-card card-box">
+            <div class="section-header"><h5>Phụ lục</h5></div>
+            <p class="tab-empty">Hợp đồng này chưa có phụ lục nào. Lập phụ lục ở trang quản lý.</p>
+        </div>
+        </c:if>
+        <c:if test="${not empty amendments}">
         <!-- ===== Phụ lục ===== -->
         <%-- CHỈ ĐỌC, như cả trang này. Nút "Lập phụ lục" nằm ở trang quản lý
              (updatecontract.jsp) cùng mọi thao tác ghi khác -- xem ghi chú đầu
@@ -961,42 +968,17 @@
                 </table>
             </div>
         </div>
-
-
-            </div>
-            </c:if>
-            <c:if test="${not empty drivePreviewUrl}">
-            <div class="tab-pane fade" id="pane-ban-pdf" role="tabpanel">
-        <%-- ===== Bản PDF đã ký =====
-             Đứng ĐẦU cột phải: đây là bản gốc của mọi thứ bên trái, để cuối
-             trang như trước thì phải cuộn qua cả trang mới thấy. Khung nhúng cao
-             640px, trước đây không dám đặt giữa vì nó đẩy mọi khối sau ra khỏi
-             tầm mắt -- nằm riêng một cột thì không đẩy gì nữa.
-
-             Chỉ hiện khi link nhận ra được là file Drive (controller dựng sẵn
-             drivePreviewUrl). Link tới nơi khác vẫn còn nút "Mở PDF trên Drive"
-             ở đầu trang -- nhúng chúng dễ ra khung trắng vì site đó tự chặn. --%>
-            <div class="info-card card-box">
-                <div class="section-header">
-                    <h5>Bản PDF đã ký</h5>
-                    <a href="${fn:escapeXml(primaryDocumentUrl)}" target="_blank" rel="noopener noreferrer"
-                       style="font-size:0.85rem; color:var(--primary); font-weight:600; text-decoration:none;">
-                        Mở trên Drive <i class="fa-solid fa-arrow-up-right-from-square"></i>
-                    </a>
-                </div>
-                <iframe src="${fn:escapeXml(drivePreviewUrl)}"
-                        style="width:100%; height:640px; border:1px solid #eef2f6; border-radius:12px;"
-                        allow="autoplay" title="Bản PDF hợp đồng"></iframe>
-                <p style="font-size:0.78rem; color:#9ca3af; margin:10px 0 0;">
-                    Không thấy nội dung? File trên Drive có thể đang giới hạn quyền xem --
-                    hãy mở bằng link ở trên để đăng nhập Google và kiểm tra quyền truy cập.
-                </p>
-            </div>
+        </c:if>
 
             </div>
-            </c:if>
-            <c:if test="${not empty handovers}">
             <div class="tab-pane fade" id="pane-ban-giao" role="tabpanel">
+        <c:if test="${empty handovers}">
+        <div class="info-card card-box">
+            <div class="section-header"><h5>Bàn giao xử lý</h5></div>
+            <p class="tab-empty">Hợp đồng này chưa bàn giao cho phòng nào. Bàn giao ở trang quản lý.</p>
+        </div>
+        </c:if>
+        <c:if test="${not empty handovers}">
         <!-- ===== Bàn giao phòng ban ===== -->
         <%-- Khối DUY NHẤT của trang này có nút ghi: phòng nhận đóng chặng của
              chính mình. Xem lý do ở đầu file. Hàng đợi
@@ -1092,7 +1074,6 @@
 
             </div>
             </c:if>
-            <c:if test="${not empty contractDocuments}">
             <div class="tab-pane fade" id="pane-tai-lieu" role="tabpanel">
         <%-- ===== Giấy tờ kèm theo (V34) =====
              CHỈ ĐỌC ở trang này như mọi khối khác; treo thêm hoặc huỷ nằm ở trang
@@ -1104,6 +1085,11 @@
              chốt chặn thật là TextRules.isSafeHttpUrl lúc THÊM. --%>
         <div class="info-card card-box">
             <div class="section-header"><h5>Tài liệu kèm theo</h5></div>
+            <c:if test="${empty contractDocuments}">
+                <p class="tab-empty">Chưa có tài liệu nào. Treo biên bản nghiệm thu, bàn giao, thanh lý,
+                    hoá đơn… ở trang quản lý.</p>
+            </c:if>
+            <c:if test="${not empty contractDocuments}">
             <div class="table-responsive">
                 <table class="table align-middle" style="font-size:0.9rem;">
                     <thead>
@@ -1134,10 +1120,38 @@
                     </tbody>
                 </table>
             </div>
+            </c:if>
         </div>
 
+        <%-- Khung xem bản PDF, GỘP vào tab này thay vì đứng riêng một tab "Bản
+             PDF". Nó chỉ là một trong những tài liệu ở bảng ngay trên -- tách
+             ra thành tab riêng thì cùng một thứ xuất hiện hai chỗ, và người xem
+             phải đoán tab nào mới là chỗ đầy đủ.
+
+             Chỉ nhúng bản "Hợp đồng đã ký" và chỉ khi link nhận ra được là file
+             Drive (controller dựng sẵn drivePreviewUrl). Link tới nơi khác vẫn
+             mở được bằng nút ở bảng trên -- nhúng chúng dễ ra khung trắng vì
+             site đó tự chặn. --%>
+        <c:if test="${not empty drivePreviewUrl}">
+            <div class="info-card card-box">
+                <div class="section-header">
+                    <h5>Xem nhanh bản hợp đồng đã ký</h5>
+                    <a href="${fn:escapeXml(primaryDocumentUrl)}" target="_blank" rel="noopener noreferrer"
+                       style="font-size:0.85rem; color:var(--primary); font-weight:600; text-decoration:none;">
+                        Mở trên Drive <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                    </a>
+                </div>
+                <iframe src="${fn:escapeXml(drivePreviewUrl)}"
+                        style="width:100%; height:640px; border:1px solid #eef2f6; border-radius:12px;"
+                        allow="autoplay" title="Bản PDF hợp đồng"></iframe>
+                <p style="font-size:0.78rem; color:#9ca3af; margin:10px 0 0;">
+                    Không thấy nội dung? File trên Drive có thể đang giới hạn quyền xem --
+                    hãy mở bằng link ở trên để đăng nhập Google và kiểm tra quyền truy cập.
+                </p>
             </div>
-            </c:if>
+        </c:if>
+
+            </div>
             <div class="tab-pane fade" id="pane-nhat-ky" role="tabpanel">
         <!-- ===== Nhật ký thay đổi ===== -->
         <div class="info-card card-box">
@@ -1176,8 +1190,14 @@
         </div>
 
             </div>
-            <c:if test="${not empty contractLinks}">
             <div class="tab-pane fade" id="pane-noi-hd" role="tabpanel">
+        <c:if test="${empty contractLinks}">
+        <div class="info-card card-box">
+            <div class="section-header"><h5>Nối bán &ndash; mua</h5></div>
+            <p class="tab-empty">Hợp đồng này chưa nối với hợp đồng nào ở chiều ngược lại. Nối ở trang quản lý.</p>
+        </div>
+        </c:if>
+        <c:if test="${not empty contractLinks}">
         <!-- ===== Đầu ra kéo theo đầu vào ===== -->
         <%-- CHỈ ĐỌC, như cả trang này: nối/gỡ nằm ở trang quản lý. --%>
         <div class="info-card card-box">
