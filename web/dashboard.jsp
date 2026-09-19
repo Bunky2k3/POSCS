@@ -455,7 +455,7 @@
 
         <!-- ===== KPI cards ===== -->
         <div class="row g-4 mb-4">
-            <div class="col-6 col-lg-3">
+            <div class="col-6 col-lg-4">
                 <div class="card-box kpi-card">
                     <div class="kpi-top">
                         <div>
@@ -467,7 +467,7 @@
                     <span class="kpi-trend up"><i class="fa-solid fa-arrow-trend-up"></i> +${newCustomersThisMonth} khách hàng mới <c:choose><c:when test="${not empty periodLabel}">trong kỳ</c:when><c:otherwise>tháng này</c:otherwise></c:choose></span>
                 </div>
             </div>
-            <div class="col-6 col-lg-3">
+            <div class="col-6 col-lg-4">
                 <div class="card-box kpi-card">
                     <div class="kpi-top">
                         <div>
@@ -479,7 +479,7 @@
                     <span class="kpi-trend warn"><i class="fa-solid fa-triangle-exclamation"></i> ${contractStatusSummary['Sắp hết hạn']} hợp đồng sắp hết hạn</span>
                 </div>
             </div>
-            <div class="col-6 col-lg-3">
+            <div class="col-6 col-lg-4">
                 <div class="card-box kpi-card">
                     <div class="kpi-top">
                         <div>
@@ -498,35 +498,19 @@
                     </c:choose>
                 </div>
             </div>
-            <div class="col-6 col-lg-3">
-                <div class="card-box kpi-card">
-                    <div class="kpi-top">
-                        <div>
-                            <div class="kpi-label">Phiếu hỗ trợ đang xử lý</div>
-                            <div class="kpi-value">${ticketStatusSummary['Đang xử lý']}</div>
-                        </div>
-                        <div class="kpi-icon bg-red"><i class="fa-solid fa-headset"></i></div>
-                    </div>
-                    <c:choose>
-                        <c:when test="${overdueOrDueSoonCount > 0}">
-                            <span class="kpi-trend down"><i class="fa-solid fa-clock"></i> ${overdueOrDueSoonCount} phiếu sắp trễ hạn xử lý</span>
-                        </c:when>
-                        <c:otherwise>
-                            <span class="kpi-trend up"><i class="fa-solid fa-check"></i> Không có phiếu nào sắp trễ hạn</span>
-                        </c:otherwise>
-                    </c:choose>
-                </div>
-            </div>
         </div>
 
-        <!-- ===== Hai bảng hành động, nằm cạnh nhau ===== -->
-        <%-- Biểu đồ "Phiếu hỗ trợ theo trạng thái" TẠM BỎ khỏi giao diện theo
-             yêu cầu; hai bảng chia đôi bề ngang. Phần dữ liệu của nó vẫn còn
-             nguyên ở tầng dưới (DashboardController vẫn đặt ticketStatusSummary,
-             ô KPI "Phiếu hỗ trợ đang xử lý" vẫn đọc từ đó), nên bật lại chỉ là
-             dựng lại thẻ biểu đồ -- không phải làm lại truy vấn. --%>
+        <!-- ===== Bảng hợp đồng trong kỳ ===== -->
+        <%-- MỌI thứ về phiếu hỗ trợ đã ra khỏi trang này theo yêu cầu: biểu đồ
+             trạng thái, ô KPI "Phiếu hỗ trợ đang xử lý" và bảng "Phiếu hỗ trợ
+             cần xử lý". Phần khách hàng giữ nguyên.
+
+             Controller cũng thôi gọi ba truy vấn phiếu -- để lại thì trang trả
+             tiền cho dữ liệu không ai đọc. Các hàm DAO thì còn nguyên (màn hình
+             phiếu hỗ trợ và NotificationScheduler vẫn dùng), nên bật lại là
+             dựng lại phần hiển thị chứ không phải viết lại truy vấn. --%>
         <div class="row g-4">
-            <div class="col-lg-6">
+            <div class="col-12">
                 <div class="card-box table-section h-100">
                     <div class="table-section-header">
                         <%-- Không còn lọc "sắp hết hạn": bảng liệt kê MỌI hợp đồng
@@ -591,64 +575,6 @@
                 </div>
             </div>
 
-            <div class="col-lg-6">
-                <div class="card-box table-section h-100">
-                    <div class="table-section-header">
-                        <h6>Phiếu hỗ trợ cần xử lý <span class="as-of-today">tính tới hôm nay</span></h6>
-                        <a href="${pageContext.request.contextPath}/ticket">Xem tất cả</a>
-                    </div>
-                    <%-- Bọc cuộn ngang: ở khổ điện thoại bảng 5 cột hẹp nhất cũng
-                         rộng hơn thẻ (~366px so với 347px) và kéo CẢ TRANG trượt
-                         ngang. Cho riêng bảng cuộn, giống cách listcontract.jsp
-                         đang làm. --%>
-                    <div class="table-responsive">
-                    <table class="mini-table">
-                        <thead><tr><th>Mã phiếu</th><th>Khách hàng</th><th>Địa bàn</th><th>Ưu tiên</th><th>Trạng thái</th></tr></thead>
-                        <tbody>
-                            <c:choose>
-                                <c:when test="${empty attentionTickets}">
-                                    <tr><td colspan="5" style="text-align:center; color:#9ca3af; padding:20px 8px;">Không có phiếu nào cần xử lý.</td></tr>
-                                </c:when>
-                                <c:otherwise>
-                                    <c:forEach var="tk" items="${attentionTickets}">
-                                        <tr>
-                                            <td><a href="${pageContext.request.contextPath}/ticket?action=view&id=${tk.ticketId}" class="link">${fn:escapeXml(tk.ticketCode)}</a></td>
-                                            <td>
-                                                <c:choose>
-                                                    <c:when test="${tk.enterprise != null}">${fn:escapeXml(tk.enterprise.enterpriseName)}</c:when>
-                                                    <c:otherwise>&mdash;</c:otherwise>
-                                                </c:choose>
-                                            </td>
-                                            <td>
-                                                <c:choose>
-                                                    <c:when test="${tk.enterprise.address.district.province != null}">${fn:escapeXml(tk.enterprise.address.district.province.shortName)}</c:when>
-                                                    <c:otherwise>&mdash;</c:otherwise>
-                                                </c:choose>
-                                            </td>
-                                            <td>
-                                                <c:choose>
-                                                    <c:when test="${tk.priority == 'Khẩn cấp'}"><span class="status-pill status-danger">Khẩn cấp</span></c:when>
-                                                    <c:when test="${tk.priority == 'Cao'}"><span class="status-pill status-warn">Cao</span></c:when>
-                                                    <c:when test="${tk.priority == 'Thấp'}"><span class="status-pill status-gray">Thấp</span></c:when>
-                                                    <c:otherwise><span class="status-pill status-info">Bình thường</span></c:otherwise>
-                                                </c:choose>
-                                            </td>
-                                            <td>
-                                                <c:choose>
-                                                    <c:when test="${tk.status == 'Đang xử lý'}"><span class="status-pill status-warn">Đang xử lý</span></c:when>
-                                                    <c:when test="${tk.status == 'Đã đóng'}"><span class="status-pill status-success">Đã đóng</span></c:when>
-                                                    <c:otherwise><span class="status-pill status-info">Mới tiếp nhận</span></c:otherwise>
-                                                </c:choose>
-                                            </td>
-                                        </tr>
-                                    </c:forEach>
-                                </c:otherwise>
-                            </c:choose>
-                        </tbody>
-                    </table>
-                    </div>
-                </div>
-            </div>
         </div>
     </div>
 

@@ -18,7 +18,6 @@ import poscs.common.Period;
 import poscs.dao.ContractDAO;
 import poscs.dao.CustomerDAO;
 import poscs.dao.EmployeeDAO;
-import poscs.dao.TechnicalSupportTicketDAO;
 import poscs.model.Contract;
 import poscs.model.Province;
 import poscs.model.User;
@@ -39,7 +38,6 @@ public class DashboardControllerTest {
     private DashboardController controller;
     private CustomerDAO customerDAO;
     private ContractDAO contractDAO;
-    private TechnicalSupportTicketDAO ticketDAO;
     private EmployeeDAO employeeDAO;
 
     private HttpServletRequest request;
@@ -50,11 +48,9 @@ public class DashboardControllerTest {
         controller = new DashboardController();
         customerDAO = mock(CustomerDAO.class);
         contractDAO = mock(ContractDAO.class);
-        ticketDAO = mock(TechnicalSupportTicketDAO.class);
         employeeDAO = mock(EmployeeDAO.class);
         setField(controller, "customerDAO", customerDAO);
         setField(controller, "contractDAO", contractDAO);
-        setField(controller, "ticketDAO", ticketDAO);
         setField(controller, "employeeDAO", employeeDAO);
 
         request = mock(HttpServletRequest.class);
@@ -68,11 +64,7 @@ public class DashboardControllerTest {
         // tránh NPE khi controller đọc qua các map/list này.
         when(contractDAO.countStatusSummary(nullable(List.class), nullable(Period.class), nullable(String.class),
                 anyBoolean(), nullable(List.class))).thenReturn(Collections.emptyMap());
-        when(ticketDAO.countStatusSummary(nullable(List.class), nullable(Period.class), nullable(List.class)))
-                .thenReturn(Collections.emptyMap());
         when(contractDAO.findActiveInPeriod(anyInt(), nullable(List.class), nullable(List.class), any(Period.class)))
-                .thenReturn(Collections.emptyList());
-        when(ticketDAO.findNeedingAttention(anyInt(), nullable(List.class), nullable(List.class)))
                 .thenReturn(Collections.emptyList());
         // Hai hàm tiền: không stub thì trả null và controller ném NPE lúc so
         // sánh doanh thu tháng này với tháng trước.
@@ -262,10 +254,7 @@ public class DashboardControllerTest {
         when(contractDAO.countStatusSummary(eq(List.of(3)), nullable(Period.class), nullable(String.class), anyBoolean(),
                 nullable(List.class)))
                 .thenReturn(Collections.emptyMap());
-        when(ticketDAO.countStatusSummary(eq(List.of(3)), nullable(Period.class), nullable(List.class)))
-                .thenReturn(Collections.emptyMap());
         when(contractDAO.findActiveInPeriod(anyInt(), eq(List.of(3)), nullable(List.class), any(Period.class))).thenReturn(Collections.emptyList());
-        when(ticketDAO.findNeedingAttention(anyInt(), eq(List.of(3)), nullable(List.class))).thenReturn(Collections.emptyList());
 
         controller.doGet(request, response);
 
@@ -274,9 +263,6 @@ public class DashboardControllerTest {
         verify(contractDAO).countStatusSummary(eq(List.of(3)), nullable(Period.class), nullable(String.class), anyBoolean(),
                 nullable(List.class));
         verify(contractDAO).findActiveInPeriod(anyInt(), eq(List.of(3)), nullable(List.class), any(Period.class));
-        verify(ticketDAO).countStatusSummary(eq(List.of(3)), nullable(Period.class), nullable(List.class));
-        verify(ticketDAO).countOverdueOrDueSoon(eq(List.of(3)), nullable(List.class));
-        verify(ticketDAO).findNeedingAttention(anyInt(), eq(List.of(3)), nullable(List.class));
         verify(contractDAO, times(2)).sumInvoiceAmountByMonth(anyInt(), anyInt(), eq(List.of(3)), nullable(List.class));
         verify(request).setAttribute("provinceFilters", List.of(3));
     }
@@ -299,7 +285,6 @@ public class DashboardControllerTest {
         verify(contractDAO).countStatusSummary(nullable(List.class), nullable(Period.class), nullable(String.class),
                 anyBoolean(), eq(List.of(7)));
         verify(customerDAO).countUpToEndOfPeriod(nullable(List.class), nullable(Period.class), eq(List.of(7)));
-        verify(ticketDAO).countStatusSummary(nullable(List.class), nullable(Period.class), eq(List.of(7)));
     }
 
     /**
@@ -355,7 +340,6 @@ public class DashboardControllerTest {
 
         verify(request).setAttribute("teamSize", 3);
         verify(contractDAO).findActiveInPeriod(anyInt(), nullable(List.class), eq(List.of(7, 8, 9)), any(Period.class));
-        verify(ticketDAO).findNeedingAttention(anyInt(), nullable(List.class), eq(List.of(7, 8, 9)));
     }
 
     /**
@@ -414,7 +398,6 @@ public class DashboardControllerTest {
         verify(customerDAO).countNewInPeriod(eq(List.<Integer>of()), any(Period.class), nullable(List.class));
         verify(contractDAO).countStatusSummary(eq(List.<Integer>of()), any(Period.class), isNull(), anyBoolean(),
                 nullable(List.class));
-        verify(ticketDAO).countStatusSummary(eq(List.<Integer>of()), any(Period.class), nullable(List.class));
         verify(contractDAO, times(2)).sumInvoiceAmountInPeriod(any(Period.class), nullable(List.class),
                 nullable(List.class));
         // Có kỳ thì không được rơi về nhánh "tháng hiện tại" nữa.
@@ -437,7 +420,6 @@ public class DashboardControllerTest {
         controller.doGet(request, response);
 
         verify(contractDAO).findActiveInPeriod(anyInt(), eq(List.<Integer>of()), nullable(List.class), any(Period.class));
-        verify(ticketDAO).findNeedingAttention(anyInt(), eq(List.<Integer>of()), nullable(List.class));
     }
 
     // ------------------------------------------------------------------
@@ -463,7 +445,6 @@ public class DashboardControllerTest {
         verify(contractDAO).countStatusSummary(eq(List.of(3, 5)), nullable(Period.class), nullable(String.class),
                 anyBoolean(), eq(List.of(7)));
         verify(customerDAO).countUpToEndOfPeriod(eq(List.of(3, 5)), nullable(Period.class), eq(List.of(7)));
-        verify(ticketDAO).countOverdueOrDueSoon(eq(List.of(3, 5)), eq(List.of(7)));
         verify(request).setAttribute("provinceFilters", List.of(3, 5));
         // Cờ để màn hình nói "địa bàn bạn phụ trách" thay vì "2 tỉnh đang chọn".
         verify(request).setAttribute("provinceFilterIsMine", true);

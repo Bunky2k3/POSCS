@@ -20,10 +20,8 @@ import poscs.dao.AddressDAO;
 import poscs.dao.ContractDAO;
 import poscs.dao.CustomerDAO;
 import poscs.dao.EmployeeDAO;
-import poscs.dao.TechnicalSupportTicketDAO;
 import poscs.model.Contract;
 import poscs.model.Province;
-import poscs.model.TechnicalRequest;
 import poscs.model.User;
 
 /**
@@ -43,11 +41,15 @@ import poscs.model.User;
  * việc của nhóm mình, không phải mỗi mấy hợp đồng đứng tên riêng họ. Xem
  * EmployeeDAO.findTeamUserIds.
  *
- * Lọc kỳ KHÔNG áp cho hai bảng cuối trang ("Hợp đồng sắp hết hạn", "Phiếu cần
- * xử lý"): đó là cảnh báo tính theo NGÀY HÔM NAY, không phải số liệu phát
- * sinh trong kỳ -- hỏi "hợp đồng nào sắp hết hạn trong quý 1 năm ngoái" là
- * câu vô nghĩa. Tiêu đề hai bảng đó ghi rõ "tính tới hôm nay" để không ai
- * đọc nhầm là chúng đã theo kỳ đang chọn.
+ * MỌI thứ về phiếu hỗ trợ đã ra khỏi trang này theo yêu cầu người dùng
+ * (2026-09-19): biểu đồ trạng thái, ô KPI và bảng "Phiếu cần xử lý". Nên
+ * controller cũng thôi gọi ba truy vấn phiếu -- để lại thì trang trả tiền cho
+ * dữ liệu không ai đọc. Hàm DAO thì còn nguyên: màn hình phiếu hỗ trợ và
+ * NotificationScheduler vẫn dùng chúng.
+ *
+ * Bảng hợp đồng thì ĐI THEO KỲ đang chọn (mặc định tháng đang chạy), khác
+ * bản trước -- lúc đó nó là "sắp hết hạn tính tới hôm nay" nên cố ý đứng
+ * ngoài bộ lọc kỳ.
  */
 @WebServlet(name = "DashboardController", urlPatterns = {"/dashboard"})
 public class DashboardController extends HttpServlet {
@@ -59,7 +61,6 @@ public class DashboardController extends HttpServlet {
      * vừa sửa. Quá số này thì đã có link "Xem tất cả".
      */
     private static final int CONTRACTS_IN_WINDOW_LIMIT = 8;
-    private static final int ATTENTION_TICKETS_LIMIT = 5;
     private static final String[] WEEKDAY_VI = {
         "Chủ Nhật", "Thứ Hai", "Thứ Ba", "Thứ Tư", "Thứ Năm", "Thứ Sáu", "Thứ Bảy"
     };
@@ -70,7 +71,6 @@ public class DashboardController extends HttpServlet {
 
     private final CustomerDAO customerDAO = new CustomerDAO();
     private final ContractDAO contractDAO = new ContractDAO();
-    private final TechnicalSupportTicketDAO ticketDAO = new TechnicalSupportTicketDAO();
     private final AddressDAO addressDAO = new AddressDAO();
     private final EmployeeDAO employeeDAO = new EmployeeDAO();
 
@@ -175,11 +175,6 @@ public class DashboardController extends HttpServlet {
             request.setAttribute("revenueTrendPercent", Math.round(trendPercent * 10) / 10.0);
         }
 
-        // ===== KPI: phiếu hỗ trợ =====
-        Map<String, Integer> ticketStatusSummary = ticketDAO.countStatusSummary(provinceFilters, period, ownerIds);
-        request.setAttribute("ticketStatusSummary", ticketStatusSummary);
-        request.setAttribute("overdueOrDueSoonCount", ticketDAO.countOverdueOrDueSoon(provinceFilters, ownerIds));
-
         request.setAttribute("currentMonthNumber", today.getMonthValue());
 
         // ===== Badge ngày hôm nay =====
@@ -214,11 +209,6 @@ public class DashboardController extends HttpServlet {
         }
         request.setAttribute("windowContracts", windowContracts);
         request.setAttribute("contractValues", contractValues);
-
-        // ===== Bảng phiếu hỗ trợ cần xử lý =====
-        List<TechnicalRequest> attentionTickets = ticketDAO.findNeedingAttention(ATTENTION_TICKETS_LIMIT,
-                provinceFilters, ownerIds);
-        request.setAttribute("attentionTickets", attentionTickets);
 
         request.getRequestDispatcher("/dashboard.jsp").forward(request, response);
     }
