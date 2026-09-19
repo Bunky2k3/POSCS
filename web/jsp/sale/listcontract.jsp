@@ -491,7 +491,13 @@
                                      vì ba cột cùng bị cắt cụt. --%>
                                 <td class="cell-wrap">
                                     <div class="cell-2line">
-                                        <a href="${pageContext.request.contextPath}/contract?action=view&id=${contract.contractId}" class="contract-title-link">${fn:escapeXml(contract.title)}</a>
+                                        <%-- Người CÓ quyền quản lý đi thẳng vào trang quản lý, không
+                                             qua trang xem. Trang xem là đích của vai trò CHỈ XEM (Kỹ
+                                             thuật/CSKH, và người của phòng nhận bàn giao); bắt người
+                                             quản lý dừng ở đó rồi bấm tiếp sang Sửa là một chặng
+                                             thừa trên mọi thao tác hàng ngày. Nút con mắt bên phải
+                                             vẫn mở được trang xem cho ai muốn nhìn bản chỉ đọc. --%>
+                                        <a href="${pageContext.request.contextPath}/contract?action=${canManage ? 'edit' : 'view'}&id=${contract.contractId}" class="contract-title-link">${fn:escapeXml(contract.title)}</a>
                                         <span class="cell-sub">
                                             <%-- Nhãn phụ lục đứng TRƯỚC tên khách hàng: nó trả lời
                                                  "dòng này là cái gì", mà câu đó phải đọc được trước
@@ -557,9 +563,9 @@
                                 </td>
                                 <td>
                                     <div class="action-icons">
-                                        <button class="act-view" title="Xem chi tiết" onclick="location.href='${pageContext.request.contextPath}/contract?action=view&id=${contract.contractId}'"><i class="fa-regular fa-eye"></i></button>
+                                        <button class="act-view" title="Xem bản chỉ đọc" onclick="location.href='${pageContext.request.contextPath}/contract?action=view&id=${contract.contractId}'"><i class="fa-regular fa-eye"></i></button>
                                         <c:if test="${canManage}">
-                                            <button class="act-edit" title="Sửa" onclick="location.href='${pageContext.request.contextPath}/contract?action=edit&id=${contract.contractId}'"><i class="fa-solid fa-pen"></i></button>
+                                            <button class="act-edit" title="Mở trang quản lý" onclick="location.href='${pageContext.request.contextPath}/contract?action=edit&id=${contract.contractId}'"><i class="fa-solid fa-pen"></i></button>
                                             <%-- Không còn nút xoá ở danh sách. Hợp đồng đã ký không
                                                  xoá được theo nghiệp vụ; thứ còn lại là huỷ một bản
                                                  ghi NHẬP NHẦM -- việc của Admin, bắt buộc có lý do,
