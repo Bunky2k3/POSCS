@@ -529,12 +529,12 @@
             <div class="col-lg-6">
                 <div class="card-box table-section h-100">
                     <div class="table-section-header">
-                        <%-- Nói RÕ cửa sổ 30 ngày (ContractDAO.SOON_THRESHOLD_DAYS).
-                             "tính tới hôm nay" không trả lời được câu người dùng
-                             thật sự hỏi: "tôi đang có 8 hợp đồng còn hiệu lực, sao
-                             bảng chỉ hiện 1?". Vì 7 cái kia còn hạn hơn 30 ngày --
-                             chúng nằm ở ô KPI "Hợp đồng đang hiệu lực" ngay trên. --%>
-                        <h6>Hợp đồng sắp hết hạn <span class="as-of-today">trong 30 ngày tới</span></h6>
+                        <%-- Không còn lọc "sắp hết hạn": bảng liệt kê MỌI hợp đồng
+                             còn hiệu lực trong kỳ, cột trạng thái tự nói ra từng cái
+                             đang ở đâu. Nhãn kỳ lấy từ chính cửa sổ controller đã
+                             dùng để truy vấn, không dựng lại ở đây -- hai chỗ tự
+                             tính thì có ngày tiêu đề nói một đằng số liệu một nẻo. --%>
+                        <h6>Hợp đồng <span class="as-of-today">${fn:escapeXml(contractWindowLabel)}</span></h6>
                         <a href="${pageContext.request.contextPath}/contract">Xem tất cả</a>
                     </div>
                     <%-- Bọc cuộn ngang: ở khổ điện thoại bảng 5 cột hẹp nhất cũng
@@ -547,15 +547,14 @@
                              "việc của tôi HOẶC trong địa bàn tôi giữ", nên câu người đọc cần
                              trả lời khi nhìn một dòng lạ là "nó ở tỉnh nào", chứ không phải
                              "ai đứng tên" -- phần lớn các dòng đứng tên chính họ. --%>
-                        <thead><tr><th>Mã HĐ</th><th>Khách hàng</th><th>Địa bàn</th><th>Giá trị</th><th>Còn lại</th></tr></thead>
+                        <thead><tr><th>Mã HĐ</th><th>Khách hàng</th><th>Địa bàn</th><th>Giá trị</th><th>Trạng thái</th></tr></thead>
                         <tbody>
                             <c:choose>
-                                <c:when test="${empty expiringContracts}">
-                                    <tr><td colspan="5" style="text-align:center; color:#9ca3af; padding:20px 8px;">Không có hợp đồng nào sắp hết hạn.</td></tr>
+                                <c:when test="${empty windowContracts}">
+                                    <tr><td colspan="5" style="text-align:center; color:#9ca3af; padding:20px 8px;">Không có hợp đồng nào trong ${fn:escapeXml(contractWindowLabel)}.</td></tr>
                                 </c:when>
                                 <c:otherwise>
-                                    <c:forEach var="ct" items="${expiringContracts}">
-                                        <c:set var="daysLeft" value="${daysRemaining[ct.contractId]}"/>
+                                    <c:forEach var="ct" items="${windowContracts}">
                                         <tr>
                                             <td><a href="${pageContext.request.contextPath}/contract?action=view&id=${ct.contractId}" class="link">${fn:escapeXml(ct.contractCode)}</a></td>
                                             <td>
@@ -571,7 +570,17 @@
                                                 </c:choose>
                                             </td>
                                             <td><span class="contract-value" data-vnd="${contractValues[ct.contractId]}">&mdash;</span></td>
-                                            <td><span class="status-pill ${daysLeft <= 7 ? 'status-danger' : 'status-warn'}">${daysLeft} ngày</span></td>
+                                            <%-- Trạng thái theo LỊCH (BR-17, ContractDAO.computeStatus), không
+                                                 phải trạng thái tiến trình: bảng này nói hợp đồng đang ở đâu
+                                                 trên trục thời gian, mà đó mới là thứ đọc cùng cột kỳ ở trên. --%>
+                                            <td>
+                                                <c:choose>
+                                                    <c:when test="${ct.status == 'Sắp hết hạn'}"><span class="status-pill status-warn">Sắp hết hạn</span></c:when>
+                                                    <c:when test="${ct.status == 'Đã hết hạn'}"><span class="status-pill status-danger">Đã hết hạn</span></c:when>
+                                                    <c:when test="${ct.status == 'Chưa hiệu lực'}"><span class="status-pill status-gray">Chưa hiệu lực</span></c:when>
+                                                    <c:otherwise><span class="status-pill status-success">Đang hiệu lực</span></c:otherwise>
+                                                </c:choose>
+                                            </td>
                                         </tr>
                                     </c:forEach>
                                 </c:otherwise>

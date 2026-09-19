@@ -559,6 +559,54 @@ public class ContractDAO {
         return summary;
     }
 
+    /**
+     * Hợp đồng CÒN HIỆU LỰC ở bất kỳ ngày nào trong {@code window} -- bảng
+     * "Hợp đồng trong <kỳ>" của Dashboard.
+     *
+     * <p>Thay cho {@link #findExpiringSoon}: bảng cũ chỉ lấy hợp đồng hết hạn
+     * trong 30 ngày, nên một nhân viên có 8 hợp đồng đang chạy vẫn thấy đúng 1
+     * dòng và tưởng trang hỏng. Ở đây KHÔNG lọc theo trạng thái nào -- cột
+     * trạng thái tự nói ra từng cái đang ở đâu.
+     *
+     * <p>Hai cột ngày đều cho phép NULL và NULL coi như KHỚP, cùng lẽ với
+     * {@link poscs.common.ListScope#activeWindowPredicate}: hợp đồng chưa chốt
+     * thời hạn là bản nháp đang soạn, đúng là việc của tháng này -- giấu đi thì
+     * người vừa tạo nó mở Dashboard không thấy thứ mình vừa làm.
+     *
+     * <p>Vẫn CHỈ hợp đồng gốc, và vẫn xếp theo ngày hết hạn gần nhất trước:
+     * phụ lục đứng cạnh cha nó là đếm hai lần một việc, còn cái sắp hết hạn thì
+     * vẫn là cái cần nhìn trước.
+     */
+    public List<Contract> findActiveInPeriod(int limit, List<Integer> provinceIds, List<Integer> ownerIds,
+            Period window) {
+        List<Contract> result = new ArrayList<>();
+        String sql = SELECT_BASE +
+            "WHERE c.is_deleted = 0 AND c.parent_contract_id IS NULL " +
+            (window == null ? "" :
+                "AND (c.effective_date IS NULL OR c.effective_date <= ?) "
+                + "AND (c.end_date IS NULL OR c.end_date >= ?) ") +
+            SqlFilters.scopeClause(DASHBOARD_OWNER_COLUMNS, ownerIds, "d.province_id", provinceIds) + " " +
+            "ORDER BY c.end_date IS NULL, c.end_date ASC LIMIT ?";
+        try (Connection conn = DBContext.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            int param = 1;
+            if (window != null) {
+                ps.setDate(param++, window.getTo());
+                ps.setDate(param++, window.getFrom());
+            }
+            param = SqlFilters.bindScope(ps, param, DASHBOARD_OWNER_COLUMNS, ownerIds, provinceIds);
+            ps.setInt(param, limit);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    result.add(mapRow(rs));
+                }
+            }
+        } catch (SQLException ex) {
+            LOG.error("Loi truy van hop dong trong ky", ex);
+        }
+        return result;
+    }
+
     /** Lấy top N hợp đồng "Sắp hết hạn" (BR-17), sắp theo ngày hết hạn gần nhất trước -- phục vụ dashboard. */
     public List<Contract> findExpiringSoon(int limit) {
         return findExpiringSoon(limit, null);

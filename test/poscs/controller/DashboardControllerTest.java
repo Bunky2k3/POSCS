@@ -70,7 +70,7 @@ public class DashboardControllerTest {
                 anyBoolean(), nullable(List.class))).thenReturn(Collections.emptyMap());
         when(ticketDAO.countStatusSummary(nullable(List.class), nullable(Period.class), nullable(List.class)))
                 .thenReturn(Collections.emptyMap());
-        when(contractDAO.findExpiringSoon(anyInt(), nullable(List.class), nullable(List.class)))
+        when(contractDAO.findActiveInPeriod(anyInt(), nullable(List.class), nullable(List.class), any(Period.class)))
                 .thenReturn(Collections.emptyList());
         when(ticketDAO.findNeedingAttention(anyInt(), nullable(List.class), nullable(List.class)))
                 .thenReturn(Collections.emptyList());
@@ -150,41 +150,77 @@ public class DashboardControllerTest {
     }
 
     @Test
-    public void expiringContracts_computesDaysRemainingAndValuePerContract() throws Exception {
+    public void bangHopDong_dayGiaTriTungHopDongRaManHinh() throws Exception {
         LocalDate today = LocalDate.now();
         Contract c = new Contract();
         c.setContractId(9);
         c.setEndDate(Date.valueOf(today.plusDays(10)));
         c.setContractValue(BigDecimal.valueOf(5_000_000));
-        List<Contract> expiring = Arrays.asList(c);
-        when(contractDAO.findExpiringSoon(anyInt(), nullable(List.class), nullable(List.class))).thenReturn(expiring);
+        List<Contract> inWindow = Arrays.asList(c);
+        when(contractDAO.findActiveInPeriod(anyInt(), nullable(List.class), nullable(List.class), any(Period.class)))
+                .thenReturn(inWindow);
         when(contractDAO.sumInvoiceAmountByMonth(anyInt(), anyInt(), nullable(List.class), nullable(List.class)))
                 .thenReturn(BigDecimal.ZERO);
 
         controller.doGet(request, response);
 
-        verify(request).setAttribute(eq("expiringContracts"), eq(expiring));
+        verify(request).setAttribute(eq("windowContracts"), eq(inWindow));
         verify(request).setAttribute(eq("contractValues"),
                 argThat((Map<Integer, BigDecimal> m) -> BigDecimal.valueOf(5_000_000).compareTo(m.get(9)) == 0));
-        verify(request).setAttribute(eq("daysRemaining"),
-                argThat((Map<Integer, Long> m) -> Long.valueOf(10L).equals(m.get(9))));
     }
 
     /**
-     * Cột "Giá trị" ở bảng hợp đồng sắp hết hạn là giá trị theo ĐIỀU KHOẢN đã
+     * Không chọn kỳ thì bảng hợp đồng lấy cửa sổ THÁNG ĐANG CHẠY.
+     *
+     * <p>Không phải "mọi thời điểm": bảng để trả lời "tháng này tôi đang cầm
+     * những gì", đổ ra cả hợp đồng ba năm trước thì câu đó hết nghĩa. Cũng
+     * không phải cửa sổ 30 ngày như bảng "sắp hết hạn" cũ -- chính nó làm
+     * người có 8 hợp đồng đang chạy chỉ thấy 1 dòng.
+     */
+    @Test
+    public void bangHopDong_khongChonKy_thiLayThangDangChay() throws Exception {
+        LocalDate today = LocalDate.now();
+        when(contractDAO.sumInvoiceAmountByMonth(anyInt(), anyInt(), nullable(List.class), nullable(List.class)))
+                .thenReturn(BigDecimal.ZERO);
+
+        controller.doGet(request, response);
+
+        verify(contractDAO).findActiveInPeriod(anyInt(), nullable(List.class), nullable(List.class),
+                argThat(w -> w.getFrom().toLocalDate().equals(today.withDayOfMonth(1))
+                        && w.getTo().toLocalDate().getMonthValue() == today.getMonthValue()));
+    }
+
+    /** Chọn kỳ thì bảng đi theo kỳ đó, không cứng ở tháng hiện tại. */
+    @Test
+    public void bangHopDong_chonKy_thiDiTheoKy() throws Exception {
+        when(request.getParameter("year")).thenReturn("2026");
+        when(request.getParameter("period")).thenReturn("q3");
+        when(contractDAO.sumInvoiceAmountInPeriod(any(Period.class), nullable(List.class), nullable(List.class)))
+                .thenReturn(BigDecimal.ZERO);
+
+        controller.doGet(request, response);
+
+        verify(contractDAO).findActiveInPeriod(anyInt(), nullable(List.class), nullable(List.class),
+                argThat(w -> "2026-07-01".equals(w.getFrom().toString())
+                        && "2026-09-30".equals(w.getTo().toString())));
+        verify(request).setAttribute("contractWindowLabel", "Quý 3/2026");
+    }
+
+    /**
+     * Cột "Giá trị" ở bảng hợp đồng là giá trị theo ĐIỀU KHOẢN đã
      * cộng phụ lục, không phải tổng các kỳ thanh toán như trước V27. Hai thứ đó
      * lệch nhau đúng bằng công nợ, và hợp đồng vừa được phụ lục bổ sung mà vẫn
      * hiện con số cũ là thứ người dùng báo lại đầu tiên.
      */
     @Test
-    public void expiringContracts_valueIncludesSignedAmendments() throws Exception {
+    public void bangHopDong_giaTriGomCaPhuLucDaKy() throws Exception {
         LocalDate today = LocalDate.now();
         Contract c = new Contract();
         c.setContractId(9);
         c.setEndDate(Date.valueOf(today.plusDays(10)));
         c.setContractValue(BigDecimal.valueOf(1_500_000_000L));
         c.setAmendmentValueSigned(BigDecimal.valueOf(250_000_000L));
-        when(contractDAO.findExpiringSoon(anyInt(), nullable(List.class), nullable(List.class)))
+        when(contractDAO.findActiveInPeriod(anyInt(), nullable(List.class), nullable(List.class), any(Period.class)))
                 .thenReturn(Arrays.asList(c));
         when(contractDAO.sumInvoiceAmountByMonth(anyInt(), anyInt(), nullable(List.class), nullable(List.class)))
                 .thenReturn(BigDecimal.ZERO);
@@ -228,7 +264,7 @@ public class DashboardControllerTest {
                 .thenReturn(Collections.emptyMap());
         when(ticketDAO.countStatusSummary(eq(List.of(3)), nullable(Period.class), nullable(List.class)))
                 .thenReturn(Collections.emptyMap());
-        when(contractDAO.findExpiringSoon(anyInt(), eq(List.of(3)), nullable(List.class))).thenReturn(Collections.emptyList());
+        when(contractDAO.findActiveInPeriod(anyInt(), eq(List.of(3)), nullable(List.class), any(Period.class))).thenReturn(Collections.emptyList());
         when(ticketDAO.findNeedingAttention(anyInt(), eq(List.of(3)), nullable(List.class))).thenReturn(Collections.emptyList());
 
         controller.doGet(request, response);
@@ -237,7 +273,7 @@ public class DashboardControllerTest {
         verify(customerDAO).countNewInPeriod(eq(List.of(3)), nullable(Period.class), nullable(List.class));
         verify(contractDAO).countStatusSummary(eq(List.of(3)), nullable(Period.class), nullable(String.class), anyBoolean(),
                 nullable(List.class));
-        verify(contractDAO).findExpiringSoon(anyInt(), eq(List.of(3)), nullable(List.class));
+        verify(contractDAO).findActiveInPeriod(anyInt(), eq(List.of(3)), nullable(List.class), any(Period.class));
         verify(ticketDAO).countStatusSummary(eq(List.of(3)), nullable(Period.class), nullable(List.class));
         verify(ticketDAO).countOverdueOrDueSoon(eq(List.of(3)), nullable(List.class));
         verify(ticketDAO).findNeedingAttention(anyInt(), eq(List.of(3)), nullable(List.class));
@@ -318,7 +354,7 @@ public class DashboardControllerTest {
         controller.doGet(request, response);
 
         verify(request).setAttribute("teamSize", 3);
-        verify(contractDAO).findExpiringSoon(anyInt(), nullable(List.class), eq(List.of(7, 8, 9)));
+        verify(contractDAO).findActiveInPeriod(anyInt(), nullable(List.class), eq(List.of(7, 8, 9)), any(Period.class));
         verify(ticketDAO).findNeedingAttention(anyInt(), nullable(List.class), eq(List.of(7, 8, 9)));
     }
 
@@ -400,7 +436,7 @@ public class DashboardControllerTest {
 
         controller.doGet(request, response);
 
-        verify(contractDAO).findExpiringSoon(anyInt(), eq(List.<Integer>of()), nullable(List.class));
+        verify(contractDAO).findActiveInPeriod(anyInt(), eq(List.<Integer>of()), nullable(List.class), any(Period.class));
         verify(ticketDAO).findNeedingAttention(anyInt(), eq(List.<Integer>of()), nullable(List.class));
     }
 

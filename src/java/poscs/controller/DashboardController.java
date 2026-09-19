@@ -52,7 +52,13 @@ import poscs.model.User;
 @WebServlet(name = "DashboardController", urlPatterns = {"/dashboard"})
 public class DashboardController extends HttpServlet {
 
-    private static final int EXPIRING_CONTRACTS_LIMIT = 5;
+    /**
+     * Số dòng tối đa của bảng hợp đồng. 8 chứ không phải 5 như bảng "sắp hết
+     * hạn" cũ: bảng giờ liệt kê mọi hợp đồng trong kỳ nên tập thường lớn hơn,
+     * mà cắt ở 5 thì một nhân viên có 8 hợp đồng lại thấy thiếu -- đúng thứ
+     * vừa sửa. Quá số này thì đã có link "Xem tất cả".
+     */
+    private static final int CONTRACTS_IN_WINDOW_LIMIT = 8;
     private static final int ATTENTION_TICKETS_LIMIT = 5;
     private static final String[] WEEKDAY_VI = {
         "Chủ Nhật", "Thứ Hai", "Thứ Ba", "Thứ Tư", "Thứ Năm", "Thứ Sáu", "Thứ Bảy"
@@ -182,23 +188,32 @@ public class DashboardController extends HttpServlet {
         request.setAttribute("todayLabel", weekday + ", " + String.format("%02d/%02d/%04d",
                 today.getDayOfMonth(), today.getMonthValue(), today.getYear()));
 
-        // ===== Bảng hợp đồng sắp hết hạn =====
-        List<Contract> expiringContracts = contractDAO.findExpiringSoon(EXPIRING_CONTRACTS_LIMIT, provinceFilters,
-                ownerIds);
+        // ===== Bảng hợp đồng trong kỳ =====
+        //
+        // Trước đây bảng này chỉ lấy hợp đồng hết hạn trong 30 ngày. Hệ quả đo
+        // được trên dữ liệu thật: sales4 có 8 hợp đồng đang chạy mà bảng hiện
+        // đúng 1 dòng -- đúng theo định nghĩa "sắp hết hạn" nhưng người dùng
+        // đọc ra là trang hỏng. Giờ bảng lấy MỌI hợp đồng còn hiệu lực trong
+        // kỳ, không lọc trạng thái; cột trạng thái tự nói ra từng cái ở đâu.
+        //
+        // Không chọn kỳ thì cửa sổ là THÁNG ĐANG CHẠY, không phải "mọi thời
+        // điểm": bảng này để trả lời "tháng này tôi đang cầm những gì", mà đổ
+        // ra cả hợp đồng của ba năm trước thì câu đó hết nghĩa. Chọn kỳ thì
+        // nghe theo kỳ.
+        Period contractWindow = period != null ? period : currentMonth(today);
+        request.setAttribute("contractWindowLabel", contractWindow.getLabel());
+        List<Contract> windowContracts =
+                contractDAO.findActiveInPeriod(CONTRACTS_IN_WINDOW_LIMIT, provinceFilters, ownerIds, contractWindow);
         Map<Integer, BigDecimal> contractValues = new HashMap<>();
-        Map<Integer, Long> daysRemaining = new HashMap<>();
-        for (Contract c : expiringContracts) {
+        for (Contract c : windowContracts) {
             // Giá trị theo ĐIỀU KHOẢN, đã cộng các phụ lục đã ký -- không phải
             // tổng các kỳ thanh toán như trước V27. Hai thứ đó khác nhau: hợp
             // đồng chưa lập kỳ nào hiện ra 0 đồng, và hợp đồng vừa được phụ lục
             // bổ sung thì vẫn hiện con số cũ.
             contractValues.put(c.getContractId(), c.getCurrentValue());
-            LocalDate endDate = c.getEndDate().toLocalDate();
-            daysRemaining.put(c.getContractId(), ChronoUnit.DAYS.between(today, endDate));
         }
-        request.setAttribute("expiringContracts", expiringContracts);
+        request.setAttribute("windowContracts", windowContracts);
         request.setAttribute("contractValues", contractValues);
-        request.setAttribute("daysRemaining", daysRemaining);
 
         // ===== Bảng phiếu hỗ trợ cần xử lý =====
         List<TechnicalRequest> attentionTickets = ticketDAO.findNeedingAttention(ATTENTION_TICKETS_LIMIT,
@@ -247,6 +262,11 @@ public class DashboardController extends HttpServlet {
             ids.add(p.getProvinceId());
         }
         return ids;
+    }
+
+    /** Tháng đang chạy, quy về một {@link Period} để dùng chung một đường lọc. */
+    private static Period currentMonth(LocalDate today) {
+        return Period.parse(String.valueOf(today.getYear()), "m" + today.getMonthValue());
     }
 
     private static Integer parseIntOrNull(String value) {
