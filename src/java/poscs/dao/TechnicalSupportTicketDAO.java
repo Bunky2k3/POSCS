@@ -15,9 +15,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import poscs.common.Period;
 import poscs.common.SqlFilters;
+import poscs.model.Address;
 import poscs.model.Contract;
+import poscs.model.District;
 import poscs.model.Enterprise;
 import poscs.model.TechnicalRequest;
+import poscs.model.Province;
 import poscs.model.TechnicalRequestHistory;
 import poscs.model.User;
 
@@ -49,20 +52,43 @@ public class TechnicalSupportTicketDAO {
         "LEFT JOIN addresses a ON e.address_id = a.address_id " +
         "LEFT JOIN districts d ON a.districts_id = d.districts_id ";
 
-    private static final String SELECT_BASE =
-        "SELECT t.ticket_id, t.ticket_code, t.enterprise_id, t.contract_id, t.ticket_type, t.priority, " +
+    /**
+     * Join tới tận bảng {@code provinces} để lấy TÊN tỉnh.
+     *
+     * <p>Khác {@link #JOIN_PROVINCE_OF_ENTERPRISE} ở đúng một bảng: bộ lọc chỉ
+     * cần {@code d.province_id} nên dừng ở districts là đủ, còn hiển thị thì
+     * cần tên. Tách riêng để những câu chỉ lọc không phải gánh thêm một join.
+     */
+    private static final String JOIN_PROVINCE_NAME =
+        JOIN_PROVINCE_OF_ENTERPRISE + "LEFT JOIN provinces p ON p.province_id = d.province_id ";
+
+    private static final String SELECT_COLUMNS =
+        "t.ticket_id, t.ticket_code, t.enterprise_id, t.contract_id, t.ticket_type, t.priority, " +
         "       t.reception_channel, t.sla_deadline, t.assigned_technician_id, t.created_by, t.created_date, " +
         "       t.description, t.root_cause, t.cause_category, t.handling_plan, t.is_warranty, t.status, t.resolution_summary, t.resolved_at, " +
         "       t.created_at, t.updated_at, t.is_deleted, " +
         "       e.enterprise_name, " +
         "       c.contract_code, " +
         "       tech.last_name AS tech_last_name, tech.middle_name AS tech_middle_name, tech.first_name AS tech_first_name, " +
-        "       creator.last_name AS creator_last_name, creator.middle_name AS creator_middle_name, creator.first_name AS creator_first_name " +
+        "       creator.last_name AS creator_last_name, creator.middle_name AS creator_middle_name, creator.first_name AS creator_first_name ";
+
+    private static final String SELECT_FROM =
         "FROM technicalrequests t " +
         "LEFT JOIN enterprises e ON t.enterprise_id = e.enterprise_id " +
         "LEFT JOIN contracts c ON t.contract_id = c.contract_id " +
         "LEFT JOIN users tech ON t.assigned_technician_id = tech.user_id " +
         "LEFT JOIN users creator ON t.created_by = creator.user_id ";
+
+    private static final String SELECT_BASE = "SELECT " + SELECT_COLUMNS + SELECT_FROM;
+
+    /**
+     * Bản kèm TỈNH của khách hàng. Tách riêng chứ không nhét vào SELECT_BASE:
+     * cột p.province_name chỉ tồn tại ở câu nào có JOIN_PROVINCE_OF_ENTERPRISE,
+     * nhét vào bản dùng chung là mọi câu còn lại vỡ ngay. Bên gọi phải nối
+     * JOIN_PROVINCE_OF_ENTERPRISE theo sau.
+     */
+    private static final String SELECT_BASE_WITH_PROVINCE =
+        "SELECT " + SELECT_COLUMNS + ", p.province_name AS enterprise_province " + SELECT_FROM;
 
     /**
      * Lấy danh sách phiếu hỗ trợ kỹ thuật của 1 khách hàng, phục vụ tab
@@ -255,7 +281,7 @@ public class TechnicalSupportTicketDAO {
     public List<TechnicalRequest> findNeedingAttention(int limit, List<Integer> provinceIds,
             List<Integer> ownerIds) {
         List<TechnicalRequest> result = new ArrayList<>();
-        String sql = SELECT_BASE + JOIN_PROVINCE_OF_ENTERPRISE +
+        String sql = SELECT_BASE_WITH_PROVINCE + JOIN_PROVINCE_NAME +
             "WHERE t.is_deleted = 0 AND t.status <> ? " +
             SqlFilters.scopeClause(OWNER_COLUMNS, ownerIds, "d.province_id", provinceIds) + " " +
             "ORDER BY FIELD(t.priority, 'Khẩn cấp', 'Cao', 'Bình thường', 'Thấp'), t.created_date ASC LIMIT ?";
@@ -267,7 +293,12 @@ public class TechnicalSupportTicketDAO {
             ps.setInt(param, limit);
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
-                    result.add(mapRow(rs));
+                    TechnicalRequest t = mapRow(rs);
+                    // Tỉnh gắn vào đúng chỗ mà hợp đồng cũng gắn
+                    // (enterprise.address.district.province), để hai bảng trên
+                    // Dashboard đọc bằng cùng một biểu thức.
+                    attachProvince(t, rs.getString("enterprise_province"));
+                    result.add(t);
                 }
             }
         } catch (SQLException ex) {
@@ -685,6 +716,20 @@ public class TechnicalSupportTicketDAO {
         } else {
             ps.setNull(index, Types.TIMESTAMP);
         }
+    }
+
+    /** Gắn tên tỉnh của khách vào phiếu; không có khách hoặc không có tỉnh thì bỏ qua. */
+    private static void attachProvince(TechnicalRequest t, String provinceName) {
+        if (t.getEnterprise() == null || provinceName == null) {
+            return;
+        }
+        Province province = new Province();
+        province.setProvinceName(provinceName);
+        District district = new District();
+        district.setProvince(province);
+        Address address = new Address();
+        address.setDistrict(district);
+        t.getEnterprise().setAddress(address);
     }
 
     private TechnicalRequest mapRow(ResultSet rs) throws SQLException {

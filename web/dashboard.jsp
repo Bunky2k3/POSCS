@@ -159,12 +159,17 @@
             font-size: 0.76rem; font-weight: 600; color: var(--primary-dark);
             background: #eaf6ff; border: 1px solid #cfe8fb; border-radius: 999px; padding: 2px 10px;
         }
+        /* Nằm TRONG thẻ lọc, là dòng thứ hai của chính nó -- trước đây nó là
+           một dải màu riêng nằm ngay dưới, tức ba dải xếp chồng (lời chào,
+           thanh lọc, chú thích) trước khi tới con số đầu tiên. Nó nói về mấy ô
+           ngay trên nó nên đứng chung là đúng chỗ, và tiết kiệm một dải. */
         .scope-note {
             display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
-            background: #eaf6ff; border: 1px solid #cfe8fb; border-radius: 10px;
-            padding: 10px 16px; margin-bottom: 18px;
-            font-size: 0.84rem; color: var(--primary-dark);
+            flex-basis: 100%; margin: 2px 0 0; padding-top: 10px;
+            border-top: 1px dashed #eef2f6;
+            font-size: 0.82rem; color: #6b7280;
         }
+        .scope-note strong { color: var(--primary-dark); }
         .scope-note i { color: var(--primary); }
         .scope-note a { color: var(--primary); font-weight: 600; margin-left: auto; }
         .as-of-today { font-weight: 500; font-size: 0.74rem; color: #9ca3af; text-transform: none; letter-spacing: 0; }
@@ -404,8 +409,6 @@
                     </div>
                 </div>
             </form>
-        </div>
-
         <c:if test="${not empty provinceFilters or not empty periodLabel}">
             <div class="scope-note">
                 <i class="fa-solid fa-filter"></i>
@@ -441,6 +444,8 @@
                 <a href="${pageContext.request.contextPath}/dashboard?provinceSet=1">Xem toàn chi nhánh</a>
             </div>
         </c:if>
+        </div>
+
 
         <!-- ===== KPI cards ===== -->
         <div class="row g-4 mb-4">
@@ -508,29 +513,25 @@
             </div>
         </div>
 
-        <!-- ===== Biểu đồ + 2 bảng hành động (xếp chồng cùng cột, không để biểu đồ chen giữa) ===== -->
-        <div class="row g-4">
-            <div class="col-lg-4">
-                <div class="card-box chart-card h-100">
-                    <div class="section-title">Phiếu hỗ trợ theo trạng thái</div>
-                    <div class="section-sub">Tổng số ${ticketStatusSummary['Mới tiếp nhận'] + ticketStatusSummary['Đang xử lý'] + ticketStatusSummary['Đã đóng']} phiếu hiện có</div>
-                    <div class="doughnut-wrap"><canvas id="ticketChart" height="200"></canvas></div>
-                    <div class="legend-row">
-                        <div class="legend-item"><span class="legend-dot" style="background:var(--primary-light)"></span>Mới tiếp nhận (${ticketStatusSummary['Mới tiếp nhận']})</div>
-                        <div class="legend-item"><span class="legend-dot" style="background:var(--warning)"></span>Đang xử lý (${ticketStatusSummary['Đang xử lý']})</div>
-                        <div class="legend-item"><span class="legend-dot" style="background:var(--success)"></span>Đã đóng (${ticketStatusSummary['Đã đóng']})</div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="col-lg-8 d-flex flex-column gap-4">
-                <div class="card-box table-section">
+        <!-- ===== Hàng 2: bảng hợp đồng (rộng) + biểu đồ phiếu (hẹp) ===== -->
+        <%-- Trước đây biểu đồ đứng MỘT cột cạnh CẢ HAI bảng xếp chồng: cột biểu
+             đồ bị kéo cao bằng hai bảng cộng lại (524px) nên cái bánh rán nằm
+             lọt thỏm giữa một thẻ trắng mênh mông, còn mắt thì không biết đọc
+             theo chiều nào. Giờ mỗi hàng ghép đúng HAI thứ cao xấp xỉ nhau, và
+             bảng dài nhất được nguyên một hàng cho riêng nó. --%>
+        <div class="row g-4 mb-4">
+            <div class="col-lg-8">
+                <div class="card-box table-section h-100">
                     <div class="table-section-header">
                         <h6>Hợp đồng sắp hết hạn <span class="as-of-today">tính tới hôm nay</span></h6>
                         <a href="${pageContext.request.contextPath}/contract">Xem tất cả</a>
                     </div>
                     <table class="mini-table">
-                        <thead><tr><th>Mã HĐ</th><th>Khách hàng</th><th>Người phụ trách</th><th>Giá trị</th><th>Còn lại</th></tr></thead>
+                        <%-- Cột ĐỊA BÀN thay cho "Người phụ trách": phạm vi của trang là
+                             "việc của tôi HOẶC trong địa bàn tôi giữ", nên câu người đọc cần
+                             trả lời khi nhìn một dòng lạ là "nó ở tỉnh nào", chứ không phải
+                             "ai đứng tên" -- phần lớn các dòng đứng tên chính họ. --%>
+                        <thead><tr><th>Mã HĐ</th><th>Khách hàng</th><th>Địa bàn</th><th>Giá trị</th><th>Còn lại</th></tr></thead>
                         <tbody>
                             <c:choose>
                                 <c:when test="${empty expiringContracts}">
@@ -549,7 +550,7 @@
                                             </td>
                                             <td>
                                                 <c:choose>
-                                                    <c:when test="${ct.owner != null}">${fn:escapeXml(ct.owner.fullName)}</c:when>
+                                                    <c:when test="${ct.enterprise.address.district.province != null}">${fn:escapeXml(ct.enterprise.address.district.province.shortName)}</c:when>
                                                     <c:otherwise>&mdash;</c:otherwise>
                                                 </c:choose>
                                             </td>
@@ -562,14 +563,32 @@
                         </tbody>
                     </table>
                 </div>
+            </div>
 
+            <div class="col-lg-4">
+                <div class="card-box chart-card h-100">
+                    <div class="section-title">Phiếu hỗ trợ theo trạng thái</div>
+                    <div class="section-sub">Tổng số ${ticketStatusSummary['Mới tiếp nhận'] + ticketStatusSummary['Đang xử lý'] + ticketStatusSummary['Đã đóng']} phiếu hiện có</div>
+                    <div class="doughnut-wrap"><canvas id="ticketChart" height="200"></canvas></div>
+                    <div class="legend-row">
+                        <div class="legend-item"><span class="legend-dot" style="background:var(--primary-light)"></span>Mới tiếp nhận (${ticketStatusSummary['Mới tiếp nhận']})</div>
+                        <div class="legend-item"><span class="legend-dot" style="background:var(--warning)"></span>Đang xử lý (${ticketStatusSummary['Đang xử lý']})</div>
+                        <div class="legend-item"><span class="legend-dot" style="background:var(--success)"></span>Đã đóng (${ticketStatusSummary['Đã đóng']})</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== Hàng 3: phiếu cần xử lý, nguyên một hàng ===== -->
+        <div class="row g-4">
+            <div class="col-12">
                 <div class="card-box table-section">
                     <div class="table-section-header">
                         <h6>Phiếu hỗ trợ cần xử lý <span class="as-of-today">tính tới hôm nay</span></h6>
                         <a href="${pageContext.request.contextPath}/ticket">Xem tất cả</a>
                     </div>
                     <table class="mini-table">
-                        <thead><tr><th>Mã phiếu</th><th>Khách hàng</th><th>Người phụ trách</th><th>Ưu tiên</th><th>Trạng thái</th></tr></thead>
+                        <thead><tr><th>Mã phiếu</th><th>Khách hàng</th><th>Địa bàn</th><th>Ưu tiên</th><th>Trạng thái</th></tr></thead>
                         <tbody>
                             <c:choose>
                                 <c:when test="${empty attentionTickets}">
@@ -587,7 +606,7 @@
                                             </td>
                                             <td>
                                                 <c:choose>
-                                                    <c:when test="${tk.assignedTechnician != null}">${fn:escapeXml(tk.assignedTechnician.fullName)}</c:when>
+                                                    <c:when test="${tk.enterprise.address.district.province != null}">${fn:escapeXml(tk.enterprise.address.district.province.shortName)}</c:when>
                                                     <c:otherwise>&mdash;</c:otherwise>
                                                 </c:choose>
                                             </td>
