@@ -187,7 +187,7 @@ public class ProductDAO {
         List<Contract> result = new ArrayList<>();
         String sql = "SELECT DISTINCT c.contract_id, c.contract_code, c.title, c.contract_type, " +
                      "       c.signing_date, c.effective_date, c.end_date, c.enterprise_id, c.owner_id, " +
-                     "       c.attachment_url, e.enterprise_name " +
+                     "       e.enterprise_name " +
                      "FROM contractproducts cp " +
                      "JOIN contracts c ON cp.contract_id = c.contract_id " +
                      "LEFT JOIN enterprises e ON c.enterprise_id = e.enterprise_id " +
@@ -208,7 +208,6 @@ public class ProductDAO {
                     c.setEndDate(rs.getDate("end_date"));
                     c.setEnterpriseId(rs.getInt("enterprise_id"));
                     c.setOwnerId(rs.getInt("owner_id"));
-                    c.setAttachmentUrl(rs.getString("attachment_url"));
                     c.setStatus(computeContractStatus(c.getEffectiveDate(), c.getEndDate()));
 
                     String enterpriseName = rs.getString("enterprise_name");
