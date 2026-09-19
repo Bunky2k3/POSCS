@@ -429,16 +429,16 @@ public class ContractDAO {
      */
     public Map<String, Integer> countStatusSummary(Integer provinceId, Period period, String direction,
             boolean rootsOnly) {
-        return countStatusSummary(provinceId, period, direction, rootsOnly, null);
+        return countStatusSummary(SqlFilters.one(provinceId), period, direction, rootsOnly, null);
     }
 
     /**
      * Như trên nhưng chỉ đếm hợp đồng do những người này phụ trách -- phạm vi
      * "của tôi" trên Dashboard (rỗng/null = toàn chi nhánh).
      */
-    public Map<String, Integer> countStatusSummary(Integer provinceId, Period period, String direction,
+    public Map<String, Integer> countStatusSummary(List<Integer> provinceIds, Period period, String direction,
             boolean rootsOnly, List<Integer> ownerIds) {
-        return countStatusSummary(provinceId, period, direction, rootsOnly, ownerIds, ListScope.all());
+        return countStatusSummary(provinceIds, period, direction, rootsOnly, ownerIds, ListScope.all(), null);
     }
 
     /**
@@ -454,7 +454,7 @@ public class ContractDAO {
      */
     public Map<String, Integer> countStatusSummary(Integer provinceId, Period period, String direction,
             boolean rootsOnly, List<Integer> ownerIds, ListScope scope) {
-        return countStatusSummary(provinceId, period, direction, rootsOnly, ownerIds, scope, null);
+        return countStatusSummary(SqlFilters.one(provinceId), period, direction, rootsOnly, ownerIds, scope, null);
     }
 
     /**
@@ -463,6 +463,19 @@ public class ContractDAO {
      * mà dải KPI trên vẫn cộng thành 18.
      */
     public Map<String, Integer> countStatusSummary(Integer provinceId, Period period, String direction,
+            boolean rootsOnly, List<Integer> ownerIds, ListScope scope, Integer waitingDepartmentId) {
+        return countStatusSummary(SqlFilters.one(provinceId), period, direction, rootsOnly, ownerIds,
+                scope, waitingDepartmentId);
+    }
+
+    /**
+     * Bản nhận NHIỀU tỉnh -- thanh lọc Dashboard đã đổi sang ô tích nhiều tỉnh.
+     *
+     * <p>Các màn hình còn lại vẫn lọc một tỉnh và giữ nguyên chữ ký cũ; chúng đi
+     * qua {@link SqlFilters#one(Integer)}. Chỉ một chỗ dựng câu lệnh, nên không
+     * có nguy cơ hai đường lọc tỉnh lệch nhau.
+     */
+    public Map<String, Integer> countStatusSummary(List<Integer> provinceIds, Period period, String direction,
             boolean rootsOnly, List<Integer> ownerIds, ListScope scope, Integer waitingDepartmentId) {
         Map<String, Integer> summary = new HashMap<>();
         summary.put(STATUS_ACTIVE, 0);
@@ -484,7 +497,7 @@ public class ContractDAO {
             "FROM contracts c " +
             "LEFT JOIN enterprises e ON c.enterprise_id = e.enterprise_id " +
             JOIN_PROVINCE_OF_ENTERPRISE +
-            "WHERE c.is_deleted = 0" + (provinceId != null ? " AND d.province_id = ?" : "")
+            "WHERE c.is_deleted = 0" + SqlFilters.inClause("d.province_id", provinceIds)
             + (period != null ? " AND c.signing_date BETWEEN ? AND ?" : "")
             + (direction != null ? " AND c.direction = ?" : "")
             + (rootsOnly ? " AND c.parent_contract_id IS NULL" : "")
@@ -514,9 +527,7 @@ public class ContractDAO {
         try (Connection conn = DBContext.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             int param = 1;
-            if (provinceId != null) {
-                ps.setInt(param++, provinceId);
-            }
+            param = SqlFilters.bind(ps, param, provinceIds);
             if (period != null) {
                 ps.setDate(param++, period.getFrom());
                 ps.setDate(param++, period.getTo());
@@ -552,11 +563,14 @@ public class ContractDAO {
 
     /** Như {@link #findExpiringSoon(int)} nhưng chỉ lấy hợp đồng thuộc 1 tỉnh (null = toàn quốc). */
     public List<Contract> findExpiringSoon(int limit, Integer provinceId) {
-        return findExpiringSoon(limit, provinceId, null);
+        return findExpiringSoon(limit, SqlFilters.one(provinceId), null);
     }
 
-    /** Như trên nhưng chỉ lấy hợp đồng do những người này phụ trách (rỗng/null = tất cả). */
-    public List<Contract> findExpiringSoon(int limit, Integer provinceId, List<Integer> ownerIds) {
+    /**
+     * Như trên nhưng thu hẹp theo NHIỀU tỉnh và theo người phụ trách -- bộ lọc
+     * của Dashboard (rỗng/null ở vế nào là không lọc vế đó, hai vế nối bằng VÀ).
+     */
+    public List<Contract> findExpiringSoon(int limit, List<Integer> provinceIds, List<Integer> ownerIds) {
         List<Contract> result = new ArrayList<>();
         String sql = SELECT_BASE +
             "WHERE c.is_deleted = 0 AND CURDATE() BETWEEN c.effective_date AND c.end_date " +
@@ -567,15 +581,13 @@ public class ContractDAO {
             // cạnh thì cộng lần nữa phần tiền đã nằm trong giá trị hiện hành
             // của cha. Phụ lục vẫn tìm được ở danh sách hợp đồng.
             "AND c.parent_contract_id IS NULL " +
-            (provinceId != null ? "AND d.province_id = ? " : "") +
+            SqlFilters.inClause("d.province_id", provinceIds) + " " +
             SqlFilters.inClause("c.owner_id", ownerIds) + " " +
             "ORDER BY c.end_date ASC LIMIT ?";
         try (Connection conn = DBContext.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             int param = 1;
-            if (provinceId != null) {
-                ps.setInt(param++, provinceId);
-            }
+            param = SqlFilters.bind(ps, param, provinceIds);
             param = SqlFilters.bind(ps, param, ownerIds);
             ps.setInt(param, limit);
             try (ResultSet rs = ps.executeQuery()) {
@@ -2822,11 +2834,11 @@ public class ContractDAO {
      * xác định kỳ -- bên gọi tự quyết định dùng hàm theo tháng bên dưới.
      */
     public BigDecimal sumInvoiceAmountInPeriod(Period period, Integer provinceId) {
-        return sumInvoiceAmountInPeriod(period, provinceId, null);
+        return sumInvoiceAmountInPeriod(period, SqlFilters.one(provinceId), null);
     }
 
-    /** Như trên nhưng chỉ tính hợp đồng do những người này phụ trách (rỗng/null = tất cả). */
-    public BigDecimal sumInvoiceAmountInPeriod(Period period, Integer provinceId, List<Integer> ownerIds) {
+    /** Như trên nhưng thu hẹp theo nhiều tỉnh và theo người phụ trách -- bộ lọc Dashboard. */
+    public BigDecimal sumInvoiceAmountInPeriod(Period period, List<Integer> provinceIds, List<Integer> ownerIds) {
         if (period == null) {
             return BigDecimal.ZERO;
         }
@@ -2841,16 +2853,14 @@ public class ContractDAO {
                      // thì hợp đồng MUA đầu tiên nhập vào là KPI tự cộng cả tiền
                      // mình đi trả, sai âm thầm cho tới lúc đối chiếu sổ sách.
                      "AND c.direction = 'Bán' " +
-                     (provinceId != null ? " AND d.province_id = ?" : "") +
+                     SqlFilters.inClause("d.province_id", provinceIds) +
                      SqlFilters.inClause("c.owner_id", ownerIds);
         try (Connection conn = DBContext.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setDate(1, period.getFrom());
             ps.setDate(2, period.getTo());
             int param = 3;
-            if (provinceId != null) {
-                ps.setInt(param++, provinceId);
-            }
+            param = SqlFilters.bind(ps, param, provinceIds);
             SqlFilters.bind(ps, param, ownerIds);
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
@@ -2875,11 +2885,12 @@ public class ContractDAO {
      * phải đi qua contracts -> enterprises -> addresses -> districts.
      */
     public BigDecimal sumInvoiceAmountByMonth(int year, int month, Integer provinceId) {
-        return sumInvoiceAmountByMonth(year, month, provinceId, null);
+        return sumInvoiceAmountByMonth(year, month, SqlFilters.one(provinceId), null);
     }
 
-    /** Như trên nhưng chỉ tính hợp đồng do những người này phụ trách (rỗng/null = tất cả). */
-    public BigDecimal sumInvoiceAmountByMonth(int year, int month, Integer provinceId, List<Integer> ownerIds) {
+    /** Như trên nhưng thu hẹp theo nhiều tỉnh và theo người phụ trách -- bộ lọc Dashboard. */
+    public BigDecimal sumInvoiceAmountByMonth(int year, int month, List<Integer> provinceIds,
+            List<Integer> ownerIds) {
         String sql = "SELECT COALESCE(SUM(p.invoice_amount), 0) FROM contract_payments p " +
                      "LEFT JOIN contracts c ON p.contract_id = c.contract_id " +
                      "LEFT JOIN enterprises e ON c.enterprise_id = e.enterprise_id " +
@@ -2891,16 +2902,14 @@ public class ContractDAO {
                      // thì hợp đồng MUA đầu tiên nhập vào là KPI tự cộng cả tiền
                      // mình đi trả, sai âm thầm cho tới lúc đối chiếu sổ sách.
                      "AND c.direction = 'Bán' " +
-                     (provinceId != null ? " AND d.province_id = ?" : "") +
+                     SqlFilters.inClause("d.province_id", provinceIds) +
                      SqlFilters.inClause("c.owner_id", ownerIds);
         try (Connection conn = DBContext.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, year);
             ps.setInt(2, month);
             int param = 3;
-            if (provinceId != null) {
-                ps.setInt(param++, provinceId);
-            }
+            param = SqlFilters.bind(ps, param, provinceIds);
             SqlFilters.bind(ps, param, ownerIds);
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {

@@ -150,7 +150,7 @@ public class CustomerDAO {
 
     /** Như {@link #countNewThisMonth()} nhưng chỉ đếm khách thuộc 1 tỉnh (null = toàn quốc). */
     public int countNewThisMonth(Integer provinceId) {
-        return countJoined(provinceId, null, false, null);
+        return countJoined(SqlFilters.one(provinceId), null, false, null);
     }
 
     /**
@@ -158,12 +158,20 @@ public class CustomerDAO {
      * quay về nghĩa cũ "trong tháng hiện tại".
      */
     public int countNewInPeriod(Integer provinceId, Period period) {
-        return countJoined(provinceId, period, false, null);
+        return countJoined(SqlFilters.one(provinceId), period, false, null);
     }
 
-    /** Như trên nhưng chỉ đếm khách do những người này phụ trách (rỗng/null = tất cả). */
-    public int countNewInPeriod(Integer provinceId, Period period, List<Integer> ownerIds) {
-        return countJoined(provinceId, period, false, ownerIds);
+    /**
+     * Như trên nhưng thu hẹp theo NHIỀU tỉnh và theo người phụ trách -- bộ lọc
+     * của Dashboard (rỗng/null ở vế nào là không lọc vế đó).
+     *
+     * <p>Nhận danh sách tỉnh chứ không phải một tỉnh: thanh lọc Dashboard đã đổi
+     * sang ô tích nhiều tỉnh, mặc định là các tỉnh người đăng nhập phụ trách.
+     * Hai vế nối bằng VÀ, không phải HOẶC -- khác {@link poscs.common.ListScope}
+     * của màn hình danh sách, và đó là lựa chọn đã chốt với người dùng.
+     */
+    public int countNewInPeriod(List<Integer> provinceIds, Period period, List<Integer> ownerIds) {
+        return countJoined(provinceIds, period, false, ownerIds);
     }
 
     /**
@@ -173,15 +181,15 @@ public class CustomerDAO {
      * trên cùng một trang. period null = đếm toàn bộ, không giới hạn thời gian.
      */
     public int countUpToEndOfPeriod(Integer provinceId, Period period) {
-        return countJoined(provinceId, period, true, null);
+        return countJoined(SqlFilters.one(provinceId), period, true, null);
     }
 
-    /** Như trên nhưng chỉ đếm khách do những người này phụ trách (rỗng/null = tất cả). */
-    public int countUpToEndOfPeriod(Integer provinceId, Period period, List<Integer> ownerIds) {
-        return countJoined(provinceId, period, true, ownerIds);
+    /** Như trên nhưng thu hẹp theo nhiều tỉnh và theo người phụ trách -- xem countNewInPeriod. */
+    public int countUpToEndOfPeriod(List<Integer> provinceIds, Period period, List<Integer> ownerIds) {
+        return countJoined(provinceIds, period, true, ownerIds);
     }
 
-    private int countJoined(Integer provinceId, Period period, boolean cumulative, List<Integer> ownerIds) {
+    private int countJoined(List<Integer> provinceIds, Period period, boolean cumulative, List<Integer> ownerIds) {
         String dateCondition;
         if (period == null) {
             // Không chọn kỳ: luỹ kế = toàn bộ; "mới" = trong tháng hiện tại.
@@ -195,7 +203,7 @@ public class CustomerDAO {
                      "LEFT JOIN addresses a ON e.address_id = a.address_id " +
                      "LEFT JOIN districts d ON a.districts_id = d.districts_id " +
                      "WHERE e.is_deleted = 0" + dateCondition +
-                     (provinceId != null ? " AND d.province_id = ?" : "") +
+                     SqlFilters.inClause("d.province_id", provinceIds) +
                      // "Khách của tôi" = khách mà tôi (hoặc cấp dưới của tôi) đứng
                      // tên phụ trách, đúng cột mà màn hình khách hàng đang hiện.
                      SqlFilters.inClause("e.account_owner_id", ownerIds);
@@ -208,9 +216,7 @@ public class CustomerDAO {
                 }
                 ps.setDate(param++, period.getTo());
             }
-            if (provinceId != null) {
-                ps.setInt(param++, provinceId);
-            }
+            param = SqlFilters.bind(ps, param, provinceIds);
             SqlFilters.bind(ps, param, ownerIds);
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {

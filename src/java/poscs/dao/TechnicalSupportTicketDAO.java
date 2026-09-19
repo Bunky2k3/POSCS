@@ -184,7 +184,7 @@ public class TechnicalSupportTicketDAO {
 
     /** Như trên, kèm lọc theo kỳ (ngày tạo phiếu). */
     public Map<String, Integer> countStatusSummary(Integer provinceId, Period period) {
-        return countStatusSummary(provinceId, period, null);
+        return countStatusSummary(SqlFilters.one(provinceId), period, null);
     }
 
     /**
@@ -192,7 +192,8 @@ public class TechnicalSupportTicketDAO {
      * lý HOẶC phiếu họ tiếp nhận -- hai vai trò khác nhau (Kỹ thuật và CSKH)
      * cùng nhìn một trang Dashboard. Rỗng/null = toàn chi nhánh.
      */
-    public Map<String, Integer> countStatusSummary(Integer provinceId, Period period, List<Integer> ownerIds) {
+    public Map<String, Integer> countStatusSummary(List<Integer> provinceIds, Period period,
+            List<Integer> ownerIds) {
         Map<String, Integer> summary = new HashMap<>();
         summary.put(STATUS_NEW, 0);
         summary.put(STATUS_IN_PROGRESS, 0);
@@ -206,7 +207,7 @@ public class TechnicalSupportTicketDAO {
             "  SUM(CASE WHEN t.status = ? THEN 1 ELSE 0 END) AS closed_count, " +
             "  SUM(CASE WHEN t.priority = 'Khẩn cấp' THEN 1 ELSE 0 END) AS urgent_count " +
             "FROM technicalrequests t " + JOIN_ENTERPRISE + JOIN_PROVINCE_OF_ENTERPRISE +
-            "WHERE t.is_deleted = 0" + (provinceId != null ? " AND d.province_id = ?" : "")
+            "WHERE t.is_deleted = 0" + SqlFilters.inClause("d.province_id", provinceIds)
             + (period != null ? " AND t.created_date BETWEEN ? AND ?" : "")
             + SqlFilters.inClauseAny(OWNER_COLUMNS, ownerIds);
 
@@ -216,9 +217,7 @@ public class TechnicalSupportTicketDAO {
             ps.setString(2, STATUS_IN_PROGRESS);
             ps.setString(3, STATUS_CLOSED);
             int param = 4;
-            if (provinceId != null) {
-                ps.setInt(param++, provinceId);
-            }
+            param = SqlFilters.bind(ps, param, provinceIds);
             if (period != null) {
                 ps.setDate(param++, period.getFrom());
                 ps.setDate(param++, period.getTo());
@@ -245,24 +244,26 @@ public class TechnicalSupportTicketDAO {
 
     /** Như {@link #findNeedingAttention(int)} nhưng chỉ lấy phiếu của khách thuộc 1 tỉnh (null = toàn quốc). */
     public List<TechnicalRequest> findNeedingAttention(int limit, Integer provinceId) {
-        return findNeedingAttention(limit, provinceId, null);
+        return findNeedingAttention(limit, SqlFilters.one(provinceId), null);
     }
 
-    /** Như trên nhưng chỉ lấy phiếu "của" những người này (rỗng/null = tất cả). */
-    public List<TechnicalRequest> findNeedingAttention(int limit, Integer provinceId, List<Integer> ownerIds) {
+    /**
+     * Như trên nhưng thu hẹp theo NHIỀU tỉnh và theo người "của" phiếu -- bộ lọc
+     * Dashboard (rỗng/null ở vế nào là không lọc vế đó, hai vế nối bằng VÀ).
+     */
+    public List<TechnicalRequest> findNeedingAttention(int limit, List<Integer> provinceIds,
+            List<Integer> ownerIds) {
         List<TechnicalRequest> result = new ArrayList<>();
         String sql = SELECT_BASE + JOIN_PROVINCE_OF_ENTERPRISE +
             "WHERE t.is_deleted = 0 AND t.status <> ? " +
-            (provinceId != null ? "AND d.province_id = ? " : "") +
+            SqlFilters.inClause("d.province_id", provinceIds) + " " +
             SqlFilters.inClauseAny(OWNER_COLUMNS, ownerIds) + " " +
             "ORDER BY FIELD(t.priority, 'Khẩn cấp', 'Cao', 'Bình thường', 'Thấp'), t.created_date ASC LIMIT ?";
         try (Connection conn = DBContext.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             int param = 1;
             ps.setString(param++, STATUS_CLOSED);
-            if (provinceId != null) {
-                ps.setInt(param++, provinceId);
-            }
+            param = SqlFilters.bind(ps, param, provinceIds);
             param = SqlFilters.bind(ps, param, ownerIds, OWNER_COLUMNS.size());
             ps.setInt(param, limit);
             try (ResultSet rs = ps.executeQuery()) {
@@ -283,22 +284,29 @@ public class TechnicalSupportTicketDAO {
 
     /** Như {@link #countOverdueOrDueSoon()} nhưng chỉ đếm phiếu của khách thuộc 1 tỉnh (null = toàn quốc). */
     public int countOverdueOrDueSoon(Integer provinceId) {
-        return countOverdueOrDueSoon(provinceId, null);
+        return countOverdueOrDueSoon(SqlFilters.one(provinceId), null);
     }
 
-    /** Như trên nhưng chỉ đếm phiếu "của" những người này (rỗng/null = tất cả). */
-    public int countOverdueOrDueSoon(Integer provinceId, List<Integer> ownerIds) {
+    /**
+     * Như trên nhưng thu hẹp theo nhiều tỉnh và theo người "của" phiếu.
+     *
+     * <p>Chỗ bind trước bản này THIẾU hẳn phần {@code ownerIds}: câu lệnh sinh
+     * ra dấu hỏi cho chúng nhưng không ai gán giá trị, nên hễ có người đăng
+     * nhập là JDBC ném lỗi, DAO nuốt lỗi rồi trả 0 -- ô "sắp trễ hạn" trên
+     * Dashboard của mọi nhân viên luôn bằng 0 mà không báo gì. Đã gán đủ.
+     */
+    public int countOverdueOrDueSoon(List<Integer> provinceIds, List<Integer> ownerIds) {
         String sql = "SELECT COUNT(*) FROM technicalrequests t " + JOIN_ENTERPRISE + JOIN_PROVINCE_OF_ENTERPRISE +
                      "WHERE t.is_deleted = 0 AND t.status <> ? " +
                      "AND t.sla_deadline IS NOT NULL AND t.sla_deadline <= DATE_ADD(NOW(), INTERVAL 24 HOUR)" +
-                     (provinceId != null ? " AND d.province_id = ?" : "") +
+                     SqlFilters.inClause("d.province_id", provinceIds) +
                      SqlFilters.inClauseAny(OWNER_COLUMNS, ownerIds);
         try (Connection conn = DBContext.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, STATUS_CLOSED);
-            if (provinceId != null) {
-                ps.setInt(2, provinceId);
-            }
+            int param = 1;
+            ps.setString(param++, STATUS_CLOSED);
+            param = SqlFilters.bind(ps, param, provinceIds);
+            SqlFilters.bind(ps, param, ownerIds, OWNER_COLUMNS.size());
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
                     return rs.getInt(1);

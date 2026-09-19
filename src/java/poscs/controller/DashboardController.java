@@ -5,6 +5,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.Calendar;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -21,6 +22,7 @@ import poscs.dao.CustomerDAO;
 import poscs.dao.EmployeeDAO;
 import poscs.dao.TechnicalSupportTicketDAO;
 import poscs.model.Contract;
+import poscs.model.Province;
 import poscs.model.TechnicalRequest;
 import poscs.model.User;
 
@@ -71,12 +73,7 @@ public class DashboardController extends HttpServlet {
             throws ServletException, IOException {
         LocalDate today = LocalDate.now();
 
-        // Bộ lọc địa bàn: null = toàn bộ 18 tỉnh của chi nhánh. Lọc áp cho TẤT
-        // CẢ số liệu trên trang, không riêng vài ô -- nửa lọc nửa không thì KPI
-        // "15 hợp đồng" nằm cạnh bảng chỉ có 4 dòng, không biết tin số nào.
-        Integer provinceFilter = parseIntOrNull(request.getParameter("provinceId"));
         request.setAttribute("provinceList", addressDAO.findBranchProvinces());
-        request.setAttribute("provinceFilter", provinceFilter);
 
         // Bộ lọc kỳ (tháng/quý). Mỗi ô lấy mốc ngày riêng của loại dữ liệu đó:
         // khách theo ngày tham gia, hợp đồng theo ngày ký, doanh thu theo ngày
@@ -106,20 +103,44 @@ public class DashboardController extends HttpServlet {
         // trông như sai so với những gì họ tự làm.
         request.setAttribute("teamSize", ownerIds == null ? 0 : ownerIds.size());
 
+        // ===== Bộ lọc địa bàn: NHIỀU tỉnh, mặc định là địa bàn của chính mình =====
+        //
+        // Lọc áp cho TẤT CẢ số liệu trên trang, không riêng vài ô -- nửa lọc nửa
+        // không thì KPI "15 hợp đồng" nằm cạnh bảng chỉ có 4 dòng, không biết
+        // tin số nào.
+        //
+        // Ghép với phạm vi người bằng VÀ, không phải HOẶC: người dùng chốt như
+        // vậy (2026-09-19). Khác ListScope của hai màn hình danh sách -- bên đó
+        // là HOẶC. Hệ quả cố ý: hợp đồng bạn đứng tên ở tỉnh NGOÀI địa bàn sẽ
+        // không vào số liệu Dashboard khi các ô tỉnh còn tích. Bỏ tích là thấy.
+        List<Province> myProvinces = me == null ? null : employeeDAO.findProvincesCoveredBy(me.getUserId());
+        if (myProvinces == null) {
+            myProvinces = List.of();
+        }
+        request.setAttribute("myProvinces", myProvinces);
+        List<Integer> provinceFilters = resolveProvinceFilters(request, myProvinces);
+        request.setAttribute("provinceFilters", provinceFilters);
+        // Đang tích đúng bằng địa bàn của mình = đang ở mặc định. Màn hình đổi
+        // câu chữ theo nó ("địa bàn bạn phụ trách" thay vì "địa bàn đang chọn").
+        request.setAttribute("provinceFilterIsMine",
+                !provinceFilters.isEmpty()
+                        && provinceFilters.size() == myProvinces.size()
+                        && provinceFilters.containsAll(provinceIdsOf(myProvinces)));
+
         // ===== KPI: khách hàng =====
         // Tổng khách hàng là số LUỸ KẾ tới hết kỳ, không phải số phát sinh
         // trong kỳ -- nếu không thì ô này trùng nghĩa với ô "khách hàng mới"
         // ngay bên dưới nó.
-        request.setAttribute("totalCustomers", customerDAO.countUpToEndOfPeriod(provinceFilter, period, ownerIds));
+        request.setAttribute("totalCustomers", customerDAO.countUpToEndOfPeriod(provinceFilters, period, ownerIds));
         request.setAttribute("newCustomersThisMonth",
-                customerDAO.countNewInPeriod(provinceFilter, period, ownerIds));
+                customerDAO.countNewInPeriod(provinceFilters, period, ownerIds));
 
         // ===== KPI: hợp đồng =====
         // direction = null: dải KPI này đếm CẢ hai chiều, cố ý. Trang tổng quan
         // là bức tranh chung, và đếm hợp đồng hai chiều chung một ô chỉ là rộng
         // chứ không sai. Khác hẳn doanh thu ngay dưới -- cộng tiền thu vào với
         // tiền trả ra thì con số vô nghĩa, nên chỗ đó lọc 'Bán' (xem V21).
-        Map<String, Integer> contractStatusSummary = contractDAO.countStatusSummary(provinceFilter, period, null,
+        Map<String, Integer> contractStatusSummary = contractDAO.countStatusSummary(provinceFilters, period, null,
                 false, ownerIds);
         request.setAttribute("contractStatusSummary", contractStatusSummary);
 
@@ -127,14 +148,14 @@ public class DashboardController extends HttpServlet {
         BigDecimal revenueThisMonth;
         BigDecimal revenueLastMonth;
         if (period != null) {
-            revenueThisMonth = contractDAO.sumInvoiceAmountInPeriod(period, provinceFilter, ownerIds);
-            revenueLastMonth = contractDAO.sumInvoiceAmountInPeriod(period.previous(), provinceFilter, ownerIds);
+            revenueThisMonth = contractDAO.sumInvoiceAmountInPeriod(period, provinceFilters, ownerIds);
+            revenueLastMonth = contractDAO.sumInvoiceAmountInPeriod(period.previous(), provinceFilters, ownerIds);
         } else {
             revenueThisMonth = contractDAO.sumInvoiceAmountByMonth(
-                    today.getYear(), today.getMonthValue(), provinceFilter, ownerIds);
+                    today.getYear(), today.getMonthValue(), provinceFilters, ownerIds);
             LocalDate lastMonth = today.minusMonths(1);
             revenueLastMonth = contractDAO.sumInvoiceAmountByMonth(
-                    lastMonth.getYear(), lastMonth.getMonthValue(), provinceFilter, ownerIds);
+                    lastMonth.getYear(), lastMonth.getMonthValue(), provinceFilters, ownerIds);
         }
         request.setAttribute("revenueThisMonth", revenueThisMonth);
         if (revenueLastMonth.compareTo(BigDecimal.ZERO) > 0) {
@@ -145,9 +166,9 @@ public class DashboardController extends HttpServlet {
         }
 
         // ===== KPI: phiếu hỗ trợ =====
-        Map<String, Integer> ticketStatusSummary = ticketDAO.countStatusSummary(provinceFilter, period, ownerIds);
+        Map<String, Integer> ticketStatusSummary = ticketDAO.countStatusSummary(provinceFilters, period, ownerIds);
         request.setAttribute("ticketStatusSummary", ticketStatusSummary);
-        request.setAttribute("overdueOrDueSoonCount", ticketDAO.countOverdueOrDueSoon(provinceFilter, ownerIds));
+        request.setAttribute("overdueOrDueSoonCount", ticketDAO.countOverdueOrDueSoon(provinceFilters, ownerIds));
 
         request.setAttribute("currentMonthNumber", today.getMonthValue());
 
@@ -158,7 +179,7 @@ public class DashboardController extends HttpServlet {
                 today.getDayOfMonth(), today.getMonthValue(), today.getYear()));
 
         // ===== Bảng hợp đồng sắp hết hạn =====
-        List<Contract> expiringContracts = contractDAO.findExpiringSoon(EXPIRING_CONTRACTS_LIMIT, provinceFilter,
+        List<Contract> expiringContracts = contractDAO.findExpiringSoon(EXPIRING_CONTRACTS_LIMIT, provinceFilters,
                 ownerIds);
         Map<Integer, BigDecimal> contractValues = new HashMap<>();
         Map<Integer, Long> daysRemaining = new HashMap<>();
@@ -177,10 +198,51 @@ public class DashboardController extends HttpServlet {
 
         // ===== Bảng phiếu hỗ trợ cần xử lý =====
         List<TechnicalRequest> attentionTickets = ticketDAO.findNeedingAttention(ATTENTION_TICKETS_LIMIT,
-                provinceFilter, ownerIds);
+                provinceFilters, ownerIds);
         request.setAttribute("attentionTickets", attentionTickets);
 
         request.getRequestDispatcher("/dashboard.jsp").forward(request, response);
+    }
+
+    /**
+     * Các tỉnh đang được tích trên thanh lọc.
+     *
+     * <p>Không có tham số {@code provinceSet} = lần đầu mở trang (hoặc mở từ
+     * một link cũ) -> lấy MẶC ĐỊNH là địa bàn của chính mình. Có tham số thì
+     * nghe theo người dùng, kể cả khi họ bỏ tích hết -- đó là cách duy nhất để
+     * phân biệt "chưa chọn gì" với "đã bỏ tích hết để xem toàn chi nhánh". Hai
+     * thứ đó gửi lên giống hệt nhau nếu chỉ nhìn {@code provinceId}.
+     *
+     * <p>Cùng lối với tham số "scope" ngay bên trên: mặc định theo vai, nhưng
+     * người dùng chọn ngược lại thì nghe theo họ.
+     *
+     * <p>Id lạ trên URL bị bỏ qua chứ không làm vỡ trang; id không thuộc 18
+     * tỉnh địa bàn thì đơn giản là không khớp bản ghi nào, không cần chặn.
+     */
+    private static List<Integer> resolveProvinceFilters(HttpServletRequest request, List<Province> myProvinces) {
+        if (request.getParameter("provinceSet") == null) {
+            return provinceIdsOf(myProvinces);
+        }
+        String[] raw = request.getParameterValues("provinceId");
+        if (raw == null) {
+            return List.of();
+        }
+        List<Integer> ids = new ArrayList<>();
+        for (String value : raw) {
+            Integer id = parseIntOrNull(value);
+            if (id != null && !ids.contains(id)) {
+                ids.add(id);
+            }
+        }
+        return ids;
+    }
+
+    private static List<Integer> provinceIdsOf(List<Province> provinces) {
+        List<Integer> ids = new ArrayList<>();
+        for (Province p : provinces) {
+            ids.add(p.getProvinceId());
+        }
+        return ids;
     }
 
     private static Integer parseIntOrNull(String value) {

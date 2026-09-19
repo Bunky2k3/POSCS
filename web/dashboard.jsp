@@ -35,6 +35,53 @@
             box-shadow: 0 4px 12px rgba(0,40,80,0.06); min-width: 190px;
         }
         .province-filter:focus { outline: none; border-color: var(--primary-light); }
+
+        /* ===== Ô tích nhiều tỉnh =====
+           18 tỉnh mà bày hết ra thanh lọc thì đẩy KPI xuống quá nửa màn hình,
+           nên gói vào một nút mở ra bảng tích. Nút vẫn nói rõ đang chọn mấy
+           tỉnh -- một nút câm thì người dùng không biết trang đang thu hẹp. */
+        .prov-pop { position: relative; }
+        .prov-pop > button {
+            cursor: pointer; text-align: left; display: flex; align-items: center; gap: 8px;
+        }
+        .prov-pop > button i.fa-chevron-down { margin-left: auto; font-size: 0.7rem; color: #9ca3af; }
+        .prov-panel {
+            display: none; position: absolute; z-index: 70; top: calc(100% + 6px); right: 0;
+            width: 320px; max-height: 340px; overflow-y: auto;
+            background: #fff; border: 1px solid #eef2f6; border-radius: 12px;
+            box-shadow: 0 16px 40px rgba(0,40,80,0.18); padding: 12px;
+        }
+        .prov-panel.open { display: block; }
+        .prov-panel .prov-actions {
+            display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+            padding-bottom: 8px; margin-bottom: 8px; border-bottom: 1px solid #eef2f6;
+        }
+        .prov-panel .prov-actions button {
+            background: none; border: none; padding: 0; cursor: pointer;
+            color: var(--primary); font-size: 0.8rem; font-weight: 600;
+        }
+        .prov-panel .prov-actions .prov-apply {
+            margin-left: auto; background: var(--primary); color: #fff;
+            border-radius: 8px; padding: 5px 14px;
+        }
+        .prov-row {
+            display: flex; align-items: center; gap: 8px;
+            padding: 5px 2px; font-size: 0.85rem; color: #374151;
+        }
+        .prov-row input { width: 15px; height: 15px; }
+        .prov-row.mine strong { color: var(--primary-dark); }
+        .prov-row .mine-tag {
+            margin-left: auto; font-size: 0.68rem; font-weight: 700; color: var(--primary);
+            background: #eaf6ff; border-radius: 6px; padding: 1px 6px;
+        }
+
+        /* Chip địa bàn dưới lời chào -- trả lời "tôi đang phụ trách tỉnh nào". */
+        .my-prov { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+        .my-prov .lbl { font-size: 0.8rem; color: #6b7280; }
+        .my-prov .chip {
+            font-size: 0.76rem; font-weight: 600; color: var(--primary-dark);
+            background: #eaf6ff; border: 1px solid #cfe8fb; border-radius: 999px; padding: 2px 10px;
+        }
         .scope-note {
             display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
             background: #eaf6ff; border: 1px solid #cfe8fb; border-radius: 10px;
@@ -133,6 +180,19 @@
                         </c:otherwise>
                     </c:choose>
                 </p>
+                <%-- Địa bàn của chính người đang xem. Hiện ngay dưới lời chào chứ
+                     không giấu trong bảng tích: nó trả lời "vì sao số của tôi khác
+                     số của đồng nghiệp", mà câu đó phải đọc được không cần bấm gì.
+                     Ai chưa được giao tỉnh nào thì KHÔNG hiện dòng này -- một dòng
+                     "phụ trách: (trống)" chỉ làm người ta tưởng hỏng. --%>
+                <c:if test="${not empty myProvinces}">
+                    <div class="my-prov">
+                        <span class="lbl"><i class="fa-solid fa-map-location-dot"></i> Bạn phụ trách:</span>
+                        <c:forEach var="mp" items="${myProvinces}">
+                            <span class="chip">${fn:escapeXml(mp.shortName)}</span>
+                        </c:forEach>
+                    </div>
+                </c:if>
             </div>
             <div class="welcome-actions">
                 <form method="GET" action="${pageContext.request.contextPath}/dashboard" id="provinceFilterForm">
@@ -145,12 +205,56 @@
                         <option value="mine" ${scopeFilter == 'mine' ? 'selected' : ''}>Của tôi</option>
                         <option value="all" ${scopeFilter == 'all' ? 'selected' : ''}>Toàn chi nhánh</option>
                     </select>
-                    <select id="filterProvince" name="provinceId" class="province-filter">
-                        <option value="">Toàn bộ 18 tỉnh địa bàn</option>
-                        <c:forEach var="province" items="${provinceList}">
-                            <option value="${province.provinceId}" ${provinceFilter == province.provinceId ? 'selected' : ''}>${fn:escapeXml(province.shortName)}</option>
-                        </c:forEach>
-                    </select>
+                    <%-- Ô tích NHIỀU tỉnh. provinceSet là cờ "form này có gửi phần
+                         tỉnh lên": bỏ tích hết thì không có tham số provinceId nào,
+                         giống hệt lần đầu mở trang -- không có cờ này thì controller
+                         không phân biệt được "chưa chọn" với "đã bỏ hết" và sẽ tự
+                         tích lại địa bàn của người dùng ngay sau khi họ vừa bỏ. --%>
+                    <input type="hidden" name="provinceSet" value="1">
+                    <div class="prov-pop">
+                        <button type="button" class="province-filter" id="provToggle"
+                                aria-expanded="false" aria-controls="provPanel">
+                            <i class="fa-solid fa-location-dot" style="color:#9ca3af;"></i>
+                            <span id="provToggleLabel">
+                                <c:choose>
+                                    <c:when test="${empty provinceFilters}">Toàn bộ 18 tỉnh địa bàn</c:when>
+                                    <c:when test="${provinceFilterIsMine}">Địa bàn của bạn (${fn:length(provinceFilters)} tỉnh)</c:when>
+                                    <c:when test="${fn:length(provinceFilters) == 1}">1 tỉnh đang chọn</c:when>
+                                    <c:otherwise>${fn:length(provinceFilters)} tỉnh đang chọn</c:otherwise>
+                                </c:choose>
+                            </span>
+                            <i class="fa-solid fa-chevron-down"></i>
+                        </button>
+                        <div class="prov-panel" id="provPanel">
+                            <div class="prov-actions">
+                                <button type="button" data-prov-all="1">Chọn tất cả</button>
+                                <button type="button" data-prov-none="1">Bỏ hết</button>
+                                <c:if test="${not empty myProvinces}">
+                                    <button type="button" data-prov-mine="1">Địa bàn của tôi</button>
+                                </c:if>
+                                <button type="submit" class="prov-apply">Áp dụng</button>
+                            </div>
+                            <c:forEach var="province" items="${provinceList}">
+                                <%-- myProvinces là List<Province> nên không dùng contains
+                                     thẳng được; đánh dấu bằng vòng lặp con, 18 x 6 phép so
+                                     sánh thì rẻ hơn hẳn một lần gọi CSDL nữa. --%>
+                                <c:set var="isMine" value="false"/>
+                                <c:forEach var="mp" items="${myProvinces}">
+                                    <c:if test="${mp.provinceId == province.provinceId}"><c:set var="isMine" value="true"/></c:if>
+                                </c:forEach>
+                                <label class="prov-row ${isMine ? 'mine' : ''}">
+                                    <input type="checkbox" name="provinceId" value="${province.provinceId}"
+                                           data-mine="${isMine}"
+                                           <c:if test="${provinceFilters.contains(province.provinceId)}">checked</c:if>>
+                                    <span><c:choose>
+                                        <c:when test="${isMine}"><strong>${fn:escapeXml(province.shortName)}</strong></c:when>
+                                        <c:otherwise>${fn:escapeXml(province.shortName)}</c:otherwise>
+                                    </c:choose></span>
+                                    <c:if test="${isMine}"><span class="mine-tag">của bạn</span></c:if>
+                                </label>
+                            </c:forEach>
+                        </div>
+                    </div>
                     <select id="filterYear" name="year" class="province-filter">
                         <option value="">Mọi thời điểm</option>
                         <c:forEach var="y" items="${yearList}">
@@ -173,14 +277,27 @@
             </div>
         </div>
 
-        <c:if test="${not empty provinceFilter or not empty periodLabel}">
+        <c:if test="${not empty provinceFilters or not empty periodLabel}">
             <div class="scope-note">
                 <i class="fa-solid fa-filter"></i>
+                <%-- Gom câu chữ vào một biến TRƯỚC khi in: viết c:choose thẳng vào
+                     câu thì mỗi nhánh kéo theo xuống dòng và thụt lề của chính nó,
+                     ra "... 2 tỉnh đang chọn ." -- thừa một dấu cách trước dấu chấm. --%>
+                <c:choose>
+                    <c:when test="${provinceFilterIsMine}"><c:set var="provNote" value="địa bàn bạn phụ trách"/></c:when>
+                    <c:when test="${fn:length(provinceFilters) == 1}"><c:set var="provNote" value="1 tỉnh đang chọn"/></c:when>
+                    <c:when test="${not empty provinceFilters}"><c:set var="provNote" value="${fn:length(provinceFilters)} tỉnh đang chọn"/></c:when>
+                    <c:otherwise><c:set var="provNote" value=""/></c:otherwise>
+                </c:choose>
                 <span>
-                    Số liệu đang thu hẹp theo<c:if test="${not empty provinceFilter}"> <strong>địa bàn đang chọn</strong></c:if><c:if test="${not empty provinceFilter and not empty periodLabel}"> và</c:if><c:if test="${not empty periodLabel}"> <strong>${fn:escapeXml(periodLabel)}</strong></c:if>.
+                    Số liệu đang thu hẹp theo<c:if test="${not empty provNote}"> <strong>${fn:escapeXml(provNote)}</strong></c:if><c:if test="${not empty provNote and not empty periodLabel}"> và</c:if><c:if test="${not empty periodLabel}"> <strong>${fn:escapeXml(periodLabel)}</strong></c:if>.
                     Riêng hai bảng cuối trang luôn tính tới hôm nay.
                 </span>
-                <a href="${pageContext.request.contextPath}/dashboard">Bỏ lọc</a>
+                <%-- "Xem toàn chi nhánh" chứ không phải "Bỏ lọc": link trỏ /dashboard
+                     trần sẽ rơi về MẶC ĐỊNH, mà mặc định giờ đã là địa bàn của mình --
+                     bấm xong thấy y nguyên thì người dùng tưởng nút hỏng. Phải mang
+                     theo provinceSet để nói rõ "đã chọn, và chọn là không tỉnh nào". --%>
+                <a href="${pageContext.request.contextPath}/dashboard?provinceSet=1">Xem toàn chi nhánh</a>
             </div>
         </c:if>
 
@@ -365,13 +482,57 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script>
-        // Chọn tỉnh là nạp lại trang ngay, không cần nút "Lọc" -- giống bộ lọc
+        // Đổi ô chọn là nạp lại trang ngay, không cần nút "Lọc" -- giống bộ lọc
         // ở danh sách khách hàng/hợp đồng.
-        ['filterScope', 'filterProvince', 'filterYear', 'filterPeriod'].forEach(function (id) {
+        //
+        // Ô TỈNH thì KHÔNG nằm trong danh sách này, cố ý: nó tích được nhiều
+        // tỉnh, nạp lại sau mỗi lần tích thì chọn ba tỉnh là ba lần tải trang
+        // và hai lần đầu ra số liệu chẳng ai cần. Nó có nút "Áp dụng" riêng.
+        ['filterScope', 'filterYear', 'filterPeriod'].forEach(function (id) {
             document.getElementById(id).addEventListener('change', function () {
                 document.getElementById('provinceFilterForm').submit();
             });
         });
+
+        // ===== Bảng tích tỉnh =====
+        (function () {
+            var toggle = document.getElementById('provToggle');
+            var panel = document.getElementById('provPanel');
+            if (!toggle || !panel) { return; }
+            var boxes = panel.querySelectorAll('input[name="provinceId"]');
+
+            function setOpen(open) {
+                panel.classList.toggle('open', open);
+                toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+            }
+            toggle.addEventListener('click', function (e) {
+                e.stopPropagation();
+                setOpen(!panel.classList.contains('open'));
+            });
+            // Bấm ra ngoài thì đóng, nhưng bấm TRONG bảng thì không -- tích một ô
+            // mà bảng tự đóng thì không tích được ô thứ hai.
+            panel.addEventListener('click', function (e) { e.stopPropagation(); });
+            document.addEventListener('click', function () { setOpen(false); });
+            document.addEventListener('keydown', function (e) {
+                if (e.key === 'Escape') { setOpen(false); }
+            });
+
+            function apply(fn) {
+                boxes.forEach(fn);
+            }
+            panel.querySelector('[data-prov-all]').addEventListener('click', function () {
+                apply(function (b) { b.checked = true; });
+            });
+            panel.querySelector('[data-prov-none]').addEventListener('click', function () {
+                apply(function (b) { b.checked = false; });
+            });
+            var mineBtn = panel.querySelector('[data-prov-mine]');
+            if (mineBtn) {
+                mineBtn.addEventListener('click', function () {
+                    apply(function (b) { b.checked = b.dataset.mine === 'true'; });
+                });
+            }
+        })();
 
         // ===== Định dạng tiền tệ rút gọn (tỷ / triệu đ) =====
         function formatCompactVND(n) {

@@ -26,6 +26,19 @@ public final class SqlFilters {
         return ids == null || ids.isEmpty();
     }
 
+    /**
+     * Một id lẻ thành danh sách, để một hàm đã nhận danh sách phục vụ luôn
+     * những bên gọi cũ chỉ có một giá trị.
+     *
+     * <p>Sinh ra khi bộ lọc tỉnh của Dashboard đổi từ MỘT tỉnh sang NHIỀU tỉnh:
+     * các màn hình khác vẫn lọc một tỉnh, và giữ nguyên chữ ký của chúng rẻ hơn
+     * là sửa hơn ba mươi chỗ gọi. null vào thì null ra -- "không lọc" phải đi
+     * xuyên qua chứ không được hoá thành danh sách một phần tử null.
+     */
+    public static List<Integer> one(Integer id) {
+        return id == null ? null : List.of(id);
+    }
+
     /** {@code " AND <column> IN (?,?,?)"}, hoặc chuỗi rỗng khi không lọc. */
     public static String inClause(String column, List<Integer> ids) {
         if (isEmpty(ids)) {
