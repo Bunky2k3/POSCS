@@ -193,15 +193,9 @@
         .kpi-trend.warn { color: var(--warning); }
         .kpi-trend.down { color: var(--danger); }
 
-        /* ===== Charts ===== */
-        .chart-card { padding: 20px 22px 16px; }
-        .chart-card .section-title { font-weight: 700; color: var(--primary-dark); font-size: 0.98rem; margin-bottom: 2px; }
-        .chart-card .section-sub { font-size: 0.8rem; color: #9ca3af; margin-bottom: 16px; }
-
-        .legend-row { display: flex; gap: 18px; justify-content: center; margin-top: 14px; flex-wrap: wrap; }
-        .doughnut-wrap { max-width: 260px; margin: 0 auto; }
-        .legend-item { display: flex; align-items: center; gap: 7px; font-size: 0.8rem; color: #6b7280; }
-        .legend-dot { width: 9px; height: 9px; border-radius: 50%; }
+        <%-- Kiểu của thẻ biểu đồ (.chart-card, .doughnut-wrap, .legend-*) đã xoá
+             cùng với chính cái biểu đồ. Không giữ CSS mồ côi: lần bật lại sẽ
+             viết theo bố cục lúc đó chứ không phải theo bố cục hôm nay. --%>
 
         /* ===== Tables ===== */
         .table-section { padding: 18px 20px 15px; }
@@ -217,6 +211,18 @@
         }
         .mini-table td { padding: 10px 10px; font-size: 0.84rem; color: #111827; border-bottom: 1px solid #f3f4f6; vertical-align: middle; }
         .mini-table tr:last-child td { border-bottom: none; }
+        /* Hai bảng giờ chia đôi bề ngang nên mỗi cột hẹp đi một nửa. Ba cột
+           cuối là số tiền, số ngày và nhãn trạng thái -- những thứ xuống dòng
+           giữa chừng thì đọc thành hai mẩu vô nghĩa ("600 triệu" / "đ"). Cột
+           mã và tên khách vẫn cho xuống dòng: chúng dài thật, ép một hàng là
+           đẩy cả bảng trượt ngang. */
+        .mini-table th:nth-child(n+3), .mini-table td:nth-child(n+3) { white-space: nowrap; }
+        /* Dưới 768px hai bảng đã xếp dọc và mỗi bảng chỉ còn ~347px: giữ nowrap
+           ở đó thì bảng rộng hơn màn hình và kéo CẢ TRANG trượt ngang (đo được:
+           scrollWidth > clientWidth ở 375px). Trả về cho xuống dòng. */
+        @media (max-width: 767px) {
+            .mini-table th:nth-child(n+3), .mini-table td:nth-child(n+3) { white-space: normal; }
+        }
         .mini-table a.link { color: var(--primary); font-weight: 600; text-decoration: none; }
         .mini-table a.link:hover { text-decoration: underline; }
 
@@ -513,19 +519,24 @@
             </div>
         </div>
 
-        <!-- ===== Hàng 2: bảng hợp đồng (rộng) + biểu đồ phiếu (hẹp) ===== -->
-        <%-- Trước đây biểu đồ đứng MỘT cột cạnh CẢ HAI bảng xếp chồng: cột biểu
-             đồ bị kéo cao bằng hai bảng cộng lại (524px) nên cái bánh rán nằm
-             lọt thỏm giữa một thẻ trắng mênh mông, còn mắt thì không biết đọc
-             theo chiều nào. Giờ mỗi hàng ghép đúng HAI thứ cao xấp xỉ nhau, và
-             bảng dài nhất được nguyên một hàng cho riêng nó. --%>
-        <div class="row g-4 mb-4">
-            <div class="col-lg-8">
+        <!-- ===== Hai bảng hành động, nằm cạnh nhau ===== -->
+        <%-- Biểu đồ "Phiếu hỗ trợ theo trạng thái" TẠM BỎ khỏi giao diện theo
+             yêu cầu; hai bảng chia đôi bề ngang. Phần dữ liệu của nó vẫn còn
+             nguyên ở tầng dưới (DashboardController vẫn đặt ticketStatusSummary,
+             ô KPI "Phiếu hỗ trợ đang xử lý" vẫn đọc từ đó), nên bật lại chỉ là
+             dựng lại thẻ biểu đồ -- không phải làm lại truy vấn. --%>
+        <div class="row g-4">
+            <div class="col-lg-6">
                 <div class="card-box table-section h-100">
                     <div class="table-section-header">
                         <h6>Hợp đồng sắp hết hạn <span class="as-of-today">tính tới hôm nay</span></h6>
                         <a href="${pageContext.request.contextPath}/contract">Xem tất cả</a>
                     </div>
+                    <%-- Bọc cuộn ngang: ở khổ điện thoại bảng 5 cột hẹp nhất cũng
+                         rộng hơn thẻ (~366px so với 347px) và kéo CẢ TRANG trượt
+                         ngang. Cho riêng bảng cuộn, giống cách listcontract.jsp
+                         đang làm. --%>
+                    <div class="table-responsive">
                     <table class="mini-table">
                         <%-- Cột ĐỊA BÀN thay cho "Người phụ trách": phạm vi của trang là
                              "việc của tôi HOẶC trong địa bàn tôi giữ", nên câu người đọc cần
@@ -562,31 +573,21 @@
                             </c:choose>
                         </tbody>
                     </table>
-                </div>
-            </div>
-
-            <div class="col-lg-4">
-                <div class="card-box chart-card h-100">
-                    <div class="section-title">Phiếu hỗ trợ theo trạng thái</div>
-                    <div class="section-sub">Tổng số ${ticketStatusSummary['Mới tiếp nhận'] + ticketStatusSummary['Đang xử lý'] + ticketStatusSummary['Đã đóng']} phiếu hiện có</div>
-                    <div class="doughnut-wrap"><canvas id="ticketChart" height="200"></canvas></div>
-                    <div class="legend-row">
-                        <div class="legend-item"><span class="legend-dot" style="background:var(--primary-light)"></span>Mới tiếp nhận (${ticketStatusSummary['Mới tiếp nhận']})</div>
-                        <div class="legend-item"><span class="legend-dot" style="background:var(--warning)"></span>Đang xử lý (${ticketStatusSummary['Đang xử lý']})</div>
-                        <div class="legend-item"><span class="legend-dot" style="background:var(--success)"></span>Đã đóng (${ticketStatusSummary['Đã đóng']})</div>
                     </div>
                 </div>
             </div>
-        </div>
 
-        <!-- ===== Hàng 3: phiếu cần xử lý, nguyên một hàng ===== -->
-        <div class="row g-4">
-            <div class="col-12">
-                <div class="card-box table-section">
+            <div class="col-lg-6">
+                <div class="card-box table-section h-100">
                     <div class="table-section-header">
                         <h6>Phiếu hỗ trợ cần xử lý <span class="as-of-today">tính tới hôm nay</span></h6>
                         <a href="${pageContext.request.contextPath}/ticket">Xem tất cả</a>
                     </div>
+                    <%-- Bọc cuộn ngang: ở khổ điện thoại bảng 5 cột hẹp nhất cũng
+                         rộng hơn thẻ (~366px so với 347px) và kéo CẢ TRANG trượt
+                         ngang. Cho riêng bảng cuộn, giống cách listcontract.jsp
+                         đang làm. --%>
+                    <div class="table-responsive">
                     <table class="mini-table">
                         <thead><tr><th>Mã phiếu</th><th>Khách hàng</th><th>Địa bàn</th><th>Ưu tiên</th><th>Trạng thái</th></tr></thead>
                         <tbody>
@@ -631,6 +632,7 @@
                             </c:choose>
                         </tbody>
                     </table>
+                    </div>
                 </div>
             </div>
         </div>
@@ -640,7 +642,6 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script>
         // Đổi ô Phạm vi là nạp lại trang ngay, không cần nút "Lọc" -- giống bộ
         // lọc ở danh sách khách hàng/hợp đồng.
@@ -778,25 +779,6 @@
 
         document.querySelectorAll('.contract-value').forEach(function (el) {
             el.textContent = formatCompactVND(Number(el.dataset.vnd));
-        });
-
-        // ===== Biểu đồ phiếu hỗ trợ theo trạng thái =====
-        var ticketCtx = document.getElementById('ticketChart').getContext('2d');
-        new Chart(ticketCtx, {
-            type: 'doughnut',
-            data: {
-                labels: ['Mới tiếp nhận', 'Đang xử lý', 'Đã đóng'],
-                datasets: [{
-                    data: [${ticketStatusSummary['Mới tiếp nhận']}, ${ticketStatusSummary['Đang xử lý']}, ${ticketStatusSummary['Đã đóng']}],
-                    backgroundColor: ['#0f9edb', '#f5a623', '#2fbf8f'],
-                    borderWidth: 0
-                }]
-            },
-            options: {
-                responsive: true,
-                cutout: '68%',
-                plugins: { legend: { display: false } }
-            }
         });
 
         // Một số trình duyệt (đặc biệt Chrome bản cũ) vẫn phục hồi trang từ
