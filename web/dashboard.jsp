@@ -41,33 +41,50 @@
            nên gói vào một nút mở ra bảng tích. Nút vẫn nói rõ đang chọn mấy
            tỉnh -- một nút câm thì người dùng không biết trang đang thu hẹp. */
         /* ===== Thanh lọc =====
-           Trước đây bốn ô lọc nhét vào góc phải cạnh lời chào: chúng gãy thành
-           hai hàng lệch nhau, và bảng tích mở ra thì neo vào mép phải của một
-           cái nút đứng giữa trang. Giờ chúng có hàng riêng, xếp từ TRÁI sang,
-           mỗi ô có nhãn -- và bảng mở xuống thẳng dưới ô của nó. */
+           Một hàng mang CẢ địa bàn của người đang xem (trái) lẫn ba ô lọc
+           (phải). Trước đây bốn ô nhét vào góc phải cạnh lời chào và gãy thành
+           hai hàng lệch nhau; tách ra hàng riêng thì thẳng nhưng tốn thêm một
+           dòng, mà hàng chip địa bàn vốn đã chiếm sẵn một dòng. Gộp là hoà. */
         .filter-bar {
-            display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap;
+            display: flex; align-items: center; gap: 12px 16px; flex-wrap: wrap;
             background: #fff; border: 1px solid #eef2f6; border-radius: 14px;
             box-shadow: 0 6px 18px rgba(0,40,80,0.06);
-            padding: 12px 16px; margin-bottom: 16px;
+            padding: 10px 16px; margin-bottom: 16px;
         }
-        .filter-bar form { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; margin: 0; }
-        .fb-field { display: flex; flex-direction: column; gap: 5px; position: relative; }
-        .fb-field > label {
-            font-size: 0.72rem; font-weight: 700; color: #9ca3af;
-            text-transform: uppercase; letter-spacing: 0.04em;
+        /* Ô lọc luôn dồn về PHẢI, kể cả khi bên trái trống (Admin không cầm
+           tỉnh nào) -- vị trí của chúng không được nhảy theo việc người xem có
+           địa bàn hay không. */
+        .filter-bar form {
+            display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+            margin: 0 0 0 auto;
+            /* flex-shrink phải là 1: khoá 0 thì trên màn hẹp cụm ba ô giữ
+               nguyên bề rộng tự nhiên (~530px) và TRÀN ra ngoài thẻ thay vì
+               xuống dòng. min-width:0 là vế còn lại -- thiếu nó thì một flex
+               item vẫn không co xuống dưới kích thước nội dung của nó. */
+            flex: 0 1 auto; min-width: 0;
         }
-        .fb-field .province-filter { margin: 0; }
+        /* Trong thanh này các ô THU theo chữ của chính nó, không giữ min-width
+           190px như bộ lọc ở chỗ khác: ba ô cứng 190px cộng lại là 620px, cộng
+           hàng chip nữa thì tràn và gãy dòng ngay ở màn 1440. */
+        .filter-bar .province-filter { min-width: 0; white-space: nowrap; padding: 8px 12px; }
+        /* Chip là phần NHƯỜNG chỗ: hết chỗ thì chúng tự xuống dòng bên trong ô
+           của mình, còn ba ô lọc giữ nguyên một hàng. Ngược lại -- ép chip một
+           hàng -- là đẩy ô lọc xuống, đúng thứ vừa bỏ đi. */
+        .filter-bar .my-prov { flex: 1 1 240px; min-width: 0; }
 
         .prov-pop { position: relative; }
         .prov-pop > button {
             cursor: pointer; text-align: left; display: flex; align-items: center; gap: 8px;
         }
         .prov-pop > button i.fa-chevron-down { margin-left: auto; font-size: 0.7rem; color: #9ca3af; }
-        /* Neo vào mép TRÁI của chính ô lọc, không phải mép phải: ô nằm bên
-           trái màn hình nên right:0 đẩy bảng chạy ngược vào giữa trang. */
+        /* Neo vào mép PHẢI của chính ô lọc, vì ba ô này đứng ở nửa phải màn
+           hình: neo trái thì bảng rộng 320px chạy tràn khỏi mép phải trang.
+           Dưới 992px hàng lọc xuống dòng và dạt về trái, lúc đó ngược lại --
+           xem media query cuối file. max-width là chốt chặn cuối để không bao
+           giờ rộng hơn màn hình. */
         .prov-panel, .period-panel {
-            display: none; position: absolute; z-index: 70; top: calc(100% + 6px); left: 0;
+            display: none; position: absolute; z-index: 70; top: calc(100% + 6px); right: 0;
+            max-width: calc(100vw - 32px);
             background: #fff; border: 1px solid #eef2f6; border-radius: 12px;
             box-shadow: 0 16px 40px rgba(0,40,80,0.18); padding: 12px;
         }
@@ -130,7 +147,7 @@
         }
 
         /* Chip địa bàn dưới lời chào -- trả lời "tôi đang phụ trách tỉnh nào". */
-        .my-prov { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+        .my-prov { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
         .my-prov .lbl { font-size: 0.8rem; color: #6b7280; }
         .my-prov .chip {
             font-size: 0.76rem; font-weight: 600; color: var(--primary-dark);
@@ -199,6 +216,13 @@
         .status-success { background: #e8faf3; color: var(--success); }
         .status-gray { background: #f3f4f6; color: #6b7280; }
 
+        /* Hàng lọc xuống dòng thì ba ô dạt về TRÁI, nên bảng phải neo trái lại
+           -- neo phải lúc đó đẩy mép trái của bảng ra ngoài màn hình. */
+        @media (max-width: 991px) {
+            .filter-bar form { margin-left: 0; }
+            .prov-panel, .period-panel { left: 0; right: auto; }
+        }
+
         @media (max-width: 768px) {
             .page-container { padding: 0 14px 32px; }
         }
@@ -234,35 +258,35 @@
                         </c:otherwise>
                     </c:choose>
                 </p>
-                <%-- Địa bàn của chính người đang xem. Hiện ngay dưới lời chào chứ
-                     không giấu trong bảng tích: nó trả lời "vì sao số của tôi khác
-                     số của đồng nghiệp", mà câu đó phải đọc được không cần bấm gì.
-                     Ai chưa được giao tỉnh nào thì KHÔNG hiện dòng này -- một dòng
-                     "phụ trách: (trống)" chỉ làm người ta tưởng hỏng. --%>
-                <c:if test="${not empty myProvinces}">
-                    <div class="my-prov">
-                        <span class="lbl"><i class="fa-solid fa-map-location-dot"></i> Bạn phụ trách:</span>
-                        <c:forEach var="mp" items="${myProvinces}">
-                            <span class="chip">${fn:escapeXml(mp.shortName)}</span>
-                        </c:forEach>
-                    </div>
-                </c:if>
             </div>
             <div class="welcome-actions">
                 <div class="today-badge"><i class="fa-regular fa-calendar"></i>${todayLabel}</div>
             </div>
         </div>
 
-        <%-- Thanh lọc đứng RIÊNG một hàng, không nhét vào góc phải cạnh lời chào:
-             bốn ô ở đó gãy thành hai hàng lệch nhau, và bảng tích mở ra thì neo
-             vào mép phải của một cái nút đứng giữa trang. Hàng riêng cũng là chỗ
-             duy nhất đủ rộng để mỗi ô có nhãn -- "Của tôi" đứng trơ một mình
-             không nói được nó lọc theo cái gì. --%>
+        <%-- MỘT hàng mang cả hai thứ: bên trái là địa bàn của người đang xem,
+             bên phải là ba ô lọc. Thanh lọc đứng riêng thì tốn thêm một dòng,
+             mà hàng chip vốn đã chiếm sẵn một dòng rồi -- gộp lại là hoà.
+
+             Địa bàn phải đọc được KHÔNG CẦN BẤM: nó trả lời "vì sao số của tôi
+             khác số của đồng nghiệp". Nên nó là chữ nằm ngoài chứ không phải
+             thứ giấu trong bảng tích. Ai chưa được giao tỉnh nào thì bên trái
+             trống và ba ô lọc tự dồn sang phải -- một dòng "phụ trách: (trống)"
+             chỉ làm người ta tưởng hỏng.
+
+             BỎ nhãn xếp trên từng ô: nhãn đội thêm một tầng chữ, mà hàng này
+             phải thấp. Thay bằng cách cho mỗi ô tự xưng -- "Phạm vi: Của tôi",
+             biểu tượng địa điểm, biểu tượng lịch. --%>
         <div class="filter-bar">
-            <i class="fa-solid fa-sliders" style="color:#9ca3af; margin-bottom:9px;"></i>
+            <c:if test="${not empty myProvinces}">
+                <div class="my-prov">
+                    <span class="lbl"><i class="fa-solid fa-map-location-dot"></i> Bạn phụ trách:</span>
+                    <c:forEach var="mp" items="${myProvinces}">
+                        <span class="chip">${fn:escapeXml(mp.shortName)}</span>
+                    </c:forEach>
+                </div>
+            </c:if>
             <form method="GET" action="${pageContext.request.contextPath}/dashboard" id="provinceFilterForm">
-                <div class="fb-field">
-                    <label for="filterScope">Phạm vi</label>
                     <%-- Phạm vi người phụ trách. Đứng TRƯỚC các ô kia vì nó là ô
                          đổi nghĩa cả trang, còn tỉnh và kỳ chỉ thu hẹp thêm.
                          Mặc định khác nhau theo vai trò (nhân viên: của tôi,
@@ -272,15 +296,13 @@
                         <option value="mine" ${scopeFilter == 'mine' ? 'selected' : ''}>Của tôi</option>
                         <option value="all" ${scopeFilter == 'all' ? 'selected' : ''}>Toàn chi nhánh</option>
                     </select>
-                </div>
                     <%-- Ô tích NHIỀU tỉnh. provinceSet là cờ "form này có gửi phần
                          tỉnh lên": bỏ tích hết thì không có tham số provinceId nào,
                          giống hệt lần đầu mở trang -- không có cờ này thì controller
                          không phân biệt được "chưa chọn" với "đã bỏ hết" và sẽ tự
                          tích lại địa bàn của người dùng ngay sau khi họ vừa bỏ. --%>
                     <input type="hidden" name="provinceSet" value="1">
-                <div class="fb-field prov-pop">
-                    <label for="provToggle">Địa bàn</label>
+                <div class="prov-pop">
                         <button type="button" class="province-filter" id="provToggle"
                                 aria-expanded="false" aria-controls="provPanel">
                             <i class="fa-solid fa-location-dot" style="color:#9ca3af;"></i>
@@ -335,8 +357,7 @@
                      link cũ và bookmark cũ vẫn mở đúng kỳ như trước. --%>
                 <input type="hidden" name="year" id="fYear" value="${yearFilter}">
                 <input type="hidden" name="period" id="fPeriod" value="${periodFilter}">
-                <div class="fb-field period-pop">
-                    <label for="periodToggle">Kỳ</label>
+                <div class="period-pop">
                     <button type="button" class="province-filter" id="periodToggle"
                             aria-expanded="false" aria-controls="periodPanel">
                         <i class="fa-regular fa-calendar" style="color:#9ca3af;"></i>
