@@ -11,10 +11,19 @@
       - contractHistory  : List<poscs.model.ContractHistory> -- nhật ký thay đổi, mới nhất trước
       - createdEvent / signedEvent / closedEvent : ba mốc tiến trình, để dựng thanh tiến trình
 
-    TRANG NÀY CHỈ ĐỌC. showDetail cố ý KHÔNG đặt một cờ can* nào, nên mọi khối
-    <c:if> điều khiển nút bấm đều tắt. Thao tác làm thay đổi dữ liệu -- ký,
+    TRANG NÀY CHỈ ĐỌC, TRỪ ĐÚNG MỘT NÚT. Thao tác làm thay đổi hợp đồng -- ký,
     thanh lý, chấm dứt, huỷ bản ghi, gắn/gỡ hàng hoá, lập kỳ thanh toán, ghi
-    nhận đã thu -- nằm ở updatecontract.jsp. Đừng thêm nút thao tác vào đây.
+    nhận đã thu, nối hợp đồng -- nằm ở updatecontract.jsp. Đừng thêm nút thao
+    tác vào đây.
+
+    NGOẠI LỆ DUY NHẤT: nút "Đã xử lý xong" của một chặng bàn giao (cờ
+    canCompleteHandover_<id>). Nó ở đây vì người bấm là phòng Kế toán / Dự án,
+    mà họ không có quyền ghi hợp đồng nên KHÔNG mở được updatecontract.jsp --
+    trang này là trang duy nhất họ vào được. Quyền kiểm theo PHÒNG BAN
+    (AccessControl.canCompleteHandover), không phải quyền ghi hợp đồng.
+
+    Đừng lấy ngoại lệ này làm tiền lệ cho nút thứ hai: mọi thao tác còn lại
+    đều do người CÓ quyền ghi bấm, mà người đó mở thẳng trang quản lý được.
 
     Hạng mục sản phẩm/dịch vụ hiển thị sản phẩm/số lượng/đơn vị/ghi chú thật
     từ contractproducts -- KHÔNG có đơn giá/thành tiền/VAT vì bảng đó chưa có
@@ -293,6 +302,14 @@
         <div class="toast-msg blocked show">
             <i class="fa-solid fa-circle-xmark"></i>
             <span>Không huỷ được bản ghi này -- vui lòng thử lại.</span>
+        </div>
+    </c:if>
+    <%-- Trang này giờ có một nút ghi (đóng chặng bàn giao), nên phải đỡ được
+         lỗi của chính nó: thiếu dòng này thì bấm hỏng là màn hình đứng im. --%>
+    <c:if test="${param.error == 'handover_done_failed'}">
+        <div class="toast-msg blocked show">
+            <i class="fa-solid fa-circle-xmark"></i>
+            <span>Không xác nhận được chặng bàn giao &mdash; có thể phòng bạn đã báo xong trước đó rồi.</span>
         </div>
     </c:if>
 
@@ -979,10 +996,15 @@
             <c:if test="${not empty handovers}">
             <div class="tab-pane fade" id="pane-ban-giao" role="tabpanel">
         <!-- ===== Bàn giao phòng ban ===== -->
-        <%-- CHỈ ĐỌC, như cả trang này. Nút "Đã xử lý xong" của phòng nhận nằm ở
-             màn hình riêng /contract?action=handovers -- người phòng Kế toán và
-             Dự án không có quyền ghi trên hợp đồng, nên chỗ làm việc của họ là
-             hàng đợi của phòng mình chứ không phải trang hợp đồng. --%>
+        <%-- Khối DUY NHẤT của trang này có nút ghi: phòng nhận đóng chặng của
+             chính mình. Xem lý do ở đầu file. Hàng đợi
+             /contract?action=handovers vẫn còn và vẫn là chỗ làm việc theo lô;
+             ở đây chỉ là đường tắt cho người đã mở sẵn hợp đồng ra.
+
+             Thanh lý rồi VẪN đóng được chặng đang treo -- khoá là khoá việc mở
+             lượt bàn giao MỚI (ContractDAO.handOverToDepartments), không khoá
+             việc dọn nốt chặng cũ, nếu không chặng lệch nhịp với lúc thanh lý
+             sẽ treo vĩnh viễn. --%>
         <div class="info-card card-box">
             <div class="section-header"><h5>Bàn giao xử lý</h5></div>
             <c:if test="${hasPendingHandover}">
@@ -1031,6 +1053,32 @@
                                     </c:if>
                                     <c:if test="${not empty hv.doneNote}">
                                         <div style="font-size:0.82rem; color:#2f6b34;">&rarr; ${fn:escapeXml(hv.doneNote)}</div>
+                                    </c:if>
+                                    <%-- Nút chỉ mọc ở chặng ĐANG TREO của phòng chính người đang
+                                         xem. Chốt chặn thật nằm ở AccessControl.canCompleteHandover,
+                                         gọi lại trong handleCompleteHandover -- ở đây chỉ là hiển thị. --%>
+                                    <c:if test="${hv.pending and requestScope['canCompleteHandover_'.concat(hv.handoverId)]}">
+                                        <form method="POST" action="${pageContext.request.contextPath}/contract"
+                                              class="row g-2" style="margin-top:6px;">
+                                            <input type="hidden" name="csrfToken" value="${csrfToken}">
+                                            <input type="hidden" name="action" value="completeHandover">
+                                            <input type="hidden" name="contractId" value="${contract.contractId}">
+                                            <input type="hidden" name="handoverId" value="${hv.handoverId}">
+                                            <input type="hidden" name="departmentId" value="${hv.departmentId}">
+                                            <%-- Xác nhận xong thì quay lại CHÍNH trang này. Thiếu dòng
+                                                 này là controller đẩy về action=edit, nơi người của
+                                                 phòng nhận ăn ngay 403. --%>
+                                            <input type="hidden" name="returnTo" value="from-view">
+                                            <div class="col-8">
+                                                <input type="text" name="doneNote" class="form-control" required
+                                                       maxlength="500" placeholder="Phòng bạn đã làm gì? (bắt buộc)">
+                                            </div>
+                                            <div class="col-4">
+                                                <button type="submit" class="btn-primary" style="width:100%;">
+                                                    <i class="fa-solid fa-check me-1"></i> Đã xử lý xong
+                                                </button>
+                                            </div>
+                                        </form>
                                     </c:if>
                                 </td>
                             </tr>

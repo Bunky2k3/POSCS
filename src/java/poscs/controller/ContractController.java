@@ -448,8 +448,12 @@ public class ContractController extends HttpServlet {
         request.setAttribute("attachmentUrl", attachmentIsSafe ? attachmentUrl : null);
         request.setAttribute("attachmentUnsafe", attachmentUrl != null && !attachmentIsSafe);
         request.setAttribute("drivePreviewUrl", attachmentIsSafe ? drivePreviewUrl(attachmentUrl) : null);
-        // TRANG XEM KHÔNG ĐẶT MỘT CỜ can* NÀO. Mọi thao tác làm thay đổi
-        // dữ liệu đã chuyển sang trang Sửa thông tin; ở đây chỉ trình bày.
+        // Trang xem đặt ĐÚNG MỘT cờ cho phép ghi: canCompleteHandover_<id>,
+        // do putContractWorkspace đặt (xem lý do ở đó). Ngoài nó ra không một
+        // cờ can* nào -- mọi thao tác sửa dữ liệu hợp đồng nằm ở trang Sửa
+        // thông tin, ở đây chỉ trình bày. Thêm cờ thứ hai vào đây là bắt đầu
+        // dựng lại trang quản lý thứ hai, và trang này thì KHÔNG kiểm quyền
+        // ghi ở đầu hàm.
         putContractWorkspace(request, contract);
 
         request.getRequestDispatcher(DETAIL_VIEW).forward(request, response);
@@ -1057,17 +1061,6 @@ public class ContractController extends HttpServlet {
         // Lập phụ lục: chỉ từ hợp đồng gốc ĐÃ KÝ và chưa đóng băng.
         request.setAttribute("canAddAmendment", contract.isSigned() && !contract.isAmendment());
 
-        // Cờ đóng chặng bàn giao đặt Ở ĐÂY, không ở putContractWorkspace: nơi
-        // đó dùng chung với trang XEM, mà trang xem cố ý không mọc nút ghi nào.
-        // Thiếu dòng này thì cái form trong updatecontract.jsp nằm đấy mà không
-        // bao giờ hiện ra -- điều kiện luôn sai.
-        for (ContractHandover h : contractDAO.findHandoversOf(contract.getContractId())) {
-            if (h.isPending()) {
-                request.setAttribute("canCompleteHandover_" + h.getHandoverId(),
-                        AccessControl.canCompleteHandover(request, h.getDepartmentId()));
-            }
-        }
-
         // Danh sách để chọn khi nối hợp đồng: CHIỀU NGƯỢC LẠI với hợp đồng đang
         // mở, chỉ hợp đồng gốc. Đổ sẵn cả danh sách vì mỗi chiều chỉ vài chục
         // bản ghi; khi nào nhiều lên thì đổi thành ô tìm kiếm AJAX như ô khách
@@ -1604,15 +1597,25 @@ public class ContractController extends HttpServlet {
         for (ContractHandover h : handovers) {
             if (h.isPending()) {
                 pendingHandover = true;
+                // Cờ đóng chặng đặt ở ĐÂY, tức cho CẢ trang xem lẫn trang quản
+                // lý. Đây là ngoại lệ DUY NHẤT của luật "trang xem không mọc
+                // nút ghi", và nó là ngoại lệ có lý do chứ không phải nới cho
+                // tiện: người đóng chặng là phòng Kế toán / Dự án, mà họ KHÔNG
+                // có quyền ghi hợp đồng nên showEditForm chặn thẳng bằng
+                // requireFullAccess. Trang xem là trang duy nhất họ mở được --
+                // không đặt cờ ở đây thì mở hợp đồng từ thông báo hay từ link
+                // ai đó gửi là tắc, phải tự nhớ đường sang hàng đợi.
+                //
+                // Cờ này KHÔNG phải quyền ghi hợp đồng: canCompleteHandover
+                // hỏi theo PHÒNG BAN. Chốt chặn thật nằm ở
+                // handleCompleteHandover, đây chỉ quyết định có vẽ nút không.
+                request.setAttribute("canCompleteHandover_" + h.getHandoverId(),
+                        AccessControl.canCompleteHandover(request, h.getDepartmentId()));
             }
         }
         // Còn phòng chưa xong thì màn hình CẢNH BÁO chứ không chặn ký: chặn
         // cứng lúc này dễ thành kẹt hơn là kiểm soát, và khách hàng chưa nói
         // đó là điều kiện bắt buộc.
-        //
-        // KHÔNG đặt cờ "được xác nhận xong" ở đây: trang xem hợp đồng cố ý
-        // không mọc một nút ghi nào, và chỗ phòng nhận đóng chặng của mình là
-        // màn hình hàng đợi riêng (action=handovers).
         request.setAttribute("hasPendingHandover", pendingHandover);
         request.setAttribute("departmentList", employeeDAO.findAllDepartments());
 
@@ -1770,11 +1773,18 @@ public class ContractController extends HttpServlet {
             response.sendRedirect(request.getContextPath() + "/error/403.jsp");
             return;
         }
-        // Quay lại đúng chỗ vừa bấm: phòng nhận làm việc ở hàng đợi, còn người
-        // của Kinh doanh thì bấm từ trang quản lý hợp đồng.
-        String back = "from-queue".equals(request.getParameter("returnTo"))
-                ? "/contract?action=handovers"
-                : "/contract?action=edit&id=" + contractId;
+        // Quay lại đúng chỗ vừa bấm. Ba chỗ bấm được, và chỗ nào cũng phải
+        // quay về chính nó: đẩy người của Kế toán/Dự án về action=edit là đẩy
+        // họ vào trang họ không có quyền mở -- xác nhận xong thì ăn ngay 403.
+        String returnTo = request.getParameter("returnTo");
+        String back;
+        if ("from-queue".equals(returnTo)) {
+            back = "/contract?action=handovers";
+        } else if ("from-view".equals(returnTo)) {
+            back = "/contract?action=view&id=" + contractId;
+        } else {
+            back = "/contract?action=edit&id=" + contractId;
+        }
         if (!contractDAO.completeHandover(handoverId, actorId(request), request.getParameter("doneNote"))) {
             response.sendRedirect(request.getContextPath() + back + "&error=handover_done_failed");
             return;

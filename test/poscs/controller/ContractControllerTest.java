@@ -751,11 +751,15 @@ public class ContractControllerTest {
     }
 
     /**
-     * Trang xem hợp đồng KHÔNG được mọc nút xác nhận: nó chỉ đọc, và chỗ phòng
-     * nhận đóng chặng là màn hình hàng đợi riêng.
+     * Trang xem PHẢI mọc nút xác nhận cho phòng của chính người đang xem.
+     *
+     * <p>Đây là ngoại lệ duy nhất của luật "trang xem không có nút ghi", và nó
+     * là lý do tồn tại của cả đường này: người đóng chặng là phòng Kế toán /
+     * Dự án, mà họ không có quyền ghi hợp đồng nên showEditForm chặn thẳng --
+     * trang xem là trang duy nhất họ mở được.
      */
     @Test
-    public void view_khongDatCoXacNhanChang() throws Exception {
+    public void view_datCoXacNhanChangChoPhongCuaMinh() throws Exception {
         Contract contract = signedContract();
         when(request.getParameter("action")).thenReturn("view");
         when(request.getParameter("id")).thenReturn("5");
@@ -764,12 +768,85 @@ public class ContractControllerTest {
         pending.setHandoverId(9);
         pending.setDepartmentId(6);
         when(contractDAO.findHandoversOf(5)).thenReturn(List.of(pending));
+        // Phòng 6, KHÔNG phải Admin và không có quyền ghi hợp đồng -- đúng hình
+        // dạng người của phòng nhận bàn giao.
+        dangNhapVoiPhongBan(6, "CSKH");
         when(request.getRequestDispatcher(anyString())).thenReturn(mock(RequestDispatcher.class));
 
         controller.doGet(request, response);
 
         verify(request).setAttribute("hasPendingHandover", true);
+        verify(request).setAttribute("canCompleteHandover_9", true);
+    }
+
+    /**
+     * Chiều ngược lại: người phòng KHÁC mở cùng trang đó thì cờ phải là false.
+     *
+     * <p>Không có ca này thì một lần "mở cho tiện" ở putContractWorkspace sẽ
+     * biến trang xem thành chỗ ai cũng đóng được chặng của người khác, mà
+     * không test nào kêu.
+     */
+    @Test
+    public void view_khongDatCoXacNhanChangChoPhongKhac() throws Exception {
+        Contract contract = signedContract();
+        when(request.getParameter("action")).thenReturn("view");
+        when(request.getParameter("id")).thenReturn("5");
+        when(contractDAO.findById(5)).thenReturn(contract);
+        ContractHandover pending = new ContractHandover();
+        pending.setHandoverId(9);
+        pending.setDepartmentId(6);
+        when(contractDAO.findHandoversOf(5)).thenReturn(List.of(pending));
+        dangNhapVoiPhongBan(2, "Sales");
+        when(request.getRequestDispatcher(anyString())).thenReturn(mock(RequestDispatcher.class));
+
+        controller.doGet(request, response);
+
+        verify(request).setAttribute("canCompleteHandover_9", false);
+    }
+
+    /**
+     * Chặng ĐÃ XONG thì không đặt cờ: nút mọc lại trên một chặng đã đóng là
+     * mời người ta bấm một cú chắc chắn thất bại.
+     */
+    @Test
+    public void view_khongDatCoChoChangDaXong() throws Exception {
+        Contract contract = signedContract();
+        when(request.getParameter("action")).thenReturn("view");
+        when(request.getParameter("id")).thenReturn("5");
+        when(contractDAO.findById(5)).thenReturn(contract);
+        ContractHandover done = new ContractHandover();
+        done.setHandoverId(9);
+        done.setDepartmentId(6);
+        done.setDoneAt(new java.sql.Timestamp(System.currentTimeMillis()));
+        when(contractDAO.findHandoversOf(5)).thenReturn(List.of(done));
+        dangNhapVoiPhongBan(6, "CSKH");
+        when(request.getRequestDispatcher(anyString())).thenReturn(mock(RequestDispatcher.class));
+
+        controller.doGet(request, response);
+
+        verify(request).setAttribute("hasPendingHandover", false);
         verify(request, never()).setAttribute(eq("canCompleteHandover_9"), any());
+    }
+
+    /**
+     * Bấm từ trang xem thì quay LẠI trang xem. Đẩy người của phòng nhận về
+     * action=edit là đẩy họ vào trang requireFullAccess chặn -- xác nhận xong
+     * thì ăn ngay 403, đúng thứ đường này sinh ra để tránh.
+     */
+    @Test
+    public void completeHandover_tuTrangXem_quayLaiTrangXem() throws Exception {
+        when(request.getParameter("action")).thenReturn("completeHandover");
+        when(request.getParameter("contractId")).thenReturn("5");
+        when(request.getParameter("handoverId")).thenReturn("9");
+        when(request.getParameter("departmentId")).thenReturn("6");
+        when(request.getParameter("doneNote")).thenReturn("đã đối chiếu công nợ");
+        when(request.getParameter("returnTo")).thenReturn("from-view");
+        dangNhapVoiPhongBan(6, "CSKH");
+        when(contractDAO.completeHandover(anyInt(), anyInt(), any())).thenReturn(true);
+
+        controller.doPost(request, response);
+
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=view&id=5");
     }
 
     /** Hàng đợi đếm theo phòng và chỉ ra chặng để lâu nhất -- hai con số giám đốc nhìn đầu tiên. */
