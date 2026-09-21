@@ -88,12 +88,38 @@
         var panel = root.querySelector('[data-popover-panel]');
         if (!toggle || !panel) { return null; }
 
+        /* Neo bảng sao cho nó nằm TRONG màn hình.
+           CSS chỉ đoán được theo trang: mặc định neo mép phải (ở Dashboard và
+           danh sách khách hàng nút đứng cuối hàng), còn trong khối "Lọc thêm"
+           của danh sách hợp đồng thì trang đó tự đặt lại thành neo trái. Đoán
+           kiểu đó sai ngay khi hàng lọc xuống dòng hoặc khi thêm bớt một ô --
+           bảng rộng 320px chạy ra ngoài mép trang và mất luôn nút "Áp dụng".
+           Ở đây đo thật rồi mới quyết: xoá kiểu nội tuyến để về đúng mặc định
+           của trang, lệch bên nào thì lật sang bên kia. */
+        function neoLai() {
+            panel.style.left = '';
+            panel.style.right = '';
+            var manHinh = document.documentElement.clientWidth;
+            var o = panel.getBoundingClientRect();
+            if (o.right > manHinh - 8) {
+                panel.style.left = 'auto';
+                panel.style.right = '0';
+                o = panel.getBoundingClientRect();
+            }
+            if (o.left < 8) {
+                panel.style.left = '0';
+                panel.style.right = 'auto';
+            }
+        }
+
         function setOpen(open) {
             if (open) {
                 closers.forEach(function (close) { close(); });
             }
             panel.classList.toggle('open', open);
             toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+            // Đo SAU khi đã hiện: bảng đang display:none thì mọi kích thước là 0.
+            if (open) { neoLai(); }
             if (open && typeof root._onOpen === 'function') { root._onOpen(); }
         }
         closers.push(function () { setOpen(false); });

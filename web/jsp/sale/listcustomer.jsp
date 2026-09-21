@@ -112,10 +112,11 @@
         }
         .filter-bar .pop-btn:focus { outline: none; border-color: var(--primary-light); }
         .filter-bar .pop-btn > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        /* Neo bảng về mép TRÁI, ngược với Dashboard. Mặc định ở appshell.css là
-           neo phải vì ở Dashboard ô này đứng sát mép phải thanh lọc; ở đây nó
-           đứng giữa hàng, neo phải thì bảng rộng 320px thò ra ngoài mép trái. */
-        .filter-bar .prov-panel { left: 0; right: auto; }
+        <%-- Bảng chọn tỉnh giữ mặc định của appshell.css là neo mép PHẢI: ở
+             trang này nút tỉnh là ô CUỐI hàng lọc, neo trái thì bảng rộng
+             320px chạy thẳng ra ngoài mép phải trang (đã dính đúng thế). Màn
+             hẹp hơn 991px thì appshell tự lật sang neo trái, vì lúc đó hàng
+             lọc xuống dòng và các ô dạt về bên trái. --%>
         /* Dải phạm vi chuyển vào TRONG thẻ lọc: nó nói cùng một chuyện với ô
            Phạm vi ngay trên nó, để tách ra ngoài thì lời giải thích và cái công
            tắc nằm ở hai chỗ khác nhau. */

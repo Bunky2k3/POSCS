@@ -77,6 +77,40 @@
              cùng với chính cái biểu đồ. Không giữ CSS mồ côi: lần bật lại sẽ
              viết theo bố cục lúc đó chứ không phải theo bố cục hôm nay. --%>
 
+        /* Nằm TRONG thẻ lọc, là dòng thứ hai của chính nó -- trước đây nó là
+           một dải màu riêng nằm ngay dưới, tức ba dải xếp chồng (lời chào,
+           thanh lọc, chú thích) trước khi tới con số đầu tiên. Nó nói về mấy ô
+           ngay trên nó nên đứng chung là đúng chỗ, và tiết kiệm một dải. */
+        .scope-note {
+            display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+            flex-basis: 100%; margin: 2px 0 0; padding-top: 10px;
+            border-top: 1px dashed #eef2f6;
+            font-size: 0.82rem; color: #6b7280;
+        }
+        .scope-note strong { color: var(--primary-dark); }
+        .scope-note i { color: var(--primary); }
+        .scope-note a { color: var(--primary); font-weight: 600; margin-left: auto; }
+        .as-of-today { font-weight: 500; font-size: 0.74rem; color: #9ca3af; text-transform: none; letter-spacing: 0; }
+
+        /* ===== KPI cards ===== */
+        .kpi-card { padding: 18px 18px 16px; display: flex; flex-direction: column; gap: 10px; height: 100%; }
+        .kpi-top { display: flex; justify-content: space-between; align-items: flex-start; }
+        .kpi-icon {
+            width: 46px; height: 46px; border-radius: 12px;
+            display: flex; align-items: center; justify-content: center; font-size: 1.15rem; color: #fff;
+        }
+        .kpi-icon.bg-blue { background: linear-gradient(135deg, var(--primary-dark), var(--primary-light)); }
+        .kpi-icon.bg-amber { background: linear-gradient(135deg, #c97a0f, var(--warning)); }
+        .kpi-icon.bg-green { background: linear-gradient(135deg, #1a8f68, var(--success)); }
+        .kpi-icon.bg-red { background: linear-gradient(135deg, #b8384f, var(--danger)); }
+
+        .kpi-label { font-size: 0.8rem; color: #6b7280; font-weight: 500; }
+        .kpi-value { font-size: 1.65rem; font-weight: 700; color: #111827; line-height: 1.1; }
+        .kpi-trend { font-size: 0.78rem; font-weight: 600; display: inline-flex; align-items: center; gap: 5px; }
+        .kpi-trend.up { color: var(--success); }
+        .kpi-trend.warn { color: var(--warning); }
+        .kpi-trend.down { color: var(--danger); }
+
         /* ===== Tables ===== */
         .table-section { padding: 18px 20px 15px; }
         .table-section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
