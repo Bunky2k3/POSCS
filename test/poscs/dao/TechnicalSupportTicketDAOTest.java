@@ -182,9 +182,12 @@ public class TechnicalSupportTicketDAOTest {
             dao.countStatusSummary(java.util.List.of(3, 5, 9), null, null);
 
             verify(conn).prepareStatement(contains("d.province_id IN (?,?,?)"));
-            verify(ps).setInt(4, 3);
-            verify(ps).setInt(5, 5);
-            verify(ps).setInt(6, 9);
+            // Tỉnh bắt đầu từ vị trí 5: bốn tham số đầu là ba trạng thái + mức
+            // ưu tiên "Khẩn cấp". Mức ưu tiên trước đây là chuỗi ghép thẳng
+            // vào SQL nên tỉnh nằm ở 4,5,6.
+            verify(ps).setInt(5, 3);
+            verify(ps).setInt(6, 5);
+            verify(ps).setInt(7, 9);
         }
     }
 

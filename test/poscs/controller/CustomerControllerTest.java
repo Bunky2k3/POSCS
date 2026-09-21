@@ -33,7 +33,7 @@ import static org.mockito.Mockito.*;
 
 /**
  * Test tầng Controller cho CustomerController -- tập trung vào các quy tắc
- * nghiệp vụ chạy trước khi chạm DB (BR-41 không xoá KH còn hợp đồng, BR-09/
+ * nghiệp vụ chạy trước khi chạm DB (BR-34 không xoá KH còn hợp đồng, BR-09/
  * BR-10 định dạng SĐT/email, phân quyền Full access CUSTOMER) chứ không test
  * lại CustomerDAO/JDBC. DAO được mock và inject thẳng vào field private
  * (không có constructor injection trong code gốc) bằng reflection.
@@ -129,7 +129,7 @@ public class CustomerControllerTest {
     }
 
     // ------------------------------------------------------------------
-    // POST ?action=delete (BR-41)
+    // POST ?action=delete (BR-34)
     // ------------------------------------------------------------------
 
     @Test
@@ -266,6 +266,51 @@ public class CustomerControllerTest {
 
         verify(customerDAO, never()).insertLifecycleEvent(any());
         verify(response).sendRedirect(CONTEXT_PATH + "/customer?action=new&error=invalid");
+    }
+
+    // ------------------------------------------------------------------
+    // BR-27 -- email/SĐT/MST duy nhất, và người dùng phải BIẾT ô nào trùng
+    // ------------------------------------------------------------------
+    //
+    // Ba cột đều có UNIQUE KEY nên luật vốn được CSDL giữ. Nhưng nếu không
+    // kiểm trước thì lỗi rơi xuống tận DB, bật lên thành SQLException, và màn
+    // hình chỉ hiện "create_failed" chung chung -- gõ nhầm một chữ số thành số
+    // của khách khác thì không hiểu vì sao, gõ lại y nguyên rồi lại hỏng.
+
+    @Test
+    public void create_trungEmail_baoDungODoVaKhongGhi() throws Exception {
+        when(request.getParameter("action")).thenReturn("create");
+        stubValidCreateFields();
+        when(customerDAO.existsByEmail("abc@example.com", null)).thenReturn(true);
+
+        controller.doPost(request, response);
+
+        verify(customerDAO, never()).insert(any(Enterprise.class));
+        verify(response).sendRedirect(CONTEXT_PATH + "/customer?action=new&error=duplicate_email");
+    }
+
+    @Test
+    public void create_trungSoDienThoai_baoDungODoVaKhongGhi() throws Exception {
+        when(request.getParameter("action")).thenReturn("create");
+        stubValidCreateFields();
+        when(customerDAO.existsByPhone("0912345678", null)).thenReturn(true);
+
+        controller.doPost(request, response);
+
+        verify(customerDAO, never()).insert(any(Enterprise.class));
+        verify(response).sendRedirect(CONTEXT_PATH + "/customer?action=new&error=duplicate_phone");
+    }
+
+    @Test
+    public void create_trungMaSoThue_baoDungODoVaKhongGhi() throws Exception {
+        when(request.getParameter("action")).thenReturn("create");
+        stubValidCreateFields();
+        when(customerDAO.existsByTaxCode("0101234567", null)).thenReturn(true);
+
+        controller.doPost(request, response);
+
+        verify(customerDAO, never()).insert(any(Enterprise.class));
+        verify(response).sendRedirect(CONTEXT_PATH + "/customer?action=new&error=duplicate_tax_code");
     }
 
     /**

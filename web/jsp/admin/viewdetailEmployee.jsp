@@ -233,7 +233,7 @@
                     </c:otherwise>
                 </c:choose>
 
-                <!-- ===== Gửi thông tin tài khoản (BR-31) + Khóa / Mở khóa tài khoản (BR-25, BR-26) ===== -->
+                <!-- ===== Gửi thông tin tài khoản (FE-02) + Khóa / Mở khóa tài khoản (BR-25, BR-26) ===== -->
                 <div class="action-bar">
                     <button type="button" class="btn-primary" data-bs-toggle="modal" data-bs-target="#sendAccountModal"><i class="fa-solid fa-paper-plane me-1"></i> Gửi thông tin tài khoản</button>
                     <c:choose>
@@ -252,7 +252,7 @@
         </div>
     </div>
 
-    <!-- ===== Modal xác nhận gửi thông tin tài khoản (BR-31) ===== -->
+    <!-- ===== Modal xác nhận gửi thông tin tài khoản (FE-02) ===== -->
     <div class="modal fade" id="sendAccountModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">

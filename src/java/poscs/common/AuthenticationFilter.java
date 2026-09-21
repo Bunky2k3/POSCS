@@ -61,6 +61,9 @@ public class AuthenticationFilter implements Filter {
     // phải đăng nhập mới xem được.
     private static final String BRANDING_ASSET_PREFIX = "/img/";
 
+    /** Khớp url-pattern của UploadFileController -- xem {@link #rendersTopbar}. */
+    private static final String UPLOAD_PATH_PREFIX = "/uploads/";
+
     // Số thông báo gần nhất bơm sẵn cho dropdown chuông ở topbar.jsp (trang
     // "Xem tất cả" tự tra lại đầy đủ qua NotificationController, không dùng
     // request attribute này).
@@ -147,14 +150,30 @@ public class AuthenticationFilter implements Filter {
                         + "/login.jsp?error=account_inactive");
                 return;
             }
+            // Đã tra ra bản mới rồi thì thay luôn bản trong session, đừng chỉ
+            // dùng nó để kiểm khoá tài khoản.
+            //
+            // AccessControl đọc role và manager_id TỪ SESSION. Giữ bản cũ nghĩa
+            // là Admin đổi vai trò của một người, hoặc gán cấp trên cho họ
+            // (thao tác bật cơ chế siết quyền ở PERMISSIONS.md), mà thay đổi đó
+            // không có hiệu lực cho tới lần họ đăng nhập lại -- trong khi thao
+            // tác khoá tài khoản ngay bên trên lại có hiệu lực tức thì. Hai
+            // hành vi khác nhau cho hai thao tác quản trị cạnh nhau, không có
+            // lý do gì.
+            //
+            // Xoá chuỗi băm mật khẩu TRƯỚC khi cất vào session, đúng như
+            // AuthenticationController.handleLogin làm: mọi JSP đều đọc được
+            // ${sessionScope.currentUser.*}, nên chỉ cần một lần lỡ tay in cả
+            // object ra là lộ hash. findByUsernameOrEmail trả về nó vì luồng
+            // đăng nhập cần, ở đây thì không.
+            freshUser.setPasswordHash(null);
+            session.setAttribute("currentUser", freshUser);
         }
 
         // Bơm sẵn dữ liệu chuông thông báo cho topbar.jsp -- topbar được
         // include ở MỌI trang sau đăng nhập mà không qua controller riêng,
         // nên nơi duy nhất chạy trước tất cả các trang đó là filter này.
-        // Bỏ qua request tới /css, /js (topbar không được render ở đó) để
-        // khỏi tốn 2 lượt query CSDL thừa cho mỗi lần tải trang.
-        if (!isStaticAssetPath(request.getServletPath())) {
+        if (rendersTopbar(request.getServletPath())) {
             User currentUser = (User) session.getAttribute("currentUser");
             request.setAttribute("unreadNotifCount", notificationDAO.countUnread(currentUser.getUserId()));
             request.setAttribute("recentNotifications",
@@ -164,7 +183,29 @@ public class AuthenticationFilter implements Filter {
         chain.doFilter(request, response);
     }
 
+    /**
+     * File nằm sẵn trong WAR: CSS và JS. Không mang dữ liệu nghiệp vụ của ai,
+     * nên request tới đây bỏ qua được cả phép kiểm tài khoản bị khoá.
+     */
     private static boolean isStaticAssetPath(String servletPath) {
         return servletPath.startsWith("/css/") || servletPath.startsWith("/js/");
+    }
+
+    /**
+     * true nếu response của đường này có vẽ topbar, tức là có cần dữ liệu
+     * chuông thông báo.
+     *
+     * <p>Tách khỏi {@link #isStaticAssetPath} vì hai câu hỏi khác nhau, và
+     * {@code /uploads/} là chỗ chúng tách ra: file người dùng tải lên MANG dữ
+     * liệu nghiệp vụ nên vẫn phải qua phép kiểm tài khoản bị khoá, nhưng nó trả
+     * về một tấm ảnh chứ không phải một trang HTML -- không có topbar nào để
+     * bơm dữ liệu vào.
+     *
+     * <p>Đáng tách vì chi phí thật: mỗi tấm ảnh là 2 lượt query thừa, nên một
+     * trang danh sách sản phẩm 20 ảnh tốn 40 lượt đi CSDL cho một cái chuông
+     * không hề được vẽ.
+     */
+    private static boolean rendersTopbar(String servletPath) {
+        return !isStaticAssetPath(servletPath) && !servletPath.startsWith(UPLOAD_PATH_PREFIX);
     }
 }

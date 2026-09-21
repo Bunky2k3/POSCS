@@ -21,6 +21,7 @@ import poscs.model.ContractProduct;
 
 import static org.junit.Assert.*;
 import poscs.common.ListScope;
+import poscs.common.Period;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 import static poscs.dao.JdbcStub.*;
@@ -813,6 +814,41 @@ public class ContractDAOTest {
 
             // Dashboard chia cho giá trị này khi tính % tăng trưởng -- null sẽ nổ.
             assertEquals(BigDecimal.ZERO, dao.sumInvoiceAmountByMonth(2026, 9));
+        }
+    }
+
+    /**
+     * Hợp đồng đã HUỶ BẢN GHI không được góp tiền vào doanh thu.
+     *
+     * <p>voidRecord xoá mềm và cố ý không đụng tới contract_payments (huỷ một
+     * bản ghi nhập nhầm không được xoá dấu vết tiền đã ghi nhận), nên hai câu
+     * cộng này phải tự loại ra. Thiếu điều kiện thì tiền của một hợp đồng đã
+     * biến mất khỏi mọi danh sách vẫn nằm mãi trong KPI, và không màn hình nào
+     * chỉ ra được nó đến từ đâu.
+     */
+    @Test
+    public void sumInvoiceAmountByMonth_loaiHopDongDaHuyBanGhi() throws Exception {
+        PreparedStatement ps = statementReturning(singleRow(row("total", BigDecimal.ZERO)));
+        Connection conn = connectionReturning(ps);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            dao.sumInvoiceAmountByMonth(2026, 9);
+            verify(conn).prepareStatement(contains("c.is_deleted = 0"));
+        }
+    }
+
+    @Test
+    public void sumInvoiceAmountInPeriod_loaiHopDongDaHuyBanGhi() throws Exception {
+        PreparedStatement ps = statementReturning(singleRow(row("total", BigDecimal.ZERO)));
+        Connection conn = connectionReturning(ps);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            dao.sumInvoiceAmountInPeriod(Period.parse("2026", "m9"), null);
+            verify(conn).prepareStatement(contains("c.is_deleted = 0"));
         }
     }
 

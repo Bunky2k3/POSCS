@@ -402,7 +402,6 @@ public class CustomerController extends HttpServlet {
         e.setWebsite(emptyToNull(request.getParameter("website")));
         e.setStatus("Active");
         e.setJoinDate(parseDateOrNull(request.getParameter("joinDate")));
-        e.setLogoUrl(FileStorage.save(request.getPart("logo"), LOGO_SUBFOLDER, FileStorage.IMAGE_EXTENSIONS));
 
         Integer accountOwnerId = resolveAccountOwnerId(request);
         if (accountOwnerId != null) {
@@ -426,6 +425,17 @@ public class CustomerController extends HttpServlet {
             response.sendRedirect(request.getContextPath() + "/customer?action=new&error=invalid");
             return;
         }
+        String duplicate = findDuplicateField(e, null);
+        if (duplicate != null) {
+            response.sendRedirect(request.getContextPath() + "/customer?action=new&error=" + duplicate);
+            return;
+        }
+
+        // Lưu logo SAU khi đã qua hết các bước kiểm: FileStorage.save ghi thẳng
+        // file xuống đĩa, nên gọi nó trước validate là mỗi lần người dùng gõ
+        // sai một ô lại để lại một file không bản ghi nào trỏ tới, và không có
+        // đường nào dọn.
+        e.setLogoUrl(FileStorage.save(request.getPart("logo"), LOGO_SUBFOLDER, FileStorage.IMAGE_EXTENSIONS));
 
         e.setEnterpriseCode(customerDAO.generateNextEnterpriseCode());
         int newId = customerDAO.insert(e);
@@ -464,12 +474,6 @@ public class CustomerController extends HttpServlet {
         e.setWebsite(emptyToNull(request.getParameter("website")));
         e.setJoinDate(parseDateOrNull(request.getParameter("joinDate")));
 
-        // Chỉ ghi đè logo khi người dùng thực sự chọn ảnh mới -- input file để
-        // trống vẫn gửi lên 1 Part rỗng (size=0), FileStorage.save trả về null
-        // trong trường hợp đó, nên giữ nguyên logo cũ thay vì xoá mất.
-        String newLogoUrl = FileStorage.save(request.getPart("logo"), LOGO_SUBFOLDER, FileStorage.IMAGE_EXTENSIONS);
-        e.setLogoUrl(newLogoUrl != null ? newLogoUrl : existing.getLogoUrl());
-
         Integer accountOwnerId = resolveAccountOwnerId(request);
         if (accountOwnerId != null) {
             e.setAccountOwnerId(accountOwnerId);
@@ -488,6 +492,21 @@ public class CustomerController extends HttpServlet {
             response.sendRedirect(request.getContextPath() + "/customer?action=edit&id=" + id + "&error=invalid");
             return;
         }
+        // Loại chính khách đang sửa ra khỏi phép kiểm, nếu không thì mở form
+        // lên bấm Lưu mà không đổi gì cũng báo trùng với chính nó.
+        String duplicate = findDuplicateField(e, id);
+        if (duplicate != null) {
+            response.sendRedirect(request.getContextPath()
+                    + "/customer?action=edit&id=" + id + "&error=" + duplicate);
+            return;
+        }
+
+        // Ghi file sau validate, cùng lý do như handleCreate. Chỉ ghi đè logo
+        // khi người dùng thực sự chọn ảnh mới -- input file để trống vẫn gửi
+        // lên 1 Part rỗng (size=0), FileStorage.save trả về null trong trường
+        // hợp đó, nên giữ nguyên logo cũ thay vì xoá mất.
+        String newLogoUrl = FileStorage.save(request.getPart("logo"), LOGO_SUBFOLDER, FileStorage.IMAGE_EXTENSIONS);
+        e.setLogoUrl(newLogoUrl != null ? newLogoUrl : existing.getLogoUrl());
 
         boolean ok = customerDAO.update(e);
         if (ok) {
@@ -514,7 +533,7 @@ public class CustomerController extends HttpServlet {
             return;
         }
 
-        // BR-41: không cho xoá khách hàng còn hợp đồng đang hiệu lực
+        // BR-34: không cho xoá khách hàng còn hợp đồng đang hiệu lực
         if (customerDAO.hasActiveContracts(id)) {
             response.sendRedirect(request.getContextPath() + "/customer?action=view&id=" + id + "&error=has_active_contracts");
             return;
@@ -587,23 +606,6 @@ public class CustomerController extends HttpServlet {
     // ------------------------------------------------------------------
 
     /**
-     * Người phụ trách chính: địa bàn quyết định, không phải người nhập liệu.
-     *
-     * <p>Đây là CHỖ KHOÁ DUY NHẤT. Tỉnh của khách đã có người cầm thì trả về
-     * người đó và bỏ qua hẳn ô {@code accountOwnerId} gửi lên -- khoá ở JSP
-     * chỉ là khoá hình, ai mở devtools cũng gỡ được. Tỉnh chưa ai cầm thì mới
-     * dùng giá trị người dùng chọn.
-     *
-     * <p>Nhánh "chưa ai cầm" không phải chiều lòng ai: bảng phân công mới phủ
-     * một phần trong 34 tỉnh, khoá tất thì không tạo nổi khách hàng ở những
-     * tỉnh còn trống -- biến "chưa phân công" thành chặn nghiệp vụ. Khi khách
-     * giao đủ bảng phân công thì nhánh này tự hết đường chạy, không phải sửa
-     * code.
-     *
-     * <p>Suy từ xã/phường chứ không từ ô tỉnh: xem {@link
-     * poscs.dao.EmployeeDAO#findAssigneeOfWard}.
-     */
-    /**
      * Đổi tham số {@code kind} trên URL thành vai trong CSDL.
      *
      * <p>Chỉ "supplier" mới ra nhà cung cấp; mọi giá trị khác -- kể cả thiếu hẳn
@@ -638,6 +640,23 @@ public class CustomerController extends HttpServlet {
         return result;
     }
 
+    /**
+     * Người phụ trách chính: địa bàn quyết định, không phải người nhập liệu.
+     *
+     * <p>Đây là CHỖ KHOÁ DUY NHẤT. Tỉnh của khách đã có người cầm thì trả về
+     * người đó và bỏ qua hẳn ô {@code accountOwnerId} gửi lên -- khoá ở JSP
+     * chỉ là khoá hình, ai mở devtools cũng gỡ được. Tỉnh chưa ai cầm thì mới
+     * dùng giá trị người dùng chọn.
+     *
+     * <p>Nhánh "chưa ai cầm" không phải chiều lòng ai: bảng phân công mới phủ
+     * một phần trong 34 tỉnh, khoá tất thì không tạo nổi khách hàng ở những
+     * tỉnh còn trống -- biến "chưa phân công" thành chặn nghiệp vụ. Khi khách
+     * giao đủ bảng phân công thì nhánh này tự hết đường chạy, không phải sửa
+     * code.
+     *
+     * <p>Suy từ xã/phường chứ không từ ô tỉnh: xem {@link
+     * poscs.dao.EmployeeDAO#findAssigneeOfWard}.
+     */
     private Integer resolveAccountOwnerId(HttpServletRequest request) {
         Integer wardId = parseIntOrNull(request.getParameter("districtId"));
         if (wardId != null) {
@@ -674,23 +693,13 @@ public class CustomerController extends HttpServlet {
     }
 
     /**
-     * Trường bắt buộc + BR-09 (định dạng SĐT) + BR-10 (định dạng email) + ngày tham gia
-     * không ở tương lai. Khớp với validate phía client ở addnewcustomer.jsp/updatecustomer.jsp
-     * -- trước đây chỉ có ở client nên có thể bị bypass bằng cách POST thẳng.
-     *
-     * Email bắt buộc phải nhập (không chỉ đúng định dạng khi có) vì cột
-     * enterprises.email trong DB là NOT NULL + UNIQUE (xem db/schema.sql) --
-     * để trống sẽ làm INSERT/UPDATE thất bại ở tầng DB thay vì báo lỗi rõ
-     * ràng "invalid" ngay tại đây.
-     */
-    /**
      * Kiểm ô chọn logo TRƯỚC khi đụng tới CSDL. Trả về false (và đã tự redirect
      * kèm lỗi) nếu file sai loại.
      *
-     * Phải chạy sớm: FileStorage.save() được gọi ngay lúc dựng Enterprise, và
-     * nó trả về null cho file sai loại y hệt khi người dùng không chọn gì --
-     * nên nếu không chặn ở đây thì luồng tạo mới lặng lẽ lưu khách hàng không
-     * logo, còn luồng sửa thì lặng lẽ giữ nguyên logo cũ.
+     * Phải chạy sớm: FileStorage.save() trả về null cho file sai loại y hệt
+     * khi người dùng không chọn gì -- nên nếu không chặn ở đây thì luồng tạo
+     * mới lặng lẽ lưu khách hàng không logo, còn luồng sửa thì lặng lẽ giữ
+     * nguyên logo cũ.
      */
     private boolean logoIsAcceptable(HttpServletRequest request, HttpServletResponse response,
             String redirectBase) throws ServletException, IOException {
@@ -701,6 +710,44 @@ public class CustomerController extends HttpServlet {
         return false;
     }
 
+    /**
+     * BR-27: tên mã lỗi của ô đầu tiên bị trùng với khách hàng khác, hoặc null
+     * nếu không trùng gì. Tên trả về dùng thẳng làm {@code ?error=...} để màn
+     * hình chỉ đúng ô phải sửa, thay vì một chữ "create_failed" chung chung.
+     *
+     * <p>Trả về ô ĐẦU TIÊN chứ không gom cả ba: form chỉ hiện được một thông
+     * báo, và người dùng sửa xong ô này bấm lưu lại sẽ thấy ngay ô tiếp theo
+     * nếu còn.
+     *
+     * @param excludeId khách đang sửa, null khi đang tạo mới
+     */
+    private String findDuplicateField(Enterprise e, Integer excludeId) {
+        if (customerDAO.existsByEmail(e.getEmail(), excludeId)) {
+            return "duplicate_email";
+        }
+        if (customerDAO.existsByPhone(e.getPhone(), excludeId)) {
+            return "duplicate_phone";
+        }
+        // Mã số thuế chỉ có trên form tạo mới -- CustomerDAO.update cố ý không
+        // ghi cột đó, nên lúc sửa e.getTaxCode() là null và phép kiểm tự bỏ qua.
+        if (customerDAO.existsByTaxCode(e.getTaxCode(), excludeId)) {
+            return "duplicate_tax_code";
+        }
+        return null;
+    }
+
+    /**
+     * Trường bắt buộc + BR-09 (định dạng SĐT) + BR-10 (định dạng email) +
+     * BR-32 (ngày tham gia không ở tương lai). Khớp với validate phía client ở
+     * addnewcustomer.jsp/updatecustomer.jsp -- trước đây chỉ có ở client nên
+     * có thể bị bypass bằng cách POST thẳng.
+     *
+     * <p>Email bắt buộc phải nhập (không chỉ đúng định dạng khi có) vì cột
+     * enterprises.email trong DB là NOT NULL + UNIQUE (xem db/schema.sql) --
+     * để trống sẽ làm INSERT/UPDATE thất bại ở tầng DB thay vì báo lỗi rõ
+     * ràng "invalid" ngay tại đây. Còn việc email đó có TRÙNG người khác không
+     * thì {@link #findDuplicateField} lo.
+     */
     private boolean isValidCommonFields(Enterprise e) {
         if (isBlank(e.getEnterpriseName()) || isBlank(e.getCustomerType()) || isBlank(e.getCustomerGroup())) {
             return false;

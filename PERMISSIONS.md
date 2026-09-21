@@ -74,13 +74,19 @@ both freeze the contract permanently: after that `ContractDAO.update` refuses
 every edit, including from Admin.
 
 **Signing also locks the terms.** From `Đã ký` onward `ContractDAO.update`
-writes exactly two columns — `owner_id` and `attachment_url`. Neither appears
-on the paper both parties signed: the owner is an internal assignment that
-follows staffing, and the link to the signed PDF usually only *exists* after
-signing, so locking it would mean the file can never be attached. Everything
-else — code, title, type, counterparty, the three dates, signing parties,
-place, value, and the line items — is contract content, and changing it goes
-through an amendment.
+writes exactly one column — `owner_id`. It does not appear on the paper both
+parties signed: the owner is an internal assignment that follows staffing.
+Everything else — code, title, type, counterparty, the three dates, signing
+parties, place, value, and the line items — is contract content, and changing
+it goes through an amendment.
+
+(Until V34 a second column was writable, `attachment_url`, open for a reason of
+its own: the link to the signed PDF usually only *exists* after signing, so
+locking it would have meant the file could never be attached. V34 dropped that
+column — a real contract carries several documents, not one link — and they now
+live in `contract_documents`, added and soft-deleted through their own actions
+with their own history rows. Attaching a file after signing no longer goes
+through `update` at all.)
 
 This is enforced in the DAO, not by disabling inputs: a hidden button still
 POSTs. The form submits the locked fields as `disabled` (browsers do not send
@@ -109,8 +115,11 @@ contract), and it must not itself be an amendment — one level only, checked in
 `ContractDAO.insert` inside the transaction, since a self-referencing foreign
 key permits chains of any length.
 
-This replaced BR-46, which allowed deleting while the status was
-"Chưa hiệu lực". That status is computed from `effective_date`, so a contract
+This replaced UC-34, which allowed deleting while the status was
+"Chưa hiệu lực". (Earlier revisions of this file cited that rule as "BR-46".
+That was wrong — BR-46 is the Ticket detail screen. The delete condition is
+described in UC-34's *Mô tả*; the only BR it cites is BR-37, the confirmation
+dialog.) That status is computed from `effective_date`, so a contract
 signed yesterday but effective next month was still deletable together with
 everything it said. The correct condition is *not yet signed* — which V23 could
 not express, because `signing_date` was `NOT NULL` and therefore no row was

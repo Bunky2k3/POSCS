@@ -559,7 +559,7 @@
         </div>
     </div>
 
-    <!-- MSG-040: chặn xoá do BR-41 (còn hợp đồng đang hiệu lực) -->
+    <!-- MSG-040: chặn xoá do BR-34 (còn hợp đồng đang hiệu lực) -->
     <c:if test="${param.error == 'has_active_contracts'}">
         <div class="toast-msg blocked show">
             <i class="fa-solid fa-circle-xmark"></i>

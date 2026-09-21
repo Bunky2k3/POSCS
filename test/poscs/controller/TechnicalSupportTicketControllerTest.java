@@ -731,6 +731,80 @@ public class TechnicalSupportTicketControllerTest {
         assertEquals(stored, saved.getValue().getSlaDeadline());
     }
 
+    /**
+     * Ô hạn SLA gửi lên RỖNG là người dùng chủ động xoá -- khác hẳn hai ca
+     * trên (không gửi, hoặc gửi giá trị rác), nơi phải giữ hạn cũ.
+     *
+     * <p>Trước đây cả ba ca rơi chung vào "giữ hạn cũ", nên gỡ hạn xử lý là
+     * việc không làm được: xoá trắng ô rồi bấm Lưu thì giá trị cũ lặng lẽ quay
+     * lại, không có thông báo nào.
+     */
+    @Test
+    public void update_slaDeadlineClearedOnPurpose_wipesTheStoredOne() throws Exception {
+        TechnicalRequest existing = fullyValidExistingTicket();
+        existing.setSlaDeadline(Timestamp.valueOf("2026-08-27 10:00:00"));
+        when(ticketDAO.findById(3)).thenReturn(existing);
+        stubValidUpdateParams();
+        when(request.getParameter("slaDeadline")).thenReturn("");
+
+        controller.doPost(request, response);
+
+        ArgumentCaptor<TechnicalRequest> saved = ArgumentCaptor.forClass(TechnicalRequest.class);
+        verify(ticketDAO).update(saved.capture(), anyInt(), any());
+        assertNull("Xoá trắng ô hạn SLA phải gỡ được hạn", saved.getValue().getSlaDeadline());
+    }
+
+    // ------------------------------------------------------------------
+    // BR-40 / BR-41 -- trạng thái và mức ưu tiên phải nằm trong danh sách
+    // ------------------------------------------------------------------
+    //
+    // Hai cột này là varchar trần trong CSDL, còn dropdown chỉ là giao diện.
+    // Không kiểm ở server thì một POST tự dựng ghi được giá trị thứ năm, và
+    // phiếu đó tàng hình: countStatusSummary so bằng với đúng ba trạng thái
+    // nên nó không rơi vào ô đếm nào, trong khi các câu SLA lọc
+    // "status <> 'Đã đóng'" vẫn tính nó là đang mở.
+
+    @Test
+    public void update_statusNgoaiDanhSach_biTuChoi() throws Exception {
+        when(ticketDAO.findById(3)).thenReturn(fullyValidExistingTicket());
+        stubValidUpdateParams();
+        when(request.getParameter("status")).thenReturn("Tạm dừng");
+
+        controller.doPost(request, response);
+
+        verify(ticketDAO, never()).update(any(TechnicalRequest.class), anyInt(), any());
+        verify(response).sendRedirect(contains("error=invalid"));
+    }
+
+    @Test
+    public void update_priorityNgoaiDanhSach_biTuChoi() throws Exception {
+        when(ticketDAO.findById(3)).thenReturn(fullyValidExistingTicket());
+        stubValidUpdateParams();
+        when(request.getParameter("priority")).thenReturn("Siêu khẩn");
+
+        controller.doPost(request, response);
+
+        verify(ticketDAO, never()).update(any(TechnicalRequest.class), anyInt(), any());
+        verify(response).sendRedirect(contains("error=invalid"));
+    }
+
+    /** "Trung bình" là nhãn của tài liệu, hệ thống dùng "Bình thường" -- phải bị từ chối. */
+    @Test
+    public void create_priorityNgoaiDanhSach_biTuChoi() throws Exception {
+        when(request.getParameter("action")).thenReturn("create");
+        when(request.getParameter("enterpriseId")).thenReturn("10");
+        when(request.getParameter("ticketType")).thenReturn("Bảo hành");
+        when(request.getParameter("priority")).thenReturn("Trung bình");
+        when(request.getParameter("receptionChannel")).thenReturn("Điện thoại");
+        when(request.getParameter("assignedTechnicianId")).thenReturn("50");
+        when(request.getParameter("description")).thenReturn("Thiết bị lỗi nguồn");
+
+        controller.doPost(request, response);
+
+        verify(ticketDAO, never()).insert(any(TechnicalRequest.class));
+        verify(response).sendRedirect(contains("error=invalid"));
+    }
+
     @Test
     public void create_readsSlaDeadlineFromForm() throws Exception {
         // Trước đây không có ô nhập nào nên phiếu tạo từ hệ thống luôn có

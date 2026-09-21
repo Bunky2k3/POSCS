@@ -520,14 +520,27 @@ public class TechnicalSupportTicketController extends HttpServlet {
         if (t.getContractId() == null && !contractPickerWasUsable) {
             t.setContractId(existing.getContractId());
         }
-        // Hạn SLA không có ô nhập trên form sửa, nên buildTicketFromRequest
-        // không bao giờ set nó. Không giữ lại từ bản cũ ở đây thì mỗi lần
-        // Admin/CSKH bấm lưu (dù chỉ đổi trạng thái) là ghi đè sla_deadline
-        // thành NULL -- phiếu lập tức biến mất khỏi ô "sắp/đã quá hạn" trên
-        // dashboard VÀ khỏi lịch nhắc SLA của NotificationScheduler, vì cả
-        // hai đều lọc "sla_deadline IS NOT NULL". Mất dữ liệu âm thầm, không
-        // báo lỗi ở đâu cả.
-        if (t.getSlaDeadline() == null) {
+        // Hạn SLA không đọc ra ngày thì có BA nghĩa khác hẳn nhau, và chỉ một
+        // trong ba là "xoá đi":
+        //
+        //  - KHÔNG có tham số: request không đi từ form sửa (POST tự dựng, hay
+        //    một form rút gọn thêm sau này) -- GIỮ hạn cũ.
+        //  - Có tham số nhưng RÁC ("hom qua", định dạng của trình duyệt cũ):
+        //    coi như không nhập -- GIỮ hạn cũ.
+        //  - Có tham số và RỖNG: người dùng nhìn thấy ô rồi chủ động xoá trắng
+        //    -- XOÁ thật. Trước đây nhánh này cũng rơi về "giữ hạn cũ", nên gỡ
+        //    hạn xử lý là việc không làm được: bấm Lưu xong giá trị cũ lặng lẽ
+        //    quay lại, không báo gì.
+        //
+        // Hai nhánh đầu phải giữ vì ghi đè thành NULL là phiếu lặng lẽ biến mất
+        // khỏi ô "sắp/đã quá hạn" trên dashboard VÀ khỏi lịch nhắc của
+        // NotificationScheduler -- cả hai đều lọc "sla_deadline IS NOT NULL".
+        //
+        // Nhánh kỹ thuật viên không bị ảnh hưởng: ở đó t chính LÀ existing, nên
+        // hạn cũ vốn đã nằm sẵn trong t.
+        String slaParam = request.getParameter("slaDeadline");
+        boolean slaClearedOnPurpose = slaParam != null && slaParam.trim().isEmpty();
+        if (t.getSlaDeadline() == null && !slaClearedOnPurpose) {
             t.setSlaDeadline(existing.getSlaDeadline());
         }
         // Chụp lại status/resolvedAt GỐC trước khi set field mới -- ở nhánh
@@ -559,7 +572,11 @@ public class TechnicalSupportTicketController extends HttpServlet {
             t.setResolvedAt(null);
         }
 
-        if (!isValid(t) || t.getStatus() == null) {
+        // Trạng thái cũng kiểm theo danh sách cho phép (BR-40), cùng lẽ với mức
+        // ưu tiên trong isValid: một trạng thái thứ tư ghi được vào CSDL sẽ làm
+        // phiếu tàng hình -- không rơi vào ô đếm nào của countStatusSummary,
+        // nhưng vẫn bị các câu SLA (status <> 'Đã đóng') tính là đang mở.
+        if (!isValid(t) || !TechnicalSupportTicketDAO.isAllowedStatus(t.getStatus())) {
             response.sendRedirect(request.getContextPath() + "/ticket?action=edit&id=" + id + "&error=invalid");
             return;
         }
@@ -671,11 +688,19 @@ public class TechnicalSupportTicketController extends HttpServlet {
         return contract != null && contract.getEnterpriseId() == t.getEnterpriseId();
     }
 
-    /** Các trường bắt buộc phải có khi tạo/sửa phiếu hỗ trợ. */
+    /**
+     * Các trường bắt buộc phải có khi tạo/sửa phiếu hỗ trợ.
+     *
+     * <p>Mức ưu tiên kiểm theo DANH SÁCH CHO PHÉP, không chỉ "khác null"
+     * (BR-41). Cột {@code priority} là {@code varchar} nên CSDL nhận mọi chuỗi,
+     * còn dropdown chỉ là giao diện -- một POST tự dựng đặt được giá trị thứ
+     * năm, và phiếu đó rơi xuống cuối mọi bảng sắp xếp theo
+     * {@code FIELD(t.priority, ...)} mà không có màn hình nào nói vì sao.
+     */
     private boolean isValid(TechnicalRequest t) {
         return t.getEnterpriseId() > 0
                 && t.getTicketType() != null
-                && t.getPriority() != null
+                && TechnicalSupportTicketDAO.isAllowedPriority(t.getPriority())
                 && t.getReceptionChannel() != null
                 && t.getAssignedTechnicianId() > 0
                 && t.getDescription() != null;

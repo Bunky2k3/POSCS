@@ -36,7 +36,15 @@ public class EmployeeController extends HttpServlet {
 
     private static final Logger LOG = LoggerFactory.getLogger(EmployeeController.class);
 
-    /** BR-31: email công ty do hệ thống tự cấp (chưa có hộp thư thật), dạng &lt;username&gt;@postef.com.vn. */
+    /**
+     * Email công ty do hệ thống tự cấp (chưa có hộp thư thật), dạng
+     * &lt;username&gt;@postef.com.vn.
+     *
+     * <p>Không có BR nào trong Project_Report phủ việc cấp email công ty --
+     * quy ước này do nhóm đặt ra. Chú thích cũ ghi "BR-31" là NHẦM: BR-31 nói
+     * về nhóm khách hàng và nhân viên phụ trách trên hồ sơ KHÁCH HÀNG, không
+     * liên quan gì tới nhân viên.
+     */
     private static final String COMPANY_EMAIL_DOMAIN = "@postef.com.vn";
 
     private static final int PAGE_SIZE = 10;
@@ -431,7 +439,7 @@ public class EmployeeController extends HttpServlet {
 
     /**
      * BR-28 (Phòng ban + Vai trò bắt buộc), BR-29 (ngày sinh hợp lệ trong
-     * quá khứ), BR-30 (giới tính hợp lệ), BR-09 (định dạng SĐT), BR-31 (email
+     * quá khứ), BR-30 (giới tính hợp lệ), BR-09 (định dạng SĐT), BR-11 (email
      * cá nhân bắt buộc + hợp lệ -- là kênh duy nhất để gửi tài khoản/mật khẩu
      * vì email công ty tự cấp chưa có hộp thư thật). Các trường bắt buộc
      * khác của users (họ, tên, CCCD, ngày sinh, ngày vào làm) đều NOT NULL

@@ -21,8 +21,8 @@ import static org.mockito.Mockito.*;
  * Test tầng Controller cho EmployeeController -- khác Customer/Contract/
  * Ticket ở chỗ quyền được gate DUY NHẤT 1 lần ở đầu doGet/doPost (chỉ Admin
  * được đụng vào Employee, không có tier View only), nên test luôn gọi thẳng
- * doGet/doPost thay vì gọi riêng từng handler. Tập trung vào BR-28..BR-31
- * (các trường bắt buộc khi tạo/sửa nhân viên), chặn trùng SĐT/CCCD, và
+ * doGet/doPost thay vì gọi riêng từng handler. Tập trung vào BR-28/BR-29/
+ * BR-30 (các trường bắt buộc khi tạo/sửa nhân viên), chặn trùng SĐT/CCCD, và
  * BR-25/BR-26 (không tự khoá chính tài khoản Admin đang đăng nhập).
  * JUnit 4 + Mockito, xem CustomerControllerTest.
  */
@@ -111,7 +111,7 @@ public class EmployeeControllerTest {
     }
 
     // ------------------------------------------------------------------
-    // POST ?action=create (BR-28..BR-31)
+    // POST ?action=create (BR-28, BR-29, BR-30)
     // ------------------------------------------------------------------
 
     @Test

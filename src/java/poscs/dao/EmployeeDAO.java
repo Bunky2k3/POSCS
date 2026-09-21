@@ -732,7 +732,7 @@ public class EmployeeDAO {
      * Cập nhật thông tin nhân viên do Admin sửa (UC-27/UC-28: gồm cả phòng
      * ban + vai trò, khác updateProfile() ở trên vốn chỉ cho tự sửa thông
      * tin cá nhân). KHÔNG đổi username/password/email công ty ở đây -- email
-     * công ty do hệ thống tự cấp gắn chết với username lúc tạo (BR-31), đổi
+     * công ty do hệ thống tự cấp gắn chết với username lúc tạo, đổi
      * mật khẩu có luồng riêng (quên mật khẩu / đổi mật khẩu).
      */
     public boolean update(User user) {
@@ -784,7 +784,7 @@ public class EmployeeDAO {
 
     /**
      * Ghi đè password_hash bằng mật khẩu tạm mới -- dùng khi Admin bấm
-     * "Gửi thông tin tài khoản" (BR-31): mỗi lần gửi/gửi lại đều cấp 1 mật
+     * "Gửi thông tin tài khoản" (FE-02): mỗi lần gửi/gửi lại đều cấp 1 mật
      * khẩu tạm mới thay vì lưu lại mật khẩu tạm cũ dạng plaintext ở đâu đó
      * chờ gửi (không an toàn), nên "gửi lại" thực chất là "cấp lại rồi gửi".
      */
