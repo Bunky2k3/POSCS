@@ -2545,9 +2545,15 @@ public class ContractDAO {
                 before.getCounterpartySignerPosition(), after.getCounterpartySignerPosition());
         addChange(parts, "Căn cứ uỷ quyền", before.getAuthorizationRef(), after.getAuthorizationRef());
         addChange(parts, "Nơi ký", before.getSigningPlace(), after.getSigningPlace());
+        // formatMoney chứ không phải toPlainString: cột là DECIMAL(15,2) nên
+        // giá trị đọc từ CSDL có scale 2 còn giá trị vừa nhập có scale 0, và
+        // "1250000000.00" khác "1250000000" theo chuỗi dù cùng một số tiền --
+        // mỗi lần bấm Lưu mà không sửa gì lại đẻ ra một dòng nhật ký báo giá
+        // trị đã đổi. Thêm nữa, "1.250.000.000 đ" mới là thứ đọc được trong
+        // nhật ký; con số trần phải đếm chữ số mới biết là bao nhiêu.
         addChange(parts, "Giá trị hợp đồng",
-                before.getContractValue() == null ? null : before.getContractValue().toPlainString(),
-                after.getContractValue() == null ? null : after.getContractValue().toPlainString());
+                formatMoney(before.getContractValue()),
+                formatMoney(after.getContractValue()));
         // Hai trường dưới là khoá ngoại -- tra tên ra để nhật ký đọc được,
         // "Khách hàng: #3 -> #7" thì không ai hiểu. Chỉ tra khi có đổi thật,
         // nên lần bấm Lưu bình thường không tốn thêm truy vấn nào.
