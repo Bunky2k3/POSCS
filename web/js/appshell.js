@@ -355,20 +355,51 @@
     }
 
     /**
-     * Đặt vào ô một chuỗi CHƯA chuẩn -- giá trị server đổ ra, hoặc thứ vừa
-     * được dán vào -- đọc bằng đúng quy tắc tiền rồi mới định dạng. Trả về
-     * false nếu không đọc được, khi đó để nguyên cho người dùng tự sửa.
+     * Chuỗi đã định dạng cho một giá trị CHƯA chuẩn -- số server đổ ra, hoặc
+     * thứ vừa được dán vào -- hoặc null khi không đọc được, khi đó nơi gọi để
+     * nguyên cho người dùng tự sửa.
      */
-    function datLaiTuChuoi(input, raw) {
+    function chuanHoaTien(raw) {
         var n = soTuChuoi(raw);
         if (n === null || n < 0) {
             // Ô nhập tiền luôn là số dương: phụ lục giảm trừ lấy dấu từ ô chọn
             // Bổ sung/Giảm trừ bên cạnh, không từ dấu trừ trong ô số.
-            return false;
+            return null;
         }
-        input.value = nhomNghin(String(Math.round(n)));
-        chuChoO(input);
-        return true;
+        return nhomNghin(String(Math.round(n)));
+    }
+
+    /** Chỉ giữ chữ số rồi phân nhóm -- đường đi lúc người dùng đang GÕ. */
+    function giuChuSo(raw) {
+        var chuSo = String(raw == null ? '' : raw).replace(/\D/g, '').replace(/^0+(?=\d)/, '');
+        return chuSo ? nhomNghin(chuSo) : '';
+    }
+
+    /**
+     * Giá trị ô sẽ mang sau một lần nhập. Hàm THUẦN, tách riêng khỏi phần gắn
+     * sự kiện để test vào được: cả hai lỗi đã bắt trên bản chạy (số âm đọc ra
+     * rỗng, dán "980000000.00" thành 98 tỷ) đều nằm ở đây chứ không nằm ở chỗ
+     * đăng ký listener.
+     */
+    function giaTriSauNhap(raw, laDan) {
+        if (laDan) {
+            // DÁN (hoặc kéo-thả) thì đọc bằng quy tắc đầy đủ: thứ được dán vào
+            // thường là số do chính hệ thống đổ ra và còn nguyên đuôi ".00".
+            // Chỉ giữ chữ số ở đây là dán "980000000.00" vào ra 98 tỷ -- đúng
+            // lỗi đã sửa ở server, nhưng xảy ra TRƯỚC khi form gửi đi nên bên
+            // Java không còn gì để cứu.
+            var chuan = chuanHoaTien(raw);
+            if (chuan !== null) {
+                return chuan;
+            }
+        }
+        // Lúc GÕ thì chỉ giữ chữ số: tiền ở đây luôn là số nguyên đồng, mà áp
+        // quy tắc đầy đủ vào từng phím sẽ cắn vào chuỗi trung gian -- đang gõ
+        // "1.500" thì có một khoảnh khắc ô mang "1.5", đọc thành 1,5 rồi làm
+        // tròn là chữ số vừa gõ biến mất dưới tay người dùng. Gõ tay phần thập
+        // phân thì phần lẻ dính vào phần nguyên, và dòng chữ ngay dưới ô là thứ
+        // để người nhập thấy ngay điều đó.
+        return giuChuSo(raw);
     }
 
     function chuChoO(input) {
@@ -383,11 +414,15 @@
     // Định dạng lại ô và giữ con trỏ ở đúng chỗ người dùng đang gõ: đếm số
     // CHỮ SỐ bên trái con trỏ rồi đặt lại sau đúng ngần ấy chữ số. Đặt thẳng
     // con trỏ về cuối thì sửa một chữ số ở giữa là nó nhảy ra cuối dòng.
-    function dinhDangO(input) {
+    function dinhDangO(input, laDan) {
         var caret = input.selectionStart;
         var soChuSoTruoc = input.value.slice(0, caret).replace(/\D/g, '').length;
-        var chuSo = input.value.replace(/\D/g, '').replace(/^0+(?=\d)/, '');
-        input.value = chuSo ? nhomNghin(chuSo) : '';
+        input.value = giaTriSauNhap(input.value, laDan);
+        if (laDan) {
+            // Vừa dán xong thì con trỏ thuộc về cuối chuỗi vừa dán, không phải
+            // vị trí cũ -- số chữ số đã đổi hẳn so với trước đó.
+            soChuSoTruoc = input.value.replace(/\D/g, '').length;
+        }
 
         var pos = 0;
         var dem = 0;
@@ -406,27 +441,14 @@
     }
 
     Array.prototype.forEach.call(document.querySelectorAll('input[data-money]'), function (input) {
-        if (!datLaiTuChuoi(input, input.value)) {
-            chuChoO(input);
+        var banDau = chuanHoaTien(input.value);
+        if (banDau !== null) {
+            input.value = banDau;
         }
+        chuChoO(input);
         input.addEventListener('input', function (ev) {
-            // DÁN (hoặc kéo-thả) thì đọc bằng quy tắc đầy đủ: thứ được dán vào
-            // thường là số do chính hệ thống đổ ra và còn nguyên đuôi ".00".
-            // Chỉ giữ chữ số ở đây là dán "980000000.00" vào ra 98 tỷ -- đúng
-            // lỗi đã sửa ở server, nhưng xảy ra TRƯỚC khi form gửi đi nên bên
-            // Java không còn gì để cứu.
-            //
-            // Lúc GÕ thì vẫn chỉ giữ chữ số: tiền ở đây luôn là số nguyên
-            // đồng, mà áp quy tắc đầy đủ vào từng phím sẽ cắn vào chuỗi trung
-            // gian -- đang gõ "1.500" thì có một khoảnh khắc ô mang "1.5", đọc
-            // thành 1,5 rồi làm tròn là chữ số vừa gõ biến mất dưới tay người
-            // dùng. Gõ tay phần thập phân thì phần lẻ dính vào phần nguyên, và
-            // dòng chữ ngay dưới ô là thứ để người nhập thấy ngay điều đó.
-            var laDan = ev && (ev.inputType === 'insertFromPaste' || ev.inputType === 'insertFromDrop');
-            if (laDan && datLaiTuChuoi(input, input.value)) {
-                return;
-            }
-            dinhDangO(input);
+            var laDan = !!(ev && (ev.inputType === 'insertFromPaste' || ev.inputType === 'insertFromDrop'));
+            dinhDangO(input, laDan);
         });
     });
 
@@ -435,6 +457,13 @@
         el.textContent = n === null ? '' : docTienVND(n);
     });
 
+    // Cửa duy nhất để test vào được phần JS: bộ chạy test nạp chính file này
+    // trong một sandbox có document giả (xem test/js/money-vnd.test.js), nên
+    // thứ gì không treo ở đây thì không kiểm được. Chỉ mở các hàm THUẦN --
+    // phần đụng vào DOM vẫn phải mở trang thật mới biết.
     window.POSCS = window.POSCS || {};
     window.POSCS.docTienVND = docTienVND;
+    window.POSCS.soTuChuoi = soTuChuoi;
+    window.POSCS.nhomNghin = nhomNghin;
+    window.POSCS.giaTriSauNhap = giaTriSauNhap;
 })();

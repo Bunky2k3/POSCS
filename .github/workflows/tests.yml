@@ -155,3 +155,58 @@ jobs:
           name: junit-results
           path: build/test/results/
           if-no-files-found: warn
+
+  # Phần JS trước đây không có test nào, và đã trả giá: hai lỗi lọt qua cả
+  # review lẫn CI rồi chỉ lộ khi mở trang thật (PR #136). Job riêng chứ không
+  # ghép vào job ant: nó không cần JDK, không cần MySQL, chạy vài giây, và khi
+  # đỏ thì tên job nói thẳng là hỏng ở JS chứ không phải ở Java.
+  js:
+    name: node --test (JS)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+
+      # Bộ chạy test có sẵn của Node, không npm/package.json/node_modules --
+      # đây là dự án Java, thêm một hệ sinh thái phụ thuộc nữa chỉ để chạy vài
+      # chục assert là cái giá không đáng.
+      #
+      # Xuất thêm bản junit để bước sau đếm được, và để tải lên xem khi đỏ.
+      - name: Run JS tests
+        run: |
+          mkdir -p build/test/results
+          node --test                --test-reporter=spec --test-reporter-destination=stdout                --test-reporter=junit --test-reporter-destination=build/test/results/TEST-js.xml                'test/js/**/*.test.js'
+
+      # node --test THOÁT 0 KHI KHÔNG TÌM THẤY FILE NÀO. Đổi tên thư mục test,
+      # sửa nhầm đường dẫn, hay quên commit file test -- CI vẫn xanh y như khi
+      # mọi thứ chạy tốt. Cùng lý do với bước "Assert integration tests actually
+      # ran" ở job trên.
+      - name: Assert JS tests actually ran
+        if: always()
+        run: |
+          python3 - <<'PYCHECK'
+          import sys
+          try:
+              xml = open("build/test/results/TEST-js.xml", encoding="utf-8").read()
+          except OSError:
+              print("KHONG thay build/test/results/TEST-js.xml -- test JS chua chay.")
+              sys.exit(1)
+          n = xml.count("<testcase")
+          print("JS: %d test" % n)
+          if n == 0:
+              print("Khong co test nao chay -- kiem lai duong dan test/js/**/*.test.js")
+              sys.exit(1)
+          PYCHECK
+
+      - name: Upload JS test results
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: js-test-results
+          path: build/test/results/TEST-js.xml
+          if-no-files-found: warn

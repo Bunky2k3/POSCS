@@ -97,6 +97,34 @@ they are not pointed at an `_it` database. That keeps a fresh clone working
 with no setup — at the cost that "all skipped" looks just like "all passed",
 so CI has an explicit step asserting they really ran.
 
+### JavaScript tests
+
+`ant test` covers Java only. The browser-side money helpers in
+`web/js/appshell.js` have their own suite, run by Node's built-in test runner —
+no npm, no `package.json`, no `node_modules`:
+
+```bash
+node --test 'test/js/**/*.test.js'
+```
+
+`appshell.js` is a plain browser script rather than a module: it runs on load
+and touches `document`. So the test builds a ~25-line fake `document` and loads
+**the real file** in a `vm` sandbox, then reads the pure functions off
+`window.POSCS`. Testing a copy of the logic would let the copy drift from the
+shipped file — which is exactly the failure this suite exists to catch.
+
+Only those pure functions are reachable this way. The event wiring and anything
+that writes to the DOM still needs the page opened for real.
+
+Two cautions, both learned the hard way:
+
+- `node --test` **exits 0 when it matches no files**, so CI asserts the tests
+  really ran — same guard as for the integration tests above.
+- A test that calls a helper directly proves nothing about the path the page
+  actually takes. The two bugs this suite was written for (PR #136) both sat
+  behind a helper that *was* covered; what was not covered was the function the
+  page calls into.
+
 ## Building and Running
 
 This project is set up as a NetBeans Ant-based web application:
