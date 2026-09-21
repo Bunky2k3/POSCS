@@ -638,6 +638,13 @@ public class ContractDAO {
             // cha của nó là NHẮC HAI LẦN cho cùng một việc. Phụ lục vẫn tìm
             // được ở danh sách hợp đồng.
             "AND c.parent_contract_id IS NULL " +
+            // CHỈ hợp đồng ĐANG chạy. Trục lịch không biết gì về trục tiến độ:
+            // một hợp đồng đã thanh lý hoặc chấm dứt sớm vẫn nằm trong khoảng
+            // hiệu lực -- kết thúc sớm không làm end_date lùi lại -- nên thiếu
+            // điều kiện này là lịch nhắc bắn "sắp hết hạn" cho một hợp đồng đã
+            // đóng từ lâu. Bản nháp cũng loại: chưa ai ký thì chưa có hạn nào
+            // để nhắc.
+            "AND c.progress_status = '" + PROGRESS_SIGNED + "' " +
             "ORDER BY c.end_date ASC LIMIT ?";
         try (Connection conn = DBContext.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -1946,8 +1953,14 @@ public class ContractDAO {
                     return false;
                 }
 
+                // COALESCE, không phải CURDATE() thẳng: hợp đồng nhập từ file
+                // PDF đã mang sẵn ngày ký đọc từ bản giấy, và đó mới là ngày
+                // ký thật. Đóng dấu đè lên nó là mất hẳn thông tin trên giấy,
+                // thay bằng ngày người nhập liệu tình cờ bấm nút. Cột trống
+                // (hợp đồng soạn thẳng trên hệ thống) thì vẫn lấy hôm nay.
                 String sql = PROGRESS_SIGNED.equals(toStatus)
-                        ? "UPDATE contracts SET progress_status = ?, signing_date = CURDATE() "
+                        ? "UPDATE contracts SET progress_status = ?, "
+                          + "signing_date = COALESCE(signing_date, CURDATE()) "
                           + "WHERE contract_id = ? AND is_deleted = 0"
                         : "UPDATE contracts SET progress_status = ? WHERE contract_id = ? AND is_deleted = 0";
                 try (PreparedStatement ps = conn.prepareStatement(sql)) {

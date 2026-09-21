@@ -766,6 +766,20 @@ public class ContractController extends HttpServlet {
                         }
                     }
                 }
+                // BR-27: ba cột này UNIQUE trên enterprises. Kiểm ở ĐÂY, cùng
+                // lượt với các lỗi khác, thay vì để câu INSERT bên dưới vỡ rồi
+                // đoán hộ "có thể MST/email/SĐT đã tồn tại" -- người sửa file
+                // PDF cần biết đúng ô nào. Không loại trừ id nào vì đây là
+                // khách hoàn toàn mới (đã không khớp mã số thuế ở trên).
+                if (customerDAO.existsByTaxCode(buyerTax.trim(), null)) {
+                    errors.add("Mã số thuế \"" + buyerTax.trim() + "\" đã thuộc về một khách hàng khác trong hệ thống.");
+                }
+                if (!isBlank(buyerEmail) && customerDAO.existsByEmail(buyerEmail.trim(), null)) {
+                    errors.add("Email \"" + buyerEmail.trim() + "\" đã thuộc về một khách hàng khác.");
+                }
+                if (!isBlank(buyerPhone) && customerDAO.existsByPhone(buyerPhone.trim(), null)) {
+                    errors.add("Số điện thoại \"" + buyerPhone.trim() + "\" đã thuộc về một khách hàng khác.");
+                }
                 if (province != null && ward != null) {
                     newEnterprise = new Enterprise();
                     newEnterprise.setEnterpriseName(buyerName.trim());
@@ -827,13 +841,29 @@ public class ContractController extends HttpServlet {
                 newEnterprise.setEnterpriseCode(customerDAO.generateNextEnterpriseCode());
                 enterpriseId = customerDAO.insert(newEnterprise);
                 if (enterpriseId <= 0) {
-                    request.setAttribute("importErrors", List.of("Lưu khách hàng mới thất bại (có thể MST/email/SĐT đã tồn tại)."));
+                    request.setAttribute("importErrors", List.of("Lưu khách hàng mới thất bại."));
                     request.getRequestDispatcher(IMPORT_VIEW).forward(request, response);
                     return;
                 }
+                // VAI phải ghi ngay, cùng lẽ với CustomerController.handleCreate:
+                // khách không có dòng nào ở enterprise_roles sẽ không lọt vào
+                // danh sách nào cả (bộ lọc dùng EXISTS, và kind luôn là một
+                // trong hai vai) -- lưu được nhưng coi như biến mất. Hợp đồng
+                // nhập ở đây là hợp đồng BÁN, nên đối tác giữ vai "Khách mua"
+                // theo cặp chéo ở đầu lớp này.
+                customerDAO.replaceRolesOf(enterpriseId, List.of(ROLE_BUYER));
             }
 
             Contract contract = new Contract();
+            // CHIỀU phải đặt tường minh. Cột contracts.direction là NOT NULL
+            // DEFAULT 'Bán', nhưng DEFAULT chỉ áp dụng khi cột VẮNG MẶT khỏi
+            // câu INSERT -- ContractDAO.insert luôn bind nó thành tham số, nên
+            // để null là MySQL từ chối ("Column 'direction' cannot be null")
+            // và mọi lần nhập PDF đều thất bại với thông báo nói về mã hợp
+            // đồng, chẳng liên quan gì. Luôn là 'Bán' vì mẫu PDF chỉ có ba loại
+            // hợp đồng bán (xem validTypes ở trên); muốn nhập hợp đồng mua thì
+            // phải có mẫu riêng, và lúc đó chiều đọc từ mẫu.
+            contract.setDirection(DIRECTION_SELL);
             // Mã lấy từ chính file PDF. Thiếu thì BÁO LỖI chứ không sinh hộ:
             // từ V28 mã là số hợp đồng thật, hệ thống không có quyền bịa ra.
             contract.setContractCode(isBlank(contractCode) ? null : contractCode.trim());
