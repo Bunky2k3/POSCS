@@ -367,10 +367,6 @@
                      form. Controller đã bắt buộc scheme http/https trước khi lưu
                      (xem TextRules.isSafeHttpUrl) -- escape ở đây thôi không đủ,
                      vì nó không chặn được href="javascript:...". --%>
-                <%-- Nhãn theo đúng loại link: drivePreviewUrl chỉ khác rỗng khi
-                     link thật sự trỏ tới file Drive. Link nội bộ công ty cũng
-                     lưu được (isSafeHttpUrl chỉ đòi http/https), nên nói "trên
-                     Drive" cho mọi link là sai sự thật. --%>
                 <%-- Dùng ${primaryDocumentUrl} (ContractController đã kiểm lại scheme)
                      chứ KHÔNG dùng thẳng giá trị trong CSDL: fn:escapeXml không vô
                      hiệu hoá được "javascript:" trong href. Đây là giấy tờ loại
@@ -378,10 +374,10 @@
                 <c:if test="${not empty primaryDocumentUrl}">
                     <a href="${fn:escapeXml(primaryDocumentUrl)}" target="_blank" rel="noopener noreferrer"
                        class="btn-delete-detail" style="cursor:pointer; color:var(--primary); border-color:#e5e7eb;">
-                        <c:choose>
-                            <c:when test="${not empty drivePreviewUrl}"><i class="fa-brands fa-google-drive"></i> Mở PDF trên Drive</c:when>
-                            <c:otherwise><i class="fa-solid fa-up-right-from-square"></i> Mở file PDF</c:otherwise>
-                        </c:choose>
+                        <%-- Nhãn KHÔNG nhắc tên Drive: tài liệu lưu ở đâu là chuyện của
+                             người dán link (isSafeHttpUrl chỉ đòi http/https), nói "trên
+                             Drive" cho mọi link là sai sự thật. --%>
+                        <i class="fa-solid fa-up-right-from-square"></i> Mở bản PDF
                     </a>
                 </c:if>
                 <a href="${pageContext.request.contextPath}/contract?action=exportPdf&id=${contract.contractId}" class="btn-delete-detail" style="cursor:pointer; color:var(--primary); border-color:#e5e7eb;"><i class="fa-solid fa-file-pdf"></i> Xuất PDF</a>
@@ -1123,33 +1119,15 @@
             </c:if>
         </div>
 
-        <%-- Khung xem bản PDF, GỘP vào tab này thay vì đứng riêng một tab "Bản
-             PDF". Nó chỉ là một trong những tài liệu ở bảng ngay trên -- tách
-             ra thành tab riêng thì cùng một thứ xuất hiện hai chỗ, và người xem
-             phải đoán tab nào mới là chỗ đầy đủ.
+        <%-- KHÔNG nhúng khung xem PDF ở đây nữa (bỏ 2026-09-21). Khung 640px
+             nằm sẵn kéo trang dài ra dù phần lớn lúc không ai xem, mà nó lại chỉ
+             chạy được với link Drive -- tài liệu lưu nơi khác vẫn phải mở tab
+             mới, nên cùng một bảng có hai kiểu hành xử và người dùng không đoán
+             được cái nào xem được tại chỗ.
 
-             Chỉ nhúng bản "Hợp đồng đã ký" và chỉ khi link nhận ra được là file
-             Drive (controller dựng sẵn drivePreviewUrl). Link tới nơi khác vẫn
-             mở được bằng nút ở bảng trên -- nhúng chúng dễ ra khung trắng vì
-             site đó tự chặn. --%>
-        <c:if test="${not empty drivePreviewUrl}">
-            <div class="info-card card-box">
-                <div class="section-header">
-                    <h5>Xem nhanh bản hợp đồng đã ký</h5>
-                    <a href="${fn:escapeXml(primaryDocumentUrl)}" target="_blank" rel="noopener noreferrer"
-                       style="font-size:0.85rem; color:var(--primary); font-weight:600; text-decoration:none;">
-                        Mở trên Drive <i class="fa-solid fa-arrow-up-right-from-square"></i>
-                    </a>
-                </div>
-                <iframe src="${fn:escapeXml(drivePreviewUrl)}"
-                        style="width:100%; height:640px; border:1px solid #eef2f6; border-radius:12px;"
-                        allow="autoplay" title="Bản PDF hợp đồng"></iframe>
-                <p style="font-size:0.78rem; color:#9ca3af; margin:10px 0 0;">
-                    Không thấy nội dung? File trên Drive có thể đang giới hạn quyền xem --
-                    hãy mở bằng link ở trên để đăng nhập Google và kiểm tra quyền truy cập.
-                </p>
-            </div>
-        </c:if>
+             Giờ mọi dòng đều mở ở tab mới bằng nút "Mở". Đổi lại được trình xem
+             của chính nơi lưu file: phóng to, tải về, in -- những thứ khung nhúng
+             không cho. --%>
 
             </div>
             <div class="tab-pane fade" id="pane-nhat-ky" role="tabpanel">
