@@ -509,21 +509,50 @@
 
              ĐIỀU KIỆN c:if của NÚT và của KHỐI phải GIỐNG HỆT nhau -- lệch một cái là
              ra nút bấm vào không có gì, hoặc khối không có đường nào tới. Tab đầu
-             (Hàng hoá) KHÔNG có điều kiện, cố ý: luôn phải còn ít nhất một tab để
-             mở sẵn, không thì người dùng nhìn vào một dãy nút mà bên dưới trống trơn.
+             Thứ tự xếp theo VIỆC PHẢI LÀM, cùng mạch với trang xem: Bước tiến
+             trình (Ký / Thanh lý / Chấm dứt) đứng đầu vì đó là lý do chính người
+             ta mở trang này, rồi tới hai thứ có hạn là Kỳ thanh toán và Bàn giao.
+             Hàng hoá tụt xuống thứ tư: sau khi ký nó gần như không đổi nữa.
+
+             Tab đầu dãy CŨNG là tab mở sẵn -- thứ tự và mặc định phải nói cùng
+             một chuyện, chứ nhìn tab đầu mà nội dung lại là tab khác thì khó
+             hiểu. Bước tiến trình có thể không có (hợp đồng đã thanh lý), lúc
+             đó Kỳ thanh toán đỡ chỗ: nó luôn tồn tại, không thì người dùng nhìn
+             vào một dãy nút mà bên dưới trống trơn.
 
              POST xong (lập kỳ, bàn giao, nối hợp đồng...) controller chuyển hướng về
              đúng trang này, không mang tab theo được -- script cuối file nhớ tab cuối
              cùng bằng sessionStorage để quay lại đúng chỗ vừa làm. --%>
         <div class="tab-wrap">
+            <%-- coTienTrinh: tab "Bước tiến trình" chỉ có khi còn bước nào bấm
+                 được. Phải gom vào MỘT biến vì nó quyết định hai chỗ cách nhau
+                 cả nghìn dòng -- nút nào mang class active, và khung nào mang
+                 "show active". Tính lại ở chỗ thứ hai là có ngày hai chỗ lệch
+                 nhau, lúc đó cả dãy nút hiện mà bên dưới trống trơn. --%>
+            <c:set var="coTienTrinh" value="${canSign or canClose or canVoid}"/>
             <ul class="nav nav-tabs" id="contractTabs" role="tablist">
+                <c:if test="${coTienTrinh}">
                 <li class="nav-item" role="presentation">
-                    <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#pane-hang-hoa"
+                    <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#pane-tien-trinh"
+                            type="button" role="tab"><i class="fa-solid fa-diagram-project me-2"></i>Bước tiến trình</button>
+                </li>
+                </c:if>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link ${coTienTrinh ? '' : 'active'}" data-bs-toggle="tab" data-bs-target="#pane-ky-thu"
+                            type="button" role="tab"><i class="fa-solid fa-money-bill-wave me-2"></i>Kỳ thanh toán</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#pane-ban-giao"
+                            type="button" role="tab"><i class="fa-solid fa-share-from-square me-2"></i>Bàn giao</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#pane-hang-hoa"
                             type="button" role="tab"><i class="fa-solid fa-boxes-stacked me-2"></i>Hàng hoá</button>
                 </li>
                 <li class="nav-item" role="presentation">
-                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#pane-ky-thu"
-                            type="button" role="tab"><i class="fa-solid fa-money-bill-wave me-2"></i>Kỳ thanh toán</button>
+                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#pane-tai-lieu"
+                            type="button" role="tab"><i class="fa-solid fa-folder-open me-2"></i>Tài liệu<c:if
+                            test="${not empty contractDocuments}"> (${fn:length(contractDocuments)})</c:if></button>
                 </li>
                 <c:if test="${canAddAmendment or not empty amendments}">
                 <li class="nav-item" role="presentation">
@@ -531,21 +560,6 @@
                             type="button" role="tab"><i class="fa-solid fa-file-circle-plus me-2"></i>Phụ lục</button>
                 </li>
                 </c:if>
-                <c:if test="${canSign or canClose or canVoid}">
-                <li class="nav-item" role="presentation">
-                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#pane-tien-trinh"
-                            type="button" role="tab"><i class="fa-solid fa-diagram-project me-2"></i>Bước tiến trình</button>
-                </li>
-                </c:if>
-                <li class="nav-item" role="presentation">
-                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#pane-ban-giao"
-                            type="button" role="tab"><i class="fa-solid fa-share-from-square me-2"></i>Bàn giao</button>
-                </li>
-                <li class="nav-item" role="presentation">
-                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#pane-tai-lieu"
-                            type="button" role="tab"><i class="fa-solid fa-folder-open me-2"></i>Tài liệu<c:if
-                            test="${not empty contractDocuments}"> (${fn:length(contractDocuments)})</c:if></button>
-                </li>
                 <c:if test="${canLinkContracts}">
                 <li class="nav-item" role="presentation">
                     <button class="nav-link" data-bs-toggle="tab" data-bs-target="#pane-noi-hd"
@@ -554,7 +568,7 @@
                 </c:if>
             </ul>
             <div class="tab-content">
-            <div class="tab-pane fade show active" id="pane-hang-hoa" role="tabpanel">
+            <div class="tab-pane fade" id="pane-hang-hoa" role="tabpanel">
         <!-- ===== Hạng mục hàng hoá ===== -->
         <div class="card-box" id="hang-hoa">
             <div class="section-header"><h5>Hạng mục sản phẩm / dịch vụ</h5></div>
@@ -636,7 +650,7 @@
         </div>
 
             </div>
-            <div class="tab-pane fade" id="pane-ky-thu" role="tabpanel">
+            <div class="tab-pane fade ${coTienTrinh ? '' : 'show active'}" id="pane-ky-thu" role="tabpanel">
         <!-- ===== Kỳ thanh toán ===== -->
         <div class="card-box">
             <div class="section-header"><h5>Kỳ thanh toán</h5></div>
@@ -819,7 +833,7 @@
             </div>
             </c:if>
             <c:if test="${canSign or canClose or canVoid}">
-            <div class="tab-pane fade" id="pane-tien-trinh" role="tabpanel">
+            <div class="tab-pane fade ${coTienTrinh ? 'show active' : ''}" id="pane-tien-trinh" role="tabpanel">
         <!-- ===== Bước tiến trình ===== -->
         <div class="card-box">
             <div class="section-header"><h5>Bước tiến trình</h5></div>

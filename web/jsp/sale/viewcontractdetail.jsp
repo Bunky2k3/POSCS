@@ -493,36 +493,33 @@
              ĐIỀU KIỆN c:if của NÚT và của KHỐI phải giống hệt nhau. Tab đầu
              (Thông tin) không có điều kiện, cố ý: luôn phải còn một tab mở sẵn. --%>
         <div class="tab-wrap">
+            <%-- Thứ tự tab xếp theo VIỆC PHẢI LÀM, không theo cấu trúc hợp đồng.
+                 Kỳ thanh toán và Bàn giao đứng ngay sau Thông tin vì đó là hai
+                 thứ CÓ HẠN và có nút xác nhận -- cũng chính là hai câu hỏi mà
+                 danh sách hợp đồng đã phải dựng ô lọc riêng ("Đang bàn giao",
+                 "đang chờ ở phòng nào"). Hàng hoá là nội dung hợp đồng nhưng
+                 sau khi ký thì gần như không đổi nữa, nên là tra cứu.
+                 Nhật ký đứng cuối: chỉ mở khi cần đối chiếu lại việc đã xảy ra.
+
+                 Trang quản lý xếp cùng một mạch để quen tay chuyển được giữa
+                 hai trang.
+
+                 MỌI tab đều hiện, kể cả khi chưa có dữ liệu. Trước đây tab nào
+                 trống thì biến mất, nên người xem không biết hợp đồng CÓ chỗ
+                 để phụ lục / tài liệu / bàn giao -- họ chỉ thấy nó sau khi ai
+                 đó đã thao tác bên trang quản lý. Tab trống giờ nói thẳng
+                 "chưa có gì", và đó là thông tin chứ không phải chỗ thừa.
+
+                 Số đếm chỉ hiện khi khác 0: "(0)" đọc ra nặng hơn là không có
+                 số nào. --%>
             <ul class="nav nav-tabs" id="contractTabs" role="tablist">
                 <li class="nav-item" role="presentation">
                     <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#pane-thong-tin"
                             type="button" role="tab"><i class="fa-solid fa-circle-info me-2"></i>Thông tin</button>
                 </li>
                 <li class="nav-item" role="presentation">
-                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#pane-hang-hoa"
-                            type="button" role="tab"><i class="fa-solid fa-boxes-stacked me-2"></i>Hàng hoá</button>
-                </li>
-                <li class="nav-item" role="presentation">
                     <button class="nav-link" data-bs-toggle="tab" data-bs-target="#pane-ky-thu"
                             type="button" role="tab"><i class="fa-solid fa-money-bill-wave me-2"></i>Kỳ thanh toán</button>
-                </li>
-                <%-- MỌI tab đều hiện, kể cả khi chưa có dữ liệu. Trước đây tab nào
-                     trống thì biến mất, nên người xem không biết hợp đồng CÓ chỗ
-                     để phụ lục / tài liệu / bàn giao -- họ chỉ thấy nó sau khi ai
-                     đó đã thao tác bên trang quản lý. Tab trống giờ nói thẳng
-                     "chưa có gì", và đó là thông tin chứ không phải chỗ thừa.
-
-                     Số đếm chỉ hiện khi khác 0: "(0)" đọc ra nặng hơn là không có
-                     số nào. --%>
-                <li class="nav-item" role="presentation">
-                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#pane-phu-luc"
-                            type="button" role="tab"><i class="fa-solid fa-file-circle-plus me-2"></i>Phụ lục<c:if
-                            test="${not empty amendments}"> (${fn:length(amendments)})</c:if></button>
-                </li>
-                <li class="nav-item" role="presentation">
-                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#pane-tai-lieu"
-                            type="button" role="tab"><i class="fa-solid fa-folder-open me-2"></i>Tài liệu<c:if
-                            test="${not empty contractDocuments}"> (${fn:length(contractDocuments)})</c:if></button>
                 </li>
                 <li class="nav-item" role="presentation">
                     <button class="nav-link" data-bs-toggle="tab" data-bs-target="#pane-ban-giao"
@@ -530,13 +527,27 @@
                             test="${not empty handovers}"> (${fn:length(handovers)})</c:if></button>
                 </li>
                 <li class="nav-item" role="presentation">
-                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#pane-nhat-ky"
-                            type="button" role="tab"><i class="fa-solid fa-clock-rotate-left me-2"></i>Nhật ký</button>
+                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#pane-hang-hoa"
+                            type="button" role="tab"><i class="fa-solid fa-boxes-stacked me-2"></i>Hàng hoá</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#pane-tai-lieu"
+                            type="button" role="tab"><i class="fa-solid fa-folder-open me-2"></i>Tài liệu<c:if
+                            test="${not empty contractDocuments}"> (${fn:length(contractDocuments)})</c:if></button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#pane-phu-luc"
+                            type="button" role="tab"><i class="fa-solid fa-file-circle-plus me-2"></i>Phụ lục<c:if
+                            test="${not empty amendments}"> (${fn:length(amendments)})</c:if></button>
                 </li>
                 <li class="nav-item" role="presentation">
                     <button class="nav-link" data-bs-toggle="tab" data-bs-target="#pane-noi-hd"
                             type="button" role="tab"><i class="fa-solid fa-link me-2"></i>Nối bán – mua<c:if
                             test="${not empty contractLinks}"> (${fn:length(contractLinks)})</c:if></button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#pane-nhat-ky"
+                            type="button" role="tab"><i class="fa-solid fa-clock-rotate-left me-2"></i>Nhật ký</button>
                 </li>
             </ul>
             <div class="tab-content">
