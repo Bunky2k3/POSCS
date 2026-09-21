@@ -294,9 +294,8 @@
                      canManage" -- người chỉ View only vì vai trò (Kỹ thuật,
                      CSKH) thì vốn không dính gì tới cây tổ chức, hiện nút này
                      ra chỉ làm họ bối rối. --%>
-                <c:if test="${!canManage && sessionScope.currentUser.subordinate}">
-                    <a href="${pageContext.request.contextPath}/changerequest?action=new&resourceType=Khách hàng&intent=Tạo mới" class="btn-outline-action"><i class="fa-solid fa-paper-plane"></i> Gửi yêu cầu</a>
-                </c:if>
+                <%-- Nút "Gửi yêu cầu" đã ẩn cùng mục Yêu cầu thay đổi (21/09/2026)
+                     -- xem ghi chú ở sidebar.jsp. --%>
             </div>
         </div>
 

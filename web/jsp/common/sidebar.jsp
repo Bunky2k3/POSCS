@@ -6,11 +6,11 @@
     Trang gọi PHẢI set request attribute "activeNav" trước khi include, để
     tô sáng đúng mục đang đứng, vd:
         <c:set var="activeNav" value="customer" scope="request"/>
-    Giá trị hợp lệ: dashboard | customer | contract | product | ticket | employee
-    | changerequest.
+    Giá trị hợp lệ: dashboard | customer | contract | product | ticket | employee.
     Không set thì không mục nào được tô sáng (không lỗi, chỉ mất highlight).
-    'systemLog' không còn trong danh sách: mục đó đã bỏ khỏi menu (xem cuối file).
-    systemLog.jsp vẫn set giá trị đó -- vô hại, chỉ là không mục nào sáng.
+    'systemLog' và 'changerequest' không còn trong danh sách: hai mục đó đã bỏ
+    khỏi menu. Trang của chúng vẫn set giá trị đó -- vô hại, chỉ là không mục
+    nào sáng.
 
     Riêng "contract" có ba mục con; trang set thêm
         <c:set var="activeContractKind" value="${kind}" scope="request"/>
@@ -18,9 +18,9 @@
     -- nên trang chi tiết/sửa hợp đồng PHẢI set theo chiều của chính hợp đồng
     đang mở, không thì mở hợp đồng mua vẫn thấy sáng "Hợp đồng bán".
 
-    Nhóm "Khách hàng" có BA mục: hai mục đầu là cùng trang /customer khác tham
-    số kind, mục thứ ba là /changerequest (activeNav riêng, không dính gì tới
-    activeCustomerKind). Riêng "customer" có hai mục con; trang cần set thêm
+    Nhóm "Khách hàng" có HAI mục: cùng trang /customer khác tham số kind. Mục
+    thứ ba (/changerequest) đã ẩn 21/09/2026 -- xem ghi chú ngay chỗ nó. Trang
+    cần set thêm
         <c:set var="activeCustomerKind" value="${kind}" scope="request"/>
     với giá trị buyer | supplier. Thiếu thì mặc định sáng mục "Khách hàng mua"
     -- đúng với việc CustomerController cũng coi kind thiếu là khách mua.
@@ -34,17 +34,17 @@
     <div class="sidebar-sub">
         <a href="${pageContext.request.contextPath}/customer?kind=buyer" class="sidebar-link ${activeNav == 'customer' and activeCustomerKind != 'supplier' ? 'active' : ''}"><i class="fa-solid fa-cart-shopping"></i><span>Khách hàng mua</span></a>
         <a href="${pageContext.request.contextPath}/customer?kind=supplier" class="sidebar-link ${activeNav == 'customer' and activeCustomerKind == 'supplier' ? 'active' : ''}"><i class="fa-solid fa-truck-field"></i><span>Nhà cung cấp</span></a>
-        <%-- Yêu cầu thay đổi nằm trong nhóm này theo yêu cầu người dùng
-             (18/09/2026). Lưu ý khi đọc: trang đó KHÔNG chỉ về khách hàng --
-             một yêu cầu chọn được "Khách hàng" hoặc "Hợp đồng"
-             (addChangeRequest.jsp), nên nó đứng ở đây là theo thói quen dùng
-             chứ không phải vì phạm vi dữ liệu.
+        <%-- MỤC "YÊU CẦU THAY ĐỔI" ĐÃ ẨN (21/09/2026, theo yêu cầu người dùng).
+             ẨN chứ không XOÁ: /changerequest, ChangeRequestController, DAO,
+             model, ba JSP và bảng change_requests đều còn nguyên và vẫn chạy
+             nếu gõ thẳng URL. Bật lại là trả dòng <a> này về.
 
-             Vẫn hiện cho MỌI vai, vì cùng một trang phục vụ hai phía -- cấp dưới
-             theo dõi yêu cầu mình gửi, cấp trên duyệt yêu cầu của cấp dưới.
-             Người chưa xếp vào cây tổ chức mở ra thấy danh sách rỗng, đúng chứ
-             không phải lỗi. --%>
-        <a href="${pageContext.request.contextPath}/changerequest" class="sidebar-link ${activeNav == 'changerequest' ? 'active' : ''}"><i class="fa-solid fa-inbox"></i><span>Yêu cầu thay đổi</span></a>
+             Cố ý không chặn URL: người dùng chọn mức "chỉ ẩn khỏi giao diện".
+             Muốn chặn hẳn thì phải thêm luật ở tầng quyền, không phải ở đây.
+
+             Bối cảnh khi nào cần dùng lại: change_requests đang mâu thuẫn với
+             luật vòng đời hợp đồng mới (đã ký thì sửa phải qua phụ lục), và
+             hướng gỡ từng bàn là đổi nghĩa nó thành "đề nghị lập phụ lục". --%>
     </div>
     <%-- Hợp đồng tách hai mục con theo chiều (xem ghi chú đầu V21). Cặp đôi
          với vai khách hàng bị CHÉO: hợp đồng BÁN ký với "Khách hàng mua". --%>
