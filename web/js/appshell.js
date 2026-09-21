@@ -60,3 +60,123 @@
     // để sidebar không kẹt ở dạng overlay khi đã quay về bố cục desktop.
     MOBILE_QUERY.addEventListener('change', closeDrawer);
 })();
+
+
+/* ===================================================================
+   Ô lọc dạng bảng chọn (popover): tích nhiều tỉnh, và chọn kỳ
+   ===================================================================
+   Dùng chung ở Dashboard, danh sách hợp đồng, danh sách khách hàng. Trước đây
+   chỉ Dashboard có và mã nằm trong <script> của chính nó; khi màn hình thứ hai
+   cần đến thì chép sang là bắt đầu có hai bản sẽ lệch nhau.
+
+   Đánh dấu bằng data-* chứ không bằng id: một trang có thể có nhiều ô, và id
+   cứng thì trang thứ hai phải đặt trùng tên mới chạy. */
+(function () {
+    'use strict';
+
+    /* Mở/đóng một bảng. Bấm TRONG bảng thì không đóng -- tích một ô mà bảng tự
+       đóng thì không tích được ô thứ hai. */
+    function wirePopover(root) {
+        var toggle = root.querySelector('[data-popover-toggle]');
+        var panel = root.querySelector('[data-popover-panel]');
+        if (!toggle || !panel) { return null; }
+
+        function setOpen(open) {
+            panel.classList.toggle('open', open);
+            toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+            if (open && typeof root._onOpen === 'function') { root._onOpen(); }
+        }
+        toggle.addEventListener('click', function (e) {
+            e.stopPropagation();
+            setOpen(!panel.classList.contains('open'));
+        });
+        panel.addEventListener('click', function (e) { e.stopPropagation(); });
+        document.addEventListener('click', function () { setOpen(false); });
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') { setOpen(false); }
+        });
+        return panel;
+    }
+
+    /* Bảng tích tỉnh. KHÔNG tự gửi form sau mỗi lần tích: chọn ba tỉnh là ba
+       lần tải trang, hai lần đầu ra kết quả chẳng ai cần. Có nút "Áp dụng". */
+    document.querySelectorAll('[data-prov-pop]').forEach(function (root) {
+        var panel = wirePopover(root);
+        if (!panel) { return; }
+        var boxes = panel.querySelectorAll('input[name="provinceId"]');
+        function each(fn) { boxes.forEach(fn); }
+
+        var all = panel.querySelector('[data-prov-all]');
+        var none = panel.querySelector('[data-prov-none]');
+        var mine = panel.querySelector('[data-prov-mine]');
+        if (all) { all.addEventListener('click', function () { each(function (b) { b.checked = true; }); }); }
+        if (none) { none.addEventListener('click', function () { each(function (b) { b.checked = false; }); }); }
+        if (mine) {
+            mine.addEventListener('click', function () {
+                each(function (b) { b.checked = b.dataset.mine === 'true'; });
+            });
+        }
+    });
+
+    /* Bảng chọn kỳ: năm + quý + tháng trong MỘT ô.
+       Hai ô rời (năm, quý/tháng) có một cái bẫy im lặng: chọn "Quý 3" mà quên
+       chọn năm thì Period.parse trả null, tức KHÔNG lọc gì, trong khi ô vẫn
+       hiện "Quý 3". Ở đây năm luôn đi kèm nên mỗi lựa chọn là một kỳ hoàn
+       chỉnh. */
+    document.querySelectorAll('[data-period-pop]').forEach(function (root) {
+        var panel = wirePopover(root);
+        if (!panel) { return; }
+
+        var years = (panel.dataset.years || '').split(',').filter(Boolean).map(Number)
+                        .sort(function (a, b) { return a - b; });
+        if (!years.length) { return; }
+        var selYear = panel.dataset.selectedYear ? Number(panel.dataset.selectedYear) : null;
+        var selPeriod = panel.dataset.selectedPeriod || '';
+        var viewYear = selYear || years[years.length - 1];
+
+        var label = panel.querySelector('[data-period-year]');
+        var prev = panel.querySelector('[data-period-prev]');
+        var next = panel.querySelector('[data-period-next]');
+        var form = root.closest('form');
+        var yearInput = form && form.querySelector('[data-period-year-input]');
+        var periodInput = form && form.querySelector('[data-period-value-input]');
+
+        function render() {
+            label.textContent = 'Năm ' + viewYear;
+            prev.disabled = viewYear <= years[0];
+            next.disabled = viewYear >= years[years.length - 1];
+            /* Tô đậm CHỈ khi đang xem đúng năm đã chọn -- nếu không, bấm mũi
+               tên sang năm khác vẫn thấy "Q3" sáng và tưởng đang xem quý 3 của
+               năm đó. */
+            panel.querySelectorAll('[data-pick]').forEach(function (b) {
+                var pick = b.dataset.pick;
+                var on;
+                if (pick === 'any') { on = selYear === null; }
+                else if (pick === 'year') { on = selYear === viewYear && selPeriod === ''; }
+                else { on = selYear === viewYear && selPeriod === pick; }
+                b.classList.toggle('sel', on);
+            });
+        }
+        root._onOpen = render;
+
+        prev.addEventListener('click', function () {
+            if (viewYear > years[0]) { viewYear--; render(); }
+        });
+        next.addEventListener('click', function () {
+            if (viewYear < years[years.length - 1]) { viewYear++; render(); }
+        });
+
+        /* Mỗi lựa chọn ghi thẳng vào hai ô ẩn rồi gửi form -- không giữ trạng
+           thái riêng ở tầng JS, nên nạp lại trang thì thứ hiện ra luôn là thứ
+           máy chủ đang thật sự lọc. */
+        panel.querySelectorAll('[data-pick]').forEach(function (b) {
+            b.addEventListener('click', function () {
+                if (!form || !yearInput || !periodInput) { return; }
+                var pick = b.dataset.pick;
+                yearInput.value = pick === 'any' ? '' : viewYear;
+                periodInput.value = (pick === 'any' || pick === 'year') ? '' : pick;
+                form.submit();
+            });
+        });
+    });
+})();
