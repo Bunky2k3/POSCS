@@ -764,6 +764,98 @@ public class ContractControllerTest {
     }
 
     // ------------------------------------------------------------------
+    // Hàng đợi bàn giao: hai trục lọc
+    // ------------------------------------------------------------------
+
+    private ContractHandover chang(int handoverId, int departmentId, String departmentName) {
+        ContractHandover h = new ContractHandover();
+        h.setHandoverId(handoverId);
+        h.setDepartmentId(departmentId);
+        h.setDepartmentName(departmentName);
+        return h;
+    }
+
+    /** Kế toán 1 chặng, Dự án 2 chặng -- đủ để phân biệt lọc đúng phòng hay không. */
+    private void hangDoiCoSanHaiPhong() {
+        when(contractDAO.findPendingHandovers(any())).thenReturn(List.of(
+                chang(1, 5, "Kế toán"),
+                chang(2, 6, "Dự án"),
+                chang(3, 6, "Dự án")));
+        when(request.getParameter("action")).thenReturn("handovers");
+        when(request.getRequestDispatcher(anyString())).thenReturn(mock(RequestDispatcher.class));
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<ContractHandover> hangDaHienThi() {
+        ArgumentCaptor<Object> rows = ArgumentCaptor.forClass(Object.class);
+        verify(request).setAttribute(eq("pendingHandovers"), rows.capture());
+        return (List<ContractHandover>) rows.getValue();
+    }
+
+    /**
+     * Mặc định là TOÀN CHI NHÁNH, KHÔNG phải "của tôi" như hai màn danh sách.
+     *
+     * <p>Ca này canh một quyết định dễ bị "dọn" cho đồng bộ rồi hỏng lặng lẽ:
+     * người phòng Kế toán/Dự án -- một trong hai người đọc chính của trang --
+     * không đứng tên hợp đồng nào, nên mặc định "của tôi" với họ là màn hình
+     * trống, và họ không có cách nào đoán ra vì sao.
+     */
+    @Test
+    public void hangDoiBanGiao_macDinhLaToanChiNhanh() throws Exception {
+        hangDoiCoSanHaiPhong();
+        dangNhapVoiPhongBan(5, "Sales"); // Sales: ở hai màn danh sách sẽ mặc định "của tôi"
+
+        controller.doGet(request, response);
+
+        // null = không thu hẹp theo người. Quan trọng hơn: KHÔNG hỏi cây tổ chức.
+        verify(contractDAO).findPendingHandovers(null);
+        verify(employeeDAO, never()).findTeamUserIds(anyInt());
+        assertEquals(3, hangDaHienThi().size());
+    }
+
+    @Test
+    public void hangDoiBanGiao_chonCuaToi_thuHepTheoNguoiVaCapDuoi() throws Exception {
+        hangDoiCoSanHaiPhong();
+        dangNhapVoiPhongBan(5, "Sales");
+        when(request.getParameter("view")).thenReturn("mine");
+        when(employeeDAO.findTeamUserIds(77)).thenReturn(List.of(77, 88));
+
+        controller.doGet(request, response);
+
+        verify(contractDAO).findPendingHandovers(List.of(77, 88));
+    }
+
+    /**
+     * Lọc phòng cắt bảng nhưng KHÔNG cắt dải đếm.
+     *
+     * <p>Dải đếm kiêm luôn cái công tắc chuyển phòng, nên nó phải giữ đủ mọi
+     * phòng: lọc luôn cả nó thì chọn Kế toán xong là mất số của Dự án, không
+     * còn đường bấm sang.
+     */
+    @Test
+    public void hangDoiBanGiao_locPhong_catBangNhungGiuNguyenDaiDem() throws Exception {
+        hangDoiCoSanHaiPhong();
+        dangNhapVoiPhongBan(5, "Kỹ thuật");
+        when(request.getParameter("departmentId")).thenReturn("6");
+
+        controller.doGet(request, response);
+
+        List<ContractHandover> rows = hangDaHienThi();
+        assertEquals("chỉ còn chặng của phòng Dự án", 2, rows.size());
+        for (ContractHandover h : rows) {
+            assertEquals(6, h.getDepartmentId());
+        }
+
+        ArgumentCaptor<Object> strip = ArgumentCaptor.forClass(Object.class);
+        verify(request).setAttribute(eq("handoverCountByDepartment"), strip.capture());
+        java.util.Map<?, ?> byDept = (java.util.Map<?, ?>) strip.getValue();
+        assertEquals("dải đếm phải còn đủ hai phòng để bấm sang", 2, byDept.size());
+        assertEquals(1, byDept.get("Kế toán"));
+        assertEquals(2, byDept.get("Dự án"));
+        verify(request).setAttribute("scopeTotal", 3);
+    }
+
+    // ------------------------------------------------------------------
     // Bàn giao phòng ban
     // ------------------------------------------------------------------
 

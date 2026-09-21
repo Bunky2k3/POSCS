@@ -1717,23 +1717,60 @@ public class ContractController extends HttpServlet {
      * <p>KHÔNG đi qua requireFullAccess(CONTRACT): người phòng Kế toán/Dự án
      * phải vào được. Ai cũng xem được hàng đợi -- nó chỉ cho biết hợp đồng đang
      * nằm đâu, còn nút bấm thì lọc theo phòng của từng người.
+     *
+     * <p>Hai trục lọc, đúng bằng hai người đọc ở trên: <b>phòng</b> cho phòng
+     * nhận, <b>phạm vi</b> cho giám đốc và Sales.
      */
     private void showHandoverQueue(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
-        List<ContractHandover> pending = contractDAO.findPendingHandovers(null);
-        request.setAttribute("pendingHandovers", pending);
+        // ===== Phạm vi: mặc định TOÀN CHI NHÁNH =====
+        //
+        // Khác hẳn hai màn danh sách, nơi Sales mở ra là thấy "của tôi". Ở đây
+        // mặc định đó sẽ hỏng: người phòng Kế toán/Dự án -- một trong hai người
+        // đọc chính của trang -- KHÔNG đứng tên hợp đồng nào cả, nên "của tôi"
+        // với họ là màn hình trống. Hàng đợi là việc chung; ai muốn thu hẹp về
+        // phần mình thì tự chọn.
+        User me = AccessControl.currentUser(request);
+        boolean mine = AccessControl.VIEW_MINE.equals(request.getParameter("view")) && me != null;
+        List<Integer> ownerIds = mine ? employeeDAO.findTeamUserIds(me.getUserId()) : null;
+        request.setAttribute("viewFilter", mine ? AccessControl.VIEW_MINE : AccessControl.VIEW_ALL);
 
-        // Đếm theo phòng để có dải tổng quan: "Kế toán đang giữ 4, Dự án 7".
+        List<ContractHandover> inScope = contractDAO.findPendingHandovers(ownerIds);
+
+        // Dải tổng quan đếm trên tập ĐÃ áp phạm vi nhưng CHƯA áp bộ lọc phòng.
+        // Đó là điều kiện để nó làm được việc thứ hai của nó -- cái công tắc
+        // chuyển phòng: lọc luôn cả nó thì chọn Kế toán xong là mất số của Dự
+        // án, không còn đường bấm sang.
+        //
+        // Cũng vì thế mà lọc phòng làm ở Java chứ không thêm điều kiện vào SQL:
+        // dải đếm cần đúng tập chưa lọc phòng, nên hỏi CSDL lần nữa chỉ để lấy
+        // lại thứ đang cầm trên tay. Hàng đợi là việc đang tồn, không phải cả
+        // lịch sử, nên tập này nhỏ.
         Map<String, Integer> byDepartment = new java.util.LinkedHashMap<>();
         long slowest = 0;
-        for (ContractHandover h : pending) {
+        for (ContractHandover h : inScope) {
             byDepartment.merge(h.getDepartmentName(), 1, Integer::sum);
             slowest = Math.max(slowest, h.getDaysWaiting());
-            request.setAttribute("canCompleteHandover_" + h.getHandoverId(),
-                    AccessControl.canCompleteHandover(request, h.getDepartmentId()));
         }
         request.setAttribute("handoverCountByDepartment", byDepartment);
         request.setAttribute("slowestHandoverDays", slowest);
+        request.setAttribute("scopeTotal", inScope.size());
+        // JSP cần cả id (để dựng link lọc) lẫn tên (để tra số đếm ở map trên).
+        request.setAttribute("departmentList", employeeDAO.findAllDepartments());
+
+        // ===== Bộ lọc phòng =====
+        Integer departmentFilter = parseIntOrNull(request.getParameter("departmentId"));
+        List<ContractHandover> rows = new ArrayList<>();
+        for (ContractHandover h : inScope) {
+            if (departmentFilter != null && departmentFilter != h.getDepartmentId()) {
+                continue;
+            }
+            rows.add(h);
+            request.setAttribute("canCompleteHandover_" + h.getHandoverId(),
+                    AccessControl.canCompleteHandover(request, h.getDepartmentId()));
+        }
+        request.setAttribute("pendingHandovers", rows);
+        request.setAttribute("departmentFilter", departmentFilter);
         request.getRequestDispatcher(HANDOVER_VIEW).forward(request, response);
     }
 
@@ -1820,7 +1857,11 @@ public class ContractController extends HttpServlet {
         String returnTo = request.getParameter("returnTo");
         String back;
         if ("from-queue".equals(returnTo)) {
-            back = "/contract?action=handovers";
+            // Mang theo bộ lọc đang bật. Không có nó thì người của Kế toán lọc
+            // ra việc phòng mình, xác nhận một chặng, rồi bị đẩy về danh sách
+            // của cả chi nhánh và phải lọc lại từ đầu cho từng dòng -- đúng
+            // cái phiền mà bộ lọc sinh ra để bỏ.
+            back = "/contract?action=handovers" + handoverQueueFilterQuery(request);
         } else if ("from-view".equals(returnTo)) {
             back = "/contract?action=view&id=" + contractId;
         } else {
@@ -1831,6 +1872,27 @@ public class ContractController extends HttpServlet {
             return;
         }
         response.sendRedirect(request.getContextPath() + back);
+    }
+
+    /**
+     * Phần query giữ lại bộ lọc của hàng đợi bàn giao khi quay về sau khi xác
+     * nhận xong một chặng.
+     *
+     * <p>Dựng lại từ giá trị ĐÃ KIỂM chứ không nối thẳng tham số vào chuỗi:
+     * chuỗi này đi vào {@code sendRedirect}, tức là vào header Location. Chép
+     * nguyên xi thứ người dùng gửi lên là mở đường nhét ký tự xuống dòng vào
+     * header. Phạm vi chỉ nhận đúng một chữ, phòng ban phải đọc ra được số.
+     */
+    private String handoverQueueFilterQuery(HttpServletRequest request) {
+        StringBuilder query = new StringBuilder();
+        if (AccessControl.VIEW_MINE.equals(request.getParameter("view"))) {
+            query.append("&view=").append(AccessControl.VIEW_MINE);
+        }
+        Integer departmentId = parseIntOrNull(request.getParameter("queueDepartmentId"));
+        if (departmentId != null) {
+            query.append("&departmentId=").append(departmentId);
+        }
+        return query.toString();
     }
 
     // ------------------------------------------------------------------
