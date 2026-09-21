@@ -125,9 +125,6 @@ public class ContractController extends HttpServlet {
     /** Số dòng sản phẩm tối đa trong hopdong_import_template.pdf (field product1..product15). */
     private static final int IMPORT_MAX_PRODUCT_ROWS = 15;
 
-    /** Bắt id file trong link Drive dạng .../file/d/<id>/... -- xem drivePreviewUrl(). */
-    private static final java.util.regex.Pattern DRIVE_FILE_ID =
-            java.util.regex.Pattern.compile("drive\\.google\\.com/file/d/([A-Za-z0-9_-]+)");
 
     private final ContractDAO contractDAO = new ContractDAO();
     private final CustomerDAO customerDAO = new CustomerDAO();
@@ -1620,14 +1617,19 @@ public class ContractController extends HttpServlet {
         List<ContractDocument> documents = contractDAO.findDocumentsOf(id);
         request.setAttribute("contractDocuments", documents);
         request.setAttribute("documentTypes", ContractDocument.TYPES);
-        // Bản PDF của CHÍNH hợp đồng -- cái duy nhất được nhúng khung xem.
+        // Bản PDF của CHÍNH hợp đồng, để dựng nút "Mở bản PDF" ở đầu trang.
         // Kiểm scheme LẠI ở đây chứ không tin lúc ghi: dữ liệu vào bảng này còn
         // qua migration V34 và các câu seed, không chỉ qua form.
+        //
+        // KHÔNG còn dựng link /preview để nhúng iframe (bỏ 2026-09-21): khung
+        // nhúng kéo trang dài ra dù phần lớn lúc không ai xem, mà nó lại chỉ
+        // chạy được với link Drive -- tài liệu ở nơi khác vẫn phải mở tab mới.
+        // Giờ MỌI tài liệu hành xử như nhau: mở ở tab mới, dùng trình xem của
+        // chính nơi lưu file (phóng to, tải về, in -- khung 640px không có).
         for (ContractDocument d : documents) {
             if (ContractDocument.TYPE_SIGNED_CONTRACT.equals(d.getDocType())
                     && TextRules.isSafeHttpUrl(d.getFileUrl())) {
                 request.setAttribute("primaryDocumentUrl", d.getFileUrl());
-                request.setAttribute("drivePreviewUrl", drivePreviewUrl(d.getFileUrl()));
                 break;
             }
         }
@@ -2092,24 +2094,6 @@ public class ContractController extends HttpServlet {
         // "người phụ trách".
         request.setAttribute("userList", employeeDAO.findActiveByRole(SALES_ROLE, keepUserId));
     }
-
-    /**
-     * Đổi link Drive dạng {@code .../file/d/<id>/view} sang {@code /preview} --
-     * bản duy nhất Google cho phép nhúng vào iframe. Trả null nếu không nhận ra
-     * là link file Drive.
-     *
-     * Cố ý chỉ nhúng link Drive: mọi site khác đều có thể tự chặn bị nhúng bằng
-     * X-Frame-Options, và một khung trắng không lời giải thích thì tệ hơn hẳn
-     * một cái link bấm được. Link lạ vẫn hiện nút "Mở PDF" như thường.
-     */
-    private String drivePreviewUrl(String url) {
-        if (url == null) {
-            return null;
-        }
-        java.util.regex.Matcher m = DRIVE_FILE_ID.matcher(url);
-        return m.find() ? "https://drive.google.com/file/d/" + m.group(1) + "/preview" : null;
-    }
-
 
     /**
      * Danh sách hợp đồng của 1 khách hàng, trả về JSON cho dropdown "Hợp đồng

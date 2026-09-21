@@ -138,13 +138,15 @@ public class ContractControllerTest {
     }
 
     /**
-     * Mở trang chi tiết của 1 hợp đồng có giấy tờ "Hợp đồng đã ký", trả về giá
-     * trị drivePreviewUrl đã dựng.
+     * Link bản PDF của hợp đồng đi thẳng ra màn hình, KHÔNG qua bước đổi sang
+     * link /preview nữa.
      *
-     * <p>Từ V34 link không còn là một cột của hợp đồng mà là một dòng trong
-     * contract_documents -- khung xem nhúng lấy đúng dòng loại "Hợp đồng đã ký".
+     * <p>Ba ca cũ quanh drivePreviewUrl (đổi /view sang /preview, link không
+     * phải Drive, không có link) đã xoá cùng khung nhúng 2026-09-21 -- không
+     * còn iframe thì không còn gì để đổi link cho.
      */
-    private Object drivePreviewAttributeFor(String documentUrl) throws Exception {
+    @Test
+    public void view_primaryDocumentUrl_dayThangRaManHinh() throws Exception {
         when(request.getParameter("action")).thenReturn("view");
         when(request.getParameter("id")).thenReturn("5");
         Contract contract = new Contract();
@@ -153,37 +155,17 @@ public class ContractControllerTest {
         doc.setDocumentId(1);
         doc.setContractId(5);
         doc.setDocType(ContractDocument.TYPE_SIGNED_CONTRACT);
-        doc.setFileUrl(documentUrl);
+        doc.setFileUrl("https://drive.google.com/file/d/1AbC_de-F/view?usp=sharing");
         when(contractDAO.findDocumentsOf(5)).thenReturn(List.of(doc));
         when(contractDAO.findById(5)).thenReturn(contract);
-        RequestDispatcher dispatcher = mock(RequestDispatcher.class);
-        when(request.getRequestDispatcher("/jsp/sale/viewcontractdetail.jsp")).thenReturn(dispatcher);
+        when(request.getRequestDispatcher("/jsp/sale/viewcontractdetail.jsp"))
+                .thenReturn(mock(RequestDispatcher.class));
 
         controller.doGet(request, response);
 
-        ArgumentCaptor<Object> captor = ArgumentCaptor.forClass(Object.class);
-        verify(request).setAttribute(eq("drivePreviewUrl"), captor.capture());
-        return captor.getValue();
-    }
-
-    @Test
-    public void view_driveLink_isConvertedToEmbeddablePreviewUrl() throws Exception {
-        // Link Drive người dùng copy ra luôn ở dạng /view; chỉ bản /preview mới
-        // nhúng được vào iframe.
-        assertEquals("https://drive.google.com/file/d/1AbC_de-F/preview",
-                drivePreviewAttributeFor("https://drive.google.com/file/d/1AbC_de-F/view?usp=sharing"));
-    }
-
-    @Test
-    public void view_nonDriveLink_producesNoPreviewUrl() throws Exception {
-        // Site khác thường tự chặn bị nhúng (X-Frame-Options) -- khung trắng
-        // khó hiểu hơn hẳn một cái link, nên không nhúng.
-        assertNull(drivePreviewAttributeFor("https://noi-bo.congty.vn/hop-dong.pdf"));
-    }
-
-    @Test
-    public void view_noAttachment_producesNoPreviewUrl() throws Exception {
-        assertNull(drivePreviewAttributeFor(null));
+        verify(request).setAttribute("primaryDocumentUrl",
+                "https://drive.google.com/file/d/1AbC_de-F/view?usp=sharing");
+        verify(request, never()).setAttribute(eq("drivePreviewUrl"), any());
     }
 
     @Test
