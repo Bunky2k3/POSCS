@@ -269,11 +269,10 @@
                     <a href="${pageContext.request.contextPath}/contract?action=importForm" class="btn-outline-action"><i class="fa-solid fa-file-pdf"></i> Nhập PDF</a>
                     <a href="${pageContext.request.contextPath}/contract?action=new&kind=${kind}" class="btn-add"><i class="fa-solid fa-plus"></i> Tạo hợp đồng</a>
                 </c:if>
-                <%-- Cùng lý do với màn Khách hàng: cấp dưới mất nút tạo/sửa
-                     nhưng phải có đường gửi yêu cầu lên cấp trên. --%>
-                <c:if test="${!canManage && sessionScope.currentUser.subordinate}">
-                    <a href="${pageContext.request.contextPath}/changerequest?action=new&resourceType=Hợp đồng&intent=Tạo mới" class="btn-outline-action"><i class="fa-solid fa-paper-plane"></i> Gửi yêu cầu</a>
-                </c:if>
+                <%-- Nút "Gửi yêu cầu" đã ẩn cùng mục Yêu cầu thay đổi (21/09/2026)
+                     -- xem ghi chú ở sidebar.jsp. Hệ quả phải biết: cấp dưới giờ
+                     KHÔNG còn đường nào trong giao diện để xin tạo/sửa hợp đồng;
+                     họ phải nhờ cấp trên trực tiếp. --%>
             </div>
         </div>
 
