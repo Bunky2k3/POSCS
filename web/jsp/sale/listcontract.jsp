@@ -9,7 +9,7 @@
       - statusSummary : Map<String,Integer> đếm số hợp đồng theo từng trạng thái, phục vụ dải KPI
       - provinceList  : List<poscs.model.Province> (18 tỉnh địa bàn chi nhánh, để đổ dropdown lọc "Tỉnh/Thành")
       - currentPage, totalPages, totalCount : thông tin phân trang
-      - keyword, statusFilter, typeFilter, provinceFilter : giá trị filter hiện tại (để giữ lại lúc submit lại form)
+      - keyword, statusFilter, typeFilter, provinceFilters : giá trị filter hiện tại (để giữ lại lúc submit lại form)
 --%>
 <!DOCTYPE html>
 <html lang="vi">
@@ -116,9 +116,29 @@
         /* min-width 180px x nhiều ô là tràn hàng ngay ở màn hình 1366px --
            thu về 150px và cho phép co lại thì cả thanh lọc nằm gọn một hàng. */
         .filter-bar select { padding: 9px 10px; border-radius: 10px; border: 1px solid #e5e7eb; background: #f9fafb; font-size: 0.84rem; flex: 0 1 auto; min-width: 124px; max-width: 148px; }
-        #filterYear { min-width: 104px; max-width: 118px; }
-        #filterPeriod { min-width: 110px; max-width: 124px; }
         .filter-bar select:focus { outline: none; border-color: var(--primary-light); }
+        /* Nút mở bảng chọn (tỉnh, kỳ). Khung và bảng bên trong nằm ở
+           appshell.css để Dashboard và hai danh sách dùng chung; ở đây chỉ sơn
+           cho khớp với các ô select đứng cạnh -- Dashboard sơn nền trắng có đổ
+           bóng, thanh lọc này nền xám nhạt, dùng chung một màu thì một trong
+           hai chỗ lạc lõng. */
+        .filter-bar .pop-btn {
+            padding: 9px 10px; border-radius: 10px; border: 1px solid #e5e7eb;
+            background: #f9fafb; font-size: 0.84rem; color: #374151;
+            flex: 0 1 auto; min-width: 150px; max-width: 210px;
+        }
+        .filter-bar .pop-btn:focus { outline: none; border-color: var(--primary-light); }
+        /* Neo bảng về mép TRÁI, ngược với Dashboard. Mặc định ở appshell.css là
+           neo phải vì ở Dashboard hai ô này đứng sát mép phải thanh lọc; trong
+           khối "Lọc thêm" chúng đứng bên trái, neo phải thì bảng rộng 320px
+           thò hẳn ra ngoài mép trái màn hình. */
+        .filter-advanced .prov-panel,
+        .filter-advanced .period-panel { left: 0; right: auto; }
+        .filter-bar .pop-btn > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        /* Dải phạm vi chuyển vào TRONG thẻ lọc: nó nói cùng một chuyện với các
+           ô ngay trên nó ("đang xem phần nào"), mà trước đây đứng tách hẳn ở
+           trên còn ô đổi phạm vi thì nằm dưới -- hai nửa của một câu ở hai chỗ. */
+        .filter-bar .scope-note { flex: 1 1 100%; margin-bottom: 0; }
 
         /* ===== Table ===== */
         .table-card { overflow: hidden; }
@@ -263,7 +283,7 @@
                 <%-- Xuất Excel là thao tác ĐỌC: chỉ lấy đúng dữ liệu vai trò này vốn đã
                      xem được trên màn hình, đổi sang dạng file. Nên KHÔNG khoá theo
                      canManage -- xem PERMISSIONS.md. --%>
-                <a href="${pageContext.request.contextPath}/contract?action=exportExcel&kind=${kind}&keyword=${fn:escapeXml(keyword)}&status=${fn:escapeXml(statusFilter)}&progress=${fn:escapeXml(progressFilter)}&scope=${fn:escapeXml(scopeFilter)}&type=${fn:escapeXml(typeFilter)}&provinceId=${provinceFilter}&year=${yearFilter}&period=${periodFilter}&waitingDept=${waitingDeptFilter}&waiting=${waitingAnyFilter ? '1' : ''}" class="btn-outline-action"><i class="fa-solid fa-file-excel"></i> Xuất Excel</a>
+                <a href="${pageContext.request.contextPath}/contract?action=exportExcel&kind=${kind}&keyword=${fn:escapeXml(keyword)}&status=${fn:escapeXml(statusFilter)}&progress=${fn:escapeXml(progressFilter)}&scope=${fn:escapeXml(scopeFilter)}&type=${fn:escapeXml(typeFilter)}${provinceQuery}&year=${yearFilter}&period=${periodFilter}&waitingDept=${waitingDeptFilter}&waiting=${waitingAnyFilter ? '1' : ''}" class="btn-outline-action"><i class="fa-solid fa-file-excel"></i> Xuất Excel</a>
                 <%-- Nhập PDF thì ngược lại: nó TẠO hợp đồng mới, nên vẫn khoá. --%>
                 <c:if test="${canManage}">
                     <a href="${pageContext.request.contextPath}/contract?action=importForm" class="btn-outline-action"><i class="fa-solid fa-file-pdf"></i> Nhập PDF</a>
@@ -281,45 +301,6 @@
              bên dưới không còn ô chọn trạng thái nữa. Link mang theo mọi lọc
              khác và được dựng ở ContractController.FilterState -- ghép chuỗi
              tại đây nghĩa là chép cùng một danh sách tham số ra bốn chỗ. --%>
-        <%-- Hai chiều thu hẹp nằm chung MỘT dải: của ai, và trong khoảng nào. Tách
-             làm hai dải thì chiếm hai dòng cho cùng một loại thông tin. --%>
-        <c:if test="${viewNarrowed or viewFilter == 'all' or not empty monthLabel}">
-            <div class="scope-note">
-                <i class="fa-solid fa-calendar-check"></i>
-                <c:choose>
-                    <c:when test="${viewNarrowed and viewProvinceCount > 0}">
-                        <strong>Hợp đồng bạn phụ trách + ${viewProvinceCount} tỉnh địa bàn của bạn</strong>
-                    </c:when>
-                    <c:when test="${viewNarrowed}"><strong>Hợp đồng bạn phụ trách</strong></c:when>
-                    <c:otherwise><strong>Toàn chi nhánh</strong></c:otherwise>
-                </c:choose>
-                <span class="sep">&middot;</span>
-                <c:choose>
-                    <c:when test="${not empty monthLabel}">
-                        còn hiệu lực trong <strong>${fn:escapeXml(monthLabel)}</strong>
-                    </c:when>
-                    <c:otherwise>mọi thời điểm</c:otherwise>
-                </c:choose>
-                <span class="spacer"></span>
-                <c:if test="${viewNarrowed or viewFilter == 'all'}">
-                    <a href="${fn:escapeXml(viewToggleUrl)}">
-                        <c:choose>
-                            <c:when test="${viewNarrowed}">Xem toàn chi nhánh</c:when>
-                            <c:otherwise>Chỉ của tôi</c:otherwise>
-                        </c:choose>
-                    </a>
-                    <span class="sep">&middot;</span>
-                </c:if>
-                <a href="${fn:escapeXml(monthToggleUrl)}">
-                    <c:choose>
-                        <c:when test="${not empty monthLabel}">Xem mọi thời điểm</c:when>
-                        <c:otherwise>Chỉ tháng này</c:otherwise>
-                    </c:choose>
-                    <i class="fa-solid fa-arrow-right-long"></i>
-                </a>
-            </div>
-        </c:if>
-
         <div class="status-strip">
             <%-- Bấm lại ô ĐANG BẬT thì bỏ lọc: không có nút "tắt" nào khác ở đây,
                  và người dùng sẽ bấm lại nó theo phản xạ. --%>
@@ -349,6 +330,20 @@
                  được phía trên. Giá trị vẫn phải đi theo form, nếu không thì đổi
                  một ô lọc khác là trạng thái đang chọn biến mất. --%>
             <input type="hidden" name="status" value="${fn:escapeXml(statusFilter)}">
+            <%-- Phạm vi người phụ trách. Trước đây là một LINK "Xem toàn chi
+                 nhánh" nằm ở dải phía trên, tách hẳn khỏi các ô lọc; giờ là một
+                 ô như mọi ô khác, giống Dashboard. Chỉ hiện khi việc thu hẹp có
+                 nghĩa -- người không có cấp dưới lẫn địa bàn thì hai lựa chọn
+                 cho ra cùng một danh sách.
+
+                 Tên tham số là "view", KHÔNG phải "scope": ở màn hình này
+                 "scope" đã là ô "Chỉ hợp đồng gốc" (giá trị "root"). --%>
+            <c:if test="${viewNarrowed or viewFilter == 'all'}">
+                <select id="filterView" name="view">
+                    <option value="mine" ${viewFilter != 'all' ? 'selected' : ''}>Của tôi</option>
+                    <option value="all" ${viewFilter == 'all' ? 'selected' : ''}>Toàn chi nhánh</option>
+                </select>
+            </c:if>
             <%-- Trục TIẾN ĐỘ, đứng riêng với trục lịch ở trên. Chọn "Đã ký" rồi
                  thêm trạng thái lịch "Đã hết hạn" sẽ ra đúng danh sách hết hạn
                  mà chưa thanh lý — hàng đợi việc còn tồn. --%>
@@ -402,24 +397,110 @@
                 <%-- Hợp đồng MUA không lọc theo tỉnh: tỉnh suy ra từ địa chỉ đối
                      tác, mà đối tác của hợp đồng mua là nhà cung cấp -- nhóm
                      không chia theo địa bàn. --%>
+                <%-- Bảng tích NHIỀU tỉnh, dùng chung mã với Dashboard
+                     (appshell.css + appshell.js). Trước đây là ô chọn MỘT tỉnh:
+                     người phụ trách năm tỉnh phải mở năm lượt trang mới xem hết
+                     địa bàn của mình, và không lượt nào cho ra tổng số đúng.
+
+                     KHÔNG có cờ "provinceSet" như Dashboard: ở đây bỏ tích hết
+                     nghĩa là không lọc tỉnh, y như ô cũ để "Tất cả" -- việc thu
+                     hẹp theo địa bàn đã do phạm vi (ListScope) lo rồi. --%>
                 <c:if test="${showProvinceFilter}">
-                    <select id="filterProvince" name="provinceId">
-                        <option value="">Tất cả tỉnh địa bàn</option>
-                        <c:forEach var="province" items="${provinceList}">
-                            <option value="${province.provinceId}" ${provinceFilter == province.provinceId ? 'selected' : ''}>${fn:escapeXml(province.shortName)}</option>
-                        </c:forEach>
-                    </select>
+                    <div class="prov-pop" data-prov-pop>
+                        <button type="button" class="pop-btn" data-popover-toggle
+                                aria-expanded="false" aria-controls="provPanel">
+                            <i class="fa-solid fa-location-dot" style="color:#9ca3af;"></i>
+                            <span>
+                                <c:choose>
+                                    <c:when test="${empty provinceFilters}">Tất cả tỉnh địa bàn</c:when>
+                                    <c:when test="${fn:length(provinceFilters) == 1}">1 tỉnh đang chọn</c:when>
+                                    <c:otherwise>${fn:length(provinceFilters)} tỉnh đang chọn</c:otherwise>
+                                </c:choose>
+                            </span>
+                            <i class="fa-solid fa-chevron-down"></i>
+                        </button>
+                        <div class="prov-panel" id="provPanel" data-popover-panel>
+                            <div class="prov-actions">
+                                <button type="button" data-prov-all>Chọn tất cả</button>
+                                <button type="button" data-prov-none>Bỏ hết</button>
+                                <c:if test="${not empty myProvinces}">
+                                    <button type="button" data-prov-mine>Địa bàn của tôi</button>
+                                </c:if>
+                                <button type="submit" class="prov-apply">Áp dụng</button>
+                            </div>
+                            <c:forEach var="province" items="${provinceList}">
+                                <%-- myProvinces là List<Province> nên không dùng contains
+                                     thẳng được; đánh dấu bằng vòng lặp con. --%>
+                                <c:set var="isMine" value="false"/>
+                                <c:forEach var="mp" items="${myProvinces}">
+                                    <c:if test="${mp.provinceId == province.provinceId}"><c:set var="isMine" value="true"/></c:if>
+                                </c:forEach>
+                                <label class="prov-row ${isMine ? 'mine' : ''}">
+                                    <input type="checkbox" name="provinceId" value="${province.provinceId}"
+                                           data-mine="${isMine}"
+                                           <c:if test="${provinceFilters.contains(province.provinceId)}">checked</c:if>>
+                                    <span><c:choose>
+                                        <c:when test="${isMine}"><strong>${fn:escapeXml(province.shortName)}</strong></c:when>
+                                        <c:otherwise>${fn:escapeXml(province.shortName)}</c:otherwise>
+                                    </c:choose></span>
+                                    <c:if test="${isMine}"><span class="mine-tag">của bạn</span></c:if>
+                                </label>
+                            </c:forEach>
+                        </div>
+                    </div>
                 </c:if>
-                <select id="filterYear" name="year">
-                    <option value="">Mọi thời điểm</option>
-                    <c:forEach var="y" items="${yearList}">
-                        <option value="${y}" ${yearFilter == y ? 'selected' : ''}>Năm ${y}</option>
-                    </c:forEach>
-                </select>
-                <%-- Quý/tháng chỉ có nghĩa khi đã chọn năm: bộ lọc kỳ dựng từ cặp
-                     (năm, kỳ), chọn "Quý 3" mà không năm thì Period.parse trả null
-                     và không lọc gì cả -- một ô bấm vào không có chuyện gì xảy ra
-                     thì thà đừng hiện. --%>
+                <%-- MỘT ô cho cả năm lẫn quý/tháng, dùng chung mã với Dashboard.
+                     Hai ô rời trước đây có một cái bẫy im lặng: chọn "Quý 3" mà
+                     quên chọn năm thì Period.parse trả null, tức KHÔNG lọc gì,
+                     trong khi ô vẫn hiện "Quý 3". Trang này né bẫy đó bằng cách
+                     GIẤU hẳn ô quý/tháng khi chưa có năm -- tức là muốn lọc theo
+                     quý phải bấm hai lượt, có một lượt tải lại trang ở giữa.
+
+                     Ô này lọc theo NGÀY KÝ. KHÁC ô "tháng này / mọi thời điểm" ở
+                     dải phạm vi bên dưới: ô kia lọc theo THỜI HẠN còn hiệu lực.
+                     Hai trục cố ý để riêng -- xem ContractController. --%>
+                <input type="hidden" name="year" value="${yearFilter}" data-period-year-input>
+                <input type="hidden" name="period" value="${periodFilter}" data-period-value-input>
+                <div class="period-pop" data-period-pop>
+                    <button type="button" class="pop-btn" data-popover-toggle
+                            aria-expanded="false" aria-controls="periodPanel">
+                        <i class="fa-regular fa-calendar" style="color:#9ca3af;"></i>
+                        <span>
+                            <c:choose>
+                                <c:when test="${not empty periodLabel}">Ký: ${fn:escapeXml(periodLabel)}</c:when>
+                                <c:otherwise>Ngày ký: mọi lúc</c:otherwise>
+                            </c:choose>
+                        </span>
+                        <i class="fa-solid fa-chevron-down"></i>
+                    </button>
+                    <%-- data-* để script biết năm nào đang chọn và năm nào được
+                         phép -- danh sách năm do Period.availableYears() quyết
+                         định, đừng đoán lại ở tầng JS. --%>
+                    <div class="period-panel" id="periodPanel" data-popover-panel
+                         data-selected-year="${empty yearFilter ? '' : yearFilter}"
+                         data-selected-period="${empty periodFilter ? '' : fn:escapeXml(periodFilter)}"
+                         data-years="<c:forEach var="y" items="${yearList}" varStatus="st">${y}<c:if test="${not st.last}">,</c:if></c:forEach>">
+                        <div class="period-nav">
+                            <button type="button" data-period-prev aria-label="Năm trước">&lsaquo;</button>
+                            <span class="yr" data-period-year></span>
+                            <button type="button" data-period-next aria-label="Năm sau">&rsaquo;</button>
+                        </div>
+                        <button type="button" class="period-wide" data-pick="any">Mọi thời điểm</button>
+                        <button type="button" class="period-wide" data-pick="year">Cả năm</button>
+                        <div class="period-lbl">Quý</div>
+                        <div class="period-grid q">
+                            <c:forEach var="q" begin="1" end="4">
+                                <button type="button" data-pick="q${q}">Q${q}</button>
+                            </c:forEach>
+                        </div>
+                        <div class="period-lbl">Tháng</div>
+                        <div class="period-grid m">
+                            <c:forEach var="m" begin="1" end="12">
+                                <button type="button" data-pick="m${m}">Th${m}</button>
+                            </c:forEach>
+                        </div>
+                    </div>
+                </div>
                 <%-- "Đang chờ ở phòng nào" -- câu hỏi của giám đốc, hỏi ngay trên
                      danh sách chứ không phải mở từng hợp đồng. Chỉ liệt kê các
                      phòng nhận bàn giao, không đổ cả danh mục phòng ban. --%>
@@ -434,20 +515,39 @@
                         </c:if>
                     </c:forEach>
                 </select>
-                <c:if test="${not empty yearFilter}">
-                    <select id="filterPeriod" name="period">
-                        <option value="">Cả năm</option>
-                        <c:forEach var="q" begin="1" end="4">
-                            <c:set var="qVal" value="q${q}"/>
-                            <option value="${qVal}" ${periodFilter == qVal ? 'selected' : ''}>Quý ${q}</option>
-                        </c:forEach>
-                        <c:forEach var="m" begin="1" end="12">
-                            <c:set var="mVal" value="m${m}"/>
-                            <option value="${mVal}" ${periodFilter == mVal ? 'selected' : ''}>Tháng ${m}</option>
-                        </c:forEach>
-                    </select>
-                </c:if>
             </div>
+
+            <%-- Hai chiều thu hẹp nằm chung MỘT dải: của ai, và trong khoảng nào.
+                 Nằm TRONG thẻ lọc vì nó giải thích cho chính mấy ô ngay trên nó;
+                 tách ra ngoài thì lời giải thích và cái công tắc ở hai chỗ khác
+                 nhau. Không còn link "Xem toàn chi nhánh" -- đã thành ô Phạm vi. --%>
+            <c:if test="${viewNarrowed or viewFilter == 'all' or not empty monthLabel}">
+                <div class="scope-note">
+                    <i class="fa-solid fa-calendar-check"></i>
+                    <c:choose>
+                        <c:when test="${viewNarrowed and viewProvinceCount > 0}">
+                            <strong>Hợp đồng bạn phụ trách + ${viewProvinceCount} tỉnh địa bàn của bạn</strong>
+                        </c:when>
+                        <c:when test="${viewNarrowed}"><strong>Hợp đồng bạn phụ trách</strong></c:when>
+                        <c:otherwise><strong>Toàn chi nhánh</strong></c:otherwise>
+                    </c:choose>
+                    <span class="sep">&middot;</span>
+                    <c:choose>
+                        <c:when test="${not empty monthLabel}">
+                            còn hiệu lực trong <strong>${fn:escapeXml(monthLabel)}</strong>
+                        </c:when>
+                        <c:otherwise>mọi thời điểm</c:otherwise>
+                    </c:choose>
+                    <span class="spacer"></span>
+                    <a href="${fn:escapeXml(monthToggleUrl)}">
+                        <c:choose>
+                            <c:when test="${not empty monthLabel}">Xem mọi thời điểm</c:when>
+                            <c:otherwise>Chỉ tháng này</c:otherwise>
+                        </c:choose>
+                        <i class="fa-solid fa-arrow-right-long"></i>
+                    </a>
+                </div>
+            </c:if>
 
             <%-- Chip những gì đang lọc. Trước đây muốn bỏ một điều kiện phải nhớ
                  nó nằm ở ô nào rồi trả ô đó về "Tất cả" -- mà với ô đã bị gom vào
@@ -586,11 +686,11 @@
                 <span class="pagination-info">Hiển thị ${fn:length(contractList)} trong tổng số ${totalCount} hợp đồng</span>
                 <nav>
                     <ul class="pagination pagination-sm mb-0">
-                        <li class="page-item ${currentPage <= 1 ? 'disabled' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/contract?action=list&kind=${kind}&page=${currentPage - 1}&keyword=${fn:escapeXml(keyword)}&status=${fn:escapeXml(statusFilter)}&progress=${fn:escapeXml(progressFilter)}&scope=${fn:escapeXml(scopeFilter)}&type=${fn:escapeXml(typeFilter)}&provinceId=${provinceFilter}&year=${yearFilter}&period=${periodFilter}&waitingDept=${waitingDeptFilter}&waiting=${waitingAnyFilter ? '1' : ''}">Trước</a></li>
+                        <li class="page-item ${currentPage <= 1 ? 'disabled' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/contract?action=list&kind=${kind}&page=${currentPage - 1}&keyword=${fn:escapeXml(keyword)}&status=${fn:escapeXml(statusFilter)}&progress=${fn:escapeXml(progressFilter)}&scope=${fn:escapeXml(scopeFilter)}&type=${fn:escapeXml(typeFilter)}${provinceQuery}&year=${yearFilter}&period=${periodFilter}&waitingDept=${waitingDeptFilter}&waiting=${waitingAnyFilter ? '1' : ''}">Trước</a></li>
                         <c:forEach begin="1" end="${totalPages}" var="p">
-                            <li class="page-item ${p == currentPage ? 'active' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/contract?action=list&kind=${kind}&page=${p}&keyword=${fn:escapeXml(keyword)}&status=${fn:escapeXml(statusFilter)}&progress=${fn:escapeXml(progressFilter)}&scope=${fn:escapeXml(scopeFilter)}&type=${fn:escapeXml(typeFilter)}&provinceId=${provinceFilter}&year=${yearFilter}&period=${periodFilter}&waitingDept=${waitingDeptFilter}&waiting=${waitingAnyFilter ? '1' : ''}">${p}</a></li>
+                            <li class="page-item ${p == currentPage ? 'active' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/contract?action=list&kind=${kind}&page=${p}&keyword=${fn:escapeXml(keyword)}&status=${fn:escapeXml(statusFilter)}&progress=${fn:escapeXml(progressFilter)}&scope=${fn:escapeXml(scopeFilter)}&type=${fn:escapeXml(typeFilter)}${provinceQuery}&year=${yearFilter}&period=${periodFilter}&waitingDept=${waitingDeptFilter}&waiting=${waitingAnyFilter ? '1' : ''}">${p}</a></li>
                         </c:forEach>
-                        <li class="page-item ${currentPage >= totalPages ? 'disabled' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/contract?action=list&kind=${kind}&page=${currentPage + 1}&keyword=${fn:escapeXml(keyword)}&status=${fn:escapeXml(statusFilter)}&progress=${fn:escapeXml(progressFilter)}&scope=${fn:escapeXml(scopeFilter)}&type=${fn:escapeXml(typeFilter)}&provinceId=${provinceFilter}&year=${yearFilter}&period=${periodFilter}&waitingDept=${waitingDeptFilter}&waiting=${waitingAnyFilter ? '1' : ''}">Sau</a></li>
+                        <li class="page-item ${currentPage >= totalPages ? 'disabled' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/contract?action=list&kind=${kind}&page=${currentPage + 1}&keyword=${fn:escapeXml(keyword)}&status=${fn:escapeXml(statusFilter)}&progress=${fn:escapeXml(progressFilter)}&scope=${fn:escapeXml(scopeFilter)}&type=${fn:escapeXml(typeFilter)}${provinceQuery}&year=${yearFilter}&period=${periodFilter}&waitingDept=${waitingDeptFilter}&waiting=${waitingAnyFilter ? '1' : ''}">Sau</a></li>
                     </ul>
                 </nav>
             </div>
@@ -650,8 +750,11 @@
         // Thêm ô lọc MỚI thì phải thêm id vào đây, nếu không tích vào không có gì
         // xảy ra -- form chỉ gửi khi gõ Enter ở ô tìm kiếm. Đã dính với
         // 'filterWaitingAny' đúng một lần.
-        ['filterProgress', 'filterScope', 'filterWaitingAny', 'filterType', 'filterProvince',
-         'filterYear', 'filterPeriod', 'filterWaitingDept']
+        // Ô tỉnh và ô kỳ KHÔNG nằm trong danh sách này: chúng là bảng chọn, mã
+        // dùng chung ở appshell.js tự lo phần gửi form (tỉnh thì chờ nút "Áp
+        // dụng" -- tích ba tỉnh mà gửi ngay là hai lượt tải trang thừa).
+        ['filterProgress', 'filterView', 'filterScope', 'filterWaitingAny', 'filterType',
+         'filterWaitingDept']
             .forEach(function (id) {
                 var el = document.getElementById(id);
                 if (el) { el.addEventListener('change', function () { filterForm.submit(); }); }

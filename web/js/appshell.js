@@ -74,6 +74,13 @@
 (function () {
     'use strict';
 
+    /* Các hàm đóng của mọi bảng trên trang. Mở một bảng thì đóng hết bảng còn
+       lại: hai bảng rộng 300px cùng mở sẽ đè lên nhau, và nút bấm của bảng dưới
+       nằm khuất sau bảng trên. Bấm ra ngoài không giải quyết được vì chính
+       handler của nút gọi stopPropagation (nếu không thì bấm nút là mở rồi đóng
+       ngay trong cùng một cú bấm). */
+    var closers = [];
+
     /* Mở/đóng một bảng. Bấm TRONG bảng thì không đóng -- tích một ô mà bảng tự
        đóng thì không tích được ô thứ hai. */
     function wirePopover(root) {
@@ -82,10 +89,14 @@
         if (!toggle || !panel) { return null; }
 
         function setOpen(open) {
+            if (open) {
+                closers.forEach(function (close) { close(); });
+            }
             panel.classList.toggle('open', open);
             toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
             if (open && typeof root._onOpen === 'function') { root._onOpen(); }
         }
+        closers.push(function () { setOpen(false); });
         toggle.addEventListener('click', function (e) {
             e.stopPropagation();
             setOpen(!panel.classList.contains('open'));

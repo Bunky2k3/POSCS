@@ -167,7 +167,7 @@ public class CustomerController extends HttpServlet {
         String keyword = request.getParameter("keyword");
         String typeFilter = request.getParameter("type");
         Integer assigneeFilter = parseIntOrNull(request.getParameter("assigneeId"));
-        Integer provinceFilter = parseIntOrNull(request.getParameter("provinceId"));
+        List<Integer> provinceFilters = ContractController.provinceFiltersOf(request);
         // Hai mục con trên thanh điều hướng đi vào cùng trang này, khác nhau ở
         // đúng tham số kind. Giá trị lạ (hoặc thiếu) thì coi như khách mua --
         // đó là danh sách cũ, và là chiều duy nhất có dữ liệu trước V20.
@@ -180,7 +180,7 @@ public class CustomerController extends HttpServlet {
         // Bỏ ở đây chứ không chỉ ẩn ô chọn: ẩn thôi thì một provinceId còn sót
         // trên URL vẫn âm thầm thu hẹp danh sách.
         if (ROLE_SUPPLIER.equals(roleFilter)) {
-            provinceFilter = null;
+            provinceFilters = List.of();
         }
 
         // Phạm vi mặc định: Sales mở trang ra thấy phần việc của mình (khách mình đứng
@@ -198,8 +198,8 @@ public class CustomerController extends HttpServlet {
                         ? AccessControl.VIEW_ALL : AccessControl.VIEW_MINE));
 
         List<Enterprise> customerList = customerDAO.findAll(page, PAGE_SIZE, keyword, typeFilter, assigneeFilter,
-                provinceFilter, false, roleFilter, scope);
-        int totalCount = customerDAO.countAll(keyword, typeFilter, assigneeFilter, provinceFilter, roleFilter, scope);
+                provinceFilters, false, roleFilter, scope);
+        int totalCount = customerDAO.countAll(keyword, typeFilter, assigneeFilter, provinceFilters, roleFilter, scope);
         int totalPages = Math.max(1, (int) Math.ceil(totalCount / (double) PAGE_SIZE));
 
         request.setAttribute("customerList", customerList);
@@ -216,7 +216,12 @@ public class CustomerController extends HttpServlet {
         request.setAttribute("keyword", keyword);
         request.setAttribute("typeFilter", typeFilter);
         request.setAttribute("assigneeFilter", assigneeFilter);
-        request.setAttribute("provinceFilter", provinceFilter);
+        request.setAttribute("provinceFilters", provinceFilters);
+        // Xem ContractController.provinceQuery -- EL không lặp được một tham số
+        // nhiều lần trong chuỗi query mà JSP tự ghép (Xuất Excel, phân trang).
+        request.setAttribute("provinceQuery", ContractController.provinceQuery(provinceFilters));
+        request.setAttribute("myProvinces",
+                employeeDAO.findProvincesCoveredBy(AccessControl.currentUser(request).getUserId()));
         request.setAttribute("roleFilter", roleFilter);
         request.setAttribute("kind", ROLE_SUPPLIER.equals(roleFilter) ? "supplier" : "buyer");
         // JSP dựng dropdown từ đây thay vì chép cứng ba lựa chọn -- xem
@@ -315,7 +320,7 @@ public class CustomerController extends HttpServlet {
         String keyword = request.getParameter("keyword");
         String typeFilter = request.getParameter("type");
         Integer assigneeFilter = parseIntOrNull(request.getParameter("assigneeId"));
-        Integer provinceFilter = parseIntOrNull(request.getParameter("provinceId"));
+        List<Integer> provinceFilters = ContractController.provinceFiltersOf(request);
 
         // Sắp theo tỉnh (sortByProvince=true): quản lý khách hàng chia theo địa bàn
         // nên file xuất ra phải gom các dòng cùng tỉnh lại với nhau, không phải
@@ -331,7 +336,7 @@ public class CustomerController extends HttpServlet {
         // Bỏ ở đây chứ không chỉ ẩn ô chọn: ẩn thôi thì một provinceId còn sót
         // trên URL vẫn âm thầm thu hẹp danh sách.
         if (ROLE_SUPPLIER.equals(roleFilter)) {
-            provinceFilter = null;
+            provinceFilters = List.of();
         }
         // Xuất ĐÚNG thứ đang nhìn thấy: cùng phạm vi mặc định với danh sách trên
         // màn hình. Thiếu dòng này thì bấm "Xuất Excel" ở màn hình 4 dòng lại ra file
@@ -341,7 +346,7 @@ public class CustomerController extends HttpServlet {
                 () -> employeeDAO.findProvincesOf(AccessControl.currentUser(request).getUserId())
                         .stream().map(Province::getProvinceId).collect(Collectors.toList()));
         List<Enterprise> all = customerDAO.findAll(1, Integer.MAX_VALUE, keyword, typeFilter, assigneeFilter,
-                provinceFilter, true, roleFilter, scope);
+                provinceFilters, true, roleFilter, scope);
         // File Excel vẫn giữ cột "Mã KH" dù danh sách trên màn hình đã bỏ: STT chỉ
         // là số thứ tự dòng trong chính file này, hai người mở hai file xuất ở hai
         // thời điểm sẽ có STT khác nhau cho cùng một khách -- cần một cột để đối

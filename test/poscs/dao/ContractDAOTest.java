@@ -20,6 +20,7 @@ import poscs.model.ContractHistory;
 import poscs.model.ContractProduct;
 
 import static org.junit.Assert.*;
+import poscs.common.ListScope;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 import static poscs.dao.JdbcStub.*;
@@ -669,8 +670,35 @@ public class ContractDAOTest {
             // xã/phường mới tới được province_id.
             String sql = capturedSql(conn);
             assertTrue(sql.contains("LEFT JOIN addresses a ON e.address_id = a.address_id"));
-            assertTrue(sql.contains("d.province_id = ?"));
+            assertTrue(sql.contains("d.province_id IN (?)"));
             verify(ps).setObject(1, 3);
+        }
+    }
+
+    /**
+     * Bảng lọc tỉnh cho tích NHIỀU tỉnh, và mỗi lần tích thêm một tỉnh phải là
+     * NỚI RA chứ không phải siết lại: một câu IN chứ không phải nhiều điều kiện
+     * nối bằng AND. Nối bằng AND thì hai tỉnh cho ra danh sách RỖNG -- không
+     * hợp đồng nào nằm ở hai tỉnh cùng lúc -- mà màn hình không báo gì cả.
+     */
+    @Test
+    public void findAll_withSeveralProvinces_buildsOneInClauseAndBindsEachId() throws Exception {
+        PreparedStatement ps = statementReturning(emptyResultSet());
+        Connection conn = connectionReturning(ps);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            dao.findAll(1, 10, null, null, null, java.util.List.of(3, 17, 4), false,
+                    null, null, null, false, null, ListScope.all());
+
+            String sql = capturedSql(conn);
+            assertTrue(sql.contains("d.province_id IN (?,?,?)"));
+            assertFalse("phải là MỘT câu IN, không phải nhiều điều kiện nối AND",
+                    sql.contains("d.province_id IN (?) AND d.province_id"));
+            verify(ps).setObject(1, 3);
+            verify(ps).setObject(2, 17);
+            verify(ps).setObject(3, 4);
         }
     }
 
@@ -687,7 +715,7 @@ public class ContractDAOTest {
 
             String sql = capturedSql(conn);
             assertTrue(sql.contains("LEFT JOIN districts d"));
-            assertTrue(sql.contains("d.province_id = ?"));
+            assertTrue(sql.contains("d.province_id IN (?)"));
         }
     }
 
