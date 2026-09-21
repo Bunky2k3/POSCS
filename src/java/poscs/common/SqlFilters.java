@@ -41,10 +41,21 @@ public final class SqlFilters {
 
     /** {@code " AND <column> IN (?,?,?)"}, hoặc chuỗi rỗng khi không lọc. */
     public static String inClause(String column, List<Integer> ids) {
+        String predicate = inPredicate(column, ids);
+        return predicate.isEmpty() ? "" : " AND " + predicate;
+    }
+
+    /**
+     * Như trên nhưng TRẦN: {@code "<column> IN (?,?,?)"}, không có " AND " ở
+     * đầu. Dành cho nơi gom điều kiện vào một danh sách rồi mới nối bằng AND
+     * (ContractDAO/CustomerDAO dựng câu lọc theo kiểu đó) -- ở đó chuỗi có
+     * sẵn " AND " sẽ thành "WHERE ... AND  AND d.province_id IN (...)".
+     */
+    public static String inPredicate(String column, List<Integer> ids) {
         if (isEmpty(ids)) {
             return "";
         }
-        return " AND " + column + " IN (" + placeholders(ids.size()) + ")";
+        return column + " IN (" + placeholders(ids.size()) + ")";
     }
 
     /**

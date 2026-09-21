@@ -310,8 +310,8 @@ public class ContractDAO {
     public List<Contract> findAll(int page, int pageSize, String keyword, String statusFilter, String typeFilter,
             Integer provinceId, boolean sortByProvince, Period period, String direction, String progressFilter,
             boolean rootsOnly, Integer waitingDepartmentId) {
-        return findAll(page, pageSize, keyword, statusFilter, typeFilter, provinceId, sortByProvince, period,
-                direction, progressFilter, rootsOnly, waitingDepartmentId, ListScope.all());
+        return findAll(page, pageSize, keyword, statusFilter, typeFilter, SqlFilters.one(provinceId), sortByProvince,
+                period, direction, progressFilter, rootsOnly, waitingDepartmentId, ListScope.all());
     }
 
     /**
@@ -319,14 +319,24 @@ public class ContractDAO {
      * khoảng nào). Đây là tham số thứ mười ba mà ghi chú trên bảo đừng thêm -- nên nó
      * là MỘT đối tượng gom cả hai chiều chứ không phải hai tham số rời. Bộ lọc tiếp
      * theo nữa thì phải gom nốt mười hai cái còn lại vào đây.
+     *
+     * <p>Ở arity ĐẦY ĐỦ này chỉ có bản danh sách, không có bản
+     * {@code Integer provinceId} song song: hai bản chỉ khác nhau ở
+     * {@code Integer} với {@code List<Integer>} thì mọi lời gọi truyền null --
+     * hoặc {@code any()} trong test -- đều nhập nhằng và không dịch được. Các
+     * bản rút gọn phía trên tự gói bằng {@link SqlFilters#one}.
+     *
+     * <p>Lọc nhiều tỉnh sinh ra khi ô lọc tỉnh của danh sách hợp đồng đổi từ ô
+     * chọn một sang bảng tích nhiều, giống Dashboard: người phụ trách năm tỉnh
+     * trước đây phải mở năm lượt trang mới xem hết địa bàn của mình.
      */
     public List<Contract> findAll(int page, int pageSize, String keyword, String statusFilter, String typeFilter,
-            Integer provinceId, boolean sortByProvince, Period period, String direction, String progressFilter,
-            boolean rootsOnly, Integer waitingDepartmentId, ListScope scope) {
+            List<Integer> provinceIds, boolean sortByProvince, Period period, String direction,
+            String progressFilter, boolean rootsOnly, Integer waitingDepartmentId, ListScope scope) {
         List<Contract> result = new ArrayList<>();
         StringBuilder sql = new StringBuilder(SELECT_BASE);
         List<Object> params = new ArrayList<>();
-        appendFilters(sql, params, keyword, statusFilter, typeFilter, provinceId, period, direction, progressFilter,
+        appendFilters(sql, params, keyword, statusFilter, typeFilter, provinceIds, period, direction, progressFilter,
                 rootsOnly, waitingDepartmentId, scope);
         sql.append(sortByProvince
                 ? " ORDER BY p.province_name IS NULL, " + AddressDAO.PROVINCE_SHORT_NAME_ORDER
@@ -375,20 +385,23 @@ public class ContractDAO {
     /** Như trên, kèm bộ lọc "đang chờ ở phòng" -- phải đi cặp với findAll. */
     public int countAll(String keyword, String statusFilter, String typeFilter, Integer provinceId, Period period,
             String direction, String progressFilter, boolean rootsOnly, Integer waitingDepartmentId) {
-        return countAll(keyword, statusFilter, typeFilter, provinceId, period, direction, progressFilter,
-                rootsOnly, waitingDepartmentId, ListScope.all());
+        return countAll(keyword, statusFilter, typeFilter, SqlFilters.one(provinceId), period, direction,
+                progressFilter, rootsOnly, waitingDepartmentId, ListScope.all());
     }
 
     /** Như trên kèm phạm vi -- phải KHỚP với findAll, nếu không thì thanh phân trang
      *  nói một đằng còn bảng liệt kê một nẻo. */
-    public int countAll(String keyword, String statusFilter, String typeFilter, Integer provinceId, Period period,
-            String direction, String progressFilter, boolean rootsOnly, Integer waitingDepartmentId,
+    /** Bản NHIỀU tỉnh -- phải KHỚP tham số với findAll cùng dạng, nếu không
+     *  thanh phân trang nói một đằng còn bảng liệt kê một nẻo. Không có bản
+     *  {@code Integer} song song ở arity này, xem ghi chú ở findAll. */
+    public int countAll(String keyword, String statusFilter, String typeFilter, List<Integer> provinceIds,
+            Period period, String direction, String progressFilter, boolean rootsOnly, Integer waitingDepartmentId,
             ListScope scope) {
         StringBuilder sql = new StringBuilder(
             "SELECT COUNT(*) FROM contracts c LEFT JOIN enterprises e ON c.enterprise_id = e.enterprise_id "
             + JOIN_PROVINCE_OF_ENTERPRISE);
         List<Object> params = new ArrayList<>();
-        appendFilters(sql, params, keyword, statusFilter, typeFilter, provinceId, period, direction, progressFilter,
+        appendFilters(sql, params, keyword, statusFilter, typeFilter, provinceIds, period, direction, progressFilter,
                 rootsOnly, waitingDepartmentId, scope);
 
         try (Connection conn = DBContext.getConnection();
@@ -2636,7 +2649,7 @@ public class ContractDAO {
     }
 
     private void appendFilters(StringBuilder sql, List<Object> params, String keyword, String statusFilter,
-            String typeFilter, Integer provinceId, Period period, String direction, String progressFilter,
+            String typeFilter, List<Integer> provinceIds, Period period, String direction, String progressFilter,
             boolean rootsOnly, Integer waitingDepartmentId, ListScope scope) {
         List<String> conditions = new ArrayList<>();
         conditions.add("c.is_deleted = 0");
@@ -2698,9 +2711,11 @@ public class ContractDAO {
             conditions.add("(" + STATUS_CASE_SQL + ") = ?");
             params.add(statusFilter);
         }
-        if (provinceId != null) {
-            conditions.add("d.province_id = ?");
-            params.add(provinceId);
+        // Nhiều tỉnh một lúc: người phụ trách năm tỉnh muốn xem cả năm chứ
+        // không phải mở năm lần trang. Danh sách rỗng/null = không siết.
+        if (!SqlFilters.isEmpty(provinceIds)) {
+            conditions.add(SqlFilters.inPredicate("d.province_id", provinceIds));
+            params.addAll(provinceIds);
         }
         if (period != null) {
             // Lọc theo NGÀY KÝ, nên bản nháp (signing_date NULL) rơi ra ngoài

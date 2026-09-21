@@ -114,8 +114,8 @@ public class CustomerDAO {
      */
     public List<Enterprise> findAll(int page, int pageSize, String keyword, String customerType,
             Integer accountOwnerId, Integer provinceId, boolean sortByProvince, String role) {
-        return findAll(page, pageSize, keyword, customerType, accountOwnerId, provinceId, sortByProvince,
-                role, ListScope.all());
+        return findAll(page, pageSize, keyword, customerType, accountOwnerId, SqlFilters.one(provinceId),
+                sortByProvince, role, ListScope.all());
     }
 
     /**
@@ -123,13 +123,20 @@ public class CustomerDAO {
      *
      * @param scope {@link ListScope#all()} = không thu hẹp (Admin, hoặc người dùng
      *              tự bấm "xem toàn chi nhánh")
+     *
+     * <p>Lọc theo NHIỀU tỉnh cùng lúc (null/rỗng = mọi tỉnh). Ở arity ĐẦY ĐỦ
+     * này KHÔNG có bản {@code Integer provinceId} song song: hai bản chỉ khác
+     * nhau ở {@code Integer} với {@code List<Integer>} thì mọi lời gọi truyền
+     * null -- hoặc {@code any()} trong test -- đều nhập nhằng và không dịch
+     * được. Các bản rút gọn phía trên tự gói bằng {@link SqlFilters#one}.
      */
     public List<Enterprise> findAll(int page, int pageSize, String keyword, String customerType,
-            Integer accountOwnerId, Integer provinceId, boolean sortByProvince, String role, ListScope scope) {
+            Integer accountOwnerId, List<Integer> provinceIds, boolean sortByProvince, String role,
+            ListScope scope) {
         List<Enterprise> result = new ArrayList<>();
         StringBuilder sql = new StringBuilder(SELECT_ENTERPRISE_BASE);
         List<Object> params = new ArrayList<>();
-        appendFilters(sql, params, keyword, customerType, accountOwnerId, provinceId, role, scope);
+        appendFilters(sql, params, keyword, customerType, accountOwnerId, provinceIds, role, scope);
         // "p.province_name IS NULL" đứng đầu để dồn khách chưa có địa chỉ xuống
         // cuối file -- mặc định MySQL xếp NULL lên đầu khi ORDER BY tăng dần.
         sql.append(sortByProvince
@@ -160,12 +167,14 @@ public class CustomerDAO {
 
     /** Như {@link #countAll(String, String, Integer)} nhưng lọc thêm theo tỉnh/thành. */
     public int countAll(String keyword, String customerType, Integer accountOwnerId, Integer provinceId, String role) {
-        return countAll(keyword, customerType, accountOwnerId, provinceId, role, ListScope.all());
+        return countAll(keyword, customerType, accountOwnerId, SqlFilters.one(provinceId), role, ListScope.all());
     }
 
     /** Như trên nhưng thu hẹp theo phạm vi -- phải KHỚP với findAll, nếu không thì
      *  số trên thanh phân trang nói một đằng, danh sách liệt kê một nẻo. */
-    public int countAll(String keyword, String customerType, Integer accountOwnerId, Integer provinceId,
+    /** Bản NHIỀU tỉnh -- phải KHỚP tham số với findAll cùng dạng. Không có bản
+     *  {@code Integer} song song ở arity này, xem ghi chú ở findAll. */
+    public int countAll(String keyword, String customerType, Integer accountOwnerId, List<Integer> provinceIds,
             String role, ListScope scope) {
         // Phải JOIN tới districts thì mới lọc được theo tỉnh; districts đã có sẵn
         // province_id nên không cần join thêm bảng provinces chỉ để đếm.
@@ -173,7 +182,7 @@ public class CustomerDAO {
                 + "LEFT JOIN addresses a ON e.address_id = a.address_id "
                 + "LEFT JOIN districts d ON a.districts_id = d.districts_id ");
         List<Object> params = new ArrayList<>();
-        appendFilters(sql, params, keyword, customerType, accountOwnerId, provinceId, role, scope);
+        appendFilters(sql, params, keyword, customerType, accountOwnerId, provinceIds, role, scope);
 
         try (Connection conn = DBContext.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql.toString())) {
@@ -553,7 +562,7 @@ public class CustomerDAO {
     // ------------------------------------------------------------------
 
     private void appendFilters(StringBuilder sql, List<Object> params, String keyword, String customerType,
-            Integer accountOwnerId, Integer provinceId, String role, ListScope scope) {
+            Integer accountOwnerId, List<Integer> provinceIds, String role, ListScope scope) {
         List<String> conditions = new ArrayList<>();
         conditions.add("e.is_deleted = 0");
 
@@ -587,9 +596,10 @@ public class CustomerDAO {
             conditions.add("e.account_owner_id = ?");
             params.add(accountOwnerId);
         }
-        if (provinceId != null) {
-            conditions.add("d.province_id = ?");
-            params.add(provinceId);
+        // Nhiều tỉnh một lúc, giống Dashboard: null/rỗng = không siết.
+        if (!SqlFilters.isEmpty(provinceIds)) {
+            conditions.add(SqlFilters.inPredicate("d.province_id", provinceIds));
+            params.addAll(provinceIds);
         }
         if (role != null && !role.trim().isEmpty()) {
             // EXISTS chứ KHÔNG phải JOIN: một công ty giữ cả hai vai sẽ khớp

@@ -187,3 +187,102 @@ body { font-family: 'Inter', sans-serif; background: #f3f4f6; min-height: 100vh;
     cursor: pointer;
 }
 .btn-outline-action:hover { background: #eaf6ff; color: var(--primary-dark); border-color: var(--primary-light); }
+
+/* ===== Ô lọc dạng BẢNG CHỌN (popover) =====
+   Dùng chung ở Dashboard, danh sách hợp đồng và danh sách khách hàng. Đặt ở
+   đây thay vì <style> của từng trang vì đã có BA trang cần: chép ba lần thì
+   lần sửa thứ tư sẽ bỏ sót một chỗ.
+
+   Hai loại đang dùng:
+     .prov-pop    -- tích NHIỀU tỉnh
+     .period-pop  -- chọn kỳ (năm / quý / tháng) trong một bảng
+
+   Bố cục của THANH lọc thì KHÔNG nằm ở đây: dashboard có chip địa bàn cộng ba
+   ô, hai danh sách có ô tìm kiếm cộng cả chục ô -- ép chung một kiểu là sai. */
+
+/* Cả hai ô mở bảng đều phải là mốc định vị: bảng bên trong dùng
+   position:absolute, thiếu relative thì nó neo vào cả trang và rơi lên góc
+   trái, bẹp lại còn vài chục pixel (đã dính đúng lỗi này một lần). */
+.prov-pop, .period-pop { position: relative; }
+.prov-pop > button, .period-pop > button {
+    cursor: pointer; text-align: left; display: flex; align-items: center; gap: 8px;
+}
+.prov-pop > button i.fa-chevron-down,
+.period-pop > button i.fa-chevron-down { margin-left: auto; font-size: 0.7rem; color: #9ca3af; }
+
+/* Neo mép PHẢI: các ô này thường đứng ở nửa phải thanh lọc, neo trái thì bảng
+   rộng 320px chạy tràn khỏi mép phải trang. Màn hẹp thì ngược lại -- xem media
+   query cuối khối. max-width là chốt chặn cuối. */
+.prov-panel, .period-panel {
+    display: none; position: absolute; z-index: 70; top: calc(100% + 6px); right: 0;
+    max-width: calc(100vw - 32px);
+    background: #fff; border: 1px solid #eef2f6; border-radius: 12px;
+    box-shadow: 0 16px 40px rgba(0,40,80,0.18); padding: 12px;
+}
+.prov-panel { width: 320px; max-height: 340px; overflow-y: auto; }
+.period-panel { width: 300px; }
+.prov-panel.open, .period-panel.open { display: block; }
+
+.prov-panel .prov-actions {
+    display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+    padding-bottom: 8px; margin-bottom: 8px; border-bottom: 1px solid #eef2f6;
+}
+.prov-panel .prov-actions button {
+    background: none; border: none; padding: 0; cursor: pointer;
+    color: var(--primary); font-size: 0.8rem; font-weight: 600;
+}
+.prov-panel .prov-actions .prov-apply {
+    margin-left: auto; background: var(--primary); color: #fff;
+    border-radius: 8px; padding: 5px 14px;
+}
+.prov-row {
+    display: flex; align-items: center; gap: 8px;
+    padding: 5px 2px; font-size: 0.85rem; color: #374151;
+}
+.prov-row input { width: 15px; height: 15px; }
+.prov-row.mine strong { color: var(--primary-dark); }
+.prov-row .mine-tag {
+    margin-left: auto; font-size: 0.68rem; font-weight: 700; color: var(--primary);
+    background: #eaf6ff; border-radius: 6px; padding: 1px 6px;
+}
+
+.period-nav {
+    display: flex; align-items: center; justify-content: space-between;
+    padding-bottom: 8px; margin-bottom: 8px; border-bottom: 1px solid #eef2f6;
+}
+.period-nav button {
+    background: #f3f4f6; border: none; border-radius: 8px; width: 28px; height: 28px;
+    cursor: pointer; color: #374151;
+}
+.period-nav button:disabled { opacity: 0.35; cursor: default; }
+.period-nav .yr { font-weight: 700; color: var(--primary-dark); font-size: 0.95rem; }
+.period-grid { display: grid; gap: 6px; margin-bottom: 8px; grid-template-columns: repeat(4, 1fr); }
+.period-grid button, .period-wide {
+    background: #fff; border: 1px solid #eef2f6; border-radius: 8px;
+    padding: 6px 0; font-size: 0.8rem; color: #374151; cursor: pointer; font-weight: 500;
+}
+.period-grid button:hover, .period-wide:hover { border-color: var(--primary-light); color: var(--primary-dark); }
+.period-grid button.sel, .period-wide.sel {
+    background: var(--primary); border-color: var(--primary); color: #fff; font-weight: 700;
+}
+.period-wide { width: 100%; margin-bottom: 8px; padding: 7px 0; }
+.period-lbl {
+    font-size: 0.7rem; font-weight: 700; color: #9ca3af;
+    text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 5px;
+}
+
+/* Chip "Bạn phụ trách: ..." -- trả lời "vì sao số của tôi khác số đồng nghiệp"
+   mà không phải bấm gì. */
+.my-prov { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.my-prov .lbl { font-size: 0.8rem; color: #6b7280; }
+.my-prov .chip {
+    font-size: 0.76rem; font-weight: 600; color: var(--primary-dark);
+    background: #eaf6ff; border: 1px solid #cfe8fb; border-radius: 999px; padding: 2px 10px;
+}
+
+/* Thanh lọc xuống dòng thì các ô dạt về TRÁI, nên bảng phải neo trái lại --
+   neo phải lúc đó đẩy mép trái của bảng ra ngoài màn hình. */
+@media (max-width: 991px) {
+    .prov-panel, .period-panel { left: 0; right: auto; }
+}
+

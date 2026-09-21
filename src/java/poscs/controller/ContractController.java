@@ -267,7 +267,7 @@ public class ContractController extends HttpServlet {
         String keyword = request.getParameter("keyword");
         String statusFilter = request.getParameter("status");
         String typeFilter = request.getParameter("type");
-        Integer provinceFilter = parseIntOrNull(request.getParameter("provinceId"));
+        List<Integer> provinceFilters = provinceFiltersOf(request);
         Period period = Period.parse(request.getParameter("year"), request.getParameter("period"));
         // Chiều đứng ĐỘC LẬP với kỳ -- hai mục con vẫn lọc được theo năm/quý/tháng.
         String direction = directionFromKind(request.getParameter("kind"));
@@ -279,7 +279,7 @@ public class ContractController extends HttpServlet {
         // Bỏ ở controller chứ không chỉ ẩn ô chọn: một provinceId còn sót trên
         // URL vẫn âm thầm thu hẹp danh sách.
         if (DIRECTION_BUY.equals(direction)) {
-            provinceFilter = null;
+            provinceFilters = List.of();
         }
         // Trục tiến độ: độc lập với trục lịch (status) và với kỳ. Một hợp đồng
         // "Đã hết hạn" theo lịch mà vẫn "Đã ký" theo tiến độ chính là việc còn
@@ -328,14 +328,14 @@ public class ContractController extends HttpServlet {
         request.setAttribute("monthToggleUrl", QueryStrings.with(request, "month", allTime ? null : MONTH_ALL));
 
         List<Contract> contractList = contractDAO.findAll(page, PAGE_SIZE, keyword, statusFilter, typeFilter,
-                provinceFilter, false, period, direction, progressFilter, rootsOnly, waitingDepartment, scope);
-        int totalCount = contractDAO.countAll(keyword, statusFilter, typeFilter, provinceFilter, period, direction,
+                provinceFilters, false, period, direction, progressFilter, rootsOnly, waitingDepartment, scope);
+        int totalCount = contractDAO.countAll(keyword, statusFilter, typeFilter, provinceFilters, period, direction,
                 progressFilter, rootsOnly, waitingDepartment, scope);
         int totalPages = Math.max(1, (int) Math.ceil(totalCount / (double) PAGE_SIZE));
         // Dải KPI trạng thái phải đếm CÙNG phạm vi với bảng bên dưới: đứng ở
         // Hợp đồng mua mà KPI gộp cả hợp đồng bán thì hai con số cạnh nhau
         // không khớp, và không có gì trên màn hình giải thích vì sao.
-        Map<String, Integer> statusSummary = contractDAO.countStatusSummary(provinceFilter, period, direction,
+        Map<String, Integer> statusSummary = contractDAO.countStatusSummary(provinceFilters, period, direction,
                 rootsOnly, null, scope, waitingDepartment);
 
         request.setAttribute("contractList", contractList);
@@ -361,7 +361,16 @@ public class ContractController extends HttpServlet {
         request.setAttribute("contractTypeOptions", contractTypesFor(direction));
         request.setAttribute("showProvinceFilter", !DIRECTION_BUY.equals(direction));
         request.setAttribute("typeFilter", typeFilter);
-        request.setAttribute("provinceFilter", provinceFilter);
+        request.setAttribute("provinceFilters", provinceFilters);
+        // Đoạn "&provinceId=1&provinceId=5" dựng sẵn ở đây: link Xuất Excel và
+        // link phân trang trong JSP tự ghép chuỗi query, mà EL không lặp được
+        // một tham số nhiều lần trong chuỗi đó. Quên nó thì bấm sang trang 2 là
+        // bộ lọc tỉnh lặng lẽ rụng.
+        request.setAttribute("provinceQuery", provinceQuery(provinceFilters));
+        // Địa bàn của người đang đăng nhập -- để đánh dấu "của bạn" trong bảng
+        // tích và cho nút "Địa bàn của tôi" chạy được, giống Dashboard.
+        request.setAttribute("myProvinces",
+                employeeDAO.findProvincesCoveredBy(AccessControl.currentUser(request).getUserId()));
         request.setAttribute("kind", DIRECTION_BUY.equals(direction) ? "buy" : "sell");
         request.setAttribute("contractTypeOptions", contractTypesFor(direction));
         setPeriodAttributes(request, period);
@@ -373,7 +382,7 @@ public class ContractController extends HttpServlet {
         // chỗ nào quên một tham số thì bấm vào là mất bộ lọc đang bật.
         String kindParam = DIRECTION_BUY.equals(direction) ? "buy" : "sell";
         FilterState state = new FilterState(kindParam, keyword, statusFilter, progressFilter,
-                rootsOnly ? "root" : null, typeFilter, provinceFilter,
+                rootsOnly ? "root" : null, typeFilter, provinceFilters,
                 request.getParameter("year"), request.getParameter("period"), waitingDepartment,
                 departmentNameOf(departments, waitingDepartment), waitingAny);
         List<FilterChip> statusChips = new ArrayList<>();
@@ -453,7 +462,7 @@ public class ContractController extends HttpServlet {
         String keyword = request.getParameter("keyword");
         String statusFilter = request.getParameter("status");
         String typeFilter = request.getParameter("type");
-        Integer provinceFilter = parseIntOrNull(request.getParameter("provinceId"));
+        List<Integer> provinceFilters = provinceFiltersOf(request);
         Period period = Period.parse(request.getParameter("year"), request.getParameter("period"));
 
         // Sắp theo tỉnh: hợp đồng được giao việc theo địa bàn nên file xuất ra
@@ -468,7 +477,7 @@ public class ContractController extends HttpServlet {
         // Bỏ ở controller chứ không chỉ ẩn ô chọn: một provinceId còn sót trên
         // URL vẫn âm thầm thu hẹp danh sách.
         if (DIRECTION_BUY.equals(direction)) {
-            provinceFilter = null;
+            provinceFilters = List.of();
         }
         // Ô "Cả phụ lục / Chỉ hợp đồng gốc" phải đi theo sang file: xuất ra một
         // danh sách khác thứ đang nhìn thấy là cách chắc chắn nhất để hai con số
@@ -482,7 +491,7 @@ public class ContractController extends HttpServlet {
                         .stream().map(Province::getProvinceId).collect(Collectors.toList()))
                 .withActiveWindow(MONTH_ALL.equals(request.getParameter("month")) ? null : currentMonth());
         List<Contract> all = contractDAO.findAll(1, Integer.MAX_VALUE, keyword, statusFilter, typeFilter,
-                provinceFilter, true, period, direction, request.getParameter("progress"),
+                provinceFilters, true, period, direction, request.getParameter("progress"),
                 "root".equals(request.getParameter("scope")),
                 waitingDepartmentForExport(request), scope);
         // Giữ cột "Mã HĐ" trong file dù danh sách trên màn hình đã bỏ -- xem lý do
@@ -2356,7 +2365,7 @@ public class ContractController extends HttpServlet {
         private final String progress;
         private final String scope;
         private final String type;
-        private final Integer provinceId;
+        private final List<Integer> provinceIds;
         private final String year;
         private final String period;
         private final Integer waitingDepartmentId;
@@ -2366,7 +2375,7 @@ public class ContractController extends HttpServlet {
         private final boolean waitingAny;
 
         FilterState(String kind, String keyword, String status, String progress, String scope,
-                String type, Integer provinceId, String year, String period, Integer waitingDepartmentId,
+                String type, List<Integer> provinceIds, String year, String period, Integer waitingDepartmentId,
                 String waitingDepartmentName, boolean waitingAny) {
             this.waitingDepartmentId = waitingDepartmentId;
             this.waitingDepartmentName = waitingDepartmentName;
@@ -2377,7 +2386,7 @@ public class ContractController extends HttpServlet {
             this.progress = progress;
             this.scope = scope;
             this.type = type;
-            this.provinceId = provinceId;
+            this.provinceIds = provinceIds == null ? List.of() : provinceIds;
             this.year = year;
             this.period = period;
         }
@@ -2391,8 +2400,17 @@ public class ContractController extends HttpServlet {
             put(sb, "progress", "progress".equals(name) ? value : progress);
             put(sb, "scope", "scope".equals(name) ? value : scope);
             put(sb, "type", "type".equals(name) ? value : type);
-            put(sb, "provinceId", "provinceId".equals(name) ? value
-                    : (provinceId == null ? null : String.valueOf(provinceId)));
+            // Tỉnh là tham số DUY NHẤT lặp được nhiều lần, nên không đi qua
+            // put() một-giá-trị như các ô khác. Đặt tên "provinceId" ở đây chỉ
+            // có nghĩa "bỏ hết tỉnh" (value luôn là null) -- chưa có đường bấm
+            // nào cần đổi sang đúng một tỉnh khác.
+            if (!"provinceId".equals(name)) {
+                for (Integer id : provinceIds) {
+                    put(sb, "provinceId", String.valueOf(id));
+                }
+            } else {
+                put(sb, "provinceId", value);
+            }
             put(sb, "year", "year".equals(name) ? value : year);
             // Bỏ năm thì kỳ mất nghĩa -- Period.parse cần cả hai, nên để lại một
             // mình "quý 3" trên URL chỉ tạo ra một chip lọc không lọc gì cả.
@@ -2444,8 +2462,12 @@ public class ContractController extends HttpServlet {
             if (!isBlank(type)) {
                 chips.add(new FilterChip("Loại: " + type, queryWith("type", null), null, true, 0));
             }
-            if (provinceId != null) {
-                chips.add(new FilterChip("Theo tỉnh", queryWith("provinceId", null), null, true, 0));
+            if (!provinceIds.isEmpty()) {
+                // Nêu SỐ tỉnh: bảng tích cho chọn nhiều, mà chip chỉ nói "Theo
+                // tỉnh" thì không biết đang siết về một tỉnh hay năm tỉnh.
+                chips.add(new FilterChip(provinceIds.size() == 1 ? "Theo tỉnh"
+                                : "Theo tỉnh (" + provinceIds.size() + ")",
+                        queryWith("provinceId", null), null, true, 0));
             }
             if (!isBlank(year)) {
                 chips.add(new FilterChip(periodLabel(), queryWith("year", null), null, true, 0));
@@ -2475,7 +2497,7 @@ public class ContractController extends HttpServlet {
         int advancedCount() {
             int n = 0;
             if (!isBlank(type)) { n++; }
-            if (provinceId != null) { n++; }
+            if (!provinceIds.isEmpty()) { n++; }
             if (!isBlank(year)) { n++; }
             // Chỉ đếm khi là MỘT PHÒNG cụ thể: ô tích "Đang bàn giao" nằm ngoài
             // thanh lọc chính, đếm nó vào đây thì nút "Lọc thêm" báo có bộ lọc
@@ -2484,6 +2506,49 @@ public class ContractController extends HttpServlet {
                     && waitingDepartmentId != ContractDAO.WAITING_ANY_DEPARTMENT) { n++; }
             return n;
         }
+    }
+
+    /**
+     * Đọc bộ lọc tỉnh từ URL: tham số {@code provinceId} lặp nhiều lần, trả về
+     * danh sách id đã bỏ trùng (rỗng = không lọc tỉnh).
+     *
+     * <p>Dùng chung cho danh sách hợp đồng và danh sách khách hàng. KHÁC bản
+     * của Dashboard ở chỗ không có cờ {@code provinceSet}: ở Dashboard, "chưa
+     * chọn gì" mặc định thành địa bàn của người dùng nên phải phân biệt được
+     * với "vừa bỏ tích hết". Ở hai màn hình danh sách, việc thu hẹp theo địa
+     * bàn đã do {@link ListScope} lo, nên bảng tích này thuần tuý là bộ lọc
+     * người dùng tự đặt: không tích gì nghĩa là không lọc, y như ô chọn một
+     * tỉnh trước đây khi để "Tất cả".
+     */
+    static List<Integer> provinceFiltersOf(HttpServletRequest request) {
+        String[] raw = request.getParameterValues("provinceId");
+        if (raw == null) {
+            return List.of();
+        }
+        List<Integer> ids = new ArrayList<>();
+        for (String value : raw) {
+            Integer id = parseIntOrNull(value);
+            if (id != null && !ids.contains(id)) {
+                ids.add(id);
+            }
+        }
+        return ids;
+    }
+
+    /**
+     * {@code "&provinceId=1&provinceId=5"} -- phần query của bộ lọc tỉnh, cho
+     * những link mà JSP tự ghép chuỗi (Xuất Excel, phân trang). EL không lặp
+     * được một tham số nhiều lần nên phải dựng sẵn ở đây.
+     */
+    static String provinceQuery(List<Integer> provinceIds) {
+        if (provinceIds == null || provinceIds.isEmpty()) {
+            return "";
+        }
+        StringBuilder sb = new StringBuilder();
+        for (Integer id : provinceIds) {
+            sb.append("&provinceId=").append(id);
+        }
+        return sb.toString();
     }
 
     /**
@@ -2502,7 +2567,9 @@ public class ContractController extends HttpServlet {
         request.setAttribute("periodLabel", period != null ? period.getLabel() : null);
     }
 
-    private Integer parseIntOrNull(String value) {
+    // static vì provinceFiltersOf() -- hàm dùng chung cho cả CustomerController
+    // -- cũng phải static và gọi tới nó.
+    private static Integer parseIntOrNull(String value) {
         if (value == null || value.trim().isEmpty()) {
             return null;
         }

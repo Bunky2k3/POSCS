@@ -584,6 +584,41 @@ public class CustomerControllerTest {
         verify(request).setAttribute("kind", "supplier");
     }
 
+    /**
+     * Ô lọc tỉnh giờ là bảng TÍCH NHIỀU: tham số provinceId lặp lại trên URL và
+     * cả hai giá trị phải xuống tới DAO. Đọc bằng getParameter() (một giá trị)
+     * thì chỉ tỉnh đầu tiên có tác dụng, tỉnh còn lại rụng lặng lẽ.
+     */
+    @Test
+    public void list_nhieuThamSoProvinceId_xuongDaoDayDu() throws Exception {
+        RequestDispatcher dispatcher = mock(RequestDispatcher.class);
+        when(request.getRequestDispatcher("/jsp/sale/listcustomer.jsp")).thenReturn(dispatcher);
+        when(request.getParameterValues("provinceId")).thenReturn(new String[]{"3", "17"});
+
+        controller.doGet(request, response);
+
+        verify(customerDAO).findAll(anyInt(), anyInt(), any(), any(), any(), eq(List.of(3, 17)),
+                eq(false), any(), any());
+        verify(customerDAO).countAll(any(), any(), any(), eq(List.of(3, 17)), any(), any());
+        verify(request).setAttribute("provinceQuery", "&provinceId=3&provinceId=17");
+    }
+
+    /**
+     * Nhà cung cấp KHÔNG chia theo địa bàn. Bỏ ở controller chứ không chỉ ẩn ô
+     * chọn -- provinceId còn sót trên URL vẫn âm thầm cắt mất kết quả.
+     */
+    @Test
+    public void list_nhaCungCap_boQuaMoiThamSoProvinceId() throws Exception {
+        RequestDispatcher dispatcher = mock(RequestDispatcher.class);
+        when(request.getRequestDispatcher("/jsp/sale/listcustomer.jsp")).thenReturn(dispatcher);
+        when(request.getParameter("kind")).thenReturn("supplier");
+        when(request.getParameterValues("provinceId")).thenReturn(new String[]{"3", "17"});
+
+        controller.doGet(request, response);
+
+        verify(customerDAO).countAll(any(), any(), any(), eq(List.<Integer>of()), any(), any());
+    }
+
     @Test
     public void list_thieuKind_macDinhLaKhachMua() throws Exception {
         RequestDispatcher dispatcher = mock(RequestDispatcher.class);

@@ -18,6 +18,7 @@ import poscs.model.Enterprise;
 import poscs.model.RelationshipRating;
 
 import static org.junit.Assert.*;
+import poscs.common.ListScope;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 import static poscs.dao.JdbcStub.*;
@@ -391,8 +392,25 @@ public class CustomerDAOTest {
             dao.findAll(1, 10, null, null, null, 3, false, null);
 
             // Tỉnh nằm ở districts.province_id chứ không phải trên enterprises.
-            assertTrue(capturedSql(conn).contains("d.province_id = ?"));
+            assertTrue(capturedSql(conn).contains("d.province_id IN (?)"));
             verify(ps).setObject(1, 3);
+        }
+    }
+
+    /** Xem ghi chú cùng tên ở ContractDAOTest: nối bằng AND thì hai tỉnh ra rỗng. */
+    @Test
+    public void findAll_withSeveralProvinces_buildsOneInClauseAndBindsEachId() throws Exception {
+        PreparedStatement ps = statementReturning(emptyResultSet());
+        Connection conn = connectionReturning(ps);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            dao.findAll(1, 10, null, null, null, java.util.List.of(3, 17), false, null, ListScope.all());
+
+            assertTrue(capturedSql(conn).contains("d.province_id IN (?,?)"));
+            verify(ps).setObject(1, 3);
+            verify(ps).setObject(2, 17);
         }
     }
 
@@ -415,7 +433,7 @@ public class CustomerDAOTest {
             String sql = capturedSql(conn);
             assertTrue(sql.contains("LEFT JOIN addresses a"));
             assertTrue(sql.contains("LEFT JOIN districts d"));
-            assertTrue(sql.contains("d.province_id = ?"));
+            assertTrue(sql.contains("d.province_id IN (?)"));
         }
     }
 

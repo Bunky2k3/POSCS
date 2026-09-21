@@ -8,7 +8,7 @@
       - userList      : List<poscs.model.User>        (nhân viên vai Sales, để đổ dropdown lọc "Người phụ trách")
       - provinceList  : List<poscs.model.Province>    (18 tỉnh địa bàn chi nhánh, để đổ dropdown lọc "Tỉnh/Thành")
       - currentPage, totalPages, totalCount : thông tin phân trang (BR-12)
-      - keyword, typeFilter, assigneeFilter, provinceFilter : giá trị filter hiện tại (để giữ lại lúc submit lại form tìm kiếm)
+      - keyword, typeFilter, assigneeFilter, provinceFilters : giá trị filter hiện tại (để giữ lại lúc submit lại form tìm kiếm)
 --%>
 <!DOCTYPE html>
 <html lang="vi">
@@ -101,6 +101,26 @@
             flex: 0 1 auto; min-width: 150px; max-width: 200px;
         }
         .filter-bar select:focus { outline: none; border-color: var(--primary-light); }
+        /* Nút mở bảng chọn tỉnh. Khung và bảng bên trong nằm ở appshell.css để
+           Dashboard và hai danh sách dùng chung; ở đây chỉ sơn cho khớp với các
+           ô select đứng cạnh -- Dashboard sơn nền trắng có đổ bóng, thanh lọc
+           này nền xám nhạt. */
+        .filter-bar .pop-btn {
+            padding: 10px 12px; border-radius: 10px; border: 1px solid #e5e7eb;
+            background: #f9fafb; font-size: 0.86rem; color: #374151;
+            flex: 0 1 auto; min-width: 170px; max-width: 220px;
+        }
+        .filter-bar .pop-btn:focus { outline: none; border-color: var(--primary-light); }
+        .filter-bar .pop-btn > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        <%-- Bảng chọn tỉnh giữ mặc định của appshell.css là neo mép PHẢI: ở
+             trang này nút tỉnh là ô CUỐI hàng lọc, neo trái thì bảng rộng
+             320px chạy thẳng ra ngoài mép phải trang (đã dính đúng thế). Màn
+             hẹp hơn 991px thì appshell tự lật sang neo trái, vì lúc đó hàng
+             lọc xuống dòng và các ô dạt về bên trái. --%>
+        /* Dải phạm vi chuyển vào TRONG thẻ lọc: nó nói cùng một chuyện với ô
+           Phạm vi ngay trên nó, để tách ra ngoài thì lời giải thích và cái công
+           tắc nằm ở hai chỗ khác nhau. */
+        .filter-bar .scope-note { flex: 1 1 100%; margin-bottom: 0; }
 
         /* ===== Table ===== */
         .table-card { overflow: hidden; }
@@ -284,7 +304,7 @@
                 <%-- Xuất Excel là thao tác ĐỌC: chỉ lấy đúng dữ liệu vai trò này vốn đã
                      xem được trên màn hình, đổi sang dạng file. Nên KHÔNG khoá theo
                      canManage -- xem PERMISSIONS.md. --%>
-                <a href="${pageContext.request.contextPath}/customer?action=exportExcel&kind=${kind}&keyword=${fn:escapeXml(keyword)}&type=${fn:escapeXml(typeFilter)}&assigneeId=${assigneeFilter}&provinceId=${provinceFilter}" class="btn-outline-action"><i class="fa-solid fa-file-excel"></i> Xuất Excel</a>
+                <a href="${pageContext.request.contextPath}/customer?action=exportExcel&kind=${kind}&keyword=${fn:escapeXml(keyword)}&type=${fn:escapeXml(typeFilter)}&assigneeId=${assigneeFilter}${provinceQuery}" class="btn-outline-action"><i class="fa-solid fa-file-excel"></i> Xuất Excel</a>
                 <c:if test="${canManage}">
                     <a href="${pageContext.request.contextPath}/customer?action=new&kind=${kind}" class="btn-add"><i class="fa-solid fa-plus"></i> Thêm khách hàng</a>
                 </c:if>
@@ -300,30 +320,6 @@
         </div>
 
         <!-- ===== Bộ lọc / tìm kiếm ===== -->
-        <c:if test="${viewNarrowed or viewFilter == 'all'}">
-            <div class="scope-note">
-                <i class="fa-solid fa-user-check"></i>
-                <c:choose>
-                    <c:when test="${viewNarrowed and viewProvinceCount > 0}">
-                        Đang xem <strong>khách bạn phụ trách và khách trong ${viewProvinceCount} tỉnh địa bàn của bạn</strong>.
-                    </c:when>
-                    <c:when test="${viewNarrowed}">
-                        Đang xem <strong>khách bạn phụ trách</strong>.
-                        <span class="sep">&middot;</span>
-                        <span style="color:#6b7280;">Bạn chưa được giao tỉnh địa bàn nào</span>
-                    </c:when>
-                    <c:otherwise>Đang xem <strong>toàn chi nhánh</strong>.</c:otherwise>
-                </c:choose>
-                <a class="spacer" href="${fn:escapeXml(viewToggleUrl)}">
-                    <c:choose>
-                        <c:when test="${viewNarrowed}">Xem toàn chi nhánh</c:when>
-                        <c:otherwise>Chỉ phần việc của tôi</c:otherwise>
-                    </c:choose>
-                    <i class="fa-solid fa-arrow-right-long"></i>
-                </a>
-            </div>
-        </c:if>
-
         <form class="filter-bar card-box" method="GET" action="${pageContext.request.contextPath}/customer" id="filterForm">
             <input type="hidden" name="action" value="list">
             <%-- Lọc xong phải ở lại đúng danh sách vừa đứng, không rơi về khách mua. --%>
@@ -332,6 +328,17 @@
                 <i class="fa-solid fa-magnifying-glass"></i>
                 <input type="text" id="searchInput" name="keyword" value="${fn:escapeXml(keyword)}" placeholder="Tìm theo mã KH, tên, số điện thoại...">
             </div>
+            <%-- Phạm vi người phụ trách. Trước đây là một LINK "Xem toàn chi
+                 nhánh" ở dải phía trên, tách hẳn khỏi các ô lọc; giờ là một ô
+                 như mọi ô khác, giống Dashboard. Chỉ hiện khi việc thu hẹp có
+                 nghĩa -- người không có cấp dưới lẫn địa bàn thì hai lựa chọn
+                 cho ra cùng một danh sách. --%>
+            <c:if test="${viewNarrowed or viewFilter == 'all'}">
+                <select id="filterView" name="view">
+                    <option value="mine" ${viewFilter != 'all' ? 'selected' : ''}>Của tôi</option>
+                    <option value="all" ${viewFilter == 'all' ? 'selected' : ''}>Toàn chi nhánh</option>
+                </select>
+            </c:if>
             <select id="filterType" name="type">
                 <option value="">Tất cả loại khách hàng</option>
                 <%-- Danh sách khác nhau theo vai: khách mua phân theo họ là nhà
@@ -354,13 +361,75 @@
                  hàng cho mình thì không chia theo địa bàn. Controller cũng bỏ
                  luôn tham số đó với vai này, nên URL còn sót provinceId cũng
                  không âm thầm cắt mất kết quả. --%>
+            <%-- Bảng tích NHIỀU tỉnh, dùng chung mã với Dashboard và danh sách
+                 hợp đồng (appshell.css + appshell.js). Trước đây là ô chọn MỘT
+                 tỉnh: người phụ trách năm tỉnh phải mở năm lượt trang mới xem
+                 hết địa bàn của mình, và không lượt nào cho ra tổng số đúng.
+
+                 KHÔNG có cờ "provinceSet" như Dashboard: ở đây bỏ tích hết
+                 nghĩa là không lọc tỉnh, y như ô cũ để "Tất cả" -- việc thu hẹp
+                 theo địa bàn đã do phạm vi (ListScope) lo rồi. --%>
             <c:if test="${showProvinceFilter}">
-                <select id="filterProvince" name="provinceId">
-                    <option value="">Tất cả tỉnh địa bàn</option>
-                    <c:forEach var="province" items="${provinceList}">
-                        <option value="${province.provinceId}" ${provinceFilter == province.provinceId ? 'selected' : ''}>${fn:escapeXml(province.shortName)}</option>
-                    </c:forEach>
-                </select>
+                <div class="prov-pop" data-prov-pop>
+                    <button type="button" class="pop-btn" data-popover-toggle
+                            aria-expanded="false" aria-controls="provPanel">
+                        <i class="fa-solid fa-location-dot" style="color:#9ca3af;"></i>
+                        <span>
+                            <c:choose>
+                                <c:when test="${empty provinceFilters}">Tất cả tỉnh địa bàn</c:when>
+                                <c:when test="${fn:length(provinceFilters) == 1}">1 tỉnh đang chọn</c:when>
+                                <c:otherwise>${fn:length(provinceFilters)} tỉnh đang chọn</c:otherwise>
+                            </c:choose>
+                        </span>
+                        <i class="fa-solid fa-chevron-down"></i>
+                    </button>
+                    <div class="prov-panel" id="provPanel" data-popover-panel>
+                        <div class="prov-actions">
+                            <button type="button" data-prov-all>Chọn tất cả</button>
+                            <button type="button" data-prov-none>Bỏ hết</button>
+                            <c:if test="${not empty myProvinces}">
+                                <button type="button" data-prov-mine>Địa bàn của tôi</button>
+                            </c:if>
+                            <button type="submit" class="prov-apply">Áp dụng</button>
+                        </div>
+                        <c:forEach var="province" items="${provinceList}">
+                            <%-- myProvinces là List<Province> nên không dùng contains
+                                 thẳng được; đánh dấu bằng vòng lặp con. --%>
+                            <c:set var="isMine" value="false"/>
+                            <c:forEach var="mp" items="${myProvinces}">
+                                <c:if test="${mp.provinceId == province.provinceId}"><c:set var="isMine" value="true"/></c:if>
+                            </c:forEach>
+                            <label class="prov-row ${isMine ? 'mine' : ''}">
+                                <input type="checkbox" name="provinceId" value="${province.provinceId}"
+                                       data-mine="${isMine}"
+                                       <c:if test="${provinceFilters.contains(province.provinceId)}">checked</c:if>>
+                                <span><c:choose>
+                                    <c:when test="${isMine}"><strong>${fn:escapeXml(province.shortName)}</strong></c:when>
+                                    <c:otherwise>${fn:escapeXml(province.shortName)}</c:otherwise>
+                                </c:choose></span>
+                                <c:if test="${isMine}"><span class="mine-tag">của bạn</span></c:if>
+                            </label>
+                        </c:forEach>
+                    </div>
+                </div>
+            </c:if>
+
+            <%-- Dải phạm vi, nằm TRONG thẻ lọc ngay dưới ô Phạm vi đã đổi nó. --%>
+            <c:if test="${viewNarrowed or viewFilter == 'all'}">
+                <div class="scope-note">
+                    <i class="fa-solid fa-user-check"></i>
+                    <c:choose>
+                        <c:when test="${viewNarrowed and viewProvinceCount > 0}">
+                            Đang xem <strong>khách bạn phụ trách và khách trong ${viewProvinceCount} tỉnh địa bàn của bạn</strong>.
+                        </c:when>
+                        <c:when test="${viewNarrowed}">
+                            Đang xem <strong>khách bạn phụ trách</strong>.
+                            <span class="sep">&middot;</span>
+                            <span style="color:#6b7280;">Bạn chưa được giao tỉnh địa bàn nào</span>
+                        </c:when>
+                        <c:otherwise>Đang xem <strong>toàn chi nhánh</strong>.</c:otherwise>
+                    </c:choose>
+                </div>
             </c:if>
         </form>
 
@@ -449,11 +518,11 @@
                 <span class="pagination-info" id="paginationInfo">Hiển thị ${fn:length(customerList)} trong tổng số ${totalCount} khách hàng</span>
                 <nav>
                     <ul class="pagination pagination-sm mb-0">
-                        <li class="page-item ${currentPage <= 1 ? 'disabled' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/customer?action=list&kind=${kind}&page=${currentPage - 1}&keyword=${fn:escapeXml(keyword)}&type=${fn:escapeXml(typeFilter)}&assigneeId=${assigneeFilter}&provinceId=${provinceFilter}">Trước</a></li>
+                        <li class="page-item ${currentPage <= 1 ? 'disabled' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/customer?action=list&kind=${kind}&page=${currentPage - 1}&keyword=${fn:escapeXml(keyword)}&type=${fn:escapeXml(typeFilter)}&assigneeId=${assigneeFilter}${provinceQuery}">Trước</a></li>
                         <c:forEach begin="1" end="${totalPages}" var="p">
-                            <li class="page-item ${p == currentPage ? 'active' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/customer?action=list&kind=${kind}&page=${p}&keyword=${fn:escapeXml(keyword)}&type=${fn:escapeXml(typeFilter)}&assigneeId=${assigneeFilter}&provinceId=${provinceFilter}">${p}</a></li>
+                            <li class="page-item ${p == currentPage ? 'active' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/customer?action=list&kind=${kind}&page=${p}&keyword=${fn:escapeXml(keyword)}&type=${fn:escapeXml(typeFilter)}&assigneeId=${assigneeFilter}${provinceQuery}">${p}</a></li>
                         </c:forEach>
-                        <li class="page-item ${currentPage >= totalPages ? 'disabled' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/customer?action=list&kind=${kind}&page=${currentPage + 1}&keyword=${fn:escapeXml(keyword)}&type=${fn:escapeXml(typeFilter)}&assigneeId=${assigneeFilter}&provinceId=${provinceFilter}">Sau</a></li>
+                        <li class="page-item ${currentPage >= totalPages ? 'disabled' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/customer?action=list&kind=${kind}&page=${currentPage + 1}&keyword=${fn:escapeXml(keyword)}&type=${fn:escapeXml(typeFilter)}&assigneeId=${assigneeFilter}${provinceQuery}">Sau</a></li>
                     </ul>
                 </nav>
             </div>
@@ -548,15 +617,16 @@
             deleteModal.hide();
         });
 
-        // Tự động submit lại form lọc khi đổi loại KH / người phụ trách
-        document.getElementById('filterType').addEventListener('change', function () { document.getElementById('filterForm').submit(); });
-        document.getElementById('filterAssignee').addEventListener('change', function () { document.getElementById('filterForm').submit(); });
-        // Ô tỉnh không có ở màn Nhà cung cấp -- gắn sự kiện lên null là vỡ
-        // toàn bộ đoạn script phía sau, kể cả các bộ lọc khác.
-        var provinceSelect = document.getElementById('filterProvince');
-        if (provinceSelect) {
-            provinceSelect.addEventListener('change', function () { document.getElementById('filterForm').submit(); });
-        }
+        // Tự động submit lại form lọc khi đổi một ô select.
+        // Gắn theo DANH SÁCH id: ô Phạm vi chỉ có khi việc thu hẹp có nghĩa, mà
+        // gắn sự kiện lên null thì vỡ cả đoạn script phía sau, kể cả các bộ lọc
+        // khác. Ô TỈNH không có ở đây: nó là bảng tích, mã dùng chung ở
+        // appshell.js chờ nút "Áp dụng" mới gửi -- tích ba tỉnh mà gửi ngay là
+        // hai lượt tải trang thừa.
+        ['filterType', 'filterAssignee', 'filterView'].forEach(function (id) {
+            var el = document.getElementById(id);
+            if (el) { el.addEventListener('change', function () { document.getElementById('filterForm').submit(); }); }
+        });
     </script>
 
     <script src="${pageContext.request.contextPath}/js/appshell.js"></script>

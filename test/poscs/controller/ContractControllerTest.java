@@ -609,6 +609,91 @@ public class ContractControllerTest {
         verify(request).setAttribute("waitingDeptFilter", 5);
     }
 
+    /**
+     * Ô lọc tỉnh giờ là bảng TÍCH NHIỀU: tham số provinceId lặp lại trên URL và
+     * cả ba giá trị phải xuống tới DAO. Đọc bằng getParameter() (một giá trị)
+     * thì chỉ tỉnh ĐẦU TIÊN có tác dụng, hai tỉnh kia rụng lặng lẽ -- màn hình
+     * vẫn hiện "3 tỉnh đang chọn".
+     */
+    @Test
+    public void list_nhieuThamSoProvinceId_xuongDaoDayDu() throws Exception {
+        RequestDispatcher dispatcher = mock(RequestDispatcher.class);
+        when(request.getRequestDispatcher("/jsp/sale/listcontract.jsp")).thenReturn(dispatcher);
+        when(request.getParameterValues("provinceId")).thenReturn(new String[]{"3", "17", "4"});
+
+        controller.doGet(request, response);
+
+        verify(contractDAO).findAll(anyInt(), anyInt(), any(), any(), any(), eq(List.of(3, 17, 4)),
+                anyBoolean(), nullable(Period.class), any(), nullable(String.class), anyBoolean(),
+                nullable(Integer.class), any());
+        verify(contractDAO).countAll(any(), any(), any(), eq(List.of(3, 17, 4)), nullable(Period.class),
+                any(), nullable(String.class), anyBoolean(), nullable(Integer.class), any());
+    }
+
+    /**
+     * Link Xuất Excel và link phân trang trong JSP tự ghép chuỗi query, mà EL
+     * không lặp được một tham số nhiều lần. Thiếu chuỗi dựng sẵn này thì bấm
+     * sang trang 2 là bộ lọc tỉnh biến mất mà không ai thấy.
+     */
+    @Test
+    public void list_chuoiQueryCuaLocTinh_lapLaiThamSoChoTungTinh() throws Exception {
+        RequestDispatcher dispatcher = mock(RequestDispatcher.class);
+        when(request.getRequestDispatcher("/jsp/sale/listcontract.jsp")).thenReturn(dispatcher);
+        when(request.getParameterValues("provinceId")).thenReturn(new String[]{"3", "17"});
+
+        controller.doGet(request, response);
+
+        verify(request).setAttribute("provinceQuery", "&provinceId=3&provinceId=17");
+    }
+
+    /** Giá trị rác và giá trị trùng không được lọt xuống câu SQL. */
+    @Test
+    public void list_provinceIdRacHoacTrung_bilocBo() throws Exception {
+        RequestDispatcher dispatcher = mock(RequestDispatcher.class);
+        when(request.getRequestDispatcher("/jsp/sale/listcontract.jsp")).thenReturn(dispatcher);
+        when(request.getParameterValues("provinceId")).thenReturn(new String[]{"3", "abc", "3", ""});
+
+        controller.doGet(request, response);
+
+        verify(contractDAO).countAll(any(), any(), any(), eq(List.of(3)), nullable(Period.class),
+                any(), nullable(String.class), anyBoolean(), nullable(Integer.class), any());
+    }
+
+    /**
+     * Hợp đồng MUA không lọc theo tỉnh (đối tác là nhà cung cấp, không chia
+     * theo địa bàn). Bỏ ở controller chứ không chỉ ẩn ô chọn -- provinceId còn
+     * sót trên URL vẫn âm thầm cắt mất kết quả.
+     */
+    @Test
+    public void list_hopDongMua_boQuaMoiThamSoProvinceId() throws Exception {
+        RequestDispatcher dispatcher = mock(RequestDispatcher.class);
+        when(request.getRequestDispatcher("/jsp/sale/listcontract.jsp")).thenReturn(dispatcher);
+        when(request.getParameter("kind")).thenReturn("buy");
+        when(request.getParameterValues("provinceId")).thenReturn(new String[]{"3", "17"});
+
+        controller.doGet(request, response);
+
+        verify(contractDAO).countAll(any(), any(), any(), eq(List.<Integer>of()), nullable(Period.class),
+                any(), nullable(String.class), anyBoolean(), nullable(Integer.class), any());
+    }
+
+    /** Chip "Theo tỉnh" nêu SỐ tỉnh, và link của nó bỏ HẾT các tỉnh chứ không chỉ một. */
+    @Test
+    public void list_chipTheoTinh_neuSoTinhVaBoHetKhiBam() throws Exception {
+        RequestDispatcher dispatcher = mock(RequestDispatcher.class);
+        when(request.getRequestDispatcher("/jsp/sale/listcontract.jsp")).thenReturn(dispatcher);
+        when(request.getParameterValues("provinceId")).thenReturn(new String[]{"3", "17"});
+
+        controller.doGet(request, response);
+
+        ArgumentCaptor<List<ContractController.FilterChip>> chips = ArgumentCaptor.forClass(List.class);
+        verify(request).setAttribute(eq("activeFilters"), chips.capture());
+        ContractController.FilterChip chip = chips.getValue().stream()
+                .filter(c -> c.getLabel().startsWith("Theo tỉnh")).findFirst().orElseThrow();
+        assertEquals("Theo tỉnh (2)", chip.getLabel());
+        assertFalse(chip.getQuery(), chip.getQuery().contains("provinceId="));
+    }
+
     /** Bộ lọc này nằm trong khối "Lọc thêm" nên phải được đếm vào badge của nút đó. */
     @Test
     public void list_locPhongDangCho_tinhVaoSoLocNangCao() throws Exception {
@@ -1091,7 +1176,9 @@ public class ContractControllerTest {
 
         controller.doGet(request, response);
 
-        verify(contractDAO).countStatusSummary(nullable(Integer.class), nullable(Period.class), eq("Mua"),
+        // Tham số đầu giờ là DANH SÁCH tỉnh (bảng tích nhiều tỉnh), không còn
+        // là một Integer.
+        verify(contractDAO).countStatusSummary(nullable(java.util.List.class), nullable(Period.class), eq("Mua"),
                 eq(true), nullable(java.util.List.class), any(), nullable(Integer.class));
     }
 
