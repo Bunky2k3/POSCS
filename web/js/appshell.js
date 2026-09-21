@@ -217,3 +217,182 @@
         });
     });
 })();
+
+// Tiền VNĐ: định dạng ô nhập theo nhóm nghìn và đọc số thành chữ.
+//
+// Dùng chung cho ô "Giá trị hợp đồng" (tạo / sửa / phụ lục) và ô "Số tiền" của
+// kỳ thanh toán, cùng dòng chữ dưới con số ở trang chi tiết hợp đồng. Đánh dấu
+// bằng thuộc tính, không phải bằng id, để thêm một ô tiền mới ở màn khác chỉ
+// cần gắn data-money là xong:
+//
+//   <input data-money>                     ô nhập, tự chèn dấu chấm khi gõ
+//   <span data-money-words-for="idCuaO">   chữ chạy theo ô đó
+//   <span data-money-words data-vnd="...">  chữ cho một con số cố định
+//
+// Dấu phân nhóm là DẤU CHẤM, khớp phần hiển thị sẵn có (toLocaleString
+// 'vi-VN') -- trong một màn hình mà chỗ này chấm chỗ kia phẩy thì người đọc
+// không biết 1.500 là một nghìn rưỡi hay một phẩy năm.
+(function () {
+    'use strict';
+
+    var DON_VI = ['không', 'một', 'hai', 'ba', 'bốn', 'năm', 'sáu', 'bảy', 'tám', 'chín'];
+    var HANG = ['', ' nghìn', ' triệu', ' tỷ', ' nghìn tỷ', ' triệu tỷ'];
+
+    // Đọc một nhóm 3 chữ số. dayDu = nhóm này đứng SAU một nhóm lớn hơn, nên
+    // phải đọc cả phần trăm rỗng: 1.000.005 là "một triệu không trăm lẻ năm",
+    // bỏ "không trăm" đi thì thành "một triệu năm" -- nghe ra 1.000.500.
+    function docBaChuSo(n, dayDu) {
+        var tram = Math.floor(n / 100);
+        var chuc = Math.floor((n % 100) / 10);
+        var donVi = n % 10;
+        var out = '';
+
+        if (tram > 0) {
+            out += DON_VI[tram] + ' trăm';
+        } else if (dayDu) {
+            out += 'không trăm';
+        }
+        if (chuc === 0 && donVi > 0 && out !== '') {
+            out += ' lẻ';
+        }
+
+        if (chuc > 1) {
+            out += ' ' + DON_VI[chuc] + ' mươi';
+            if (donVi === 1) {
+                out += ' mốt';          // hai mươi mốt, không phải "hai mươi một"
+            } else if (donVi === 5) {
+                out += ' lăm';          // hai mươi lăm
+            } else if (donVi > 0) {
+                out += ' ' + DON_VI[donVi];
+            }
+        } else if (chuc === 1) {
+            out += ' mười';
+            if (donVi === 5) {
+                out += ' lăm';          // mười lăm
+            } else if (donVi > 0) {
+                out += ' ' + DON_VI[donVi];
+            }
+        } else if (donVi > 0) {
+            out += ' ' + DON_VI[donVi];
+        }
+        return out.replace(/\s+/g, ' ').trim();
+    }
+
+    function docSo(n) {
+        if (n === 0) {
+            return 'không';
+        }
+        var nhom = [];
+        while (n > 0) {
+            nhom.push(n % 1000);
+            n = Math.floor(n / 1000);
+        }
+        var phan = [];
+        for (var i = nhom.length - 1; i >= 0; i--) {
+            if (nhom[i] === 0) {
+                continue;               // nhóm rỗng thì bỏ hẳn: 1.000.000 là "một triệu"
+            }
+            phan.push(docBaChuSo(nhom[i], i < nhom.length - 1) + HANG[i]);
+        }
+        return phan.join(' ');
+    }
+
+    // Đọc số tiền thành chữ, viết hoa chữ đầu. Số âm chỉ xuất hiện trên phụ
+    // lục giảm trừ, nên đọc là "Giảm trừ ..." cho đúng nghiệp vụ thay vì "Âm".
+    function docTienVND(value) {
+        var n = Math.round(Number(value));
+        if (!isFinite(n)) {
+            return '';
+        }
+        var am = n < 0;
+        var chu = docSo(Math.abs(n));
+        if (am) {
+            return 'Giảm trừ ' + chu + ' đồng';
+        }
+        return chu.charAt(0).toUpperCase() + chu.slice(1) + ' đồng';
+    }
+
+    function nhomNghin(chuSo) {
+        return chuSo.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    }
+
+    // Đọc con số từ một chuỗi có thể mang dấu phân nhóm LẪN dấu thập phân --
+    // cùng quy tắc với MoneyVnd.parseOrNull bên Java, xem javadoc ở đó. Cần
+    // cho giá trị mặc định của ô sửa: server đổ ra "980000000.00", xoá mọi dấu
+    // chấm là thành 98 tỷ.
+    function soTuChuoi(raw) {
+        var s = String(raw == null ? '' : raw).replace(/[\s\u00A0\u202F]/g, '');
+        if (!s || !/^[0-9]+([.,][0-9]+)*$/.test(s)) {
+            return null;
+        }
+        var lastDot = s.lastIndexOf('.');
+        var lastComma = s.lastIndexOf(',');
+        var sep = Math.max(lastDot, lastComma);
+        var intPart = s;
+        var frac = '';
+        if (sep >= 0) {
+            var tail = s.slice(sep + 1);
+            if ((lastDot >= 0 && lastComma >= 0) || tail.length !== 3) {
+                intPart = s.slice(0, sep).replace(/[.,]/g, '');
+                frac = tail;
+            } else {
+                intPart = s.replace(/[.,]/g, '');
+            }
+        }
+        var n = Number((intPart || '0') + (frac ? '.' + frac : ''));
+        return isFinite(n) ? n : null;
+    }
+
+    function chuChoO(input) {
+        var dich = document.querySelector('[data-money-words-for="' + input.id + '"]');
+        if (!dich) {
+            return;
+        }
+        var chuSo = input.value.replace(/\D/g, '');
+        dich.textContent = chuSo ? docTienVND(Number(chuSo)) : '';
+    }
+
+    // Định dạng lại ô và giữ con trỏ ở đúng chỗ người dùng đang gõ: đếm số
+    // CHỮ SỐ bên trái con trỏ rồi đặt lại sau đúng ngần ấy chữ số. Đặt thẳng
+    // con trỏ về cuối thì sửa một chữ số ở giữa là nó nhảy ra cuối dòng.
+    function dinhDangO(input) {
+        var caret = input.selectionStart;
+        var soChuSoTruoc = input.value.slice(0, caret).replace(/\D/g, '').length;
+        var chuSo = input.value.replace(/\D/g, '').replace(/^0+(?=\d)/, '');
+        input.value = chuSo ? nhomNghin(chuSo) : '';
+
+        var pos = 0;
+        var dem = 0;
+        while (pos < input.value.length && dem < soChuSoTruoc) {
+            if (/\d/.test(input.value.charAt(pos))) {
+                dem++;
+            }
+            pos++;
+        }
+        try {
+            input.setSelectionRange(pos, pos);
+        } catch (e) {
+            // input type khác text thì không đặt được caret -- không sao.
+        }
+        chuChoO(input);
+    }
+
+    Array.prototype.forEach.call(document.querySelectorAll('input[data-money]'), function (input) {
+        var n = soTuChuoi(input.value);
+        if (n !== null) {
+            input.value = nhomNghin(String(Math.round(n)));
+        }
+        chuChoO(input);
+        input.addEventListener('input', function () {
+            dinhDangO(input);
+        });
+    });
+
+    Array.prototype.forEach.call(document.querySelectorAll('[data-money-words][data-vnd]'), function (el) {
+        var n = soTuChuoi(el.getAttribute('data-vnd'));
+        el.textContent = n === null ? '' : docTienVND(n);
+    });
+
+    window.POSCS = window.POSCS || {};
+    window.POSCS.docTienVND = docTienVND;
+})();

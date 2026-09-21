@@ -286,3 +286,12 @@ body { font-family: 'Inter', sans-serif; background: #f3f4f6; min-height: 100vh;
     .prov-panel, .period-panel { left: 0; right: auto; }
 }
 
+
+/* Số tiền đọc thành chữ, đặt ngay dưới ô nhập hoặc dưới con số. Cố ý mờ và
+   nghiêng: đây là thứ để LIẾC qua đối chiếu, không phải một trường dữ liệu
+   nữa -- in đậm bằng con số thì mắt không biết đọc cái nào trước. */
+.money-words {
+    display: block; margin-top: 5px;
+    font-size: 0.78rem; font-style: italic; color: #6b7280;
+}
+.money-words:empty { display: none; }
