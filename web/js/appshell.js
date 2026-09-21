@@ -320,10 +320,18 @@
     // cùng quy tắc với MoneyVnd.parseOrNull bên Java, xem javadoc ở đó. Cần
     // cho giá trị mặc định của ô sửa: server đổ ra "980000000.00", xoá mọi dấu
     // chấm là thành 98 tỷ.
+    //
+    // Nhận cả số ÂM, khác MoneyVnd.parseOrNull bên Java (bên đó từ chối, vì
+    // không ai được gõ một giá trị hợp đồng âm vào form): hàm này còn đọc
+    // data-vnd của trang chi tiết, mà phụ lục giảm trừ mang giá trị âm thật.
     function soTuChuoi(raw) {
         var s = String(raw == null ? '' : raw).replace(/[\s\u00A0\u202F]/g, '');
-        if (!s || !/^[0-9]+([.,][0-9]+)*$/.test(s)) {
+        if (!s || !/^-?[0-9]+([.,][0-9]+)*$/.test(s)) {
             return null;
+        }
+        var am = s.charAt(0) === '-';
+        if (am) {
+            s = s.slice(1);
         }
         var lastDot = s.lastIndexOf('.');
         var lastComma = s.lastIndexOf(',');
@@ -340,7 +348,27 @@
             }
         }
         var n = Number((intPart || '0') + (frac ? '.' + frac : ''));
-        return isFinite(n) ? n : null;
+        if (!isFinite(n)) {
+            return null;
+        }
+        return am ? -n : n;
+    }
+
+    /**
+     * Đặt vào ô một chuỗi CHƯA chuẩn -- giá trị server đổ ra, hoặc thứ vừa
+     * được dán vào -- đọc bằng đúng quy tắc tiền rồi mới định dạng. Trả về
+     * false nếu không đọc được, khi đó để nguyên cho người dùng tự sửa.
+     */
+    function datLaiTuChuoi(input, raw) {
+        var n = soTuChuoi(raw);
+        if (n === null || n < 0) {
+            // Ô nhập tiền luôn là số dương: phụ lục giảm trừ lấy dấu từ ô chọn
+            // Bổ sung/Giảm trừ bên cạnh, không từ dấu trừ trong ô số.
+            return false;
+        }
+        input.value = nhomNghin(String(Math.round(n)));
+        chuChoO(input);
+        return true;
     }
 
     function chuChoO(input) {
@@ -378,12 +406,26 @@
     }
 
     Array.prototype.forEach.call(document.querySelectorAll('input[data-money]'), function (input) {
-        var n = soTuChuoi(input.value);
-        if (n !== null) {
-            input.value = nhomNghin(String(Math.round(n)));
+        if (!datLaiTuChuoi(input, input.value)) {
+            chuChoO(input);
         }
-        chuChoO(input);
-        input.addEventListener('input', function () {
+        input.addEventListener('input', function (ev) {
+            // DÁN (hoặc kéo-thả) thì đọc bằng quy tắc đầy đủ: thứ được dán vào
+            // thường là số do chính hệ thống đổ ra và còn nguyên đuôi ".00".
+            // Chỉ giữ chữ số ở đây là dán "980000000.00" vào ra 98 tỷ -- đúng
+            // lỗi đã sửa ở server, nhưng xảy ra TRƯỚC khi form gửi đi nên bên
+            // Java không còn gì để cứu.
+            //
+            // Lúc GÕ thì vẫn chỉ giữ chữ số: tiền ở đây luôn là số nguyên
+            // đồng, mà áp quy tắc đầy đủ vào từng phím sẽ cắn vào chuỗi trung
+            // gian -- đang gõ "1.500" thì có một khoảnh khắc ô mang "1.5", đọc
+            // thành 1,5 rồi làm tròn là chữ số vừa gõ biến mất dưới tay người
+            // dùng. Gõ tay phần thập phân thì phần lẻ dính vào phần nguyên, và
+            // dòng chữ ngay dưới ô là thứ để người nhập thấy ngay điều đó.
+            var laDan = ev && (ev.inputType === 'insertFromPaste' || ev.inputType === 'insertFromDrop');
+            if (laDan && datLaiTuChuoi(input, input.value)) {
+                return;
+            }
             dinhDangO(input);
         });
     });
