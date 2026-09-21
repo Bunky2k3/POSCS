@@ -54,14 +54,22 @@ import poscs.model.Province;
 import poscs.model.User;
 
 /**
- * Controller cho phần "Thông tin chung" của hợp đồng (bảng contracts).
- * Trang chi tiết (showDetail) cũng hiển thị hạng mục sản phẩm/dịch vụ
- * (contractproducts) ở dạng CHỈ ĐỌC -- bảng đó chưa có cột lưu đơn giá nên
- * chưa thể tính thành tiền/VAT/tổng cộng như mockup UI, và form thêm/sửa
- * hợp đồng ở đây chưa có UI để gắn/gỡ sản phẩm, thuộc phạm vi khác. Điều
- * hướng theo tham số "action" -- quyền hạn theo PERMISSIONS.md enforce
- * bằng AccessControl.requireFullAccess ở đầu mỗi hàm handleCreate/
- * handleUpdate/handleDelete (Kỹ thuật/CSKH chỉ View only trên Contract).
+ * Controller cho hợp đồng (bảng contracts) và mọi thứ treo vào nó: hạng mục
+ * sản phẩm, kỳ thanh toán, phụ lục, liên kết bán&harr;mua, bàn giao liên
+ * phòng, tài liệu. Điều hướng theo tham số "action" -- quyền hạn theo
+ * PERMISSIONS.md, enforce bằng AccessControl.requireFullAccess ở đầu mỗi hàm
+ * handleCreate/handleUpdate/handleDelete (Kỹ thuật/CSKH chỉ View only trên
+ * Contract).
+ *
+ * <p>Hạng mục sản phẩm (contractproducts) gắn/gỡ bằng hai action riêng
+ * (addProduct / removeProduct) trên form sửa, không nằm trong form tạo:
+ * hợp đồng phải tồn tại trước thì dòng hạng mục mới có chỗ để treo vào.
+ *
+ * <p>KHÔNG có đơn giá theo dòng. Bảng contractproducts chỉ lưu số lượng và
+ * đơn vị, còn tiền nằm ở đúng một chỗ: cột {@code contracts.contract_value},
+ * một số TỔNG do người dùng gõ theo bản giấy. Hệ quả cần biết khi đọc mọi
+ * đoạn tính tiền ở đây: không có cách nào đối chiếu tổng giá trị với hạng
+ * mục, nên phần thành tiền/VAT trong mockup UI vẫn chưa dựng được.
  */
 @WebServlet(name = "ContractController", urlPatterns = {"/contract", "/contract/byEnterprise"})
 @MultipartConfig(maxFileSize = 5 * 1024 * 1024, maxRequestSize = 10 * 1024 * 1024, fileSizeThreshold = 1024 * 1024)
@@ -529,18 +537,18 @@ public class ContractController extends HttpServlet {
                 headers, rows);
     }
 
-    /**
-     * Xuất PDF 1 hợp đồng -- nút "Xuất PDF" ở viewcontractdetail.jsp.
-     * contract.enterprise (từ ContractDAO) chỉ có id+tên nên phải gọi lại
-     * customerDAO.findById() lấy Enterprise đầy đủ (địa chỉ/MST/người đại
-     * diện) để in vào PDF. Không có đơn giá/thành tiền (xem javadoc đầu file).
-     */
     /** Toạ độ y (tính từ đáy trang) nơi vùng bảng sản phẩm bắt đầu trên trang 2 của
      * hopdong_template.pdf -- phải khớp với TABLE_TOP_Y trong script đã dùng để dựng
      * file mẫu đó (xem GenerateContractTemplate, không thuộc source repo). */
     private static final float TABLE_TOP_Y = 732f;
     private static final int TABLE_PAGE_INDEX = 1;
 
+    /**
+     * Xuất PDF 1 hợp đồng -- nút "Xuất PDF" ở viewcontractdetail.jsp.
+     * contract.enterprise (từ ContractDAO) chỉ có id+tên nên phải gọi lại
+     * customerDAO.findById() lấy Enterprise đầy đủ (địa chỉ/MST/người đại
+     * diện) để in vào PDF. Không có đơn giá/thành tiền (xem javadoc đầu file).
+     */
     private void exportPdf(HttpServletRequest request, HttpServletResponse response) throws IOException {
         Integer id = parseIntOrNull(request.getParameter("id"));
         Contract contract = id != null ? contractDAO.findById(id) : null;
@@ -758,6 +766,20 @@ public class ContractController extends HttpServlet {
                         }
                     }
                 }
+                // BR-27: ba cột này UNIQUE trên enterprises. Kiểm ở ĐÂY, cùng
+                // lượt với các lỗi khác, thay vì để câu INSERT bên dưới vỡ rồi
+                // đoán hộ "có thể MST/email/SĐT đã tồn tại" -- người sửa file
+                // PDF cần biết đúng ô nào. Không loại trừ id nào vì đây là
+                // khách hoàn toàn mới (đã không khớp mã số thuế ở trên).
+                if (customerDAO.existsByTaxCode(buyerTax.trim(), null)) {
+                    errors.add("Mã số thuế \"" + buyerTax.trim() + "\" đã thuộc về một khách hàng khác trong hệ thống.");
+                }
+                if (!isBlank(buyerEmail) && customerDAO.existsByEmail(buyerEmail.trim(), null)) {
+                    errors.add("Email \"" + buyerEmail.trim() + "\" đã thuộc về một khách hàng khác.");
+                }
+                if (!isBlank(buyerPhone) && customerDAO.existsByPhone(buyerPhone.trim(), null)) {
+                    errors.add("Số điện thoại \"" + buyerPhone.trim() + "\" đã thuộc về một khách hàng khác.");
+                }
                 if (province != null && ward != null) {
                     newEnterprise = new Enterprise();
                     newEnterprise.setEnterpriseName(buyerName.trim());
@@ -819,13 +841,29 @@ public class ContractController extends HttpServlet {
                 newEnterprise.setEnterpriseCode(customerDAO.generateNextEnterpriseCode());
                 enterpriseId = customerDAO.insert(newEnterprise);
                 if (enterpriseId <= 0) {
-                    request.setAttribute("importErrors", List.of("Lưu khách hàng mới thất bại (có thể MST/email/SĐT đã tồn tại)."));
+                    request.setAttribute("importErrors", List.of("Lưu khách hàng mới thất bại."));
                     request.getRequestDispatcher(IMPORT_VIEW).forward(request, response);
                     return;
                 }
+                // VAI phải ghi ngay, cùng lẽ với CustomerController.handleCreate:
+                // khách không có dòng nào ở enterprise_roles sẽ không lọt vào
+                // danh sách nào cả (bộ lọc dùng EXISTS, và kind luôn là một
+                // trong hai vai) -- lưu được nhưng coi như biến mất. Hợp đồng
+                // nhập ở đây là hợp đồng BÁN, nên đối tác giữ vai "Khách mua"
+                // theo cặp chéo ở đầu lớp này.
+                customerDAO.replaceRolesOf(enterpriseId, List.of(ROLE_BUYER));
             }
 
             Contract contract = new Contract();
+            // CHIỀU phải đặt tường minh. Cột contracts.direction là NOT NULL
+            // DEFAULT 'Bán', nhưng DEFAULT chỉ áp dụng khi cột VẮNG MẶT khỏi
+            // câu INSERT -- ContractDAO.insert luôn bind nó thành tham số, nên
+            // để null là MySQL từ chối ("Column 'direction' cannot be null")
+            // và mọi lần nhập PDF đều thất bại với thông báo nói về mã hợp
+            // đồng, chẳng liên quan gì. Luôn là 'Bán' vì mẫu PDF chỉ có ba loại
+            // hợp đồng bán (xem validTypes ở trên); muốn nhập hợp đồng mua thì
+            // phải có mẫu riêng, và lúc đó chiều đọc từ mẫu.
+            contract.setDirection(DIRECTION_SELL);
             // Mã lấy từ chính file PDF. Thiếu thì BÁO LỖI chứ không sinh hộ:
             // từ V28 mã là số hợp đồng thật, hệ thống không có quyền bịa ra.
             contract.setContractCode(isBlank(contractCode) ? null : contractCode.trim());
@@ -1388,7 +1426,7 @@ public class ContractController extends HttpServlet {
      * Huỷ một bản ghi hợp đồng NHẬP NHẦM khỏi danh sách -- không phải huỷ hợp
      * đồng ngoài đời.
      *
-     * <p>Trước đây đây là "xoá hợp đồng" theo BR-46, mở cho cả Sales và chặn
+     * <p>Trước đây đây là "xoá hợp đồng" theo UC-34, mở cho cả Sales và chặn
      * bằng một điều kiện tính theo lịch (xem {@link ContractDAO#voidRecord} để
      * biết vì sao điều kiện đó sai). Hợp đồng đã ký là chứng cứ, không xoá được
      * trong nghiệp vụ; nên việc còn lại chỉ là sửa hậu quả của một lần nhập
@@ -1410,8 +1448,9 @@ public class ContractController extends HttpServlet {
 
         // Bản NHÁP thì ai quản được hợp đồng cũng xoá được: nó chưa ký, chưa là
         // chứng cứ gì, xoá một bản nháp sai là việc thường ngày. Đây chính là
-        // điều kiện đúng của BR-46 cũ ("chưa ký") -- trước V24 nó không với tới
-        // được vì signing_date NOT NULL khiến mọi hợp đồng đều đã ký.
+        // điều kiện đúng của UC-34 ("nháp hoặc chưa có hiệu lực") -- trước V24
+        // nó không với tới được vì signing_date NOT NULL khiến mọi hợp đồng
+        // đều đã ký.
         //
         // Đã ký trở đi thì chỉ Admin, vì lúc đó không còn là xoá nghiệp vụ mà
         // là gỡ một bản ghi nhập nhầm ra khỏi danh sách.
@@ -2044,10 +2083,6 @@ public class ContractController extends HttpServlet {
     }
 
     /**
-     * @param keepUserId người đang phụ trách bản ghi đang sửa -- giữ trong
-     *        dropdown kể cả khi họ đã đổi vai, xem EmployeeDAO.findActiveByRole.
-     */
-    /**
      * Đổi tham số {@code kind} trên URL thành chiều hợp đồng.
      *
      * <p>Chỉ "buy" mới ra hợp đồng mua; mọi giá trị khác -- kể cả thiếu hẳn --
@@ -2082,6 +2117,10 @@ public class ContractController extends HttpServlet {
                 .contains(counterpartyRoleFor(c.getDirection()));
     }
 
+    /**
+     * @param keepUserId người đang phụ trách bản ghi đang sửa -- giữ trong
+     *        dropdown kể cả khi họ đã đổi vai, xem EmployeeDAO.findActiveByRole.
+     */
     private void setDropdownAttributes(HttpServletRequest request, Integer keepUserId) {
         setDropdownAttributes(request, keepUserId, DIRECTION_SELL, null);
     }
@@ -2250,7 +2289,6 @@ public class ContractController extends HttpServlet {
         return (current == null ? java.math.BigDecimal.ZERO : current).add(delta).signum() < 0;
     }
 
-    /** BR-44: các trường bắt buộc phải có, và Ngày ký ≤ Ngày hiệu lực ≤ Ngày kết thúc. */
     /**
      * Đọc số tiền người dùng gõ. Chấp nhận cả "1.500.000.000" lẫn "1500000000"
      * -- người Việt gõ dấu chấm phân nhóm theo thói quen, và bắt họ gõ số trần
@@ -2276,6 +2314,7 @@ public class ContractController extends HttpServlet {
         }
     }
 
+    /** BR-36: các trường bắt buộc phải có, và Ngày ký ≤ Ngày hiệu lực ≤ Ngày kết thúc. */
     private boolean isValid(Contract c) {
         if (c.getContractCode() == null || c.getTitle() == null || c.getContractType() == null
                 || c.getEnterpriseId() <= 0 || c.getOwnerId() <= 0) {
@@ -2287,12 +2326,12 @@ public class ContractController extends HttpServlet {
         // Ngày ký có thể TRỐNG: bản nháp chưa ký thì chưa có ngày ký, và ngày
         // đó được đóng dấu lúc bấm Ký (ContractDAO.changeProgressStatus đặt
         // CURDATE()) chứ không phải thứ người dùng gõ vào ô. Khi đã có thì vẫn
-        // phải giữ BR-44: ký <= hiệu lực <= kết thúc.
+        // phải giữ BR-36: ký <= hiệu lực <= kết thúc.
         if (c.getSigningDate() != null && c.getEffectiveDate() != null
                 && c.getSigningDate().after(c.getEffectiveDate())) {
             return false;
         }
-        // Có cả hai thì vẫn giữ BR-44; thiếu một trong hai thì chưa có gì để so.
+        // Có cả hai thì vẫn giữ BR-36; thiếu một trong hai thì chưa có gì để so.
         return c.getEffectiveDate() == null || c.getEndDate() == null
                 || !c.getEffectiveDate().after(c.getEndDate());
     }

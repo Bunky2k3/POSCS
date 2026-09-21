@@ -38,6 +38,49 @@ public class TechnicalSupportTicketDAO {
     public static final String STATUS_IN_PROGRESS = "Đang xử lý";
     public static final String STATUS_CLOSED = "Đã đóng";
 
+    /**
+     * Mức độ ưu tiên, khớp đúng bốn lựa chọn của dropdown trên cả ba màn hình
+     * phiếu hỗ trợ.
+     *
+     * <p>Trước đây bốn chuỗi này nằm rải trong SQL ({@code countStatusSummary},
+     * {@code ORDER BY FIELD(...)} của {@code findNeedingAttention}) và trong ba
+     * file JSP, không chỗ nào nhìn thấy chỗ nào. Gom về đây để còn ép được ở
+     * server -- xem {@link #isAllowedPriority}.
+     */
+    public static final String PRIORITY_URGENT = "Khẩn cấp";
+    public static final String PRIORITY_HIGH = "Cao";
+    public static final String PRIORITY_NORMAL = "Bình thường";
+    public static final String PRIORITY_LOW = "Thấp";
+
+    /**
+     * Ba trạng thái hợp lệ của phiếu. Cột {@code status} là {@code varchar}
+     * chứ không phải ENUM, nên CSDL không ép được gì -- chốt chặn duy nhất là
+     * {@link #isAllowedStatus} gọi từ controller.
+     *
+     * <p>Không có ở đây nghĩa là ghi được một trạng thái thứ tư vào CSDL, và
+     * phiếu đó lập tức TÀNG HÌNH: cả ba ô đếm của {@link #countStatusSummary}
+     * đều so bằng với đúng ba chuỗi này, nên nó không rơi vào ô nào; còn các
+     * câu SLA lọc {@code status <> 'Đã đóng'} lại vẫn đếm nó là đang mở. Hai
+     * con số trên cùng một dashboard mâu thuẫn nhau mà không ai truy ra được
+     * vì sao.
+     */
+    private static final java.util.Set<String> ALLOWED_STATUSES =
+            java.util.Set.of(STATUS_NEW, STATUS_IN_PROGRESS, STATUS_CLOSED);
+
+    /** Cùng lý do với {@link #ALLOWED_STATUSES}: một mức ưu tiên lạ rơi xuống cuối mọi bảng sắp xếp mà không báo gì. */
+    private static final java.util.Set<String> ALLOWED_PRIORITIES =
+            java.util.Set.of(PRIORITY_URGENT, PRIORITY_HIGH, PRIORITY_NORMAL, PRIORITY_LOW);
+
+    /** true nếu chuỗi này là một trong ba trạng thái hợp lệ. null coi là KHÔNG hợp lệ (trạng thái là cột NOT NULL). */
+    public static boolean isAllowedStatus(String status) {
+        return ALLOWED_STATUSES.contains(status);
+    }
+
+    /** true nếu chuỗi này là một trong bốn mức ưu tiên hợp lệ. null coi là KHÔNG hợp lệ (cột NOT NULL). */
+    public static boolean isAllowedPriority(String priority) {
+        return ALLOWED_PRIORITIES.contains(priority);
+    }
+
     /** Join khách hàng cho các truy vấn đếm (SELECT_BASE đã có sẵn join này). */
     private static final String JOIN_ENTERPRISE =
         "LEFT JOIN enterprises e ON t.enterprise_id = e.enterprise_id ";
@@ -190,7 +233,6 @@ public class TechnicalSupportTicketDAO {
         return 0;
     }
 
-    /** Đếm số phiếu theo từng trạng thái + số phiếu ưu tiên khẩn cấp, phục vụ dải KPI ở đầu trang danh sách. */
     /**
      * Hai cột nói "phiếu này là của ai": người được giao xử lý và người tiếp
      * nhận. Phạm vi "của tôi" trên Dashboard khớp CẢ HAI, vì Kỹ thuật nhìn vào
@@ -199,6 +241,7 @@ public class TechnicalSupportTicketDAO {
     private static final List<String> OWNER_COLUMNS =
             List.of("t.assigned_technician_id", "t.created_by");
 
+    /** Đếm số phiếu theo từng trạng thái + số phiếu ưu tiên khẩn cấp, phục vụ dải KPI ở đầu trang danh sách. */
     public Map<String, Integer> countStatusSummary() {
         return countStatusSummary(null);
     }
@@ -224,14 +267,14 @@ public class TechnicalSupportTicketDAO {
         summary.put(STATUS_NEW, 0);
         summary.put(STATUS_IN_PROGRESS, 0);
         summary.put(STATUS_CLOSED, 0);
-        summary.put("Khẩn cấp", 0);
+        summary.put(PRIORITY_URGENT, 0);
 
         String sql =
             "SELECT " +
             "  SUM(CASE WHEN t.status = ? THEN 1 ELSE 0 END) AS new_count, " +
             "  SUM(CASE WHEN t.status = ? THEN 1 ELSE 0 END) AS progress_count, " +
             "  SUM(CASE WHEN t.status = ? THEN 1 ELSE 0 END) AS closed_count, " +
-            "  SUM(CASE WHEN t.priority = 'Khẩn cấp' THEN 1 ELSE 0 END) AS urgent_count " +
+            "  SUM(CASE WHEN t.priority = ? THEN 1 ELSE 0 END) AS urgent_count " +
             "FROM technicalrequests t " + JOIN_ENTERPRISE + JOIN_PROVINCE_OF_ENTERPRISE +
             "WHERE t.is_deleted = 0"
             + (period != null ? " AND t.created_date BETWEEN ? AND ?" : "")
@@ -244,7 +287,8 @@ public class TechnicalSupportTicketDAO {
             ps.setString(1, STATUS_NEW);
             ps.setString(2, STATUS_IN_PROGRESS);
             ps.setString(3, STATUS_CLOSED);
-            int param = 4;
+            ps.setString(4, PRIORITY_URGENT);
+            int param = 5;
             if (period != null) {
                 ps.setDate(param++, period.getFrom());
                 ps.setDate(param++, period.getTo());
@@ -255,7 +299,7 @@ public class TechnicalSupportTicketDAO {
                     summary.put(STATUS_NEW, rs.getInt("new_count"));
                     summary.put(STATUS_IN_PROGRESS, rs.getInt("progress_count"));
                     summary.put(STATUS_CLOSED, rs.getInt("closed_count"));
-                    summary.put("Khẩn cấp", rs.getInt("urgent_count"));
+                    summary.put(PRIORITY_URGENT, rs.getInt("urgent_count"));
                 }
             }
         } catch (SQLException ex) {
@@ -284,12 +328,18 @@ public class TechnicalSupportTicketDAO {
         String sql = SELECT_BASE_WITH_PROVINCE + JOIN_PROVINCE_NAME +
             "WHERE t.is_deleted = 0 AND t.status <> ? " +
             SqlFilters.scopeClause(OWNER_COLUMNS, ownerIds, "d.province_id", provinceIds) + " " +
-            "ORDER BY FIELD(t.priority, 'Khẩn cấp', 'Cao', 'Bình thường', 'Thấp'), t.created_date ASC LIMIT ?";
+            "ORDER BY FIELD(t.priority, ?, ?, ?, ?), t.created_date ASC LIMIT ?";
         try (Connection conn = DBContext.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             int param = 1;
             ps.setString(param++, STATUS_CLOSED);
             param = SqlFilters.bindScope(ps, param, OWNER_COLUMNS, ownerIds, provinceIds);
+            // Thứ tự của FIELD(...) chính là thứ tự ưu tiên giảm dần. Phải bind
+            // SAU scopeClause vì mệnh đề đó nằm trước ORDER BY trong câu SQL.
+            ps.setString(param++, PRIORITY_URGENT);
+            ps.setString(param++, PRIORITY_HIGH);
+            ps.setString(param++, PRIORITY_NORMAL);
+            ps.setString(param++, PRIORITY_LOW);
             ps.setInt(param, limit);
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {

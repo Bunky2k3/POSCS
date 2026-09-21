@@ -170,10 +170,9 @@ public class CustomerDAO {
         return countAll(keyword, customerType, accountOwnerId, SqlFilters.one(provinceId), role, ListScope.all());
     }
 
-    /** Như trên nhưng thu hẹp theo phạm vi -- phải KHỚP với findAll, nếu không thì
-     *  số trên thanh phân trang nói một đằng, danh sách liệt kê một nẻo. */
-    /** Bản NHIỀU tỉnh -- phải KHỚP tham số với findAll cùng dạng. Không có bản
-     *  {@code Integer} song song ở arity này, xem ghi chú ở findAll. */
+    /** Bản NHIỀU tỉnh, kèm phạm vi -- phải KHỚP tham số với findAll cùng dạng, nếu
+     *  không thì số trên thanh phân trang nói một đằng, danh sách liệt kê một nẻo.
+     *  Không có bản {@code Integer} song song ở arity này, xem ghi chú ở findAll. */
     public int countAll(String keyword, String customerType, Integer accountOwnerId, List<Integer> provinceIds,
             String role, ListScope scope) {
         // Phải JOIN tới districts thì mới lọc được theo tỉnh; districts đã có sẵn
@@ -359,13 +358,13 @@ public class CustomerDAO {
         return String.format("KH-%04d", nextNumber);
     }
 
+    /** Thử lại tối đa bao nhiêu lần khi enterprise_code sinh ra bị trùng (xem insert()). */
+    private static final int MAX_CODE_GEN_ATTEMPTS = 5;
+
     /**
      * Thêm khách hàng mới. Nếu enterprise.getAddress() có street/district thì tự tạo
      * dòng addresses trước rồi mới gán address_id. Trả về enterprise_id vừa tạo, hoặc -1 nếu lỗi.
      */
-    /** Thử lại tối đa bao nhiêu lần khi enterprise_code sinh ra bị trùng (xem insert()). */
-    private static final int MAX_CODE_GEN_ATTEMPTS = 5;
-
     public int insert(Enterprise enterprise) {
         String sql = "INSERT INTO enterprises " +
                 "(enterprise_code, enterprise_name, customer_type, customer_group, tax_code, email, phone, " +
@@ -519,7 +518,71 @@ public class CustomerDAO {
         }
     }
 
-    /** Xoá mềm khách hàng (is_deleted = 1). Gọi hasActiveContracts() trước để áp BR-41. */
+    /**
+     * BR-27: email và số điện thoại khách hàng phải duy nhất toàn hệ thống --
+     * true nếu email này đã thuộc về một khách hàng khác.
+     *
+     * <p>Ba cột {@code email}, {@code phone}, {@code tax_code} đều có UNIQUE
+     * KEY, nên luật này vốn đã được CSDL giữ. Kiểm trước ở đây là để người dùng
+     * BIẾT mình sai chỗ nào: không có nó thì gõ nhầm một chữ số thành số của
+     * khách khác sẽ rơi xuống tận DB, bật lên thành SQLException và màn hình
+     * chỉ hiện "create_failed" chung chung -- không hiểu vì sao, gõ lại y
+     * nguyên rồi lại hỏng. Đúng cái bẫy {@code EmployeeDAO.existsByPhone} đã
+     * chữa cho nhân viên và {@code AuthenticationController} đã chữa cho hồ sơ
+     * cá nhân; riêng khách hàng bị bỏ sót.
+     *
+     * <p>Không thay được cho ràng buộc UNIQUE: giữa lúc kiểm và lúc ghi vẫn có
+     * khe cho hai request song song. Chốt chặn thật vẫn ở CSDL, đây chỉ là lớp
+     * cho ra thông báo tử tế.
+     *
+     * @param excludeEnterpriseId khách đang sửa (null khi đang tạo mới) -- không
+     *        loại nó ra thì mở form sửa rồi bấm lưu mà không đổi gì cũng báo trùng
+     */
+    public boolean existsByEmail(String email, Integer excludeEnterpriseId) {
+        return existsByColumn("email", email, excludeEnterpriseId);
+    }
+
+    /** BR-27, xem {@link #existsByEmail}. */
+    public boolean existsByPhone(String phone, Integer excludeEnterpriseId) {
+        return existsByColumn("phone", phone, excludeEnterpriseId);
+    }
+
+    /** Mã số thuế cũng UNIQUE, cùng lý do -- xem {@link #existsByEmail}. */
+    public boolean existsByTaxCode(String taxCode, Integer excludeEnterpriseId) {
+        return existsByColumn("tax_code", taxCode, excludeEnterpriseId);
+    }
+
+    /**
+     * KHÔNG lọc {@code is_deleted}: UNIQUE KEY của MySQL cũng không lọc. Một
+     * khách đã xoá mềm vẫn giữ chỗ email/SĐT của nó trong chỉ mục, nên bỏ qua
+     * dòng đó ở đây là báo "không trùng" rồi vẫn hỏng ở tầng dưới -- đúng thứ
+     * hàm này sinh ra để tránh.
+     */
+    private boolean existsByColumn(String column, String value, Integer excludeEnterpriseId) {
+        if (value == null) {
+            return false;
+        }
+        String sql = "SELECT 1 FROM enterprises WHERE " + column + " = ?" +
+                     (excludeEnterpriseId != null ? " AND enterprise_id <> ?" : "") + " LIMIT 1";
+        try (Connection conn = DBContext.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, value);
+            if (excludeEnterpriseId != null) {
+                ps.setInt(2, excludeEnterpriseId);
+            }
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next();
+            }
+        } catch (SQLException ex) {
+            LOG.error("Loi kiem tra trung lap khach hang (column={}, excludeEnterpriseId={})",
+                    column, excludeEnterpriseId, ex);
+            // An toàn: coi như đã trùng để chặn lại, thay vì để lọt xuống DB rồi
+            // vỡ ở đó -- cùng cách EmployeeDAO.existsByColumn đang xử lý.
+            return true;
+        }
+    }
+
+    /** Xoá mềm khách hàng (is_deleted = 1). Gọi hasActiveContracts() trước để áp BR-34. */
     public boolean softDelete(int enterpriseId) {
         String sql = "UPDATE enterprises SET is_deleted = 1 WHERE enterprise_id = ?";
         try (Connection conn = DBContext.getConnection();
@@ -533,7 +596,7 @@ public class CustomerDAO {
     }
 
     /**
-     * BR-41: kiểm tra khách hàng còn hợp đồng đang hiệu lực hay không trước khi
+     * BR-34: kiểm tra khách hàng còn hợp đồng đang hiệu lực hay không trước khi
      * cho xoá. Tính trực tiếp theo effective_date/end_date (BR-17) thay vì đọc
      * cột contracts.status đã lưu -- cột đó chỉ được ghi lúc insert/update
      * (xem ContractDAO), nên 1 hợp đồng "Chưa hiệu lực" đã tự chuyển sang hiệu

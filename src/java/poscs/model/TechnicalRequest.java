@@ -122,6 +122,16 @@ public class TechnicalRequest {
     public Timestamp getSlaDeadline() { return slaDeadline; }
 
     /**
+     * Trạng thái "đã đóng", bản sao riêng của model.
+     *
+     * <p>Danh sách đầy đủ ba trạng thái (và phép kiểm hợp lệ) nằm ở
+     * {@code TechnicalSupportTicketDAO}. Chép lại đúng một chuỗi ở đây thay vì
+     * tham chiếu sang đó, để model không phụ thuộc ngược lên tầng DAO -- cùng
+     * cách {@code Contract} giữ DRAFT/LIQUIDATED/TERMINATED của riêng nó.
+     */
+    private static final String CLOSED = "Đã đóng";
+
+    /**
      * Phiếu đã trễ hạn SLA: quá hạn mà vẫn chưa đóng.
      *
      * Tính trong model chứ không lưu thành cột, cùng lý do với trạng thái hợp
@@ -133,13 +143,13 @@ public class TechnicalRequest {
      */
     public boolean isSlaOverdue() {
         return slaDeadline != null
-                && !"Đã đóng".equals(status)
+                && !CLOSED.equals(status)
                 && slaDeadline.getTime() < System.currentTimeMillis();
     }
 
     /** Sắp tới hạn SLA: còn dưới 24 giờ và chưa đóng. Cùng ngưỡng với dashboard. */
     public boolean isSlaDueSoon() {
-        if (slaDeadline == null || "Đã đóng".equals(status) || isSlaOverdue()) {
+        if (slaDeadline == null || CLOSED.equals(status) || isSlaOverdue()) {
             return false;
         }
         long remaining = slaDeadline.getTime() - System.currentTimeMillis();

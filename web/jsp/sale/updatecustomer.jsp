@@ -138,6 +138,10 @@
                     <c:choose>
                         <c:when test="${param.error == 'invalid_image_type'}">Logo chỉ nhận file ảnh JPG, PNG, GIF hoặc WEBP. Logo cũ được giữ nguyên.</c:when>
                         <c:when test="${param.error == 'invalid'}">Thông tin khách hàng chưa hợp lệ. Vui lòng kiểm tra lại các ô bắt buộc.</c:when>
+                        <%-- BR-27, xem addnewcustomer.jsp: mỗi cột UNIQUE một thông báo riêng. --%>
+                        <c:when test="${param.error == 'duplicate_email'}">Email này đã thuộc về một khách hàng khác. Vui lòng nhập email khác.</c:when>
+                        <c:when test="${param.error == 'duplicate_phone'}">Số điện thoại này đã thuộc về một khách hàng khác. Vui lòng kiểm tra lại.</c:when>
+                        <c:when test="${param.error == 'duplicate_tax_code'}">Mã số thuế này đã được đăng ký cho một khách hàng khác.</c:when>
                         <c:when test="${param.error == 'update_failed'}">Không lưu được thay đổi. Vui lòng thử lại.</c:when>
                         <c:otherwise>Đã có lỗi xảy ra. Vui lòng thử lại.</c:otherwise>
                     </c:choose>

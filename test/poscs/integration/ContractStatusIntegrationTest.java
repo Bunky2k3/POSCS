@@ -163,7 +163,7 @@ public class ContractStatusIntegrationTest {
     }
 
     /**
-     * Không còn điều kiện xoá theo trạng thái lịch (BR-46 cũ): hợp đồng nào
+     * Không còn điều kiện xoá theo trạng thái lịch (UC-34 cũ): hợp đồng nào
      * cũng đã ký, nên huỷ được hay không là câu hỏi về QUYỀN, chặn ở
      * ContractController chứ không ở DAO. Thứ DAO vẫn phải chặn là huỷ không lý
      * do, và huỷ lại một bản ghi đã huỷ.

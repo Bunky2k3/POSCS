@@ -187,21 +187,6 @@ public final class AccessControl {
     }
 
     /**
-     * Ngoại lệ riêng cho TICKET: role "Kỹ thuật" chỉ View only trên toàn bộ
-     * ticket (không có trong FULL_ACCESS_ROLES), nhưng vẫn cần tự cập nhật
-     * tiến độ/trạng thái của đúng phiếu đang được giao cho mình -- theo yêu
-     * cầu nghiệp vụ (vai trò Technical: "Handling assigned technical
-     * requests, updating progress and status"). Không cấp Full access vì họ
-     * không được đổi khách hàng/hợp đồng/độ ưu tiên/người xử lý của ticket.
-     *
-     * Hàm này chỉ trả lời "có phải kỹ thuật viên của đúng phiếu này không";
-     * DANH SÁCH CỘT được sửa nằm ở TechnicalSupportTicketController.
-     * handleUpdate (hiện là status, root_cause, cause_category, handling_plan,
-     * resolution_summary -- xem PERMISSIONS.md). Ba cột nguyên nhân/phương
-     * hướng nằm trong danh sách đó vì theo yêu cầu khách hàng, cả mạch chẩn
-     * đoán lẫn hướng xử lý đều là phần do chính nhân viên kỹ thuật đánh giá.
-     */
-    /**
      * true nếu người này được xác nhận "đã xử lý xong" cho chặng bàn giao của
      * một phòng.
      *
@@ -222,6 +207,21 @@ public final class AccessControl {
         return isAdmin(request) || user.getDepartmentId() == departmentId;
     }
 
+    /**
+     * Ngoại lệ riêng cho TICKET: role "Kỹ thuật" chỉ View only trên toàn bộ
+     * ticket (không có trong FULL_ACCESS_ROLES), nhưng vẫn cần tự cập nhật
+     * tiến độ/trạng thái của đúng phiếu đang được giao cho mình -- theo yêu
+     * cầu nghiệp vụ (vai trò Technical: "Handling assigned technical
+     * requests, updating progress and status"). Không cấp Full access vì họ
+     * không được đổi khách hàng/hợp đồng/độ ưu tiên/người xử lý của ticket.
+     *
+     * <p>Hàm này chỉ trả lời "có phải kỹ thuật viên của đúng phiếu này không";
+     * DANH SÁCH CỘT được sửa nằm ở TechnicalSupportTicketController.
+     * handleUpdate (hiện là status, root_cause, cause_category, handling_plan,
+     * resolution_summary -- xem PERMISSIONS.md). Ba cột nguyên nhân/phương
+     * hướng nằm trong danh sách đó vì theo yêu cầu khách hàng, cả mạch chẩn
+     * đoán lẫn hướng xử lý đều là phần do chính nhân viên kỹ thuật đánh giá.
+     */
     public static boolean canUpdateAssignedTicket(HttpServletRequest request, TechnicalRequest ticket) {
         User user = currentUser(request);
         if (user == null || user.getRole() == null || ticket == null) {

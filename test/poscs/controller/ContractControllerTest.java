@@ -31,8 +31,8 @@ import static org.mockito.Mockito.*;
 
 /**
  * Test tầng Controller cho ContractController -- tập trung vào các quy tắc
- * nghiệp vụ chạy trước khi chạm DB (BR-44 ngày ký &le; hiệu lực &le; kết
- * thúc, BR-46 chỉ xoá hợp đồng "Chưa hiệu lực", parse số lượng kiểu VN khi
+ * nghiệp vụ chạy trước khi chạm DB (BR-36 ngày ký &le; hiệu lực &le; kết
+ * thúc, UC-34 chỉ xoá hợp đồng "Chưa hiệu lực", parse số lượng kiểu VN khi
  * gắn sản phẩm, phân quyền Full access CONTRACT) chứ không test lại
  * ContractDAO/JDBC hay 2 action xuất/nhập PDF (exportPdf/handleImportPdf --
  * cần PDDocument mẫu thật từ WEB-INF/templates qua ServletContext, thuộc
@@ -194,7 +194,7 @@ public class ContractControllerTest {
     }
 
     // ------------------------------------------------------------------
-    // POST ?action=create / update (BR-44)
+    // POST ?action=create / update (BR-36)
     // ------------------------------------------------------------------
 
     /**
@@ -1015,7 +1015,7 @@ public class ContractControllerTest {
     public void create_signDateAfterEffectiveDate_violatesBr44_redirectsWithoutInserting() throws Exception {
         when(request.getParameter("action")).thenReturn("create");
         stubValidContractFields();
-        // Ngày ký SAU ngày hiệu lực -- vi phạm BR-44 (ký <= hiệu lực <= kết thúc)
+        // Ngày ký SAU ngày hiệu lực -- vi phạm BR-36 (ký <= hiệu lực <= kết thúc)
         when(request.getParameter("signDate")).thenReturn("2026-02-01");
         when(request.getParameter("effectiveDate")).thenReturn("2026-01-15");
 
@@ -1445,10 +1445,10 @@ public class ContractControllerTest {
     }
 
     // ------------------------------------------------------------------
-    // POST ?action=delete -- huỷ bản ghi NHẬP NHẦM (thay cho BR-46 cũ)
+    // POST ?action=delete -- huỷ bản ghi NHẬP NHẦM (thay cho UC-34 cũ)
     // ------------------------------------------------------------------
     //
-    // BR-46 cũ cho Sales xoá hợp đồng khi trạng thái là "Chưa hiệu lực". Điều
+    // UC-34 cho Sales xoá hợp đồng khi trạng thái là "Chưa hiệu lực". Điều
     // kiện đó tính theo LỊCH, nên hợp đồng ký hôm qua và hiệu lực tháng sau vẫn
     // xoá được cùng toàn bộ nội dung đã ký. Điều kiện đúng phải là chưa ký, mà
     // signing_date NOT NULL nên không bản ghi nào chưa ký -- xoá theo nghĩa
@@ -1472,7 +1472,7 @@ public class ContractControllerTest {
 
     /**
      * Bản NHÁP thì ai quản được hợp đồng cũng xoá được -- nó chưa ký, chưa là
-     * chứng cứ gì. Đây đúng là điều kiện của BR-46 cũ ("chưa ký"), thứ mà trước
+     * chứng cứ gì. Đây đúng là điều kiện của UC-34 ("chưa ký"), thứ mà trước
      * V24 không với tới được vì signing_date NOT NULL khiến mọi hợp đồng đều đã
      * ký.
      */

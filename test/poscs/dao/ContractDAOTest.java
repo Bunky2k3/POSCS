@@ -21,6 +21,7 @@ import poscs.model.ContractProduct;
 
 import static org.junit.Assert.*;
 import poscs.common.ListScope;
+import poscs.common.Period;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 import static poscs.dao.JdbcStub.*;
@@ -377,12 +378,15 @@ public class ContractDAOTest {
 
             assertTrue(dao.changeProgressStatus(5, ContractDAO.PROGRESS_SIGNED, ACTOR, null));
 
-            // Ngày ký là ngày hành động xảy ra, do CSDL đóng dấu -- không phải
-            // thứ người dùng gõ vào ô rồi sửa lại sau.
+            // Ngày ký do CSDL đóng dấu, không phải thứ người dùng gõ vào ô rồi
+            // sửa lại sau -- nhưng COALESCE chứ không phải CURDATE() thẳng:
+            // hợp đồng nhập từ file PDF đã mang sẵn ngày ký đọc từ bản giấy, và
+            // đè lên nó là mất hẳn ngày ký thật. Chỉ cột trống mới lấy hôm nay.
             ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
             verify(conn, atLeastOnce()).prepareStatement(sql.capture());
-            assertTrue("Bước ký phải đóng dấu signing_date",
-                    sql.getAllValues().stream().anyMatch(q -> q.contains("signing_date = CURDATE()")));
+            assertTrue("Bước ký phải đóng dấu signing_date khi cột đang trống",
+                    sql.getAllValues().stream()
+                            .anyMatch(q -> q.contains("signing_date = COALESCE(signing_date, CURDATE())")));
 
             // Dòng nhật ký của MỐC vòng đời mang cả hai đầu, khác dòng sửa đổi.
             verify(historyPs).setString(4, ContractDAO.PROGRESS_DRAFT);
@@ -813,6 +817,63 @@ public class ContractDAOTest {
 
             // Dashboard chia cho giá trị này khi tính % tăng trưởng -- null sẽ nổ.
             assertEquals(BigDecimal.ZERO, dao.sumInvoiceAmountByMonth(2026, 9));
+        }
+    }
+
+    /**
+     * Hợp đồng đã HUỶ BẢN GHI không được góp tiền vào doanh thu.
+     *
+     * <p>voidRecord xoá mềm và cố ý không đụng tới contract_payments (huỷ một
+     * bản ghi nhập nhầm không được xoá dấu vết tiền đã ghi nhận), nên hai câu
+     * cộng này phải tự loại ra. Thiếu điều kiện thì tiền của một hợp đồng đã
+     * biến mất khỏi mọi danh sách vẫn nằm mãi trong KPI, và không màn hình nào
+     * chỉ ra được nó đến từ đâu.
+     */
+    /**
+     * Lịch nhắc chỉ nhắc hợp đồng ĐANG chạy.
+     *
+     * <p>Trục lịch không biết gì về trục tiến độ: chấm dứt sớm không làm
+     * end_date lùi lại, nên một hợp đồng đã đóng vẫn nằm trong khoảng hiệu lực
+     * và vẫn lọt vào cửa sổ 30 ngày. Thiếu điều kiện này thì người phụ trách
+     * nhận "sắp hết hạn" cho hợp đồng đã chấm dứt từ lâu -- đo được trên
+     * poscs_db: 09/2026/HĐKT-POSTEF, Chấm dứt sớm, hết hạn 26/05/2027.
+     */
+    @Test
+    public void findExpiringSoon_chiNhacHopDongDangChay() throws Exception {
+        PreparedStatement ps = statementReturning(emptyResultSet());
+        Connection conn = connectionReturning(ps);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            dao.findExpiringSoon(10);
+            verify(conn).prepareStatement(contains("c.progress_status = '" + ContractDAO.PROGRESS_SIGNED + "'"));
+        }
+    }
+
+    @Test
+    public void sumInvoiceAmountByMonth_loaiHopDongDaHuyBanGhi() throws Exception {
+        PreparedStatement ps = statementReturning(singleRow(row("total", BigDecimal.ZERO)));
+        Connection conn = connectionReturning(ps);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            dao.sumInvoiceAmountByMonth(2026, 9);
+            verify(conn).prepareStatement(contains("c.is_deleted = 0"));
+        }
+    }
+
+    @Test
+    public void sumInvoiceAmountInPeriod_loaiHopDongDaHuyBanGhi() throws Exception {
+        PreparedStatement ps = statementReturning(singleRow(row("total", BigDecimal.ZERO)));
+        Connection conn = connectionReturning(ps);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            dao.sumInvoiceAmountInPeriod(Period.parse("2026", "m9"), null);
+            verify(conn).prepareStatement(contains("c.is_deleted = 0"));
         }
     }
 

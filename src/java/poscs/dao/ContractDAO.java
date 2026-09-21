@@ -389,9 +389,7 @@ public class ContractDAO {
                 progressFilter, rootsOnly, waitingDepartmentId, ListScope.all());
     }
 
-    /** Như trên kèm phạm vi -- phải KHỚP với findAll, nếu không thì thanh phân trang
-     *  nói một đằng còn bảng liệt kê một nẻo. */
-    /** Bản NHIỀU tỉnh -- phải KHỚP tham số với findAll cùng dạng, nếu không
+    /** Bản NHIỀU tỉnh, kèm phạm vi -- phải KHỚP tham số với findAll cùng dạng, nếu không
      *  thanh phân trang nói một đằng còn bảng liệt kê một nẻo. Không có bản
      *  {@code Integer} song song ở arity này, xem ghi chú ở findAll. */
     public int countAll(String keyword, String statusFilter, String typeFilter, List<Integer> provinceIds,
@@ -620,38 +618,37 @@ public class ContractDAO {
         return result;
     }
 
-    /** Lấy top N hợp đồng "Sắp hết hạn" (BR-17), sắp theo ngày hết hạn gần nhất trước -- phục vụ dashboard. */
-    public List<Contract> findExpiringSoon(int limit) {
-        return findExpiringSoon(limit, null);
-    }
-
-    /** Như {@link #findExpiringSoon(int)} nhưng chỉ lấy hợp đồng thuộc 1 tỉnh (null = toàn quốc). */
-    public List<Contract> findExpiringSoon(int limit, Integer provinceId) {
-        return findExpiringSoon(limit, SqlFilters.one(provinceId), null);
-    }
-
     /**
-     * Như trên nhưng thu hẹp theo NHIỀU tỉnh và theo người phụ trách -- bộ lọc
-     * của Dashboard (rỗng/null ở vế nào là không lọc vế đó, hai vế nối bằng VÀ).
+     * Lấy top N hợp đồng "Sắp hết hạn" (BR-17), sắp theo ngày hết hạn gần nhất
+     * trước -- nuôi lịch nhắc của {@code NotificationScheduler}.
+     *
+     * <p>Từng có thêm hai overload nhận {@code provinceId} và
+     * {@code (provinceIds, ownerIds)}. Cả hai đã bỏ: người gọi duy nhất là lịch
+     * nhắc, và nó luôn truyền null cho cả hai vế, nên toàn bộ nhánh lọc đó chưa
+     * bao giờ chạy. Bảng "sắp hết hạn" trên Dashboard đã chuyển sang
+     * {@link #findActiveInPeriod} từ lâu -- đó mới là chỗ cần lọc địa bàn, và
+     * nó tự có tham số riêng.
      */
-    public List<Contract> findExpiringSoon(int limit, List<Integer> provinceIds, List<Integer> ownerIds) {
+    public List<Contract> findExpiringSoon(int limit) {
         List<Contract> result = new ArrayList<>();
         String sql = SELECT_BASE +
             "WHERE c.is_deleted = 0 AND CURDATE() BETWEEN c.effective_date AND c.end_date " +
             "AND DATEDIFF(c.end_date, CURDATE()) <= " + SOON_THRESHOLD_DAYS + " " +
-            // CHỈ hợp đồng gốc. Bảng này ở Dashboard trả lời "sắp tới phải lo
-            // những hợp đồng nào", mà một phụ lục gia hạn đứng riêng cạnh hợp
-            // đồng cha của nó là ĐẾM HAI LẦN một việc -- và cột giá trị bên
-            // cạnh thì cộng lần nữa phần tiền đã nằm trong giá trị hiện hành
-            // của cha. Phụ lục vẫn tìm được ở danh sách hợp đồng.
+            // CHỈ hợp đồng gốc. Một phụ lục gia hạn đứng riêng cạnh hợp đồng
+            // cha của nó là NHẮC HAI LẦN cho cùng một việc. Phụ lục vẫn tìm
+            // được ở danh sách hợp đồng.
             "AND c.parent_contract_id IS NULL " +
-            SqlFilters.scopeClause(DASHBOARD_OWNER_COLUMNS, ownerIds, "d.province_id", provinceIds) + " " +
+            // CHỈ hợp đồng ĐANG chạy. Trục lịch không biết gì về trục tiến độ:
+            // một hợp đồng đã thanh lý hoặc chấm dứt sớm vẫn nằm trong khoảng
+            // hiệu lực -- kết thúc sớm không làm end_date lùi lại -- nên thiếu
+            // điều kiện này là lịch nhắc bắn "sắp hết hạn" cho một hợp đồng đã
+            // đóng từ lâu. Bản nháp cũng loại: chưa ai ký thì chưa có hạn nào
+            // để nhắc.
+            "AND c.progress_status = '" + PROGRESS_SIGNED + "' " +
             "ORDER BY c.end_date ASC LIMIT ?";
         try (Connection conn = DBContext.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
-            int param = 1;
-            param = SqlFilters.bindScope(ps, param, DASHBOARD_OWNER_COLUMNS, ownerIds, provinceIds);
-            ps.setInt(param, limit);
+            ps.setInt(1, limit);
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
                     result.add(mapRow(rs));
@@ -1829,7 +1826,7 @@ public class ContractDAO {
     /**
      * Huỷ mềm một bản ghi hợp đồng (is_deleted = 1), kèm lý do bắt buộc.
      *
-     * <p>THAY CHO cặp canDelete()/softDelete() cũ. BR-46 cũ cho xoá khi trạng
+     * <p>THAY CHO cặp canDelete()/softDelete() cũ. UC-34 cho xoá khi trạng
      * thái là "Chưa hiệu lực" -- mà trạng thái đó tính theo LỊCH, nên hợp đồng
      * ký hôm qua và hiệu lực tháng sau vẫn xoá được, mang theo cả nội dung đã
      * ký. Điều kiện đúng phải là CHƯA KÝ; nhưng signing_date là NOT NULL nên
@@ -1956,8 +1953,14 @@ public class ContractDAO {
                     return false;
                 }
 
+                // COALESCE, không phải CURDATE() thẳng: hợp đồng nhập từ file
+                // PDF đã mang sẵn ngày ký đọc từ bản giấy, và đó mới là ngày
+                // ký thật. Đóng dấu đè lên nó là mất hẳn thông tin trên giấy,
+                // thay bằng ngày người nhập liệu tình cờ bấm nút. Cột trống
+                // (hợp đồng soạn thẳng trên hệ thống) thì vẫn lấy hôm nay.
                 String sql = PROGRESS_SIGNED.equals(toStatus)
-                        ? "UPDATE contracts SET progress_status = ?, signing_date = CURDATE() "
+                        ? "UPDATE contracts SET progress_status = ?, "
+                          + "signing_date = COALESCE(signing_date, CURDATE()) "
                           + "WHERE contract_id = ? AND is_deleted = 0"
                         : "UPDATE contracts SET progress_status = ? WHERE contract_id = ? AND is_deleted = 0";
                 try (PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -3068,6 +3071,23 @@ public class ContractDAO {
     // đứng một mình được, mọi câu ở đây đều JOIN về contracts.
 
     /**
+     * Loại tiền của hợp đồng ĐÃ HUỶ BẢN GHI ra khỏi các phép cộng doanh thu.
+     *
+     * <p>{@code voidRecord} xoá MỀM: dòng contracts vẫn nằm đó với
+     * {@code is_deleted = 1}, và các kỳ thanh toán treo vào nó không bị đụng
+     * tới (cố ý -- huỷ một bản ghi nhập nhầm không được phép xoá dấu vết tiền
+     * đã ghi nhận). Nhưng hai câu cộng bên dưới JOIN thẳng sang contracts, nên
+     * thiếu điều kiện này thì tiền của một hợp đồng đã biến mất khỏi mọi danh
+     * sách vẫn nằm mãi trong KPI doanh thu -- sai âm thầm, và không có màn hình
+     * nào chỉ ra được nó đến từ đâu.
+     *
+     * <p>Tách thành hằng số vì cả hai câu phải giống nhau từng chữ: lệch một
+     * chỗ là KPI theo kỳ và KPI theo tháng ra hai con số khác nhau cho cùng một
+     * quãng thời gian.
+     */
+    private static final String REVENUE_LIVE_CONTRACT_SQL = "AND c.is_deleted = 0 ";
+
+    /**
      * Tổng tiền đã thu trong một kỳ (theo ngày thanh toán), lọc thêm theo tỉnh
      * của khách hàng đứng tên hợp đồng. period null = trả về 0 phần tiền chưa
      * xác định kỳ -- bên gọi tự quyết định dùng hàm theo tháng bên dưới.
@@ -3092,6 +3112,7 @@ public class ContractDAO {
                      // thì hợp đồng MUA đầu tiên nhập vào là KPI tự cộng cả tiền
                      // mình đi trả, sai âm thầm cho tới lúc đối chiếu sổ sách.
                      "AND c.direction = 'Bán' " +
+                     REVENUE_LIVE_CONTRACT_SQL +
                      SqlFilters.scopeClause(DASHBOARD_OWNER_COLUMNS, ownerIds, "d.province_id", provinceIds);
         try (Connection conn = DBContext.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -3139,6 +3160,7 @@ public class ContractDAO {
                      // thì hợp đồng MUA đầu tiên nhập vào là KPI tự cộng cả tiền
                      // mình đi trả, sai âm thầm cho tới lúc đối chiếu sổ sách.
                      "AND c.direction = 'Bán' " +
+                     REVENUE_LIVE_CONTRACT_SQL +
                      SqlFilters.scopeClause(DASHBOARD_OWNER_COLUMNS, ownerIds, "d.province_id", provinceIds);
         try (Connection conn = DBContext.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
