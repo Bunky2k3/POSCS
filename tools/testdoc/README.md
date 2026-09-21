@@ -5,10 +5,21 @@ mã nguồn test và kết quả chạy test, thay vì gõ tay 385 test case và
 
 ## Cách chạy
 
+Ba bước, **đúng thứ tự này**: `ant test` xoá sạch `build/test/results` trước
+khi chạy, nên bản junit của Node phải sinh SAU, nếu không phần JavaScript sẽ
+mang nhãn "Chưa chạy".
+
 ```
 ant test                                        # bắt buộc chạy trước
+
+node --test --test-reporter=junit      --test-reporter-destination=build/test/results/TEST-js.xml      "test/js/**/*.test.js"                     # phần JavaScript
+
 python tools/testdoc/gen_unittest_function.py
 ```
+
+Thiếu Node thì phần Java vẫn sinh bình thường, phần JavaScript được liệt kê
+nhưng đánh dấu "Chưa chạy" kèm cảnh báo - thà thiếu còn hơn ghi Đạt cho thứ
+chưa từng chạy.
 
 Kết quả mặc định: `%USERPROFILE%\Documents\POSCS_UnitTest_Function.xlsx`
 
@@ -31,6 +42,25 @@ Trên máy chưa cài Ant vào PATH (xem `.github/workflows/tests.yml`):
   -Dlibs.CopyLibs.classpath="%CD%\lib-build\org-netbeans-modules-java-j2seproject-copylibstask.jar" \
   test
 ```
+
+## Test JavaScript
+
+Mã nguồn `web/js/appshell.js` không có lớp nào, nên nhóm sheet lấy tên file làm
+"lớp": `appshell_<hàm>`. Tiêu đề test trong `test/js/*.test.js` viết theo quy
+ước
+
+```
+test('<hàm>: <điều kiện> → <kỳ vọng>', ...)
+```
+
+đúng ba phần mà ma trận UTCID cần, chỉ khác là viết bằng tiếng Việt cho đọc
+được thẳng trong terminal. Thiếu dấu `→` thì cả phần mô tả bị coi là điều kiện
+và script cảnh báo ở cuối - kỳ vọng để trống cho người viết tự điền, chứ không
+đoán bừa một câu vào tài liệu nộp.
+
+Bộ xuất junit của Node escape hai lần (`"` ra thành `&amp;quot;`), script tự gỡ
+trước khi đối chiếu tên - không gỡ thì mọi tiêu đề có dấu nháy kép đều bị ghi
+nhầm là "Chưa chạy".
 
 ## Cách script hiểu test
 

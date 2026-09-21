@@ -3,17 +3,26 @@
 """Sinh tài liệu Report 5.1 - Unit Test (Function) theo mẫu SEP490.
 
 Nguồn dữ liệu:
-  - test/**/*Test.java          -> danh sách test case (tên method @Test)
+  - test/**/*Test.java          -> danh sách test case Java (tên method @Test)
+  - test/js/*.test.js           -> danh sách test case JavaScript (tên test())
   - build/test/results/*.xml    -> kết quả Passed/Failed/Untested THẬT của lần
                                    `ant test` gần nhất. Không có file này thì
                                    script dừng, để tài liệu không bao giờ ghi
                                    "Passed" cho thứ chưa từng chạy.
+  - build/test/results/TEST-js.xml -> kết quả của `node --test`. Thiếu file này
+                                   thì phần JS vẫn được liệt kê nhưng đánh dấu
+                                   "Chưa chạy", không bao giờ đoán là Đạt.
 
 Quy ước đặt tên test trong repo: <method>_<điều kiện>_<kỳ vọng>, ví dụ
 `insert_noRowAffected_rollsBackAndReturnsMinusOne`. Script tách tên này thành
 dòng Condition và dòng Confirm của ma trận UTCID.
 
-Chạy:  python tools/testdoc/gen_unittest_function.py [-o <đường dẫn .xlsx>]
+Chạy (đúng thứ tự -- `ant test` xoá sạch build/test/results trước khi chạy,
+nên bản junit của Node phải sinh SAU):
+
+    ant ... test
+    node --test --test-reporter=junit          --test-reporter-destination=build/test/results/TEST-js.xml          'test/js/**/*.test.js'
+    python tools/testdoc/gen_unittest_function.py [-o <đường dẫn .xlsx>]
 
 File .xlsx là tài liệu nộp, KHÔNG nằm trong repo. Mặc định ghi ra
 <thư mục Documents của người dùng>/POSCS_UnitTest_Function.xlsx.
@@ -40,9 +49,36 @@ GLOSSARY = pathlib.Path(__file__).with_name("vi_glossary.json")
 
 PROJECT_NAME = "POSCS - Point Of Sale & Customer Support System"
 PROJECT_CODE = "POSCS"
-DOC_CODE = "POSCS_UnitTest_v1.0"
+VERSION = "2.0"
+DOC_CODE = "POSCS_UnitTest_v%s" % VERSION
 CREATOR = "G82"
 ISSUE_DATE = datetime.date.today()
+
+# Lịch sử thay đổi in ra Trang bìa. Giữ nguyên dòng cũ khi lên phiên bản mới --
+# mẫu SEP490 yêu cầu Record of change là lịch sử, không phải dòng cuối cùng.
+CHANGE_LOG = [
+    (datetime.date(2026, 9, 11), "1.0", "Toàn bộ", "A",
+     "Tạo mới tài liệu Unit Test cho POSCS", ""),
+    (ISSUE_DATE, "2.0", "Toàn bộ", "M",
+     "Cập nhật theo mã nguồn hiện tại (vòng đời hợp đồng, bàn giao, tài liệu "
+     "hợp đồng, module tiền); bổ sung nhóm hàm JavaScript", ""),
+]
+
+# --- Nguồn test JavaScript -------------------------------------------------
+# Phần JS chạy bằng bộ chạy test có sẵn của Node (không npm), kết quả xuất ra
+# junit để đọc được ở đây -- xem test/js/money-vnd.test.js và README của thư
+# mục này.
+JS_TEST_DIR = ROOT / "test" / "js"
+JS_RESULT = RESULT_DIR / "TEST-js.xml"
+
+# Tên "lớp" cho phần JS: mã nguồn là web/js/appshell.js, không có lớp nào cả,
+# nên lấy tên file làm nhóm để sheet đọc ra vẫn là "<nguồn>_<hàm>".
+JS_PROD_CLASS = "appshell"
+
+# Tiêu đề test JS theo quy ước "<hàm>: <điều kiện> → <kỳ vọng>" -- cùng một
+# cách chia ba phần như tên method Java, chỉ khác là viết bằng tiếng Việt cho
+# đọc được thẳng trong terminal.
+JS_TEST_PATTERN = re.compile(r"^test\(\s*'([^']+)'", re.M)
 
 # Integration test không thuộc tài liệu 5.1 - chúng nằm ở Report 5.2.
 EXCLUDED_TEST_CLASSES = {
@@ -235,6 +271,29 @@ def classify(condition_raw, expectation_raw=""):
     return "N"
 
 
+# Cùng việc như classify() nhưng cho tiêu đề test JavaScript -- tiêu đề đó viết
+# bằng tiếng Việt nên danh sách từ khoá tiếng Anh ở trên không bắt được gì.
+# Kiểm A TRƯỚC B ở đây (ngược với bản tiếng Anh): "chuỗi rỗng hoặc không phải
+# số" là đầu vào bất thường chứ không phải ca biên, mà chữ "rỗng" lại đứng
+# trước.
+ABNORMAL_WORDS_VI = ("âm", "không đọc được", "không phải số", "không hợp lệ")
+BOUNDARY_WORDS_VI = ("rỗng", "số 0", "khoảng trắng", "thừa ở đầu", "biên",
+                     "tối đa", "tối thiểu")
+
+
+def classify_vi(condition, expectation=""):
+    low = (condition or "").lower()
+    for word in ABNORMAL_WORDS_VI:
+        if word in low:
+            return "A"
+    for word in BOUNDARY_WORDS_VI:
+        if word in low:
+            return "B"
+    if "null" in (expectation or "").lower():
+        return "A"
+    return "N"
+
+
 def load_glossary():
     """Bản dịch tiếng Việt cho chuỗi điều kiện/kỳ vọng sinh từ tên test."""
     data = json.loads(GLOSSARY.read_text(encoding="utf-8"))
@@ -334,17 +393,104 @@ def collect():
                 unknown.append("%s.%s (khong co trong ket qua junit)"
                                % (test_class, test_name))
                 status = "Untested"
+            condition_vi = vi(condition) or "Dữ liệu hợp lệ (trường hợp mặc định)"
+            expectation_vi = vi(expectation) or "Thực thi đúng như đặc tả"
+            # Danh sách từ khoá tiếng Anh không bắt được gì trên một tên test
+            # đặt bằng tiếng Việt ("soAm", "chuoiRong"...) -- mà repo có khá
+            # nhiều test như vậy, và tất cả sẽ bị xếp nhầm hết vào loại N. Rơi
+            # về bộ phân loại tiếng Việt, chạy trên chuỗi ĐÃ DỊCH nên bắt được
+            # cả tên tiếng Việt không dấu.
+            loai = classify(condition_raw, expect_raw)
+            if loai == "N":
+                loai = classify_vi(condition_vi, expectation_vi)
             groups.setdefault((prod_class, method), []).append({
                 "test_class": test_class,
+                "test_file": test_class + ".java",
                 "package": package,
                 "test_name": test_name,
-                "condition": vi(condition) or "Dữ liệu hợp lệ (trường hợp mặc định)",
-                "expectation": vi(expectation) or "Thực thi đúng như đặc tả",
-                "type": classify(condition_raw, expect_raw),
+                "condition": condition_vi,
+                "expectation": expectation_vi,
+                "type": loai,
                 "status": status,
                 "precondition": precondition,
             })
+    collect_js(groups, unknown)
     return groups, unknown
+
+
+def load_js_results():
+    """Tiêu đề test JS -> Passed | Failed | Untested, đọc từ bản junit của Node.
+
+    Thiếu file thì trả rỗng chứ không dừng cả script: máy chưa cài Node vẫn
+    sinh được phần Java, và phần JS sẽ mang nhãn "Chưa chạy" -- thà thiếu còn
+    hơn ghi Đạt cho thứ chưa từng chạy.
+    """
+    if not JS_RESULT.is_file():
+        return {}
+    out = {}
+    for tc in ET.parse(JS_RESULT).getroot().iter("testcase"):
+        # Bộ xuất junit của Node escape HAI LẦN: dấu nháy kép trong tiêu đề ra
+        # thành "&amp;quot;" chứ không phải """. Không gỡ thì mọi tiêu đề có
+        # dấu nháy sẽ không khớp với tên đọc từ mã nguồn, và test đang chạy tốt
+        # bị ghi vào tài liệu là "Chưa chạy".
+        ten = (tc.get("name") or "").replace("&amp;quot;", '"').replace("&quot;", '"')
+        if tc.find("failure") is not None or tc.find("error") is not None:
+            status = "Failed"
+        elif tc.find("skipped") is not None:
+            status = "Untested"
+        else:
+            status = "Passed"
+        out[ten] = status
+    return out
+
+
+def collect_js(groups, unknown):
+    """Gộp các test JavaScript vào cùng cấu trúc groups với phần Java.
+
+    Tiêu đề test theo quy ước "<hàm>: <điều kiện> → <kỳ vọng>", tách ra đúng ba
+    phần mà ma trận UTCID cần. Tiêu đề không có dấu "→" thì cả phần mô tả coi
+    là điều kiện, và kỳ vọng để trống cho người viết tự điền -- đoán bừa một
+    câu kỳ vọng vào tài liệu nộp thì tệ hơn là để trống.
+    """
+    if not JS_TEST_DIR.is_dir():
+        return
+    ket_qua = load_js_results()
+    thieu_ket_qua = not ket_qua
+    for path in sorted(JS_TEST_DIR.glob("*.test.js")):
+        source = path.read_text(encoding="utf-8", errors="replace")
+        for title in JS_TEST_PATTERN.findall(source):
+            if ":" not in title:
+                unknown.append("%s: %s (thieu dau ':')" % (path.name, title))
+                continue
+            method, mo_ta = title.split(":", 1)
+            method = method.strip()
+            mo_ta = mo_ta.strip()
+            if "→" in mo_ta:
+                condition, expectation = [x.strip() for x in mo_ta.split("→", 1)]
+            else:
+                condition, expectation = mo_ta, ""
+                unknown.append("%s: %s (thieu dau '→')" % (path.name, title))
+            status = ket_qua.get(title)
+            if status is None:
+                if not thieu_ket_qua:
+                    unknown.append("%s (khong co trong TEST-js.xml)" % title)
+                status = "Untested"
+            groups.setdefault((JS_PROD_CLASS, method), []).append({
+                "test_class": path.stem,
+                "test_file": path.name,
+                "package": "web/js",
+                "test_name": title,
+                "condition": condition or "Dữ liệu hợp lệ (trường hợp mặc định)",
+                "expectation": expectation or "Thực thi đúng như đặc tả",
+                "type": classify_vi(condition, expectation),
+                "status": status,
+                "precondition": ("Không cần mock - nạp web/js/appshell.js trong "
+                                 "sandbox vm với document giả, chạy bằng "
+                                 "`node --test`"),
+            })
+    if thieu_ket_qua and any(k[0] == JS_PROD_CLASS for k in groups):
+        print("  CANH BAO - khong thay %s, phan JS danh dau 'Chua chay'."
+              % JS_RESULT.name)
 
 
 def sheet_names(groups):
@@ -412,7 +558,7 @@ def build_cover(wb):
     rows = [
         ("Tên dự án", PROJECT_NAME, "Người lập", CREATOR),
         ("Mã dự án", PROJECT_CODE, "Ngày phát hành", ISSUE_DATE),
-        ("Mã tài liệu", DOC_CODE, "Phiên bản", "1.0"),
+        ("Mã tài liệu", DOC_CODE, "Phiên bản", VERSION),
     ]
     for i, (label, value, label2, value2) in enumerate(rows, start=4):
         put(ws, i, 1, label, font=BOLD, fill=LBL_FILL)
@@ -424,12 +570,9 @@ def build_cover(wb):
                "Mô tả thay đổi", "Tham chiếu"]
     for j, head in enumerate(headers, start=1):
         put(ws, 10, j, head, font=BOLD, fill=HDR_FILL, align=CENTER)
-    put(ws, 11, 1, ISSUE_DATE)
-    put(ws, 11, 2, "1.0")
-    put(ws, 11, 3, "Toàn bộ")
-    put(ws, 11, 4, "A")
-    put(ws, 11, 5, "Tạo mới tài liệu Unit Test cho POSCS")
-    put(ws, 11, 6, "")
+    for i, dong in enumerate(CHANGE_LOG, start=11):
+        for j, o in enumerate(dong, start=1):
+            put(ws, i, j, o, align=WRAP if j == 5 else None)
     return ws
 
 
@@ -541,8 +684,9 @@ def build_case_sheet(wb, key, cases, name):
         ("Người lập", CREATOR),
         ("Người thực thi", CREATOR),
         ("Yêu cầu kiểm thử",
-         "Kiểm thử đơn vị hàm %s() của lớp %s (mã nguồn test: %s.java)"
-         % (method, prod_class, cases[0]["test_class"])),
+         "Kiểm thử đơn vị hàm %s() của %s (mã nguồn test: %s)"
+         % (method, prod_class, cases[0].get("test_file",
+                                             cases[0]["test_class"] + ".java"))),
         ("Tổng số test case", len(cases)),
         ("Đạt / Trượt / Chưa chạy", "%d / %d / %d"
          % (counts["Passed"], counts["Failed"], counts["Untested"])),

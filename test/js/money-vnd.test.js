@@ -86,7 +86,7 @@ const POSCS = napAppshell();
 // docTienVND -- đọc số thành chữ
 // ----------------------------------------------------------------------
 
-test('docTienVND: các mốc dễ sai của cách đọc tiếng Việt', () => {
+test('docTienVND: các mốc hàng chục, hàng trăm dễ đọc sai → đọc đúng lăm / mốt / lẻ', () => {
     const bang = [
         [0, 'Không đồng'],
         [1, 'Một đồng'],
@@ -107,7 +107,7 @@ test('docTienVND: các mốc dễ sai của cách đọc tiếng Việt', () => 
     }
 });
 
-test('docTienVND: nhóm rỗng ở giữa phải đọc "không trăm lẻ"', () => {
+test('docTienVND: nhóm ba chữ số ở giữa bằng 0 → đọc kèm "không trăm lẻ"', () => {
     // Bỏ "không trăm" đi thì 1.000.005 thành "một triệu năm" -- nghe ra
     // 1.000.500, tức là một con số khác hẳn.
     assert.strictEqual(POSCS.docTienVND(1000000), 'Một triệu đồng');
@@ -115,7 +115,7 @@ test('docTienVND: nhóm rỗng ở giữa phải đọc "không trăm lẻ"', ()
     assert.strictEqual(POSCS.docTienVND(1000015), 'Một triệu không trăm mười lăm đồng');
 });
 
-test('docTienVND: các bậc nghìn / triệu / tỷ', () => {
+test('docTienVND: số tròn nghìn, triệu, tỷ → đọc đúng tên bậc', () => {
     assert.strictEqual(POSCS.docTienVND(1000), 'Một nghìn đồng');
     assert.strictEqual(POSCS.docTienVND(980000000), 'Chín trăm tám mươi triệu đồng');
     assert.strictEqual(POSCS.docTienVND(1000000000), 'Một tỷ đồng');
@@ -123,7 +123,7 @@ test('docTienVND: các bậc nghìn / triệu / tỷ', () => {
     assert.strictEqual(POSCS.docTienVND(1000000000000), 'Một nghìn tỷ đồng');
 });
 
-test('docTienVND: số âm đọc là "Giảm trừ" chứ không phải "Âm"', () => {
+test('docTienVND: số âm của phụ lục → đọc là "Giảm trừ ..." chứ không phải "Âm"', () => {
     // Số âm ở đây chỉ đến từ phụ lục giảm trừ, nên đọc theo nghiệp vụ.
     assert.strictEqual(POSCS.docTienVND(-120000000), 'Giảm trừ một trăm hai mươi triệu đồng');
 });
@@ -133,14 +133,14 @@ test('docTienVND: số âm đọc là "Giảm trừ" chứ không phải "Âm"',
 // Cùng quy tắc với MoneyVnd.parseOrNull bên Java, xem javadoc ở đó.
 // ----------------------------------------------------------------------
 
-test('soTuChuoi: chuỗi từ CSDL không bị nhân 100', () => {
+test('soTuChuoi: chuỗi DECIMAL(15,2) từ CSDL → giữ nguyên giá trị, không nhân 100', () => {
     // JSP đổ DECIMAL(15,2) thẳng ra ô nhập, nên chuỗi vào mang đuôi ".00".
     assert.strictEqual(POSCS.soTuChuoi('980000000.00'), 980000000);
     assert.strictEqual(POSCS.soTuChuoi('980000000,00'), 980000000);
     assert.strictEqual(POSCS.soTuChuoi('1500000000.00'), 1500000000);
 });
 
-test('soTuChuoi: nhóm cuối đúng 3 chữ số là phân nhóm', () => {
+test('soTuChuoi: nhóm cuối đúng 3 chữ số → hiểu là dấu phân nhóm', () => {
     // "1.500" ở Việt Nam là một nghìn rưỡi, không phải một phẩy năm.
     assert.strictEqual(POSCS.soTuChuoi('1.500'), 1500);
     assert.strictEqual(POSCS.soTuChuoi('1,500'), 1500);
@@ -148,29 +148,29 @@ test('soTuChuoi: nhóm cuối đúng 3 chữ số là phân nhóm', () => {
     assert.strictEqual(POSCS.soTuChuoi('1,500,000,000'), 1500000000);
 });
 
-test('soTuChuoi: nhóm cuối khác 3 chữ số là thập phân', () => {
+test('soTuChuoi: nhóm cuối khác 3 chữ số → hiểu là dấu thập phân', () => {
     assert.strictEqual(POSCS.soTuChuoi('1.5'), 1.5);
     assert.strictEqual(POSCS.soTuChuoi('1,5'), 1.5);
 });
 
-test('soTuChuoi: có cả hai loại dấu thì dấu SAU là thập phân', () => {
+test('soTuChuoi: có cả dấu chấm lẫn dấu phẩy → dấu đứng sau là thập phân', () => {
     assert.strictEqual(POSCS.soTuChuoi('1.500,75'), 1500.75);
     assert.strictEqual(POSCS.soTuChuoi('1,500.75'), 1500.75);
 });
 
-test('soTuChuoi: bỏ qua khoảng trắng, kể cả non-breaking space', () => {
+test('soTuChuoi: chuỗi có khoảng trắng và non-breaking space → vẫn đọc được', () => {
     // Dán từ Excel hay từ một trang web khác rất hay mang theo U+00A0.
     assert.strictEqual(POSCS.soTuChuoi(' 980 000 000 '), 980000000);
     assert.strictEqual(POSCS.soTuChuoi('980 000 000'), 980000000);
 });
 
-test('soTuChuoi: chuỗi không đọc được trả null', () => {
+test('soTuChuoi: chuỗi rỗng hoặc không phải số → trả null', () => {
     for (const rac of ['', '   ', 'abc', '12abc', '1.500 đ', '.', '.5', '5.', null, undefined]) {
         assert.strictEqual(POSCS.soTuChuoi(rac), null, JSON.stringify(rac));
     }
 });
 
-test('soTuChuoi: ĐỌC ĐƯỢC SỐ ÂM (lỗi đã xảy ra: phụ lục giảm trừ)', () => {
+test('soTuChuoi: giá trị âm của phụ lục giảm trừ → đọc được, không trả null', () => {
     // Trang chi tiết đổ contract_value ra data-vnd, và phụ lục giảm trừ mang
     // giá trị âm THẬT. Bản cũ từ chối dấu trừ nên trả null, dòng chữ rỗng, và
     // CSS .money-words:empty giấu luôn -- tính năng biến mất không một dấu vết
@@ -184,7 +184,7 @@ test('soTuChuoi: ĐỌC ĐƯỢC SỐ ÂM (lỗi đã xảy ra: phụ lục gi�
 // giaTriSauNhap -- giá trị ô mang sau một lần gõ hoặc dán
 // ----------------------------------------------------------------------
 
-test('giaTriSauNhap: gõ từng phím thì chỉ giữ chữ số', () => {
+test('giaTriSauNhap: gõ từng phím → chỉ giữ chữ số rồi phân nhóm', () => {
     // Chuỗi trung gian lúc đang gõ "1.500" phải đi qua được, không bị hàm đọc
     // số cắn mất chữ số vừa gõ.
     assert.strictEqual(POSCS.giaTriSauNhap('1', false), '1');
@@ -194,13 +194,13 @@ test('giaTriSauNhap: gõ từng phím thì chỉ giữ chữ số', () => {
     assert.strictEqual(POSCS.giaTriSauNhap('1500000000', false), '1.500.000.000');
 });
 
-test('giaTriSauNhap: ô rỗng và số 0 đứng đầu', () => {
+test('giaTriSauNhap: ô rỗng hoặc số 0 thừa ở đầu → chuẩn hoá về đúng con số', () => {
     assert.strictEqual(POSCS.giaTriSauNhap('', false), '');
     assert.strictEqual(POSCS.giaTriSauNhap('0', false), '0');
     assert.strictEqual(POSCS.giaTriSauNhap('007', false), '7');
 });
 
-test('giaTriSauNhap: DÁN số có đuôi thập phân KHÔNG nhân 100 (lỗi đã xảy ra)', () => {
+test('giaTriSauNhap: dán số có đuôi thập phân → giữ nguyên giá trị, không nhân 100', () => {
     // Copy một con số từ bản xuất Excel hoặc từ một ô cũ còn nguyên đuôi ".00"
     // rồi dán vào. Bản cũ xoá mọi ký tự không phải chữ số, nên "980000000.00"
     // thành 98.000.000.000 ngay trên màn hình và bấm Lưu là CSDL nhận 98 tỷ --
@@ -210,18 +210,18 @@ test('giaTriSauNhap: DÁN số có đuôi thập phân KHÔNG nhân 100 (lỗi �
     assert.strictEqual(POSCS.giaTriSauNhap('1500000000,00', true), '1.500.000.000');
 });
 
-test('giaTriSauNhap: dán số đã phân nhóm thì giữ nguyên', () => {
+test('giaTriSauNhap: dán số đã phân nhóm sẵn → giữ nguyên', () => {
     assert.strictEqual(POSCS.giaTriSauNhap('1.500.000.000', true), '1.500.000.000');
     assert.strictEqual(POSCS.giaTriSauNhap('98 000 000', true), '98.000.000');
 });
 
-test('giaTriSauNhap: dán chuỗi không đọc được thì lùi về giữ chữ số', () => {
+test('giaTriSauNhap: dán chuỗi không đọc được → lùi về giữ chữ số', () => {
     // "980.000.000 ₫" copy nguyên từ trang chi tiết: có ký hiệu tiền nên không
     // khớp quy tắc đọc số, nhưng lùi về giữ chữ số vẫn ra đúng con số.
     assert.strictEqual(POSCS.giaTriSauNhap('980.000.000 ₫', true), '980.000.000');
 });
 
-test('giaTriSauNhap: dán số âm thì ô giữ nguyên chữ số, không mang dấu trừ', () => {
+test('giaTriSauNhap: dán số âm → ô chỉ giữ con số, bỏ dấu trừ', () => {
     // Ô nhập tiền luôn là số dương: dấu của phụ lục nằm ở ô chọn Bổ sung/Giảm
     // trừ bên cạnh. Dán "-120000000" vào thì chỉ còn con số.
     assert.strictEqual(POSCS.giaTriSauNhap('-120000000', true), '120.000.000');
@@ -231,7 +231,7 @@ test('giaTriSauNhap: dán số âm thì ô giữ nguyên chữ số, không mang
 // nhomNghin
 // ----------------------------------------------------------------------
 
-test('nhomNghin: chèn dấu chấm mỗi 3 chữ số, không phải dấu phẩy', () => {
+test('nhomNghin: chuỗi chữ số bất kỳ → chèn dấu chấm mỗi 3 chữ số', () => {
     // Dấu chấm để khớp phần hiển thị sẵn có (toLocaleString 'vi-VN'): một màn
     // hình mà chỗ này chấm chỗ kia phẩy thì 1.500 đọc ra hai nghĩa.
     assert.strictEqual(POSCS.nhomNghin('1'), '1');
