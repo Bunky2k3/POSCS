@@ -29,6 +29,7 @@ import poscs.common.AccessControl;
 import poscs.common.ListScope;
 import poscs.common.ExcelUtil;
 import poscs.common.Logs;
+import poscs.common.MoneyVnd;
 import poscs.common.PdfUtil;
 import poscs.common.Period;
 import poscs.common.QueryStrings;
@@ -2058,7 +2059,7 @@ public class ContractController extends HttpServlet {
         }
 
         ContractPayment payment = new ContractPayment();
-        payment.setInvoiceAmount(parseMoneyOrNull(request.getParameter("invoiceAmount")));
+        payment.setInvoiceAmount(MoneyVnd.parseOrNull(request.getParameter("invoiceAmount")));
         payment.setDueDate(parseDateOrNull(request.getParameter("dueDate")));
         payment.setPaidDate(parseDateOrNull(request.getParameter("paidDate")));
 
@@ -2322,7 +2323,7 @@ public class ContractController extends HttpServlet {
      * <p>Không có tham số {@code valueAdjustment} = đang ở form hợp đồng gốc.
      */
     private java.math.BigDecimal parseContractValue(HttpServletRequest request) {
-        java.math.BigDecimal amount = parseMoneyOrNull(request.getParameter("contractValue"));
+        java.math.BigDecimal amount = MoneyVnd.parseOrNull(request.getParameter("contractValue"));
         String adjustment = request.getParameter("valueAdjustment");
         if (adjustment == null) {
             return amount;
@@ -2349,31 +2350,6 @@ public class ContractController extends HttpServlet {
         }
         java.math.BigDecimal current = parent.getCurrentValue();
         return (current == null ? java.math.BigDecimal.ZERO : current).add(delta).signum() < 0;
-    }
-
-    /**
-     * Đọc số tiền người dùng gõ. Chấp nhận cả "1.500.000.000" lẫn "1500000000"
-     * -- người Việt gõ dấu chấm phân nhóm theo thói quen, và bắt họ gõ số trần
-     * chỉ tạo ra lỗi nhập liệu chứ không tạo ra dữ liệu sạch hơn.
-     *
-     * <p>Trả null khi để trống (bản nháp chưa chốt giá) HOẶC khi chuỗi không
-     * đọc được -- không ném ra ngoài: một ô tiền gõ sai không đáng làm hỏng cả
-     * lần lưu, và isValid() bên dưới sẽ bắt nếu giá trị đó là bắt buộc.
-     *
-     * <p>Số âm bị từ chối: giá trị hợp đồng âm không có nghĩa, và nếu lọt vào
-     * thì nó âm thầm trừ đi trong mọi phép cộng sau này.
-     */
-    private java.math.BigDecimal parseMoneyOrNull(String raw) {
-        if (isBlank(raw)) {
-            return null;
-        }
-        String digits = raw.replaceAll("[.,\\s]", "");
-        try {
-            java.math.BigDecimal value = new java.math.BigDecimal(digits);
-            return value.signum() < 0 ? null : value;
-        } catch (NumberFormatException ex) {
-            return null;
-        }
     }
 
     /** BR-36: các trường bắt buộc phải có, và Ngày ký ≤ Ngày hiệu lực ≤ Ngày kết thúc. */

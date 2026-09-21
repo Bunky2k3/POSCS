@@ -377,8 +377,9 @@
                              lên dấu trừ lẫn "Giảm trừ" thì controller sẽ đảo dấu một
                              khoản vốn đã âm. --%>
                         <input type="text" class="form-control" id="contractValue" name="contractValue"
-                               inputmode="numeric" placeholder="VD: 1.500.000.000"
+                               inputmode="numeric" data-money placeholder="VD: 1.500.000.000"
                                value="${contract.amendment and contract.contractValue != null ? contract.contractValue.abs() : contract.contractValue}" ${canEditTerms ? '' : 'disabled'} data-term="1">
+                        <span class="money-words" data-money-words-for="contractValue"></span>
                         <span style="font-size:0.78rem; color:#9ca3af; display:block; margin-top:6px;">
                             <c:choose>
                                 <c:when test="${contract.amendment}">
@@ -710,8 +711,9 @@
                         <div class="row g-2 align-items-end">
                             <div class="col-md-4">
                                 <label class="form-label">Số tiền (VNĐ)</label>
-                                <input type="text" class="form-control" name="invoiceAmount" inputmode="numeric"
-                                       placeholder="VD: 450.000.000" required>
+                                <input type="text" class="form-control" id="invoiceAmount" name="invoiceAmount" inputmode="numeric"
+                                       data-money placeholder="VD: 450.000.000" required>
+                                <span class="money-words" data-money-words-for="invoiceAmount"></span>
                             </div>
                             <div class="col-md-3">
                                 <label class="form-label">Đến hạn</label>

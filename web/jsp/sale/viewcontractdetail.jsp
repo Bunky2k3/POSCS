@@ -628,6 +628,7 @@
                                      ("1,5 tỷ đ"), còn đây cần con số chính xác. --%>
                                 <strong class="${contract.amendment ? 'money-signed' : 'money-vnd'}"
                                         data-vnd="${contract.contractValue}">&mdash;</strong>
+                                <span class="money-words" data-money-words data-vnd="${contract.contractValue}"></span>
                                 <c:if test="${contract.amendment}">
                                     <div style="font-size:0.78rem; color:#6b7280; margin-top:4px;">
                                         Cộng vào giá trị hợp đồng gốc khi phụ lục này được ký.

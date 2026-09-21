@@ -1103,6 +1103,74 @@ public class ContractDAOTest {
         }
     }
 
+    /**
+     * Mở form sửa rồi bấm Lưu mà không đổi gì thì KHÔNG được sinh dòng nhật ký
+     * -- kể cả khi giá trị hợp đồng đọc từ CSDL có scale 2 (DECIMAL(15,2)) còn
+     * giá trị vừa nhập có scale 0.
+     *
+     * <p>So bằng chuỗi toPlainString thì "1250000000.00" khác "1250000000", nên
+     * mỗi lần bấm Lưu lại đẻ ra một dòng "Giá trị hợp đồng: 1250000000.00 →
+     * 1250000000" -- một thay đổi chưa hề xảy ra, đúng thứ khối chú thích ở
+     * update() nói là không được có.
+     */
+    @Test
+    public void update_sameMoneyWithDifferentScale_writesNoHistoryLine() throws Exception {
+        java.util.Map<String, Object> before = parentRow(ContractDAO.PROGRESS_DRAFT, null);
+        before.put("contract_value", new BigDecimal("1250000000.00"));
+        ResultSet current = singleRow(before);
+        PreparedStatement historyPs = mock(PreparedStatement.class);
+        PreparedStatement contractPs = mock(PreparedStatement.class);
+        when(contractPs.executeQuery()).thenReturn(current);
+        when(contractPs.executeUpdate()).thenReturn(1);
+        Connection conn = connectionRoutingOn("contract_history", historyPs, contractPs);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            // Đúng thứ MoneyVnd.parseOrNull trả về khi người dùng không đụng ô tiền.
+            assertTrue(dao.update(resubmitted(new BigDecimal("1250000000")), ACTOR));
+
+            verify(historyPs, never()).executeUpdate();
+            verify(conn).commit();
+        }
+    }
+
+    /** Đổi thật thì vẫn ghi, và ghi bằng số có phân nhóm để đọc được. */
+    @Test
+    public void update_moneyChanged_logsBothSidesGrouped() throws Exception {
+        java.util.Map<String, Object> before = parentRow(ContractDAO.PROGRESS_DRAFT, null);
+        before.put("contract_value", new BigDecimal("1250000000.00"));
+        ResultSet current = singleRow(before);
+        PreparedStatement historyPs = mock(PreparedStatement.class);
+        PreparedStatement contractPs = mock(PreparedStatement.class);
+        when(contractPs.executeQuery()).thenReturn(current);
+        when(contractPs.executeUpdate()).thenReturn(1);
+        Connection conn = connectionRoutingOn("contract_history", historyPs, contractPs);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            assertTrue(dao.update(resubmitted(new BigDecimal("1500000000")), ACTOR));
+
+            ArgumentCaptor<String> detail = ArgumentCaptor.forClass(String.class);
+            verify(historyPs).setString(eq(3), detail.capture());
+            assertEquals("Giá trị hợp đồng: 1.250.000.000 đ → 1.500.000.000 đ", detail.getValue());
+        }
+    }
+
+    /** Đúng các trường của parentRow(), chỉ khác mỗi số tiền -- để nhật ký chỉ nói về tiền. */
+    private static Contract resubmitted(BigDecimal value) {
+        Contract c = new Contract();
+        c.setContractId(3);
+        c.setContractCode("01/2026/HĐMB-POSTEF");
+        c.setTitle("Hợp đồng gốc");
+        c.setContractType("Mua vật tư");
+        c.setEnterpriseId(12);
+        c.setOwnerId(5);
+        c.setContractValue(value);
+        return c;
+    }
+
     // ------------------------------------------------------------------
     // correct() -- Admin chữa sai sót nhập liệu
     // ------------------------------------------------------------------

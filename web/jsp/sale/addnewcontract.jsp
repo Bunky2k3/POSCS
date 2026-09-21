@@ -287,7 +287,8 @@
                     <div class="col-md-6 field-row">
                         <label>${empty parentContract ? 'Giá trị hợp đồng (VNĐ)' : 'Số tiền điều chỉnh (VNĐ)'}</label>
                         <input type="text" class="form-control" id="contractValue" name="contractValue"
-                               inputmode="numeric" placeholder="VD: ${empty parentContract ? '1.500.000.000' : '250.000.000'}">
+                               inputmode="numeric" data-money placeholder="VD: ${empty parentContract ? '1.500.000.000' : '250.000.000'}">
+                        <span class="money-words" data-money-words-for="contractValue"></span>
                         <span style="font-size:0.78rem; color:#9ca3af; display:block; margin-top:6px;">
                             <c:choose>
                                 <c:when test="${not empty parentContract}">
