@@ -84,12 +84,20 @@
         .table-section-header a { font-size: 0.8rem; color: var(--primary); text-decoration: none; font-weight: 600; }
         .table-section-header a:hover { text-decoration: underline; }
 
-        .mini-table { width: 100%; }
+        /* table-layout: fixed -- KHÔNG để trình duyệt tự chia cột.
+           Cách chia tự động dựa vào chỗ xuống dòng được của nội dung, và ở đây
+           nó cho ra kết quả ngược đời: "08/2026/HĐKT-POSTEF" gần như không ngắt
+           được nên trình duyệt giữ hẳn 131px cho cột Mã HĐ, còn "Công ty Cổ
+           phần Đầu tư Hạ tầng Đất Tổ" ngắt được ở mọi dấu cách nên bị ép xuống
+           86px -- tên khách rơi thành 5 dòng, dòng bảng cao 141px trong khi
+           bảng khách hàng ngay bên cạnh chỉ 61px. Chia cứng thì cột tên được
+           phần rộng nhất, đúng như nó cần. */
+        .mini-table { width: 100%; table-layout: fixed; }
         .mini-table th {
             font-size: 0.7rem; text-transform: uppercase; color: #9ca3af; font-weight: 700;
-            padding: 8px 10px; border-bottom: 1.5px solid #eef2f6; text-align: left;
+            padding: 8px 7px; border-bottom: 1.5px solid #eef2f6; text-align: left;
         }
-        .mini-table td { padding: 10px 10px; font-size: 0.84rem; color: #111827; border-bottom: 1px solid #f3f4f6; vertical-align: middle; }
+        .mini-table td { padding: 10px 7px; font-size: 0.84rem; color: #111827; border-bottom: 1px solid #f3f4f6; vertical-align: middle; }
         .mini-table tr:last-child td { border-bottom: none; }
         /* Hai bảng giờ chia đôi bề ngang nên mỗi cột hẹp đi một nửa. Ba cột
            cuối là số tiền, số ngày và nhãn trạng thái -- những thứ xuống dòng
@@ -103,6 +111,65 @@
         @media (max-width: 767px) {
             .mini-table th:nth-child(n+3), .mini-table td:nth-child(n+3) { white-space: normal; }
         }
+        /* Tỉ lệ cột của TỪNG bảng. Để trong CSS chứ không dựng colgroup trong
+           JSP: hai bảng khác số cột, mà colgroup lẫn vào giữa các thẻ c:forEach
+           thì lần sửa sau rất dễ thêm cột mà quên sửa colgroup. */
+        /* Ba cột cuối được cấp ĐÚNG bề rộng tự nhiên đo được của nội dung
+           (91 / 85 / 114px kể cả đệm, trong thẻ rộng 516px), phần còn lại chia
+           cho mã và tên. Cấp thiếu thì nội dung nowrap tràn ra khỏi ô và bảng
+           mọc thanh cuộn ngang ngay trong thẻ. */
+        /* Tỉ lệ phần trăm co theo thẻ, còn chữ thì không: khi thẻ hẹp lại
+           (màn 1280 cho mỗi thẻ ~436px) mấy cột nowrap không co thêm được nữa
+           và nội dung THÒ RA ngoài ô. min-width chặn chỗ đó -- hẹp hơn ngần
+           này thì cho chính bảng cuộn ngang trong thẻ, đúng việc của
+           .table-responsive, còn hơn là chữ đè lên nhau. */
+        /* 465px = bề rộng nhỏ nhất mà MỌI cột còn đủ chỗ theo tỉ lệ dưới đây
+           (đo trên trình duyệt: bảng hợp đồng cần 459, bảng khách hàng 452).
+           Đúng bằng cỡ thẻ ở màn 1366 nên laptop phổ biến vẫn không phải cuộn;
+           hẹp hơn nữa thì cuộn trong thẻ, còn hơn để chữ tràn ra ngoài ô. */
+        .mini-table.t-contract, .mini-table.t-customer { min-width: 465px; }
+        .mini-table.t-contract th:nth-child(1), .mini-table.t-contract td:nth-child(1) { width: 44%; }
+        .mini-table.t-contract th:nth-child(2), .mini-table.t-contract td:nth-child(2) { width: 17%; }
+        .mini-table.t-contract th:nth-child(3), .mini-table.t-contract td:nth-child(3) { width: 17%; }
+        .mini-table.t-contract th:nth-child(4), .mini-table.t-contract td:nth-child(4) { width: 22%; }
+        /* Ô hai dòng: mã đậm ở trên, tên khách chữ nhỏ mờ ở dưới. */
+        .cell-2line { display: flex; flex-direction: column; gap: 2px; }
+        .cell-2line .cell-sub { font-size: 0.76rem; color: #6b7280; line-height: 1.35; }
+        .mini-table.t-customer th:nth-child(1), .mini-table.t-customer td:nth-child(1) { width: 38%; }
+        .mini-table.t-customer th:nth-child(2), .mini-table.t-customer td:nth-child(2) { width: 16%; }
+        .mini-table.t-customer th:nth-child(3), .mini-table.t-customer td:nth-child(3) { width: 27%; }
+        /* Cột ĐỊA BÀN không xuống dòng ở cả hai bảng: "Quảng Ninh" bị bẻ thành
+           "Quảng / Ninh" đọc rất khó chịu, mà tên tỉnh dài nhất cũng chỉ cần
+           70px trong khi cột được cấp tối thiểu 74px (nhờ min-width ở trên).
+           Luật nowrap chung ở trên chỉ áp từ cột thứ BA trở đi, và ở bảng hợp
+           đồng địa bàn đã lùi về cột thứ hai sau khi gộp mã với tên khách. */
+        .mini-table.t-contract td:nth-child(2), .mini-table.t-contract th:nth-child(2),
+        .mini-table.t-customer td:nth-child(2), .mini-table.t-customer th:nth-child(2) { white-space: nowrap; }
+        /* Cột "Loại" được xuống dòng, khác ba cột cuối của bảng kia: nó là
+           CHỮ ("Nhà mạng viễn thông"), xuống dòng vẫn đọc được, mà ép một hàng
+           thì riêng nó ngốn 144px và đẩy cả bảng vượt quá bề rộng thẻ. */
+        .mini-table.t-customer td:nth-child(3), .mini-table.t-customer th:nth-child(3) { white-space: normal; }
+        .mini-table.t-customer th:nth-child(4), .mini-table.t-customer td:nth-child(4) { width: 19%; }
+        /* Khổ điện thoại: bỏ min-width. Thẻ chỉ còn ~307px, giữ 465 là bắt
+           cuộn ngang ở mọi dòng, trong khi ba cột cuối đã được trả về cho
+           xuống dòng (media query phía trên) nên bảng vừa khít vẫn đọc được.
+           Phải đứng SAU khối tỉ lệ ở trên: cùng độ ưu tiên thì luật viết sau
+           thắng, để trong media query phía trên là không có tác dụng. */
+        @media (max-width: 767px) {
+            .mini-table.t-contract, .mini-table.t-customer { min-width: 0; }
+            /* Thẻ chỉ còn ~307px nên hai thứ vốn không bao giờ xuống dòng cũng
+               phải chịu xuống: mã hợp đồng (không có chỗ ngắt tự nhiên) và
+               nhãn trạng thái. Không cho thì chúng thò ra ngoài ô và bảng lại
+               mọc thanh cuộn ngang -- đúng thứ min-width: 0 vừa bỏ đi. */
+            .mini-table.t-contract td:nth-child(1) { overflow-wrap: anywhere; }
+            .mini-table .status-pill { white-space: normal; }
+            .mini-table.t-contract td:nth-child(2), .mini-table.t-contract th:nth-child(2),
+            .mini-table.t-customer td:nth-child(2), .mini-table.t-customer th:nth-child(2) { white-space: normal; }
+        }
+        /* Ô trống ("Không có hợp đồng nào...") trải hết bảng -- tỉ lệ ở trên
+           dành cho cột thật, colspan không được ăn theo cột thứ nhất. */
+        .mini-table td[colspan] { width: auto; }
+
         .mini-table a.link { color: var(--primary); font-weight: 600; text-decoration: none; }
         .mini-table a.link:hover { text-decoration: underline; }
 
@@ -405,26 +472,37 @@
                          ngang. Cho riêng bảng cuộn, giống cách listcontract.jsp
                          đang làm. --%>
                     <div class="table-responsive">
-                    <table class="mini-table">
+                    <table class="mini-table t-contract">
                         <%-- Cột ĐỊA BÀN thay cho "Người phụ trách": phạm vi của trang là
                              "việc của tôi HOẶC trong địa bàn tôi giữ", nên câu người đọc cần
                              trả lời khi nhìn một dòng lạ là "nó ở tỉnh nào", chứ không phải
                              "ai đứng tên" -- phần lớn các dòng đứng tên chính họ. --%>
-                        <thead><tr><th>Mã HĐ</th><th>Khách hàng</th><th>Địa bàn</th><th>Giá trị</th><th>Trạng thái</th></tr></thead>
+                        <%-- Mã hợp đồng và tên khách gộp thành MỘT ô hai dòng, giống
+                             cách listcontract.jsp đã làm với cột "Hợp đồng". Để hai cột
+                             rời thì trong thẻ rộng 516px chúng tranh nhau chỗ và cùng
+                             thua: mã gần như không ngắt dòng được nên trình duyệt giữ
+                             hẳn 131px cho nó, tên khách bị ép còn 86px và rơi thành năm
+                             dòng. Gộp lại thì mã nằm trọn một dòng, tên khách có cả
+                             phần rộng còn lại. --%>
+                        <thead><tr><th>Hợp đồng</th><th>Địa bàn</th><th>Giá trị</th><th>Trạng thái</th></tr></thead>
                         <tbody>
                             <c:choose>
                                 <c:when test="${empty windowContracts}">
-                                    <tr><td colspan="5" style="text-align:center; color:#9ca3af; padding:20px 8px;">Không có hợp đồng nào trong ${fn:escapeXml(contractWindowLabel)}.</td></tr>
+                                    <tr><td colspan="4" style="text-align:center; color:#9ca3af; padding:20px 8px;">Không có hợp đồng nào trong ${fn:escapeXml(contractWindowLabel)}.</td></tr>
                                 </c:when>
                                 <c:otherwise>
                                     <c:forEach var="ct" items="${windowContracts}">
                                         <tr>
-                                            <td><a href="${pageContext.request.contextPath}/contract?action=view&id=${ct.contractId}" class="link">${fn:escapeXml(ct.contractCode)}</a></td>
                                             <td>
-                                                <c:choose>
-                                                    <c:when test="${ct.enterprise != null}">${fn:escapeXml(ct.enterprise.enterpriseName)}</c:when>
-                                                    <c:otherwise>&mdash;</c:otherwise>
-                                                </c:choose>
+                                                <div class="cell-2line">
+                                                    <a href="${pageContext.request.contextPath}/contract?action=view&id=${ct.contractId}" class="link">${fn:escapeXml(ct.contractCode)}</a>
+                                                    <span class="cell-sub">
+                                                        <c:choose>
+                                                            <c:when test="${ct.enterprise != null}">${fn:escapeXml(ct.enterprise.enterpriseName)}</c:when>
+                                                            <c:otherwise>&mdash;</c:otherwise>
+                                                        </c:choose>
+                                                    </span>
+                                                </div>
                                             </td>
                                             <td>
                                                 <c:choose>
@@ -464,7 +542,7 @@
                         <a href="${pageContext.request.contextPath}/customer">Xem tất cả</a>
                     </div>
                     <div class="table-responsive">
-                    <table class="mini-table">
+                    <table class="mini-table t-customer">
                         <thead><tr><th>Khách hàng</th><th>Địa bàn</th><th>Loại</th><th>Tham gia</th></tr></thead>
                         <tbody>
                             <c:choose>
