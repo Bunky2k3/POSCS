@@ -121,6 +121,12 @@
            Phạm vi ngay trên nó, để tách ra ngoài thì lời giải thích và cái công
            tắc nằm ở hai chỗ khác nhau. */
         .filter-bar .scope-note { flex: 1 1 100%; margin-bottom: 0; }
+        /* Hàng địa bàn chiếm trọn một dòng, khác Dashboard (ở đó nó đứng cạnh
+           ba ô lọc). Lý do: thanh lọc ở đây đã có bốn ô, chèn thêm chip vào
+           cùng dòng là chúng bị bóp lại còn vài chục pixel. Kiểu dáng của
+           .my-prov/.chip nằm ở appshell.css, dùng chung -- chỉ phần bố cục
+           mới theo từng trang. */
+        .filter-bar .my-prov { flex: 1 1 100%; }
 
         /* ===== Table ===== */
         .table-card { overflow: hidden; }
@@ -411,6 +417,29 @@
                             </label>
                         </c:forEach>
                     </div>
+                </div>
+            </c:if>
+
+            <%-- Địa bàn của người đang xem, GỌI TÊN chứ không chỉ đếm.
+                 Cùng mã và cùng lẽ với Dashboard: nó phải đọc được KHÔNG CẦN
+                 BẤM, vì nó trả lời "vì sao danh sách của tôi khác của đồng
+                 nghiệp". Nằm trong bảng tích thì chỉ ai nghĩ tới việc mở ra
+                 mới thấy, mà người cần câu trả lời đó thường chưa biết mình
+                 đang thắc mắc chuyện gì.
+
+                 Dải "Đang xem..." ngay dưới vẫn giữ con số: hai câu khác
+                 nhau -- hàng này nói BẠN phụ trách tỉnh nào, dải kia nói danh
+                 sách ĐANG hiển thị theo phạm vi nào.
+
+                 Theo showProvinceFilter: ở mục Nhà cung cấp không có bảng
+                 chọn tỉnh nào cả (địa bàn là chuyện của bên mua), nên một
+                 hàng "Bạn phụ trách..." đứng cạnh chỗ trống chỉ gây khó hiểu. --%>
+            <c:if test="${showProvinceFilter and not empty myProvinces}">
+                <div class="my-prov">
+                    <span class="lbl"><i class="fa-solid fa-map-location-dot"></i> Bạn phụ trách:</span>
+                    <c:forEach var="mp" items="${myProvinces}">
+                        <span class="chip">${fn:escapeXml(mp.shortName)}</span>
+                    </c:forEach>
                 </div>
             </c:if>
 

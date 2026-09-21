@@ -139,6 +139,11 @@
            ô ngay trên nó ("đang xem phần nào"), mà trước đây đứng tách hẳn ở
            trên còn ô đổi phạm vi thì nằm dưới -- hai nửa của một câu ở hai chỗ. */
         .filter-bar .scope-note { flex: 1 1 100%; margin-bottom: 0; }
+        /* Hàng địa bàn chiếm trọn một dòng, khác Dashboard (ở đó nó đứng cạnh
+           ba ô lọc). Thanh lọc ở đây đông ô nhất trong ba màn hình, chèn chip
+           vào cùng dòng là các ô bị bóp lại. Kiểu dáng .my-prov/.chip dùng
+           chung ở appshell.css -- chỉ bố cục mới theo từng trang. */
+        .filter-bar .my-prov { flex: 1 1 100%; }
 
         /* ===== Table ===== */
         .table-card { overflow: hidden; }
@@ -516,6 +521,24 @@
                     </c:forEach>
                 </select>
             </div>
+
+            <%-- Địa bàn của người đang xem, GỌI TÊN chứ không chỉ đếm. Cùng mã
+                 và cùng lẽ với Dashboard và danh sách khách hàng: nó phải đọc
+                 được KHÔNG CẦN BẤM, vì nó trả lời "vì sao danh sách của tôi
+                 khác của đồng nghiệp". Nằm trong bảng tích thì chỉ ai nghĩ tới
+                 việc mở ra mới thấy.
+
+                 Theo showProvinceFilter: mục Hợp đồng mua không có bảng chọn
+                 tỉnh (đối tác là nhà cung cấp, không chia theo địa bàn), nên
+                 một hàng "Bạn phụ trách..." ở đó chỉ gây khó hiểu. --%>
+            <c:if test="${showProvinceFilter and not empty myProvinces}">
+                <div class="my-prov">
+                    <span class="lbl"><i class="fa-solid fa-map-location-dot"></i> Bạn phụ trách:</span>
+                    <c:forEach var="mp" items="${myProvinces}">
+                        <span class="chip">${fn:escapeXml(mp.shortName)}</span>
+                    </c:forEach>
+                </div>
+            </c:if>
 
             <%-- Hai chiều thu hẹp nằm chung MỘT dải: của ai, và trong khoảng nào.
                  Nằm TRONG thẻ lọc vì nó giải thích cho chính mấy ô ngay trên nó;
