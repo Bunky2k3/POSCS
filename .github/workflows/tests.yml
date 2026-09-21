@@ -18,7 +18,7 @@ jobs:
 
     # MySQL thật cho các test tích hợp (poscs.integration.*). Không có service
     # này thì chúng tự SKIP -- CI vẫn xanh nhưng mất hẳn lớp kiểm tra bắt được
-    # lỗi SQL/schema, đúng loại lỗi mà 340 test mock không thấy.
+    # lỗi SQL/schema, đúng loại lỗi mà các test mock không thấy.
     services:
       mysql:
         image: mysql:8.0

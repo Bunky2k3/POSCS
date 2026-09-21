@@ -57,7 +57,7 @@ documents the naming convention and full workflow (including keeping
 
 `ant test` runs everything. Two very different layers live side by side:
 
-- **Unit tests** (`test/poscs/**`, ~340 of them) mock JDBC via
+- **Unit tests** (`test/poscs/**`, the bulk of the suite) mock JDBC via
   `poscs.dao.JdbcStub`, so no SQL ever reaches a database. They are fast and
   need no setup — but by construction they cannot catch a wrong column name,
   invalid SQL, a schema drift, a violated UNIQUE/foreign key, a transaction

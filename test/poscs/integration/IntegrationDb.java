@@ -160,7 +160,17 @@ public final class IntegrationDb {
             "notifications", "customer_lifecycle_events", "contract_handovers", "contract_links",
             "contract_documents", "contract_payments",
             "technicalrequestdevices", "technicalrequesthistory", "technicalrequests",
-            "contract_history", "contractproducts", "contracts", "enterprisecontacts", "enterprises",
+            "contract_history", "contractproducts", "contracts",
+            // enterprise_roles, change_requests và user_provinces LÀ dữ liệu
+            // nghiệp vụ, không phải bảng tra cứu -- bỏ sót đúng ba bảng này là
+            // hiện tượng mô tả ở khối chú thích trên, và nó đã xảy ra thật:
+            // sau vài lượt chạy, poscs_it còn 12 dòng enterprise_roles trong
+            // khi chỉ có 1 enterprise. Hậu quả không phải test đỏ mà là test
+            // XANH SAI -- ca khẳng định "khách mới phải có vai" vẫn đạt nhờ
+            // dòng rác của lượt trước bám vào đúng id mà AUTO_INCREMENT vừa
+            // cấp lại.
+            "enterprise_roles", "enterprisecontacts", "enterprises",
+            "change_requests", "user_provinces",
             "productimages", "productcatalogues", "products", "users", "addresses"
         };
         try (Connection conn = DBContext.getConnection();
