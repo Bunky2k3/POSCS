@@ -503,6 +503,27 @@ public class AuthenticationFilterTest {
         verify(response, never()).sendRedirect(anyString());
     }
 
+    /**
+     * updateProfile.jsp gọi AJAX endpoint này để nạp xã/phường theo tỉnh đã
+     * chọn -- thiếu nó thì filter chặn thành redirect HTML, JS cố parse JSON
+     * thất bại, hiện "Không tải được danh sách xã/phường" ngay trên chính
+     * trang đang ép hoàn thiện hồ sơ.
+     */
+    @Test
+    public void get_profileIncomplete_addressWardsPath_isAllowedThrough() throws Exception {
+        when(request.getMethod()).thenReturn("GET");
+        when(request.getServletPath()).thenReturn("/address/wards");
+        sessionWithLoggedInUser();
+        User fresh = loggedInUser();
+        fresh.setGender(null);
+        when(employeeDAO.findByUsername("sale01")).thenReturn(fresh);
+
+        filter.doFilter(request, response, chain);
+
+        verify(chain).doFilter(request, response);
+        verify(response, never()).sendRedirect(anyString());
+    }
+
     /** Tài khoản đã hoàn thiện đủ thì không bị ép gì cả -- trường hợp phổ biến nhất. */
     @Test
     public void get_fullyOnboardedAccount_isNeverRedirectedForOnboarding() throws Exception {
