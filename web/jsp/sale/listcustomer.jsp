@@ -354,14 +354,23 @@
                     <option value="${fn:escapeXml(ct)}" ${typeFilter == ct ? 'selected' : ''}>${fn:escapeXml(ct)}</option>
                 </c:forEach>
             </select>
+            <%-- TẠM ẨN (2026-09-22): ô này liệt kê TẤT CẢ Sales, không lọc theo
+                 Phạm vi đang chọn -- khi Phạm vi = "Của tôi", chọn một đồng
+                 nghiệp ở đây AND với trần phạm vi (xem CustomerDAO.appendFilters)
+                 luôn cho ra danh sách rỗng, không có gì giải thích vì sao, dễ
+                 hiểu nhầm là lỗi. Trước mắt việc thu hẹp theo người/địa bàn đã
+                 có Phạm vi + bảng chọn tỉnh lo; ô "Người phụ trách chính" chỉ
+                 thật sự có nghĩa khi đang xem "Toàn chi nhánh", để sau khi có
+                 nhu cầu đó rõ ràng thì làm lại cho đúng (vd. chỉ hiện khi
+                 viewFilter == 'all', hoặc lọc userList theo phạm vi). --%>
+            <%--
             <select id="filterAssignee" name="assigneeId">
-                <%-- Nhãn nói rõ "chính": bộ lọc chỉ soi cột phụ trách chính,
-                     chọn một người sẽ KHÔNG kéo theo khách họ chỉ đứng hỗ trợ. --%>
                 <option value="">Tất cả người phụ trách chính</option>
                 <c:forEach var="staff" items="${userList}">
                     <option value="${staff.userId}" ${assigneeFilter == staff.userId ? 'selected' : ''}>${fn:escapeXml(staff.fullName)}</option>
                 </c:forEach>
             </select>
+            --%>
             <%-- Nhà cung cấp KHÔNG lọc theo tỉnh. Tỉnh ở đây là địa bàn BÁN
                  HÀNG -- nó quyết định ai cầm khách nào (user_provinces); bên bán
                  hàng cho mình thì không chia theo địa bàn. Controller cũng bỏ
