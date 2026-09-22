@@ -5,6 +5,7 @@ import java.security.SecureRandom;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.sql.Date;
+import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -130,7 +131,7 @@ public class AuthenticationController extends HttpServlet {
 
         // Luôn tra lại từ DB thay vì dùng thẳng currentUser trong session --
         // session chỉ lưu vài trường cơ bản dùng cho việc đăng nhập/phân
-        // quyền (xem EmployeeDAO.findByUsernameOrEmail), không có đủ thông
+        // quyền (xem EmployeeDAO.findByUsername), không có đủ thông
         // tin để hiển thị hồ sơ đầy đủ (địa chỉ, CCCD, ngày sinh...).
         User profile = employeeDAO.findProfileById(currentUser.getUserId());
         if (profile == null) {
@@ -226,6 +227,23 @@ public class AuthenticationController extends HttpServlet {
             response.sendRedirect(request.getContextPath() + "/updateProfile?error=invalid_email");
             return;
         }
+        // Từ V35: gender/dateOfBirth không còn được Admin đảm bảo sẵn lúc tạo
+        // tài khoản (nới NOT NULL ở DB) -- đây là màn hình nhân viên TỰ khai
+        // hai trường đó lần đầu, nên phải ép bắt buộc + đúng định dạng NGAY Ở
+        // ĐÂY, cùng quy tắc BR-30/BR-29 mà EmployeeController.isValidCommonFields
+        // áp cho Admin trước đây. Thiếu bước này thì AuthenticationFilter cứ
+        // ép nhân viên quay lại trang này mãi vì User.isProfileIncomplete()
+        // không bao giờ hết true.
+        String gender = request.getParameter("gender");
+        if (!"Nam".equals(gender) && !"Nữ".equals(gender) && !"Khác".equals(gender)) {
+            response.sendRedirect(request.getContextPath() + "/updateProfile?error=invalid_gender");
+            return;
+        }
+        Date dateOfBirth = parseDateOrNull(request.getParameter("dob"));
+        if (dateOfBirth == null || !dateOfBirth.toLocalDate().isBefore(LocalDate.now())) {
+            response.sendRedirect(request.getContextPath() + "/updateProfile?error=invalid_dob");
+            return;
+        }
         // Bắt buộc chọn Xã/Phường (và do đó cả Tỉnh/Thành, vì mỗi xã/phường
         // chỉ thuộc đúng 1 tỉnh) -- địa chỉ chi tiết thì không bắt buộc.
         Integer districtId = parseIntOrNull(request.getParameter("districtId"));
@@ -264,8 +282,8 @@ public class AuthenticationController extends HttpServlet {
         user.setLastName(lastName);
         user.setMiddleName(middleName);
         user.setFirstName(firstName);
-        user.setGender(request.getParameter("gender"));
-        user.setDateOfBirth(parseDateOrNull(request.getParameter("dob")));
+        user.setGender(gender);
+        user.setDateOfBirth(dateOfBirth);
         user.setCitizenId(citizenId);
         user.setPhone(phone);
         user.setPersonalEmail(personalEmail);
@@ -368,9 +386,8 @@ public class AuthenticationController extends HttpServlet {
     // ------------------------------------------------------------------
 
     private void handleLogin(HttpServletRequest request, HttpServletResponse response) throws IOException {
-        // Form login.jsp gửi lên field "username", nhưng người dùng có thể gõ
-        // username HOẶC email vào đó -- EmployeeDAO.findByUsernameOrEmail sẽ
-        // khớp cả 2 khả năng.
+        // Từ V36: đăng nhập chỉ bằng username -- không còn "email công ty"
+        // giả để chấp nhận thêm như một định danh thứ hai.
         String identifier = trimToNull(request.getParameter("username"));
         String password = request.getParameter("password");
 
@@ -386,11 +403,11 @@ public class AuthenticationController extends HttpServlet {
             return;
         }
 
-        User user = employeeDAO.findByUsernameOrEmail(identifier);
+        User user = employeeDAO.findByUsername(identifier);
         // Gộp chung 2 trường hợp "không tìm thấy user" và "sai mật khẩu" thành
         // cùng 1 thông báo lỗi ở phía client (login.jsp), để không lộ cho kẻ tấn
-        // công biết username/email nào tồn tại trong hệ thống (chỉ khác nhau ở
-        // bước kiểm tra: nếu user == null thì gọi BCrypt.checkpw sẽ NullPointerException,
+        // công biết username nào tồn tại trong hệ thống (chỉ khác nhau ở bước
+        // kiểm tra: nếu user == null thì gọi BCrypt.checkpw sẽ NullPointerException,
         // nên phải kiểm tra user == null trước bằng toán tử || ngắn mạch).
         if (user == null || !BCrypt.checkpw(password, user.getPasswordHash())) {
             recordFailedLoginAttempt(clientIp, now);
@@ -451,9 +468,9 @@ public class AuthenticationController extends HttpServlet {
         // Luôn tra lại user MỚI NHẤT từ DB để lấy password_hash hiện hành,
         // KHÔNG dùng hash cũ đang cache trong session -- phòng trường hợp mật
         // khẩu đã bị đổi ở nơi khác (vd. một tab khác) từ lúc đăng nhập tới giờ.
-        User freshUser = employeeDAO.findByUsernameOrEmail(currentUser.getUsername());
+        User freshUser = employeeDAO.findByUsername(currentUser.getUsername());
         // freshUser.isDeleted(): tài khoản có thể đã bị khóa bởi admin từ lúc
-        // đăng nhập tới giờ (findByUsernameOrEmail giờ trả về cả tài khoản bị
+        // đăng nhập tới giờ (findByUsername vẫn trả về cả tài khoản bị
         // khóa, xem ghi chú ở EmployeeDAO) -- coi như phiên hết hiệu lực, huỷ
         // session và đá về màn hình đăng nhập, KHÔNG cho đổi mật khẩu.
         if (freshUser == null || freshUser.isDeleted()) {
@@ -485,7 +502,7 @@ public class AuthenticationController extends HttpServlet {
         }
 
         String newHash = BCrypt.hashpw(newPassword, BCrypt.gensalt());
-        boolean ok = employeeDAO.updatePasswordByEmail(freshUser.getEmail(), newHash);
+        boolean ok = employeeDAO.updatePasswordByUsername(freshUser.getUsername(), newHash);
         if (!ok) {
             LOG.warn("Doi mat khau that bai o buoc ghi CSDL (actor={})", Logs.actor(request));
             response.sendRedirect(request.getContextPath() + "/changePassword.jsp?error=update_failed");
@@ -592,7 +609,7 @@ public class AuthenticationController extends HttpServlet {
         private long windowStartMillis;
     }
 
-    private static final String SESSION_RESET_EMAIL = "resetEmail";
+    private static final String SESSION_RESET_USERNAME = "resetUsername";
     private static final String SESSION_RESET_OTP = "resetOtp";
     private static final String SESSION_RESET_OTP_EXPIRY = "resetOtpExpiry";
     private static final String SESSION_RESET_OTP_ATTEMPTS = "resetOtpAttempts";
@@ -602,38 +619,40 @@ public class AuthenticationController extends HttpServlet {
     private final SecureRandom random = new SecureRandom();
 
     // ------------------------------------------------------------------
-    // Bước 1: Quên mật khẩu -- nhập email, sinh + gửi OTP
+    // Bước 1: Quên mật khẩu -- nhập username, sinh + gửi OTP tới email cá nhân
     // ------------------------------------------------------------------
 
     private void handleForgotPassword(HttpServletRequest request, HttpServletResponse response) throws IOException {
-        String email = trimToNull(request.getParameter("email"));
-        // Validate ĐỊNH DẠNG thôi (không phải "email này có tồn tại không") --
-        // an toàn để báo lỗi riêng cho trường hợp sai định dạng, vì nó không
-        // tiết lộ gì về việc email đó có tài khoản hay không (khác với việc
-        // báo "email không tồn tại", điều mà code bên dưới cố tình tránh).
-        if (email == null || !email.matches("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$")) {
-            response.sendRedirect(request.getContextPath() + "/forgotPassword.jsp?error=invalid_email");
+        // Từ V36: nhập USERNAME (đăng nhập chỉ bằng username, không còn "email
+        // công ty" giả để mà nhập). OTP vẫn gửi qua mail, nhưng gửi tới
+        // personal_email ĐÃ LƯU trong hồ sơ -- không còn gửi tới đúng chuỗi
+        // người dùng tự gõ như bản cũ (lỗi cũ: gõ email công ty ảo thì OTP
+        // "gửi" tới một hộp thư chưa từng tồn tại).
+        String username = trimToNull(request.getParameter("username"));
+        if (username == null) {
+            response.sendRedirect(request.getContextPath() + "/forgotPassword.jsp?error=missing_username");
             return;
         }
 
-        // Cố tình KHÔNG báo lỗi riêng khi email không tồn tại trong hệ thống:
-        // nếu 2 trường hợp "email có tồn tại" và "email không tồn tại" trả về
-        // 2 kết quả khác nhau, kẻ tấn công có thể dò ra danh sách email hợp lệ
+        // Cố tình KHÔNG báo lỗi riêng khi username không tồn tại trong hệ
+        // thống: nếu 2 trường hợp "tồn tại" và "không tồn tại" trả về 2 kết
+        // quả khác nhau, kẻ tấn công có thể dò ra danh sách username hợp lệ
         // trong hệ thống (user enumeration). Nên luôn điều hướng sang
-        // verifyOtp.jsp giống nhau; nếu email không tồn tại thì đơn giản là
-        // không có OTP nào được sinh/lưu/gửi, nên bước xác thực OTP ở sau chắc
-        // chắn sẽ thất bại (không có gì để so khớp).
+        // verifyOtp.jsp giống nhau; nếu username không tồn tại (hoặc chưa có
+        // personal_email) thì đơn giản là không có OTP nào được sinh/lưu/gửi,
+        // nên bước xác thực OTP ở sau chắc chắn sẽ thất bại (không có gì để
+        // so khớp).
         // Kiểm hạn mức TRƯỚC khi tra CSDL: quá hạn thì không gửi mail, cũng
         // không chạm DB. Vẫn điều hướng sang verifyOtp.jsp như mọi trường hợp
-        // khác để không tiết lộ email nào có tài khoản (xem ghi chú bên trên).
+        // khác để không tiết lộ username nào có tài khoản (xem ghi chú trên).
         if (!allowOtpRequest(clientIp(request), System.currentTimeMillis())) {
             response.sendRedirect(request.getContextPath() + "/verifyOtp.jsp");
             return;
         }
 
-        User user = employeeDAO.findByUsernameOrEmail(email);
-        if (user != null) {
-            issueOtp(request.getSession(true), email);
+        User user = employeeDAO.findByUsername(username);
+        if (user != null && user.getPersonalEmail() != null) {
+            issueOtp(request.getSession(true), username, user.getPersonalEmail());
         }
 
         response.sendRedirect(request.getContextPath() + "/verifyOtp.jsp");
@@ -673,11 +692,11 @@ public class AuthenticationController extends HttpServlet {
 
     private void handleResendOtp(HttpServletRequest request, HttpServletResponse response) throws IOException {
         HttpSession session = request.getSession(false);
-        String email = session != null ? (String) session.getAttribute(SESSION_RESET_EMAIL) : null;
+        String username = session != null ? (String) session.getAttribute(SESSION_RESET_USERNAME) : null;
 
-        // Không có email trong session nghĩa là chưa qua bước 1 (mất session,
-        // hoặc POST thẳng vào URL này) -- không có địa chỉ nào để gửi tới.
-        if (email == null) {
+        // Không có username trong session nghĩa là chưa qua bước 1 (mất
+        // session, hoặc POST thẳng vào URL này) -- không biết gửi lại cho ai.
+        if (username == null) {
             response.sendRedirect(request.getContextPath() + "/forgotPassword.jsp?error=session_expired");
             return;
         }
@@ -695,7 +714,13 @@ public class AuthenticationController extends HttpServlet {
             return;
         }
 
-        issueOtp(session, email);
+        // personal_email không lưu trong session (tránh giữ PII thừa ở đó) --
+        // tra lại từ username mỗi lần gửi lại, luôn dùng địa chỉ MỚI NHẤT
+        // trong hồ sơ (phòng trường hợp nhân viên vừa tự sửa email cá nhân).
+        User user = employeeDAO.findByUsername(username);
+        if (user != null && user.getPersonalEmail() != null) {
+            issueOtp(session, username, user.getPersonalEmail());
+        }
         response.sendRedirect(request.getContextPath() + "/verifyOtp.jsp?resent=1");
     }
 
@@ -757,12 +782,12 @@ public class AuthenticationController extends HttpServlet {
 
     private void handleResetPassword(HttpServletRequest request, HttpServletResponse response) throws IOException {
         HttpSession session = request.getSession(false);
-        String email = session != null ? (String) session.getAttribute(SESSION_RESET_EMAIL) : null;
+        String username = session != null ? (String) session.getAttribute(SESSION_RESET_USERNAME) : null;
         Boolean verified = session != null ? (Boolean) session.getAttribute(SESSION_OTP_VERIFIED) : null;
 
         // Chặn truy cập thẳng vào bước 3 mà chưa qua bước 2 (vd. gõ thẳng URL
         // resetPassword.jsp, hoặc POST thẳng vào ResetPasswordServlet bằng tay).
-        if (email == null || verified == null || !verified) {
+        if (username == null || verified == null || !verified) {
             response.sendRedirect(request.getContextPath() + "/forgotPassword.jsp?error=unauthorized");
             return;
         }
@@ -779,12 +804,12 @@ public class AuthenticationController extends HttpServlet {
         }
 
         String newHash = BCrypt.hashpw(newPassword, BCrypt.gensalt());
-        boolean ok = employeeDAO.updatePasswordByEmail(email, newHash);
+        boolean ok = employeeDAO.updatePasswordByUsername(username, newHash);
 
         // Dọn sạch toàn bộ trạng thái reset trong session -- dù thành công hay
         // thất bại cũng phải xoá, không để sót cờ otpVerified=true cho request
         // sau lợi dụng (vd. tự POST lại /ResetPasswordServlet lần nữa).
-        session.removeAttribute(SESSION_RESET_EMAIL);
+        session.removeAttribute(SESSION_RESET_USERNAME);
         session.removeAttribute(SESSION_RESET_OTP);
         session.removeAttribute(SESSION_RESET_OTP_EXPIRY);
         session.removeAttribute(SESSION_RESET_OTP_ATTEMPTS);
@@ -792,7 +817,7 @@ public class AuthenticationController extends HttpServlet {
         session.removeAttribute(SESSION_OTP_VERIFIED);
 
         if (!ok) {
-            LOG.warn("Dat lai mat khau that bai o buoc ghi CSDL (email={})", email);
+            LOG.warn("Dat lai mat khau that bai o buoc ghi CSDL (username={})", username);
             response.sendRedirect(request.getContextPath() + "/forgotPassword.jsp?error=update_failed");
             return;
         }
@@ -801,21 +826,25 @@ public class AuthenticationController extends HttpServlet {
 
 
     /**
-     * Sinh mã OTP mới cho email này, ghi đè toàn bộ trạng thái OTP cũ trong
-     * session rồi gửi mail. Mã cũ (nếu có) mất hiệu lực ngay -- tại một thời
-     * điểm chỉ có đúng 1 mã dùng được, nên bấm "gửi lại" nhiều lần không để lại
-     * một loạt mã còn sống rải rác làm rộng bề mặt đoán mò.
+     * Sinh mã OTP mới cho tài khoản {@code username} này, ghi đè toàn bộ
+     * trạng thái OTP cũ trong session rồi gửi mail tới {@code personalEmail}
+     * (email cá nhân ĐÃ LƯU trong hồ sơ -- từ V36 không còn gửi tới đúng
+     * chuỗi người dùng tự gõ ở ô "quên mật khẩu" nữa, vì ô đó giờ nhận
+     * username, không phải một địa chỉ email). Mã cũ (nếu có) mất hiệu lực
+     * ngay -- tại một thời điểm chỉ có đúng 1 mã dùng được, nên bấm "gửi lại"
+     * nhiều lần không để lại một loạt mã còn sống rải rác làm rộng bề mặt
+     * đoán mò.
      */
-    private void issueOtp(HttpSession session, String email) {
+    private void issueOtp(HttpSession session, String username, String personalEmail) {
         String otp = generateOtp();
-        session.setAttribute(SESSION_RESET_EMAIL, email);
+        session.setAttribute(SESSION_RESET_USERNAME, username);
         session.setAttribute(SESSION_RESET_OTP, otp);
         session.setAttribute(SESSION_RESET_OTP_EXPIRY, System.currentTimeMillis() + OTP_VALID_MILLIS);
         session.setAttribute(SESSION_RESET_OTP_LAST_SENT, System.currentTimeMillis());
         session.removeAttribute(SESSION_RESET_OTP_ATTEMPTS); // reset bộ đếm số lần nhập sai cho mã OTP mới này
         session.removeAttribute(SESSION_OTP_VERIFIED); // reset nếu trước đó đã từng verify 1 lần khác
 
-        EmailUtil.sendOtpEmail(email, otp);
+        EmailUtil.sendOtpEmail(personalEmail, otp);
     }
 
     /** Sinh mã OTP ngẫu nhiên gồm OTP_LENGTH chữ số (có thể có số 0 ở đầu, vd "004821"). */

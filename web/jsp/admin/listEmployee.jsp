@@ -89,7 +89,7 @@
             <input type="hidden" name="action" value="list">
             <div class="search-input-wrap">
                 <i class="fa-solid fa-magnifying-glass"></i>
-                <input type="text" name="keyword" value="${fn:escapeXml(keyword)}" placeholder="Tìm theo tên, email, số điện thoại...">
+                <input type="text" name="keyword" value="${fn:escapeXml(keyword)}" placeholder="Tìm theo tên, số điện thoại...">
             </div>
             <select id="filterRole" name="roleId">
                 <option value="">Tất cả vai trò</option>
@@ -121,7 +121,7 @@
                         </div>
                     </div>
                     <div class="employee-field"><i class="fa-solid fa-building"></i>${fn:escapeXml(emp.department.departmentName)} &middot; ${fn:escapeXml(emp.role.roleName)}</div>
-                    <div class="employee-field"><i class="fa-solid fa-envelope"></i>${fn:escapeXml(emp.email)}</div>
+                    <div class="employee-field"><i class="fa-solid fa-user"></i>${fn:escapeXml(emp.username)}</div>
                     <span class="status-badge ${emp.deleted ? 'status-inactive' : 'status-active'}">${emp.deleted ? 'Ngừng hoạt động' : 'Đang hoạt động'}</span>
                 </a>
             </c:forEach>

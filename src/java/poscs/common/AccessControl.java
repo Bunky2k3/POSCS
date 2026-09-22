@@ -31,11 +31,15 @@ public final class AccessControl {
     // role_name nào được Full (tạo/sửa/xoá) cho từng Resource -- role không có
     // trong danh sách coi như chỉ View only (hoặc No access, với EMPLOYEE).
     // Khớp đúng bảng "Access matrix" trong PERMISSIONS.md.
+    //
+    // Từ ngày gộp vai (xem PERMISSIONS.md): CSKH đã xoá, nhập chung vào Sales
+    // -- Resource.TICKET (trước đây "Admin", "CSKH") giờ Sales cầm thay,
+    // CỘNG THÊM vào quyền Customer/Contract đã có sẵn, không phải đổi chỗ.
     private static final Map<Resource, Set<String>> FULL_ACCESS_ROLES = Map.of(
             Resource.CUSTOMER, Set.of("Admin", "Sales"),
             Resource.CONTRACT, Set.of("Admin", "Sales"),
             Resource.PRODUCT, Set.of("Admin", "Kỹ thuật"),
-            Resource.TICKET, Set.of("Admin", "CSKH"),
+            Resource.TICKET, Set.of("Admin", "Sales"),
             Resource.EMPLOYEE, Set.of("Admin")
     );
 
@@ -130,8 +134,8 @@ public final class AccessControl {
      * Phạm vi mặc định khi mở danh sách khách hàng / hợp đồng.
      *
      * <p>CHỈ Sales bị thu hẹp. Admin nhìn toàn bộ (họ quản trị, không cầm khách).
-     * Kỹ thuật và CSKH cũng nhìn toàn bộ: họ không đứng tên khách nào cả, thu hẹp
-     * theo "khách của tôi" là họ thấy đúng 0 dòng và hết làm việc được.
+     * Kỹ thuật cũng nhìn toàn bộ: không đứng tên khách nào cả, thu hẹp theo
+     * "khách của tôi" là họ thấy đúng 0 dòng và hết làm việc được.
      *
      * <p>Thu hẹp này là MẶC ĐỊNH, KHÔNG phải rào quyền: còn {@code view=all} để xem
      * toàn chi nhánh, và trang chi tiết từng bản ghi không chặn gì thêm. Ai cần rào

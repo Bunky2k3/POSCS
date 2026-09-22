@@ -78,18 +78,16 @@ public class EmailUtil {
 
     /**
      * Gửi tài khoản vừa được Admin khởi tạo (UC-26 Create Employee) tới EMAIL
-     * CÁ NHÂN của nhân viên đó (không phải email công ty vừa cấp -- email
-     * công ty là địa chỉ hệ thống tự sinh, chưa có hộp thư thật để nhận mail
-     * cho tới khi công ty cấp hộp thư đó, nên vẫn phải gửi qua kênh nhân
-     * viên chắc chắn nhận được): email công ty vừa cấp + username đăng nhập
+     * CÁ NHÂN của nhân viên đó -- kênh THẬT duy nhất họ có (từ V36, không
+     * còn "email công ty" giả để mà cân nhắc gửi tới đó): username đăng nhập
      * + mật khẩu tạm -- dùng cùng chế độ "dev mode in ra console" như
      * sendOtpEmail() khi chưa cấu hình SMTP thật.
      */
-    public static boolean sendNewAccountEmail(String toEmail, String fullName, String companyEmail, String username, String tempPassword) {
+    public static boolean sendNewAccountEmail(String toEmail, String fullName, String username, String tempPassword) {
         if (MAIL_USERNAME.isEmpty() || MAIL_PASSWORD.isEmpty()) {
             LOG.info("[DEV MODE] Chua cau hinh SMTP, in thong tin tai khoan ra log.");
-            LOG.info("Gui toi: {} | Email cong ty: {} | Username: {} | Mat khau tam: {}",
-                    toEmail, companyEmail, username, tempPassword);
+            LOG.info("Gui toi: {} | Username: {} | Mat khau tam: {}",
+                    toEmail, username, tempPassword);
             return true;
         }
 
@@ -114,7 +112,6 @@ public class EmailUtil {
             message.setText(
                     "Xin chao " + fullName + ",\n\n"
                     + "Tai khoan cua ban tren he thong POSCS da duoc quan tri vien khoi tao:\n\n"
-                    + "Email cong ty duoc cap: " + companyEmail + "\n"
                     + "Ten dang nhap: " + username + "\n"
                     + "Mat khau tam thoi: " + tempPassword + "\n\n"
                     + "Vui long dang nhap va doi mat khau ngay trong lan dau tien de dam bao an toan.\n"

@@ -242,12 +242,12 @@
                         </div>
                     </c:if>
                     <div class="mb-4">
-                        <label for="username" class="form-label">Tên đăng nhập / Email</label>
+                        <label for="username" class="form-label">Tên đăng nhập</label>
                         <div class="input-group">
                             <span class="input-group-text"><i class="fa-regular fa-user"></i></span>
                             <input type="text" class="form-control" id="username" name="username"
                                    value="<c:out value="${param.username}"/>"
-                                   placeholder="Nhập email hoặc username..." required autofocus>
+                                   placeholder="Nhập tên đăng nhập..." required autofocus>
                         </div>
                     </div>
 

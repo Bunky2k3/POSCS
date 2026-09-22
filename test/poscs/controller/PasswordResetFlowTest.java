@@ -18,9 +18,12 @@ import static org.mockito.Mockito.*;
 
 /**
  * Test cho luồng "Quên mật khẩu" của AuthenticationController -- 3 bước
- * (email -> OTP -> mật khẩu mới), toàn bộ trạng thái tạm nằm trong session. Trọng tâm:
+ * (username -> OTP -> mật khẩu mới), toàn bộ trạng thái tạm nằm trong
+ * session. Từ V36: bước 1 nhận USERNAME (không còn "email công ty" giả để
+ * nhập), và OTP luôn gửi tới {@code personal_email} ĐÃ LƯU trong hồ sơ --
+ * KHÔNG còn gửi tới đúng chuỗi người dùng tự gõ như bản cũ. Trọng tâm:
  * <ul>
- *   <li>Chống user enumeration ở bước 1: email tồn tại hay không đều
+ *   <li>Chống user enumeration ở bước 1: username tồn tại hay không đều
  *       redirect y hệt nhau sang verifyOtp.jsp, chỉ khác ở việc OTP có thực
  *       sự được sinh/gửi hay không.</li>
  *   <li>MAX_OTP_ATTEMPTS (5 lần) -- chặn dò toàn bộ 10^6 khả năng OTP trong
@@ -82,26 +85,33 @@ public class PasswordResetFlowTest {
         return session;
     }
 
+    /** Tài khoản tìm được ở bước 1/gửi lại -- luôn cần personal_email để issueOtp có nơi gửi tới. */
+    private User userWithPersonalEmail(String personalEmail) {
+        User user = new User();
+        user.setPersonalEmail(personalEmail);
+        return user;
+    }
+
     // ------------------------------------------------------------------
     // Bước 1: /ForgotPasswordServlet
     // ------------------------------------------------------------------
 
     @Test
-    public void forgotPassword_invalidEmailFormat_redirectsWithError() throws Exception {
+    public void forgotPassword_missingUsername_redirectsWithError() throws Exception {
         when(request.getServletPath()).thenReturn("/ForgotPasswordServlet");
-        when(request.getParameter("email")).thenReturn("not-an-email");
+        when(request.getParameter("username")).thenReturn("   "); // trim -> null
 
         controller.doPost(request, response);
 
-        verify(response).sendRedirect(CONTEXT_PATH + "/forgotPassword.jsp?error=invalid_email");
-        verify(employeeDAO, never()).findByUsernameOrEmail(anyString());
+        verify(response).sendRedirect(CONTEXT_PATH + "/forgotPassword.jsp?error=missing_username");
+        verify(employeeDAO, never()).findByUsername(anyString());
     }
 
     @Test
-    public void forgotPassword_unknownEmail_redirectsSameAsSuccessButSendsNoOtp() throws Exception {
+    public void forgotPassword_unknownUsername_redirectsSameAsSuccessButSendsNoOtp() throws Exception {
         when(request.getServletPath()).thenReturn("/ForgotPasswordServlet");
-        when(request.getParameter("email")).thenReturn("ghost@example.com");
-        when(employeeDAO.findByUsernameOrEmail("ghost@example.com")).thenReturn(null);
+        when(request.getParameter("username")).thenReturn("ghost");
+        when(employeeDAO.findByUsername("ghost")).thenReturn(null);
         Map<String, Object> attrs = new HashMap<>();
         HttpSession session = fakeSession(attrs);
         when(request.getSession(true)).thenReturn(session);
@@ -109,17 +119,37 @@ public class PasswordResetFlowTest {
         try (MockedStatic<EmailUtil> emailUtil = mockStatic(EmailUtil.class)) {
             controller.doPost(request, response);
 
-            // Không lộ khác biệt "email tồn tại" vs "không tồn tại" -- cùng 1 redirect.
+            // Không lộ khác biệt "username tồn tại" vs "không tồn tại" -- cùng 1 redirect.
             verify(response).sendRedirect(CONTEXT_PATH + "/verifyOtp.jsp");
             emailUtil.verify(() -> EmailUtil.sendOtpEmail(anyString(), anyString()), never());
         }
     }
 
     @Test
-    public void forgotPassword_knownEmail_generatesAndSendsOtp() throws Exception {
+    public void forgotPassword_accountWithoutPersonalEmail_sendsNoOtpEither() throws Exception {
+        // BR-11 bắt buộc personal_email lúc tạo, nhưng dữ liệu cũ/hỏng vẫn có
+        // thể thiếu -- không có địa chỉ nào để gửi thì cũng phải im lặng như
+        // "không tồn tại", không báo lỗi riêng (vẫn là nguyên tắc chống dò).
         when(request.getServletPath()).thenReturn("/ForgotPasswordServlet");
-        when(request.getParameter("email")).thenReturn("annd@example.com");
-        when(employeeDAO.findByUsernameOrEmail("annd@example.com")).thenReturn(new User());
+        when(request.getParameter("username")).thenReturn("annd");
+        when(employeeDAO.findByUsername("annd")).thenReturn(userWithPersonalEmail(null));
+        Map<String, Object> attrs = new HashMap<>();
+        HttpSession session = fakeSession(attrs);
+        when(request.getSession(true)).thenReturn(session);
+
+        try (MockedStatic<EmailUtil> emailUtil = mockStatic(EmailUtil.class)) {
+            controller.doPost(request, response);
+
+            verify(response).sendRedirect(CONTEXT_PATH + "/verifyOtp.jsp");
+            emailUtil.verify(() -> EmailUtil.sendOtpEmail(anyString(), anyString()), never());
+        }
+    }
+
+    @Test
+    public void forgotPassword_knownUsername_generatesAndSendsOtpToPersonalEmail() throws Exception {
+        when(request.getServletPath()).thenReturn("/ForgotPasswordServlet");
+        when(request.getParameter("username")).thenReturn("annd");
+        when(employeeDAO.findByUsername("annd")).thenReturn(userWithPersonalEmail("an.nguyen@gmail.com"));
         Map<String, Object> attrs = new HashMap<>();
         HttpSession session = fakeSession(attrs);
         when(request.getSession(true)).thenReturn(session);
@@ -130,8 +160,10 @@ public class PasswordResetFlowTest {
             controller.doPost(request, response);
 
             verify(response).sendRedirect(CONTEXT_PATH + "/verifyOtp.jsp");
-            emailUtil.verify(() -> EmailUtil.sendOtpEmail(eq("annd@example.com"), anyString()));
+            // Gửi tới EMAIL CÁ NHÂN đã lưu, không phải chuỗi "annd" người dùng gõ.
+            emailUtil.verify(() -> EmailUtil.sendOtpEmail(eq("an.nguyen@gmail.com"), anyString()));
             org.junit.Assert.assertNotNull("OTP phải được lưu vào session", attrs.get("resetOtp"));
+            org.junit.Assert.assertEquals("annd", attrs.get("resetUsername"));
         }
     }
 
@@ -215,8 +247,8 @@ public class PasswordResetFlowTest {
     @Test
     public void forgotPassword_beyondPerIpQuota_stopsSendingMail() throws Exception {
         when(request.getServletPath()).thenReturn("/ForgotPasswordServlet");
-        when(request.getParameter("email")).thenReturn("annd@example.com");
-        when(employeeDAO.findByUsernameOrEmail("annd@example.com")).thenReturn(new User());
+        when(request.getParameter("username")).thenReturn("annd");
+        when(employeeDAO.findByUsername("annd")).thenReturn(userWithPersonalEmail("an.nguyen@gmail.com"));
         Map<String, Object> attrs = new HashMap<>();
         HttpSession session = fakeSession(attrs);
         when(request.getSession(true)).thenReturn(session);
@@ -237,8 +269,8 @@ public class PasswordResetFlowTest {
     @Test
     public void forgotPassword_quotaExhausted_stillRedirectsIdenticallyToHideTheLimit() throws Exception {
         when(request.getServletPath()).thenReturn("/ForgotPasswordServlet");
-        when(request.getParameter("email")).thenReturn("annd@example.com");
-        when(employeeDAO.findByUsernameOrEmail("annd@example.com")).thenReturn(new User());
+        when(request.getParameter("username")).thenReturn("annd");
+        when(employeeDAO.findByUsername("annd")).thenReturn(userWithPersonalEmail("an.nguyen@gmail.com"));
         Map<String, Object> attrs = new HashMap<>();
         HttpSession session = fakeSession(attrs);
         when(request.getSession(true)).thenReturn(session);
@@ -251,8 +283,8 @@ public class PasswordResetFlowTest {
             }
 
             // Nếu lần bị chặn trả về trang/tham số khác, kẻ tấn công dò được
-            // đúng ngưỡng và cả việc email nào có tài khoản -- phá luôn nguyên
-            // tắc chống enumeration mà bước 1 đang giữ.
+            // đúng ngưỡng và cả việc username nào có tài khoản -- phá luôn
+            // nguyên tắc chống enumeration mà bước 1 đang giữ.
             verify(response, times(12)).sendRedirect(CONTEXT_PATH + "/verifyOtp.jsp");
         }
     }
@@ -275,9 +307,9 @@ public class PasswordResetFlowTest {
     }
 
     @Test
-    public void resendOtp_sessionWithoutEmail_redirectsWithSessionExpiredError() throws Exception {
+    public void resendOtp_sessionWithoutUsername_redirectsWithSessionExpiredError() throws Exception {
         when(request.getServletPath()).thenReturn("/ResendOtpServlet");
-        // Session tồn tại nhưng chưa qua bước 1 -- không có địa chỉ nào để gửi tới.
+        // Session tồn tại nhưng chưa qua bước 1 -- không biết gửi lại cho ai.
         HttpSession session = fakeSession(new HashMap<>());
         when(request.getSession(false)).thenReturn(session);
 
@@ -293,7 +325,7 @@ public class PasswordResetFlowTest {
     public void resendOtp_withinCooldown_sendsNothingAndKeepsExistingOtp() throws Exception {
         when(request.getServletPath()).thenReturn("/ResendOtpServlet");
         Map<String, Object> attrs = new HashMap<>();
-        attrs.put("resetEmail", "annd@example.com");
+        attrs.put("resetUsername", "annd");
         attrs.put("resetOtp", "123456");
         attrs.put("resetOtpLastSent", System.currentTimeMillis() - 5000); // mới gửi 5 giây trước
         HttpSession session = fakeSession(attrs);
@@ -311,13 +343,14 @@ public class PasswordResetFlowTest {
     }
 
     @Test
-    public void resendOtp_afterCooldown_sendsNewOtpToSessionEmail() throws Exception {
+    public void resendOtp_afterCooldown_sendsNewOtpToPersonalEmailOnFile() throws Exception {
         when(request.getServletPath()).thenReturn("/ResendOtpServlet");
         Map<String, Object> attrs = new HashMap<>();
-        attrs.put("resetEmail", "annd@example.com");
+        attrs.put("resetUsername", "annd");
         attrs.put("resetOtpLastSent", System.currentTimeMillis() - 31_000); // đã quá 30 giây
         HttpSession session = fakeSession(attrs);
         when(request.getSession(false)).thenReturn(session);
+        when(employeeDAO.findByUsername("annd")).thenReturn(userWithPersonalEmail("an.nguyen@gmail.com"));
 
         try (MockedStatic<EmailUtil> emailUtil = mockStatic(EmailUtil.class)) {
             emailUtil.when(() -> EmailUtil.sendOtpEmail(anyString(), anyString())).thenReturn(true);
@@ -325,8 +358,9 @@ public class PasswordResetFlowTest {
             controller.doPost(request, response);
 
             verify(response).sendRedirect(CONTEXT_PATH + "/verifyOtp.jsp?resent=1");
-            // Gửi tới đúng email đã lưu ở bước 1 -- người dùng không phải gõ lại.
-            emailUtil.verify(() -> EmailUtil.sendOtpEmail(eq("annd@example.com"), anyString()));
+            // Tra lại personal_email MỚI NHẤT từ username lưu trong session,
+            // không phải gửi tới đúng chuỗi cũ -- người dùng không phải gõ lại.
+            emailUtil.verify(() -> EmailUtil.sendOtpEmail(eq("an.nguyen@gmail.com"), anyString()));
             org.junit.Assert.assertNotNull("Mã mới phải được lưu vào session", attrs.get("resetOtp"));
         }
     }
@@ -335,10 +369,11 @@ public class PasswordResetFlowTest {
     public void resendOtp_neverSentBefore_isAllowed() throws Exception {
         when(request.getServletPath()).thenReturn("/ResendOtpServlet");
         Map<String, Object> attrs = new HashMap<>();
-        attrs.put("resetEmail", "annd@example.com");
+        attrs.put("resetUsername", "annd");
         // resetOtpLastSent chưa từng được set -- không có gì để so, phải cho qua.
         HttpSession session = fakeSession(attrs);
         when(request.getSession(false)).thenReturn(session);
+        when(employeeDAO.findByUsername("annd")).thenReturn(userWithPersonalEmail("an.nguyen@gmail.com"));
 
         try (MockedStatic<EmailUtil> emailUtil = mockStatic(EmailUtil.class)) {
             emailUtil.when(() -> EmailUtil.sendOtpEmail(anyString(), anyString())).thenReturn(true);
@@ -346,7 +381,7 @@ public class PasswordResetFlowTest {
             controller.doPost(request, response);
 
             verify(response).sendRedirect(CONTEXT_PATH + "/verifyOtp.jsp?resent=1");
-            emailUtil.verify(() -> EmailUtil.sendOtpEmail(eq("annd@example.com"), anyString()));
+            emailUtil.verify(() -> EmailUtil.sendOtpEmail(eq("an.nguyen@gmail.com"), anyString()));
         }
     }
 
@@ -354,11 +389,12 @@ public class PasswordResetFlowTest {
     public void resendOtp_replacesOldCodeAndResetsAttemptCounter() throws Exception {
         when(request.getServletPath()).thenReturn("/ResendOtpServlet");
         Map<String, Object> attrs = new HashMap<>();
-        attrs.put("resetEmail", "annd@example.com");
+        attrs.put("resetUsername", "annd");
         attrs.put("resetOtp", "111111");
         attrs.put("resetOtpAttempts", 3);
         HttpSession session = fakeSession(attrs);
         when(request.getSession(false)).thenReturn(session);
+        when(employeeDAO.findByUsername("annd")).thenReturn(userWithPersonalEmail("an.nguyen@gmail.com"));
 
         try (MockedStatic<EmailUtil> emailUtil = mockStatic(EmailUtil.class)) {
             emailUtil.when(() -> EmailUtil.sendOtpEmail(anyString(), anyString())).thenReturn(true);
@@ -380,7 +416,7 @@ public class PasswordResetFlowTest {
     public void resetPassword_otpNotVerifiedYet_redirectsWithUnauthorizedError() throws Exception {
         when(request.getServletPath()).thenReturn("/ResetPasswordServlet");
         Map<String, Object> attrs = new HashMap<>();
-        attrs.put("resetEmail", "annd@example.com");
+        attrs.put("resetUsername", "annd");
         // otpVerified chưa từng được set -- coi như chưa qua bước 2.
         HttpSession session = fakeSession(attrs);
         when(request.getSession(false)).thenReturn(session);
@@ -388,14 +424,14 @@ public class PasswordResetFlowTest {
         controller.doPost(request, response);
 
         verify(response).sendRedirect(CONTEXT_PATH + "/forgotPassword.jsp?error=unauthorized");
-        verify(employeeDAO, never()).updatePasswordByEmail(anyString(), anyString());
+        verify(employeeDAO, never()).updatePasswordByUsername(anyString(), anyString());
     }
 
     @Test
     public void resetPassword_weakPassword_redirectsWithError() throws Exception {
         when(request.getServletPath()).thenReturn("/ResetPasswordServlet");
         Map<String, Object> attrs = new HashMap<>();
-        attrs.put("resetEmail", "annd@example.com");
+        attrs.put("resetUsername", "annd");
         attrs.put("otpVerified", Boolean.TRUE);
         HttpSession session = fakeSession(attrs);
         when(request.getSession(false)).thenReturn(session);
@@ -410,7 +446,7 @@ public class PasswordResetFlowTest {
     public void resetPassword_confirmationMismatch_redirectsWithError() throws Exception {
         when(request.getServletPath()).thenReturn("/ResetPasswordServlet");
         Map<String, Object> attrs = new HashMap<>();
-        attrs.put("resetEmail", "annd@example.com");
+        attrs.put("resetUsername", "annd");
         attrs.put("otpVerified", Boolean.TRUE);
         HttpSession session = fakeSession(attrs);
         when(request.getSession(false)).thenReturn(session);
@@ -426,17 +462,17 @@ public class PasswordResetFlowTest {
     public void resetPassword_valid_updatesHashAndClearsSessionAndRedirectsToLogin() throws Exception {
         when(request.getServletPath()).thenReturn("/ResetPasswordServlet");
         Map<String, Object> attrs = new HashMap<>();
-        attrs.put("resetEmail", "annd@example.com");
+        attrs.put("resetUsername", "annd");
         attrs.put("otpVerified", Boolean.TRUE);
         HttpSession session = fakeSession(attrs);
         when(request.getSession(false)).thenReturn(session);
         when(request.getParameter("newPassword")).thenReturn("brand-new-password1");
         when(request.getParameter("confirmPassword")).thenReturn("brand-new-password1");
-        when(employeeDAO.updatePasswordByEmail(eq("annd@example.com"), anyString())).thenReturn(true);
+        when(employeeDAO.updatePasswordByUsername(eq("annd"), anyString())).thenReturn(true);
 
         controller.doPost(request, response);
 
-        verify(employeeDAO).updatePasswordByEmail(eq("annd@example.com"), anyString());
+        verify(employeeDAO).updatePasswordByUsername(eq("annd"), anyString());
         org.junit.Assert.assertTrue("Session phải được dọn sạch sau khi đổi xong", attrs.isEmpty());
         verify(response).sendRedirect(CONTEXT_PATH + "/login.jsp?reset=success");
     }
@@ -445,13 +481,13 @@ public class PasswordResetFlowTest {
     public void resetPassword_daoUpdateFails_stillClearsSessionAndRedirectsWithError() throws Exception {
         when(request.getServletPath()).thenReturn("/ResetPasswordServlet");
         Map<String, Object> attrs = new HashMap<>();
-        attrs.put("resetEmail", "annd@example.com");
+        attrs.put("resetUsername", "annd");
         attrs.put("otpVerified", Boolean.TRUE);
         HttpSession session = fakeSession(attrs);
         when(request.getSession(false)).thenReturn(session);
         when(request.getParameter("newPassword")).thenReturn("brand-new-password1");
         when(request.getParameter("confirmPassword")).thenReturn("brand-new-password1");
-        when(employeeDAO.updatePasswordByEmail(eq("annd@example.com"), anyString())).thenReturn(false);
+        when(employeeDAO.updatePasswordByUsername(eq("annd"), anyString())).thenReturn(false);
 
         controller.doPost(request, response);
 

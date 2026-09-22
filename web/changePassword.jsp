@@ -290,6 +290,13 @@
 
             <div class="form-body">
 
+                <c:if test="${param.onboarding == '1'}">
+                    <div class="alert alert-error">
+                        <i class="fa-solid fa-triangle-exclamation"></i>
+                        Bạn đang dùng mật khẩu tạm -- vui lòng đổi mật khẩu trước khi tiếp tục sử dụng hệ thống.
+                    </div>
+                </c:if>
+
                 <c:if test="${not empty param.error}">
                     <div class="alert alert-error">
                         <i class="fa-solid fa-circle-exclamation"></i>

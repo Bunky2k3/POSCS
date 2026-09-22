@@ -17,6 +17,7 @@ import poscs.model.Address;
 import poscs.model.Department;
 import poscs.model.District;
 import poscs.model.Province;
+import poscs.model.ProvinceAssignment;
 import poscs.model.Role;
 import poscs.model.User;
 
@@ -25,37 +26,47 @@ public class EmployeeDAO {
     private static final Logger LOG = LoggerFactory.getLogger(EmployeeDAO.class);
 
     /**
-     * Tra cứu 1 nhân viên theo username HOẶC email, kèm role -- dùng cho
-     * đăng nhập. Trả về null nếu không tìm thấy. LƯU Ý: không lọc theo
-     * is_deleted ở đây -- tài khoản bị khóa (is_deleted=1) vẫn được trả về
-     * để controller có thể phân biệt "sai mật khẩu" với "tài khoản bị khóa"
-     * và báo thông báo lỗi phù hợp (chỉ sau khi đã xác minh đúng mật khẩu,
-     * để không lộ trạng thái tài khoản cho kẻ dò mật khẩu).
+     * Tra cứu 1 nhân viên theo username, kèm role -- dùng cho đăng nhập. Trả
+     * về null nếu không tìm thấy. LƯU Ý: không lọc theo is_deleted ở đây --
+     * tài khoản bị khóa (is_deleted=1) vẫn được trả về để controller có thể
+     * phân biệt "sai mật khẩu" với "tài khoản bị khóa" và báo thông báo lỗi
+     * phù hợp (chỉ sau khi đã xác minh đúng mật khẩu, để không lộ trạng thái
+     * tài khoản cho kẻ dò mật khẩu).
+     *
+     * <p>Từ V36: KHÔNG còn nhánh "hoặc email" -- users.email (chuỗi
+     * &lt;username&gt;@postef.com.vn hệ thống tự bịa, chưa từng gắn hộp thư
+     * thật) đã xoá, username là định danh đăng nhập duy nhất.
      */
-    public User findByUsernameOrEmail(String identifier) {
+    public User findByUsername(String username) {
         // JOIN sẵn bảng roles để lấy luôn role_name, tránh phải query thêm lần 2.
-        String sql = "SELECT u.user_id, u.username, u.email, u.password_hash, u.role_id, " +
-                     "u.last_name, u.middle_name, u.first_name, u.department_id, u.manager_id, u.avatar_url, u.is_deleted, r.role_name " +
+        // gender/date_of_birth/citizen_id/phone + must_change_password: cần
+        // ngay từ lúc đăng nhập (không phải chỉ lúc xem hồ sơ) để
+        // AuthenticationFilter biết có phải ép qua /changePassword,
+        // /updateProfile hay không -- xem User.isProfileIncomplete, V35.
+        String sql = "SELECT u.user_id, u.username, u.password_hash, u.must_change_password, u.role_id, " +
+                     "u.last_name, u.middle_name, u.first_name, u.gender, u.date_of_birth, u.citizen_id, u.phone, " +
+                     "u.department_id, u.manager_id, u.avatar_url, u.is_deleted, r.role_name " +
                      "FROM users u JOIN roles r ON u.role_id = r.role_id " +
-                     "WHERE (u.username = ? OR u.email = ?)";
+                     "WHERE u.username = ?";
         try (Connection conn = DBContext.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
-            // Cùng 1 giá trị identifier được so khớp với cả 2 cột username và email,
-            // để form đăng nhập chấp nhận nhập username hoặc email đều được.
-            ps.setString(1, identifier);
-            ps.setString(2, identifier);
+            ps.setString(1, username);
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
                     // Map từng cột trong ResultSet sang object User.
                     User u = new User();
                     u.setUserId(rs.getInt("user_id"));
                     u.setUsername(rs.getString("username"));
-                    u.setEmail(rs.getString("email"));
                     u.setPasswordHash(rs.getString("password_hash")); // hash BCrypt, controller sẽ so khớp bằng BCrypt.checkpw
+                    u.setMustChangePassword(rs.getBoolean("must_change_password"));
                     u.setRoleId(rs.getInt("role_id"));
                     u.setLastName(rs.getString("last_name"));
                     u.setMiddleName(rs.getString("middle_name"));
                     u.setFirstName(rs.getString("first_name"));
+                    u.setGender(rs.getString("gender"));
+                    u.setDateOfBirth(rs.getDate("date_of_birth"));
+                    u.setCitizenId(rs.getString("citizen_id"));
+                    u.setPhone(rs.getString("phone"));
                     u.setDepartmentId(rs.getInt("department_id"));
                     // Vị trí trong cây tổ chức PHẢI đi cùng User vào session:
                     // AccessControl đọc thẳng từ đó để biết người này là cấp
@@ -75,7 +86,7 @@ public class EmployeeDAO {
                 // hợp lệ, không phải lỗi hệ thống).
             }
         } catch (SQLException ex) {
-            LOG.error("Loi truy van dang nhap (identifier={})", identifier, ex);
+            LOG.error("Loi truy van dang nhap (username={})", username, ex);
         }
         return null;
     }
@@ -107,7 +118,6 @@ public class EmployeeDAO {
                     User u = new User();
                     u.setUserId(rs.getInt("user_id"));
                     u.setUsername(rs.getString("username"));
-                    u.setEmail(rs.getString("email"));
                     u.setRoleId(rs.getInt("role_id"));
                     u.setRole(new Role(rs.getInt("role_id"), rs.getString("role_name")));
                     u.setLastName(rs.getString("last_name"));
@@ -152,7 +162,7 @@ public class EmployeeDAO {
     }
 
     /**
-     * Cập nhật các trường "thông tin cá nhân" (KHÔNG gồm email đăng nhập,
+     * Cập nhật các trường "thông tin cá nhân" (KHÔNG gồm username đăng nhập,
      * phòng ban, vai trò, ngày vào làm -- các trường đó do Admin quản lý,
      * xem section-hint trong updateProfile.jsp). Nếu user.getAddress() có
      * dữ liệu, tự tạo/cập nhật luôn dòng addresses tương ứng. Trả về true
@@ -240,20 +250,28 @@ public class EmployeeDAO {
     }
 
     /**
-     * Đặt lại mật khẩu (đã hash sẵn bằng BCrypt) cho tài khoản có email này.
-     * Dùng trong luồng quên mật khẩu, SAU KHI đã xác thực OTP thành công.
-     * Trả về true nếu có đúng 1 hàng được cập nhật.
+     * Đặt lại mật khẩu (đã hash sẵn bằng BCrypt) cho tài khoản có username
+     * này. Dùng trong luồng quên mật khẩu (SAU KHI đã xác thực OTP thành
+     * công) VÀ luồng tự đổi mật khẩu (AuthenticationController.
+     * handleChangePassword, sau khi đã xác minh đúng mật khẩu cũ). Trả về
+     * true nếu có đúng 1 hàng được cập nhật.
+     *
+     * <p>Từ V36: khoá theo username, không còn email công ty (đã xoá cột).
+     *
+     * <p>Luôn tắt kèm {@code must_change_password}: cả hai luồng đều là lúc
+     * người dùng vừa tự đặt một mật khẩu chỉ họ biết, khác mật khẩu tạm Admin
+     * cấp -- xem V35, AuthenticationFilter.
      */
-    public boolean updatePasswordByEmail(String email, String newPasswordHash) {
-        String sql = "UPDATE users SET password_hash = ? WHERE email = ? AND is_deleted = 0";
+    public boolean updatePasswordByUsername(String username, String newPasswordHash) {
+        String sql = "UPDATE users SET password_hash = ?, must_change_password = 0 WHERE username = ? AND is_deleted = 0";
         try (Connection conn = DBContext.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, newPasswordHash);
-            ps.setString(2, email);
+            ps.setString(2, username);
             // executeUpdate() trả về số hàng bị ảnh hưởng; ==1 nghĩa là cập nhật đúng 1 user.
             return ps.executeUpdate() == 1;
         } catch (SQLException ex) {
-            LOG.error("Loi cap nhat mat khau (email={})", email, ex);
+            LOG.error("Loi cap nhat mat khau (username={})", username, ex);
             return false;
         }
     }
@@ -440,9 +458,9 @@ public class EmployeeDAO {
 
     private void appendFilters(StringBuilder sql, List<Object> params, String keyword, String statusFilter, Integer roleFilter) {
         if (keyword != null && !keyword.trim().isEmpty()) {
-            sql.append(" AND (u.last_name LIKE ? OR u.middle_name LIKE ? OR u.first_name LIKE ? OR u.email LIKE ? OR u.phone LIKE ?)");
+            sql.append(" AND (u.last_name LIKE ? OR u.middle_name LIKE ? OR u.first_name LIKE ? OR u.phone LIKE ?)");
             String like = "%" + keyword.trim() + "%";
-            for (int i = 0; i < 5; i++) {
+            for (int i = 0; i < 4; i++) {
                 params.add(like);
             }
         }
@@ -519,57 +537,16 @@ public class EmployeeDAO {
         }
     }
 
-    /**
-     * Những người có thể chọn làm CẤP TRÊN cho nhân viên {@code excludeUserId}
-     * (truyền null khi đang tạo nhân viên mới).
-     *
-     * Lọc sẵn ở đây hai điều kiện giữ cây đúng 2 tầng, thay vì đổ hết danh
-     * sách ra rồi trông chờ người dùng chọn đúng:
-     *
-     *  - {@code manager_id IS NULL}: người đã là cấp dưới thì không được làm
-     *    cấp trên của ai nữa -- nếu không sẽ mọc ra tầng thứ ba, mà mô hình
-     *    chốt với khách chỉ có hai.
-     *  - bỏ chính mình: tự làm cấp trên của mình là vô nghĩa, và CSDL cũng
-     *    chặn bằng chk_users_manager_not_self.
-     *
-     * Đây chỉ là lọc cho ô chọn dễ dùng; chốt chặn thật vẫn nằm ở
-     * EmployeeController trước khi ghi, vì form thì ai cũng sửa được.
-     */
-    public List<User> findEligibleManagers(Integer excludeUserId) {
-        List<User> result = new ArrayList<>();
-        String sql = "SELECT u.user_id, u.username, u.last_name, u.middle_name, u.first_name, r.role_name " +
-                     "FROM users u JOIN roles r ON u.role_id = r.role_id " +
-                     "WHERE u.is_deleted = 0 AND u.manager_id IS NULL " +
-                     (excludeUserId != null ? "AND u.user_id <> ? " : "") +
-                     "ORDER BY u.last_name, u.first_name";
-        try (Connection conn = DBContext.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            if (excludeUserId != null) {
-                ps.setInt(1, excludeUserId);
-            }
-            try (ResultSet rs = ps.executeQuery()) {
-                while (rs.next()) {
-                    User u = new User();
-                    u.setUserId(rs.getInt("user_id"));
-                    u.setUsername(rs.getString("username"));
-                    u.setLastName(rs.getString("last_name"));
-                    u.setMiddleName(rs.getString("middle_name"));
-                    u.setFirstName(rs.getString("first_name"));
-                    u.setRole(new Role(0, rs.getString("role_name")));
-                    result.add(u);
-                }
-            }
-        } catch (SQLException ex) {
-            LOG.error("Loi truy van danh sach cap tren (excludeUserId={})", excludeUserId, ex);
-        }
-        return result;
-    }
+    // findEligibleManagers (ô chọn "Cấp trên" trên form thêm/sửa) đã xoá cùng
+    // với chính ô đó -- KHÔNG còn đường nào qua UI để gán/đổi manager_id, xem
+    // PERMISSIONS.md. Cây tổ chức đã gán vẫn đọc/dùng nguyên (AccessControl,
+    // findProvincesManagedBy...), chỉ mất chỗ NHẬP MỚI; đổi cấp trên hiện phải
+    // sửa trực tiếp trong CSDL cho tới khi có UI khác thay thế.
 
     private User mapRow(ResultSet rs) throws SQLException {
         User u = new User();
         u.setUserId(rs.getInt("user_id"));
         u.setUsername(rs.getString("username"));
-        u.setEmail(rs.getString("email"));
         u.setRoleId(rs.getInt("role_id"));
         u.setRole(new Role(rs.getInt("role_id"), rs.getString("role_name")));
         u.setLastName(rs.getString("last_name"));
@@ -588,13 +565,13 @@ public class EmployeeDAO {
         u.setHireDate(rs.getDate("hire_date"));
         u.setCreatedAt(rs.getTimestamp("created_at"));
         u.setDeleted(rs.getBoolean("is_deleted"));
+        u.setMustChangePassword(rs.getBoolean("must_change_password"));
         return u;
     }
 
-    /** BR-27: email/SĐT/CCCD phải duy nhất -- true nếu email này đã có người dùng (dùng khi tạo mới/sửa). */
-    public boolean existsByEmail(String email, Integer excludeUserId) {
-        return existsByColumn("email", email, excludeUserId);
-    }
+    // existsByEmail đã xoá cùng cột email công ty (V36, xem PERMISSIONS.md) --
+    // BR-27 giờ chỉ còn SĐT/CCCD. personal_email (email cá nhân, cột khác)
+    // không có ràng buộc UNIQUE nên vốn cũng chưa từng cần kiểm trùng.
 
     public boolean existsByPhone(String phone, Integer excludeUserId) {
         return existsByColumn("phone", phone, excludeUserId);
@@ -675,36 +652,41 @@ public class EmployeeDAO {
      * EmployeeController, hàm này chỉ lưu). Nếu user.getAddress() có dữ
      * liệu thì tạo luôn dòng addresses tương ứng, cùng transaction với
      * INSERT users -- tái dùng resolveAddressId() có sẵn.
+     *
+     * <p>{@code must_change_password} luôn ghi '1': mật khẩu vừa tạo là mật
+     * khẩu tạm (EmployeeController sinh ngẫu nhiên), nhân viên chưa hề biết
+     * tới nó cho tới khi Admin bấm "Gửi thông tin tài khoản" -- xem V35.
+     * gender/date_of_birth/citizen_id/phone từ V35 được phép NULL: không còn
+     * ép Admin điền hết lúc tạo, nhân viên tự bổ sung ở lần đăng nhập đầu.
      */
     public int insert(User user) {
-        String sql = "INSERT INTO users (username, email, password_hash, role_id, last_name, middle_name, " +
-                     "first_name, gender, date_of_birth, citizen_id, phone, personal_email, address_id, " +
-                     "department_id, hire_date, manager_id, is_deleted) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)";
+        String sql = "INSERT INTO users (username, password_hash, must_change_password, role_id, last_name, " +
+                     "middle_name, first_name, gender, date_of_birth, citizen_id, phone, personal_email, address_id, " +
+                     "department_id, hire_date, manager_id, is_deleted) VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)";
         try (Connection conn = DBContext.getConnection()) {
             conn.setAutoCommit(false);
             try {
                 Integer addressId = resolveAddressId(conn, user.getAddress());
                 try (PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
                     ps.setString(1, user.getUsername());
-                    ps.setString(2, user.getEmail());
-                    ps.setString(3, user.getPasswordHash());
-                    ps.setInt(4, user.getRoleId());
-                    ps.setString(5, user.getLastName());
-                    ps.setString(6, user.getMiddleName());
-                    ps.setString(7, user.getFirstName());
-                    ps.setString(8, user.getGender());
-                    ps.setDate(9, user.getDateOfBirth());
-                    ps.setString(10, user.getCitizenId());
-                    ps.setString(11, user.getPhone());
-                    ps.setString(12, user.getPersonalEmail());
+                    ps.setString(2, user.getPasswordHash());
+                    ps.setInt(3, user.getRoleId());
+                    ps.setString(4, user.getLastName());
+                    ps.setString(5, user.getMiddleName());
+                    ps.setString(6, user.getFirstName());
+                    ps.setString(7, user.getGender());
+                    ps.setDate(8, user.getDateOfBirth());
+                    ps.setString(9, user.getCitizenId());
+                    ps.setString(10, user.getPhone());
+                    ps.setString(11, user.getPersonalEmail());
                     if (addressId != null) {
-                        ps.setInt(13, addressId);
+                        ps.setInt(12, addressId);
                     } else {
-                        ps.setNull(13, Types.INTEGER);
+                        ps.setNull(12, Types.INTEGER);
                     }
-                    ps.setInt(14, user.getDepartmentId());
-                    ps.setDate(15, user.getHireDate());
-                    setNullableInt(ps, 16, user.getManagerId());
+                    ps.setInt(13, user.getDepartmentId());
+                    ps.setDate(14, user.getHireDate());
+                    setNullableInt(ps, 15, user.getManagerId());
                     int affected = ps.executeUpdate();
                     if (affected == 0) {
                         conn.rollback();
@@ -731,9 +713,9 @@ public class EmployeeDAO {
     /**
      * Cập nhật thông tin nhân viên do Admin sửa (UC-27/UC-28: gồm cả phòng
      * ban + vai trò, khác updateProfile() ở trên vốn chỉ cho tự sửa thông
-     * tin cá nhân). KHÔNG đổi username/password/email công ty ở đây -- email
-     * công ty do hệ thống tự cấp gắn chết với username lúc tạo, đổi
-     * mật khẩu có luồng riêng (quên mật khẩu / đổi mật khẩu).
+     * tin cá nhân). KHÔNG đổi username/password ở đây -- username do hệ
+     * thống tự sinh lúc tạo (gắn chết, không sửa lại), đổi mật khẩu có luồng
+     * riêng (quên mật khẩu / đổi mật khẩu).
      */
     public boolean update(User user) {
         String sql = "UPDATE users SET role_id = ?, last_name = ?, middle_name = ?, first_name = ?, " +
@@ -787,9 +769,14 @@ public class EmployeeDAO {
      * "Gửi thông tin tài khoản" (FE-02): mỗi lần gửi/gửi lại đều cấp 1 mật
      * khẩu tạm mới thay vì lưu lại mật khẩu tạm cũ dạng plaintext ở đâu đó
      * chờ gửi (không an toàn), nên "gửi lại" thực chất là "cấp lại rồi gửi".
+     *
+     * <p>Luôn bật lại {@code must_change_password}: mật khẩu vừa ghi là mật
+     * khẩu TẠM, kể cả khi nhân viên trước đó đã tự đổi và cờ này đã tắt --
+     * Admin cấp lại nghĩa là mật khẩu cũ (do nhân viên tự đặt) không còn dùng
+     * được nữa, phải ép đổi lại từ đầu. Xem V35, AuthenticationFilter.
      */
     public boolean updatePasswordHash(int userId, String passwordHash) {
-        String sql = "UPDATE users SET password_hash = ? WHERE user_id = ?";
+        String sql = "UPDATE users SET password_hash = ?, must_change_password = 1 WHERE user_id = ?";
         try (Connection conn = DBContext.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, passwordHash);
@@ -830,8 +817,8 @@ public class EmployeeDAO {
     // hai: vài tỉnh tự cầm, vài tỉnh phủ qua lính.
     //
     // Nằm trong EmployeeDAO chứ không phải một DAO riêng: "ai cầm tỉnh nào"
-    // là thuộc tính của nhân viên, cùng miền với cây tổ chức ở
-    // findEligibleManagers, và màn hình quản lý nó cũng là màn hình nhân viên.
+    // là thuộc tính của nhân viên, cùng miền với cây tổ chức (manager_id) của
+    // chính bảng users, và màn hình quản lý nó cũng là màn hình nhân viên.
 
     /** Các tỉnh mà {@code userId} trực tiếp cầm. */
     public List<Province> findProvincesOf(int userId) {
@@ -1026,29 +1013,48 @@ public class EmployeeDAO {
     }
 
     /**
-     * Những tỉnh mà {@code userId} chọn được: chưa ai cầm, hoặc chính họ đang
-     * cầm. Lọc sẵn để ô chọn không mời người dùng cướp tỉnh của đồng nghiệp
-     * rồi ăn lỗi UNIQUE.
+     * Toàn bộ tỉnh/thành, kèm người đang cầm (nếu có) -- dùng cho form
+     * thêm/sửa nhân viên. Đổ CẢ tỉnh đã có người cầm ra màn hình (khác {@code
+     * findSelectableProvinces} cũ, đã xoá) vì Admin cần thấy NGAY ai đang giữ
+     * tỉnh đó thay vì tự hỏi "sao tỉnh này biến mất khỏi ô chọn" -- JSP tự
+     * khoá checkbox của tỉnh thuộc NGƯỜI KHÁC, dựa vào {@code holderUserId}.
+     *
+     * <p>KHÔNG lọc theo {@code is_deleted} của người cầm, khác {@link
+     * #findAllAssignments()}: tỉnh do một tài khoản đã bị khoá cầm vẫn CHIẾM
+     * đúng một dòng UNIQUE trong {@code user_provinces} -- INSERT cho người
+     * khác vẫn vi phạm ràng buộc đó dù người cầm cũ không còn hoạt động, nên
+     * ô chọn phải khoá đúng như CSDL sẽ khoá, không phải khoá theo cảm tính.
      */
-    public List<Province> findSelectableProvinces(Integer userId) {
-        String sql = "SELECT p.province_id, p.province_name FROM provinces p " +
+    public List<ProvinceAssignment> findAllProvincesWithHolder() {
+        String sql = "SELECT p.province_id, p.province_name, up.user_id AS holder_id, " +
+                     "u.last_name, u.middle_name, u.first_name " +
+                     "FROM provinces p " +
                      "LEFT JOIN user_provinces up ON up.province_id = p.province_id " +
-                     "WHERE up.province_id IS NULL" +
-                     (userId != null ? " OR up.user_id = ?" : "") +
-                     " ORDER BY p.province_name";
-        List<Province> result = new ArrayList<>();
+                     "LEFT JOIN users u ON u.user_id = up.user_id " +
+                     "ORDER BY p.province_name";
+        List<ProvinceAssignment> result = new ArrayList<>();
         try (Connection conn = DBContext.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            if (userId != null) {
-                ps.setInt(1, userId);
-            }
-            try (ResultSet rs = ps.executeQuery()) {
-                while (rs.next()) {
-                    result.add(new Province(rs.getInt("province_id"), rs.getString("province_name")));
+             PreparedStatement ps = conn.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+                int holderIdRaw = rs.getInt("holder_id");
+                Integer holderId = rs.wasNull() ? null : holderIdRaw;
+                String holderName = null;
+                if (holderId != null) {
+                    // Tái dùng đúng luật ghép họ tên của User.getFullName()
+                    // thay vì chép lại CONCAT trong SQL, để hai nơi không lệch
+                    // nhau khi luật đó đổi (vd. thêm học vị/chức danh).
+                    User holder = new User();
+                    holder.setLastName(rs.getString("last_name"));
+                    holder.setMiddleName(rs.getString("middle_name"));
+                    holder.setFirstName(rs.getString("first_name"));
+                    holderName = holder.getFullName();
                 }
+                result.add(new ProvinceAssignment(rs.getInt("province_id"), rs.getString("province_name"),
+                        holderId, holderName));
             }
         } catch (SQLException ex) {
-            LOG.error("Loi tra danh sach tinh chon duoc (userId={})", userId, ex);
+            LOG.error("Loi tra danh sach tinh kem nguoi cam", ex);
         }
         return result;
     }

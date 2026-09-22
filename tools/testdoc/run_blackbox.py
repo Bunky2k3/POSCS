@@ -98,14 +98,18 @@ def test_login():
            "HTTP %s -> %s; /dashboard trả 200 sau đăng nhập"
            % (r.status_code, r.headers.get("Location")))
 
+    # Từ V36: không còn "email công ty" (users.email đã xoá) -- đăng nhập chỉ
+    # bằng username. TC_LOGIN_002 đổi từ "email công ty đăng nhập được" (đúng
+    # ở bản cũ) thành "một chuỗi dạng email KHÔNG còn đăng nhập được", vì nó
+    # không khớp bất kỳ username nào.
     s = requests.Session()
     token = csrf(s, "/login.jsp")
     r = s.post(BASE + "/login", allow_redirects=False,
                data={"username": "admin@poscs.vn", "password": "Admin@123",
                      "csrfToken": token})
     expect("TC_LOGIN_002",
-           r.status_code == 302 and "dashboard" in (r.headers.get("Location") or ""),
-           "Đăng nhập bằng email công ty: HTTP %s -> %s"
+           "invalid_credentials" in (r.headers.get("Location") or ""),
+           "Đăng nhập bằng chuỗi dạng email (không phải username): HTTP %s -> %s"
            % (r.status_code, r.headers.get("Location")))
 
     for cid, user, pwd, label in [

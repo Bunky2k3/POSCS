@@ -6,9 +6,15 @@ import java.sql.Timestamp;
 public class User {
     private int userId;
     private String username;
-    private String email;
     private String passwordHash;
-    
+    /**
+     * true nếu mật khẩu hiện tại còn là mật khẩu TẠM do Admin cấp (tạo tài
+     * khoản, hoặc "Gửi lại thông tin tài khoản"), chưa phải mật khẩu do chính
+     * nhân viên đặt. AuthenticationFilter dùng cờ này để ép qua
+     * /changePassword trước khi cho vào các trang khác -- xem V35.
+     */
+    private boolean mustChangePassword;
+
     // Thuộc tính lưu trữ ID khóa ngoại
     private int roleId;
     private int departmentId;
@@ -49,14 +55,13 @@ public class User {
     }
 
     // Constructor có tham số (Có thể tạo thêm constructor với ít tham số hơn tùy nhu cầu)
-    public User(int userId, String username, String email, String passwordHash, int roleId,
+    public User(int userId, String username, String passwordHash, int roleId,
                 String lastName, String middleName, String firstName, String gender,
                 Date dateOfBirth, String citizenId, String phone, String personalEmail,
                 Integer addressId, String avatarUrl, int departmentId, Date hireDate,
                 Timestamp createdAt, Timestamp updatedAt, boolean isDeleted) {
         this.userId = userId;
         this.username = username;
-        this.email = email;
         this.passwordHash = passwordHash;
         this.roleId = roleId;
         this.lastName = lastName;
@@ -82,9 +87,6 @@ public class User {
 
     public String getUsername() { return username; }
     public void setUsername(String username) { this.username = username; }
-
-    public String getEmail() { return email; }
-    public void setEmail(String email) { this.email = email; }
 
     public String getPasswordHash() { return passwordHash; }
     public void setPasswordHash(String passwordHash) { this.passwordHash = passwordHash; }
@@ -172,4 +174,18 @@ public class User {
 
     public boolean isDeleted() { return isDeleted; }
     public void setDeleted(boolean isDeleted) { this.isDeleted = isDeleted; }
+
+    public boolean isMustChangePassword() { return mustChangePassword; }
+    public void setMustChangePassword(boolean mustChangePassword) { this.mustChangePassword = mustChangePassword; }
+
+    /**
+     * true nếu còn thiếu ít nhất một trong bốn trường cá nhân mà từ V35 Admin
+     * không còn bắt buộc phải điền lúc tạo tài khoản (gender, dateOfBirth,
+     * citizenId, phone) -- nhân viên tạo trước V35 luôn có đủ nên luôn trả
+     * false, chỉ nhân viên tạo sau đó (còn thiếu, chưa tự bổ sung) mới true.
+     * AuthenticationFilter dùng để ép qua /updateProfile.
+     */
+    public boolean isProfileIncomplete() {
+        return gender == null || dateOfBirth == null || citizenId == null || phone == null;
+    }
 }

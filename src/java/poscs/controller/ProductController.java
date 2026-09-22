@@ -28,7 +28,8 @@ import poscs.model.ProductCategory;
  * Controller cho toàn bộ chức năng sản phẩm (products). Điều hướng theo
  * tham số "action" -- role nào được thao tác gì xem PERMISSIONS.md, enforce
  * bằng AccessControl.requireFullAccess ở đầu mỗi hàm handleCreate/
- * handleUpdate/handleDelete (Sales/CSKH chỉ View only trên Product).
+ * handleUpdate/handleDelete (Sales chỉ View only trên Product -- CSKH đã gộp
+ * vào Sales, xem PERMISSIONS.md).
  *
  * addNewProduct.jsp/updateProduct.jsp gửi lên dạng multipart/form-data (ảnh +
  * catalogue tải từ máy, có thể chọn nhiều file) -- @MultipartConfig là bắt

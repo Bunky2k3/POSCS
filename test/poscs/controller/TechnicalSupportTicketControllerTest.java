@@ -42,7 +42,8 @@ import static org.mockito.Mockito.*;
 
 /**
  * Test tầng Controller cho TechnicalSupportTicketController -- tập trung
- * vào phân quyền TICKET (Full access CSKH/Admin, cộng ngoại lệ Kỹ thuật
+ * vào phân quyền TICKET (Full access Sales/Admin -- Sales gộp thêm việc của
+ * CSKH cũ, xem PERMISSIONS.md -- cộng ngoại lệ Kỹ thuật
  * được tự cập nhật đúng phiếu giao cho mình -- AccessControl.
  * canUpdateAssignedTicket) và quy tắc stamp resolved_at chỉ 1 lần khi
  * chuyển sang "Đã đóng". JUnit 4 + Mockito, xem CustomerControllerTest.
@@ -81,7 +82,7 @@ public class TechnicalSupportTicketControllerTest {
         when(request.getSession(false)).thenReturn(session);
         when(request.getContextPath()).thenReturn(CONTEXT_PATH);
 
-        loginAs("CSKH", 99); // role được Full access trên TICKET, xem PERMISSIONS.md
+        loginAs("Sales", 99); // role được Full access trên TICKET (gộp CSKH), xem PERMISSIONS.md
 
         // exportPdf đọc font tiếng Việt qua ServletContext. Dùng ĐÚNG file font
         // trong web/WEB-INF/fonts thay vì mock trả byte giả: PDType0Font.load
@@ -168,7 +169,7 @@ public class TechnicalSupportTicketControllerTest {
 
     @Test
     public void create_withoutFullAccess_returns403AndNeverInserts() throws Exception {
-        loginAs("Sales", 1); // không có Full access trên TICKET
+        loginAs("Kỹ thuật", 1); // không có Full access trên TICKET (Sales thì có, từ khi gộp CSKH)
         when(request.getParameter("action")).thenReturn("create");
         stubValidCreateFields();
 
@@ -257,7 +258,7 @@ public class TechnicalSupportTicketControllerTest {
      */
     @Test
     public void update_passesLoggedInUserAndInternalNoteToDao() throws Exception {
-        loginAs("CSKH", 99);
+        loginAs("Sales", 99);
         stubValidUpdateParams();
         when(request.getParameter("status")).thenReturn(TechnicalSupportTicketDAO.STATUS_CLOSED);
         when(request.getParameter("internalNote")).thenReturn("Khách xác nhận đã ổn");
@@ -271,7 +272,7 @@ public class TechnicalSupportTicketControllerTest {
     /** Ô ghi chú để trống thì lưu NULL, đừng lưu chuỗi rỗng cho lịch sử lấm tấm ô trắng. */
     @Test
     public void update_blankInternalNote_isStoredAsNull() throws Exception {
-        loginAs("CSKH", 99);
+        loginAs("Sales", 99);
         stubValidUpdateParams();
         when(request.getParameter("status")).thenReturn(TechnicalSupportTicketDAO.STATUS_CLOSED);
         when(request.getParameter("internalNote")).thenReturn("   ");
@@ -304,7 +305,7 @@ public class TechnicalSupportTicketControllerTest {
 
     @Test
     public void update_alreadyClosedTicket_doesNotOverwriteOriginalResolvedAt() throws Exception {
-        loginAs("CSKH", 99); // Full access
+        loginAs("Sales", 99); // Full access
         when(request.getParameter("action")).thenReturn("update");
         when(request.getParameter("ticketId")).thenReturn("3");
         when(request.getParameter("enterpriseId")).thenReturn("10");
@@ -444,7 +445,7 @@ public class TechnicalSupportTicketControllerTest {
     /** Chưa có phương hướng thì lưu NULL, không lưu chuỗi rỗng. */
     @Test
     public void update_blankHandlingPlan_isStoredAsNull() throws Exception {
-        loginAs("CSKH", 99);
+        loginAs("Sales", 99);
         stubValidUpdateParams();
         when(request.getParameter("handlingPlan")).thenReturn("   ");
         when(ticketDAO.findById(3)).thenReturn(fullyValidExistingTicket());
@@ -455,10 +456,10 @@ public class TechnicalSupportTicketControllerTest {
                 anyInt(), any());
     }
 
-    /** Role có Full access (CSKH/Admin) cũng ghi được nguyên nhân như bình thường. */
+    /** Role có Full access (Sales/Admin) cũng ghi được nguyên nhân như bình thường. */
     @Test
     public void update_fullAccessRole_alsoWritesRootCauseAndCategory() throws Exception {
-        loginAs("CSKH", 99);
+        loginAs("Sales", 99);
         stubValidUpdateParams();
         when(request.getParameter("rootCause")).thenReturn("Bo mạch nguồn lỗi từ nhà sản xuất");
         when(request.getParameter("causeCategory")).thenReturn("Do thiết bị");
@@ -480,7 +481,7 @@ public class TechnicalSupportTicketControllerTest {
      */
     @Test
     public void update_blankCauseFields_areStoredAsNullNotEmptyString() throws Exception {
-        loginAs("CSKH", 99);
+        loginAs("Sales", 99);
         stubValidUpdateParams();
         when(request.getParameter("rootCause")).thenReturn("   ");
         when(request.getParameter("causeCategory")).thenReturn("");
@@ -500,7 +501,7 @@ public class TechnicalSupportTicketControllerTest {
      */
     @Test
     public void update_withoutAnyCause_stillSaves() throws Exception {
-        loginAs("CSKH", 99);
+        loginAs("Sales", 99);
         stubValidUpdateParams();
         when(ticketDAO.findById(3)).thenReturn(fullyValidExistingTicket());
 
@@ -516,7 +517,7 @@ public class TechnicalSupportTicketControllerTest {
 
     @Test
     public void delete_withoutFullAccess_returns403() throws Exception {
-        loginAs("Sales", 1);
+        loginAs("Kỹ thuật", 1); // Sales có Full access trên TICKET từ khi gộp CSKH
         when(request.getParameter("action")).thenReturn("delete");
         when(request.getParameter("id")).thenReturn("3");
 
@@ -681,7 +682,7 @@ public class TechnicalSupportTicketControllerTest {
     @Test
     public void update_formOmitsSlaDeadline_keepsTheStoredOne() throws Exception {
         // Form sửa không bắt buộc nhập hạn SLA. Nếu handleUpdate không giữ lại
-        // giá trị cũ thì mỗi lần Admin/CSKH bấm lưu là ghi đè sla_deadline
+        // giá trị cũ thì mỗi lần Admin/Sales bấm lưu là ghi đè sla_deadline
         // thành NULL -- phiếu biến mất khỏi ô "sắp/đã quá hạn" trên dashboard
         // và khỏi lịch nhắc SLA, vì cả hai đều lọc "sla_deadline IS NOT NULL".
         Timestamp stored = Timestamp.valueOf("2026-08-27 10:00:00");

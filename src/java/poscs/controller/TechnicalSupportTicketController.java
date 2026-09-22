@@ -37,8 +37,9 @@ import poscs.model.User;
 /**
  * Controller CRUD cho phiếu hỗ trợ kỹ thuật (bảng technicalrequests). Điều
  * hướng theo tham số "action", theo đúng khuôn mẫu của CustomerController/
- * ContractController -- quyền hạn theo PERMISSIONS.md (CSKH và Admin có
- * toàn quyền, Sales/Kỹ thuật chỉ xem) enforce bằng
+ * ContractController -- quyền hạn theo PERMISSIONS.md (Sales và Admin có
+ * toàn quyền -- Sales gộp thêm việc của CSKH cũ, xem PERMISSIONS.md -- Kỹ
+ * thuật chỉ xem, trừ đúng phiếu được giao) enforce bằng
  * AccessControl.requireFullAccess ở đầu mỗi hàm handleCreate/handleDelete.
  * Riêng handleUpdate có thêm ngoại lệ: Kỹ thuật được tự đổi trạng thái/ghi
  * chú xử lý của đúng phiếu đang giao cho mình, xem
@@ -55,8 +56,8 @@ public class TechnicalSupportTicketController extends HttpServlet {
     private static final int PAGE_SIZE = 10;
     /**
      * Vai được giao XỬ LÝ phiếu -- khớp roles.role_name, xem AccessControl.
-     * Khác hẳn vai được quyền TẠO phiếu (CSKH): người tiếp nhận và người đi
-     * sửa là hai người khác nhau.
+     * Khác hẳn vai được quyền TẠO phiếu (Sales, gộp thêm việc của CSKH cũ):
+     * người tiếp nhận và người đi sửa là hai người khác nhau.
      */
     private static final String TECHNICIAN_ROLE = "Kỹ thuật";
 

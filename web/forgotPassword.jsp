@@ -229,19 +229,18 @@
                 <div class="mb-4">
                     <h3 class="fw-bold" style="color: #111827;">Quên mật khẩu?</h3>
                     <p class="text-muted" style="font-size: 0.95rem;">
-                        Nhập email đã đăng ký, hệ thống sẽ gửi cho bạn mã OTP để xác nhận và đặt lại mật khẩu.
+                        Nhập tên đăng nhập, hệ thống sẽ gửi mã OTP tới email cá nhân trong hồ sơ của bạn để xác nhận và đặt lại mật khẩu.
                     </p>
                 </div>
 
-                <%-- AuthenticationController#handleForgotPassword: kiểm tra email tồn tại, sinh mã OTP, lưu vào session, gửi OTP qua email, rồi redirect sang verifyOtp.jsp --%>
+                <%-- AuthenticationController#handleForgotPassword: kiểm tra username tồn tại, sinh mã OTP, lưu vào session, gửi OTP qua email cá nhân đã lưu, rồi redirect sang verifyOtp.jsp --%>
                 <form action="ForgotPasswordServlet" method="POST" id="forgotPasswordForm">
                     <input type="hidden" name="csrfToken" value="${csrfToken}">
                     <c:if test="${not empty param.error}">
                         <div class="alert alert-danger py-2 px-3 mb-4" style="font-size: 0.9rem; border-radius: 12px;">
                             <c:choose>
-                                <c:when test="${param.error == 'missing_email'}">Vui lòng nhập email.</c:when>
-                                <c:when test="${param.error == 'invalid_email'}">Địa chỉ email không đúng định dạng.</c:when>
-                                <c:when test="${param.error == 'unauthorized'}">Vui lòng thực hiện lại từ bước nhập email.</c:when>
+                                <c:when test="${param.error == 'missing_username'}">Vui lòng nhập tên đăng nhập.</c:when>
+                                <c:when test="${param.error == 'unauthorized'}">Vui lòng thực hiện lại từ bước nhập tên đăng nhập.</c:when>
                                 <c:when test="${param.error == 'update_failed'}">Có lỗi xảy ra, vui lòng thử lại.</c:when>
                                 <c:when test="${param.error == 'session_expired'}">Phiên làm việc đã hết hạn, vui lòng thử lại.</c:when>
                                 <c:otherwise>Đã có lỗi xảy ra. Vui lòng thử lại.</c:otherwise>
@@ -249,11 +248,11 @@
                         </div>
                     </c:if>
                     <div class="mb-4">
-                        <label for="email" class="form-label">Email đăng ký</label>
+                        <label for="username" class="form-label">Tên đăng nhập</label>
                         <div class="input-group">
-                            <span class="input-group-text"><i class="fa-regular fa-envelope"></i></span>
-                            <input type="email" class="form-control" id="email" name="email"
-                                   placeholder="Nhập email của bạn..." required autofocus>
+                            <span class="input-group-text"><i class="fa-regular fa-user"></i></span>
+                            <input type="text" class="form-control" id="username" name="username"
+                                   placeholder="Nhập tên đăng nhập của bạn..." required autofocus>
                         </div>
                     </div>
 
@@ -265,7 +264,7 @@
 
                     <div class="alert-info-custom mb-4">
                         <i class="fa-solid fa-circle-info me-1"></i>
-                        Mã OTP gồm 6 chữ số, có hiệu lực trong <strong>5 phút</strong>. Vui lòng kiểm tra cả hộp thư rác (Spam) nếu không thấy email.
+                        Mã OTP gồm 6 chữ số, có hiệu lực trong <strong>5 phút</strong>, gửi tới email cá nhân trong hồ sơ. Vui lòng kiểm tra cả hộp thư rác (Spam) nếu không thấy email.
                     </div>
 
                     <div class="text-center">
@@ -278,7 +277,7 @@
                     <div class="p-3 rounded mt-4" style="background-color: #f8fafc; border: 1px dashed #cbd5e1; text-align: center;">
                         <span class="text-muted" style="font-size: 0.85rem; line-height: 1.5; display: block;">
                             <i class="fa-solid fa-circle-info text-primary mb-1"></i><br>
-                            Không nhớ email đã đăng ký?<br>
+                            Không nhớ tên đăng nhập?<br>
                             Vui lòng liên hệ <strong>Phòng Nhân sự / IT</strong> để được hỗ trợ.
                         </span>
                     </div>

@@ -26,9 +26,17 @@ any role — every single action (including list/view) requires Admin.
 | `role_name` in DB | Description |
 |---|---|
 | `Admin` | Full access to everything, including employee/user management |
-| `Sales` | Owns customer relationships and contracts |
+| `Sales` | Owns customer relationships, contracts, **and technical support tickets** (absorbed `CSKH`'s ticket ownership when that role was merged into Sales — see note below) |
 | `Kỹ thuật` (Technical) | Owns the product catalog and does technical support work |
-| `CSKH` (Customer Support) | Owns technical support tickets |
+
+`CSKH` (Customer Support) has been **removed and merged into `Sales`**: the
+role added no distinct access beyond ticket ownership, so rather than keep a
+fourth role around for that one difference, ticket Full access moved onto
+`Sales` directly (`AccessControl.FULL_ACCESS_ROLES`). Existing `CSKH` accounts
+were reassigned to `Sales` in the same migration that dropped the role row
+(see `db/migrations/`). Nothing about *how* tickets work changed — creation,
+the assigned-technician exception, the two-column ownership scope — only
+*which role name* is allowed to do it.
 
 ## Access matrix
 
@@ -128,17 +136,21 @@ the condition is now reachable and is what the `isDraft()` branch above checks.
 
 `Sales` is split into the two tiers of the org chart: a **manager** (`quản lý
 vùng`) and the **staff** under them (`nhân viên cầm tỉnh`, one province each).
-Every other role is a single tier — a `Kỹ thuật` or `CSKH` user having a
-manager changes nothing about their access.
+Every other role is a single tier — a `Kỹ thuật` user having a manager
+changes nothing about their access.
 
-| Resource | Admin | Sales — manager | Sales — staff | Kỹ thuật | CSKH |
-|---|---|---|---|---|---|
-| Customer (`enterprises`) | Full | Full | View only † | View only | View only |
-| Contract (`contracts`) | Full | Full | View only † | View only | View only |
-| Product (`products`) | Full | View only | View only | Full | View only |
-| Ticket (`technicalrequests`) | Full | View only | View only | View only* | Full |
-| Employee (`users`) | Full | No access | No access | No access | No access |
-| System log (`/systemLog`) | Full | No access | No access | No access | No access |
+The hierarchy split only narrows **Customer and Contract** (`HIERARCHY_RESTRICTED`
+in `AccessControl`) — it does not apply to Ticket, so a Sales *staff* member
+has the same Full access to tickets as a Sales *manager*, unlike the † rows.
+
+| Resource | Admin | Sales — manager | Sales — staff | Kỹ thuật |
+|---|---|---|---|---|
+| Customer (`enterprises`) | Full | Full | View only † | View only |
+| Contract (`contracts`) | Full | Full | View only † | View only |
+| Product (`products`) | Full | View only | View only | Full |
+| Ticket (`technicalrequests`) | Full | Full | Full | View only* |
+| Employee (`users`) | Full | No access | No access | No access |
+| System log (`/systemLog`) | Full | No access | No access | No access |
 
 \* **Exception:** `Kỹ thuật` may update the `status`, `rootCause`,
 `causeCategory`, `handlingPlan` and `resolutionSummary` of a ticket assigned to them
@@ -245,16 +257,27 @@ Scope and consequences worth knowing before implementing:
   for users who actually get a manager assigned. Filling in the real org
   chart is what switches it on, and that data is still pending from the
   customer.
-- **The tree is kept to exactly two tiers** in three places, because one alone
-  is not enough: the DB refuses a user managing themselves
-  (`chk_users_manager_not_self`), `EmployeeDAO.findEligibleManagers` only
-  offers people who have no manager of their own, and
-  `EmployeeController.isValidManagerChoice` re-checks both before writing —
-  the dropdown is a convenience, a hand-made POST is not bound by it.
+- **The "Cấp trên" dropdown is gone from the add/edit employee forms** (both
+  `EmployeeDAO.findEligibleManagers` and `EmployeeController.
+  isValidManagerChoice`, which used to police it, were removed with it —
+  there is nothing left for either to check). `manager_id` can currently only
+  be set by editing the database directly, until a replacement UI exists.
+  `handleUpdate` explicitly re-reads and re-writes the employee's EXISTING
+  `manager_id` on every save so it isn't silently wiped just because the form
+  no longer submits it.
+- **The tree is still kept to exactly two tiers going forward**, but by only
+  one enforcement layer now: the DB refuses a user managing themselves
+  (`chk_users_manager_not_self`). There is no longer an application-level
+  check that a chosen manager has no manager of their own — if a UI to
+  assign `manager_id` reappears, it must re-implement that check (see the old
+  `findEligibleManagers`/`isValidManagerChoice` in git history for the shape
+  of it) before it can safely write.
 - **`AccessControl` reads the tier off the session `User`**, so
-  `EmployeeDAO.findByUsernameOrEmail` must keep selecting `manager_id`. Drop
-  it there and every user silently looks like a manager: no error, no log,
-  the restriction just quietly stops applying.
+  `EmployeeDAO.findByUsername` (renamed from `findByUsernameOrEmail` in V36,
+  which also dropped the fake company-email column and login-by-email
+  entirely) must keep selecting `manager_id`. Drop it there and every user
+  silently looks like a manager: no error, no log, the restriction just
+  quietly stops applying.
 
 ## Notes for implementation
 
@@ -286,6 +309,14 @@ Scope and consequences worth knowing before implementing:
   save and no way in.
 - `Employee` (user account management) has no "View only" tier for
   non-Admin roles — it's Admin-only end to end.
+- **`Admin` cannot be assigned through the employee add/edit forms.** The
+  role dropdown (`EmployeeController.assignableRoles`) omits it — an Admin
+  account still has to be created by hand in the database (see the seed-data
+  comment in `db/schema.sql`), and `handleCreate`/`handleUpdate` re-check the
+  submitted `roleId` server-side so a hand-made POST cannot bypass the
+  dropdown either. The one exception is editing an employee who is *already*
+  Admin: the dropdown keeps that option (selected) so saving an unrelated
+  field on their profile does not silently demote them.
 - **System log** (`/systemLog`, viewing and downloading the server's log
   files) is not a business resource, so it is not in `Resource` and not
   governed by `requireFullAccess`. It is gated by

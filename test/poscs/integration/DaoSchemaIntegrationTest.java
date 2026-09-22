@@ -132,7 +132,7 @@ public class DaoSchemaIntegrationTest {
         IntegrationDb.assumeAvailable();
 
         assertNotNull("Truy vấn đăng nhập phải đọc được user vừa seed",
-                employeeDAO.findByUsernameOrEmail(Fixtures.USERNAME));
+                employeeDAO.findByUsername(Fixtures.USERNAME));
         assertNotNull(employeeDAO.findById(Fixtures.USER_ID));
         assertNotNull(employeeDAO.findProfileById(Fixtures.USER_ID));
         assertEquals(1, employeeDAO.findAll(1, 50, null, null, null).size());
