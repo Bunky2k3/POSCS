@@ -100,28 +100,40 @@ profile, with session-fixation protection on login and a
 rate-limited forgot-password/OTP flow. Creating an employee
 (`EmployeeController`) generates a username + temporary password;
 sending that account info (and OTP emails) is done via `EmailUtil`,
-which calls the SendGrid HTTP API — falls back to printing to the
-server console in dev mode if `SENDGRID_API_KEY`/`MAIL_FROM` aren't
+which sends through Gmail SMTP — falls back to printing to the
+server console in dev mode if `MAIL_USERNAME`/`MAIL_PASSWORD` aren't
 set (see below).
 
-### Email (SendGrid)
+### Email (Gmail SMTP)
 
-`EmailUtil` reads `SENDGRID_API_KEY` and `MAIL_FROM` from environment
+`EmailUtil` reads `MAIL_USERNAME`, `MAIL_PASSWORD`, and optionally
+`MAIL_SMTP_HOST`/`MAIL_SMTP_PORT`/`MAIL_FROM` from environment
 variables (same pattern as `DB_URL`/`DB_USER`/`DB_PASSWORD` above —
 set them wherever the servlet container process picks up env vars,
 e.g. Tomcat's `bin/setenv.sh`/`bin/setenv.bat`):
 
 ```bash
-export SENDGRID_API_KEY="SG.xxxxxxxxxxxxxxxxxxxxxxxx"
-export MAIL_FROM="your-verified-sender@yourdomain.com"
+export MAIL_USERNAME="your-gmail-address@gmail.com"
+export MAIL_PASSWORD="xxxxxxxxxxxxxxxx"
 ```
 
-1. Create a SendGrid account (free tier: 100 emails/day) at
-   https://signup.sendgrid.com/
-2. Verify a Single Sender (the address `MAIL_FROM` will use) at
-   https://app.sendgrid.com/settings/sender_auth/senders
-3. Create an API key at https://app.sendgrid.com/settings/api_keys
+`MAIL_SMTP_HOST` (default `smtp.gmail.com`), `MAIL_SMTP_PORT`
+(default `587`), and `MAIL_FROM` (default: same as `MAIL_USERNAME`)
+are optional overrides — only set them if not using Gmail directly.
 
-If either variable is unset, `EmailUtil` prints the email content to
-the server console instead of sending it — safe for local dev, but
-make sure both are set before going live.
+1. `MAIL_USERNAME` is the sending Gmail address.
+2. `MAIL_PASSWORD` must be a Google **App Password** (16 characters,
+   generated at https://myaccount.google.com/apppasswords), **not**
+   the normal account password — Gmail rejects plain-password SMTP
+   logins.
+
+If either `MAIL_USERNAME` or `MAIL_PASSWORD` is unset, `EmailUtil`
+prints the email content to the server console instead of sending it
+— safe for local dev, but make sure both are set before going live.
+
+Gmail SMTP has a practical sending limit (~500 messages/day per
+account) and no delivery/bounce dashboard. For higher volume or
+better deliverability tracking in production, consider switching to
+a transactional email API (e.g. SendGrid, AWS SES) instead — that
+would mean changing `EmailUtil`'s sending code, this env-var setup is
+specific to the current Gmail SMTP implementation.
