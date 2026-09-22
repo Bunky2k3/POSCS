@@ -78,7 +78,11 @@ public class AuthenticationFilter implements Filter {
             "/changePassword",
             "/updateProfile",
             "/UpdateProfileServlet",
-            "/viewProfile"
+            "/viewProfile",
+            // updateProfile.jsp gọi AJAX endpoint này để nạp xã/phường theo
+            // tỉnh đã chọn -- thiếu nó thì request bị chặn thành redirect
+            // HTML, JS cố parse JSON thất bại và hiện "Không tải được".
+            "/address/wards"
     );
 
     // Số thông báo gần nhất bơm sẵn cho dropdown chuông ở topbar.jsp (trang
