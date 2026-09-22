@@ -117,9 +117,9 @@ public class WriteAndTransactionIntegrationTest {
         IntegrationDb.assumeAvailable();
         // Thêm người thứ hai để có số điện thoại mà đụng vào.
         IntegrationDb.exec(
-            "INSERT INTO users (user_id, username, email, password_hash, role_id, last_name, first_name, "
+            "INSERT INTO users (user_id, username, password_hash, role_id, last_name, first_name, "
             + "gender, date_of_birth, citizen_id, phone, department_id, hire_date) VALUES "
-            + "(2, 'itsales', 'itsales@poscs.test', '" + Fixtures.PASSWORD_HASH + "', 2, N'Trần', N'Kinh Doanh', "
+            + "(2, 'itsales', '" + Fixtures.PASSWORD_HASH + "', 2, N'Trần', N'Kinh Doanh', "
             + "N'Nam', '1992-02-02', '000000000002', '0900000002', 1, '2024-01-01')");
 
         String nameBefore = IntegrationDb.scalar(
@@ -188,9 +188,9 @@ public class WriteAndTransactionIntegrationTest {
     public void markAllAsRead_onlyTouchesTheGivenUser() throws Exception {
         IntegrationDb.assumeAvailable();
         IntegrationDb.exec(
-            "INSERT INTO users (user_id, username, email, password_hash, role_id, last_name, first_name, "
+            "INSERT INTO users (user_id, username, password_hash, role_id, last_name, first_name, "
             + "gender, date_of_birth, citizen_id, phone, department_id, hire_date) VALUES "
-            + "(2, 'itsales', 'itsales@poscs.test', '" + Fixtures.PASSWORD_HASH + "', 2, N'Trần', N'Kinh Doanh', "
+            + "(2, 'itsales', '" + Fixtures.PASSWORD_HASH + "', 2, N'Trần', N'Kinh Doanh', "
             + "N'Nam', '1992-02-02', '000000000002', '0900000002', 1, '2024-01-01')");
         notificationDAO.insert(Fixtures.USER_ID, "Của người 1", "contract_expiring", 1);
         notificationDAO.insert(2, "Của người 2", "contract_expiring", 1);
