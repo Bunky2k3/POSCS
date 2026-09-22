@@ -64,6 +64,23 @@ public class AuthenticationFilter implements Filter {
     /** Khớp url-pattern của UploadFileController -- xem {@link #rendersTopbar}. */
     private static final String UPLOAD_PATH_PREFIX = "/uploads/";
 
+    /**
+     * Đường còn phải lọt qua được trong lúc nhân viên bị ép "hoàn thiện tài
+     * khoản" (xem {@link #needsOnboarding}) -- thiếu một trong các đường này
+     * thì chính trang đang ép người dùng vào cũng không tải được (VD:
+     * /changePassword là action submit form của /changePassword.jsp,
+     * /UpdateProfileServlet là action submit form của /updateProfile).
+     * /viewProfile không bắt buộc về kỹ thuật nhưng giữ để link "Quay lại
+     * trang cá nhân" trên changePassword.jsp không bị đá ngược lại.
+     */
+    private static final Set<String> ONBOARDING_ALLOWED_PATHS = Set.of(
+            "/changePassword.jsp",
+            "/changePassword",
+            "/updateProfile",
+            "/UpdateProfileServlet",
+            "/viewProfile"
+    );
+
     // Số thông báo gần nhất bơm sẵn cho dropdown chuông ở topbar.jsp (trang
     // "Xem tất cả" tự tra lại đầy đủ qua NotificationController, không dùng
     // request attribute này).
@@ -143,7 +160,7 @@ public class AuthenticationFilter implements Filter {
         // trang, nên thêm câu này không đổi bậc chi phí.
         if (!isStaticAssetPath(request.getServletPath())) {
             User sessionUser = (User) session.getAttribute("currentUser");
-            User freshUser = employeeDAO.findByUsernameOrEmail(sessionUser.getUsername());
+            User freshUser = employeeDAO.findByUsername(sessionUser.getUsername());
             if (freshUser == null || freshUser.isDeleted()) {
                 session.invalidate();
                 response.sendRedirect(request.getContextPath()
@@ -164,10 +181,30 @@ public class AuthenticationFilter implements Filter {
             // Xoá chuỗi băm mật khẩu TRƯỚC khi cất vào session, đúng như
             // AuthenticationController.handleLogin làm: mọi JSP đều đọc được
             // ${sessionScope.currentUser.*}, nên chỉ cần một lần lỡ tay in cả
-            // object ra là lộ hash. findByUsernameOrEmail trả về nó vì luồng
+            // object ra là lộ hash. findByUsername trả về nó vì luồng
             // đăng nhập cần, ở đây thì không.
             freshUser.setPasswordHash(null);
             session.setAttribute("currentUser", freshUser);
+
+            // Ép "hoàn thiện tài khoản" trước khi cho vào bất cứ trang nào
+            // khác: còn dùng mật khẩu tạm Admin cấp, HOẶC còn thiếu ít nhất
+            // một trong bốn trường cá nhân mà từ V35 không còn bắt buộc lúc
+            // Admin tạo tài khoản (xem User.isProfileIncomplete). Kiểm ở đây
+            // vì đây là chỗ DUY NHẤT chạy trước MỌI trang sau đăng nhập.
+            //
+            // /uploads/ vẫn phải lọt qua dù không nằm trong ONBOARDING_ALLOWED_PATHS:
+            // đó là ảnh (avatar ở topbar chẳng hạn), chặn nó không bảo vệ gì
+            // thêm, chỉ làm vỡ ảnh ngay trên chính trang đang ép người dùng vào.
+            String servletPath = request.getServletPath();
+            boolean onboardingExempt = ONBOARDING_ALLOWED_PATHS.contains(servletPath)
+                    || servletPath.startsWith(UPLOAD_PATH_PREFIX);
+            if (!onboardingExempt && needsOnboarding(freshUser)) {
+                // Mật khẩu tạm là việc gấp hơn (bảo mật) -- ép đổi mật khẩu
+                // trước, hồ sơ cá nhân xử lý sau khi đã có mật khẩu riêng.
+                String target = freshUser.isMustChangePassword() ? "/changePassword.jsp" : "/updateProfile";
+                response.sendRedirect(request.getContextPath() + target + "?onboarding=1");
+                return;
+            }
         }
 
         // Bơm sẵn dữ liệu chuông thông báo cho topbar.jsp -- topbar được
@@ -181,6 +218,11 @@ public class AuthenticationFilter implements Filter {
         }
 
         chain.doFilter(request, response);
+    }
+
+    /** true nếu còn phải ép qua /changePassword hoặc /updateProfile trước khi dùng hệ thống -- xem V35. */
+    private static boolean needsOnboarding(User user) {
+        return user.isMustChangePassword() || user.isProfileIncomplete();
     }
 
     /**

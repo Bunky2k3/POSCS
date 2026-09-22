@@ -29,7 +29,6 @@ public final class Fixtures {
     public static final int TICKET_ID = 1;
 
     public static final String USERNAME = "itadmin";
-    public static final String EMAIL = "itadmin@poscs.test";
     public static final String PHONE = "0900000001";
     public static final String CITIZEN_ID = "000000000001";
 
@@ -54,10 +53,10 @@ public final class Fixtures {
             "INSERT INTO addresses (address_id, street_and_local_name, districts_id) VALUES "
             + "(" + ADDRESS_ID + ", N'Số 1 Đường Thử Nghiệm', " + WARD_ID + ")");
         IntegrationDb.exec(
-            "INSERT INTO users (user_id, username, email, password_hash, role_id, last_name, "
+            "INSERT INTO users (user_id, username, password_hash, role_id, last_name, "
             + "middle_name, first_name, gender, date_of_birth, citizen_id, phone, personal_email, "
             + "address_id, department_id, hire_date) VALUES ("
-            + USER_ID + ", '" + USERNAME + "', '" + EMAIL + "', '" + PASSWORD_HASH + "', " + ROLE_ID + ", "
+            + USER_ID + ", '" + USERNAME + "', '" + PASSWORD_HASH + "', " + ROLE_ID + ", "
             + "N'Nguyễn', NULL, N'Quản Trị', N'Nam', '1990-01-01', '" + CITIZEN_ID + "', '" + PHONE + "', "
             + "'it.admin@gmail.com', " + ADDRESS_ID + ", " + DEPARTMENT_ID + ", '2024-01-01')");
     }

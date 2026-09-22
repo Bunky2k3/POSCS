@@ -53,7 +53,7 @@ public class AuthenticationFilterTest {
         // nào có người dùng đăng nhập đều cần stub này.
         employeeDAO = mock(EmployeeDAO.class);
         setField(filter, "employeeDAO", employeeDAO);
-        when(employeeDAO.findByUsernameOrEmail(anyString())).thenReturn(activeUser());
+        when(employeeDAO.findByUsername(anyString())).thenReturn(activeUser());
 
         request = mock(HttpServletRequest.class);
         response = mock(HttpServletResponse.class);
@@ -78,11 +78,22 @@ public class AuthenticationFilterTest {
         return session;
     }
 
+    /**
+     * Nhân viên đã hoàn thiện tài khoản: đủ 4 trường cá nhân (từ V35 không
+     * còn NOT NULL ở DB) và không còn dùng mật khẩu tạm -- đại diện cho phần
+     * lớn tài khoản thật (mọi tài khoản tạo trước V35 đều ở trạng thái này).
+     * Test riêng cho luồng "chưa hoàn thiện" tự set null/true lại từng trường.
+     */
     private User loggedInUser() {
         User u = new User();
         u.setUserId(7);
         u.setUsername("sale01");
         u.setRole(new Role(2, "Sales"));
+        u.setGender("Nam");
+        u.setDateOfBirth(java.sql.Date.valueOf("1995-05-20"));
+        u.setCitizenId("001195012345");
+        u.setPhone("0912345678");
+        u.setMustChangePassword(false);
         return u;
     }
 
@@ -324,7 +335,7 @@ public class AuthenticationFilterTest {
 
         User locked = loggedInUser();
         locked.setDeleted(true);
-        when(employeeDAO.findByUsernameOrEmail("sale01")).thenReturn(locked);
+        when(employeeDAO.findByUsername("sale01")).thenReturn(locked);
 
         filter.doFilter(request, response, chain);
 
@@ -343,7 +354,7 @@ public class AuthenticationFilterTest {
         HttpSession session = fakeSession(attrs);
         when(request.getSession(true)).thenReturn(session);
         when(request.getSession(false)).thenReturn(session);
-        when(employeeDAO.findByUsernameOrEmail("sale01")).thenReturn(null);
+        when(employeeDAO.findByUsername("sale01")).thenReturn(null);
 
         filter.doFilter(request, response, chain);
 
@@ -381,7 +392,127 @@ public class AuthenticationFilterTest {
 
         filter.doFilter(request, response, chain);
 
-        verify(employeeDAO, never()).findByUsernameOrEmail(anyString());
+        verify(employeeDAO, never()).findByUsername(anyString());
         verify(chain).doFilter(request, response);
+    }
+
+    // ------------------------------------------------------------------
+    // "Hoàn thiện tài khoản" lần đầu (V35): mật khẩu tạm và/hoặc hồ sơ
+    // thiếu 1 trong 4 trường cá nhân đều phải ép qua /changePassword hoặc
+    // /updateProfile trước khi vào bất cứ trang nào khác.
+    // ------------------------------------------------------------------
+
+    private HttpSession sessionWithLoggedInUser() {
+        Map<String, Object> attrs = new HashMap<>();
+        attrs.put("currentUser", loggedInUser());
+        HttpSession session = fakeSession(attrs);
+        when(request.getSession(true)).thenReturn(session);
+        when(request.getSession(false)).thenReturn(session);
+        return session;
+    }
+
+    @Test
+    public void get_mustChangePassword_nonExemptPath_redirectsToChangePassword() throws Exception {
+        when(request.getMethod()).thenReturn("GET");
+        when(request.getServletPath()).thenReturn("/customer");
+        sessionWithLoggedInUser();
+        User fresh = loggedInUser();
+        fresh.setMustChangePassword(true); // hồ sơ vẫn đủ, chỉ còn mật khẩu tạm
+        when(employeeDAO.findByUsername("sale01")).thenReturn(fresh);
+
+        filter.doFilter(request, response, chain);
+
+        verify(chain, never()).doFilter(any(), any());
+        verify(response).sendRedirect("/POSCS/changePassword.jsp?onboarding=1");
+    }
+
+    @Test
+    public void get_profileIncomplete_nonExemptPath_redirectsToUpdateProfile() throws Exception {
+        when(request.getMethod()).thenReturn("GET");
+        when(request.getServletPath()).thenReturn("/customer");
+        sessionWithLoggedInUser();
+        User fresh = loggedInUser();
+        fresh.setGender(null); // mật khẩu đã tự đổi rồi, chỉ còn thiếu hồ sơ
+        when(employeeDAO.findByUsername("sale01")).thenReturn(fresh);
+
+        filter.doFilter(request, response, chain);
+
+        verify(chain, never()).doFilter(any(), any());
+        verify(response).sendRedirect("/POSCS/updateProfile?onboarding=1");
+    }
+
+    /** Thiếu cả hai thì mật khẩu tạm là việc gấp hơn, ép đổi mật khẩu trước. */
+    @Test
+    public void get_bothMustChangePasswordAndProfileIncomplete_prioritizesChangePassword() throws Exception {
+        when(request.getMethod()).thenReturn("GET");
+        when(request.getServletPath()).thenReturn("/customer");
+        sessionWithLoggedInUser();
+        User fresh = loggedInUser();
+        fresh.setMustChangePassword(true);
+        fresh.setPhone(null);
+        when(employeeDAO.findByUsername("sale01")).thenReturn(fresh);
+
+        filter.doFilter(request, response, chain);
+
+        verify(response).sendRedirect("/POSCS/changePassword.jsp?onboarding=1");
+    }
+
+    @Test
+    public void get_mustChangePassword_changePasswordPath_isAllowedThrough() throws Exception {
+        when(request.getMethod()).thenReturn("GET");
+        when(request.getServletPath()).thenReturn("/changePassword.jsp");
+        sessionWithLoggedInUser();
+        User fresh = loggedInUser();
+        fresh.setMustChangePassword(true);
+        when(employeeDAO.findByUsername("sale01")).thenReturn(fresh);
+
+        filter.doFilter(request, response, chain);
+
+        verify(chain).doFilter(request, response);
+        verify(response, never()).sendRedirect(anyString());
+    }
+
+    @Test
+    public void get_profileIncomplete_updateProfilePath_isAllowedThrough() throws Exception {
+        when(request.getMethod()).thenReturn("GET");
+        when(request.getServletPath()).thenReturn("/updateProfile");
+        sessionWithLoggedInUser();
+        User fresh = loggedInUser();
+        fresh.setCitizenId(null);
+        when(employeeDAO.findByUsername("sale01")).thenReturn(fresh);
+
+        filter.doFilter(request, response, chain);
+
+        verify(chain).doFilter(request, response);
+        verify(response, never()).sendRedirect(anyString());
+    }
+
+    /** Ảnh (avatar ở topbar chẳng hạn) vẫn phải tải được ngay trên trang đang ép hoàn thiện tài khoản. */
+    @Test
+    public void get_profileIncomplete_uploadsPath_isAllowedThrough() throws Exception {
+        when(request.getMethod()).thenReturn("GET");
+        when(request.getServletPath()).thenReturn("/uploads/avatars/a1b2.png");
+        sessionWithLoggedInUser();
+        User fresh = loggedInUser();
+        fresh.setMustChangePassword(true);
+        when(employeeDAO.findByUsername("sale01")).thenReturn(fresh);
+
+        filter.doFilter(request, response, chain);
+
+        verify(chain).doFilter(request, response);
+        verify(response, never()).sendRedirect(anyString());
+    }
+
+    /** Tài khoản đã hoàn thiện đủ thì không bị ép gì cả -- trường hợp phổ biến nhất. */
+    @Test
+    public void get_fullyOnboardedAccount_isNeverRedirectedForOnboarding() throws Exception {
+        when(request.getMethod()).thenReturn("GET");
+        when(request.getServletPath()).thenReturn("/customer");
+        sessionWithLoggedInUser(); // employeeDAO đã stub sẵn activeUser() (đủ hồ sơ) ở setUp()
+
+        filter.doFilter(request, response, chain);
+
+        verify(chain).doFilter(request, response);
+        verify(response, never()).sendRedirect(anyString());
     }
 }

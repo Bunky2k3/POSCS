@@ -236,7 +236,8 @@ public class TechnicalSupportTicketDAO {
     /**
      * Hai cột nói "phiếu này là của ai": người được giao xử lý và người tiếp
      * nhận. Phạm vi "của tôi" trên Dashboard khớp CẢ HAI, vì Kỹ thuật nhìn vào
-     * cột thứ nhất còn CSKH nhìn vào cột thứ hai.
+     * cột thứ nhất còn Sales (tạo phiếu, gộp thêm việc của CSKH cũ) nhìn vào
+     * cột thứ hai.
      */
     private static final List<String> OWNER_COLUMNS =
             List.of("t.assigned_technician_id", "t.created_by");
@@ -258,7 +259,7 @@ public class TechnicalSupportTicketDAO {
 
     /**
      * Như trên nhưng chỉ đếm phiếu "của" những người này: phiếu họ được giao xử
-     * lý HOẶC phiếu họ tiếp nhận -- hai vai trò khác nhau (Kỹ thuật và CSKH)
+     * lý HOẶC phiếu họ tiếp nhận -- hai vai trò khác nhau (Kỹ thuật và Sales)
      * cùng nhìn một trang Dashboard. Rỗng/null = toàn chi nhánh.
      */
     public Map<String, Integer> countStatusSummary(List<Integer> provinceIds, Period period,

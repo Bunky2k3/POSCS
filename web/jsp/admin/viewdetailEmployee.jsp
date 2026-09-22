@@ -132,10 +132,6 @@
                         <div class="view-value"><c:out value="${employee.username}"/></div>
                     </div>
                     <div class="col-md-6 field-row">
-                        <label>Email công ty</label>
-                        <div class="view-value"><c:out value="${employee.email}"/></div>
-                    </div>
-                    <div class="col-md-6 field-row">
                         <label>Phòng ban</label>
                         <div class="view-value"><c:out value="${employee.department.departmentName}"/></div>
                     </div>
@@ -261,7 +257,7 @@
                 </div>
                 <div class="modal-body">
                     <h5 class="mb-2" style="font-weight:700; color:#111827;">Xác nhận gửi thông tin tài khoản</h5>
-                    Hệ thống sẽ cấp 1 mật khẩu tạm <strong>mới</strong> và gửi cùng tên đăng nhập, email công ty tới email cá nhân (<c:out value="${employee.personalEmail}"/>) của <strong><c:out value="${employee.fullName}"/></strong>. Mật khẩu tạm cũ (nếu có) sẽ không còn dùng được nữa.
+                    Hệ thống sẽ cấp 1 mật khẩu tạm <strong>mới</strong> và gửi cùng tên đăng nhập tới email cá nhân (<c:out value="${employee.personalEmail}"/>) của <strong><c:out value="${employee.fullName}"/></strong>. Mật khẩu tạm cũ (nếu có) sẽ không còn dùng được nữa.
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn-modal-cancel" data-bs-dismiss="modal">Hủy</button>

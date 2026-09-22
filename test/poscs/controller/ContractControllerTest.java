@@ -913,7 +913,7 @@ public class ContractControllerTest {
         when(request.getParameter("handoverId")).thenReturn("9");
         when(request.getParameter("departmentId")).thenReturn("6");
         when(request.getParameter("doneNote")).thenReturn("đã kiểm điều khoản");
-        dangNhapVoiPhongBan(6, "CSKH");
+        dangNhapVoiPhongBan(6, "Sales");
         when(contractDAO.completeHandover(anyInt(), anyInt(), any())).thenReturn(true);
 
         controller.doPost(request, response);
@@ -941,7 +941,7 @@ public class ContractControllerTest {
         when(contractDAO.findHandoversOf(5)).thenReturn(List.of(pending));
         // Phòng 6, KHÔNG phải Admin và không có quyền ghi hợp đồng -- đúng hình
         // dạng người của phòng nhận bàn giao.
-        dangNhapVoiPhongBan(6, "CSKH");
+        dangNhapVoiPhongBan(6, "Sales");
         when(request.getRequestDispatcher(anyString())).thenReturn(mock(RequestDispatcher.class));
 
         controller.doGet(request, response);
@@ -990,7 +990,7 @@ public class ContractControllerTest {
         done.setDepartmentId(6);
         done.setDoneAt(new java.sql.Timestamp(System.currentTimeMillis()));
         when(contractDAO.findHandoversOf(5)).thenReturn(List.of(done));
-        dangNhapVoiPhongBan(6, "CSKH");
+        dangNhapVoiPhongBan(6, "Sales");
         when(request.getRequestDispatcher(anyString())).thenReturn(mock(RequestDispatcher.class));
 
         controller.doGet(request, response);
@@ -1012,7 +1012,7 @@ public class ContractControllerTest {
         when(request.getParameter("departmentId")).thenReturn("6");
         when(request.getParameter("doneNote")).thenReturn("đã đối chiếu công nợ");
         when(request.getParameter("returnTo")).thenReturn("from-view");
-        dangNhapVoiPhongBan(6, "CSKH");
+        dangNhapVoiPhongBan(6, "Sales");
         when(contractDAO.completeHandover(anyInt(), anyInt(), any())).thenReturn(true);
 
         controller.doPost(request, response);

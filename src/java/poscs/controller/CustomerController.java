@@ -38,7 +38,8 @@ import poscs.model.User;
  * Controller cho toàn bộ chức năng khách hàng (enterprises). Điều hướng
  * theo tham số "action" -- role nào được thao tác gì xem PERMISSIONS.md,
  * enforce bằng AccessControl.requireFullAccess ở đầu mỗi hàm handleCreate/
- * handleUpdate/handleDelete (Kỹ thuật/CSKH chỉ View only trên Customer).
+ * handleUpdate/handleDelete (Kỹ thuật chỉ View only trên Customer -- CSKH đã
+ * gộp vào Sales, xem PERMISSIONS.md).
  */
 @WebServlet(name = "CustomerController", urlPatterns = {"/customer"})
 @MultipartConfig(maxFileSize = 5 * 1024 * 1024, maxRequestSize = 10 * 1024 * 1024, fileSizeThreshold = 1024 * 1024)
@@ -204,8 +205,8 @@ public class CustomerController extends HttpServlet {
 
         request.setAttribute("customerList", customerList);
         // Khách hàng giao cho Sales, nên ô lọc "người phụ trách" chỉ liệt kê
-        // Sales -- đổ cả Admin/Kỹ thuật/CSKH vào là mời người dùng lọc theo
-        // những người không bao giờ phụ trách khách hàng nào.
+        // Sales -- đổ cả Admin/Kỹ thuật vào là mời người dùng lọc theo những
+        // người không bao giờ phụ trách khách hàng nào.
         request.setAttribute("userList", employeeDAO.findActiveByRole(SALES_ROLE));
         request.setAttribute("provinceList", addressDAO.findBranchProvinces());
         request.setAttribute("currentPage", page);

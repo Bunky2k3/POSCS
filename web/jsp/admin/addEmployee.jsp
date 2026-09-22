@@ -24,6 +24,8 @@
 
     <style>
         .page-container { max-width: 900px; margin: 32px auto; padding: 0 20px 32px; }
+        .back-link { display: inline-flex; align-items: center; gap: 6px; color: #6b7280; font-size: 0.87rem; font-weight: 600; text-decoration: none; margin-bottom: 16px; }
+        .back-link:hover { color: var(--primary-dark); }
         .form-card { background: #fff; border-radius: 20px; overflow: hidden; box-shadow: 0 15px 40px rgba(0,40,80,0.12); }
         .form-banner { background: linear-gradient(120deg, var(--primary-dark), var(--primary), var(--primary-light)); padding: 30px 34px 24px; color: #fff; }
         .form-banner h3 { font-weight: 700; margin: 0 0 4px; }
@@ -43,6 +45,19 @@
         .form-control:focus, .form-select:focus { background-color: #ffffff; border-color: var(--primary-light); box-shadow: 0 0 0 4px rgba(15,158,219,0.15); }
         .error-text { color: var(--danger); font-size: 12px; margin-top: 5px; display: none; }
 
+        <%-- .prov-pop/.prov-panel/.prov-row/.prov-actions đã có sẵn ở
+             appshell.css (dùng chung với Dashboard/danh sách KH/HĐ) -- chỉ khai
+             báo thêm phần riêng của trang này: nút mở popover và ghi chú "đã
+             giao cho ai". --%>
+        .emp-prov-pop { display: block; }
+        .emp-prov-toggle {
+            width: 100%; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 10px;
+            padding: 0.6rem 0.9rem; font-size: 0.9rem; color: #374151; font-weight: 500;
+        }
+        .emp-prov-toggle:hover, .emp-prov-toggle:focus { border-color: var(--primary-light); outline: none; }
+        .prov-row.is-locked { color: #9ca3af; cursor: not-allowed; }
+        .province-holder-note { margin-left: auto; color: var(--danger); font-size: 0.72rem; white-space: nowrap; }
+
         .action-bar { display: flex; gap: 12px; margin-top: 28px; justify-content: flex-end; border-top: 1.5px solid #eef2f6; padding-top: 22px; }
         .btn-primary { background: linear-gradient(120deg, var(--primary), var(--primary-light)); border: none; border-radius: 10px; padding: 0.6rem 1.4rem; font-weight: 600; font-size: 0.9rem; box-shadow: 0 6px 16px rgba(5,104,166,0.3); }
         .btn-primary:hover { background: linear-gradient(120deg, var(--primary-dark), var(--primary)); }
@@ -61,6 +76,7 @@
         <div class="main-content">
 
     <div class="page-container">
+        <a href="${pageContext.request.contextPath}/employee" class="back-link"><i class="fa-solid fa-arrow-left"></i> Quay lại danh sách nhân viên</a>
         <div class="form-card">
             <div class="form-banner">
                 <h3><i class="fa-solid fa-user-plus me-2"></i>Thêm nhân viên mới</h3>
@@ -74,7 +90,6 @@
                             <c:when test="${param.error == 'invalid'}">Vui lòng nhập đầy đủ và đúng định dạng các trường bắt buộc.</c:when>
                             <c:when test="${param.error == 'duplicate_phone'}">Số điện thoại này đã được sử dụng bởi tài khoản khác.</c:when>
                             <c:when test="${param.error == 'duplicate_citizen'}">Số CCCD/CMND này đã được sử dụng bởi tài khoản khác.</c:when>
-                            <c:when test="${param.error == 'invalid_manager'}">Người được chọn làm cấp trên không hợp lệ. Cấp trên phải là người chưa có cấp trên của riêng mình, và không thể là chính nhân viên này.</c:when>
                             <c:when test="${param.error == 'create_failed'}">Không thể tạo nhân viên. Vui lòng thử lại.</c:when>
                             <c:otherwise>Đã có lỗi xảy ra. Vui lòng thử lại.</c:otherwise>
                         </c:choose>
@@ -83,7 +98,7 @@
 
                 <div class="info-banner">
                     <i class="fa-solid fa-circle-info"></i>
-                    <div>Hệ thống sẽ tự cấp tên đăng nhập và email công ty (dạng &lt;tên đăng nhập&gt;@postef.com.vn) cho nhân viên. Sau khi tạo xong, vào trang chi tiết nhân viên và bấm <strong>"Gửi thông tin tài khoản"</strong> để gửi mật khẩu tạm thời tới email cá nhân của nhân viên.</div>
+                    <div>Hệ thống sẽ tự cấp tên đăng nhập cho nhân viên. Sau khi tạo xong, vào trang chi tiết nhân viên và bấm <strong>"Gửi thông tin tài khoản"</strong> để gửi mật khẩu tạm thời tới email cá nhân của nhân viên.</div>
                 </div>
 
                 <form id="addEmployeeForm" action="${pageContext.request.contextPath}/employee" method="POST" onsubmit="return validateForm();">
@@ -94,8 +109,8 @@
                     <div class="section-header"><h5>Thông tin công việc</h5></div>
                     <div class="row">
                         <div class="col-md-6 field-row">
-                            <label>Email công ty</label>
-                            <div class="form-control" style="background:#eef2f6; color:#6b7280;">Hệ thống tự cấp theo dạng &lt;tên đăng nhập&gt;@postef.com.vn</div>
+                            <label>Tên đăng nhập</label>
+                            <div class="form-control" style="background:#eef2f6; color:#6b7280;">Hệ thống tự sinh từ họ tên sau khi lưu</div>
                         </div>
                         <div class="col-md-6 field-row">
                             <label for="department">Phòng ban</label>
@@ -123,31 +138,18 @@
                             <span class="error-text" id="err-hireDate">Vui lòng chọn ngày vào làm.</span>
                         </div>
                         <%--
-                          Cấp trên trong cây tổ chức 2 tầng. Để trống = người
-                          này thuộc tầng trên (quản lý vùng); chọn một người =
-                          thành cấp dưới của họ.
-
-                          Không phải chuyện hành chính suông: trên Khách hàng
-                          và Hợp đồng, ai có cấp trên thì chỉ còn quyền XEM,
-                          muốn đổi gì phải gửi yêu cầu lên (PERMISSIONS.md).
-                          Danh sách đã lọc sẵn những người bản thân chưa có cấp
-                          trên, để cây không mọc thêm tầng thứ ba.
-                        --%>
-                        <div class="col-md-6 field-row">
-                            <label for="managerId">Cấp trên</label>
-                            <select class="form-select" id="managerId" name="managerId">
-                                <option value="">-- Không có (thuộc tầng quản lý) --</option>
-                                <c:forEach var="m" items="${managerList}">
-                                    <option value="${m.userId}">${fn:escapeXml(m.fullName)} (${fn:escapeXml(m.role.roleName)})</option>
-                                </c:forEach>
-                            </select>
-                        </div>
-                        <%--
                           Địa bàn phụ trách: những tỉnh người này trực tiếp cầm.
-                          Danh sách đã lọc sẵn tỉnh chưa ai cầm (cộng tỉnh của
-                          chính họ), vì khách hàng chốt "một tỉnh một người" và
-                          CSDL cũng ràng buộc bằng UNIQUE -- không lọc thì ô chọn
-                          mời người dùng cướp tỉnh của đồng nghiệp rồi ăn lỗi.
+                          Gói vào popover (.prov-pop/.prov-panel/.prov-row dùng
+                          chung với Dashboard/danh sách KH/HĐ ở appshell.css) --
+                          bày thẳng 34 dòng ra trang làm form dài lê thê. Đổ CẢ
+                          tỉnh đã có người khác cầm vào bảng (khác trước -- xem
+                          EmployeeDAO.findAllProvincesWithHolder), kèm tên người
+                          đang giữ, rồi khoá đúng checkbox đó -- để Admin thấy
+                          NGAY vì sao không chọn được, thay vì tỉnh lặng lẽ biến
+                          mất khỏi ô chọn. Nhân viên MỚI tạo nên không có tỉnh
+                          nào "của riêng" -- mọi tỉnh đã có người cầm đều bị khoá
+                          hết. Khách hàng chốt "một tỉnh một người" và CSDL cũng
+                          ràng buộc bằng UNIQUE.
 
                           CHỈ điền cho tầng lá. Địa bàn của quản lý vùng không
                           nhập tay mà suy ra bằng cách gộp địa bàn của cấp dưới
@@ -155,12 +157,28 @@
                           hai tầng là tạo hai nguồn sự thật rồi có ngày lệch nhau.
                         --%>
                         <div class="col-12 field-row">
-                            <label for="provinceIds">Địa bàn phụ trách <span class="text-muted" style="text-transform: none; font-weight: 400;">(giữ Ctrl để chọn nhiều tỉnh)</span></label>
-                            <select class="form-select" id="provinceIds" name="provinceIds" multiple size="6">
-                                <c:forEach var="p" items="${selectableProvinces}">
-                                    <option value="${p.provinceId}">${fn:escapeXml(p.provinceName)}</option>
-                                </c:forEach>
-                            </select>
+                            <label>Địa bàn phụ trách <span class="text-muted" style="text-transform: none; font-weight: 400;">(tỉnh đã có người khác cầm sẽ hiện tên người đó và không chọn được)</span></label>
+                            <div class="prov-pop emp-prov-pop" data-prov-pop>
+                                <button type="button" class="emp-prov-toggle" data-popover-toggle aria-expanded="false" aria-controls="empProvincePanel">
+                                    <i class="fa-solid fa-location-dot" style="color:#9ca3af;"></i>
+                                    <span id="empProvinceLabel">Chưa chọn tỉnh nào</span>
+                                    <i class="fa-solid fa-chevron-down"></i>
+                                </button>
+                                <div class="prov-panel" id="empProvincePanel" data-popover-panel>
+                                    <div class="prov-actions">
+                                        <button type="button" id="empProvinceClear">Bỏ hết</button>
+                                    </div>
+                                    <c:forEach var="p" items="${allProvinceAssignments}">
+                                        <label class="prov-row${p.holderUserId != null ? ' is-locked' : ''}">
+                                            <input type="checkbox" name="provinceIds" value="${p.provinceId}" ${p.holderUserId != null ? 'disabled' : ''}>
+                                            <span>${fn:escapeXml(p.provinceName)}</span>
+                                            <c:if test="${p.holderUserId != null}">
+                                                <span class="province-holder-note">${fn:escapeXml(p.holderName)}</span>
+                                            </c:if>
+                                        </label>
+                                    </c:forEach>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
@@ -182,9 +200,13 @@
                             <span class="error-text" id="err-firstName">Trường này không được để trống.</span>
                         </div>
 
+                        <div class="col-12">
+                            <small class="text-muted">Giới tính, ngày sinh, CCCD/CMND, số điện thoại có thể để trống — nhân viên sẽ tự bổ sung khi đăng nhập lần đầu.</small>
+                        </div>
                         <div class="col-md-4 field-row">
                             <label for="gender">Giới tính</label>
                             <select class="form-select" id="gender" name="gender">
+                                <option value="">-- Để nhân viên tự chọn --</option>
                                 <option value="Nam">Nam</option>
                                 <option value="Nữ">Nữ</option>
                                 <option value="Khác">Khác</option>
@@ -198,7 +220,6 @@
                         <div class="col-md-4 field-row">
                             <label for="citizenId">Số CCCD/CMND</label>
                             <input type="text" class="form-control" id="citizenId" name="citizenId">
-                            <span class="error-text" id="err-citizenId">Trường này không được để trống.</span>
                         </div>
 
                         <div class="col-md-6 field-row">
@@ -280,6 +301,34 @@
         function isValidPhone(value) { return /^(0|\+84)[0-9]{9,10}$/.test(value.replace(/[\s.-]/g, '')); }
         function isValidEmail(value) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value); }
 
+        // ===== Popover "Địa bàn phụ trách" =====
+        // Mở/đóng/tự neo đã có sẵn (wirePopover trong appshell.js, gắn qua
+        // data-prov-pop/data-popover-toggle/data-popover-panel). Phần riêng ở
+        // đây chỉ là hai việc appshell.js không biết: đếm để hiện lên nút, và
+        // "Bỏ hết" -- KHÔNG dùng data-prov-none có sẵn vì nó tìm
+        // input[name="provinceId"] (số ít, dành cho ô lọc), còn ở đây tên
+        // trường là "provinceIds" (số nhiều, EmployeeController đọc bằng
+        // getParameterValues) nên phải tự viết.
+        (function () {
+            var label = document.getElementById('empProvinceLabel');
+            var boxes = document.querySelectorAll('#empProvincePanel input[name="provinceIds"]');
+            function updateLabel() {
+                var checked = 0;
+                boxes.forEach(function (b) { if (b.checked) { checked++; } });
+                label.textContent = checked === 0 ? 'Chưa chọn tỉnh nào'
+                        : (checked === 1 ? '1 tỉnh đang chọn' : checked + ' tỉnh đang chọn');
+            }
+            boxes.forEach(function (b) { b.addEventListener('change', updateLabel); });
+            var clearBtn = document.getElementById('empProvinceClear');
+            if (clearBtn) {
+                clearBtn.addEventListener('click', function () {
+                    boxes.forEach(function (b) { if (!b.disabled) { b.checked = false; } });
+                    updateLabel();
+                });
+            }
+            updateLabel();
+        })();
+
         var contextPath = '${pageContext.request.contextPath}';
         var districtSelect = document.getElementById('district');
 
@@ -314,7 +363,7 @@
             var valid = true;
             document.querySelectorAll('.error-text').forEach(function (el) { el.style.display = 'none'; });
 
-            var requiredIds = ['lastName', 'firstName', 'citizenId', 'department', 'roleId', 'hireDate', 'dateOfBirth', 'personalEmail'];
+            var requiredIds = ['lastName', 'firstName', 'department', 'roleId', 'hireDate', 'personalEmail'];
             requiredIds.forEach(function (id) {
                 var el = document.getElementById(id);
                 if (!el.value.trim()) {
@@ -331,7 +380,7 @@
             }
 
             var phone = document.getElementById('phone');
-            if (!isValidPhone(phone.value)) {
+            if (phone.value && !isValidPhone(phone.value)) {
                 document.getElementById('err-phone').style.display = 'block';
                 valid = false;
             }

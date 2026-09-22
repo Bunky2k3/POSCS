@@ -251,8 +251,8 @@ phút); ba ca tương ứng sẽ thành "N/A" kèm lý do.
   **trước** bước kiểm quyền, và ca kiểm phân quyền sẽ đạt vì lý do sai.
 - Ô "Xếp hạng quan hệ" gửi **tên hằng enum** (`GOOD`/`NEEDS_REVIEW`/`BAD`/
   `AT_RISK`), không phải chuỗi tiếng Việt.
-- Quên mật khẩu tra theo **email công ty hoặc tên đăng nhập**, không phải email
-  cá nhân.
+- Quên mật khẩu tra theo **tên đăng nhập** (từ V36, không còn "email công ty"
+  để mà nhập); OTP thì luôn gửi tới **email cá nhân** đã lưu trong hồ sơ.
 - Danh sách Nhân viên và Sản phẩm dựng bằng lưới thẻ chứ không phải `<table>`;
   đếm `<tr>` sẽ luôn ra 0. Lưới rỗng vẫn có một phần tử con `.empty-state`.
 - Khi kiểm "kết quả lọc không lẫn giá trị khác", chỉ đọc chữ trong khối kết

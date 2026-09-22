@@ -110,7 +110,7 @@ public class SystemLogControllerTest {
 
     @Test
     public void view_nonAdminRoles_allGet403() throws Exception {
-        for (String role : new String[]{"Sales", "Kỹ thuật", "CSKH"}) {
+        for (String role : new String[]{"Sales", "Kỹ thuật"}) {
             HttpServletResponse res = mock(HttpServletResponse.class);
             loginAs(role);
 

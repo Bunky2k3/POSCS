@@ -5,7 +5,10 @@ import java.security.SecureRandom;
 import java.sql.Date;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServlet;
@@ -21,6 +24,9 @@ import poscs.common.TextRules;
 import poscs.dao.AddressDAO;
 import poscs.dao.EmployeeDAO;
 import poscs.model.Address;
+import poscs.model.Province;
+import poscs.model.ProvinceAssignment;
+import poscs.model.Role;
 import poscs.model.User;
 
 /**
@@ -36,16 +42,13 @@ public class EmployeeController extends HttpServlet {
 
     private static final Logger LOG = LoggerFactory.getLogger(EmployeeController.class);
 
-    /**
-     * Email công ty do hệ thống tự cấp (chưa có hộp thư thật), dạng
-     * &lt;username&gt;@postef.com.vn.
-     *
-     * <p>Không có BR nào trong Project_Report phủ việc cấp email công ty --
-     * quy ước này do nhóm đặt ra. Chú thích cũ ghi "BR-31" là NHẦM: BR-31 nói
-     * về nhóm khách hàng và nhân viên phụ trách trên hồ sơ KHÁCH HÀNG, không
-     * liên quan gì tới nhân viên.
-     */
-    private static final String COMPANY_EMAIL_DOMAIN = "@postef.com.vn";
+    // "Email công ty" (<username>@postef.com.vn) đã bỏ (V36) -- chuỗi hệ
+    // thống tự bịa, chưa từng gắn hộp thư thật, và một email thường phải đi
+    // kèm bước ĐĂNG KÝ hộp thư thật chứ không phải chỉ ghép chuỗi. Đăng nhập
+    // giờ chỉ bằng username; xem PERMISSIONS.md.
+
+    /** role_name của Admin trong bảng roles -- xem AccessControl.ROLE_ADMIN. */
+    private static final String ADMIN_ROLE_NAME = "Admin";
 
     private static final int PAGE_SIZE = 10;
     private static final String LIST_VIEW = "/jsp/admin/listEmployee.jsp";
@@ -175,9 +178,8 @@ public class EmployeeController extends HttpServlet {
 
     private void showCreateForm(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
-        request.setAttribute("managerList", employeeDAO.findEligibleManagers(null));
-        request.setAttribute("selectableProvinces", employeeDAO.findSelectableProvinces(null));
-        request.setAttribute("roleList", employeeDAO.findAllRoles());
+        request.setAttribute("allProvinceAssignments", branchProvinceAssignments(null));
+        request.setAttribute("roleList", assignableRoles(null));
         request.setAttribute("departmentList", employeeDAO.findAllDepartments());
         request.setAttribute("provinceList", addressDAO.findAllProvinces());
         request.getRequestDispatcher(CREATE_VIEW).forward(request, response);
@@ -192,13 +194,76 @@ public class EmployeeController extends HttpServlet {
             return;
         }
         request.setAttribute("employee", employee);
-        request.setAttribute("managerList", employeeDAO.findEligibleManagers(id));
-        request.setAttribute("selectableProvinces", employeeDAO.findSelectableProvinces(id));
-        request.setAttribute("assignedProvinces", employeeDAO.findProvincesOf(id));
-        request.setAttribute("roleList", employeeDAO.findAllRoles());
+        request.setAttribute("allProvinceAssignments", branchProvinceAssignments(id));
+        request.setAttribute("roleList", assignableRoles(employee.getRoleId()));
         request.setAttribute("departmentList", employeeDAO.findAllDepartments());
         request.setAttribute("provinceList", addressDAO.findAllProvinces());
         request.getRequestDispatcher(UPDATE_VIEW).forward(request, response);
+    }
+
+    /**
+     * Danh sách tỉnh cho ô "Địa bàn phụ trách": chỉ 18 tỉnh địa bàn chi nhánh
+     * (AddressDAO.findBranchProvinces), KHÔNG phải cả 34 tỉnh toàn quốc --
+     * đây là địa bàn KINH DOANH (giống dropdown tỉnh của khách hàng/hợp
+     * đồng), khác hẳn ô "Địa chỉ" bên dưới (hộ khẩu cá nhân, dùng
+     * addressDAO.findAllProvinces() vì nhân viên chi nhánh miền Bắc vẫn có
+     * thể quê ở nơi khác).
+     *
+     * <p>Vẫn giữ lại tỉnh nằm NGOÀI địa bàn nếu nhân viên đang sửa
+     * ({@code editingEmployeeId}) đã cầm nó từ trước (dữ liệu cũ/nhập nhầm)
+     * -- cùng lý do {@code AddressDAO.findBranchProvincesIncluding} tồn tại:
+     * ẩn nó đi thì mở form sửa lên ô đó thiếu tỉnh, bấm lưu (mà không tick
+     * lại) là xoá mất tỉnh ngoài địa bàn đó của người này.
+     */
+    private List<ProvinceAssignment> branchProvinceAssignments(Integer editingEmployeeId) {
+        Set<Integer> branchIds = new HashSet<>();
+        for (Province p : addressDAO.findBranchProvinces()) {
+            branchIds.add(p.getProvinceId());
+        }
+        List<ProvinceAssignment> result = new ArrayList<>();
+        for (ProvinceAssignment pa : employeeDAO.findAllProvincesWithHolder()) {
+            boolean inBranch = branchIds.contains(pa.getProvinceId());
+            boolean heldByEditingEmployee = editingEmployeeId != null
+                    && pa.getHolderUserId() != null && pa.getHolderUserId().equals(editingEmployeeId);
+            if (inBranch || heldByEditingEmployee) {
+                result.add(pa);
+            }
+        }
+        return result;
+    }
+
+    /**
+     * Danh sách vai trò cho dropdown "Vai trò" ở form thêm/sửa: bỏ "Admin"
+     * ra khỏi lựa chọn -- tài khoản Admin phải tạo tay (qua CSDL), không qua
+     * form nhân viên thường, để tránh bấm nhầm cấp nhầm quyền cao nhất qua
+     * đúng luồng mật khẩu tạm gửi email như một Sales/Kỹ thuật bình thường.
+     *
+     * <p>NGOẠI LỆ: nếu nhân viên đang sửa ({@code editingRoleId}) hiện đã là
+     * Admin, vẫn giữ "Admin" trong danh sách (đã chọn sẵn) -- ẩn đi thì ô
+     * chọn hiện trống, bấm lưu (mà không tick lại, vì còn tick được đâu) là
+     * hạ cấp mất một Admin chỉ vì Admin đó (hoặc Admin khác) sửa trường khác.
+     * {@link EmployeeDAO#findAllRoles} vẫn dùng nguyên cho ô lọc ở danh sách
+     * -- lọc "xem ai đang là Admin" là việc hợp lệ, khác với việc CẤP Admin.
+     */
+    private List<Role> assignableRoles(Integer editingRoleId) {
+        List<Role> result = new ArrayList<>();
+        for (Role r : employeeDAO.findAllRoles()) {
+            if (!ADMIN_ROLE_NAME.equals(r.getRoleName())
+                    || (editingRoleId != null && r.getRoleId() == editingRoleId)) {
+                result.add(r);
+            }
+        }
+        return result;
+    }
+
+    /** true nếu roleId này chính là vai Admin -- dùng để chặn cấp/giữ Admin qua form, xem {@link #assignableRoles}. */
+    private boolean isAdminRoleId(int roleId) {
+        for (Role r : employeeDAO.findAllRoles()) {
+            if (ADMIN_ROLE_NAME.equals(r.getRoleName())) {
+                return r.getRoleId() == roleId;
+            }
+        }
+        return false;
     }
 
     // ------------------------------------------------------------------
@@ -206,12 +271,11 @@ public class EmployeeController extends HttpServlet {
     // ------------------------------------------------------------------
 
     /**
-     * UC-26 Create Employee: chỉ tạo hồ sơ + tự cấp email công ty
-     * (username@postef.com.vn, chưa phải hộp thư thật) + tự sinh username/mật
-     * khẩu tạm (hash ngay, không giữ lại bản rõ) -- KHÔNG gửi email ở bước
-     * này. Việc gửi thông tin tài khoản cho nhân viên là hành động Admin chủ
-     * động bấm riêng ở trang chi tiết (xem handleSendAccount), để Admin có
-     * thể rà lại thông tin trước khi gửi và gửi lại được nếu cần.
+     * UC-26 Create Employee: chỉ tạo hồ sơ + tự sinh username/mật khẩu tạm
+     * (hash ngay, không giữ lại bản rõ) -- KHÔNG gửi email ở bước này. Việc
+     * gửi thông tin tài khoản cho nhân viên là hành động Admin chủ động bấm
+     * riêng ở trang chi tiết (xem handleSendAccount), để Admin có thể rà lại
+     * thông tin trước khi gửi và gửi lại được nếu cần.
      */
     private void handleCreate(HttpServletRequest request, HttpServletResponse response) throws IOException {
         User u = buildUserFromRequest(request, new User());
@@ -220,22 +284,29 @@ public class EmployeeController extends HttpServlet {
             response.sendRedirect(request.getContextPath() + "/employee?action=new&error=invalid");
             return;
         }
-        if (employeeDAO.existsByPhone(u.getPhone(), null)) {
+        // Dropdown đã lọc sẵn (assignableRoles), nhưng đó chỉ là tiện cho
+        // người dùng -- một request tự dựng gửi thẳng roleId nào cũng được,
+        // nên phải chặn lại ở đây trước khi ghi. Nhân viên MỚI không bao giờ
+        // được tạo thẳng thành Admin qua form này.
+        if (isAdminRoleId(u.getRoleId())) {
+            response.sendRedirect(request.getContextPath() + "/employee?action=new&error=invalid");
+            return;
+        }
+        // Từ V35: phone/citizenId có thể null (chưa nhập) -- bỏ qua kiểm trùng
+        // trong trường hợp đó, gọi existsByColumn(null) chỉ tốn 1 query vô ích
+        // (SQL "cột = NULL" không khớp gì nên luôn trả false, không sai, chỉ
+        // thừa) và dễ đọc nhầm là đang kiểm tra thật.
+        if (u.getPhone() != null && employeeDAO.existsByPhone(u.getPhone(), null)) {
             response.sendRedirect(request.getContextPath() + "/employee?action=new&error=duplicate_phone");
             return;
         }
-        if (employeeDAO.existsByCitizenId(u.getCitizenId(), null)) {
+        if (u.getCitizenId() != null && employeeDAO.existsByCitizenId(u.getCitizenId(), null)) {
             response.sendRedirect(request.getContextPath() + "/employee?action=new&error=duplicate_citizen");
-            return;
-        }
-        if (!isValidManagerChoice(u)) {
-            response.sendRedirect(request.getContextPath() + "/employee?action=new&error=invalid_manager");
             return;
         }
 
         String username = employeeDAO.generateUniqueUsername(u.getLastName(), u.getMiddleName(), u.getFirstName());
         u.setUsername(username);
-        u.setEmail(username + COMPANY_EMAIL_DOMAIN);
         u.setPasswordHash(BCrypt.hashpw(generateTempPassword(), BCrypt.gensalt()));
 
         int newId = employeeDAO.insert(u);
@@ -255,8 +326,8 @@ public class EmployeeController extends HttpServlet {
      * lẫn gửi lại đều dùng chung action này) -- vì mật khẩu tạm đã hash ngay
      * lúc tạo/lần gửi trước và không lưu bản rõ ở đâu cả, mỗi lần bấm đều
      * CẤP LẠI 1 mật khẩu tạm mới rồi gửi, không phải gửi lại y hệt mật khẩu
-     * cũ. Gửi tới EMAIL CÁ NHÂN (kênh chắc chắn nhận được, khác email công ty
-     * tự cấp chưa có hộp thư thật).
+     * cũ. Gửi tới EMAIL CÁ NHÂN -- kênh THẬT duy nhất nhân viên có (từ V36,
+     * không còn "email công ty" giả để mà cân nhắc gửi tới đó).
      */
     private void handleSendAccount(HttpServletRequest request, HttpServletResponse response) throws IOException {
         Integer id = parseIntOrNull(request.getParameter("id"));
@@ -282,7 +353,7 @@ public class EmployeeController extends HttpServlet {
         // dấu hiệu duy nhất là một tham số warning trên URL của Admin.
         String tempPassword = generateTempPassword();
         boolean mailSent = EmailUtil.sendNewAccountEmail(employee.getPersonalEmail(), employee.getFullName(),
-                employee.getEmail(), employee.getUsername(), tempPassword);
+                employee.getUsername(), tempPassword);
         if (!mailSent) {
             // Chưa đụng tới mật khẩu cũ -- nhân viên vẫn đăng nhập được như trước.
             response.sendRedirect(request.getContextPath() + "/employee?action=view&id=" + id + "&error=mail_failed");
@@ -303,28 +374,38 @@ public class EmployeeController extends HttpServlet {
 
     private void handleUpdate(HttpServletRequest request, HttpServletResponse response) throws IOException {
         Integer id = parseIntOrNull(request.getParameter("userId"));
-        if (id == null || employeeDAO.findById(id) == null) {
+        User existing = id != null ? employeeDAO.findById(id) : null;
+        if (existing == null) {
             response.sendRedirect(request.getContextPath() + "/employee?error=notfound");
             return;
         }
 
         User u = buildUserFromRequest(request, new User());
         u.setUserId(id);
+        // Không có form nào (thêm/sửa) còn ô "Cấp trên" -- giữ NGUYÊN giá trị
+        // hiện có, đừng để chỗ này lặng lẽ xoá mất cấp trên đã gán chỉ vì
+        // request không gửi kèm managerId. Muốn đổi cấp trên hiện phải sửa
+        // trực tiếp trong CSDL (xem PERMISSIONS.md).
+        u.setManagerId(existing.getManagerId());
 
         if (!isValidCommonFields(u)) {
             response.sendRedirect(request.getContextPath() + "/employee?action=edit&id=" + id + "&error=invalid");
             return;
         }
-        if (employeeDAO.existsByPhone(u.getPhone(), id)) {
+        // Chỉ CHẶN khi đây là một lần THĂNG lên Admin (trước đó không phải,
+        // request lại gửi roleId Admin) -- một Admin ĐÃ LÀ Admin từ trước
+        // (giữ nguyên qua dropdown, xem assignableRoles) vẫn phải lưu được
+        // bình thường, không thể tự khoá chính diện họ vào một vòng lặp.
+        if (isAdminRoleId(u.getRoleId()) && !isAdminRoleId(existing.getRoleId())) {
+            response.sendRedirect(request.getContextPath() + "/employee?action=edit&id=" + id + "&error=invalid");
+            return;
+        }
+        if (u.getPhone() != null && employeeDAO.existsByPhone(u.getPhone(), id)) {
             response.sendRedirect(request.getContextPath() + "/employee?action=edit&id=" + id + "&error=duplicate_phone");
             return;
         }
-        if (employeeDAO.existsByCitizenId(u.getCitizenId(), id)) {
+        if (u.getCitizenId() != null && employeeDAO.existsByCitizenId(u.getCitizenId(), id)) {
             response.sendRedirect(request.getContextPath() + "/employee?action=edit&id=" + id + "&error=duplicate_citizen");
-            return;
-        }
-        if (!isValidManagerChoice(u)) {
-            response.sendRedirect(request.getContextPath() + "/employee?action=edit&id=" + id + "&error=invalid_manager");
             return;
         }
 
@@ -374,40 +455,16 @@ public class EmployeeController extends HttpServlet {
         return sb.toString();
     }
 
-    /**
-     * Người được chọn làm cấp trên có hợp lệ không.
-     *
-     * Danh sách trong ô chọn đã lọc sẵn (xem EmployeeDAO.findEligibleManagers)
-     * nhưng đó chỉ là tiện cho người dùng -- một request tự dựng gửi thẳng
-     * managerId nào cũng được, nên phải kiểm lại ở đây trước khi ghi.
-     *
-     * Hai điều kiện, đều để giữ cây đúng HAI tầng như đã chốt với khách:
-     *
-     *  - không tự làm cấp trên của chính mình (CSDL cũng chặn bằng
-     *    chk_users_manager_not_self, nhưng bắt ở đây thì báo lỗi tử tế được
-     *    thay vì ném SQLException lên);
-     *  - người làm cấp trên thì bản thân không được có cấp trên, nếu không
-     *    sẽ mọc ra tầng thứ ba.
-     *
-     * @return true nếu để trống (không có cấp trên -- hợp lệ) hoặc chọn đúng.
-     */
-    private boolean isValidManagerChoice(User u) {
-        Integer managerId = u.getManagerId();
-        if (managerId == null) {
-            return true;
-        }
-        if (u.getUserId() > 0 && managerId == u.getUserId()) {
-            return false;
-        }
-        User manager = employeeDAO.findById(managerId);
-        return manager != null && !manager.isDeleted() && !manager.isSubordinate();
-    }
-
     private User buildUserFromRequest(HttpServletRequest request, User u) {
         u.setLastName(emptyToNull(request.getParameter("lastName")));
         u.setMiddleName(emptyToNull(request.getParameter("middleName")));
         u.setFirstName(emptyToNull(request.getParameter("firstName")));
-        u.setGender(request.getParameter("gender"));
+        // Từ V35: Admin không còn bắt buộc chọn giới tính lúc tạo/sửa -- ô
+        // chọn có option rỗng ("-- Để nhân viên tự chọn --"), request trả về
+        // chuỗi rỗng khi Admin để vậy, phải quy về null như các trường tự do
+        // khác thay vì lưu chuỗi rỗng (sẽ trượt qua check isValidCommonFields
+        // dưới vì "" không khớp Nam/Nữ/Khác NHƯNG cũng không null).
+        u.setGender(emptyToNull(request.getParameter("gender")));
         u.setDateOfBirth(parseDateOrNull(request.getParameter("dateOfBirth")));
         u.setCitizenId(emptyToNull(request.getParameter("citizenId")));
         u.setPhone(emptyToNull(request.getParameter("phone")));
@@ -422,9 +479,10 @@ public class EmployeeController extends HttpServlet {
         if (departmentId != null) {
             u.setDepartmentId(departmentId);
         }
-        // Để trống = không có cấp trên = tầng trên của cây tổ chức. Đây là
-        // trạng thái hợp lệ và là mặc định, không phải dữ liệu thiếu.
-        u.setManagerId(parseIntOrNull(request.getParameter("managerId")));
+        // KHÔNG đọc managerId từ request ở đây -- form thêm/sửa không còn ô
+        // "Cấp trên" (bỏ theo yêu cầu, xem PERMISSIONS.md). Nhân viên mới mặc
+        // định chưa có cấp trên (User.managerId để nguyên null); handleUpdate
+        // tự gán lại giá trị hiện có ngay sau khi gọi hàm này, đừng lặp ở đây.
 
         Integer districtId = parseIntOrNull(request.getParameter("districtId"));
         String addressDetail = emptyToNull(request.getParameter("addressDetail"));
@@ -438,15 +496,21 @@ public class EmployeeController extends HttpServlet {
     }
 
     /**
-     * BR-28 (Phòng ban + Vai trò bắt buộc), BR-29 (ngày sinh hợp lệ trong
-     * quá khứ), BR-30 (giới tính hợp lệ), BR-09 (định dạng SĐT), BR-11 (email
-     * cá nhân bắt buộc + hợp lệ -- là kênh duy nhất để gửi tài khoản/mật khẩu
-     * vì email công ty tự cấp chưa có hộp thư thật). Các trường bắt buộc
-     * khác của users (họ, tên, CCCD, ngày sinh, ngày vào làm) đều NOT NULL
-     * trong DB nên phải chặn ở đây trước khi tới tầng DAO.
+     * BR-28 (Phòng ban + Vai trò bắt buộc), BR-29 (ngày sinh hợp lệ trong quá
+     * khứ, NẾU có nhập), BR-30 (giới tính hợp lệ, NẾU có chọn), BR-09 (định
+     * dạng SĐT, NẾU có nhập), BR-11 (email cá nhân bắt buộc + hợp lệ -- là
+     * kênh duy nhất để gửi tài khoản/mật khẩu, từ V36 không còn "email công
+     * ty" nào để mà cân nhắc thay thế).
+     *
+     * <p>Từ V35: gender/dateOfBirth/citizenId/phone KHÔNG còn bắt buộc ở đây
+     * -- đây là dữ liệu cá nhân, Admin có thể để trống lúc tạo/sửa, nhân viên
+     * tự bổ sung ở lần đăng nhập đầu (AuthenticationController.
+     * handleUpdateProfile áp đúng 4 quy tắc BR-29/BR-30/BR-09 này, ép qua
+     * AuthenticationFilter). Chỉ khi CÓ nhập thì mới kiểm đúng định dạng --
+     * để trống không còn là lỗi, nhập sai định dạng vẫn là lỗi.
      */
     private boolean isValidCommonFields(User u) {
-        if (isBlank(u.getLastName()) || isBlank(u.getFirstName()) || isBlank(u.getCitizenId())) {
+        if (isBlank(u.getLastName()) || isBlank(u.getFirstName())) {
             return false;
         }
         if (!TextRules.isSafeFreeText(u.getLastName())
@@ -458,10 +522,11 @@ public class EmployeeController extends HttpServlet {
         if (u.getRoleId() <= 0 || u.getDepartmentId() <= 0) {
             return false;
         }
-        if (!"Nam".equals(u.getGender()) && !"Nữ".equals(u.getGender()) && !"Khác".equals(u.getGender())) {
+        if (u.getGender() != null
+                && !"Nam".equals(u.getGender()) && !"Nữ".equals(u.getGender()) && !"Khác".equals(u.getGender())) {
             return false;
         }
-        if (u.getDateOfBirth() == null || !u.getDateOfBirth().toLocalDate().isBefore(LocalDate.now())) {
+        if (u.getDateOfBirth() != null && !u.getDateOfBirth().toLocalDate().isBefore(LocalDate.now())) {
             return false;
         }
         if (u.getHireDate() == null) {
@@ -470,7 +535,7 @@ public class EmployeeController extends HttpServlet {
         if (isBlank(u.getPersonalEmail()) || !isValidEmail(u.getPersonalEmail())) {
             return false;
         }
-        return isValidPhone(u.getPhone());
+        return u.getPhone() == null || isValidPhone(u.getPhone());
     }
 
     private boolean isBlank(String value) {

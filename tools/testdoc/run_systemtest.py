@@ -146,64 +146,58 @@ def flow_auth():
     expect("ST_AUTH_008", ok, "Đăng nhập bằng mật khẩu mới: %s"
            % ("được" if ok else "KHÔNG được"))
 
-    # --- quên mật khẩu bằng OTP (email công ty)
-    page = U.html(admin.get(R.BASE + "/employee?action=view&id=" + uid))
-    mail_m = re.search(r"[\w.+-]+@[\w.-]+\.\w+", U.page_text(page))
-    company_mail = None
-    for cand in re.findall(r"[\w.+-]+@[\w.-]+\.\w+", U.page_text(page)):
-        if "gmail" not in cand:
-            company_mail = cand
-            break
-    if company_mail is None:
-        skip_rest("ST_AUTH", 9, 13, "Không đọc được email công ty của tài khoản")
+    # --- quên mật khẩu bằng OTP (username -- không còn "email công ty" từ V36)
+    otp_sess = requests.Session()
+    otp_sess.headers["Accept-Language"] = "vi-VN,vi;q=0.9"
+    before = U.count_log(r"Ma OTP: \d{6}")
+    t = R.csrf(otp_sess, "/forgotPassword.jsp")
+    r = otp_sess.post(R.BASE + "/ForgotPasswordServlet", allow_redirects=False,
+                      data={"username": uname, "csrfToken": t})
+    time.sleep(0.5)
+    issued = U.count_log(r"Ma OTP: \d{6}") == before + 1
+    # OTP giờ gửi tới personal_email đã lưu trong hồ sơ, không phải chuỗi
+    # vừa gõ -- không biết trước địa chỉ đó ở đây nên đọc mã cuối cùng
+    # trong log thay vì lọc theo email (an toàn vì chạy tuần tự, không có
+    # yêu cầu OTP nào khác chen giữa).
+    otp = U.otp_from_log()
+    expect("ST_AUTH_009", issued and otp is not None,
+           "Gửi OTP cho username %s -> %s, mã %s" % (uname, r.headers.get("Location"), otp))
+    if not issued:
+        skip_rest("ST_AUTH", 10, 13,
+                  "Hạn mức 10 yêu cầu OTP/IP trong 15 phút đã cạn")
     else:
-        otp_sess = requests.Session()
-        otp_sess.headers["Accept-Language"] = "vi-VN,vi;q=0.9"
-        before = U.count_log(r"Ma OTP: \d{6}")
-        t = R.csrf(otp_sess, "/forgotPassword.jsp")
-        r = otp_sess.post(R.BASE + "/ForgotPasswordServlet", allow_redirects=False,
-                          data={"email": company_mail, "csrfToken": t})
-        time.sleep(0.5)
-        issued = U.count_log(r"Ma OTP: \d{6}") == before + 1
-        otp = U.otp_from_log(company_mail)
-        expect("ST_AUTH_009", issued and otp is not None,
-               "Gửi OTP tới %s -> %s, mã %s" % (company_mail, r.headers.get("Location"), otp))
-        if not issued:
-            skip_rest("ST_AUTH", 10, 13,
-                      "Hạn mức 10 yêu cầu OTP/IP trong 15 phút đã cạn")
-        else:
-            t = R.csrf(otp_sess, "/verifyOtp.jsp")
-            r = otp_sess.post(R.BASE + "/VerifyOtpServlet", allow_redirects=False,
-                              data={"otpCode": "000000", "csrfToken": t})
-            expect("ST_AUTH_010", "invalid_otp" in (r.headers.get("Location") or ""),
-                   "Nhập sai OTP -> %s" % r.headers.get("Location"))
+        t = R.csrf(otp_sess, "/verifyOtp.jsp")
+        r = otp_sess.post(R.BASE + "/VerifyOtpServlet", allow_redirects=False,
+                          data={"otpCode": "000000", "csrfToken": t})
+        expect("ST_AUTH_010", "invalid_otp" in (r.headers.get("Location") or ""),
+               "Nhập sai OTP -> %s" % r.headers.get("Location"))
 
-            t = R.csrf(otp_sess, "/verifyOtp.jsp")
-            r = otp_sess.post(R.BASE + "/VerifyOtpServlet", allow_redirects=False,
-                              data={"otpCode": otp, "csrfToken": t})
-            loc = r.headers.get("Location") or ""
-            expect("ST_AUTH_011", "resetPassword" in loc,
-                   "Nhập đúng OTP -> %s" % loc)
+        t = R.csrf(otp_sess, "/verifyOtp.jsp")
+        r = otp_sess.post(R.BASE + "/VerifyOtpServlet", allow_redirects=False,
+                          data={"otpCode": otp, "csrfToken": t})
+        loc = r.headers.get("Location") or ""
+        expect("ST_AUTH_011", "resetPassword" in loc,
+               "Nhập đúng OTP -> %s" % loc)
 
-            otp_pw = "MatKhauOtp@%s" % run
-            t = R.csrf(otp_sess, "/resetPassword.jsp")
-            r = otp_sess.post(R.BASE + "/ResetPasswordServlet", allow_redirects=False,
-                              data={"newPassword": otp_pw, "confirmPassword": otp_pw,
-                                    "csrfToken": t})
-            loc = r.headers.get("Location") or ""
-            emp_sess, ok = fresh("new", uname, otp_pw)
-            expect("ST_AUTH_012", "error" not in loc and ok,
-                   "Đặt mật khẩu mới -> %s; đăng nhập lại: %s"
-                   % (loc, "được" if ok else "KHÔNG được"))
-            if ok:
-                new_pw = otp_pw
+        otp_pw = "MatKhauOtp@%s" % run
+        t = R.csrf(otp_sess, "/resetPassword.jsp")
+        r = otp_sess.post(R.BASE + "/ResetPasswordServlet", allow_redirects=False,
+                          data={"newPassword": otp_pw, "confirmPassword": otp_pw,
+                                "csrfToken": t})
+        loc = r.headers.get("Location") or ""
+        emp_sess, ok = fresh("new", uname, otp_pw)
+        expect("ST_AUTH_012", "error" not in loc and ok,
+               "Đặt mật khẩu mới -> %s; đăng nhập lại: %s"
+               % (loc, "được" if ok else "KHÔNG được"))
+        if ok:
+            new_pw = otp_pw
 
-            t = R.csrf(otp_sess, "/verifyOtp.jsp")
-            r = otp_sess.post(R.BASE + "/VerifyOtpServlet", allow_redirects=False,
-                              data={"otpCode": otp, "csrfToken": t})
-            loc = r.headers.get("Location") or ""
-            expect("ST_AUTH_013", "resetPassword" not in loc,
-                   "Dùng lại mã OTP cũ -> %s (bị từ chối)" % loc)
+        t = R.csrf(otp_sess, "/verifyOtp.jsp")
+        r = otp_sess.post(R.BASE + "/VerifyOtpServlet", allow_redirects=False,
+                          data={"otpCode": otp, "csrfToken": t})
+        loc = r.headers.get("Location") or ""
+        expect("ST_AUTH_013", "resetPassword" not in loc,
+               "Dùng lại mã OTP cũ -> %s (bị từ chối)" % loc)
 
     # --- Admin khoá tài khoản
     emp_sess, ok = fresh("new", uname, new_pw)

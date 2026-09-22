@@ -8,6 +8,7 @@ import java.util.List;
 import org.junit.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.MockedStatic;
+import poscs.model.ProvinceAssignment;
 import poscs.model.User;
 
 import static org.junit.Assert.*;
@@ -22,7 +23,7 @@ import static poscs.dao.JdbcStub.*;
  *   <li>{@code generateUniqueUsername} -- bỏ dấu tiếng Việt rồi dò số đuôi cho
  *       tới khi trống. Người tạo nhân viên không được gõ username (BR-28), nên
  *       nếu hàm này trả về tên đã có thì INSERT sẽ vỡ ở tầng CSDL.</li>
- *   <li>{@code existsByEmail/Phone/CitizenId} (BR-27) -- khi đọc lỗi thì cố ý
+ *   <li>{@code existsByPhone/CitizenId} (BR-27) -- khi đọc lỗi thì cố ý
  *       trả <b>true</b> ("coi như đã trùng"), chặn ở tầng ứng dụng thay vì thả
  *       cho UNIQUE KEY của CSDL từ chối bằng một trang lỗi khó hiểu.</li>
  *   <li>{@code findAll} -- bộ lọc động và phép tính OFFSET của phân trang.</li>
@@ -118,50 +119,9 @@ public class EmployeeDAOTest {
     }
 
     // ------------------------------------------------------------------
-    // existsBy* (BR-27) -- trùng lặp email/SĐT/CCCD
+    // existsBy* (BR-27) -- trùng lặp SĐT/CCCD (existsByEmail đã xoá cùng cột
+    // email công ty, V36)
     // ------------------------------------------------------------------
-
-    @Test
-    public void existsByEmail_rowFound_returnsTrue() throws Exception {
-        PreparedStatement ps = statementReturning(singleRow(row("1", 1)));
-        Connection conn = connectionReturning(ps);
-
-        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
-            db.when(DBContext::getConnection).thenReturn(conn);
-
-            assertTrue(dao.existsByEmail("an@congty.vn", null));
-            verify(ps).setString(1, "an@congty.vn");
-            verify(ps, never()).setInt(anyInt(), anyInt());
-        }
-    }
-
-    @Test
-    public void existsByEmail_noRow_returnsFalse() throws Exception {
-        PreparedStatement ps = statementReturning(emptyResultSet());
-        Connection conn = connectionReturning(ps);
-
-        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
-            db.when(DBContext::getConnection).thenReturn(conn);
-
-            assertFalse(dao.existsByEmail("moi@congty.vn", null));
-        }
-    }
-
-    @Test
-    public void existsByEmail_editingOwnRecord_excludesThatUserId() throws Exception {
-        PreparedStatement ps = statementReturning(emptyResultSet());
-        Connection conn = connectionReturning(ps);
-
-        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
-            db.when(DBContext::getConnection).thenReturn(conn);
-
-            assertFalse(dao.existsByEmail("an@congty.vn", 7));
-
-            // Không loại trừ chính mình thì sửa hồ sơ mà giữ nguyên email sẽ bị
-            // báo "email đã tồn tại" -- do chính dòng của mình.
-            verify(ps).setInt(2, 7);
-        }
-    }
 
     @Test
     public void existsByPhone_sqlError_returnsTrueToBlockTheWrite() throws Exception {
@@ -231,8 +191,9 @@ public class EmployeeDAOTest {
 
             verify(conn).prepareStatement(sqlCaptor.capture());
             assertTrue(sqlCaptor.getValue().contains("last_name LIKE ?"));
-            // Từ khoá được trim rồi bọc %...% và lặp cho cả 5 cột tìm kiếm.
-            verify(ps, times(5)).setObject(anyInt(), eq("%an%"));
+            // Từ khoá được trim rồi bọc %...% và lặp cho cả 4 cột tìm kiếm
+            // (họ, tên đệm, tên, SĐT -- không còn email từ V36).
+            verify(ps, times(4)).setObject(anyInt(), eq("%an%"));
         }
     }
 
@@ -444,7 +405,7 @@ public class EmployeeDAOTest {
     }
 
     @Test
-    public void updatePasswordByEmail_exactlyOneRow_returnsTrue() throws Exception {
+    public void updatePasswordByUsername_exactlyOneRow_returnsTrue() throws Exception {
         PreparedStatement ps = mock(PreparedStatement.class);
         when(ps.executeUpdate()).thenReturn(1);
         Connection conn = connectionReturning(ps);
@@ -452,14 +413,14 @@ public class EmployeeDAOTest {
         try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
             db.when(DBContext::getConnection).thenReturn(conn);
 
-            assertTrue(dao.updatePasswordByEmail("an@congty.vn", "$2a$10$hash"));
+            assertTrue(dao.updatePasswordByUsername("annd", "$2a$10$hash"));
             verify(ps).setString(1, "$2a$10$hash");
-            verify(ps).setString(2, "an@congty.vn");
+            verify(ps).setString(2, "annd");
         }
     }
 
     @Test
-    public void updatePasswordByEmail_multipleRowsTouched_returnsFalse() throws Exception {
+    public void updatePasswordByUsername_multipleRowsTouched_returnsFalse() throws Exception {
         PreparedStatement ps = mock(PreparedStatement.class);
         when(ps.executeUpdate()).thenReturn(2);
         Connection conn = connectionReturning(ps);
@@ -468,13 +429,13 @@ public class EmployeeDAOTest {
             db.when(DBContext::getConnection).thenReturn(conn);
 
             // Hàm này so == 1 chứ không phải > 0: đổi mật khẩu trúng nhiều tài
-            // khoản nghĩa là dữ liệu email đang hỏng, không nên báo thành công.
-            assertFalse(dao.updatePasswordByEmail("an@congty.vn", "$2a$10$hash"));
+            // khoản nghĩa là dữ liệu username đang hỏng, không nên báo thành công.
+            assertFalse(dao.updatePasswordByUsername("annd", "$2a$10$hash"));
         }
     }
 
     @Test
-    public void updatePasswordByEmail_noMatchingAccount_returnsFalse() throws Exception {
+    public void updatePasswordByUsername_noMatchingAccount_returnsFalse() throws Exception {
         PreparedStatement ps = mock(PreparedStatement.class);
         when(ps.executeUpdate()).thenReturn(0);
         Connection conn = connectionReturning(ps);
@@ -482,7 +443,7 @@ public class EmployeeDAOTest {
         try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
             db.when(DBContext::getConnection).thenReturn(conn);
 
-            assertFalse(dao.updatePasswordByEmail("khong-ton-tai@congty.vn", "$2a$10$hash"));
+            assertFalse(dao.updatePasswordByUsername("khong-ton-tai", "$2a$10$hash"));
         }
     }
 
@@ -668,6 +629,44 @@ public class EmployeeDAOTest {
 
             assertNotNull(dao.findAllAssignments());
             assertTrue(dao.findAllAssignments().isEmpty());
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // findAllProvincesWithHolder -- form thêm/sửa nhân viên (đổ CẢ tỉnh đã
+    // có người cầm, kèm tên người đó, để Admin thấy vì sao khoá)
+    // ------------------------------------------------------------------
+
+    @Test
+    public void findAllProvincesWithHolder_gomCaTinhChuaAiCamVaTinhDaCoNguoiCam() throws Exception {
+        ResultSet rs = resultSetOf(List.of(
+                row("province_id", 1, "province_name", "Tỉnh A"), // holder_id vắng mặt = NULL
+                row("province_id", 2, "province_name", "Tỉnh B", "holder_id", 7,
+                        "last_name", "Nguyễn", "first_name", "An")
+        ));
+        Connection conn = connectionReturning(statementReturning(rs));
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            List<ProvinceAssignment> result = dao.findAllProvincesWithHolder();
+
+            assertEquals(2, result.size());
+            assertNull(result.get(0).getHolderUserId());
+            assertNull(result.get(0).getHolderName());
+            assertEquals(Integer.valueOf(7), result.get(1).getHolderUserId());
+            // Ghép họ tên đúng luật User.getFullName() (không có tên đệm).
+            assertEquals("Nguyễn An", result.get(1).getHolderName());
+        }
+    }
+
+    @Test
+    public void findAllProvincesWithHolder_loiCsdl_traVeListRongChuKhongNull() throws Exception {
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenThrow(new SQLException("hỏng"));
+
+            assertNotNull(dao.findAllProvincesWithHolder());
+            assertTrue(dao.findAllProvincesWithHolder().isEmpty());
         }
     }
 }

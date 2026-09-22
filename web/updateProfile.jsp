@@ -168,12 +168,20 @@
 
             <div class="profile-body">
 
+                <c:if test="${param.onboarding == '1'}">
+                    <div class="alert alert-danger py-2 px-3 mb-4" style="font-size: 0.9rem; border-radius: 12px;">
+                        Vui lòng bổ sung đầy đủ thông tin cá nhân (giới tính, ngày sinh, CCCD/CMND, số điện thoại) trước khi tiếp tục sử dụng hệ thống.
+                    </div>
+                </c:if>
+
                 <c:if test="${not empty param.error}">
                     <div class="alert alert-danger py-2 px-3 mb-4" style="font-size: 0.9rem; border-radius: 12px;">
                         <c:choose>
                             <c:when test="${param.error == 'missing_fields'}">Vui lòng nhập đầy đủ Họ, Tên và Số CCCD/CMND.</c:when>
                             <c:when test="${param.error == 'invalid_phone'}">Số điện thoại không hợp lệ.</c:when>
                             <c:when test="${param.error == 'invalid_email'}">Địa chỉ email không hợp lệ.</c:when>
+                            <c:when test="${param.error == 'invalid_gender'}">Vui lòng chọn giới tính.</c:when>
+                            <c:when test="${param.error == 'invalid_dob'}">Vui lòng chọn ngày sinh hợp lệ trong quá khứ.</c:when>
                             <c:when test="${param.error == 'missing_address'}">Vui lòng chọn Tỉnh/Thành phố và Xã/Phường.</c:when>
                             <c:when test="${param.error == 'invalid_characters'}">Họ tên và địa chỉ không được chứa ký tự &lt; &gt; ". Vui lòng nhập lại.</c:when>
                             <c:when test="${param.error == 'invalid_image_type'}">Ảnh đại diện chỉ nhận file JPG, PNG, GIF hoặc WEBP. Vui lòng chọn lại.</c:when>
@@ -196,8 +204,8 @@
                     </div>
                     <div class="row">
                         <div class="col-md-6 field-row">
-                            <label>Email đăng nhập</label>
-                            <div class="readonly-value"><c:out value="${profile.email}"/></div>
+                            <label>Tên đăng nhập</label>
+                            <div class="readonly-value"><c:out value="${profile.username}"/></div>
                         </div>
                         <div class="col-md-6 field-row">
                             <label>Phòng ban</label>
@@ -242,6 +250,7 @@
                         <div class="col-md-4 field-row">
                             <label for="dob">Ngày sinh</label>
                             <input type="date" class="form-control" id="dob" name="dob" value="${profile.dateOfBirth}">
+                            <span class="error-text" id="err-dob">Vui lòng chọn ngày sinh hợp lệ trong quá khứ.</span>
                         </div>
                         <div class="col-md-4 field-row">
                             <label for="citizenId">Số CCCD/CMND</label>
@@ -377,7 +386,7 @@
             var valid = true;
             document.querySelectorAll('.error-text').forEach(function (el) { el.style.display = 'none'; });
 
-            var requiredIds = ['lastName', 'firstName', 'citizenId', 'province', 'district'];
+            var requiredIds = ['lastName', 'firstName', 'citizenId', 'dob', 'province', 'district'];
             requiredIds.forEach(function (id) {
                 var el = document.getElementById(id);
                 if (!el.value.trim()) {
@@ -386,6 +395,12 @@
                     valid = false;
                 }
             });
+
+            var dob = document.getElementById('dob');
+            if (dob.value && new Date(dob.value) >= new Date()) {
+                document.getElementById('err-dob').style.display = 'block';
+                valid = false;
+            }
 
             var phone = document.getElementById('phone');
             if (!isValidPhone(phone.value)) {

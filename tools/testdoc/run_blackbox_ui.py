@@ -409,17 +409,22 @@ def test_password_flows(S):
         return
 
     import requests
-    # handleForgotPassword tra cứu bằng findByUsernameOrEmail: tên đăng nhập
-    # hoặc EMAIL CÔNG TY, không phải email cá nhân.
-    email = "tech02@poscs.vn"
+    # Từ V36: handleForgotPassword tra cứu bằng findByUsername (KHÔNG còn
+    # "email công ty" giả để nhập nữa). OTP luôn gửi tới personal_email đã
+    # lưu trong hồ sơ -- không còn chắc là chuỗi nào sẽ xuất hiện trong log
+    # (script này không biết personal_email thật của "tech02" trong CSDL
+    # đang chạy), nên otp_from_log() bên dưới gọi KHÔNG kèm bộ lọc, lấy mã
+    # OTP cuối cùng được in ra -- đủ an toàn vì các request ở đây chạy nối
+    # tiếp nhau, không có ai khác đồng thời xin OTP trên cùng máy chủ test.
+    username = "tech02"
 
     s = requests.Session()
     before = count_log(r"Ma OTP: \d{6}")
     t = R.csrf(s, "/forgotPassword.jsp")
     r = s.post(R.BASE + "/ForgotPasswordServlet", allow_redirects=False,
-               data={"email": email, "csrfToken": t})
+               data={"username": username, "csrfToken": t})
     time.sleep(0.3)
-    otp = otp_from_log(email)
+    otp = otp_from_log()
     issued = count_log(r"Ma OTP: \d{6}") == before + 1
     if not issued:
         # Hạn mức 10 yêu cầu/IP trong 15 phút còn hiệu lực từ lượt chạy trước
@@ -434,18 +439,18 @@ def test_password_flows(S):
                    "Khởi động lại Tomcat (bộ đếm nằm trong bộ nhớ) rồi chạy lại")
         return
     expect("TC_FORGOT_001", r.status_code == 302 and otp is not None,
-           "Gửi OTP tới email %s -> %s, log ghi mã %s"
-           % (email, r.headers.get("Location"), otp))
+           "Gửi OTP cho username %s -> %s, log ghi mã %s"
+           % (username, r.headers.get("Location"), otp))
 
     s2 = requests.Session()
     before = count_log(r"Ma OTP: \d{6}")
     t = R.csrf(s2, "/forgotPassword.jsp")
     r = s2.post(R.BASE + "/ForgotPasswordServlet", allow_redirects=False,
-                data={"email": "khongcoai@example.com", "csrfToken": t})
+                data={"username": "khongcoai", "csrfToken": t})
     time.sleep(0.3)
     after = count_log(r"Ma OTP: \d{6}")
     expect("TC_FORGOT_003", r.status_code == 302 and after == before,
-           "Email không tồn tại -> %s, KHÔNG có mã nào được gửi thêm"
+           "Username không tồn tại -> %s, KHÔNG có mã nào được gửi thêm"
            % r.headers.get("Location"))
 
     # nhập sai OTP
@@ -467,7 +472,7 @@ def test_password_flows(S):
            "Bấm gửi lại trong 30 giây -> %s, không gửi mã mới" % loc)
 
     # nhập đúng OTP -> đặt lại mật khẩu
-    otp = otp_from_log(email)
+    otp = otp_from_log()
     t = R.csrf(s, "/verifyOtp.jsp")
     r = s.post(R.BASE + "/VerifyOtpServlet", allow_redirects=False,
                data={"otpCode": otp, "csrfToken": t})
@@ -535,25 +540,30 @@ def test_password_flows(S):
     s7 = requests.Session()
     t = R.csrf(s7, "/forgotPassword.jsp")
     r = s7.post(R.BASE + "/ForgotPasswordServlet", allow_redirects=False,
-                data={"email": "", "csrfToken": t})
+                data={"username": "", "csrfToken": t})
     loc = r.headers.get("Location") or ""
-    expect("TC_FORGOT_002", "missing_email" in loc or "error" in loc,
-           "Bỏ trống email -> %s" % loc)
+    expect("TC_FORGOT_002", "missing_username" in loc or "error" in loc,
+           "Bỏ trống tên đăng nhập -> %s" % loc)
 
+    # TC_FORGOT_004 trước đây kiểm "email sai định dạng" -- không còn áp dụng
+    # từ V36 (ô nhập giờ là username, không có định dạng để mà sai). Đổi
+    # thành: một username lạ (không tồn tại) vẫn phải đi qua đúng nhánh chống
+    # dò tài khoản (cùng response như TC_FORGOT_003), không rơi vào nhánh lỗi
+    # riêng nào khác dù chuỗi nhập vào "trông" bất thường.
     s8 = requests.Session()
     t = R.csrf(s8, "/forgotPassword.jsp")
     r = s8.post(R.BASE + "/ForgotPasswordServlet", allow_redirects=False,
-                data={"email": "abc@@", "csrfToken": t})
+                data={"username": "khong ton tai !!", "csrfToken": t})
     loc = r.headers.get("Location") or ""
-    expect("TC_FORGOT_004", "invalid_email" in loc or "error" in loc,
-           "Email sai định dạng -> %s" % loc)
+    expect("TC_FORGOT_004", r.status_code == 302 and "error" not in loc,
+           "Username lạ, có ký tự khác thường -> %s" % loc)
 
     s9 = requests.Session()
     r = s9.post(R.BASE + "/ResendOtpServlet", allow_redirects=False,
                 data={"csrfToken": R.csrf(s9, "/forgotPassword.jsp")})
     loc = r.headers.get("Location") or ""
     expect("TC_RESEND_004", r.status_code == 302,
-           "Gửi lại khi session không có email -> %s" % loc)
+           "Gửi lại khi session không có username -> %s" % loc)
 
 
 def test_change_password(S):

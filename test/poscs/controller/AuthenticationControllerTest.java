@@ -93,7 +93,7 @@ public class AuthenticationControllerTest {
         when(request.getServletPath()).thenReturn("/login");
         when(request.getParameter("username")).thenReturn("annd");
         when(request.getParameter("password")).thenReturn("correct-password");
-        when(employeeDAO.findByUsernameOrEmail("annd"))
+        when(employeeDAO.findByUsername("annd"))
                 .thenAnswer(inv -> userWithPassword("correct-password"));
         HttpSession session = mock(HttpSession.class);
         when(request.getSession(true)).thenReturn(session);
@@ -204,7 +204,7 @@ public class AuthenticationControllerTest {
         when(request.getServletPath()).thenReturn("/login");
         when(request.getParameter("username")).thenReturn("ghost");
         when(request.getParameter("password")).thenReturn("whatever");
-        when(employeeDAO.findByUsernameOrEmail("ghost")).thenReturn(null);
+        when(employeeDAO.findByUsername("ghost")).thenReturn(null);
 
         controller.doPost(request, response);
 
@@ -217,7 +217,7 @@ public class AuthenticationControllerTest {
         when(request.getServletPath()).thenReturn("/login");
         when(request.getParameter("username")).thenReturn("annd");
         when(request.getParameter("password")).thenReturn("wrong-password");
-        when(employeeDAO.findByUsernameOrEmail("annd")).thenReturn(userWithPassword("correct-password"));
+        when(employeeDAO.findByUsername("annd")).thenReturn(userWithPassword("correct-password"));
 
         controller.doPost(request, response);
 
@@ -229,7 +229,7 @@ public class AuthenticationControllerTest {
     public void login_tooManyFailedAttemptsFromSameIp_locksOutEvenWithCorrectPasswordAfterward() throws Exception {
         when(request.getServletPath()).thenReturn("/login");
         when(request.getParameter("username")).thenReturn("annd");
-        when(employeeDAO.findByUsernameOrEmail("annd")).thenReturn(userWithPassword("correct-password"));
+        when(employeeDAO.findByUsername("annd")).thenReturn(userWithPassword("correct-password"));
 
         when(request.getParameter("password")).thenReturn("wrong-password");
         for (int i = 0; i < 5; i++) {
@@ -307,7 +307,7 @@ public class AuthenticationControllerTest {
         // vòng map ResultSet riêng). Dùng chung một instance cho cả 6 lượt sẽ
         // sai thực tế: handleLogin xoá password hash khỏi object trước khi cất
         // vào session, nên lượt sau sẽ gặp hash null.
-        when(employeeDAO.findByUsernameOrEmail("annd"))
+        when(employeeDAO.findByUsername("annd"))
                 .thenAnswer(inv -> userWithPassword("correct-password"));
         when(request.getSession(true)).thenReturn(mock(HttpSession.class));
 
@@ -335,7 +335,7 @@ public class AuthenticationControllerTest {
         when(request.getParameter("password")).thenReturn("correct-password");
         User deactivated = userWithPassword("correct-password");
         deactivated.setDeleted(true);
-        when(employeeDAO.findByUsernameOrEmail("annd")).thenReturn(deactivated);
+        when(employeeDAO.findByUsername("annd")).thenReturn(deactivated);
 
         controller.doPost(request, response);
 
@@ -348,7 +348,7 @@ public class AuthenticationControllerTest {
         when(request.getParameter("username")).thenReturn("annd");
         when(request.getParameter("password")).thenReturn("correct-password");
         User user = userWithPassword("correct-password");
-        when(employeeDAO.findByUsernameOrEmail("annd")).thenReturn(user);
+        when(employeeDAO.findByUsername("annd")).thenReturn(user);
 
         HttpSession oldSession = mock(HttpSession.class);
         HttpSession newSession = mock(HttpSession.class);
@@ -368,7 +368,7 @@ public class AuthenticationControllerTest {
         when(request.getParameter("username")).thenReturn("annd");
         when(request.getParameter("password")).thenReturn("correct-password");
         User user = userWithPassword("correct-password");
-        when(employeeDAO.findByUsernameOrEmail("annd")).thenReturn(user);
+        when(employeeDAO.findByUsername("annd")).thenReturn(user);
 
         when(request.getSession(false)).thenReturn(null); // chưa từng có session nào
         HttpSession newSession = mock(HttpSession.class);
@@ -401,7 +401,7 @@ public class AuthenticationControllerTest {
         HttpSession session = loggedInSession(sessionUser);
         User freshButDeactivated = userWithPassword("correct-password");
         freshButDeactivated.setDeleted(true);
-        when(employeeDAO.findByUsernameOrEmail("annd")).thenReturn(freshButDeactivated);
+        when(employeeDAO.findByUsername("annd")).thenReturn(freshButDeactivated);
 
         controller.doPost(request, response);
 
@@ -413,34 +413,34 @@ public class AuthenticationControllerTest {
     public void changePassword_wrongOldPassword_redirectsWithError() throws Exception {
         when(request.getServletPath()).thenReturn("/changePassword");
         loggedInSession(userWithPassword("correct-password"));
-        when(employeeDAO.findByUsernameOrEmail("annd")).thenReturn(userWithPassword("correct-password"));
+        when(employeeDAO.findByUsername("annd")).thenReturn(userWithPassword("correct-password"));
         when(request.getParameter("oldPassword")).thenReturn("wrong-old-password");
 
         controller.doPost(request, response);
 
         verify(response).sendRedirect(CONTEXT_PATH + "/changePassword.jsp?error=wrong_old_password");
-        verify(employeeDAO, never()).updatePasswordByEmail(anyString(), anyString());
+        verify(employeeDAO, never()).updatePasswordByUsername(anyString(), anyString());
     }
 
     @Test
     public void changePassword_weakNewPassword_redirectsWithError() throws Exception {
         when(request.getServletPath()).thenReturn("/changePassword");
         loggedInSession(userWithPassword("correct-password"));
-        when(employeeDAO.findByUsernameOrEmail("annd")).thenReturn(userWithPassword("correct-password"));
+        when(employeeDAO.findByUsername("annd")).thenReturn(userWithPassword("correct-password"));
         when(request.getParameter("oldPassword")).thenReturn("correct-password");
         when(request.getParameter("newPassword")).thenReturn("short");
 
         controller.doPost(request, response);
 
         verify(response).sendRedirect(CONTEXT_PATH + "/changePassword.jsp?error=weak_password");
-        verify(employeeDAO, never()).updatePasswordByEmail(anyString(), anyString());
+        verify(employeeDAO, never()).updatePasswordByUsername(anyString(), anyString());
     }
 
     @Test
     public void changePassword_confirmationMismatch_redirectsWithError() throws Exception {
         when(request.getServletPath()).thenReturn("/changePassword");
         loggedInSession(userWithPassword("correct-password"));
-        when(employeeDAO.findByUsernameOrEmail("annd")).thenReturn(userWithPassword("correct-password"));
+        when(employeeDAO.findByUsername("annd")).thenReturn(userWithPassword("correct-password"));
         when(request.getParameter("oldPassword")).thenReturn("correct-password");
         when(request.getParameter("newPassword")).thenReturn("newpassword1");
         when(request.getParameter("confirmPassword")).thenReturn("different-password");
@@ -454,7 +454,7 @@ public class AuthenticationControllerTest {
     public void changePassword_sameAsOldPassword_redirectsWithError() throws Exception {
         when(request.getServletPath()).thenReturn("/changePassword");
         loggedInSession(userWithPassword("correct-password"));
-        when(employeeDAO.findByUsernameOrEmail("annd")).thenReturn(userWithPassword("correct-password"));
+        when(employeeDAO.findByUsername("annd")).thenReturn(userWithPassword("correct-password"));
         when(request.getParameter("oldPassword")).thenReturn("correct-password");
         when(request.getParameter("newPassword")).thenReturn("correct-password");
         when(request.getParameter("confirmPassword")).thenReturn("correct-password");
@@ -462,7 +462,7 @@ public class AuthenticationControllerTest {
         controller.doPost(request, response);
 
         verify(response).sendRedirect(CONTEXT_PATH + "/changePassword.jsp?error=same_as_old");
-        verify(employeeDAO, never()).updatePasswordByEmail(anyString(), anyString());
+        verify(employeeDAO, never()).updatePasswordByUsername(anyString(), anyString());
     }
 
     @Test
@@ -470,16 +470,15 @@ public class AuthenticationControllerTest {
         when(request.getServletPath()).thenReturn("/changePassword");
         HttpSession session = loggedInSession(userWithPassword("correct-password"));
         User freshUser = userWithPassword("correct-password");
-        freshUser.setEmail("annd@postef.com.vn");
-        when(employeeDAO.findByUsernameOrEmail("annd")).thenReturn(freshUser);
+        when(employeeDAO.findByUsername("annd")).thenReturn(freshUser);
         when(request.getParameter("oldPassword")).thenReturn("correct-password");
         when(request.getParameter("newPassword")).thenReturn("brand-new-password1");
         when(request.getParameter("confirmPassword")).thenReturn("brand-new-password1");
-        when(employeeDAO.updatePasswordByEmail(eq("annd@postef.com.vn"), anyString())).thenReturn(true);
+        when(employeeDAO.updatePasswordByUsername(eq("annd"), anyString())).thenReturn(true);
 
         controller.doPost(request, response);
 
-        verify(employeeDAO).updatePasswordByEmail(eq("annd@postef.com.vn"), anyString());
+        verify(employeeDAO).updatePasswordByUsername(eq("annd"), anyString());
         verify(session).invalidate();
         verify(response).sendRedirect(CONTEXT_PATH + "/login.jsp?reset=success");
     }
@@ -494,6 +493,10 @@ public class AuthenticationControllerTest {
         when(request.getParameter("citizenId")).thenReturn("001201012345");
         when(request.getParameter("phone")).thenReturn("0912345678");
         when(request.getParameter("personalEmail")).thenReturn("an@example.com");
+        // Từ V35: gender/dob là hai trường nhân viên tự khai lần đầu, nên
+        // giờ bắt buộc ở chính đường tự phục vụ này (xem handleUpdateProfile).
+        when(request.getParameter("gender")).thenReturn("Nam");
+        when(request.getParameter("dob")).thenReturn("1995-05-20");
         when(request.getParameter("districtId")).thenReturn("10");
     }
 
@@ -518,6 +521,32 @@ public class AuthenticationControllerTest {
 
         verify(employeeDAO, never()).updateProfile(any());
         verify(response).sendRedirect(CONTEXT_PATH + "/updateProfile?error=invalid_phone");
+    }
+
+    @Test
+    public void updateProfile_missingGender_redirectsWithInvalidGenderError() throws Exception {
+        when(request.getServletPath()).thenReturn("/UpdateProfileServlet");
+        loggedInSession(userWithPassword("whatever"));
+        stubValidUpdateProfileFields();
+        when(request.getParameter("gender")).thenReturn(null);
+
+        controller.doPost(request, response);
+
+        verify(employeeDAO, never()).updateProfile(any());
+        verify(response).sendRedirect(CONTEXT_PATH + "/updateProfile?error=invalid_gender");
+    }
+
+    @Test
+    public void updateProfile_futureDob_redirectsWithInvalidDobError() throws Exception {
+        when(request.getServletPath()).thenReturn("/UpdateProfileServlet");
+        loggedInSession(userWithPassword("whatever"));
+        stubValidUpdateProfileFields();
+        when(request.getParameter("dob")).thenReturn(java.time.LocalDate.now().plusDays(1).toString());
+
+        controller.doPost(request, response);
+
+        verify(employeeDAO, never()).updateProfile(any());
+        verify(response).sendRedirect(CONTEXT_PATH + "/updateProfile?error=invalid_dob");
     }
 
     @Test

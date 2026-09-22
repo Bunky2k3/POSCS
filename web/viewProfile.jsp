@@ -128,8 +128,8 @@
                 <div class="section-header"><h5>Thông tin công việc</h5></div>
                 <div class="row">
                     <div class="col-md-6 field-row">
-                        <label>Email đăng nhập</label>
-                        <div class="view-value"><c:out value="${profile.email}"/></div>
+                        <label>Tên đăng nhập</label>
+                        <div class="view-value"><c:out value="${profile.username}"/></div>
                     </div>
                     <div class="col-md-6 field-row">
                         <label>Phòng ban</label>

@@ -110,9 +110,15 @@ public class AccessControlHierarchyTest {
         assertTrue(AccessControl.hasFullAccess(request, AccessControl.Resource.PRODUCT));
     }
 
+    /**
+     * TICKET không nằm trong HIERARCHY_RESTRICTED (chỉ Customer/Contract mới
+     * bị siết theo cây tổ chức) -- Sales là role giữ quyền TICKET (gộp thêm
+     * việc của CSKH cũ, xem PERMISSIONS.md), có cấp trên hay không cũng không
+     * đổi gì ở đây, khác hẳn Customer/Contract phía trên.
+     */
     @Test
-    public void cskhCoCapTren_vanGiuToanQuyenPhieuHoTro() {
-        loginAs("CSKH", 3);
+    public void salesCoCapTren_vanGiuToanQuyenPhieuHoTro() {
+        loginAs("Sales", 3);
 
         assertTrue(AccessControl.hasFullAccess(request, AccessControl.Resource.TICKET));
     }
