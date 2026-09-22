@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import poscs.common.SqlFilters;
 import poscs.model.Contract;
 import poscs.model.Enterprise;
 import poscs.model.Product;
@@ -40,12 +41,17 @@ public class ProductDAO {
     /**
      * Lấy danh sách sản phẩm có phân trang + lọc, phục vụ listProduct.jsp
      * (mỗi sản phẩm đã kèm sẵn .primaryImageUrl để làm ảnh đại diện thẻ).
+     *
+     * @param categoryIds danh mục + mọi hậu duệ của nó (xem
+     *                     ProductController.subtreeIds) -- sản phẩm CHỈ gắn ở
+     *                     danh mục LÁ, nên lọc theo đúng 1 category_id (danh
+     *                     mục cha/giữa cây) sẽ luôn ra rỗng; null/rỗng = không lọc.
      */
-    public List<Product> findAll(int page, int pageSize, String keyword, Integer categoryId) {
+    public List<Product> findAll(int page, int pageSize, String keyword, List<Integer> categoryIds) {
         List<Product> result = new ArrayList<>();
         StringBuilder sql = new StringBuilder(SELECT_BASE);
         List<Object> params = new ArrayList<>();
-        appendFilters(sql, params, keyword, categoryId);
+        appendFilters(sql, params, keyword, categoryIds);
         sql.append(" ORDER BY p.product_id DESC LIMIT ? OFFSET ?");
         params.add(pageSize);
         params.add(Math.max(0, (page - 1) * pageSize));
@@ -59,7 +65,7 @@ public class ProductDAO {
                 }
             }
         } catch (SQLException ex) {
-            LOG.error("Loi truy van danh sach san pham (categoryId={})", categoryId, ex);
+            LOG.error("Loi truy van danh sach san pham (categoryIds={})", categoryIds, ex);
         }
         // Danh sách chỉ cần 1 ảnh đại diện/sản phẩm (không cần load hết ảnh +
         // catalogue như trang chi tiết) -- PAGE_SIZE nhỏ (10) nên N truy vấn
@@ -79,10 +85,10 @@ public class ProductDAO {
     }
 
     /** Đếm tổng số sản phẩm thoả điều kiện lọc, phục vụ phân trang (BR-12). */
-    public int countAll(String keyword, Integer categoryId) {
+    public int countAll(String keyword, List<Integer> categoryIds) {
         StringBuilder sql = new StringBuilder("SELECT COUNT(*) FROM products p ");
         List<Object> params = new ArrayList<>();
-        appendFilters(sql, params, keyword, categoryId);
+        appendFilters(sql, params, keyword, categoryIds);
 
         try (Connection conn = DBContext.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql.toString())) {
@@ -93,7 +99,7 @@ public class ProductDAO {
                 }
             }
         } catch (SQLException ex) {
-            LOG.error("Loi dem so luong san pham (categoryId={})", categoryId, ex);
+            LOG.error("Loi dem so luong san pham (categoryIds={})", categoryIds, ex);
         }
         return 0;
     }
@@ -507,7 +513,7 @@ public class ProductDAO {
     // Helpers riêng
     // ------------------------------------------------------------------
 
-    private void appendFilters(StringBuilder sql, List<Object> params, String keyword, Integer categoryId) {
+    private void appendFilters(StringBuilder sql, List<Object> params, String keyword, List<Integer> categoryIds) {
         List<String> conditions = new ArrayList<>();
         conditions.add("p.is_deleted = 0");
 
@@ -517,9 +523,9 @@ public class ProductDAO {
             params.add(likeValue);
             params.add(likeValue);
         }
-        if (categoryId != null) {
-            conditions.add("p.category_id = ?");
-            params.add(categoryId);
+        if (!SqlFilters.isEmpty(categoryIds)) {
+            conditions.add(SqlFilters.inPredicate("p.category_id", categoryIds));
+            params.addAll(categoryIds);
         }
 
         sql.append("WHERE ").append(String.join(" AND ", conditions));

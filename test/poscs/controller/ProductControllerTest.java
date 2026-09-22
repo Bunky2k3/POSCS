@@ -122,6 +122,53 @@ public class ProductControllerTest {
                 s.containsAll(Arrays.asList(1, 2, 3)) && s.size() == 3));
     }
 
+    /**
+     * Sản phẩm CHỈ gắn ở danh mục LÁ (xem lớp Javadoc) -- lọc theo một danh
+     * mục CHA/GIỮA CÂY phải mở rộng xuống hết hậu duệ, không chỉ khớp đúng
+     * category_id đã chọn, nếu không truy vấn luôn ra rỗng dù panel bên cạnh
+     * hiện đúng tổng số > 0 (bug thật gặp trên môi trường chạy thật).
+     */
+    @Test
+    @SuppressWarnings("unchecked")
+    public void showList_filterByParentCategory_queriesWholeSubtreeNotJustParentId() throws Exception {
+        // Cấp 1: Năng lượng tái tạo(1) ; Cấp 2 (lá): Ắc quy(2, cha=1), Hệ thống nguồn(3, cha=1)
+        List<ProductCategory> categories = Arrays.asList(
+                category(1, "Năng lượng tái tạo", null),
+                category(2, "Ắc quy", 1),
+                category(3, "Hệ thống nguồn AC/DC, UPS", 1)
+        );
+        when(productDAO.findAllCategories()).thenReturn(categories);
+        when(productDAO.countByCategory()).thenReturn(Map.of(2, 5, 3, 3));
+        when(request.getParameter("categoryId")).thenReturn("1"); // lọc theo danh mục CHA
+
+        controller.doGet(request, response);
+
+        verify(productDAO).findAll(anyInt(), anyInt(), any(),
+                argThat((List<Integer> ids) -> ids != null
+                        && ids.containsAll(Arrays.asList(1, 2, 3)) && ids.size() == 3));
+        verify(productDAO).countAll(any(),
+                argThat((List<Integer> ids) -> ids != null
+                        && ids.containsAll(Arrays.asList(1, 2, 3)) && ids.size() == 3));
+    }
+
+    /** Lọc theo đúng danh mục LÁ (không có con) thì tập lọc chỉ có đúng 1 id -- không kéo thêm gì. */
+    @Test
+    @SuppressWarnings("unchecked")
+    public void showList_filterByLeafCategory_queriesOnlyThatId() throws Exception {
+        List<ProductCategory> categories = Arrays.asList(
+                category(1, "Năng lượng tái tạo", null),
+                category(2, "Ắc quy", 1)
+        );
+        when(productDAO.findAllCategories()).thenReturn(categories);
+        when(productDAO.countByCategory()).thenReturn(Map.of(2, 5));
+        when(request.getParameter("categoryId")).thenReturn("2");
+
+        controller.doGet(request, response);
+
+        verify(productDAO).findAll(anyInt(), anyInt(), any(),
+                argThat((List<Integer> ids) -> ids != null && ids.equals(List.of(2))));
+    }
+
     @Test
     public void showList_noFilter_expandsNoCategoryByDefault() throws Exception {
         when(productDAO.findAllCategories()).thenReturn(Collections.emptyList());
