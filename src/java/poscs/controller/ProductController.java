@@ -122,12 +122,20 @@ public class ProductController extends HttpServlet {
         String keyword = request.getParameter("keyword");
         Integer categoryFilter = parseIntOrNull(request.getParameter("categoryId"));
 
-        List<Product> productList = productDAO.findAll(page, PAGE_SIZE, keyword, categoryFilter);
-        int totalCount = productDAO.countAll(keyword, categoryFilter);
-        int totalPages = Math.max(1, (int) Math.ceil(totalCount / (double) PAGE_SIZE));
-
         List<ProductCategory> categoryList = productDAO.findAllCategories();
         Map<Integer, List<ProductCategory>> childrenByParent = childrenByParent(categoryList);
+
+        // categoryFilter có thể là danh mục CHA/GIỮA cây (vd "Năng lượng tái
+        // tạo") -- sản phẩm CHỈ gắn ở danh mục LÁ (xem subtreeCategoryCounts
+        // bên dưới), nên lọc phải mở rộng xuống hết hậu duệ. Lọc đúng bằng
+        // category_id đã chọn thì luôn ra danh sách RỖNG dù panel bên cạnh
+        // hiện đúng tổng số > 0 -- hai chỗ nói hai chuyện khác nhau.
+        List<Integer> categoryIdsToQuery = categoryFilter != null
+                ? subtreeIds(categoryFilter, childrenByParent) : null;
+
+        List<Product> productList = productDAO.findAll(page, PAGE_SIZE, keyword, categoryIdsToQuery);
+        int totalCount = productDAO.countAll(keyword, categoryIdsToQuery);
+        int totalPages = Math.max(1, (int) Math.ceil(totalCount / (double) PAGE_SIZE));
 
         request.setAttribute("productList", productList);
         request.setAttribute("categoryList", categoryList);
@@ -200,6 +208,23 @@ public class ProductController extends HttpServlet {
             }
         }
         return total;
+    }
+
+    /**
+     * categoryId + mọi hậu duệ (đệ quy theo childrenByParent), dùng để lọc
+     * danh sách sản phẩm khi chọn 1 danh mục -- cùng logic cộng dồn với
+     * {@link #subtreeCount}, chỉ khác là trả về tập id thay vì tổng số.
+     */
+    private List<Integer> subtreeIds(int categoryId, Map<Integer, List<ProductCategory>> childrenByParent) {
+        List<Integer> result = new ArrayList<>();
+        result.add(categoryId);
+        List<ProductCategory> children = childrenByParent.get(categoryId);
+        if (children != null) {
+            for (ProductCategory child : children) {
+                result.addAll(subtreeIds(child.getCategoryId(), childrenByParent));
+            }
+        }
+        return result;
     }
 
     /**
