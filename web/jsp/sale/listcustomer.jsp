@@ -334,17 +334,44 @@
                 <i class="fa-solid fa-magnifying-glass"></i>
                 <input type="text" id="searchInput" name="keyword" value="${fn:escapeXml(keyword)}" placeholder="Tìm theo mã KH, tên, số điện thoại...">
             </div>
-            <%-- Phạm vi người phụ trách. Trước đây là một LINK "Xem toàn chi
-                 nhánh" ở dải phía trên, tách hẳn khỏi các ô lọc; giờ là một ô
-                 như mọi ô khác, giống Dashboard. Chỉ hiện khi việc thu hẹp có
-                 nghĩa -- người không có cấp dưới lẫn địa bàn thì hai lựa chọn
-                 cho ra cùng một danh sách. --%>
-            <c:if test="${viewNarrowed or viewFilter == 'all'}">
-                <select id="filterView" name="view">
-                    <option value="mine" ${viewFilter != 'all' ? 'selected' : ''}>Của tôi</option>
-                    <option value="all" ${viewFilter == 'all' ? 'selected' : ''}>Toàn chi nhánh</option>
-                </select>
-            </c:if>
+            <%-- Phạm vi + Người phụ trách chính GỘP thành 1 ô (2026-09-22):
+                 trước đây là 2 ô độc lập, nối bằng AND ở CustomerDAO -- đang
+                 xem "Của tôi" mà chọn một đồng nghiệp ở ô kia thì AND đó luôn
+                 ra danh sách RỖNG, không giải thích được vì sao, dễ hiểu nhầm
+                 là lỗi. Gộp lại thì chọn thẳng tên một người NGHĨA LÀ mở rộng
+                 khỏi phạm vi "của tôi" luôn, không cần bật "Toàn chi nhánh"
+                 riêng trước. Không phải lỗ hổng quyền mới: "Của tôi" chỉ là
+                 phạm vi MẶC ĐỊNH, không phải rào quyền (xem
+                 AccessControl.listScope) -- ai cũng đã bấm "Toàn chi nhánh" là
+                 xem được hết từ trước tới giờ, gộp thêm bước chọn tên chỉ là
+                 rút gọn thao tác.
+
+                 Backend giữ nguyên 2 tham số view/assigneeId như cũ (không
+                 đổi Controller/DAO) -- 2 input ẩn dưới đây mới là thứ thật sự
+                 gửi lên, select hiển thị chỉ đổi giá trị 2 ô ẩn đó qua JS rồi
+                 mới submit (xem script cuối trang). --%>
+            <input type="hidden" id="view" name="view" value="${viewFilter == 'all' ? 'all' : 'mine'}">
+            <input type="hidden" id="assigneeId" name="assigneeId" value="${assigneeFilter}">
+            <c:choose>
+                <c:when test="${not empty assigneeFilter}"><c:set var="scopeSelectValue" value="u${assigneeFilter}"/></c:when>
+                <c:when test="${viewFilter == 'all' or not viewNarrowed}"><c:set var="scopeSelectValue" value="all"/></c:when>
+                <c:otherwise><c:set var="scopeSelectValue" value="mine"/></c:otherwise>
+            </c:choose>
+            <select id="filterScope">
+                <%-- "Của tôi" chỉ có nghĩa khi việc thu hẹp có nghĩa -- người
+                     không có cấp dưới lẫn địa bàn thì "Của tôi"/"Toàn chi
+                     nhánh" cho ra cùng một danh sách. --%>
+                <c:if test="${viewNarrowed}">
+                    <option value="mine" ${scopeSelectValue == 'mine' ? 'selected' : ''}>Của tôi</option>
+                </c:if>
+                <option value="all" ${scopeSelectValue == 'all' ? 'selected' : ''}>Toàn chi nhánh</option>
+                <c:forEach var="staff" items="${userList}">
+                    <%-- Nhãn nói rõ "chính": chọn một người sẽ KHÔNG kéo theo
+                         khách họ chỉ đứng hỗ trợ, chỉ soi cột phụ trách chính. --%>
+                    <c:set var="staffValue" value="u${staff.userId}"/>
+                    <option value="${staffValue}" ${scopeSelectValue == staffValue ? 'selected' : ''}>${fn:escapeXml(staff.fullName)}</option>
+                </c:forEach>
+            </select>
             <select id="filterType" name="type">
                 <option value="">Tất cả loại khách hàng</option>
                 <%-- Danh sách khác nhau theo vai: khách mua phân theo họ là nhà
@@ -354,23 +381,6 @@
                     <option value="${fn:escapeXml(ct)}" ${typeFilter == ct ? 'selected' : ''}>${fn:escapeXml(ct)}</option>
                 </c:forEach>
             </select>
-            <%-- TẠM ẨN (2026-09-22): ô này liệt kê TẤT CẢ Sales, không lọc theo
-                 Phạm vi đang chọn -- khi Phạm vi = "Của tôi", chọn một đồng
-                 nghiệp ở đây AND với trần phạm vi (xem CustomerDAO.appendFilters)
-                 luôn cho ra danh sách rỗng, không có gì giải thích vì sao, dễ
-                 hiểu nhầm là lỗi. Trước mắt việc thu hẹp theo người/địa bàn đã
-                 có Phạm vi + bảng chọn tỉnh lo; ô "Người phụ trách chính" chỉ
-                 thật sự có nghĩa khi đang xem "Toàn chi nhánh", để sau khi có
-                 nhu cầu đó rõ ràng thì làm lại cho đúng (vd. chỉ hiện khi
-                 viewFilter == 'all', hoặc lọc userList theo phạm vi). --%>
-            <%--
-            <select id="filterAssignee" name="assigneeId">
-                <option value="">Tất cả người phụ trách chính</option>
-                <c:forEach var="staff" items="${userList}">
-                    <option value="${staff.userId}" ${assigneeFilter == staff.userId ? 'selected' : ''}>${fn:escapeXml(staff.fullName)}</option>
-                </c:forEach>
-            </select>
-            --%>
             <%-- Nhà cung cấp KHÔNG lọc theo tỉnh. Tỉnh ở đây là địa bàn BÁN
                  HÀNG -- nó quyết định ai cầm khách nào (user_provinces); bên bán
                  hàng cho mình thì không chia theo địa bàn. Controller cũng bỏ
@@ -452,11 +462,26 @@
                 </div>
             </c:if>
 
+            <%-- assigneeFilter (chọn một người ở ô filterScope gộp) LUÔN kèm
+                 view=all (xem script cuối trang), nên nếu không tách riêng
+                 nhánh này thì dải bên dưới sẽ nói "Đang xem toàn chi nhánh"
+                 trong khi ô lọc phía trên đang hiện đúng tên MỘT người -- hai
+                 chỗ nói hai chuyện khác nhau trên cùng một trang. --%>
+            <c:if test="${not empty assigneeFilter}">
+                <c:set var="assigneeName" value=""/>
+                <c:forEach var="staff" items="${userList}">
+                    <c:if test="${staff.userId == assigneeFilter}"><c:set var="assigneeName" value="${staff.fullName}"/></c:if>
+                </c:forEach>
+            </c:if>
+
             <%-- Dải phạm vi, nằm TRONG thẻ lọc ngay dưới ô Phạm vi đã đổi nó. --%>
             <c:if test="${viewNarrowed or viewFilter == 'all'}">
                 <div class="scope-note">
                     <i class="fa-solid fa-user-check"></i>
                     <c:choose>
+                        <c:when test="${not empty assigneeFilter}">
+                            Đang xem <strong>khách hàng do ${fn:escapeXml(assigneeName)} phụ trách chính</strong>.
+                        </c:when>
                         <c:when test="${viewNarrowed and viewProvinceCount > 0}">
                             Đang xem <strong>khách bạn phụ trách và khách trong ${viewProvinceCount} tỉnh địa bàn của bạn</strong>.
                         </c:when>
@@ -656,15 +681,37 @@
         });
 
         // Tự động submit lại form lọc khi đổi một ô select.
-        // Gắn theo DANH SÁCH id: ô Phạm vi chỉ có khi việc thu hẹp có nghĩa, mà
-        // gắn sự kiện lên null thì vỡ cả đoạn script phía sau, kể cả các bộ lọc
-        // khác. Ô TỈNH không có ở đây: nó là bảng tích, mã dùng chung ở
-        // appshell.js chờ nút "Áp dụng" mới gửi -- tích ba tỉnh mà gửi ngay là
-        // hai lượt tải trang thừa.
-        ['filterType', 'filterAssignee', 'filterView'].forEach(function (id) {
+        // Gắn theo DANH SÁCH id: ô Phạm vi/Người phụ trách gộp (filterScope)
+        // chỉ có khi có ai đó để chọn, mà gắn sự kiện lên null thì vỡ cả đoạn
+        // script phía sau, kể cả các bộ lọc khác. Ô TỈNH không có ở đây: nó là
+        // bảng tích, mã dùng chung ở appshell.js chờ nút "Áp dụng" mới gửi --
+        // tích ba tỉnh mà gửi ngay là hai lượt tải trang thừa.
+        ['filterType'].forEach(function (id) {
             var el = document.getElementById(id);
             if (el) { el.addEventListener('change', function () { document.getElementById('filterForm').submit(); }); }
         });
+
+        // filterScope gộp 2 tham số (view + assigneeId) vào 1 ô hiển thị --
+        // xem chú thích ngay tại chỗ khai báo select. Trước khi submit phải tự
+        // tách giá trị ra 2 input ẩn #view/#assigneeId, vì backend vẫn đọc
+        // đúng 2 tham số đó như cũ, không đổi gì ở Controller/DAO.
+        (function () {
+            var scopeSelect = document.getElementById('filterScope');
+            if (!scopeSelect) { return; }
+            scopeSelect.addEventListener('change', function () {
+                var val = scopeSelect.value;
+                var viewInput = document.getElementById('view');
+                var assigneeInput = document.getElementById('assigneeId');
+                if (val.indexOf('u') === 0) {
+                    viewInput.value = 'all';
+                    assigneeInput.value = val.substring(1);
+                } else {
+                    viewInput.value = val; // 'mine' hoặc 'all'
+                    assigneeInput.value = '';
+                }
+                document.getElementById('filterForm').submit();
+            });
+        })();
     </script>
 
     <script src="${pageContext.request.contextPath}/js/appshell.js"></script>
