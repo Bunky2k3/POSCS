@@ -203,7 +203,9 @@
         <div class="card-header">
             <div class="icon-circle"><i class="fa-solid fa-shield-halved"></i></div>
             <h3>Đặt lại mật khẩu mới</h3>
-            <p>Nhập mật khẩu mới cho tài khoản <strong>nguyenvana@company.com</strong></p>
+            <%-- Chỉ tới được đây sau khi đã nhập đúng OTP gửi tới email cá nhân của tài khoản (xem guard ở
+                 đầu trang), nên hiện tên đăng nhập không còn lộ gì cho kẻ dò username. --%>
+            <p>Nhập mật khẩu mới cho tài khoản <strong><c:out value="${sessionScope.resetUsername}"/></strong></p>
         </div>
 
         <div class="card-body-custom">

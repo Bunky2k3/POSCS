@@ -17,6 +17,7 @@ import pathlib
 import re
 import sys
 import time
+from urllib.parse import urljoin
 
 import requests
 from pypdf import PdfReader, PdfWriter
@@ -334,8 +335,13 @@ def test_otp_timing():
         r = s.post(R.BASE + "/VerifyOtpServlet", allow_redirects=False,
                    data={"otpCode": "000000", "csrfToken": t})
     loc = r.headers.get("Location") or ""
-    U.expect("TC_OTP_003", "too_many_attempts" in loc,
-             "Nhập sai 5 lần liên tiếp -> %s" % loc)
+    # Mở cả trang đích, không chỉ nhìn URL: từng có lúc URL đúng mà trang đó
+    # đá tiếp về bước 1, thông báo không bao giờ hiện, ca này vẫn "Đạt".
+    shown = U.page_text(U.html(s.get(urljoin(R.BASE + "/", loc)))) if loc else ""
+    msg = re.search(r"Bạn đã nhập sai mã OTP quá nhiều lần[^.]*\.", shown)
+    U.expect("TC_OTP_003", "too_many_attempts" in loc and msg is not None,
+             "Nhập sai 5 lần liên tiếp -> %s, trang báo: %s"
+             % (loc, msg.group(0) if msg else "(không thấy thông báo)"))
 
     if SKIP_SLOW:
         U.record("TC_OTP_004", "N/A", "Bỏ qua do chạy với --skip-slow",

@@ -80,6 +80,13 @@ public class AuthenticationController extends HttpServlet {
     // người đang bị khoá lại thử được ngay.
     private static final long LOGIN_ATTEMPT_RETENTION_MILLIS = LOGIN_LOCKOUT_MILLIS * 2;
 
+    // Username không tồn tại vẫn phải tốn đúng một lượt BCrypt như khi sai mật
+    // khẩu: bỏ bước này thì username giả trả lời trong ~3 ms, username thật
+    // ~70 ms -- thông báo lỗi giống hệt nhau cũng vô ích, bấm giờ là biết ai có
+    // tài khoản. Băm bằng gensalt() mặc định như mọi hash thật trong CSDL, nên
+    // cùng độ khó và cùng thời gian kiểm.
+    private static final String DUMMY_PASSWORD_HASH = BCrypt.hashpw("khong-phai-mat-khau-cua-ai", BCrypt.gensalt());
+
     private static final class LoginAttemptState {
         private int failedCount;
         private long lockedUntilMillis;
@@ -409,10 +416,11 @@ public class AuthenticationController extends HttpServlet {
         User user = employeeDAO.findByUsername(identifier);
         // Gộp chung 2 trường hợp "không tìm thấy user" và "sai mật khẩu" thành
         // cùng 1 thông báo lỗi ở phía client (login.jsp), để không lộ cho kẻ tấn
-        // công biết username nào tồn tại trong hệ thống (chỉ khác nhau ở bước
-        // kiểm tra: nếu user == null thì gọi BCrypt.checkpw sẽ NullPointerException,
-        // nên phải kiểm tra user == null trước bằng toán tử || ngắn mạch).
-        if (user == null || !BCrypt.checkpw(password, user.getPasswordHash())) {
+        // công biết username nào tồn tại trong hệ thống. Cùng lý do đó, username
+        // không tồn tại vẫn chạy BCrypt với DUMMY_PASSWORD_HASH -- xem ghi chú ở đó.
+        boolean passwordMatches = BCrypt.checkpw(password,
+                user != null ? user.getPasswordHash() : DUMMY_PASSWORD_HASH);
+        if (user == null || !passwordMatches) {
             recordFailedLoginAttempt(clientIp, now);
             redirectToLoginWithError(request, response, "invalid_credentials", identifier);
             return;
@@ -782,7 +790,11 @@ public class AuthenticationController extends HttpServlet {
             session.removeAttribute(SESSION_RESET_OTP);
             session.removeAttribute(SESSION_RESET_OTP_EXPIRY);
             session.removeAttribute(SESSION_RESET_OTP_ATTEMPTS);
-            response.sendRedirect(request.getContextPath() + "/verifyOtp.jsp?error=too_many_attempts");
+            // Về thẳng bước 1 -- nơi xin mã mới -- kèm lý do. Trỏ về
+            // verifyOtp.jsp như trước thì trang đó thấy session hết mã, đá
+            // tiếp về bước 1 với câu chung chung, và thông báo này không bao
+            // giờ hiện ra.
+            response.sendRedirect(request.getContextPath() + "/forgotPassword.jsp?error=too_many_attempts");
             return;
         }
 

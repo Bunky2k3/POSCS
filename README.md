@@ -222,6 +222,10 @@ the person with shell access to the server.
 - **Session fixation:** login regenerates the session instead of
   reusing whatever session ID the request arrived with (see
   `AuthenticationController#handleLogin`).
+- **Login does not reveal which usernames exist:** an unknown username
+  gets the same `invalid_credentials` error as a wrong password, and
+  still runs one BCrypt check against a dummy hash of the same cost, so
+  the response time matches too (`AuthenticationController#handleLogin`).
 - **OTP rate limiting:** the forgot-password flow locks out a code
   after 5 failed verification attempts, and enforces a 30-second
   server-side cooldown between resend requests

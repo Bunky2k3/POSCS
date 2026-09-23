@@ -213,6 +213,27 @@ public class AuthenticationControllerTest {
     }
 
     @Test
+    public void login_unknownUser_stillRunsOneBcryptCheckOfTheSameCost() throws Exception {
+        // Cùng mã lỗi mà username giả bỏ qua BCrypt thì trả lời nhanh hơn
+        // username thật cỡ 70 ms -- bấm giờ là dò được ai có tài khoản.
+        when(request.getServletPath()).thenReturn("/login");
+        when(request.getParameter("username")).thenReturn("ghost");
+        when(request.getParameter("password")).thenReturn("whatever");
+        when(employeeDAO.findByUsername("ghost")).thenReturn(null);
+        // "$2a$10$": thuật toán + độ khó mà gensalt() dùng cho mọi hash thật.
+        String realCostPrefix = BCrypt.gensalt().substring(0, 7);
+
+        // CALLS_REAL_METHODS: BCrypt vẫn chạy thật như mọi test khác trong
+        // lớp này, mockStatic chỉ để đếm lời gọi.
+        try (MockedStatic<BCrypt> bcrypt = mockStatic(BCrypt.class, CALLS_REAL_METHODS)) {
+            controller.doPost(request, response);
+
+            bcrypt.verify(() -> BCrypt.checkpw(eq("whatever"), startsWith(realCostPrefix)), times(1));
+        }
+        verify(response).sendRedirect(contains("error=invalid_credentials"));
+    }
+
+    @Test
     public void login_wrongPassword_redirectsWithInvalidCredentialsError() throws Exception {
         when(request.getServletPath()).thenReturn("/login");
         when(request.getParameter("username")).thenReturn("annd");
