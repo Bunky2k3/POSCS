@@ -27,6 +27,23 @@ public class EmailUtil {
     private static final String MAIL_PASSWORD = System.getenv().getOrDefault("MAIL_PASSWORD", "");
     private static final String MAIL_FROM = System.getenv().getOrDefault("MAIL_FROM", MAIL_USERNAME);
 
+    // Không đặt timeout thì Jakarta Mail chờ vô hạn khi SMTP treo. OTP gửi qua
+    // đúng 1 luồng nền (xem AuthenticationController) -- một lần treo là mọi
+    // mã sau đó kẹt lại trong hàng đợi cho tới khi khởi động lại ứng dụng.
+    private static final String SMTP_TIMEOUT_MILLIS = "10000";
+
+    private static Properties smtpProperties() {
+        Properties props = new Properties();
+        props.put("mail.smtp.auth", "true");
+        props.put("mail.smtp.starttls.enable", "true");
+        props.put("mail.smtp.host", SMTP_HOST);
+        props.put("mail.smtp.port", SMTP_PORT);
+        props.put("mail.smtp.connectiontimeout", SMTP_TIMEOUT_MILLIS);
+        props.put("mail.smtp.timeout", SMTP_TIMEOUT_MILLIS);
+        props.put("mail.smtp.writetimeout", SMTP_TIMEOUT_MILLIS);
+        return props;
+    }
+
     /**
      * Gửi mã OTP tới {@code toEmail}. Trả về true nếu gửi thành công (hoặc
      * đã in ra console ở chế độ dev -- xem ghi chú bên dưới).
@@ -45,13 +62,7 @@ public class EmailUtil {
             return true;
         }
 
-        Properties props = new Properties();
-        props.put("mail.smtp.auth", "true");
-        props.put("mail.smtp.starttls.enable", "true");
-        props.put("mail.smtp.host", SMTP_HOST);
-        props.put("mail.smtp.port", SMTP_PORT);
-
-        Session session = Session.getInstance(props, new Authenticator() {
+        Session session = Session.getInstance(smtpProperties(), new Authenticator() {
             @Override
             protected PasswordAuthentication getPasswordAuthentication() {
                 return new PasswordAuthentication(MAIL_USERNAME, MAIL_PASSWORD);
@@ -91,13 +102,7 @@ public class EmailUtil {
             return true;
         }
 
-        Properties props = new Properties();
-        props.put("mail.smtp.auth", "true");
-        props.put("mail.smtp.starttls.enable", "true");
-        props.put("mail.smtp.host", SMTP_HOST);
-        props.put("mail.smtp.port", SMTP_PORT);
-
-        Session session = Session.getInstance(props, new Authenticator() {
+        Session session = Session.getInstance(smtpProperties(), new Authenticator() {
             @Override
             protected PasswordAuthentication getPasswordAuthentication() {
                 return new PasswordAuthentication(MAIL_USERNAME, MAIL_PASSWORD);

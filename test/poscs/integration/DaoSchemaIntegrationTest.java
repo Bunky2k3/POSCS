@@ -10,6 +10,7 @@ import poscs.dao.EmployeeDAO;
 import poscs.dao.NotificationDAO;
 import poscs.dao.ProductDAO;
 import poscs.dao.TechnicalSupportTicketDAO;
+import poscs.model.User;
 
 import static org.junit.Assert.*;
 
@@ -131,8 +132,12 @@ public class DaoSchemaIntegrationTest {
     public void employeeDao_readQueriesRunAndReturnSeededRow() {
         IntegrationDb.assumeAvailable();
 
-        assertNotNull("Truy vấn đăng nhập phải đọc được user vừa seed",
-                employeeDAO.findByUsername(Fixtures.USERNAME));
+        User byUsername = employeeDAO.findByUsername(Fixtures.USERNAME);
+        assertNotNull("Truy vấn đăng nhập phải đọc được user vừa seed", byUsername);
+        // Quên mật khẩu gửi OTP tới địa chỉ này. Mock DAO ở PasswordResetFlowTest
+        // không bắt được việc SELECT thiếu cột -- chỉ test chạy CSDL thật mới bắt được.
+        assertEquals("findByUsername phải nạp personal_email",
+                Fixtures.PERSONAL_EMAIL, byUsername.getPersonalEmail());
         assertNotNull(employeeDAO.findById(Fixtures.USER_ID));
         assertNotNull(employeeDAO.findProfileById(Fixtures.USER_ID));
         assertEquals(1, employeeDAO.findAll(1, 50, null, null, null).size());
