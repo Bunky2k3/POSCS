@@ -31,6 +31,7 @@ public final class Fixtures {
     public static final String USERNAME = "itadmin";
     public static final String PHONE = "0900000001";
     public static final String CITIZEN_ID = "000000000001";
+    public static final String PERSONAL_EMAIL = "it.admin@gmail.com";
 
     /** BCrypt của "Admin@123" -- cố định để test đăng nhập khỏi phải hash lại mỗi lần. */
     public static final String PASSWORD_PLAIN = "Admin@123";
@@ -58,7 +59,7 @@ public final class Fixtures {
             + "address_id, department_id, hire_date) VALUES ("
             + USER_ID + ", '" + USERNAME + "', '" + PASSWORD_HASH + "', " + ROLE_ID + ", "
             + "N'Nguyễn', NULL, N'Quản Trị', N'Nam', '1990-01-01', '" + CITIZEN_ID + "', '" + PHONE + "', "
-            + "'it.admin@gmail.com', " + ADDRESS_ID + ", " + DEPARTMENT_ID + ", '2024-01-01')");
+            + "'" + PERSONAL_EMAIL + "', " + ADDRESS_ID + ", " + DEPARTMENT_ID + ", '2024-01-01')");
     }
 
     public static void seedEnterprise() throws SQLException {

@@ -43,9 +43,10 @@ public class EmployeeDAO {
         // ngay từ lúc đăng nhập (không phải chỉ lúc xem hồ sơ) để
         // AuthenticationFilter biết có phải ép qua /changePassword,
         // /updateProfile hay không -- xem User.isProfileIncomplete, V35.
+        // personal_email: luồng quên mật khẩu gửi OTP tới đúng địa chỉ này.
         String sql = "SELECT u.user_id, u.username, u.password_hash, u.must_change_password, u.role_id, " +
                      "u.last_name, u.middle_name, u.first_name, u.gender, u.date_of_birth, u.citizen_id, u.phone, " +
-                     "u.department_id, u.manager_id, u.avatar_url, u.is_deleted, r.role_name " +
+                     "u.personal_email, u.department_id, u.manager_id, u.avatar_url, u.is_deleted, r.role_name " +
                      "FROM users u JOIN roles r ON u.role_id = r.role_id " +
                      "WHERE u.username = ?";
         try (Connection conn = DBContext.getConnection();
@@ -67,6 +68,10 @@ public class EmployeeDAO {
                     u.setDateOfBirth(rs.getDate("date_of_birth"));
                     u.setCitizenId(rs.getString("citizen_id"));
                     u.setPhone(rs.getString("phone"));
+                    // Quên map cột này thì getPersonalEmail() luôn null, và
+                    // quên mật khẩu im lặng không gửi OTP cho ai cả -- đúng
+                    // như đã xảy ra từ V36 tới khi có test tích hợp chặn lại.
+                    u.setPersonalEmail(rs.getString("personal_email"));
                     u.setDepartmentId(rs.getInt("department_id"));
                     // Vị trí trong cây tổ chức PHẢI đi cùng User vào session:
                     // AccessControl đọc thẳng từ đó để biết người này là cấp
