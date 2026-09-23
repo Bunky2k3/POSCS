@@ -202,7 +202,10 @@
         <div class="card-header">
             <div class="icon-circle"><i class="fa-solid fa-shield-halved"></i></div>
             <h3>Xác thực OTP</h3>
-            <p>Mã OTP gồm 6 chữ số đã được gửi đến<br><strong>ngu***.a@company.com</strong></p>
+            <%-- Cố tình KHÔNG hiện địa chỉ email (kể cả dạng che ***): handleForgotPassword
+                 điều hướng sang đây y hệt nhau dù username có tồn tại hay không (chống dò
+                 username), nên trang này cũng không được để lộ là có OTP nào được gửi thật. --%>
+            <p>Nếu tên đăng nhập hợp lệ, mã OTP gồm 6 chữ số đã được gửi tới <strong>email cá nhân</strong> trong hồ sơ tài khoản.</p>
         </div>
 
         <div class="card-body-custom">
