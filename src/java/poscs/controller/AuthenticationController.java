@@ -9,6 +9,9 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.MultipartConfig;
 import jakarta.servlet.annotation.WebServlet;
@@ -615,8 +618,31 @@ public class AuthenticationController extends HttpServlet {
     private static final String SESSION_RESET_OTP_ATTEMPTS = "resetOtpAttempts";
     private static final String SESSION_RESET_OTP_LAST_SENT = "resetOtpLastSent";
     private static final String SESSION_OTP_VERIFIED = "otpVerified";
+    // TRUE khi mã trong session là mã "mồi" -- xem issueOtp.
+    private static final String SESSION_RESET_DECOY = "resetOtpDecoy";
 
     private final SecureRandom random = new SecureRandom();
+
+    // Gửi mail OTP ở luồng nền thay vì ngay trong request: Transport.send tới
+    // Gmail mất cỡ vài giây, còn mã "mồi" (xem issueOtp) không gửi gì nên trả
+    // về gần như tức thì. Gửi đồng bộ thì chỉ cần bấm giờ phản hồi là phân
+    // biệt được username thật/giả, mọi công sức chống dò bên dưới thành thừa.
+    // Một luồng là đủ: hạn mức theo IP đã chặn số mail mỗi nguồn gửi ra, và
+    // EmailUtil đặt timeout nên một lần SMTP treo không kẹt hàng đợi mãi.
+    private final ExecutorService otpMailPool = Executors.newSingleThreadExecutor(r -> {
+        Thread t = new Thread(r, "otp-mail");
+        t.setDaemon(true);
+        return t;
+    });
+    // Tách khỏi otpMailPool để test thay được bằng Runnable::run --
+    // mockStatic(EmailUtil) chỉ có hiệu lực trên đúng luồng đã tạo ra nó.
+    private Executor otpMailExecutor = otpMailPool;
+
+    @Override
+    public void destroy() {
+        // shutdown chứ không shutdownNow: mail OTP đang xếp hàng vẫn gửi nốt.
+        otpMailPool.shutdown();
+    }
 
     // ------------------------------------------------------------------
     // Bước 1: Quên mật khẩu -- nhập username, sinh + gửi OTP tới email cá nhân
@@ -637,11 +663,13 @@ public class AuthenticationController extends HttpServlet {
         // Cố tình KHÔNG báo lỗi riêng khi username không tồn tại trong hệ
         // thống: nếu 2 trường hợp "tồn tại" và "không tồn tại" trả về 2 kết
         // quả khác nhau, kẻ tấn công có thể dò ra danh sách username hợp lệ
-        // trong hệ thống (user enumeration). Nên luôn điều hướng sang
-        // verifyOtp.jsp giống nhau; nếu username không tồn tại (hoặc chưa có
-        // personal_email) thì đơn giản là không có OTP nào được sinh/lưu/gửi,
-        // nên bước xác thực OTP ở sau chắc chắn sẽ thất bại (không có gì để
-        // so khớp).
+        // trong hệ thống (user enumeration). Chỉ redirect giống nhau là CHƯA
+        // đủ: nếu username không tồn tại mà session không có mã nào thì
+        // verifyOtp.jsp đá ngược về bước 1, còn gửi lại mã thì báo hết phiên
+        // -- chính hai chỗ đó từng lộ ra điều mà redirect này cố giấu. Nên
+        // username không tồn tại (hoặc chưa có personal_email) vẫn nhận một
+        // mã "mồi" y hệt mã thật, chỉ là không gửi đi đâu và không bao giờ
+        // xác thực được -- xem issueOtp.
         // Kiểm hạn mức TRƯỚC khi tra CSDL: quá hạn thì không gửi mail, cũng
         // không chạm DB. Vẫn điều hướng sang verifyOtp.jsp như mọi trường hợp
         // khác để không tiết lộ username nào có tài khoản (xem ghi chú trên).
@@ -651,9 +679,7 @@ public class AuthenticationController extends HttpServlet {
         }
 
         User user = employeeDAO.findByUsername(username);
-        if (user != null && user.getPersonalEmail() != null) {
-            issueOtp(request.getSession(true), username, user.getPersonalEmail());
-        }
+        issueOtp(request.getSession(true), username, user != null ? user.getPersonalEmail() : null);
 
         response.sendRedirect(request.getContextPath() + "/verifyOtp.jsp");
     }
@@ -717,10 +743,9 @@ public class AuthenticationController extends HttpServlet {
         // personal_email không lưu trong session (tránh giữ PII thừa ở đó) --
         // tra lại từ username mỗi lần gửi lại, luôn dùng địa chỉ MỚI NHẤT
         // trong hồ sơ (phòng trường hợp nhân viên vừa tự sửa email cá nhân).
+        // Mã mồi thì gửi lại cũng chỉ cấp mã mồi mới -- phản hồi y hệt mã thật.
         User user = employeeDAO.findByUsername(username);
-        if (user != null && user.getPersonalEmail() != null) {
-            issueOtp(session, username, user.getPersonalEmail());
-        }
+        issueOtp(session, username, user != null ? user.getPersonalEmail() : null);
         response.sendRedirect(request.getContextPath() + "/verifyOtp.jsp?resent=1");
     }
 
@@ -761,8 +786,12 @@ public class AuthenticationController extends HttpServlet {
             return;
         }
 
+        // Mã mồi (xem issueOtp) không bao giờ đúng, kể cả khi đoán trúng cả 6
+        // số: nếu đoán trúng là qua thì cứ thử đủ nhiều lượt sẽ đổi được mật
+        // khẩu của tài khoản có thật nhưng chưa khai personal_email.
+        boolean decoy = Boolean.TRUE.equals(session.getAttribute(SESSION_RESET_DECOY));
         String inputOtp = trimToNull(request.getParameter("otpCode"));
-        if (inputOtp == null || !inputOtp.equals(expectedOtp)) {
+        if (decoy || inputOtp == null || !inputOtp.equals(expectedOtp)) {
             session.setAttribute(SESSION_RESET_OTP_ATTEMPTS, attempts + 1);
             response.sendRedirect(request.getContextPath() + "/verifyOtp.jsp?error=invalid_otp");
             return;
@@ -815,6 +844,7 @@ public class AuthenticationController extends HttpServlet {
         session.removeAttribute(SESSION_RESET_OTP_ATTEMPTS);
         session.removeAttribute(SESSION_RESET_OTP_LAST_SENT);
         session.removeAttribute(SESSION_OTP_VERIFIED);
+        session.removeAttribute(SESSION_RESET_DECOY);
 
         if (!ok) {
             LOG.warn("Dat lai mat khau that bai o buoc ghi CSDL (username={})", username);
@@ -834,6 +864,12 @@ public class AuthenticationController extends HttpServlet {
      * ngay -- tại một thời điểm chỉ có đúng 1 mã dùng được, nên bấm "gửi lại"
      * nhiều lần không để lại một loạt mã còn sống rải rác làm rộng bề mặt
      * đoán mò.
+     *
+     * <p>{@code personalEmail} rỗng (username không tồn tại, hoặc tài khoản
+     * chưa khai email cá nhân) thì sinh mã "mồi": session giống hệt khi có mã
+     * thật -- verifyOtp.jsp hiện ra, gửi lại, khoảng chờ, đếm số lần sai đều
+     * chạy như thường -- chỉ khác là không gửi đi đâu và handleVerifyOtp luôn
+     * từ chối. Nhờ vậy không bước nào của luồng cho biết username có tồn tại.
      */
     private void issueOtp(HttpSession session, String username, String personalEmail) {
         String otp = generateOtp();
@@ -844,7 +880,12 @@ public class AuthenticationController extends HttpServlet {
         session.removeAttribute(SESSION_RESET_OTP_ATTEMPTS); // reset bộ đếm số lần nhập sai cho mã OTP mới này
         session.removeAttribute(SESSION_OTP_VERIFIED); // reset nếu trước đó đã từng verify 1 lần khác
 
-        EmailUtil.sendOtpEmail(personalEmail, otp);
+        if (personalEmail == null || personalEmail.isBlank()) {
+            session.setAttribute(SESSION_RESET_DECOY, Boolean.TRUE);
+            return;
+        }
+        session.removeAttribute(SESSION_RESET_DECOY);
+        otpMailExecutor.execute(() -> EmailUtil.sendOtpEmail(personalEmail, otp));
     }
 
     /** Sinh mã OTP ngẫu nhiên gồm OTP_LENGTH chữ số (có thể có số 0 ở đầu, vd "004821"). */

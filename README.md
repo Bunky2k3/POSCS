@@ -226,4 +226,11 @@ the person with shell access to the server.
   after 5 failed verification attempts, and enforces a 30-second
   server-side cooldown between resend requests
   (`AuthenticationController`).
+- **Forgot password does not reveal which usernames exist:** an unknown
+  username (or an account with no personal email) still gets a decoy
+  code in the session, so the OTP page, resend, cooldown and
+  wrong-code counter all respond exactly as for a real account. The
+  decoy is never mailed and can never be verified, and the real OTP
+  email is sent on a background thread so response time does not give
+  it away either (`AuthenticationController#issueOtp`).
 - **Role-based access control:** see [PERMISSIONS.md](PERMISSIONS.md).

@@ -131,6 +131,11 @@ If either `MAIL_USERNAME` or `MAIL_PASSWORD` is unset, `EmailUtil`
 prints the email content to the server console instead of sending it
 — safe for local dev, but make sure both are set before going live.
 
+OTP emails are sent on a background thread, so the forgot-password
+page responds before SMTP finishes: a failed send shows up only in the
+log (`Loi gui email otp`), not on screen. SMTP connect/read/write give
+up after 10 seconds.
+
 Gmail SMTP has a practical sending limit (~500 messages/day per
 account) and no delivery/bounce dashboard. For higher volume or
 better deliverability tracking in production, consider switching to
