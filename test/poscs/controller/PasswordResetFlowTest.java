@@ -207,7 +207,9 @@ public class PasswordResetFlowTest {
 
         controller.doPost(request, response);
 
-        verify(response).sendRedirect(CONTEXT_PATH + "/verifyOtp.jsp?error=too_many_attempts");
+        // Về bước 1, KHÔNG về verifyOtp.jsp: mã vừa bị xoá nên trang đó sẽ đá
+        // tiếp về bước 1 với câu chung chung, nuốt mất thông báo này.
+        verify(response).sendRedirect(CONTEXT_PATH + "/forgotPassword.jsp?error=too_many_attempts");
         org.junit.Assert.assertNull("OTP phải bị xoá sau khi vượt quá số lần thử", attrs.get("resetOtp"));
     }
 

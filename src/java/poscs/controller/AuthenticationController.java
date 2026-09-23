@@ -765,7 +765,11 @@ public class AuthenticationController extends HttpServlet {
             session.removeAttribute(SESSION_RESET_OTP);
             session.removeAttribute(SESSION_RESET_OTP_EXPIRY);
             session.removeAttribute(SESSION_RESET_OTP_ATTEMPTS);
-            response.sendRedirect(request.getContextPath() + "/verifyOtp.jsp?error=too_many_attempts");
+            // Về thẳng bước 1 -- nơi xin mã mới -- kèm lý do. Trỏ về
+            // verifyOtp.jsp như trước thì trang đó thấy session hết mã, đá
+            // tiếp về bước 1 với câu chung chung, và thông báo này không bao
+            // giờ hiện ra.
+            response.sendRedirect(request.getContextPath() + "/forgotPassword.jsp?error=too_many_attempts");
             return;
         }
 

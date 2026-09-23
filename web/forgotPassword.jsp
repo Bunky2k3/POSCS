@@ -243,6 +243,7 @@
                                 <c:when test="${param.error == 'unauthorized'}">Vui lòng thực hiện lại từ bước nhập tên đăng nhập.</c:when>
                                 <c:when test="${param.error == 'update_failed'}">Có lỗi xảy ra, vui lòng thử lại.</c:when>
                                 <c:when test="${param.error == 'session_expired'}">Phiên làm việc đã hết hạn, vui lòng thử lại.</c:when>
+                                <c:when test="${param.error == 'too_many_attempts'}">Bạn đã nhập sai mã OTP quá nhiều lần. Vui lòng nhập lại tên đăng nhập để nhận mã mới.</c:when>
                                 <c:otherwise>Đã có lỗi xảy ra. Vui lòng thử lại.</c:otherwise>
                             </c:choose>
                         </div>
