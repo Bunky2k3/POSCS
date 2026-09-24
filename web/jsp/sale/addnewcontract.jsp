@@ -7,8 +7,8 @@
       - userList      : List<poscs.model.User>       (nhân viên vai Sales, để đổ dropdown "Người phụ trách")
 
     Form này chỉ tạo bản ghi trong bảng contracts. Hạng mục sản phẩm/dịch vụ
-    (contractproducts) được gắn ở trang chi tiết hợp đồng sau khi tạo xong,
-    qua action addProduct -- không nhập tại đây.
+    (contractproducts) được gắn ở trang quản lý hợp đồng (updatecontract.jsp,
+    tab Hàng hoá) sau khi tạo xong, qua action addProduct -- không nhập tại đây.
 --%>
 <!DOCTYPE html>
 <html lang="vi">
@@ -319,15 +319,18 @@
                          Treo giấy tờ ở trang quản lý, tab "Tài liệu". --%>
                 </div>
 
+                <%-- Trang chi tiết mở ra sau khi lưu CHỈ ĐỌC -- hàng hoá thêm ở trang
+                     quản lý (nút "Quản lý hợp đồng" trên chính trang đó). --%>
                 <div class="section-header"><h5>Hạng mục sản phẩm / dịch vụ</h5></div>
                 <p style="font-size:0.86rem; color:#6b7280; margin:0 0 4px;">
-                    Sau khi tạo xong hợp đồng, mở trang chi tiết để thêm sản phẩm/dịch vụ vào hợp đồng.
+                    Lưu xong, bấm <strong>Quản lý hợp đồng</strong> ở trang vừa mở rồi thêm sản phẩm/dịch vụ
+                    ở tab <strong>Hàng hoá</strong>.
                 </p>
 
 
                 <div class="action-bar">
                     <a href="${pageContext.request.contextPath}/contract?kind=${activeContractKind}" class="btn-cancel">Hủy</a>
-                    <button type="submit" class="btn-primary"><i class="fa-solid fa-check me-1"></i> Tạo hợp đồng</button>
+                    <button type="submit" class="btn-primary"><i class="fa-solid fa-check me-1"></i> ${empty parentContract ? 'Tạo hợp đồng' : 'Lập phụ lục'}</button>
                 </div>
             </form>
         </div>

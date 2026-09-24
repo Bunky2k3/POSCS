@@ -8,8 +8,8 @@
       - customerList : List<poscs.model.Enterprise>
       - userList      : List<poscs.model.User>
 
-    Form này chỉ sửa bản ghi trong bảng contracts. Hạng mục sản phẩm/dịch vụ
-    được thêm/gỡ ở trang chi tiết hợp đồng, không sửa tại đây.
+    Form sửa ở đầu trang chỉ sửa bản ghi trong bảng contracts. Hạng mục sản
+    phẩm/dịch vụ thêm/gỡ ở tab Hàng hoá bên dưới (form riêng, đứng ngoài form sửa).
 --%>
 <!DOCTYPE html>
 <html lang="vi">
@@ -188,7 +188,8 @@
                     <i class="fa-solid fa-lock" style="margin-top:3px;"></i>
                     <span><strong>Hợp đồng ở trạng thái “${fn:escapeXml(contract.progressStatus)}”.</strong>
                         Nội dung không sửa được nữa, kể cả bởi quản trị viên — phát sinh sau thời điểm
-                        này phải lập hợp đồng mới. Bên dưới chỉ còn phần ghi nhận tiền về.</span>
+                        này phải lập hợp đồng mới. Bên dưới vẫn làm được: ghi nhận tiền về, thêm/huỷ tài liệu,
+                        nối hợp đồng bán – mua, và đóng các chặng bàn giao còn đang treo.</span>
                 </div>
             </div>
         </c:if>
@@ -245,7 +246,7 @@
             <form id="createContractForm" action="${pageContext.request.contextPath}/contract" method="POST" onsubmit="return validateForm();">
                 <input type="hidden" name="csrfToken" value="${csrfToken}">
                 <%-- Một form, hai đích. Bình thường gửi "update" (sau khi ký thì
-                     server chỉ nhận người phụ trách + link). Admin bật chế độ
+                     server chỉ nhận người phụ trách). Admin bật chế độ
                      chữa sai sót thì script đổi ô này thành "correct" -- đường
                      duy nhất chạm được vào điều khoản của hợp đồng đã ký, và nó
                      bắt buộc kèm lý do. --%>
@@ -260,8 +261,9 @@
                             <i class="fa-solid fa-file-signature" style="margin-top:3px;"></i>
                             <div>
                                 <strong>Hợp đồng đã ký — điều khoản đã khoá.</strong>
-                                Chỉ còn <strong>người phụ trách</strong> và <strong>link bản PDF</strong> sửa được;
-                                hai thứ đó là dữ liệu quản trị nội bộ, không nằm trên tờ giấy hai bên ký.
+                                Chỉ còn <strong>người phụ trách</strong> sửa được — đó là phân công nội bộ,
+                                không nằm trên tờ giấy hai bên ký. Bản PDF đã ký và các biên bản thì treo ở
+                                tab <strong>Tài liệu</strong> bên dưới.
                                 <div style="margin-top:6px;">
                                     Cần thay đổi điều khoản thì <strong>lập phụ lục</strong> — một văn bản riêng, có chữ ký.
                                     <c:if test="${canCorrect}">
@@ -456,9 +458,11 @@
                 </div>
 
                 <div class="section-header"><h5>Hạng mục sản phẩm / dịch vụ</h5></div>
+                <%-- Không còn link #hang-hoa: khối đó giờ nằm trong một tab đang ẩn,
+                     nhảy tới neo của nó không hiện ra gì. Gọi tên tab thay vì chỉ đường. --%>
                 <p style="font-size:0.86rem; color:#6b7280; margin:0 0 4px;">
-                    Hạng mục không sửa trong form này — nó có khối riêng
-                    <a href="#hang-hoa">ngay bên dưới</a>, vì thêm/gỡ là thao tác ghi ngay chứ không chờ bấm Lưu.
+                    Hạng mục không sửa trong form này — thêm/gỡ ở tab <strong>Hàng hoá</strong> bên dưới;
+                    thao tác ở đó ghi ngay, không chờ bấm Lưu.
                 </p>
 
 
