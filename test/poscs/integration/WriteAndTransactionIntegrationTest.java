@@ -165,6 +165,32 @@ public class WriteAndTransactionIntegrationTest {
         assertEquals(6, IntegrationDb.count("enterprises", "is_deleted = 0"));
     }
 
+    @Test
+    public void generatedCode_ignoresNewestRowWhenItHasAnotherPrefix() throws Exception {
+        IntegrationDb.assumeAvailable();
+        // Dựng lại đúng dữ liệu đã làm hỏng poscs_db: V28 gieo nhà cung cấp mã
+        // NCC- SAU các khách KH-, nên dòng có id lớn nhất không mang mã KH-.
+        // Lấy mã của dòng đó rồi bỏ hết chữ thì NCC-004 thành KH-0005 -- mã đã
+        // có -- và vòng thử lại trong insert() đọc lại đúng dòng đó, nên cả năm
+        // lần đều trùng: không ai tạo được khách hàng nữa.
+        seedEnterpriseWithCode(2, "KH-0005");
+        seedEnterpriseWithCode(3, "NCC-004");
+
+        assertEquals("KH-0006", customerDAO.generateNextEnterpriseCode());
+    }
+
+    @Test
+    public void generatedCode_comparesCodesAsNumbersNotText() throws Exception {
+        IntegrationDb.assumeAvailable();
+        // So như chuỗi thì "KH-9999" > "KH-10000", nên MAX(enterprise_code) sẽ
+        // trả về mã đã có ngay khi số khách vượt 4 chữ số. Chèn KH-10000 trước
+        // để cách lấy theo id lớn nhất cũng không qua được.
+        seedEnterpriseWithCode(2, "KH-10000");
+        seedEnterpriseWithCode(3, "KH-9999");
+
+        assertEquals("KH-10001", customerDAO.generateNextEnterpriseCode());
+    }
+
     // ------------------------------------------------------------------
     // Thông báo: idempotent theo (user, ref_type, ref_id)
     // ------------------------------------------------------------------
@@ -296,5 +322,18 @@ public class WriteAndTransactionIntegrationTest {
         e.setAccountOwnerId(Fixtures.USER_ID);
         e.setStatus("Active");
         return e;
+    }
+
+    /**
+     * Chèn thẳng bằng SQL một khách hàng với id và mã cho trước -- test sinh mã
+     * cần tự đặt thứ tự id, vì đó chính là thứ cách sinh mã cũ dựa vào.
+     */
+    private void seedEnterpriseWithCode(int id, String code) throws Exception {
+        IntegrationDb.exec(
+            "INSERT INTO enterprises (enterprise_id, enterprise_code, enterprise_name, customer_type, "
+            + "customer_group, tax_code, email, phone, account_owner_id) VALUES ("
+            + id + ", '" + code + "', N'Công ty " + code + "', N'Đại lý phân phối', N'Thường', "
+            + "'01000080" + id + "', 'dn" + id + "@example.com', '09000080" + id + "', "
+            + Fixtures.USER_ID + ")");
     }
 }

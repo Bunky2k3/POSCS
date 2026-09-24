@@ -328,9 +328,20 @@ public class CustomerDAO {
         return result;
     }
 
-    /** Sinh mã khách hàng tiếp theo dạng KH-0001, KH-0002, ... */
+    /**
+     * Sinh mã khách hàng tiếp theo dạng KH-0001, KH-0002, ...
+     *
+     * Chỉ xét mã đúng dạng KH-số và so theo GIÁ TRỊ SỐ. Bảng enterprises còn
+     * chứa mã khác tiền tố (nhà cung cấp NCC-001.. do V28 gieo), nên:
+     * - lấy mã của dòng id lớn nhất (cách cũ) vớ phải NCC-004, bỏ chữ còn 4,
+     *   ra KH-0005 -- mã đã có -- và từ đó không tạo được khách hàng nào nữa;
+     * - MAX(enterprise_code) so như chuỗi: "NCC-..." > "KH-...", và cả
+     *   "KH-9999" > "KH-10000".
+     */
     public String generateNextEnterpriseCode() {
-        String sql = "SELECT enterprise_code FROM enterprises ORDER BY enterprise_id DESC LIMIT 1";
+        String sql = "SELECT enterprise_code FROM enterprises " +
+                "WHERE enterprise_code REGEXP '^KH-[0-9]+$' " +
+                "ORDER BY CAST(SUBSTRING(enterprise_code, 4) AS UNSIGNED) DESC LIMIT 1";
         try (Connection conn = DBContext.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql);
              ResultSet rs = ps.executeQuery()) {
