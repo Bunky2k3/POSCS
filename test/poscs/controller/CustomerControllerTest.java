@@ -543,24 +543,104 @@ public class CustomerControllerTest {
     // Vai khách hàng: khách mua / nhà cung cấp (V20)
     // ------------------------------------------------------------------
     //
+    // Từ khi tách hai trang tạo (2026-09-24), vai lúc TẠO suy từ trang (kind)
+    // chứ không từ ô tick -- mỗi trang đúng một vai, nên "không vai nào" và
+    // "vai lạ" không lọt được qua đường tạo nữa. Ô tick hai vai chỉ còn ở
+    // trang Sửa, nên các test luật "ít nhất một vai" và danh sách trắng chuyển
+    // sang đó.
+    //
     // Vai nằm ở bảng riêng (enterprise_roles) nên CSDL không ép được luật
     // "ít nhất một vai" -- ràng buộc nói về sự tồn tại của dòng ở bảng khác,
     // CHECK không với tới. Những test này canh đúng chỗ chặn duy nhất.
 
-    /**
-     * Không tick vai nào thì khách lưu được nhưng biến khỏi CẢ HAI danh sách
-     * -- không ai biết cho tới khi có người đi tìm không thấy.
-     */
+    /** Thiếu kind là trang khách hàng: vai Khách mua, mã dãy KH. */
     @Test
-    public void create_khongCoVaiNao_khongLuuVaBaoLoi() throws Exception {
+    public void create_trangKhachHang_ghiVaiKhachMua() throws Exception {
         when(request.getParameter("action")).thenReturn("create");
         stubValidCreateFields();
         when(request.getParameterValues("roles")).thenReturn(null);
+        when(customerDAO.generateNextEnterpriseCode()).thenReturn("KH-0001");
+        when(customerDAO.insert(any(Enterprise.class))).thenReturn(7);
+
+        controller.doPost(request, response);
+
+        verify(customerDAO).replaceRolesOf(7, List.of("Khách mua"));
+        verify(customerDAO, never()).generateNextSupplierCode();
+    }
+
+    /**
+     * Ô tick vai gửi kèm -- request nặn tay, hoặc form cũ còn mở sẵn trong
+     * trình duyệt -- bị bỏ qua: vai theo trang, kể cả vai lạ không lọt vào.
+     */
+    @Test
+    public void create_oTickVaiGuiLen_biBoQua() throws Exception {
+        when(request.getParameter("action")).thenReturn("create");
+        stubValidCreateFields();
+        when(request.getParameterValues("roles"))
+                .thenReturn(new String[]{"Khách mua", "Nhà cung cấp", "Khách VIP"});
+        when(customerDAO.generateNextEnterpriseCode()).thenReturn("KH-0001");
+        when(customerDAO.insert(any(Enterprise.class))).thenReturn(7);
+
+        controller.doPost(request, response);
+
+        verify(customerDAO).replaceRolesOf(7, List.of("Khách mua"));
+    }
+
+    /** Trang nhà cung cấp: vai Nhà cung cấp và mã dãy NCC, không phải KH. */
+    @Test
+    public void create_trangNhaCungCap_ghiVaiNhaCungCapVaMaNcc() throws Exception {
+        when(request.getParameter("action")).thenReturn("create");
+        when(request.getParameter("kind")).thenReturn("supplier");
+        stubValidCreateFields();
+        when(customerDAO.generateNextSupplierCode()).thenReturn("NCC-005");
+        when(customerDAO.insert(any(Enterprise.class))).thenReturn(7);
+
+        controller.doPost(request, response);
+
+        ArgumentCaptor<Enterprise> saved = ArgumentCaptor.forClass(Enterprise.class);
+        verify(customerDAO).insert(saved.capture());
+        assertEquals("NCC-005", saved.getValue().getEnterpriseCode());
+        verify(customerDAO, never()).generateNextEnterpriseCode();
+        verify(customerDAO).replaceRolesOf(7, List.of("Nhà cung cấp"));
+    }
+
+    /** Lỗi ở trang nhà cung cấp phải quay về ĐÚNG trang đó, không rơi sang trang khách hàng. */
+    @Test
+    public void create_trangNhaCungCapLoi_quayVeTrangNhaCungCap() throws Exception {
+        when(request.getParameter("action")).thenReturn("create");
+        when(request.getParameter("kind")).thenReturn("supplier");
+        stubValidCreateFields();
+        when(request.getParameter("phone")).thenReturn("not-a-phone");
 
         controller.doPost(request, response);
 
         verify(customerDAO, never()).insert(any());
-        verify(response).sendRedirect(CONTEXT_PATH + "/customer?action=new&error=invalid");
+        verify(response).sendRedirect(CONTEXT_PATH + "/customer?action=new&kind=supplier&error=invalid");
+    }
+
+    private void stubValidUpdateOfCustomer5() {
+        when(request.getParameter("action")).thenReturn("update");
+        when(request.getParameter("customerId")).thenReturn("5");
+        Enterprise existing = new Enterprise();
+        existing.setEnterpriseId(5);
+        existing.setAddressId(31);
+        when(customerDAO.findById(5)).thenReturn(existing);
+        stubValidCreateFields();
+    }
+
+    /**
+     * Trang Sửa: bỏ tick cả hai vai thì khách lưu được nhưng biến khỏi CẢ HAI
+     * danh sách -- không ai biết cho tới khi có người đi tìm không thấy.
+     */
+    @Test
+    public void update_khongCoVaiNao_khongLuuVaBaoLoi() throws Exception {
+        stubValidUpdateOfCustomer5();
+        when(request.getParameterValues("roles")).thenReturn(null);
+
+        controller.doPost(request, response);
+
+        verify(customerDAO, never()).update(any());
+        verify(response).sendRedirect(CONTEXT_PATH + "/customer?action=edit&id=5&error=invalid");
     }
 
     /**
@@ -569,30 +649,27 @@ public class CustomerControllerTest {
      * khỏi cả hai danh sách y như trường hợp không có vai.
      */
     @Test
-    public void create_vaiLa_biLocBo() throws Exception {
-        when(request.getParameter("action")).thenReturn("create");
-        stubValidCreateFields();
+    public void update_vaiLa_biLocBo() throws Exception {
+        stubValidUpdateOfCustomer5();
         when(request.getParameterValues("roles")).thenReturn(new String[]{"Khách VIP"});
 
         controller.doPost(request, response);
 
-        verify(customerDAO, never()).insert(any());
-        verify(response).sendRedirect(CONTEXT_PATH + "/customer?action=new&error=invalid");
+        verify(customerDAO, never()).update(any());
+        verify(response).sendRedirect(CONTEXT_PATH + "/customer?action=edit&id=5&error=invalid");
     }
 
-    /** Công ty vừa mua vừa bán: giữ cả hai vai, không phải chọn một. */
+    /** Công ty vừa mua vừa bán: thêm vai thứ hai ở trang Sửa, giữ cả hai. */
     @Test
-    public void create_caHaiVai_ghiDuCaHai() throws Exception {
-        when(request.getParameter("action")).thenReturn("create");
-        stubValidCreateFields();
+    public void update_caHaiVai_ghiDuCaHai() throws Exception {
+        stubValidUpdateOfCustomer5();
         when(request.getParameterValues("roles"))
                 .thenReturn(new String[]{"Khách mua", "Nhà cung cấp"});
-        when(customerDAO.generateNextEnterpriseCode()).thenReturn("KH-0001");
-        when(customerDAO.insert(any(Enterprise.class))).thenReturn(7);
+        when(customerDAO.update(any(Enterprise.class))).thenReturn(true);
 
         controller.doPost(request, response);
 
-        verify(customerDAO).replaceRolesOf(7, List.of("Khách mua", "Nhà cung cấp"));
+        verify(customerDAO).replaceRolesOf(5, List.of("Khách mua", "Nhà cung cấp"));
     }
 
     /**
@@ -824,6 +901,209 @@ public class CustomerControllerTest {
         verify(customerDAO, never()).hasActiveContracts(anyInt());
         verify(customerDAO, never()).softDelete(anyInt());
         verify(response).sendRedirect(CONTEXT_PATH + "/customer?error=notfound");
+    }
+
+    // ------------------------------------------------------------------
+    // Sales đã được giao tỉnh: khách đứng tên mình, chỉ trong tỉnh mình cầm
+    // ------------------------------------------------------------------
+    //
+    // Chốt với người dùng 2026-09-24. Khoá ở JSP chỉ là khoá hình, nên các
+    // test dưới POST thẳng accountOwnerId của người khác và xã/phường ngoài
+    // địa bàn -- đúng như một request nặn tay.
+
+    /** Người đang đăng nhập (user 99) trực tiếp cầm các tỉnh này. */
+    private void holdsProvinces(Province... provinces) {
+        when(employeeDAO.findProvincesOf(99)).thenReturn(List.of(provinces));
+    }
+
+    @Test
+    public void create_salesCoTinh_khachDungTenMinhDuGuiTenNguoiKhac() throws Exception {
+        holdsProvinces(new Province(1, "Thành phố Hà Nội"));
+        when(request.getParameter("action")).thenReturn("create");
+        stubValidCreateFields(); // accountOwnerId=9, districtId=10
+        when(employeeDAO.findAssigneeOfWard(10)).thenReturn(99);
+        when(customerDAO.generateNextEnterpriseCode()).thenReturn("KH-0014");
+        when(customerDAO.insert(any(Enterprise.class))).thenReturn(7);
+
+        controller.doPost(request, response);
+
+        ArgumentCaptor<Enterprise> saved = ArgumentCaptor.forClass(Enterprise.class);
+        verify(customerDAO).insert(saved.capture());
+        assertEquals(99, saved.getValue().getAccountOwnerId());
+        verify(response).sendRedirect(CONTEXT_PATH + "/customer?action=view&id=7");
+    }
+
+    /**
+     * Xã/phường thuộc tỉnh người khác cầm: chặn hẳn. Với Admin thì cùng request
+     * này lưu được và khách đứng tên người cầm tỉnh -- Sales thì không được tạo
+     * khách hộ địa bàn người khác.
+     */
+    @Test
+    public void create_salesCoTinh_xaThuocTinhNguoiKhac_biChan() throws Exception {
+        holdsProvinces(new Province(1, "Thành phố Hà Nội"));
+        when(request.getParameter("action")).thenReturn("create");
+        stubValidCreateFields();
+        when(employeeDAO.findAssigneeOfWard(10)).thenReturn(42);
+
+        controller.doPost(request, response);
+
+        verify(customerDAO, never()).insert(any());
+        verify(response).sendRedirect(CONTEXT_PATH + "/customer?action=new&error=province_not_allowed");
+    }
+
+    /** Tỉnh chưa ai cầm cũng nằm ngoài địa bàn của mình. */
+    @Test
+    public void create_salesCoTinh_xaOTinhChuaAiCam_biChan() throws Exception {
+        holdsProvinces(new Province(1, "Thành phố Hà Nội"));
+        when(request.getParameter("action")).thenReturn("create");
+        stubValidCreateFields();
+        when(employeeDAO.findAssigneeOfWard(10)).thenReturn(null);
+
+        controller.doPost(request, response);
+
+        verify(customerDAO, never()).insert(any());
+        verify(response).sendRedirect(CONTEXT_PATH + "/customer?action=new&error=province_not_allowed");
+    }
+
+    /**
+     * Sales CHƯA được giao tỉnh thì chạy như Admin -- người phụ trách theo địa
+     * bàn -- để CSKH vẫn tạo được khách hộ người cầm tỉnh.
+     */
+    @Test
+    public void create_salesChuaCoTinh_nguoiPhuTrachTheoDiaBan() throws Exception {
+        holdsProvinces();
+        when(request.getParameter("action")).thenReturn("create");
+        stubValidCreateFields();
+        when(employeeDAO.findAssigneeOfWard(10)).thenReturn(42);
+        when(customerDAO.generateNextEnterpriseCode()).thenReturn("KH-0014");
+        when(customerDAO.insert(any(Enterprise.class))).thenReturn(7);
+
+        controller.doPost(request, response);
+
+        ArgumentCaptor<Enterprise> saved = ArgumentCaptor.forClass(Enterprise.class);
+        verify(customerDAO).insert(saved.capture());
+        assertEquals(42, saved.getValue().getAccountOwnerId());
+    }
+
+    /** Luật khoá chỉ dành cho tài khoản Sales: Admin có cầm tỉnh cũng vẫn theo địa bàn. */
+    @Test
+    public void create_adminCoCamTinh_vanTheoDiaBan() throws Exception {
+        loginAs("Admin");
+        holdsProvinces(new Province(1, "Thành phố Hà Nội"));
+        when(request.getParameter("action")).thenReturn("create");
+        stubValidCreateFields();
+        when(employeeDAO.findAssigneeOfWard(10)).thenReturn(42);
+        when(customerDAO.generateNextEnterpriseCode()).thenReturn("KH-0014");
+        when(customerDAO.insert(any(Enterprise.class))).thenReturn(7);
+
+        controller.doPost(request, response);
+
+        ArgumentCaptor<Enterprise> saved = ArgumentCaptor.forClass(Enterprise.class);
+        verify(customerDAO).insert(saved.capture());
+        assertEquals(42, saved.getValue().getAccountOwnerId());
+    }
+
+    /**
+     * Nhà cung cấp không chia theo địa bàn: Sales tạo thì đứng tên chính mình,
+     * kể cả khi văn phòng nhà cung cấp nằm ở tỉnh người khác cầm.
+     */
+    @Test
+    public void create_nhaCungCapDoSalesTao_dungTenNguoiTao() throws Exception {
+        holdsProvinces(new Province(1, "Thành phố Hà Nội"));
+        when(request.getParameter("action")).thenReturn("create");
+        when(request.getParameter("kind")).thenReturn("supplier");
+        stubValidCreateFields();
+        when(employeeDAO.findAssigneeOfWard(10)).thenReturn(42);
+        when(customerDAO.generateNextSupplierCode()).thenReturn("NCC-005");
+        when(customerDAO.insert(any(Enterprise.class))).thenReturn(7);
+
+        controller.doPost(request, response);
+
+        ArgumentCaptor<Enterprise> saved = ArgumentCaptor.forClass(Enterprise.class);
+        verify(customerDAO).insert(saved.capture());
+        assertEquals(99, saved.getValue().getAccountOwnerId());
+    }
+
+    /** Admin tạo nhà cung cấp: giữ người được chọn, bảng phân công không ghi đè. */
+    @Test
+    public void create_nhaCungCapDoAdminTao_giuNguoiDuocChon() throws Exception {
+        loginAs("Admin");
+        when(request.getParameter("action")).thenReturn("create");
+        when(request.getParameter("kind")).thenReturn("supplier");
+        stubValidCreateFields(); // accountOwnerId=9
+        when(employeeDAO.findAssigneeOfWard(10)).thenReturn(42);
+        when(customerDAO.generateNextSupplierCode()).thenReturn("NCC-005");
+        when(customerDAO.insert(any(Enterprise.class))).thenReturn(7);
+
+        controller.doPost(request, response);
+
+        ArgumentCaptor<Enterprise> saved = ArgumentCaptor.forClass(Enterprise.class);
+        verify(customerDAO).insert(saved.capture());
+        assertEquals(9, saved.getValue().getAccountOwnerId());
+    }
+
+    private void openCreateForm(String kind) {
+        when(request.getRequestDispatcher("/jsp/sale/addnewcustomer.jsp")).thenReturn(mock(RequestDispatcher.class));
+        when(request.getParameter("action")).thenReturn("new");
+        when(request.getParameter("kind")).thenReturn(kind);
+    }
+
+    /**
+     * Sales cầm nhiều tỉnh: dropdown chỉ còn các tỉnh đó, xếp theo tên ngắn như
+     * mọi ô tỉnh khác; người phụ trách khoá tên mình nên không nhúng bảng phân công.
+     */
+    @Test
+    public void createForm_salesCoTinh_chiTinhMinhVaKhoaTenMinh() throws Exception {
+        openCreateForm(null);
+        Province haNoi = new Province(1, "Thành phố Hà Nội");
+        Province bacNinh = new Province(2, "Tỉnh Bắc Ninh");
+        // findProvincesOf xếp theo tên đầy đủ: "Thành phố ..." đứng trước.
+        holdsProvinces(haNoi, bacNinh);
+
+        controller.doGet(request, response);
+
+        verify(request).setAttribute("provinceList", List.of(bacNinh, haNoi));
+        verify(request).setAttribute(eq("lockedOwner"), any(User.class));
+        verify(employeeDAO, never()).findAllAssignments();
+        verify(addressDAO, never()).findBranchProvinces();
+    }
+
+    /** Sales chưa được giao tỉnh: trang chạy như cũ -- 18 tỉnh chi nhánh, người phụ trách theo địa bàn. */
+    @Test
+    public void createForm_salesChuaCoTinh_chayNhuCu() throws Exception {
+        openCreateForm(null);
+        holdsProvinces();
+
+        controller.doGet(request, response);
+
+        verify(addressDAO).findBranchProvinces();
+        verify(employeeDAO).findAllAssignments();
+        verify(request, never()).setAttribute(eq("lockedOwner"), any());
+    }
+
+    /** Trang nhà cung cấp: cả 34 tỉnh, không theo địa bàn; Sales bị khoá tên mình. */
+    @Test
+    public void createForm_nhaCungCap_ca34TinhVaKhoaTenSales() throws Exception {
+        openCreateForm("supplier");
+        holdsProvinces(new Province(1, "Thành phố Hà Nội"));
+
+        controller.doGet(request, response);
+
+        verify(request).setAttribute("kind", "supplier");
+        verify(addressDAO).findAllProvinces();
+        verify(addressDAO, never()).findBranchProvinces();
+        verify(employeeDAO, never()).findAllAssignments();
+        verify(request).setAttribute(eq("lockedOwner"), any(User.class));
+    }
+
+    @Test
+    public void createForm_nhaCungCapCuaAdmin_khongKhoaTen() throws Exception {
+        loginAs("Admin");
+        openCreateForm("supplier");
+
+        controller.doGet(request, response);
+
+        verify(request, never()).setAttribute(eq("lockedOwner"), any());
     }
 
 }

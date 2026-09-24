@@ -289,6 +289,37 @@ public class CustomerDAOTest {
         }
     }
 
+    /**
+     * Nhà cung cấp trùng mã thì sinh lại TRONG DÃY NCC. Vòng thử lại trước đây
+     * luôn gọi generateNextEnterpriseCode(), nên một nhà cung cấp đụng mã sẽ lưu
+     * ra với mã KH -- lẫn sang dãy khách hàng mà không ai hay.
+     */
+    @Test
+    public void insert_duplicateSupplierCode_retriesWithinNccSeries() throws Exception {
+        ResultSet keys = singleRow(row("id", 92));
+        PreparedStatement insertPs = mock(PreparedStatement.class);
+        when(insertPs.executeUpdate())
+                .thenThrow(duplicateKeyError("enterprise_code"))
+                .thenReturn(1);
+        when(insertPs.getGeneratedKeys()).thenReturn(keys);
+
+        PreparedStatement codePs = statementReturning(singleRow(row("enterprise_code", "NCC-005")));
+
+        Connection conn = mock(Connection.class);
+        when(conn.prepareStatement(anyString(), anyInt())).thenReturn(insertPs);
+        when(conn.prepareStatement(anyString())).thenReturn(codePs);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            Enterprise e = enterprise("NCC-005");
+            assertEquals(92, dao.insert(e));
+
+            verify(codePs).setString(1, "^NCC-[0-9]+$");
+            assertEquals("NCC-006", e.getEnterpriseCode());
+        }
+    }
+
     @Test
     public void insert_nonDuplicateSqlError_failsImmediatelyWithoutRetrying() throws Exception {
         PreparedStatement ps = mock(PreparedStatement.class);

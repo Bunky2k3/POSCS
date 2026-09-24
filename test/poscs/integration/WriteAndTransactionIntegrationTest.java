@@ -191,6 +191,19 @@ public class WriteAndTransactionIntegrationTest {
         assertEquals("KH-10001", customerDAO.generateNextEnterpriseCode());
     }
 
+    @Test
+    public void generatedSupplierCode_continuesNccSeriesAndIgnoresKh() throws Exception {
+        IntegrationDb.assumeAvailable();
+        // Hai dãy chung một bảng: nhà cung cấp tạo trên web nối tiếp dãy NCC do
+        // V28 gieo (ba chữ số), và mỗi dãy chỉ nhìn số của chính nó -- KH-0012
+        // không làm NCC nhảy số, NCC-004 không làm KH nhảy số.
+        seedEnterpriseWithCode(2, "NCC-004");
+        seedEnterpriseWithCode(3, "KH-0012");
+
+        assertEquals("NCC-005", customerDAO.generateNextSupplierCode());
+        assertEquals("KH-0013", customerDAO.generateNextEnterpriseCode());
+    }
+
     // ------------------------------------------------------------------
     // Thông báo: idempotent theo (user, ref_type, ref_id)
     // ------------------------------------------------------------------

@@ -6,9 +6,20 @@
     tự sinh Mã khách hàng duy nhất, tạo/chọn địa chỉ (INSERT vào addresses nếu cần) rồi
     INSERT vào bảng enterprises.
 
-    Request attribute cần có trước khi forward tới trang này:
-      - userList     : List<poscs.model.User>     (để đổ dropdown "Nhân viên phụ trách")
-      - provinceList : List<poscs.model.Province>  (để đổ dropdown "Tỉnh / Thành phố")
+    MỘT khung cho HAI trang: Thêm khách hàng (kind=buyer) và Thêm nhà cung cấp
+    (kind=supplier). Vai suy từ trang, không có ô tick vai -- công ty vừa mua
+    vừa bán thì thêm vai thứ hai ở trang Sửa.
+
+    Request attribute cần có trước khi forward tới trang này (xem
+    CustomerController.showCreateForm):
+      - kind                 : "buyer" | "supplier"
+      - userList             : List<poscs.model.User>     (dropdown người phụ trách / hỗ trợ)
+      - provinceList         : List<poscs.model.Province> (dropdown "Tỉnh / Thành phố")
+      - customerTypeOptions  : List<String>                (loại theo vai)
+      - lockedOwner          : poscs.model.User, CHỈ khi người phụ trách bị khoá
+                               theo người đang đăng nhập (Sales)
+      - territoryAssignments : Map tỉnh -> người, CHỈ khi người phụ trách suy
+                               theo địa bàn (trang khách hàng, Admin/Sales chưa có tỉnh)
 
     Dropdown "Xã / Phường" KHÔNG đổ sẵn từ server -- JS nạp qua AJAX
     (GET /address/wards?provinceId=..., xem AddressController) ngay khi
@@ -17,10 +28,12 @@
 <!DOCTYPE html>
 <html lang="vi">
 <head>
+    <c:set var="isSupplier" value="${kind == 'supplier'}"/>
+    <c:set var="noun" value="${isSupplier ? 'nhà cung cấp' : 'khách hàng'}"/>
     <meta charset="UTF-8">
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Thêm khách hàng - POSCS Portal</title>
+    <title>Thêm ${noun} - POSCS Portal</title>
     <link rel="icon" type="image/png" href="${pageContext.request.contextPath}/img/favicon.png">
 
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -57,19 +70,9 @@
 
         .error-text { color: var(--danger); font-size: 12px; margin-top: 5px; display: none; }
 
-        /* Hai vai là hai ô tick ĐỘC LẬP, không phải radio: khách vừa mua vừa
-           bán thì tick cả hai. Viền + nền để nhìn ra ngay đây là ô chọn được,
-           khác hẳn dòng chữ thường. */
-        .role-check-group { display: flex; gap: 10px; flex-wrap: wrap; }
-        .role-check {
-            display: inline-flex; align-items: center; gap: 8px; cursor: pointer;
-            padding: 0.55rem 0.9rem; border: 1px solid #e5e7eb; border-radius: 10px;
-            background: #f9fafb; font-size: 0.86rem; font-weight: 600; color: #374151;
-            text-transform: none; letter-spacing: 0; margin-bottom: 0;
-        }
-        .role-check:hover { border-color: var(--primary-light); background: #fff; }
-        .role-check small { color: #9ca3af; font-weight: 500; }
-        .role-check input { width: 15px; height: 15px; accent-color: var(--primary); }
+        /* Dòng giải thích dưới ô bị khoá: người dùng phải biết VÌ SAO không
+           chọn được, nếu không sẽ tưởng trang hỏng. */
+        .field-hint { font-size: 0.8rem; margin-top: 6px; color: #6b7280; }
 
         /* ===== Logo doanh nghiệp ===== */
         .logo-upload-wrap { display: flex; flex-direction: column; align-items: center; margin-bottom: 24px; }
@@ -110,12 +113,8 @@
     <%@ include file="/jsp/common/topbar.jsp" %>
     <div class="app-shell">
         <c:set var="activeNav" value="customer" scope="request"/>
-        <%-- Trang này không có tham số kind trên URL, nên suy mục con cần tô
-             sáng từ chính vai của khách: chỉ khi khách CHỈ là bên bán mới sáng
-             "Nhà cung cấp". Khách hai vai thì sáng "Khách hàng mua" -- phải
-             chọn một, và đó là danh sách mặc định. --%>
-        <c:set var="activeCustomerKind" scope="request"
-               value="${not empty customerRoles and customerRoles.contains('Nhà cung cấp') and not customerRoles.contains('Khách mua') ? 'supplier' : 'buyer'}"/>
+        <%-- Mục con cần tô sáng trên sidebar = đúng trang đang đứng. --%>
+        <c:set var="activeCustomerKind" scope="request" value="${isSupplier ? 'supplier' : 'buyer'}"/>
         <%@ include file="/jsp/common/sidebar.jsp" %>
         <div class="main-content">
 
@@ -129,24 +128,29 @@
 
         <div class="page-header-row">
             <div>
-                <h2>Thêm khách hàng</h2>
-                <p>Tạo mới hồ sơ khách hàng doanh nghiệp</p>
+                <h2>Thêm ${noun}</h2>
+                <p>${isSupplier ? 'Tạo mới hồ sơ nhà cung cấp (bên bán hàng cho mình)' : 'Tạo mới hồ sơ khách hàng doanh nghiệp'}</p>
             </div>
         </div>
 
         <div class="card-box">
             <c:if test="${not empty param.error}">
                 <div class="alert alert-danger py-2 px-3 mb-3" style="font-size: 0.9rem; border-radius: 12px;">
+                    <%-- Ba cột UNIQUE (email/SĐT/MST) áp trên CẢ bảng, không riêng một
+                         vai -- nên ở trang nhà cung cấp, bản ghi bị trùng rất có thể
+                         là một khách hàng. Đặt ở đây vì c:choose không nhận c:set. --%>
+                    <c:set var="other" value="${isSupplier ? 'một doanh nghiệp khác (khách hàng hoặc nhà cung cấp)' : 'một khách hàng khác'}"/>
                     <c:choose>
                         <c:when test="${param.error == 'invalid_image_type'}">Logo chỉ nhận file ảnh JPG, PNG, GIF hoặc WEBP. Vui lòng chọn lại.</c:when>
-                        <c:when test="${param.error == 'invalid'}">Thông tin khách hàng chưa hợp lệ. Vui lòng kiểm tra lại các ô bắt buộc.</c:when>
+                        <c:when test="${param.error == 'invalid'}">Thông tin ${noun} chưa hợp lệ. Vui lòng kiểm tra lại các ô bắt buộc.</c:when>
+                        <c:when test="${param.error == 'province_not_allowed'}">Xã / phường đã chọn không thuộc các tỉnh bạn phụ trách. Vui lòng chọn lại.</c:when>
                         <%-- BR-27: ba ô có UNIQUE KEY, mỗi ô một thông báo riêng. Trước
                              đây cả ba rơi chung vào "create_failed" nên người dùng không
                              biết phải sửa ô nào. --%>
-                        <c:when test="${param.error == 'duplicate_email'}">Email này đã thuộc về một khách hàng khác. Vui lòng nhập email khác.</c:when>
-                        <c:when test="${param.error == 'duplicate_phone'}">Số điện thoại này đã thuộc về một khách hàng khác. Vui lòng kiểm tra lại.</c:when>
-                        <c:when test="${param.error == 'duplicate_tax_code'}">Mã số thuế này đã được đăng ký cho một khách hàng khác.</c:when>
-                        <c:when test="${param.error == 'create_failed'}">Không lưu được khách hàng. Vui lòng thử lại.</c:when>
+                        <c:when test="${param.error == 'duplicate_email'}">Email này đã thuộc về ${other}. Vui lòng nhập email khác.</c:when>
+                        <c:when test="${param.error == 'duplicate_phone'}">Số điện thoại này đã thuộc về ${other}. Vui lòng kiểm tra lại.</c:when>
+                        <c:when test="${param.error == 'duplicate_tax_code'}">Mã số thuế này đã được đăng ký cho ${other}. Nếu đó chính là công ty này, hãy mở hồ sơ của họ và tick thêm vai ở trang Sửa.</c:when>
+                        <c:when test="${param.error == 'create_failed'}">Không lưu được ${noun}. Vui lòng thử lại.</c:when>
                         <c:otherwise>Đã có lỗi xảy ra. Vui lòng thử lại.</c:otherwise>
                     </c:choose>
                 </div>
@@ -155,8 +159,11 @@
             <form id="createCustomerForm" action="${pageContext.request.contextPath}/customer" method="POST" enctype="multipart/form-data" onsubmit="return validateForm();">
                 <input type="hidden" name="csrfToken" value="${csrfToken}">
                 <input type="hidden" name="action" value="create">
+                <%-- Quyết định vai, dãy mã (KH-/NCC-) và luật người phụ trách ở
+                     CustomerController.handleCreate. --%>
+                <input type="hidden" name="kind" value="${isSupplier ? 'supplier' : 'buyer'}">
 
-                <div class="section-header"><h5>Thông tin khách hàng</h5></div>
+                <div class="section-header"><h5>Thông tin ${noun}</h5></div>
 
                 <div class="logo-upload-wrap">
                     <div class="logo-avatar-wrap">
@@ -169,9 +176,10 @@
 
                 <div class="row">
                     <div class="col-md-6 field-row">
-                        <label>Tên khách hàng <span class="req">*</span></label>
-                        <input type="text" class="form-control" id="customerName" name="customerName" placeholder="VD: VNPT Hà Nội">
-                        <span class="error-text" id="err-customerName">Tên khách hàng không được để trống.</span>
+                        <label>Tên ${noun} <span class="req">*</span></label>
+                        <input type="text" class="form-control" id="customerName" name="customerName"
+                               placeholder="${isSupplier ? 'VD: Công ty CP Vật liệu Cáp quang Đông Á' : 'VD: VNPT Hà Nội'}">
+                        <span class="error-text" id="err-customerName">Tên ${noun} không được để trống.</span>
                     </div>
                     <div class="col-md-6 field-row">
                         <label>Mã số thuế <span class="req">*</span></label>
@@ -179,55 +187,60 @@
                         <span class="error-text" id="err-taxCode">Mã số thuế không được để trống.</span>
                     </div>
                     <div class="col-md-6 field-row">
-                        <label>Loại khách hàng <span class="req">*</span></label>
+                        <label>Loại ${noun} <span class="req">*</span></label>
                         <select class="form-select" id="customerType" name="customerType">
-                            <option value="">-- Chọn loại khách hàng --</option>
+                            <option value="">-- Chọn loại ${noun} --</option>
                             <%-- Loại khách hàng theo VAI, đổ từ CustomerController --%>
                             <c:forEach var="ct" items="${customerTypeOptions}">
                                 <option value="${fn:escapeXml(ct)}">${fn:escapeXml(ct)}</option>
                             </c:forEach>
                         </select>
-                        <span class="error-text" id="err-customerType">Vui lòng chọn loại khách hàng.</span>
+                        <span class="error-text" id="err-customerType">Vui lòng chọn loại ${noun}.</span>
                     </div>
 
                     <div class="col-md-6 field-row">
-                        <label>Nhóm khách hàng <span class="req">*</span></label>
+                        <label>Nhóm ${noun} <span class="req">*</span></label>
+                        <c:set var="groupPrefix" value="${isSupplier ? 'Nhà cung cấp' : 'Khách hàng'}"/>
                         <select class="form-select" id="customerGroup" name="customerGroup">
-                            <option value="">-- Chọn nhóm khách hàng --</option>
-                            <option value="VIP">Khách hàng VIP</option>
-                            <option value="Thân thiết">Khách hàng thân thiết</option>
-                            <option value="Tiềm năng">Khách hàng tiềm năng</option>
-                            <option value="Thường">Khách hàng thường</option>
+                            <option value="">-- Chọn nhóm ${noun} --</option>
+                            <option value="VIP">${groupPrefix} VIP</option>
+                            <option value="Thân thiết">${groupPrefix} thân thiết</option>
+                            <option value="Tiềm năng">${groupPrefix} tiềm năng</option>
+                            <option value="Thường">${groupPrefix} thường</option>
                         </select>
-                        <span class="error-text" id="err-customerGroup">Vui lòng chọn nhóm khách hàng.</span>
-                    </div>
-                    <div class="col-md-6 field-row">
-                        <label>Vai của khách hàng <span class="req">*</span></label>
-                        <%-- Hai vai độc lập, không phải hai lựa chọn loại trừ: một công
-                             ty vừa mua thiết bị vừa cung cấp linh kiện thì tick cả hai và
-                             nó xuất hiện ở cả hai danh sách. Đó là lý do vai nằm ở bảng
-                             riêng chứ không phải một cột trên enterprises (xem V20). --%>
-                        <div class="role-check-group">
-                            <label class="role-check"><input type="checkbox" name="roles" value="Khách mua"
-                                ${customerRoles.contains('Khách mua') ? 'checked' : ''}> Khách hàng mua <small>(mua của mình)</small></label>
-                            <label class="role-check"><input type="checkbox" name="roles" value="Nhà cung cấp"
-                                ${customerRoles.contains('Nhà cung cấp') ? 'checked' : ''}> Nhà cung cấp <small>(bán cho mình)</small></label>
-                        </div>
-                        <span class="error-text" id="err-roles">Chọn ít nhất một vai.</span>
+                        <span class="error-text" id="err-customerGroup">Vui lòng chọn nhóm ${noun}.</span>
                     </div>
                     <div class="col-md-6 field-row">
                         <label>Người phụ trách chính <span class="req">*</span></label>
-                        <select class="form-select" id="assignee" name="accountOwnerId">
-                            <option value="">-- Chọn nhân viên --</option>
-                            <c:forEach var="staff" items="${userList}">
-                                <option value="${staff.userId}">${fn:escapeXml(staff.fullName)}</option>
-                            </c:forEach>
-                        </select>
-                        <%-- Ô select bị disabled thì trình duyệt KHÔNG gửi giá trị lên.
-                             Input này gánh giá trị lúc ô bị khoá; lúc ô mở thì nó tự
-                             disabled để không gửi hai giá trị cùng tên. --%>
-                        <input type="hidden" id="accountOwnerHidden" name="accountOwnerId" disabled>
-                        <div id="goiYDiaBan" class="text-muted" style="display:none; font-size: 0.8rem; margin-top: 6px; text-transform: none; font-weight: 400;"></div>
+                        <c:choose>
+                            <c:when test="${not empty lockedOwner}">
+                                <%-- Sales tạo thì đứng tên chính mình. Vẫn là ô select (bị
+                                     khoá, một lựa chọn) chứ không phải ô chữ, để JS so "người
+                                     hỗ trợ trùng người phụ trách" theo user_id như chế độ
+                                     thường. Server tự gán lại người đang đăng nhập, bỏ qua ô
+                                     ẩn này -- đây chỉ là khoá hình. --%>
+                                <select class="form-select" id="assignee" disabled>
+                                    <option value="${lockedOwner.userId}" selected>${fn:escapeXml(lockedOwner.fullName)}</option>
+                                </select>
+                                <input type="hidden" name="accountOwnerId" value="${lockedOwner.userId}">
+                                <div class="field-hint">
+                                    ${isSupplier ? 'Nhà cung cấp do bạn tạo sẽ đứng tên bạn.' : 'Khách hàng do bạn tạo sẽ đứng tên bạn.'}
+                                </div>
+                            </c:when>
+                            <c:otherwise>
+                                <select class="form-select" id="assignee" name="accountOwnerId">
+                                    <option value="">-- Chọn nhân viên --</option>
+                                    <c:forEach var="staff" items="${userList}">
+                                        <option value="${staff.userId}">${fn:escapeXml(staff.fullName)}</option>
+                                    </c:forEach>
+                                </select>
+                                <%-- Ô select bị disabled thì trình duyệt KHÔNG gửi giá trị lên.
+                                     Input này gánh giá trị lúc ô bị khoá theo địa bàn; lúc ô mở
+                                     thì nó tự disabled để không gửi hai giá trị cùng tên. --%>
+                                <input type="hidden" id="accountOwnerHidden" name="accountOwnerId" disabled>
+                                <div id="goiYDiaBan" class="text-muted" style="display:none; font-size: 0.8rem; margin-top: 6px; text-transform: none; font-weight: 400;"></div>
+                            </c:otherwise>
+                        </c:choose>
                         <span class="error-text" id="err-assignee">Vui lòng chọn người phụ trách chính.</span>
                     </div>
                     <div class="col-md-6 field-row">
@@ -267,12 +280,30 @@
                 <div class="row">
                     <div class="col-md-6 field-row">
                         <label>Tỉnh / Thành phố <span class="req">*</span></label>
-                        <select class="form-select" id="province" name="provinceId">
-                            <option value="">-- Chọn tỉnh / thành phố --</option>
-                            <c:forEach var="prov" items="${provinceList}">
-                                <option value="${prov.provinceId}">${fn:escapeXml(prov.shortName)}</option>
-                            </c:forEach>
-                        </select>
+                        <%-- Trang khách hàng + người phụ trách bị khoá = Sales đã được
+                             giao tỉnh: provinceList chỉ còn các tỉnh người đó cầm. Cầm
+                             đúng một tỉnh thì chọn sẵn và khoá luôn. Server kiểm lại theo
+                             xã/phường (CustomerController.handleCreate). --%>
+                        <c:set var="ownTerritoryOnly" value="${not empty lockedOwner and not isSupplier}"/>
+                        <c:choose>
+                            <c:when test="${ownTerritoryOnly and fn:length(provinceList) == 1}">
+                                <select class="form-select" id="province" disabled>
+                                    <option value="${provinceList[0].provinceId}" selected>${fn:escapeXml(provinceList[0].shortName)}</option>
+                                </select>
+                                <input type="hidden" name="provinceId" value="${provinceList[0].provinceId}">
+                            </c:when>
+                            <c:otherwise>
+                                <select class="form-select" id="province" name="provinceId">
+                                    <option value="">-- Chọn tỉnh / thành phố --</option>
+                                    <c:forEach var="prov" items="${provinceList}">
+                                        <option value="${prov.provinceId}">${fn:escapeXml(prov.shortName)}</option>
+                                    </c:forEach>
+                                </select>
+                            </c:otherwise>
+                        </c:choose>
+                        <c:if test="${ownTerritoryOnly}">
+                            <div class="field-hint">Chỉ các tỉnh bạn phụ trách.</div>
+                        </c:if>
                         <span class="error-text" id="err-province">Vui lòng chọn tỉnh / thành phố.</span>
                     </div>
                     <div class="col-md-6 field-row">
@@ -291,7 +322,7 @@
 
                 <div class="action-bar">
                     <a href="${pageContext.request.contextPath}/customer?kind=${activeCustomerKind}" class="btn-cancel">Hủy</a>
-                    <button type="submit" class="btn-primary"><i class="fa-solid fa-check me-1"></i> Tạo khách hàng</button>
+                    <button type="submit" class="btn-primary"><i class="fa-solid fa-check me-1"></i> Tạo ${noun}</button>
                 </div>
             </form>
         </div>
@@ -365,6 +396,11 @@
         //
         // Đây chỉ là tầng hiển thị. Khoá thật nằm ở CustomerController
         // .resolveAccountOwnerId -- ô disabled ai mở devtools cũng gỡ được.
+        //
+        // Chỉ chạy khi server nhúng bảng phân công: trang khách hàng của Admin
+        // và Sales chưa được giao tỉnh. Trang nhà cung cấp không theo địa bàn,
+        // còn Sales đã có tỉnh thì ô người phụ trách khoá sẵn tên họ.
+        var suyTheoDiaBan = ${not empty territoryAssignments};
         var phanCongDiaBan = {
             <c:forEach var="e" items="${territoryAssignments}" varStatus="st">'${e.key}': ${e.value}<c:if test="${!st.last}">,</c:if></c:forEach>
         };
@@ -378,6 +414,9 @@
         var dienBoiDiaBan = false;
 
         function apDungPhanCongDiaBan(provinceId) {
+            if (!suyTheoDiaBan) {
+                return;
+            }
             var userId = provinceId ? phanCongDiaBan[provinceId] : null;
             var opt = userId ? Array.prototype.find.call(oNguoiPhuTrach.options, function (o) {
                 return o.value === String(userId);
@@ -408,10 +447,16 @@
         // đừng xoá khi họ đổi sang một tỉnh trống khác.
         oNguoiPhuTrach.addEventListener('change', function () { dienBoiDiaBan = false; });
 
-        document.getElementById('province').addEventListener('change', function () {
+        var oTinh = document.getElementById('province');
+        oTinh.addEventListener('change', function () {
             loadWards(this.value);
             apDungPhanCongDiaBan(this.value);
         });
+        // Sales chỉ cầm một tỉnh: ô tỉnh đã chọn sẵn (và khoá), nên phải tự
+        // nạp xã/phường ngay -- không có sự kiện change nào để chờ.
+        if (oTinh.value) {
+            loadWards(oTinh.value);
+        }
 
         function validateForm() {
             var valid = true;
@@ -425,12 +470,6 @@
                 var el = document.getElementById(id);
                 if (!el.value) { document.getElementById('err-' + id).style.display = 'block'; valid = false; }
             });
-
-            // Ít nhất một vai. Server chặn lại lần nữa -- không có vai nào thì
-            // khách lưu được nhưng biến khỏi cả hai danh sách.
-            if (document.querySelectorAll('input[name="roles"]:checked').length === 0) {
-                document.getElementById('err-roles').style.display = 'block'; valid = false;
-            }
 
             var name = document.getElementById('customerName');
             if (!name.value.trim()) { document.getElementById('err-customerName').style.display = 'block'; valid = false; }

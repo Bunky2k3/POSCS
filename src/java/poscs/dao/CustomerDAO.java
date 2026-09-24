@@ -328,28 +328,59 @@ public class CustomerDAO {
         return result;
     }
 
+    /** Hai dãy mã theo vai, khớp dữ liệu có sẵn: KH-0001.. và NCC-001.. (V28 gieo). */
+    private static final String CUSTOMER_CODE_PREFIX = "KH-";
+    private static final String SUPPLIER_CODE_PREFIX = "NCC-";
+
+    /** Sinh mã khách hàng tiếp theo dạng KH-0001, KH-0002, ... */
+    public String generateNextEnterpriseCode() {
+        return generateNextCode(CUSTOMER_CODE_PREFIX, 4);
+    }
+
     /**
-     * Sinh mã khách hàng tiếp theo dạng KH-0001, KH-0002, ...
+     * Sinh mã nhà cung cấp tiếp theo dạng NCC-005, NCC-006, ... -- nối tiếp bốn
+     * nhà cung cấp V28 gieo, giữ đúng ba chữ số như bản gieo.
+     */
+    public String generateNextSupplierCode() {
+        return generateNextCode(SUPPLIER_CODE_PREFIX, 3);
+    }
+
+    /**
+     * Mã tiếp theo của MỘT dãy (KH- hoặc NCC-).
      *
-     * Chỉ xét mã đúng dạng KH-số và so theo GIÁ TRỊ SỐ. Bảng enterprises còn
-     * chứa mã khác tiền tố (nhà cung cấp NCC-001.. do V28 gieo), nên:
-     * - lấy mã của dòng id lớn nhất (cách cũ) vớ phải NCC-004, bỏ chữ còn 4,
-     *   ra KH-0005 -- mã đã có -- và từ đó không tạo được khách hàng nào nữa;
+     * Chỉ xét mã đúng dạng tiền-tố-số và so theo GIÁ TRỊ SỐ. Hai dãy nằm chung
+     * một bảng, nên:
+     * - lấy mã của dòng id lớn nhất (cách cũ) vớ phải mã của dãy kia -- NCC-004
+     *   bỏ chữ còn 4, ra KH-0005, mã đã có -- và từ đó không tạo được khách
+     *   hàng nào nữa (PR #148);
      * - MAX(enterprise_code) so như chuỗi: "NCC-..." > "KH-...", và cả
      *   "KH-9999" > "KH-10000".
      */
-    public String generateNextEnterpriseCode() {
+    private String generateNextCode(String prefix, int digits) {
         String sql = "SELECT enterprise_code FROM enterprises " +
-                "WHERE enterprise_code REGEXP '^KH-[0-9]+$' " +
-                "ORDER BY CAST(SUBSTRING(enterprise_code, 4) AS UNSIGNED) DESC LIMIT 1";
+                "WHERE enterprise_code REGEXP ? " +
+                "ORDER BY CAST(SUBSTRING(enterprise_code, ?) AS UNSIGNED) DESC LIMIT 1";
         try (Connection conn = DBContext.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql);
-             ResultSet rs = ps.executeQuery()) {
-            return nextEnterpriseCodeAfter(rs.next() ? rs.getString("enterprise_code") : null);
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, "^" + prefix + "[0-9]+$");
+            ps.setInt(2, prefix.length() + 1);
+            try (ResultSet rs = ps.executeQuery()) {
+                return nextCodeAfter(rs.next() ? rs.getString("enterprise_code") : null, prefix, digits);
+            }
         } catch (SQLException ex) {
-            LOG.error("Loi sinh ma khach hang", ex);
+            LOG.error("Loi sinh ma khach hang (prefix={})", prefix, ex);
             return null;
         }
+    }
+
+    /**
+     * Sinh lại mã CÙNG DÃY với mã vừa bị trùng: nhà cung cấp trùng mã thì lấy
+     * NCC tiếp theo, không nhảy sang dãy KH.
+     */
+    private String generateNextCodeLike(String code) {
+        return code != null && code.startsWith(SUPPLIER_CODE_PREFIX)
+                ? generateNextSupplierCode()
+                : generateNextEnterpriseCode();
     }
 
     /**
@@ -359,14 +390,18 @@ public class CustomerDAO {
      * 1 lần rồi tăng dần bằng hàm này.
      */
     public String nextEnterpriseCodeAfter(String previousCode) {
+        return nextCodeAfter(previousCode, CUSTOMER_CODE_PREFIX, 4);
+    }
+
+    private static String nextCodeAfter(String previousCode, String prefix, int digits) {
         int nextNumber = 1;
         if (previousCode != null) {
-            String digits = previousCode.replaceAll("[^0-9]", "");
-            if (!digits.isEmpty()) {
-                nextNumber = Integer.parseInt(digits) + 1;
+            String number = previousCode.replaceAll("[^0-9]", "");
+            if (!number.isEmpty()) {
+                nextNumber = Integer.parseInt(number) + 1;
             }
         }
-        return String.format("KH-%04d", nextNumber);
+        return prefix + String.format("%0" + digits + "d", nextNumber);
     }
 
     /** Thử lại tối đa bao nhiêu lần khi enterprise_code sinh ra bị trùng (xem insert()). */
@@ -443,7 +478,7 @@ public class CustomerDAO {
                 } catch (SQLException ex) {
                     conn.rollback();
                     if (isDuplicateKeyError(ex, "enterprise_code") && attempt < MAX_CODE_GEN_ATTEMPTS) {
-                        enterprise.setEnterpriseCode(generateNextEnterpriseCode());
+                        enterprise.setEnterpriseCode(generateNextCodeLike(enterprise.getEnterpriseCode()));
                         continue;
                     }
                     throw ex;

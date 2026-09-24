@@ -312,7 +312,7 @@
                      canManage -- xem PERMISSIONS.md. --%>
                 <a href="${pageContext.request.contextPath}/customer?action=exportExcel&kind=${kind}&keyword=${fn:escapeXml(keyword)}&type=${fn:escapeXml(typeFilter)}&assigneeId=${assigneeFilter}${provinceQuery}" class="btn-outline-action"><i class="fa-solid fa-file-excel"></i> Xuất Excel</a>
                 <c:if test="${canManage}">
-                    <a href="${pageContext.request.contextPath}/customer?action=new&kind=${kind}" class="btn-add"><i class="fa-solid fa-plus"></i> Thêm khách hàng</a>
+                    <a href="${pageContext.request.contextPath}/customer?action=new&kind=${kind}" class="btn-add"><i class="fa-solid fa-plus"></i> ${kind == 'supplier' ? 'Thêm nhà cung cấp' : 'Thêm khách hàng'}</a>
                 </c:if>
                 <%-- Cấp dưới không có nút "Thêm" vì không được ghi (V16), nhưng
                      không được để họ cụt đường: đây là lối gửi yêu cầu lên cấp
