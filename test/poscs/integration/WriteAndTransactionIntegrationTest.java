@@ -1,6 +1,7 @@
 package poscs.integration;
 
 import java.util.List;
+import java.util.Map;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -202,6 +203,27 @@ public class WriteAndTransactionIntegrationTest {
 
         assertEquals("NCC-005", customerDAO.generateNextSupplierCode());
         assertEquals("KH-0013", customerDAO.generateNextEnterpriseCode());
+    }
+
+    // ------------------------------------------------------------------
+    // Cây tổ chức: cấp trên trực tiếp (lọc ô "Người hỗ trợ" của khách hàng)
+    // ------------------------------------------------------------------
+
+    @Test
+    public void managerMap_chiGomNguoiCoCapTrenVaConLamViec() throws Exception {
+        IntegrationDb.assumeAvailable();
+        // Fixture user 1 làm cấp trên của user 2 và user 3; user 3 đã nghỉ
+        // (xoá mềm) nên không được còn trong bảng. User 1 không có cấp trên
+        // nên cũng không có dòng nào.
+        IntegrationDb.exec(
+            "INSERT INTO users (user_id, username, password_hash, role_id, last_name, first_name, "
+            + "gender, date_of_birth, citizen_id, phone, department_id, hire_date, manager_id, is_deleted) VALUES "
+            + "(2, 'itsales2', '" + Fixtures.PASSWORD_HASH + "', 2, N'Trần', N'Cấp Dưới', "
+            + "N'Nam', '1992-02-02', '000000000002', '0900000002', 1, '2024-01-01', " + Fixtures.USER_ID + ", 0), "
+            + "(3, 'itsales3', '" + Fixtures.PASSWORD_HASH + "', 2, N'Lê', N'Đã Nghỉ', "
+            + "N'Nam', '1993-03-03', '000000000003', '0900000003', 1, '2024-01-01', " + Fixtures.USER_ID + ", 1)");
+
+        assertEquals(Map.of(2, Fixtures.USER_ID), employeeDAO.findManagerMap());
     }
 
     // ------------------------------------------------------------------

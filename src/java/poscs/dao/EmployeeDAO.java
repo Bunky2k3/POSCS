@@ -865,6 +865,33 @@ public class EmployeeDAO {
     }
 
     /**
+     * Cấp trên trực tiếp của từng người, dạng {@code user_id -> manager_id} --
+     * chỉ gồm người CÓ cấp trên.
+     *
+     * <p>Dùng cho ô "Người hỗ trợ" của khách hàng: người hỗ trợ không được là
+     * cấp trên trực tiếp của người phụ trách chính (chốt với người dùng
+     * 2026-09-24). Trả cả bảng một lần như {@link #findAllAssignments()}: form
+     * nhúng sẵn để lọc lại ngay khi đổi người phụ trách, không phải gọi AJAX.
+     *
+     * <p>Cây chưa có dữ liệu thì trả map rỗng -- luật tự chưa chặn ai, cùng
+     * nguyên tắc "chưa xếp vào cây thì chưa bị siết" của AccessControl.
+     */
+    public Map<Integer, Integer> findManagerMap() {
+        Map<Integer, Integer> result = new LinkedHashMap<>();
+        String sql = "SELECT user_id, manager_id FROM users WHERE is_deleted = 0 AND manager_id IS NOT NULL";
+        try (Connection conn = DBContext.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+                result.put(rs.getInt("user_id"), rs.getInt("manager_id"));
+            }
+        } catch (SQLException ex) {
+            LOG.error("Loi tra cay cap tren", ex);
+        }
+        return result;
+    }
+
+    /**
      * Địa bàn mà Dashboard coi là "của tôi": tỉnh mình trực tiếp cầm CỘNG tỉnh
      * của cấp dưới trực tiếp.
      *

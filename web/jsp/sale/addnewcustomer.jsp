@@ -144,6 +144,7 @@
                         <c:when test="${param.error == 'invalid_image_type'}">Logo chỉ nhận file ảnh JPG, PNG, GIF hoặc WEBP. Vui lòng chọn lại.</c:when>
                         <c:when test="${param.error == 'invalid'}">Thông tin ${noun} chưa hợp lệ. Vui lòng kiểm tra lại các ô bắt buộc.</c:when>
                         <c:when test="${param.error == 'province_not_allowed'}">Xã / phường đã chọn không thuộc các tỉnh bạn phụ trách. Vui lòng chọn lại.</c:when>
+                        <c:when test="${param.error == 'support_is_superior'}">Người hỗ trợ không được là cấp trên trực tiếp của người phụ trách chính. Vui lòng chọn người khác.</c:when>
                         <%-- BR-27: ba ô có UNIQUE KEY, mỗi ô một thông báo riêng. Trước
                              đây cả ba rơi chung vào "create_failed" nên người dùng không
                              biết phải sửa ô nào. --%>
@@ -245,12 +246,16 @@
                     </div>
                     <div class="col-md-6 field-row">
                         <label>Người hỗ trợ</label>
+                        <%-- Lọc theo người phụ trách chính (POSCS.ganLocNguoiHoTro ở
+                             appshell.js): không có chính người đó, không có cấp trên
+                             trực tiếp của người đó. --%>
                         <select class="form-select" id="supportAssignee" name="supportOwnerId">
                             <option value="">-- Chưa bố trí --</option>
                             <c:forEach var="staff" items="${userList}">
                                 <option value="${staff.userId}">${fn:escapeXml(staff.fullName)}</option>
                             </c:forEach>
                         </select>
+                        <div id="goiYNguoiHoTro" class="field-hint" style="display:none;"></div>
                         <span class="error-text" id="err-supportAssignee">Người hỗ trợ phải khác người phụ trách chính.</span>
                     </div>
 
@@ -447,10 +452,28 @@
         // đừng xoá khi họ đổi sang một tỉnh trống khác.
         oNguoiPhuTrach.addEventListener('change', function () { dienBoiDiaBan = false; });
 
+        // ===== Người hỗ trợ lọc theo người phụ trách chính =====
+        //
+        // Cấp trên trực tiếp của từng người, nhúng sẵn từ server
+        // (EmployeeDAO.findManagerMap). Hàm lọc nằm ở appshell.js, mà file đó
+        // nạp SAU đoạn script này -- nên gắn ở DOMContentLoaded, lúc mọi
+        // script thường đã chạy xong. Trước lúc đó locNguoiHoTro là hàm rỗng.
+        var capTrenCua = {
+            <c:forEach var="m" items="${managerOf}" varStatus="st">'${m.key}': ${m.value}<c:if test="${!st.last}">,</c:if></c:forEach>
+        };
+        var locNguoiHoTro = function () {};
+        document.addEventListener('DOMContentLoaded', function () {
+            locNguoiHoTro = POSCS.ganLocNguoiHoTro(oNguoiPhuTrach, document.getElementById('supportAssignee'),
+                    capTrenCua, document.getElementById('goiYNguoiHoTro'));
+        });
+
         var oTinh = document.getElementById('province');
         oTinh.addEventListener('change', function () {
             loadWards(this.value);
             apDungPhanCongDiaBan(this.value);
+            // Địa bàn vừa điền lại người phụ trách bằng code -- không có sự
+            // kiện change, phải lọc tay.
+            locNguoiHoTro();
         });
         // Sales chỉ cầm một tỉnh: ô tỉnh đã chọn sẵn (và khoá), nên phải tự
         // nạp xã/phường ngay -- không có sự kiện change nào để chờ.

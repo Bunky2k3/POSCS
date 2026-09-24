@@ -295,6 +295,9 @@ public class CustomerController extends HttpServlet {
                 request.setAttribute("territoryAssignments", employeeDAO.findAllAssignments());
             }
         }
+        // Để form lọc ô "Người hỗ trợ" theo người phụ trách chính -- xem
+        // supportIsOwnersManager.
+        request.setAttribute("managerOf", employeeDAO.findManagerMap());
         request.getRequestDispatcher(CREATE_VIEW).forward(request, response);
     }
 
@@ -361,6 +364,7 @@ public class CustomerController extends HttpServlet {
         List<String> roles = customerDAO.findRolesOf(customer.getEnterpriseId());
         request.setAttribute("customerTypeOptions",
                 customerTypesFor(roles.contains(ROLE_SUPPLIER) ? ROLE_SUPPLIER : ROLE_BUYER));
+        request.setAttribute("managerOf", employeeDAO.findManagerMap());
         request.getRequestDispatcher(UPDATE_VIEW).forward(request, response);
     }
 
@@ -500,6 +504,10 @@ public class CustomerController extends HttpServlet {
             response.sendRedirect(formUrl + "&error=invalid");
             return;
         }
+        if (supportIsOwnersManager(e)) {
+            response.sendRedirect(formUrl + "&error=support_is_superior");
+            return;
+        }
         String duplicate = findDuplicateField(e, null);
         if (duplicate != null) {
             response.sendRedirect(formUrl + "&error=" + duplicate);
@@ -567,6 +575,11 @@ public class CustomerController extends HttpServlet {
         if (!isValidCommonFields(e) || (e.getAddress() == null && existing.getAddressId() == null)
                 || roles.isEmpty()) {
             response.sendRedirect(request.getContextPath() + "/customer?action=edit&id=" + id + "&error=invalid");
+            return;
+        }
+        if (supportIsOwnersManager(e)) {
+            response.sendRedirect(request.getContextPath()
+                    + "/customer?action=edit&id=" + id + "&error=support_is_superior");
             return;
         }
         // Loại chính khách đang sửa ra khỏi phép kiểm, nếu không thì mở form
@@ -785,6 +798,26 @@ public class CustomerController extends HttpServlet {
         }
         response.sendRedirect(redirectBase + "&error=invalid_image_type");
         return false;
+    }
+
+    /**
+     * Người hỗ trợ có phải CẤP TRÊN TRỰC TIẾP của người phụ trách chính không.
+     *
+     * <p>Chốt với người dùng 2026-09-24: người hỗ trợ không được đứng cao hơn
+     * người phụ trách chính -- tức không được là cấp trên của chính người đó.
+     * Trưởng nhóm KHÁC (không quản lý người phụ trách) thì vẫn được. Trùng
+     * chính người phụ trách chính thì {@link #isValidCommonFields} đã chặn.
+     *
+     * <p>Form đã lọc sẵn ô này (appshell.js, POSCS.ganLocNguoiHoTro); chặn ở
+     * đây vì lọc trên form ai mở devtools cũng gỡ được. Cây tổ chức chưa có dữ
+     * liệu thì luật chưa chặn ai -- xem EmployeeDAO.findManagerMap.
+     */
+    private boolean supportIsOwnersManager(Enterprise e) {
+        Integer supportOwnerId = e.getSupportOwnerId();
+        if (supportOwnerId == null || e.getAccountOwnerId() <= 0) {
+            return false;
+        }
+        return supportOwnerId.equals(employeeDAO.findManagerMap().get(e.getAccountOwnerId()));
     }
 
     /**

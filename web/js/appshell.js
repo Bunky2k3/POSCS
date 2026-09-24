@@ -467,3 +467,78 @@
     window.POSCS.nhomNghin = nhomNghin;
     window.POSCS.giaTriSauNhap = giaTriSauNhap;
 })();
+
+
+// Người hỗ trợ của khách hàng: KHÔNG được là chính người phụ trách chính, và
+// KHÔNG được là cấp trên TRỰC TIẾP của người đó -- trưởng nhóm khác thì vẫn
+// được (chốt với người dùng 2026-09-24). Dùng ở addnewcustomer.jsp và
+// updatecustomer.jsp. Đây chỉ là lọc cho dễ chọn; server kiểm lại ở
+// CustomerController.supportIsOwnersManager.
+//
+// Cây tổ chức (users.manager_id) chưa có dữ liệu thì vế cấp trên chưa loại ai;
+// nhập cây xong là tự có hiệu lực, không phải sửa gì ở đây.
+(function () {
+    'use strict';
+
+    // Những user_id (dạng chuỗi, so thẳng với option.value) không được làm
+    // người hỗ trợ khi người phụ trách chính là chuTriId. capTrenCua:
+    // { user_id: user_id của cấp trên }, chỉ gồm người CÓ cấp trên.
+    function nguoiHoTroBiLoai(chuTriId, capTrenCua) {
+        if (!chuTriId) {
+            return [];
+        }
+        var loai = [String(chuTriId)];
+        var capTren = capTrenCua ? capTrenCua[String(chuTriId)] : null;
+        if (capTren) {
+            loai.push(String(capTren));
+        }
+        return loai;
+    }
+
+    // Lọc ô người hỗ trợ theo ô người phụ trách chính, và lọc lại mỗi khi ô đó
+    // đổi. Trả về hàm lọc để gọi tay: form khách hàng còn điền ô người phụ
+    // trách bằng code (theo địa bàn), mà gán .value thì không phát sự kiện
+    // change nào.
+    //
+    // Người hỗ trợ đang chọn mà hoá không hợp lệ thì bỏ chọn VÀ báo -- bỏ lặng
+    // lẽ thì bấm lưu là mất người hỗ trợ mà người dùng không hề hay.
+    function ganLocNguoiHoTro(oChuTri, oHoTro, capTrenCua, oGoiY) {
+        function loc() {
+            var loai = nguoiHoTroBiLoai(oChuTri.value, capTrenCua);
+            var boChon = false;
+            Array.prototype.forEach.call(oHoTro.options, function (o) {
+                if (!o.value) {
+                    return;
+                }
+                var biLoai = loai.indexOf(o.value) >= 0;
+                // hidden để ẩn khỏi danh sách; disabled để trình duyệt nào
+                // không ẩn được option (Safari) cũng không cho chọn.
+                o.hidden = biLoai;
+                o.disabled = biLoai;
+                if (biLoai && o.selected) {
+                    boChon = true;
+                }
+            });
+            if (boChon) {
+                oHoTro.value = '';
+                if (oGoiY) {
+                    oGoiY.textContent = 'Đã bỏ chọn người hỗ trợ: người đó là người phụ trách chính '
+                        + 'hoặc cấp trên trực tiếp của họ. Vui lòng chọn người khác.';
+                    oGoiY.style.display = 'block';
+                }
+            }
+        }
+        oChuTri.addEventListener('change', loc);
+        oHoTro.addEventListener('change', function () {
+            if (oGoiY) {
+                oGoiY.style.display = 'none';
+            }
+        });
+        loc();
+        return loc;
+    }
+
+    window.POSCS = window.POSCS || {};
+    window.POSCS.nguoiHoTroBiLoai = nguoiHoTroBiLoai;
+    window.POSCS.ganLocNguoiHoTro = ganLocNguoiHoTro;
+})();

@@ -2,6 +2,7 @@ package poscs.controller;
 
 import java.lang.reflect.Field;
 import java.util.List;
+import java.util.Map;
 import jakarta.servlet.RequestDispatcher;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -1104,6 +1105,81 @@ public class CustomerControllerTest {
         controller.doGet(request, response);
 
         verify(request, never()).setAttribute(eq("lockedOwner"), any());
+    }
+
+    // ------------------------------------------------------------------
+    // Người hỗ trợ không được là cấp trên trực tiếp của người phụ trách
+    // ------------------------------------------------------------------
+    //
+    // Chốt với người dùng 2026-09-24. Form lọc sẵn ô này, nhưng lọc trên
+    // form ai mở devtools cũng gỡ được -- các test dưới POST thẳng.
+
+    /** Người phụ trách 9 có cấp trên 77: chọn 77 làm người hỗ trợ thì chặn. */
+    @Test
+    public void create_nguoiHoTroLaCapTrenTrucTiep_biChan() throws Exception {
+        when(request.getParameter("action")).thenReturn("create");
+        stubValidCreateFields(); // người phụ trách 9 (xã 10 chưa ai cầm)
+        when(request.getParameter("supportOwnerId")).thenReturn("77");
+        when(employeeDAO.findManagerMap()).thenReturn(Map.of(9, 77));
+
+        controller.doPost(request, response);
+
+        verify(customerDAO, never()).insert(any());
+        verify(response).sendRedirect(CONTEXT_PATH + "/customer?action=new&error=support_is_superior");
+    }
+
+    /** Trưởng nhóm KHÁC (55 quản lý người 12, không quản lý 9) thì vẫn được. */
+    @Test
+    public void create_truongNhomKhac_vanDuocLamNguoiHoTro() throws Exception {
+        when(request.getParameter("action")).thenReturn("create");
+        stubValidCreateFields();
+        when(request.getParameter("supportOwnerId")).thenReturn("55");
+        when(employeeDAO.findManagerMap()).thenReturn(Map.of(9, 77, 12, 55));
+        when(customerDAO.generateNextEnterpriseCode()).thenReturn("KH-0014");
+        when(customerDAO.insert(any(Enterprise.class))).thenReturn(7);
+
+        controller.doPost(request, response);
+
+        verify(response).sendRedirect(CONTEXT_PATH + "/customer?action=view&id=7");
+    }
+
+    /** Cấp DƯỚI của người phụ trách làm người hỗ trợ thì được. */
+    @Test
+    public void create_capDuoiCuaNguoiPhuTrach_duocLamNguoiHoTro() throws Exception {
+        when(request.getParameter("action")).thenReturn("create");
+        stubValidCreateFields();
+        when(request.getParameter("supportOwnerId")).thenReturn("31");
+        when(employeeDAO.findManagerMap()).thenReturn(Map.of(31, 9));
+        when(customerDAO.generateNextEnterpriseCode()).thenReturn("KH-0014");
+        when(customerDAO.insert(any(Enterprise.class))).thenReturn(7);
+
+        controller.doPost(request, response);
+
+        verify(response).sendRedirect(CONTEXT_PATH + "/customer?action=view&id=7");
+    }
+
+    /** Trang Sửa chặn y như trang tạo, nếu không thì tạo xong sửa lại là đường vòng. */
+    @Test
+    public void update_nguoiHoTroLaCapTrenTrucTiep_biChan() throws Exception {
+        stubValidUpdateOfCustomer5();
+        when(request.getParameter("supportOwnerId")).thenReturn("77");
+        when(employeeDAO.findManagerMap()).thenReturn(Map.of(9, 77));
+
+        controller.doPost(request, response);
+
+        verify(customerDAO, never()).update(any());
+        verify(response).sendRedirect(CONTEXT_PATH + "/customer?action=edit&id=5&error=support_is_superior");
+    }
+
+    @Test
+    public void createForm_nhungCayCapTrenDeLocNguoiHoTro() throws Exception {
+        openCreateForm(null);
+        Map<Integer, Integer> cay = Map.of(22, 23);
+        when(employeeDAO.findManagerMap()).thenReturn(cay);
+
+        controller.doGet(request, response);
+
+        verify(request).setAttribute("managerOf", cay);
     }
 
 }
