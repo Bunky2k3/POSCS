@@ -192,8 +192,15 @@
         .field-row label { font-size: 0.75rem; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: .3px; margin-bottom: 6px; display: block; }
         .field-row .view-value {
             font-size: 0.95rem; color: #111827; font-weight: 500; min-height: 40px; display: flex; align-items: center;
+            flex-wrap: wrap;
             border: 1px solid #eef2f6; background: #f9fafb; border-radius: 10px; padding: 8px 14px;
         }
+        /* Dòng phụ dưới một con số (số đọc thành chữ, dòng giải thích giá trị
+           hiện hành) phải XUỐNG DÒNG. Ô là hàng flex nên thiếu hai dòng này thì
+           dòng phụ bị ép đứng cạnh con số -- "1.800.000.000 ₫Một tỷ tám trăm..."
+           dính liền, còn dòng giải thích bóp con số xuống hai hàng. */
+        .field-row .view-value > .money-words,
+        .field-row .view-value > div { flex-basis: 100%; }
         .field-row .view-value a { color: var(--primary); font-weight: 600; text-decoration: none; }
         .field-row .view-value a:hover { text-decoration: underline; }
 
