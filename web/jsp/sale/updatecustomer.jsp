@@ -142,6 +142,7 @@
                         <c:when test="${param.error == 'duplicate_email'}">Email này đã thuộc về một khách hàng khác. Vui lòng nhập email khác.</c:when>
                         <c:when test="${param.error == 'duplicate_phone'}">Số điện thoại này đã thuộc về một khách hàng khác. Vui lòng kiểm tra lại.</c:when>
                         <c:when test="${param.error == 'duplicate_tax_code'}">Mã số thuế này đã được đăng ký cho một khách hàng khác.</c:when>
+                        <c:when test="${param.error == 'support_is_superior'}">Người hỗ trợ không được là cấp trên trực tiếp của người phụ trách chính. Vui lòng chọn người khác.</c:when>
                         <c:when test="${param.error == 'update_failed'}">Không lưu được thay đổi. Vui lòng thử lại.</c:when>
                         <c:otherwise>Đã có lỗi xảy ra. Vui lòng thử lại.</c:otherwise>
                     </c:choose>
@@ -228,12 +229,17 @@
                     </div>
                     <div class="col-md-6 field-row">
                         <label>Người hỗ trợ</label>
+                        <%-- Lọc theo người phụ trách chính như ở addnewcustomer.jsp. Khách
+                             cũ đang có người hỗ trợ không còn hợp lệ (vd. vừa được xếp làm
+                             cấp trên của người phụ trách) thì mở form ra là bị bỏ chọn kèm
+                             dòng báo bên dưới, không bỏ lặng lẽ. --%>
                         <select class="form-select" id="supportAssignee" name="supportOwnerId">
                             <option value="">-- Chưa bố trí --</option>
                             <c:forEach var="staff" items="${userList}">
                                 <option value="${staff.userId}" ${staff.userId == customer.supportOwnerId ? 'selected' : ''}>${fn:escapeXml(staff.fullName)}</option>
                             </c:forEach>
                         </select>
+                        <div id="goiYNguoiHoTro" class="text-muted" style="display:none; font-size: 0.8rem; margin-top: 6px; text-transform: none; font-weight: 400;"></div>
                         <span class="error-text" id="err-supportAssignee">Người hỗ trợ phải khác người phụ trách chính.</span>
                     </div>
 
@@ -408,9 +414,26 @@
 
         oNguoiPhuTrach.addEventListener('change', function () { dienBoiDiaBan = false; });
 
+        // ===== Người hỗ trợ lọc theo người phụ trách chính =====
+        // Xem ghi chú ở addnewcustomer.jsp: gắn ở DOMContentLoaded vì
+        // appshell.js nạp sau đoạn script này. Lúc đó apDungPhanCongDiaBan
+        // bên dưới đã điền xong người phụ trách theo địa bàn, nên lần lọc đầu
+        // tiên lọc theo đúng người sẽ được lưu.
+        var capTrenCua = {
+            <c:forEach var="m" items="${managerOf}" varStatus="st">'${m.key}': ${m.value}<c:if test="${!st.last}">,</c:if></c:forEach>
+        };
+        var locNguoiHoTro = function () {};
+        document.addEventListener('DOMContentLoaded', function () {
+            locNguoiHoTro = POSCS.ganLocNguoiHoTro(oNguoiPhuTrach, document.getElementById('supportAssignee'),
+                    capTrenCua, document.getElementById('goiYNguoiHoTro'));
+        });
+
         document.getElementById('province').addEventListener('change', function () {
             loadWards(this.value, null);
             apDungPhanCongDiaBan(this.value);
+            // Địa bàn vừa điền lại người phụ trách bằng code -- không có sự
+            // kiện change, phải lọc tay.
+            locNguoiHoTro();
         });
 
         // Khởi tạo đúng danh sách xã/phường theo tỉnh đã chọn sẵn khi load trang
