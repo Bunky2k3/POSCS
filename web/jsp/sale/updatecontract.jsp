@@ -1035,12 +1035,12 @@
             </c:if>
         </div>
 
-        <%-- Khối hợp đồng nối kèm đứng ở cột hẹp, giống trang xem. Đã thử cả hai
-             chỗ và đo: ở cột hẹp, hợp đồng KHÔNG có liên kết nào (đa số) cho trang
-             ngắn hơn 265px; đổi lại, hợp đồng có hai liên kết dài thêm 124px. Lấy
-             ca phổ biến. --%>
             </div>
-            <c:if test="${canLinkContracts}">
+            <%-- Tab Tài liệu KHÔNG nằm trong c:if nào: nút của nó luôn hiện, kể cả
+                 trên phụ lục (biên bản, bản scan của chính phụ lục treo ở đây).
+                 Trước đây khung này lọt vào c:if canLinkContracts của tab Nối bán –
+                 mua ngay dưới, nên trên phụ lục nút có mà khung không -- bấm vào
+                 trống trơn, không thêm được tài liệu nào. --%>
             <div class="tab-pane fade" id="pane-tai-lieu" role="tabpanel">
         <!-- ===== Giấy tờ kèm theo (V34) ===== -->
         <%-- CHỈ LƯU LINK, không tải file lên. Khách hàng chốt như vậy: hồ sơ của
@@ -1141,6 +1141,9 @@
         </div>
 
             </div>
+            <%-- Điều kiện GIỐNG HỆT nút tab ở trên: canLinkContracts. Chỉ bọc đúng
+                 khung này thôi -- xem ghi chú ở khung Tài liệu. --%>
+            <c:if test="${canLinkContracts}">
             <div class="tab-pane fade" id="pane-noi-hd" role="tabpanel">
         <!-- ===== Đầu ra kéo theo đầu vào ===== -->
         <%-- Hợp đồng BÁN nối với các đơn MUA sinh ra vì nó, và ngược lại. Quan
