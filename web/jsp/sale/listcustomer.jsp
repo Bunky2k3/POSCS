@@ -307,6 +307,7 @@
                 <p>Quản lý thông tin khách hàng doanh nghiệp đối tác</p>
             </div>
             <div class="header-actions">
+                <a href="${pageContext.request.contextPath}/guide?module=customer#danh-sach" target="_blank" rel="noopener" class="guide-btn" title="Mở hướng dẫn sử dụng ở tab mới"><i class="fa-regular fa-circle-question"></i> Hướng dẫn</a>
                 <%-- Xuất Excel là thao tác ĐỌC: chỉ lấy đúng dữ liệu vai trò này vốn đã
                      xem được trên màn hình, đổi sang dạng file. Nên KHÔNG khoá theo
                      canManage -- xem PERMISSIONS.md. --%>

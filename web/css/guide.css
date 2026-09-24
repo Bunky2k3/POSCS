@@ -1,0 +1,171 @@
+/*
+ * Trang Hướng dẫn sử dụng (/guide?module=...). Mở ở tab riêng nên KHÔNG dùng
+ * khung app (sidebar/topbar của app): trang đọc và in được, có mục lục trái.
+ *
+ * Nội dung trong <main class="guide-content"> chỉ dùng một tập thẻ gọn --
+ * h2/h3, p, ol.guide-steps, figure.guide-shot, .guide-note/.guide-warn,
+ * table.guide-table -- vì tools/guide/ dựng lại chính nội dung đó sang file
+ * Word (Report6). Thêm kiểu trình bày mới thì nhớ dạy thêm cho phần xuất Word.
+ */
+
+:root {
+    --g-primary-dark: #003c6e;
+    --g-primary: #0568a6;
+    --g-primary-light: #0f9edb;
+    --g-mark: #e11d48;
+    --g-text: #1f2937;
+    --g-muted: #6b7280;
+    --g-line: #e5e7eb;
+    --g-bg: #f4f7fb;
+}
+
+* { box-sizing: border-box; }
+
+body.guide {
+    margin: 0;
+    font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Arial, sans-serif;
+    color: var(--g-text);
+    background: var(--g-bg);
+    font-size: 15px;
+    line-height: 1.65;
+}
+
+/* ===== Thanh trên ===== */
+.guide-topbar {
+    position: sticky; top: 0; z-index: 10;
+    display: flex; align-items: center; gap: 18px;
+    padding: 10px 28px; background: #fff;
+    box-shadow: 0 2px 12px rgba(0, 40, 80, 0.08);
+}
+.guide-topbar .brand img { height: 34px; display: block; }
+.guide-topbar .title { font-weight: 700; color: var(--g-primary-dark); white-space: nowrap; }
+.guide-tabs { display: flex; gap: 4px; flex-wrap: wrap; }
+.guide-tabs a, .guide-tabs span {
+    padding: 6px 12px; border-radius: 8px; font-size: 0.88rem; font-weight: 600;
+    color: var(--g-muted); text-decoration: none;
+}
+.guide-tabs a:hover { background: #eef6fd; color: var(--g-primary); }
+.guide-tabs .active { background: var(--g-primary); color: #fff; }
+.guide-tabs .soon { color: #b6bcc6; cursor: default; }
+.guide-topbar .spacer { flex: 1; }
+.guide-topbar .tool {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 7px 13px; border-radius: 9px; border: 1.5px solid var(--g-line);
+    background: #fff; color: var(--g-primary); font-weight: 600; font-size: 0.86rem;
+    text-decoration: none; cursor: pointer; font-family: inherit;
+}
+.guide-topbar .tool:hover { border-color: var(--g-primary-light); background: #eef6fd; }
+
+/* ===== Bố cục: mục lục + nội dung ===== */
+.guide-layout {
+    display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 28px;
+    max-width: 1280px; margin: 0 auto; padding: 26px 28px 60px;
+}
+.guide-toc {
+    position: sticky; top: 78px; align-self: start;
+    max-height: calc(100vh - 100px); overflow: auto;
+    background: #fff; border-radius: 14px; padding: 16px 14px;
+    box-shadow: 0 6px 20px rgba(0, 40, 80, 0.06);
+}
+.guide-toc h4 {
+    margin: 0 0 8px; font-size: 0.72rem; letter-spacing: .06em; text-transform: uppercase; color: var(--g-muted);
+}
+.guide-toc a {
+    display: block; padding: 5px 8px; border-radius: 7px; font-size: 0.86rem;
+    color: #374151; text-decoration: none; line-height: 1.35;
+}
+.guide-toc a.sub { padding-left: 20px; font-size: 0.8rem; color: var(--g-muted); }
+.guide-toc a:hover { background: #f1f6fb; color: var(--g-primary); }
+.guide-toc a.active { background: #e6f2fb; color: var(--g-primary-dark); font-weight: 600; }
+
+.guide-content {
+    background: #fff; border-radius: 16px; padding: 30px 38px 40px;
+    box-shadow: 0 10px 30px rgba(0, 40, 80, 0.06); min-width: 0;
+}
+.guide-content h1 { margin: 0 0 6px; font-size: 1.7rem; color: var(--g-primary-dark); }
+.guide-content .lead { color: var(--g-muted); margin: 0 0 18px; }
+.guide-content h2 {
+    margin: 38px 0 12px; padding-top: 18px; border-top: 1.5px solid #eef2f6;
+    font-size: 1.28rem; color: var(--g-primary-dark); scroll-margin-top: 80px;
+}
+.guide-content h3 { margin: 24px 0 8px; font-size: 1.05rem; color: #0b3b64; scroll-margin-top: 80px; }
+.guide-content p { margin: 8px 0; }
+.guide-content code {
+    background: #f3f4f6; border-radius: 5px; padding: 1px 6px; font-size: 0.88em;
+}
+
+/* Ai làm được */
+.guide-who { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 6px 0 12px; font-size: 0.86rem; }
+.guide-who .lbl { color: var(--g-muted); font-weight: 600; }
+.guide-who .role {
+    padding: 2px 10px; border-radius: 999px; font-weight: 600; font-size: 0.8rem;
+    background: #e6f2fb; color: var(--g-primary-dark);
+}
+.guide-who .role.no { background: #f3f4f6; color: #9ca3af; text-decoration: line-through; }
+
+/* Các bước: số tròn đỏ trùng với số khoanh trên ảnh */
+ol.guide-steps { list-style: none; counter-reset: step; padding-left: 0; margin: 10px 0 16px; }
+ol.guide-steps > li {
+    counter-increment: step; position: relative; padding: 6px 0 6px 42px; min-height: 30px;
+}
+ol.guide-steps > li::before {
+    content: counter(step); position: absolute; left: 0; top: 5px;
+    width: 27px; height: 27px; border-radius: 50%;
+    background: var(--g-mark); color: #fff; font-weight: 700; font-size: 0.85rem;
+    display: flex; align-items: center; justify-content: center;
+}
+/* Bước KHÔNG có số trên ảnh (vd. bước thao tác bàn phím) -- chấm xám. */
+ol.guide-steps > li.plain::before { background: #cbd5e1; }
+
+/* Ảnh chụp */
+figure.guide-shot { margin: 14px 0 22px; }
+figure.guide-shot a { display: block; }
+figure.guide-shot img {
+    display: block; max-width: 100%; height: auto; border-radius: 10px;
+    border: 1px solid var(--g-line); box-shadow: 0 8px 24px rgba(0, 40, 80, 0.1);
+}
+/* Ảnh DỌC (cả một form, trang chi tiết) để tràn bề ngang thì chiếm gần một
+   màn hình -- thu lại và căn giữa. */
+figure.guide-shot.narrow img { max-width: 720px; margin: 0 auto; }
+figure.guide-shot figcaption {
+    margin-top: 8px; text-align: center; font-size: 0.84rem; color: var(--g-muted); font-style: italic;
+}
+
+/* Lưu ý / cảnh báo */
+.guide-note, .guide-warn {
+    margin: 14px 0; padding: 12px 16px 12px 44px; border-radius: 12px; position: relative; font-size: 0.93rem;
+}
+.guide-note { background: #eef6fd; border-left: 4px solid var(--g-primary-light); }
+.guide-warn { background: #fff6e6; border-left: 4px solid #f5a623; }
+.guide-note::before, .guide-warn::before {
+    font-family: 'Font Awesome 6 Free'; font-weight: 900; position: absolute; left: 16px; top: 12px;
+}
+.guide-note::before { content: '\f05a'; color: var(--g-primary-light); }
+.guide-warn::before { content: '\f071'; color: #f5a623; }
+.guide-note p:first-child, .guide-warn p:first-child { margin-top: 0; }
+.guide-note p:last-child, .guide-warn p:last-child { margin-bottom: 0; }
+
+/* Bảng (quyền, thông báo lỗi...) */
+table.guide-table { width: 100%; border-collapse: collapse; margin: 12px 0 18px; font-size: 0.9rem; }
+table.guide-table th, table.guide-table td {
+    border: 1px solid var(--g-line); padding: 8px 11px; text-align: left; vertical-align: top;
+}
+table.guide-table th { background: #f3f7fb; color: #0b3b64; font-weight: 700; }
+
+@media (max-width: 960px) {
+    .guide-layout { grid-template-columns: minmax(0, 1fr); padding: 16px; }
+    .guide-toc { position: static; max-height: none; }
+    .guide-content { padding: 22px 18px; }
+    .guide-topbar { flex-wrap: wrap; padding: 10px 16px; }
+}
+
+/* In / Lưu PDF: bỏ thanh trên + mục lục, ảnh không bị cắt đôi qua trang. */
+@media print {
+    body.guide { background: #fff; font-size: 12pt; }
+    .guide-topbar, .guide-toc { display: none; }
+    .guide-layout { display: block; padding: 0; max-width: none; }
+    .guide-content { box-shadow: none; padding: 0; border-radius: 0; }
+    figure.guide-shot, table.guide-table, .guide-note, .guide-warn { break-inside: avoid; }
+    .guide-content h2 { break-before: auto; break-after: avoid; }
+    figure.guide-shot img { box-shadow: none; }
+}

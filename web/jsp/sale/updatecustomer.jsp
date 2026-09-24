@@ -130,6 +130,7 @@
                 <h2>Cập nhật thông tin khách hàng</h2>
                 <p>Mã khách hàng: <strong style="color:var(--primary-dark)">${fn:escapeXml(customer.enterpriseCode)}</strong> &middot; Mã số thuế: <strong style="color:var(--primary-dark)">${fn:escapeXml(customer.taxCode)}</strong></p>
             </div>
+            <a href="${pageContext.request.contextPath}/guide?module=customer#sua" target="_blank" rel="noopener" class="guide-btn" title="Mở hướng dẫn sử dụng ở tab mới"><i class="fa-regular fa-circle-question"></i> Hướng dẫn</a>
         </div>
 
         <div class="card-box">

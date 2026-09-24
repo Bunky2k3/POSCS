@@ -245,6 +245,7 @@
                 </div>
             </div>
             <div class="header-actions">
+                <a href="${pageContext.request.contextPath}/guide?module=customer#chi-tiet" target="_blank" rel="noopener" class="guide-btn" title="Mở hướng dẫn sử dụng ở tab mới"><i class="fa-regular fa-circle-question"></i> Hướng dẫn</a>
                 <c:if test="${canManage}">
                     <button class="btn-edit-detail" type="button" onclick="openEvaluateModal()"><i class="fa-solid fa-chart-line"></i> Đánh giá lại xếp hạng</button>
                     <a href="${pageContext.request.contextPath}/customer?action=edit&id=${customer.enterpriseId}" class="btn-edit-detail"><i class="fa-solid fa-pen"></i> Sửa thông tin</a>

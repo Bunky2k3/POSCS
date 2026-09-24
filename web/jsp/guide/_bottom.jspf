@@ -1,0 +1,46 @@
+<%@page pageEncoding="UTF-8"%>
+<%-- Phần CUỐI dùng chung của trang Hướng dẫn sử dụng -- xem _top.jspf. --%>
+        </main>
+    </div>
+    <script>
+        // Mục lục dựng từ chính các tiêu đề h2/h3 có id: viết nội dung xong là
+        // có mục lục, không phải khai hai nơi rồi để chúng lệch nhau.
+        (function () {
+            var toc = document.getElementById('guideToc');
+            var links = [];
+            document.querySelectorAll('#guideContent h2[id], #guideContent h3[id]').forEach(function (h) {
+                var a = document.createElement('a');
+                a.href = '#' + h.id;
+                a.textContent = h.textContent;
+                if (h.tagName === 'H3') {
+                    a.className = 'sub';
+                }
+                toc.appendChild(a);
+                links.push({ a: a, h: h });
+            });
+            // Tô sáng mục đang đọc = tiêu đề CUỐI CÙNG đã cuộn qua mép trên (dưới
+            // thanh trên). Không dùng IntersectionObserver: nó chỉ báo khi tiêu
+            // đề đi QUA dải theo dõi, nên bấm mục lục nhảy thẳng tới giữa một
+            // mục dài là mục lục vẫn sáng mục cũ.
+            var pending = false;
+            function highlight() {
+                pending = false;
+                var current = links.length ? links[0] : null;
+                links.forEach(function (l) {
+                    if (l.h.getBoundingClientRect().top <= 110) {
+                        current = l;
+                    }
+                });
+                links.forEach(function (l) { l.a.classList.toggle('active', l === current); });
+            }
+            window.addEventListener('scroll', function () {
+                if (!pending) {
+                    pending = true;
+                    window.requestAnimationFrame(highlight);
+                }
+            }, { passive: true });
+            highlight();
+        })();
+    </script>
+</body>
+</html>
