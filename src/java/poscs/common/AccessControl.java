@@ -123,6 +123,12 @@ public final class AccessControl {
         return user != null && user.getRole() != null && ROLE_ADMIN.equals(user.getRole().getRoleName());
     }
 
+    /** true nếu người đang đăng nhập giữ vai trò Sales. */
+    public static boolean isSales(HttpServletRequest request) {
+        User user = currentUser(request);
+        return user != null && user.getRole() != null && ROLE_SALES.equals(user.getRole().getRoleName());
+    }
+
     /** Giá trị tham số "view" trên URL hai màn hình danh sách. */
     public static final String VIEW_MINE = "mine";
     public static final String VIEW_ALL = "all";

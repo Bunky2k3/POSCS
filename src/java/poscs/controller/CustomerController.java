@@ -2,9 +2,12 @@ package poscs.controller;
 
 import java.io.IOException;
 import java.sql.Date;
+import java.text.Collator;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.stream.Collectors;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.MultipartConfig;
@@ -260,20 +263,65 @@ public class CustomerController extends HttpServlet {
         if (!AccessControl.requireFullAccess(request, response, AccessControl.Resource.CUSTOMER)) {
             return;
         }
-        request.setAttribute("userList", employeeDAO.findActiveByRole(SALES_ROLE));
-        request.setAttribute("provinceList", addressDAO.findBranchProvinces());
-        // Phân công địa bàn, để form điền sẵn rồi KHOÁ ô người phụ trách khi
-        // chọn tỉnh. Nhúng cả bảng (34 tỉnh) một lần thay vì gọi AJAX mỗi lần
-        // đổi ô tỉnh -- dữ liệu nhỏ, và đỡ hẳn một endpoint phải gác quyền
-        // riêng. Khoá thật nằm ở resolveAccountOwnerId, đây chỉ là tầng hiển thị.
-        request.setAttribute("territoryAssignments", employeeDAO.findAllAssignments());
-        // Tick sẵn vai ứng với danh sách người dùng vừa đứng: bấm "Thêm" từ
-        // trang Nhà cung cấp mà form mặc định là khách mua thì lưu xong nó
-        // rơi vào danh sách kia, và người nhập không hiểu vì sao.
+        // Hai trang riêng -- Thêm khách hàng / Thêm nhà cung cấp -- dùng chung
+        // một khung JSP, khác nhau ở kind. Vai suy từ trang đang đứng chứ không
+        // còn ô tick: bấm "Thêm" từ danh sách nào thì bản ghi về đúng danh sách
+        // đó. Xem handleCreate cho luật người phụ trách của từng trang.
         String role = roleFromKind(request.getParameter("kind"));
-        request.setAttribute("customerRoles", List.of(role));
+        boolean supplier = ROLE_SUPPLIER.equals(role);
+        request.setAttribute("kind", supplier ? "supplier" : "buyer");
         request.setAttribute("customerTypeOptions", customerTypesFor(role));
+        request.setAttribute("userList", employeeDAO.findActiveByRole(SALES_ROLE));
+
+        User me = AccessControl.currentUser(request);
+        if (supplier) {
+            // ĐỊA BÀN KHÔNG ÁP CHO NHÀ CUNG CẤP (xem showList): địa chỉ chọn
+            // trong cả 34 tỉnh, và không nhúng bảng phân công.
+            request.setAttribute("provinceList", addressDAO.findAllProvinces());
+            if (AccessControl.isSales(request)) {
+                request.setAttribute("lockedOwner", me);
+            }
+        } else {
+            List<Province> myProvinces = territoryOf(request);
+            if (!myProvinces.isEmpty()) {
+                request.setAttribute("provinceList", myProvinces);
+                request.setAttribute("lockedOwner", me);
+            } else {
+                request.setAttribute("provinceList", addressDAO.findBranchProvinces());
+                // Phân công địa bàn, để form điền sẵn rồi KHOÁ ô người phụ trách khi
+                // chọn tỉnh. Nhúng cả bảng (34 tỉnh) một lần thay vì gọi AJAX mỗi lần
+                // đổi ô tỉnh -- dữ liệu nhỏ, và đỡ hẳn một endpoint phải gác quyền
+                // riêng. Khoá thật nằm ở resolveAccountOwnerId, đây chỉ là tầng hiển thị.
+                request.setAttribute("territoryAssignments", employeeDAO.findAllAssignments());
+            }
+        }
         request.getRequestDispatcher(CREATE_VIEW).forward(request, response);
+    }
+
+    /**
+     * Các tỉnh người đang đăng nhập TRỰC TIẾP cầm, nếu họ là Sales -- rỗng với
+     * mọi trường hợp còn lại.
+     *
+     * <p>Không rỗng thì trang Thêm khách hàng khoá theo người đó: chỉ các tỉnh
+     * này, khách đứng tên chính họ. Rỗng thì trang chạy như cũ, người phụ trách
+     * suy theo địa bàn: Admin, và cả Sales chưa được giao tỉnh nào -- chốt với
+     * người dùng 2026-09-24, để CSKH vẫn tạo được khách hộ người cầm tỉnh.
+     *
+     * <p>Không gộp tỉnh của cấp dưới: khách ở tỉnh của lính thì phải đứng tên
+     * lính, không phải tên sếp.
+     */
+    private List<Province> territoryOf(HttpServletRequest request) {
+        if (!AccessControl.isSales(request)) {
+            return List.of();
+        }
+        List<Province> provinces = new ArrayList<>(
+                employeeDAO.findProvincesOf(AccessControl.currentUser(request).getUserId()));
+        // findProvincesOf xếp theo tên đầy đủ ("Thành phố ..." đứng trước mọi
+        // "Tỉnh ..."), còn dropdown hiện tên ngắn -- xếp lại theo tên ngắn cho
+        // giống các ô tỉnh khác.
+        provinces.sort(Comparator.comparing(Province::getShortName,
+                Collator.getInstance(Locale.forLanguageTag("vi"))));
+        return provinces;
     }
 
     private void showEditForm(HttpServletRequest request, HttpServletResponse response)
@@ -390,7 +438,13 @@ public class CustomerController extends HttpServlet {
         if (!AccessControl.requireFullAccess(request, response, AccessControl.Resource.CUSTOMER)) {
             return;
         }
-        if (!logoIsAcceptable(request, response, request.getContextPath() + "/customer?action=new")) {
+        // Vai theo trang gửi form lên (kind), không theo ô tick: mỗi trang tạo
+        // đúng một vai, nên cũng không còn chuyện lưu khách không vai nào. Công
+        // ty vừa mua vừa bán thì tick thêm vai thứ hai ở trang Sửa.
+        String role = roleFromKind(request.getParameter("kind"));
+        boolean supplier = ROLE_SUPPLIER.equals(role);
+        String formUrl = request.getContextPath() + "/customer?action=new" + (supplier ? "&kind=supplier" : "");
+        if (!logoIsAcceptable(request, response, formUrl)) {
             return;
         }
         Enterprise e = new Enterprise();
@@ -404,7 +458,32 @@ public class CustomerController extends HttpServlet {
         e.setStatus("Active");
         e.setJoinDate(parseDateOrNull(request.getParameter("joinDate")));
 
-        Integer accountOwnerId = resolveAccountOwnerId(request);
+        // Người phụ trách chính -- chỗ khoá thật; JSP chỉ khoá hình. Bỏ qua ô
+        // accountOwnerId gửi lên ở mọi nhánh có khoá, như một request nặn tay.
+        User me = AccessControl.currentUser(request);
+        Integer accountOwnerId;
+        if (supplier) {
+            // Nhà cung cấp không chia theo địa bàn: Sales tạo thì đứng tên chính
+            // mình, Admin chọn tay. Không tra bảng phân công -- người cầm tỉnh
+            // nơi nhà cung cấp đặt văn phòng chẳng liên quan gì tới họ.
+            accountOwnerId = AccessControl.isSales(request)
+                    ? Integer.valueOf(me.getUserId())
+                    : parseIntOrNull(request.getParameter("accountOwnerId"));
+        } else if (!territoryOf(request).isEmpty()) {
+            // Sales đã được giao tỉnh: chỉ tạo khách trong tỉnh mình cầm, khách
+            // đứng tên mình. Kiểm theo XÃ/PHƯỜNG như resolveAccountOwnerId, không
+            // theo ô tỉnh rời. Mỗi tỉnh chỉ một người cầm (UNIQUE ở
+            // user_provinces), nên "xã này thuộc tỉnh của tôi" chính là "người
+            // cầm xã này là tôi".
+            Integer wardId = parseIntOrNull(request.getParameter("districtId"));
+            if (wardId != null && !Integer.valueOf(me.getUserId()).equals(employeeDAO.findAssigneeOfWard(wardId))) {
+                response.sendRedirect(formUrl + "&error=province_not_allowed");
+                return;
+            }
+            accountOwnerId = me.getUserId();
+        } else {
+            accountOwnerId = resolveAccountOwnerId(request);
+        }
         if (accountOwnerId != null) {
             e.setAccountOwnerId(accountOwnerId);
         }
@@ -417,18 +496,13 @@ public class CustomerController extends HttpServlet {
         // khách không có địa chỉ sẽ rơi khỏi mọi bộ lọc/thống kê theo tỉnh.
         // Chỉ chặn ở tầng ứng dụng, cột address_id vẫn để NULL được cho dữ
         // liệu cũ tạo trước thay đổi này.
-        // Ít nhất một vai: khách không vai nào sẽ không xuất hiện ở cả hai
-        // danh sách -- lưu được nhưng coi như biến mất. CSDL không ép được
-        // luật này (ràng buộc nằm ở bảng khác, CHECK không với tới), nên chặn
-        // ở đây là chốt duy nhất.
-        List<String> roles = rolesFromRequest(request);
-        if (!isValidCommonFields(e) || isBlank(e.getTaxCode()) || e.getAddress() == null || roles.isEmpty()) {
-            response.sendRedirect(request.getContextPath() + "/customer?action=new&error=invalid");
+        if (!isValidCommonFields(e) || isBlank(e.getTaxCode()) || e.getAddress() == null) {
+            response.sendRedirect(formUrl + "&error=invalid");
             return;
         }
         String duplicate = findDuplicateField(e, null);
         if (duplicate != null) {
-            response.sendRedirect(request.getContextPath() + "/customer?action=new&error=" + duplicate);
+            response.sendRedirect(formUrl + "&error=" + duplicate);
             return;
         }
 
@@ -438,15 +512,17 @@ public class CustomerController extends HttpServlet {
         // đường nào dọn.
         e.setLogoUrl(FileStorage.save(request.getPart("logo"), LOGO_SUBFOLDER, FileStorage.IMAGE_EXTENSIONS));
 
-        e.setEnterpriseCode(customerDAO.generateNextEnterpriseCode());
+        e.setEnterpriseCode(supplier
+                ? customerDAO.generateNextSupplierCode()
+                : customerDAO.generateNextEnterpriseCode());
         int newId = customerDAO.insert(e);
         if (newId <= 0) {
             LOG.warn("Tao khach hang that bai (actor={}, enterpriseCode={})", Logs.actor(request), e.getEnterpriseCode());
-            response.sendRedirect(request.getContextPath() + "/customer?action=new&error=create_failed");
+            response.sendRedirect(formUrl + "&error=create_failed");
             return;
         }
         // Vai nằm ở bảng riêng nên phải ghi tách khỏi hồ sơ khách hàng.
-        customerDAO.replaceRolesOf(newId, roles);
+        customerDAO.replaceRolesOf(newId, List.of(role));
         response.sendRedirect(request.getContextPath() + "/customer?action=view&id=" + newId);
     }
 
