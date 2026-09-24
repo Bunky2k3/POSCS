@@ -277,7 +277,7 @@
     <c:if test="${param.error == 'missing_term'}">
         <div class="toast-msg blocked show">
             <i class="fa-solid fa-circle-xmark"></i>
-            <span>Chưa ký được: hợp đồng còn thiếu ngày hiệu lực hoặc ngày kết thúc. Vào Sửa thông tin để điền thời hạn trước.</span>
+            <span>Chưa ký được: hợp đồng còn thiếu ngày hiệu lực hoặc ngày kết thúc. Bấm Quản lý hợp đồng, điền thời hạn và lưu trước.</span>
         </div>
     </c:if>
     <c:if test="${param.error == 'progress_failed'}">
@@ -379,8 +379,9 @@
 
              Mọi thao tác làm thay đổi dữ liệu -- ký, thanh lý, chấm dứt sớm,
              huỷ bản ghi, gắn/gỡ hàng hoá, lập kỳ thanh toán, ghi nhận đã thu --
-             đã chuyển sang trang Sửa thông tin (updatecontract.jsp). Trang xem
-             chỉ trình bày, không có nút nào gây thay đổi.
+             đã chuyển sang trang Quản lý hợp đồng (updatecontract.jsp). Trang
+             xem chỉ trình bày; ngoại lệ duy nhất là nút "Đã xử lý xong" của
+             chặng bàn giao (xem ghi chú đầu file).
 
              Đừng thêm nút thao tác vào đây. Nếu cần một hành động mới thì nó
              thuộc về trang sửa. --%>
