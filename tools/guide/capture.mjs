@@ -205,6 +205,15 @@ class Page {
         await this.settle(500);
     }
 
+    // Chọn file cho ô <input type=file>, như người dùng bấm "Chọn tệp". Phải đi
+    // qua DOM.setFileInputFiles: JS trên trang không được phép tự gán file vào ô.
+    async upload(selector, filePath) {
+        await this.need(selector);
+        const { root } = await this.cdp.send('DOM.getDocument', { depth: 0 });
+        const { nodeId } = await this.cdp.send('DOM.querySelector', { nodeId: root.nodeId, selector });
+        await this.cdp.send('DOM.setFileInputFiles', { nodeId, files: [path.resolve(filePath)] });
+    }
+
     async need(selector) {
         if (!await this.eval(`!!document.querySelector(${JSON.stringify(selector)})`)) {
             throw new Error('Không thấy phần tử ' + selector);
@@ -237,9 +246,11 @@ async function login(page, user) {
     }
 }
 
-// Vẽ khung + số đỏ lên các phần tử cần chỉ. marks: [{ sel, n, text?, pad? }]
+// Vẽ khung + số đỏ lên các phần tử cần chỉ. marks: [{ sel, n, text?, within?, pad? }]
 // -- có text thì lấy phần tử ĐẦU TIÊN khớp sel mà chữ bên trong chứa text
-// (cho những khối không có id riêng, vd. tiêu đề mục "Người liên hệ"). Trả
+// (cho những khối không có id riêng, vd. tiêu đề mục "Người liên hệ"); có
+// within = { sel, text? } thì chỉ tìm bên trong khối đầu tiên khớp within
+// (vd. đúng nhãn tiến độ của MỘT dòng bảng, chọn dòng theo chữ của nó). Trả
 // về các mark không tìm thấy -- kịch bản sai thì phải báo, đừng chụp ảnh
 // thiếu số.
 function marksScript(marks) {
@@ -251,11 +262,17 @@ function marksScript(marks) {
         layer.style.cssText = 'position:absolute;left:0;top:0;width:0;height:0;z-index:2147483647;pointer-events:none;';
         document.body.appendChild(layer);
         const missing = [];
+        const pick = (root, sel, text) => text
+            ? Array.from(root.querySelectorAll(sel)).find((e) => e.textContent.includes(text))
+            : root.querySelector(sel);
         for (const m of ${JSON.stringify(marks)}) {
-            const el = m.text
-                ? Array.from(document.querySelectorAll(m.sel)).find((e) => e.textContent.includes(m.text))
-                : document.querySelector(m.sel);
-            if (!el) { missing.push(m.text ? m.sel + ' "' + m.text + '"' : m.sel); continue; }
+            const root = m.within ? pick(document, m.within.sel, m.within.text) : document;
+            const el = root ? pick(root, m.sel, m.text) : null;
+            if (!el) {
+                missing.push((m.within ? m.within.sel + (m.within.text ? ' "' + m.within.text + '"' : '') + ' > ' : '')
+                    + (m.text ? m.sel + ' "' + m.text + '"' : m.sel));
+                continue;
+            }
             const r = el.getBoundingClientRect();
             const pad = m.pad == null ? 5 : m.pad;
             const x = r.left + window.scrollX - pad;
@@ -313,17 +330,37 @@ async function clipOf(page, clip, margin = 16) {
 }
 
 async function capture(page, shot, outFile) {
+    // Khung đỏ phải vẽ và chụp trên CÙNG MỘT bố cục trang. Trước đây vùng chụp
+    // dài hơn khung nhìn thì để Chrome tự nới lúc chụp (captureBeyondViewport):
+    // trang dàn lại SAU khi khung đã vẽ -- thanh cuộn dọc biến mất, nội dung căn
+    // giữa trôi sang phải ~10px, còn khung đỏ đứng yên ở toạ độ cũ, nên mọi khung
+    // lệch trái (cả loạt ảnh mẫu Khách hàng dính). Giờ nới khung nhìn cho chứa
+    // trọn vùng chụp TRƯỚC, đo lại, rồi mới vẽ khung và chụp.
+    await page.eval('window.scrollTo(0, 0)');
+    let clip = await clipOf(page, shot.clip, shot.margin);
+    for (let i = 0; clip && i < 3; i++) {
+        const view = await page.eval('({ w: window.innerWidth, h: window.innerHeight })');
+        const bottom = Math.ceil(clip.y + clip.height);
+        if (bottom <= view.h) {
+            break;
+        }
+        await page.cdp.send('Emulation.setDeviceMetricsOverride', {
+            width: view.w, height: bottom, deviceScaleFactor: 1, mobile: false
+        });
+        await page.settle(300);
+        await page.eval('window.scrollTo(0, 0)');
+        // Dàn lại rồi thì đo lại -- vùng chụp có thể đã dời chỗ.
+        clip = await clipOf(page, shot.clip, shot.margin);
+    }
     if (shot.marks && shot.marks.length) {
         const missing = await page.eval(marksScript(shot.marks));
         if (missing.length) {
             throw new Error('Không thấy phần tử để khoanh số: ' + missing.join(', '));
         }
     }
-    const clip = await clipOf(page, shot.clip, shot.margin);
     const params = { format: 'png' };
     if (clip) {
         params.clip = clip;
-        params.captureBeyondViewport = true;
     }
     const { data } = await page.cdp.send('Page.captureScreenshot', params);
     writeFileSync(outFile, Buffer.from(data, 'base64'));
