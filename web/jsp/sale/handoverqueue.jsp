@@ -94,6 +94,14 @@
             </a>
         </div>
 
+        <%-- Bấm "Xong" hỏng thì controller quay về đây kèm error -- trước đây
+             trang không đọc tham số đó, nên bấm hỏng là màn hình đứng im. --%>
+        <c:if test="${param.error == 'handover_done_failed'}">
+            <div class="alert alert-danger py-2 px-3 mb-3" style="font-size: 0.9rem; border-radius: 12px;">
+                Không xác nhận được chặng bàn giao &mdash; có thể phòng đó đã báo xong trước rồi. Ô ghi chú là bắt buộc.
+            </div>
+        </c:if>
+
         <%-- Phạm vi. Mặc định TOÀN CHI NHÁNH, khác hai màn danh sách -- lý do ghi
              ở ContractController#showHandoverQueue: người phòng Kế toán/Dự án
              không đứng tên hợp đồng nào, nên "của tôi" với họ là màn hình trống.

@@ -225,6 +225,14 @@
                         <c:when test="${param.error == 'link_invalid'}">Không nối được hai hợp đồng này: phải là một hợp đồng bán với một hợp đồng mua, và cả hai đều phải là hợp đồng gốc (không phải phụ lục).</c:when>
                         <c:when test="${param.error == 'link_duplicate'}">Hai hợp đồng này đã nối với nhau rồi.</c:when>
                         <c:when test="${param.error == 'unlink_failed'}">Không gỡ được liên kết. Vui lòng thử lại.</c:when>
+                        <%-- Năm mã dưới đây controller gửi về CHÍNH trang này (action=edit).
+                             Câu của chúng từng nằm ở trang xem -- nơi không bao giờ nhận
+                             chúng -- nên ở đây người dùng chỉ thấy câu chung chung cuối cùng. --%>
+                        <c:when test="${param.error == 'add_product_invalid'}">Không thêm được hàng hoá: chọn một sản phẩm và nhập số lượng là số nguyên lớn hơn 0 (viết 1.000 cũng được).</c:when>
+                        <c:when test="${param.error == 'add_product_failed'}">Không thêm được hàng hoá — hàng hoá chỉ sửa được khi hợp đồng còn là bản Nháp. Nếu vừa có người ký hợp đồng này, tải lại trang để xem.</c:when>
+                        <c:when test="${param.error == 'remove_product_failed'}">Không gỡ được hàng hoá này — hàng hoá chỉ sửa được khi hợp đồng còn là bản Nháp.</c:when>
+                        <c:when test="${param.error == 'payment_failed'}">Không thực hiện được trên kỳ thanh toán — kiểm lại số tiền (phải lớn hơn 0) và ngày đến hạn. Kỳ đã ghi nhận thu thì không ghi lại được; hợp đồng đã thanh lý hoặc chấm dứt thì không lập hay xoá kỳ được nữa.</c:when>
+                        <c:when test="${param.error == 'handover_done_failed'}">Không xác nhận được chặng bàn giao — có thể phòng đó đã báo xong trước rồi. Ô ghi chú là bắt buộc.</c:when>
                         <c:otherwise>Đã có lỗi xảy ra. Vui lòng thử lại.</c:otherwise>
                     </c:choose>
                 </div>

@@ -260,34 +260,18 @@
             <span>Không xuất được PDF: hợp đồng có quá nhiều dòng sản phẩm/ghi chú dài để vừa 1 trang. Hãy rút gọn ghi chú hoặc liên hệ quản trị viên.</span>
         </div>
     </c:if>
-    <c:if test="${param.error == 'add_product_invalid'}">
+    <%-- Chỉ những mã controller gửi về TRANG NÀY (action=view). Lỗi hàng hoá và
+         kỳ thanh toán thì về trang quản lý -- câu của chúng nằm bên đó. --%>
+    <c:if test="${param.error == 'amendment_not_allowed'}">
         <div class="toast-msg blocked show">
             <i class="fa-solid fa-circle-xmark"></i>
-            <span>Không thêm được sản phẩm: vui lòng chọn sản phẩm và nhập số lượng hợp lệ.</span>
-        </div>
-    </c:if>
-    <c:if test="${param.error == 'add_product_failed'}">
-        <div class="toast-msg blocked show">
-            <i class="fa-solid fa-circle-xmark"></i>
-            <span>Thêm sản phẩm thất bại -- vui lòng thử lại.</span>
-        </div>
-    </c:if>
-    <c:if test="${param.error == 'remove_product_failed'}">
-        <div class="toast-msg blocked show">
-            <i class="fa-solid fa-circle-xmark"></i>
-            <span>Không gỡ được sản phẩm này -- vui lòng thử lại.</span>
+            <span>Không lập được phụ lục: phụ lục chỉ lập từ hợp đồng gốc đã ký và chưa thanh lý. Có thể hợp đồng vừa được thanh lý hoặc chấm dứt.</span>
         </div>
     </c:if>
     <c:if test="${param.error == 'void_reason_required'}">
         <div class="toast-msg blocked show">
             <i class="fa-solid fa-circle-xmark"></i>
             <span>Phải có lý do thì mới huỷ được bản ghi hợp đồng.</span>
-        </div>
-    </c:if>
-    <c:if test="${param.error == 'payment_failed'}">
-        <div class="toast-msg blocked show">
-            <i class="fa-solid fa-circle-xmark"></i>
-            <span>Không thực hiện được trên kỳ thanh toán &mdash; kiểm lại số tiền, ngày đến hạn, hoặc hợp đồng đã đóng băng.</span>
         </div>
     </c:if>
     <c:if test="${param.error == 'missing_term'}">
