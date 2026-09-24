@@ -25,9 +25,11 @@
             var pending = false;
             function highlight() {
                 pending = false;
+                // Tiêu đề đã lên tới 1/3 trên màn hình là người đọc đã vào mục đó.
+                var line = Math.max(110, window.innerHeight * 0.35);
                 var current = links.length ? links[0] : null;
                 links.forEach(function (l) {
-                    if (l.h.getBoundingClientRect().top <= 110) {
+                    if (l.h.getBoundingClientRect().top <= line) {
                         current = l;
                     }
                 });

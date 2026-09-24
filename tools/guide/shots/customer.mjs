@@ -35,7 +35,10 @@ export default {
                 { sel: '.header-actions .btn-outline-action', n: 5 },
                 { sel: '.header-actions .btn-add', n: 6 },
                 { sel: 'table tbody tr:first-child td:last-child', n: 7 }
-            ]
+            ],
+            // Chỉ phần nội dung trang: cả khung 1920px thu vào trang hướng dẫn thì
+            // chữ trong ảnh nhỏ quá không đọc nổi.
+            clip: '.page-container'
         },
         {
             file: '02-loc-tinh.png',
