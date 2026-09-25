@@ -427,7 +427,12 @@ public class EmployeeDAO {
                 "JOIN departments dep ON u.department_id = dep.department_id WHERE 1=1");
         List<Object> params = new ArrayList<>();
         appendFilters(sql, params, keyword, statusFilter, roleFilter);
-        sql.append(" ORDER BY u.created_at DESC LIMIT ? OFFSET ?");
+        // user_id đứng sau làm khoá phụ: created_at trùng nhau là chuyện thường
+        // (12 tài khoản mẫu cùng một mốc tạo), mà với các dòng bằng nhau MySQL
+        // không hứa thứ tự nào cả -- mỗi câu LIMIT/OFFSET trả một kiểu, nên
+        // cùng một người hiện ở cả trang 1 lẫn trang 2 còn người khác thì biến
+        // khỏi mọi trang. Thứ tự phải toàn phần thì phân trang mới đúng.
+        sql.append(" ORDER BY u.created_at DESC, u.user_id DESC LIMIT ? OFFSET ?");
         params.add(pageSize);
         params.add((page - 1) * pageSize);
 
