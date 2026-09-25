@@ -3,7 +3,14 @@
 <%@taglib prefix="fn" uri="jakarta.tags.functions"%>
 <%--
     Servlet cần đặt request attribute sau trước khi forward tới trang này:
-      - employee : poscs.model.User (đã kèm .role, .address.district.province nếu có)
+      - employee          : poscs.model.User (đã kèm .role, .address.district.province nếu có)
+      - dateOfBirthText, hireDateText : ngày đã định dạng dd/MM/yyyy (null nếu chưa có)
+      - assignedProvinces : tỉnh người này trực tiếp cầm
+      - managedProvinces  : tỉnh suy ra từ cấp dưới (rỗng nếu không có cấp dưới)
+
+    Từ V35 giới tính / ngày sinh / CCCD / SĐT có thể còn trống (nhân viên tự
+    bổ sung ở lần đăng nhập đầu) -- ô trống ghi "Chưa cập nhật" thay vì để
+    một khung rỗng trông như lỗi hiển thị.
 --%>
 <!DOCTYPE html>
 <html lang="vi">
@@ -185,24 +192,24 @@
 
                     <div class="col-md-4 field-row">
                         <label>Giới tính</label>
-                        <div class="view-value"><c:out value="${employee.gender}"/></div>
+                        <div class="view-value"><c:out value="${employee.gender}" default="Chưa cập nhật"/></div>
                     </div>
                     <div class="col-md-4 field-row">
                         <label>Ngày sinh</label>
-                        <div class="view-value"><c:out value="${dateOfBirthText}"/></div>
+                        <div class="view-value"><c:out value="${dateOfBirthText}" default="Chưa cập nhật"/></div>
                     </div>
                     <div class="col-md-4 field-row">
                         <label>Số CCCD/CMND</label>
-                        <div class="view-value"><c:out value="${employee.citizenId}"/></div>
+                        <div class="view-value"><c:out value="${employee.citizenId}" default="Chưa cập nhật"/></div>
                     </div>
 
                     <div class="col-md-6 field-row">
                         <label>Số điện thoại</label>
-                        <div class="view-value"><c:out value="${employee.phone}"/></div>
+                        <div class="view-value"><c:out value="${employee.phone}" default="Chưa cập nhật"/></div>
                     </div>
                     <div class="col-md-6 field-row">
                         <label>Email cá nhân</label>
-                        <div class="view-value"><c:out value="${employee.personalEmail}" default="—"/></div>
+                        <div class="view-value"><c:out value="${employee.personalEmail}" default="Chưa cập nhật"/></div>
                     </div>
                 </div>
 

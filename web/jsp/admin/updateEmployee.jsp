@@ -39,6 +39,9 @@
 
         .field-row { margin-bottom: 18px; }
         .field-row label { font-size: 0.75rem; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: .3px; margin-bottom: 6px; display: block; }
+        .field-row label .req { color: var(--danger); }
+        /* Chú thích trong nhãn giữ chữ thường, không ăn text-transform của nhãn. */
+        .field-row label .label-note { text-transform: none; font-weight: 400; letter-spacing: normal; }
         .form-control, .form-select { padding: 0.6rem 0.9rem; border-radius: 10px; border: 1px solid #e5e7eb; background-color: #f9fafb; font-size: 0.9rem; }
         .form-control:focus, .form-select:focus { background-color: #ffffff; border-color: var(--primary-light); box-shadow: 0 0 0 4px rgba(15,158,219,0.15); }
         .error-text { color: var(--danger); font-size: 12px; margin-top: 5px; display: none; }
@@ -53,7 +56,16 @@
             padding: 0.6rem 0.9rem; font-size: 0.9rem; color: #374151; font-weight: 500;
         }
         .emp-prov-toggle:hover, .emp-prov-toggle:focus { border-color: var(--primary-light); outline: none; }
-        .prov-row.is-locked { color: #9ca3af; cursor: not-allowed; }
+        /* Dòng tỉnh trong bảng chọn cũng là <label> nằm trong .field-row, nên ăn
+           luôn kiểu nhãn ô nhập ở trên (chữ HOA, cỡ nhỏ, xám, display:block):
+           tên tỉnh viết hoa, tên người đang cầm rớt xuống dòng. Trả lại đúng
+           kiểu .prov-row của appshell.css. */
+        .field-row label.prov-row {
+            display: flex; align-items: center; gap: 8px; margin-bottom: 0;
+            padding: 5px 2px; font-size: 0.85rem; font-weight: 400; color: #374151;
+            text-transform: none; letter-spacing: normal;
+        }
+        .prov-row.is-locked, .field-row label.prov-row.is-locked { color: #9ca3af; cursor: not-allowed; }
         .province-holder-note { margin-left: auto; color: var(--danger); font-size: 0.72rem; white-space: nowrap; }
 
         .action-bar { display: flex; gap: 12px; margin-top: 28px; justify-content: flex-end; border-top: 1.5px solid #eef2f6; padding-top: 22px; }
@@ -105,11 +117,11 @@
                     <div class="section-header"><h5>Thông tin công việc</h5></div>
                     <div class="row">
                         <div class="col-md-6 field-row">
-                            <label for="username">Tên đăng nhập (hệ thống tự sinh -- không thể sửa)</label>
+                            <label for="username">Tên đăng nhập <span class="label-note">(hệ thống tự sinh, không sửa được)</span></label>
                             <input type="text" class="form-control" id="username" value="${fn:escapeXml(employee.username)}" disabled readonly>
                         </div>
                         <div class="col-md-6 field-row">
-                            <label for="department">Phòng ban</label>
+                            <label for="department">Phòng ban <span class="req">*</span></label>
                             <select class="form-select" id="department" name="departmentId">
                                 <c:forEach var="d" items="${departmentList}">
                                     <option value="${d.departmentId}" ${d.departmentId == employee.departmentId ? 'selected' : ''}>${fn:escapeXml(d.departmentName)}</option>
@@ -118,7 +130,7 @@
                             <span class="error-text" id="err-department">Vui lòng chọn phòng ban.</span>
                         </div>
                         <div class="col-md-6 field-row">
-                            <label for="roleId">Vai trò</label>
+                            <label for="roleId">Vai trò <span class="req">*</span></label>
                             <select class="form-select" id="roleId" name="roleId">
                                 <c:forEach var="r" items="${roleList}">
                                     <option value="${r.roleId}" ${r.roleId == employee.roleId ? 'selected' : ''}>${fn:escapeXml(r.roleName)}</option>
@@ -127,7 +139,7 @@
                             <span class="error-text" id="err-roleId">Vui lòng chọn vai trò.</span>
                         </div>
                         <div class="col-md-6 field-row">
-                            <label for="hireDate">Ngày vào làm</label>
+                            <label for="hireDate">Ngày vào làm <span class="req">*</span></label>
                             <input type="date" class="form-control" id="hireDate" name="hireDate" value="${employee.hireDate}">
                             <span class="error-text" id="err-hireDate">Vui lòng chọn ngày vào làm.</span>
                         </div>
@@ -179,7 +191,7 @@
                     <div class="section-header"><h5>Thông tin cá nhân</h5></div>
                     <div class="row">
                         <div class="col-md-4 field-row">
-                            <label for="lastName">Họ</label>
+                            <label for="lastName">Họ <span class="req">*</span></label>
                             <input type="text" class="form-control" id="lastName" name="lastName" value="${fn:escapeXml(employee.lastName)}">
                             <span class="error-text" id="err-lastName">Trường này không được để trống.</span>
                         </div>
@@ -188,7 +200,7 @@
                             <input type="text" class="form-control" id="middleName" name="middleName" value="${fn:escapeXml(employee.middleName)}">
                         </div>
                         <div class="col-md-4 field-row">
-                            <label for="firstName">Tên</label>
+                            <label for="firstName">Tên <span class="req">*</span></label>
                             <input type="text" class="form-control" id="firstName" name="firstName" value="${fn:escapeXml(employee.firstName)}">
                             <span class="error-text" id="err-firstName">Trường này không được để trống.</span>
                         </div>
@@ -221,7 +233,7 @@
                             <span class="error-text" id="err-phone">Số điện thoại không hợp lệ.</span>
                         </div>
                         <div class="col-md-6 field-row">
-                            <label for="personalEmail">Email cá nhân <span class="text-muted" style="text-transform:none; font-weight:400;">(dùng để gửi tài khoản)</span></label>
+                            <label for="personalEmail">Email cá nhân <span class="req">*</span> <span class="text-muted" style="text-transform:none; font-weight:400;">(dùng để gửi tài khoản)</span></label>
                             <input type="email" class="form-control" id="personalEmail" name="personalEmail" value="${fn:escapeXml(employee.personalEmail)}">
                             <span class="error-text" id="err-personalEmail">Vui lòng nhập email cá nhân hợp lệ.</span>
                         </div>
