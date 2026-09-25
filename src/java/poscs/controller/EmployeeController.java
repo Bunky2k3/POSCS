@@ -304,18 +304,29 @@ public class EmployeeController extends HttpServlet {
             response.sendRedirect(request.getContextPath() + "/employee?action=new&error=duplicate_citizen");
             return;
         }
+        List<Integer> provinceIds = parseIntList(request.getParameterValues("provinceIds"));
+        if (anyProvinceHeldByOthers(provinceIds, null)) {
+            response.sendRedirect(request.getContextPath() + "/employee?action=new&error=province_taken");
+            return;
+        }
 
         String username = employeeDAO.generateUniqueUsername(u.getLastName(), u.getMiddleName(), u.getFirstName());
         u.setUsername(username);
         u.setPasswordHash(BCrypt.hashpw(generateTempPassword(), BCrypt.gensalt()));
 
         int newId = employeeDAO.insert(u);
-        if (newId > 0) {
-            employeeDAO.replaceProvincesOf(newId, parseIntList(request.getParameterValues("provinceIds")));
-        }
         if (newId <= 0) {
             LOG.warn("Tao nhan vien that bai (actor={}, username={})", Logs.actor(request), u.getUsername());
             response.sendRedirect(request.getContextPath() + "/employee?action=new&error=create_failed");
+            return;
+        }
+        if (!employeeDAO.replaceProvincesOf(newId, provinceIds)) {
+            // Hồ sơ đã tạo, chỉ địa bàn chưa lưu được -- đưa thẳng vào form sửa
+            // của người vừa tạo để chọn lại, đừng báo "xong" như trước.
+            LOG.warn("Tao nhan vien xong nhung khong luu duoc dia ban (actor={}, userId={})",
+                    Logs.actor(request), newId);
+            response.sendRedirect(request.getContextPath() + "/employee?action=edit&id=" + newId
+                    + "&error=province_not_saved");
             return;
         }
         response.sendRedirect(request.getContextPath() + "/employee?action=view&id=" + newId);
@@ -408,18 +419,55 @@ public class EmployeeController extends HttpServlet {
             response.sendRedirect(request.getContextPath() + "/employee?action=edit&id=" + id + "&error=duplicate_citizen");
             return;
         }
+        List<Integer> provinceIds = parseIntList(request.getParameterValues("provinceIds"));
+        if (anyProvinceHeldByOthers(provinceIds, id)) {
+            response.sendRedirect(request.getContextPath() + "/employee?action=edit&id=" + id + "&error=province_taken");
+            return;
+        }
 
         boolean ok = employeeDAO.update(u);
-        if (ok) {
-            // Địa bàn lưu ở bảng riêng nên phải ghi tách khỏi hồ sơ nhân viên.
-            employeeDAO.replaceProvincesOf(id, parseIntList(request.getParameterValues("provinceIds")));
-        }
         if (!ok) {
             LOG.warn("Cap nhat nhan vien that bai (actor={}, userId={})", Logs.actor(request), id);
             response.sendRedirect(request.getContextPath() + "/employee?action=edit&id=" + id + "&error=update_failed");
             return;
         }
+        // Địa bàn lưu ở bảng riêng nên phải ghi tách khỏi hồ sơ nhân viên --
+        // và phải NHÌN kết quả: trước đây bỏ qua nó, nên khi một tỉnh vừa bị
+        // người khác nhận (hai tab cùng giao một tỉnh), cả lượt ghi địa bàn bị
+        // huỷ mà trang vẫn báo xong, người dùng tưởng đã giao tỉnh.
+        if (!employeeDAO.replaceProvincesOf(id, provinceIds)) {
+            LOG.warn("Cap nhat nhan vien xong nhung khong luu duoc dia ban (actor={}, userId={})",
+                    Logs.actor(request), id);
+            response.sendRedirect(request.getContextPath() + "/employee?action=edit&id=" + id
+                    + "&error=province_not_saved");
+            return;
+        }
         response.sendRedirect(request.getContextPath() + "/employee?action=view&id=" + id);
+    }
+
+    /**
+     * true nếu trong {@code provinceIds} có tỉnh đang do NGƯỜI KHÁC cầm.
+     *
+     * <p>Ô chọn ở form đã khoá sẵn những tỉnh đó, nhưng form mở từ trước vẫn
+     * gửi lên được một tỉnh vừa có chủ (hai tab, hai Admin cùng giao một tỉnh).
+     * CSDL chặn bằng UNIQUE và huỷ cả lượt ghi địa bàn -- kiểm TRƯỚC ở đây để
+     * từ chối cho gọn, chưa ghi gì, thay vì ghi hồ sơ xong mới vỡ phần địa bàn.
+     *
+     * @param targetUserId người đang tạo/sửa; null khi tạo mới (mọi tỉnh đã có
+     *        chủ đều là của người khác). Tỉnh người này đang cầm không tính.
+     */
+    private boolean anyProvinceHeldByOthers(List<Integer> provinceIds, Integer targetUserId) {
+        if (provinceIds.isEmpty()) {
+            return false;
+        }
+        Set<Integer> wanted = new HashSet<>(provinceIds);
+        for (ProvinceAssignment pa : employeeDAO.findAllProvincesWithHolder()) {
+            if (wanted.contains(pa.getProvinceId()) && pa.getHolderUserId() != null
+                    && !pa.getHolderUserId().equals(targetUserId)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** UC-29 Ban/Unban Employee (BR-25/BR-26) -- không cho tự khóa chính tài khoản Admin đang đăng nhập. */

@@ -90,6 +90,7 @@
                             <c:when test="${param.error == 'invalid'}">Vui lòng nhập đầy đủ và đúng định dạng các trường bắt buộc.</c:when>
                             <c:when test="${param.error == 'duplicate_phone'}">Số điện thoại này đã được sử dụng bởi tài khoản khác.</c:when>
                             <c:when test="${param.error == 'duplicate_citizen'}">Số CCCD/CMND này đã được sử dụng bởi tài khoản khác.</c:when>
+                            <c:when test="${param.error == 'province_taken'}">Có tỉnh trong ô Địa bàn phụ trách vừa được giao cho người khác. Chọn lại địa bàn rồi tạo lại.</c:when>
                             <c:when test="${param.error == 'create_failed'}">Không thể tạo nhân viên. Vui lòng thử lại.</c:when>
                             <c:otherwise>Đã có lỗi xảy ra. Vui lòng thử lại.</c:otherwise>
                         </c:choose>

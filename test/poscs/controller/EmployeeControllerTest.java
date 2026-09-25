@@ -59,6 +59,8 @@ public class EmployeeControllerTest {
         when(request.getContextPath()).thenReturn(CONTEXT_PATH);
 
         loginAs("Admin", 99); // chỉ Admin mới có quyền trên EMPLOYEE, xem PERMISSIONS.md
+        // Mặc định ghi địa bàn thành công; các test về địa bàn tự ghi đè.
+        when(employeeDAO.replaceProvincesOf(anyInt(), any())).thenReturn(true);
     }
 
     private void loginAs(String roleName, int userId) {
@@ -287,6 +289,92 @@ public class EmployeeControllerTest {
         controller.doPost(request, response);
 
         verify(employeeDAO).update(argThat((User u) -> Integer.valueOf(7).equals(u.getManagerId())));
+    }
+
+    // ------------------------------------------------------------------
+    // Địa bàn phụ trách -- một tỉnh một người
+    // ------------------------------------------------------------------
+    //
+    // Ô chọn khoá sẵn tỉnh của người khác, nhưng form mở từ trước (hai tab)
+    // vẫn gửi lên được một tỉnh vừa có chủ. Trước đây kết quả ghi địa bàn bị
+    // bỏ qua: CSDL huỷ lượt ghi (UNIQUE) mà trang vẫn báo xong.
+
+    @Test
+    public void create_provinceHeldByAnotherEmployee_isRefusedBeforeCreating() throws Exception {
+        when(request.getParameter("action")).thenReturn("create");
+        stubValidCreateFields();
+        when(request.getParameterValues("provinceIds")).thenReturn(new String[]{"5"});
+        when(employeeDAO.findAllProvincesWithHolder()).thenReturn(
+                List.of(new ProvinceAssignment(5, "Thành phố Hà Nội", 22, "Phạm Thị Ngọc Anh")));
+
+        controller.doPost(request, response);
+
+        verify(employeeDAO, never()).insert(any());
+        verify(response).sendRedirect(CONTEXT_PATH + "/employee?action=new&error=province_taken");
+    }
+
+    @Test
+    public void update_provinceHeldByAnotherEmployee_isRefusedBeforeSaving() throws Exception {
+        when(request.getParameter("action")).thenReturn("update");
+        when(request.getParameter("userId")).thenReturn("15");
+        when(employeeDAO.findById(15)).thenReturn(new User());
+        stubValidCreateFields();
+        when(request.getParameterValues("provinceIds")).thenReturn(new String[]{"5"});
+        when(employeeDAO.findAllProvincesWithHolder()).thenReturn(
+                List.of(new ProvinceAssignment(5, "Thành phố Hà Nội", 22, "Phạm Thị Ngọc Anh")));
+
+        controller.doPost(request, response);
+
+        verify(employeeDAO, never()).update(any());
+        verify(employeeDAO, never()).replaceProvincesOf(anyInt(), any());
+        verify(response).sendRedirect(CONTEXT_PATH + "/employee?action=edit&id=15&error=province_taken");
+    }
+
+    /** Tỉnh chính người này đang cầm thì không phải xung đột -- lưu lại form là chuyện thường. */
+    @Test
+    public void update_keepingOwnProvince_isNotAConflict() throws Exception {
+        when(request.getParameter("action")).thenReturn("update");
+        when(request.getParameter("userId")).thenReturn("15");
+        when(employeeDAO.findById(15)).thenReturn(new User());
+        stubValidCreateFields();
+        when(request.getParameterValues("provinceIds")).thenReturn(new String[]{"5"});
+        when(employeeDAO.findAllProvincesWithHolder()).thenReturn(
+                List.of(new ProvinceAssignment(5, "Thành phố Hà Nội", 15, "Nguyễn An")));
+        when(employeeDAO.update(any(User.class))).thenReturn(true);
+
+        controller.doPost(request, response);
+
+        verify(employeeDAO).replaceProvincesOf(15, List.of(5));
+        verify(response).sendRedirect(CONTEXT_PATH + "/employee?action=view&id=15");
+    }
+
+    /** Lọt qua bước kiểm (hai bên giao cùng lúc) mà ghi địa bàn hỏng: phải nói ra, không báo xong. */
+    @Test
+    public void update_provinceWriteFails_saysSoInsteadOfReportingSuccess() throws Exception {
+        when(request.getParameter("action")).thenReturn("update");
+        when(request.getParameter("userId")).thenReturn("15");
+        when(employeeDAO.findById(15)).thenReturn(new User());
+        stubValidCreateFields();
+        when(employeeDAO.update(any(User.class))).thenReturn(true);
+        when(employeeDAO.replaceProvincesOf(anyInt(), any())).thenReturn(false);
+
+        controller.doPost(request, response);
+
+        verify(response).sendRedirect(CONTEXT_PATH + "/employee?action=edit&id=15&error=province_not_saved");
+        verify(response, never()).sendRedirect(CONTEXT_PATH + "/employee?action=view&id=15");
+    }
+
+    @Test
+    public void create_provinceWriteFails_opensTheNewEmployeesEditFormWithTheError() throws Exception {
+        when(request.getParameter("action")).thenReturn("create");
+        stubValidCreateFields();
+        when(employeeDAO.generateUniqueUsername("Nguyễn", null, "An")).thenReturn("annd");
+        when(employeeDAO.insert(any(User.class))).thenReturn(15);
+        when(employeeDAO.replaceProvincesOf(anyInt(), any())).thenReturn(false);
+
+        controller.doPost(request, response);
+
+        verify(response).sendRedirect(CONTEXT_PATH + "/employee?action=edit&id=15&error=province_not_saved");
     }
 
     // ------------------------------------------------------------------

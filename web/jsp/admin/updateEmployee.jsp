@@ -88,6 +88,8 @@
                             <c:when test="${param.error == 'invalid'}">Vui lòng nhập đầy đủ và đúng định dạng các trường bắt buộc.</c:when>
                             <c:when test="${param.error == 'duplicate_phone'}">Số điện thoại này đã được sử dụng bởi tài khoản khác.</c:when>
                             <c:when test="${param.error == 'duplicate_citizen'}">Số CCCD/CMND này đã được sử dụng bởi tài khoản khác.</c:when>
+                            <c:when test="${param.error == 'province_taken'}">Chưa lưu gì: có tỉnh trong ô Địa bàn phụ trách đang do người khác cầm (có thể vừa được giao ở một tab khác). Chọn lại địa bàn rồi lưu lại.</c:when>
+                            <c:when test="${param.error == 'province_not_saved'}">Thông tin nhân viên đã lưu, nhưng địa bàn thì chưa: có tỉnh vừa được giao cho người khác. Chọn lại địa bàn rồi bấm Lưu thay đổi.</c:when>
                             <c:when test="${param.error == 'update_failed'}">Không thể cập nhật nhân viên. Vui lòng thử lại.</c:when>
                             <c:otherwise>Đã có lỗi xảy ra. Vui lòng thử lại.</c:otherwise>
                         </c:choose>
