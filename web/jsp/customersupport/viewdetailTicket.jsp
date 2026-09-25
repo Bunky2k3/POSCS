@@ -369,8 +369,9 @@
                             <li class="history-item">
                                 <%--
                                   from_status rỗng = dòng đánh dấu lúc lập phiếu
-                                  (dữ liệu mẫu có sẵn kiểu này). Hiện "Tạo phiếu"
-                                  thay vì để mũi tên mọc ra từ khoảng trắng.
+                                  (TechnicalSupportTicketDAO.insert ghi dòng này,
+                                  dữ liệu mẫu cũng vậy). Hiện "Tạo phiếu" thay vì
+                                  để mũi tên mọc ra từ khoảng trắng.
                                 --%>
                                 <div class="history-transition">
                                     <c:choose>
