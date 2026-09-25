@@ -333,7 +333,11 @@
                 </div>
                 <div class="row">
                     <div class="col-12 field-row">
-                        <label>Ghi chú nội bộ <span class="text-muted" style="text-transform: none; font-weight: 400;">(không bắt buộc, chỉ hiện ở lịch sử xử lý)</span></label>
+                        <%-- Nói thẳng điều kiện lưu: DAO chỉ ghi ghi chú này kèm dòng lịch
+                             sử khi TRẠNG THÁI đổi. Nhãn cũ ("chỉ hiện ở lịch sử xử lý")
+                             không nói vế đó, nên ghi chú viết mà không đổi trạng thái là
+                             mất lặng lẽ. --%>
+                        <label>Ghi chú nội bộ <span class="text-muted" style="text-transform: none; font-weight: 400;">(không bắt buộc, chỉ lưu khi đổi trạng thái)</span></label>
                         <textarea class="form-control" id="internalNote" name="internalNote" rows="2" placeholder="Vì sao đổi trạng thái lần này? (nguyên nhân và kết quả đã có ô riêng ở trên)"></textarea>
                     </div>
                 </div>

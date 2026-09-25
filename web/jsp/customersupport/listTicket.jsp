@@ -58,11 +58,11 @@
         .search-input-wrap i { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: #9ca3af; font-size: 0.9rem; }
         .search-input-wrap input { width: 100%; padding: 10px 14px 10px 38px; border-radius: 10px; border: 1px solid #e5e7eb; background: #f9fafb; font-size: 0.88rem; }
         .search-input-wrap input:focus { outline: none; background: #fff; border-color: var(--primary-light); box-shadow: 0 0 0 4px rgba(15, 158, 219, 0.15); }
-        /* min-width 180px x nhiều ô là tràn hàng ngay ở màn hình 1366px --
-           thu về 150px và cho phép co lại thì cả thanh lọc nằm gọn một hàng. */
-        .filter-bar select { padding: 9px 10px; border-radius: 10px; border: 1px solid #e5e7eb; background: #f9fafb; font-size: 0.84rem; flex: 0 1 auto; min-width: 124px; max-width: 148px; }
-        #filterYear { min-width: 104px; max-width: 118px; }
-        #filterPeriod { min-width: 110px; max-width: 124px; }
+        /* Mỗi ô chọn rộng đúng bằng lựa chọn dài nhất của nó, ô tìm kiếm co giãn
+           lấp phần còn lại. Trước đây ép max-width 118-148px nên chữ bị cắt
+           ("Tất cả mức ưu tiê", "Mọi thời điể"); bốn ô cộng lại chỉ khoảng
+           550px, màn hình 1366px vẫn nằm gọn một hàng. */
+        .filter-bar select { padding: 9px 10px; border-radius: 10px; border: 1px solid #e5e7eb; background: #f9fafb; font-size: 0.84rem; flex: 0 0 auto; min-width: 104px; }
         .filter-bar select:focus { outline: none; border-color: var(--primary-light); }
 
         .table-card { overflow: hidden; }
