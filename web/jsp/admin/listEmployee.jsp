@@ -120,7 +120,8 @@
                 <a class="employee-card" href="${pageContext.request.contextPath}/employee?action=view&id=${emp.userId}">
                     <div class="employee-card-top">
                         <%-- Ảnh đại diện đã tải lên nếu có; chưa có thì rơi về ảnh chữ cái đầu. --%>
-                        <c:set var="avatarSrc" value="https://ui-avatars.com/api/?name=${fn:escapeXml(emp.firstName)}&amp;background=0568a6&amp;color=fff"/>
+                        <%-- c:url + c:param mã hoá tham số đúng một lần. Viết sẵn "&amp;" trong chuỗi như trước thì src="${fn:escapeXml(...)}" escape thêm lần nữa: trình duyệt nhận "amp;background", ui-avatars bỏ qua màu. --%>
+                        <c:url var="avatarSrc" value="https://ui-avatars.com/api/"><c:param name="name" value="${emp.firstName}"/><c:param name="background" value="0568a6"/><c:param name="color" value="fff"/></c:url>
                         <c:if test="${not empty emp.avatarUrl}">
                             <c:set var="avatarSrc" value="${pageContext.request.contextPath}${emp.avatarUrl}"/>
                         </c:if>
