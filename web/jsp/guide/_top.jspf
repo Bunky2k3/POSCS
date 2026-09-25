@@ -28,7 +28,7 @@
                  GuideController.PAGES. --%>
             <a href="${pageContext.request.contextPath}/guide?module=customer" class="${guideModule == 'customer' ? 'active' : ''}">Khách hàng</a>
             <a href="${pageContext.request.contextPath}/guide?module=contract" class="${guideModule == 'contract' ? 'active' : ''}">Hợp đồng</a>
-            <span class="soon" title="Đang soạn">Phiếu hỗ trợ</span>
+            <a href="${pageContext.request.contextPath}/guide?module=ticket" class="${guideModule == 'ticket' ? 'active' : ''}">Phiếu hỗ trợ</a>
             <span class="soon" title="Đang soạn">Nhân viên</span>
         </nav>
         <span class="spacer"></span>

@@ -312,6 +312,41 @@ public class WriteAndTransactionIntegrationTest {
         assertNotNull("Phải join được tên người đổi", h.getChangedByUser().getFullName());
     }
 
+    /**
+     * Lập phiếu bằng insert() thì "Lịch sử xử lý" có ngay dòng mở đầu -- from_status
+     * rỗng, tức chữ "Tạo phiếu" trên trang chi tiết -- ghi cùng transaction với
+     * phiếu. Chỉ CSDL thật mới kiểm được from_status NOT NULL nhận chuỗi rỗng
+     * và khoá ngoại tới phiếu vừa sinh id.
+     */
+    @Test
+    public void ticketInsert_writesTheOpeningHistoryRow() throws Exception {
+        IntegrationDb.assumeAvailable();
+        Fixtures.seedContract();
+
+        TechnicalRequest t = new TechnicalRequest();
+        t.setTicketCode(ticketDAO.generateNextTicketCode());
+        t.setEnterpriseId(Fixtures.ENTERPRISE_ID);
+        t.setTicketType("Bảo hành");
+        t.setPriority(TechnicalSupportTicketDAO.PRIORITY_HIGH);
+        t.setReceptionChannel("Điện thoại");
+        t.setAssignedTechnicianId(Fixtures.USER_ID);
+        t.setCreatedBy(Fixtures.USER_ID);
+        t.setCreatedDate(new java.sql.Date(System.currentTimeMillis()));
+        t.setDescription("Thiết bị lỗi nguồn");
+        t.setStatus(TechnicalSupportTicketDAO.STATUS_NEW);
+
+        int newId = ticketDAO.insert(t);
+        assertTrue("insert phải trả về id mới", newId > 0);
+
+        List<TechnicalRequestHistory> history = ticketDAO.findHistoryByTicketId(newId);
+        assertEquals(1, history.size());
+        TechnicalRequestHistory h = history.get(0);
+        assertEquals("", h.getFromStatus());
+        assertEquals(TechnicalSupportTicketDAO.STATUS_NEW, h.getToStatus());
+        assertEquals(Fixtures.USER_ID, h.getChangedBy());
+        assertNull(h.getInternalNote());
+    }
+
     @Test
     public void ticketUpdateWithoutStatusChange_writesNoHistoryRow() throws Exception {
         IntegrationDb.assumeAvailable();

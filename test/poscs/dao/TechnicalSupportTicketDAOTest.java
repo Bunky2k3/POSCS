@@ -588,6 +588,74 @@ public class TechnicalSupportTicketDAOTest {
         }
     }
 
+    /** Connection giả cho insert(): câu INSERT phiếu và câu INSERT lịch sử là hai statement riêng. */
+    private Connection insertConnection(PreparedStatement ticketPs, PreparedStatement historyInsertPs) throws Exception {
+        Connection conn = mock(Connection.class);
+        when(conn.prepareStatement(contains("INSERT INTO technicalrequests"), anyInt())).thenReturn(ticketPs);
+        when(conn.prepareStatement(contains("technicalrequesthistory"))).thenReturn(historyInsertPs);
+        return conn;
+    }
+
+    /**
+     * Lập phiếu thì ghi luôn dòng mở đầu của "Lịch sử xử lý": from_status rỗng
+     * (trang chi tiết hiện "Tạo phiếu"), tới trạng thái ban đầu, người lập là
+     * người tạo phiếu -- rồi mới commit, cùng một transaction với phiếu.
+     */
+    @Test
+    public void insert_writesOpeningHistoryRowInSameTransaction() throws Exception {
+        java.sql.ResultSet generatedKeys = singleRow(row("GENERATED_KEY", 42));
+        PreparedStatement ticketPs = mock(PreparedStatement.class);
+        when(ticketPs.executeUpdate()).thenReturn(1);
+        when(ticketPs.getGeneratedKeys()).thenReturn(generatedKeys);
+        PreparedStatement historyInsertPs = mock(PreparedStatement.class);
+        Connection conn = insertConnection(ticketPs, historyInsertPs);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            TechnicalRequest t = ticket();
+            t.setTicketCode("TK-0042");
+            t.setStatus(TechnicalSupportTicketDAO.STATUS_NEW);
+            t.setCreatedBy(CHANGED_BY);
+            t.setCreatedDate(java.sql.Date.valueOf("2026-09-25"));
+
+            assertEquals(42, dao.insert(t));
+
+            verify(historyInsertPs).setInt(1, 42);
+            verify(historyInsertPs).setString(2, "");
+            verify(historyInsertPs).setString(3, TechnicalSupportTicketDAO.STATUS_NEW);
+            verify(historyInsertPs).setInt(4, CHANGED_BY);
+            verify(historyInsertPs).setString(5, null);
+            verify(conn).setAutoCommit(false);
+            verify(conn).commit();
+        }
+    }
+
+    /** Ghi dòng mở đầu hỏng -> phiếu cũng không được ở lại: rollback, trả -1. */
+    @Test
+    public void insert_historyInsertFails_rollsBackTheTicketToo() throws Exception {
+        java.sql.ResultSet generatedKeys = singleRow(row("GENERATED_KEY", 42));
+        PreparedStatement ticketPs = mock(PreparedStatement.class);
+        when(ticketPs.executeUpdate()).thenReturn(1);
+        when(ticketPs.getGeneratedKeys()).thenReturn(generatedKeys);
+        PreparedStatement historyInsertPs = mock(PreparedStatement.class);
+        when(historyInsertPs.executeUpdate()).thenThrow(new SQLException("khoá ngoại changed_by"));
+        Connection conn = insertConnection(ticketPs, historyInsertPs);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            TechnicalRequest t = ticket();
+            t.setTicketCode("TK-0042");
+            t.setCreatedDate(java.sql.Date.valueOf("2026-09-25"));
+
+            assertEquals(-1, dao.insert(t));
+            verify(conn, never()).commit();
+            verify(conn).rollback();
+            verify(conn).setAutoCommit(true);
+        }
+    }
+
     /**
      * mapRow đọc được hai cột mới từ ResultSet -- thiếu dòng này thì trang chi
      * tiết luôn hiện "chưa đánh giá nguyên nhân" dù trong CSDL đã có, và tệ

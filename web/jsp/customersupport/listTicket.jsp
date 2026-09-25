@@ -58,11 +58,11 @@
         .search-input-wrap i { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: #9ca3af; font-size: 0.9rem; }
         .search-input-wrap input { width: 100%; padding: 10px 14px 10px 38px; border-radius: 10px; border: 1px solid #e5e7eb; background: #f9fafb; font-size: 0.88rem; }
         .search-input-wrap input:focus { outline: none; background: #fff; border-color: var(--primary-light); box-shadow: 0 0 0 4px rgba(15, 158, 219, 0.15); }
-        /* min-width 180px x nhiều ô là tràn hàng ngay ở màn hình 1366px --
-           thu về 150px và cho phép co lại thì cả thanh lọc nằm gọn một hàng. */
-        .filter-bar select { padding: 9px 10px; border-radius: 10px; border: 1px solid #e5e7eb; background: #f9fafb; font-size: 0.84rem; flex: 0 1 auto; min-width: 124px; max-width: 148px; }
-        #filterYear { min-width: 104px; max-width: 118px; }
-        #filterPeriod { min-width: 110px; max-width: 124px; }
+        /* Mỗi ô chọn rộng đúng bằng lựa chọn dài nhất của nó, ô tìm kiếm co giãn
+           lấp phần còn lại. Trước đây ép max-width 118-148px nên chữ bị cắt
+           ("Tất cả mức ưu tiê", "Mọi thời điể"); bốn ô cộng lại chỉ khoảng
+           550px, màn hình 1366px vẫn nằm gọn một hàng. */
+        .filter-bar select { padding: 9px 10px; border-radius: 10px; border: 1px solid #e5e7eb; background: #f9fafb; font-size: 0.84rem; flex: 0 0 auto; min-width: 104px; }
         .filter-bar select:focus { outline: none; border-color: var(--primary-light); }
 
         .table-card { overflow: hidden; }
@@ -147,6 +147,8 @@
         .action-icons .act-view:hover { background: #eaf6ff; color: var(--primary); }
         .action-icons .act-edit:hover { background: #fff4e0; color: var(--warning); }
         .action-icons .act-delete:hover { background: #fdecef; color: var(--danger); }
+        /* Phiếu đang xử lý không xoá được -- nút mờ như ở trang chi tiết. */
+        .action-icons .act-delete:disabled { opacity: .45; cursor: not-allowed; background: #f3f4f6; color: #6b7280; }
 
         .empty-state { text-align: center; padding: 60px 20px; color: #9ca3af; }
         .empty-state i { font-size: 2.4rem; margin-bottom: 12px; color: #d1d5db; }
@@ -199,6 +201,7 @@
                 <p>Theo dõi và xử lý các yêu cầu hỗ trợ kỹ thuật từ khách hàng</p>
             </div>
             <div class="header-actions">
+                <a href="${pageContext.request.contextPath}/guide?module=ticket#danh-sach" target="_blank" rel="noopener" class="guide-btn" title="Mở hướng dẫn sử dụng ở tab mới"><i class="fa-regular fa-circle-question"></i> Hướng dẫn</a>
                 <%-- Giữ nguyên bộ lọc đang áp để file xuất ra khớp đúng những gì đang thấy trên màn hình. --%>
                 <%-- Xuất Excel là thao tác ĐỌC: chỉ lấy đúng dữ liệu vai trò này vốn đã
                      xem được trên màn hình, đổi sang dạng file. Nên KHÔNG khoá theo
@@ -209,6 +212,16 @@
                 </c:if>
             </div>
         </div>
+
+        <%-- Mở một phiếu không còn (id sai, hoặc phiếu vừa bị xoá) thì controller
+             đưa về đây kèm ?error=notfound -- trước đây trang im lặng, người
+             dùng bấm một link rồi thấy lại danh sách mà không hiểu vì sao. --%>
+        <c:if test="${param.error == 'notfound'}">
+            <div class="alert alert-warning py-2 px-3 mb-3" style="font-size: 0.9rem; border-radius: 12px;">
+                <i class="fa-solid fa-circle-exclamation me-1"></i>
+                Không tìm thấy phiếu hỗ trợ này. Có thể phiếu đã bị xoá.
+            </div>
+        </c:if>
 
         <!-- ===== Dải trạng thái tổng quan ===== -->
         <div class="status-strip">
@@ -323,7 +336,17 @@
                                         <button class="act-view" title="Xem chi tiết" onclick="location.href='${pageContext.request.contextPath}/ticket?action=view&id=${ticket.ticketId}'"><i class="fa-regular fa-eye"></i></button>
                                         <c:if test="${canManage}">
                                             <button class="act-edit" title="Sửa" onclick="location.href='${pageContext.request.contextPath}/ticket?action=edit&id=${ticket.ticketId}'"><i class="fa-solid fa-pen"></i></button>
-                                            <button class="act-delete" title="Xóa" onclick="openDeleteModal(${ticket.ticketId}, '${fn:escapeXml(ticket.ticketCode)}')"><i class="fa-solid fa-trash"></i></button>
+                                            <%-- Cùng điều kiện với TechnicalSupportTicketDAO.canDelete: phiếu
+                                                 đang xử lý thì server từ chối xoá, nên nút mờ sẵn thay vì
+                                                 để người dùng bấm, xác nhận, rồi bị đưa sang trang khác. --%>
+                                            <c:choose>
+                                                <c:when test="${ticket.status == 'Đang xử lý'}">
+                                                    <button class="act-delete" disabled title="Không thể xóa phiếu đang có người xử lý dở dang"><i class="fa-solid fa-trash"></i></button>
+                                                </c:when>
+                                                <c:otherwise>
+                                                    <button class="act-delete" title="Xóa" onclick="openDeleteModal(${ticket.ticketId}, '${fn:escapeXml(ticket.ticketCode)}')"><i class="fa-solid fa-trash"></i></button>
+                                                </c:otherwise>
+                                            </c:choose>
                                         </c:if>
                                     </div>
                                 </td>

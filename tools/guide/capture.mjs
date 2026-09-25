@@ -38,7 +38,8 @@ const ACCOUNTS = {
     sales4: 'Poscs@123',
     sales5: 'Poscs@123',
     cskh1: 'Poscs@123',
-    kythuat1: 'Poscs@123'
+    kythuat1: 'Poscs@123',
+    kythuat3: 'Poscs@123'
 };
 
 const CHROME_CANDIDATES = [

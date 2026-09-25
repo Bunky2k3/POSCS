@@ -5,12 +5,14 @@
 <%--
     Request attribute do TechnicalSupportTicketController#showDetail thiết
     lập trước khi forward tới trang này:
-      - ticket    : poscs.model.TechnicalRequest (có sẵn .enterprise, .contract,
-                    .assignedTechnician, .createdByUser đã join nếu tồn tại)
-      - canDelete : boolean -- true nếu phiếu chưa có ai xử lý dở dang (status != "Đang xử lý")
+      - ticket        : poscs.model.TechnicalRequest (có sẵn .enterprise, .contract,
+                        .assignedTechnician, .createdByUser đã join nếu tồn tại)
+      - ticketHistory : List<poscs.model.TechnicalRequestHistory>, mới nhất trước
+      - canDelete     : boolean -- true nếu phiếu chưa có ai xử lý dở dang (status != "Đang xử lý")
+      - canEdit       : boolean -- quyền Full, HOẶC kỹ thuật viên đang được giao phiếu này
+      - canManage     : boolean -- quyền Full (nút Xóa)
 
-    technicalrequestdevices (thiết bị lỗi) và technicalrequesthistory (lịch
-    sử đổi trạng thái) chưa hiển thị dữ liệu thật -- thuộc phạm vi khác.
+    technicalrequestdevices (thiết bị lỗi) chưa hiển thị -- thuộc phạm vi khác.
 --%>
 <!DOCTYPE html>
 <html lang="vi">
@@ -61,6 +63,9 @@
         .status-new { background: #eaf6ff; color: var(--primary); } .status-new .dot { background: var(--primary); }
         .status-progress { background: #fff4e0; color: var(--warning); } .status-progress .dot { background: var(--warning); }
         .status-closed { background: #e8faf3; color: var(--success); } .status-closed .dot { background: var(--success); }
+        /* Cảnh báo hạn xử lý: cùng màu và cùng ngưỡng với danh sách phiếu. */
+        .sla-overdue { background: #fdecec; color: var(--danger, #d92d20); } .sla-overdue .dot { background: var(--danger, #d92d20); }
+        .sla-soon { background: #fff4e0; color: var(--warning); } .sla-soon .dot { background: var(--warning); }
 
         .header-actions { display: flex; gap: 10px; }
         .btn-edit-detail {
@@ -142,6 +147,17 @@
     <div class="page-container">
         <a href="${pageContext.request.contextPath}/ticket" class="back-link-top"><i class="fa-solid fa-arrow-left-long"></i> Quay lại danh sách</a>
 
+        <%-- Xoá bị từ chối (phiếu đang xử lý) thì controller đưa về ĐÚNG trang
+             này kèm ?error=cannot_delete. Trước đây trang không đọc tham số đó:
+             bấm xoá từ danh sách xong là rơi vào trang chi tiết, không một dòng
+             nào nói vì sao phiếu vẫn còn. --%>
+        <c:if test="${param.error == 'cannot_delete'}">
+            <div class="alert alert-danger py-2 px-3 mb-3" style="font-size: 0.9rem; border-radius: 12px;">
+                <i class="fa-solid fa-circle-exclamation me-1"></i>
+                Không xoá được phiếu này vì phiếu đang có người xử lý (trạng thái <strong>Đang xử lý</strong>). Chỉ xoá được phiếu Mới tiếp nhận hoặc Đã đóng.
+            </div>
+        </c:if>
+
         <!-- ===== Header ===== -->
         <div class="detail-header card-box">
             <div class="doc-info">
@@ -174,7 +190,8 @@
                 </div>
             </div>
             <div class="header-actions">
-                <a href="${pageContext.request.contextPath}/ticket?action=exportPdf&id=${ticket.ticketId}" class="btn-delete-detail" style="cursor:pointer; color:var(--primary); border-color:#e5e7eb;"><i class="fa-solid fa-file-pdf"></i> Xuất phiếu</a>
+                <a href="${pageContext.request.contextPath}/guide?module=ticket#chi-tiet" target="_blank" rel="noopener" class="guide-btn" title="Mở hướng dẫn sử dụng ở tab mới"><i class="fa-regular fa-circle-question"></i> Hướng dẫn</a>
+                <a href="${pageContext.request.contextPath}/ticket?action=exportPdf&id=${ticket.ticketId}" class="btn-delete-detail" style="cursor:pointer; color:var(--primary); border-color:#e5e7eb; text-decoration:none;"><i class="fa-solid fa-file-pdf"></i> Xuất phiếu</a>
                 <c:if test="${canEdit}">
                     <a href="${pageContext.request.contextPath}/ticket?action=edit&id=${ticket.ticketId}" class="btn-edit-detail"><i class="fa-solid fa-pen"></i> Sửa thông tin</a>
                 </c:if>
@@ -228,11 +245,28 @@
                         </c:choose>
                     </div>
                 </div>
-                <div class="col-md-6 field-row">
+                <%-- Ba mốc thời gian của phiếu đứng chung một hàng. Hạn xử lý trước
+                     đây chỉ thấy trong form sửa và bản PDF -- kỹ thuật viên xem
+                     phiếu không biết mình còn bao lâu, dù danh sách đã gắn nhãn
+                     "Quá hạn SLA" cho chính phiếu đó. --%>
+                <div class="col-md-4 field-row">
                     <label>Ngày tạo</label>
                     <div class="view-value"><fmt:formatDate value="${ticket.createdDate}" pattern="dd/MM/yyyy"/></div>
                 </div>
-                <div class="col-md-6 field-row">
+                <div class="col-md-4 field-row">
+                    <label>Hạn xử lý (SLA)</label>
+                    <div class="view-value">
+                        <c:choose>
+                            <c:when test="${ticket.slaDeadline != null}">
+                                <fmt:formatDate value="${ticket.slaDeadline}" pattern="dd/MM/yyyy HH:mm"/>
+                                <c:if test="${ticket.slaOverdue}"><span class="pill sla-overdue" title="Đã quá hạn xử lý theo SLA"><span class="dot"></span>Quá hạn SLA</span></c:if>
+                                <c:if test="${ticket.slaDueSoon}"><span class="pill sla-soon" title="Còn dưới 24 giờ tới hạn SLA"><span class="dot"></span>Sắp tới hạn</span></c:if>
+                            </c:when>
+                            <c:otherwise>Không đặt hạn</c:otherwise>
+                        </c:choose>
+                    </div>
+                </div>
+                <div class="col-md-4 field-row">
                     <label>Thời điểm hoàn tất</label>
                     <div class="view-value">
                         <c:choose>
@@ -336,8 +370,9 @@
                             <li class="history-item">
                                 <%--
                                   from_status rỗng = dòng đánh dấu lúc lập phiếu
-                                  (dữ liệu mẫu có sẵn kiểu này). Hiện "Tạo phiếu"
-                                  thay vì để mũi tên mọc ra từ khoảng trắng.
+                                  (TechnicalSupportTicketDAO.insert ghi dòng này,
+                                  dữ liệu mẫu cũng vậy). Hiện "Tạo phiếu" thay vì
+                                  để mũi tên mọc ra từ khoảng trắng.
                                 --%>
                                 <div class="history-transition">
                                     <c:choose>

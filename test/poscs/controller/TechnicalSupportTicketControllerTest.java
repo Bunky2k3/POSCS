@@ -19,6 +19,7 @@ import jakarta.servlet.http.HttpSession;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.ArgumentCaptor;
+import poscs.common.Period;
 import poscs.dao.ContractDAO;
 import poscs.dao.CustomerDAO;
 import poscs.dao.EmployeeDAO;
@@ -83,6 +84,9 @@ public class TechnicalSupportTicketControllerTest {
         when(request.getContextPath()).thenReturn(CONTEXT_PATH);
 
         loginAs("Sales", 99); // role được Full access trên TICKET (gộp CSKH), xem PERMISSIONS.md
+        // Mặc định khách của phiếu là khách mua -- vai duy nhất lập được phiếu.
+        // Các test về luật vai tự ghi đè dòng này.
+        when(customerDAO.findRolesOf(anyInt())).thenReturn(Collections.singletonList("Khách mua"));
 
         // exportPdf đọc font tiếng Việt qua ServletContext. Dùng ĐÚNG file font
         // trong web/WEB-INF/fonts thay vì mock trả byte giả: PDType0Font.load
@@ -596,7 +600,7 @@ public class TechnicalSupportTicketControllerTest {
     @Test
     public void exportExcel_writesRealWorkbookWithHeaderAndOneRowPerTicket() throws Exception {
         when(request.getParameter("action")).thenReturn("exportExcel");
-        when(ticketDAO.findAll(eq(1), eq(Integer.MAX_VALUE), any(), any(), any()))
+        when(ticketDAO.findAll(eq(1), eq(Integer.MAX_VALUE), any(), any(), any(), any()))
                 .thenReturn(Arrays.asList(ticketForExport(), ticketForExport()));
         ByteArrayOutputStream captured = captureResponseBody();
 
@@ -624,7 +628,7 @@ public class TechnicalSupportTicketControllerTest {
     @Test
     public void exportExcel_sendsFileAsAttachmentNotHtml() throws Exception {
         when(request.getParameter("action")).thenReturn("exportExcel");
-        when(ticketDAO.findAll(eq(1), eq(Integer.MAX_VALUE), any(), any(), any()))
+        when(ticketDAO.findAll(eq(1), eq(Integer.MAX_VALUE), any(), any(), any(), any()))
                 .thenReturn(Collections.emptyList());
         captureResponseBody();
 
@@ -643,13 +647,35 @@ public class TechnicalSupportTicketControllerTest {
         when(request.getParameter("keyword")).thenReturn("trạm BTS");
         when(request.getParameter("status")).thenReturn("Đang xử lý");
         when(request.getParameter("priority")).thenReturn("Cao");
-        when(ticketDAO.findAll(anyInt(), anyInt(), any(), any(), any()))
+        when(ticketDAO.findAll(anyInt(), anyInt(), any(), any(), any(), any()))
                 .thenReturn(Collections.emptyList());
         captureResponseBody();
 
         controller.doGet(request, response);
 
-        verify(ticketDAO).findAll(1, Integer.MAX_VALUE, "trạm BTS", "Đang xử lý", "Cao");
+        // Không chọn năm = mọi thời điểm (kỳ null), như màn hình danh sách.
+        verify(ticketDAO).findAll(1, Integer.MAX_VALUE, "trạm BTS", "Đang xử lý", "Cao", null);
+    }
+
+    @Test
+    public void exportExcel_appliesTheSelectedPeriodLikeTheList() throws Exception {
+        // Link "Xuất Excel" gửi kèm year/period của thanh lọc. Trước đây controller
+        // bỏ qua hai tham số này: lọc Tháng 8 thì màn hình còn vài phiếu mà file
+        // vẫn ra toàn bộ.
+        when(request.getParameter("action")).thenReturn("exportExcel");
+        when(request.getParameter("year")).thenReturn("2026");
+        when(request.getParameter("period")).thenReturn("m8");
+        when(ticketDAO.findAll(anyInt(), anyInt(), any(), any(), any(), any()))
+                .thenReturn(Collections.emptyList());
+        captureResponseBody();
+
+        controller.doGet(request, response);
+
+        ArgumentCaptor<Period> period = ArgumentCaptor.forClass(Period.class);
+        verify(ticketDAO).findAll(eq(1), eq(Integer.MAX_VALUE), any(), any(), any(), period.capture());
+        assertNotNull("Có chọn năm thì phải lọc theo kỳ", period.getValue());
+        assertEquals(Date.valueOf("2026-08-01"), period.getValue().getFrom());
+        assertEquals(Date.valueOf("2026-08-31"), period.getValue().getTo());
     }
 
     @Test
@@ -659,7 +685,7 @@ public class TechnicalSupportTicketControllerTest {
         when(request.getParameter("action")).thenReturn("exportExcel");
         TechnicalRequest t = ticketForExport();
         t.setDescription("=HYPERLINK(\"http://kegian.example\",\"Bấm vào đây\")");
-        when(ticketDAO.findAll(eq(1), eq(Integer.MAX_VALUE), any(), any(), any()))
+        when(ticketDAO.findAll(eq(1), eq(Integer.MAX_VALUE), any(), any(), any(), any()))
                 .thenReturn(Collections.singletonList(t));
         ByteArrayOutputStream captured = captureResponseBody();
 
@@ -956,6 +982,80 @@ public class TechnicalSupportTicketControllerTest {
 
         verify(ticketDAO, never()).update(any(TechnicalRequest.class), anyInt(), any());
         verify(response).sendRedirect(CONTEXT_PATH + "/ticket?action=edit&id=3&error=contract_mismatch");
+    }
+
+    // ------------------------------------------------------------------
+    // Khách hàng của phiếu phải giữ vai "Khách mua"
+    // ------------------------------------------------------------------
+    //
+    // Trước đây ô chọn khách hàng đổ mọi doanh nghiệp, kể cả nhà cung cấp --
+    // chọn nhầm thì ô hợp đồng bên cạnh liệt kê hợp đồng MUA. Ô chọn giờ lọc
+    // theo vai, và server kiểm lại (ô chọn chỉ là khoá hình).
+
+    @Test
+    public void create_customerIsOnlyASupplier_isRejected() throws Exception {
+        when(request.getParameter("action")).thenReturn("create");
+        stubValidCreateFields();
+        when(customerDAO.findRolesOf(10)).thenReturn(Collections.singletonList("Nhà cung cấp"));
+
+        controller.doPost(request, response);
+
+        verify(ticketDAO, never()).insert(any(TechnicalRequest.class));
+        verify(response).sendRedirect(CONTEXT_PATH + "/ticket?action=new&error=not_buyer");
+    }
+
+    @Test
+    public void update_switchToASupplierOnlyCustomer_isRejected() throws Exception {
+        when(ticketDAO.findById(3)).thenReturn(fullyValidExistingTicket()); // khách hiện tại: 10
+        stubValidUpdateParams();
+        when(request.getParameter("enterpriseId")).thenReturn("21");
+        when(customerDAO.findRolesOf(21)).thenReturn(Collections.singletonList("Nhà cung cấp"));
+
+        controller.doPost(request, response);
+
+        verify(ticketDAO, never()).update(any(TechnicalRequest.class), anyInt(), any());
+        verify(response).sendRedirect(CONTEXT_PATH + "/ticket?action=edit&id=3&error=not_buyer");
+    }
+
+    /**
+     * Phiếu lập trước khi có luật này mà khách không giữ vai khách mua: giữ
+     * nguyên khách thì vẫn lưu được -- không bắt người sửa ngày hạn phải đổi
+     * cả khách hàng.
+     */
+    @Test
+    public void update_keepingTheCurrentNonBuyerCustomer_stillSaves() throws Exception {
+        when(ticketDAO.findById(3)).thenReturn(fullyValidExistingTicket()); // khách hiện tại: 10
+        stubValidUpdateParams(); // gửi lại đúng enterpriseId=10
+        when(customerDAO.findRolesOf(10)).thenReturn(Collections.singletonList("Nhà cung cấp"));
+
+        controller.doPost(request, response);
+
+        verify(ticketDAO).update(any(TechnicalRequest.class), anyInt(), any());
+        verify(response).sendRedirect(CONTEXT_PATH + "/ticket?action=view&id=3");
+    }
+
+    @Test
+    public void createForm_customerPickerListsOnlyBuyers() throws Exception {
+        when(request.getParameter("action")).thenReturn("new");
+        RequestDispatcher dispatcher = mock(RequestDispatcher.class);
+        when(request.getRequestDispatcher("/jsp/customersupport/addnewTicket.jsp")).thenReturn(dispatcher);
+
+        controller.doGet(request, response);
+
+        verify(customerDAO).findAllByRole("Khách mua", null);
+    }
+
+    @Test
+    public void editForm_customerPickerKeepsTheTicketsCurrentCustomer() throws Exception {
+        when(request.getParameter("action")).thenReturn("edit");
+        when(request.getParameter("id")).thenReturn("3");
+        when(ticketDAO.findById(3)).thenReturn(fullyValidExistingTicket()); // khách hiện tại: 10
+        RequestDispatcher dispatcher = mock(RequestDispatcher.class);
+        when(request.getRequestDispatcher("/jsp/customersupport/updateTicket.jsp")).thenReturn(dispatcher);
+
+        controller.doGet(request, response);
+
+        verify(customerDAO).findAllByRole("Khách mua", 10);
     }
 
     // ------------------------------------------------------------------

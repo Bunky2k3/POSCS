@@ -26,8 +26,8 @@ import poscs.model.User;
 
 /**
  * DAO cho phiếu hỗ trợ kỹ thuật (bảng technicalrequests), kèm lịch sử đổi
- * trạng thái ở bảng con technicalrequesthistory -- xem {@link #update} và
- * {@link #findHistoryByTicketId}. Chưa xử lý technicalrequestdevices (thiết
+ * trạng thái ở bảng con technicalrequesthistory -- xem {@link #insert} (dòng
+ * mở đầu), {@link #update} và {@link #findHistoryByTicketId}. Chưa xử lý technicalrequestdevices (thiết
  * bị lỗi): bảng đó chưa có model/DAO nào, thuộc phạm vi khác.
  */
 public class TechnicalSupportTicketDAO {
@@ -462,7 +462,23 @@ public class TechnicalSupportTicketDAO {
     /** Thử lại tối đa bao nhiêu lần khi ticket_code sinh ra bị trùng (xem insert()). */
     private static final int MAX_CODE_GEN_ATTEMPTS = 5;
 
-    /** Thêm phiếu hỗ trợ mới. Trả về ticket_id vừa tạo, hoặc -1 nếu lỗi. */
+    /**
+     * from_status của dòng lịch sử mở đầu, ghi lúc lập phiếu. Cột NOT NULL nên
+     * dùng chuỗi rỗng -- đúng quy ước dữ liệu mẫu (V15) đang dùng, và là thứ
+     * viewdetailTicket.jsp dựa vào để hiện chữ "Tạo phiếu".
+     */
+    static final String FROM_STATUS_CREATED = "";
+
+    /**
+     * Thêm phiếu hỗ trợ mới, kèm dòng lịch sử mở đầu "Tạo phiếu -> trạng thái
+     * ban đầu" -- TRONG CÙNG MỘT TRANSACTION. Trả về ticket_id vừa tạo, hoặc -1
+     * nếu lỗi.
+     *
+     * Dòng mở đầu cho "Lịch sử xử lý" bắt đầu từ lúc tiếp nhận: ai lập, lúc nào.
+     * Trước đây chỉ dữ liệu mẫu có dòng này; phiếu lập trên phần mềm thì chưa
+     * có dòng nào cho tới lần đổi trạng thái đầu tiên, nên hai loại phiếu đọc
+     * khác nhau trên cùng một màn hình.
+     */
     public int insert(TechnicalRequest t) {
         String sql = "INSERT INTO technicalrequests " +
                 "(ticket_code, enterprise_id, contract_id, ticket_type, priority, reception_channel, sla_deadline, " +
@@ -477,36 +493,65 @@ public class TechnicalSupportTicketDAO {
         // ghi đè; thử sinh mã mới và INSERT lại vài lần thay vì báo lỗi ngay, để
         // người dùng không phải tự bấm lưu lại.
         for (int attempt = 1; attempt <= MAX_CODE_GEN_ATTEMPTS; attempt++) {
-            try (Connection conn = DBContext.getConnection();
-                 PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
-                ps.setString(1, t.getTicketCode());
-                ps.setInt(2, t.getEnterpriseId());
-                setNullableInt(ps, 3, t.getContractId());
-                ps.setString(4, t.getTicketType());
-                ps.setString(5, t.getPriority());
-                ps.setString(6, t.getReceptionChannel());
-                setNullableTimestamp(ps, 7, t.getSlaDeadline());
-                ps.setInt(8, t.getAssignedTechnicianId());
-                ps.setInt(9, t.getCreatedBy());
-                ps.setDate(10, t.getCreatedDate());
-                ps.setString(11, t.getDescription());
-                ps.setBoolean(12, t.isWarranty());
-                ps.setString(13, t.getStatus());
-                // Phiếu vừa tiếp nhận thì chưa ai đánh giá nguyên nhân -- form
-                // tạo phiếu không có 2 ô này nên thực tế luôn ghi NULL. Vẫn bind
-                // ở đây để insert() không phải là con đường duy nhất bỏ sót cột
-                // nếu sau này có chỗ tạo phiếu kèm sẵn nguyên nhân.
-                ps.setString(14, t.getRootCause());
-                ps.setString(15, t.getCauseCategory());
-                ps.setString(16, t.getHandlingPlan());
+            try (Connection conn = DBContext.getConnection()) {
+                conn.setAutoCommit(false);
+                // Xem ContractDAO.insertProducts để hiểu vì sao dùng cờ committed
+                // thay vì 2 khối catch tách rời.
+                boolean committed = false;
+                try {
+                    int newId;
+                    try (PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+                        ps.setString(1, t.getTicketCode());
+                        ps.setInt(2, t.getEnterpriseId());
+                        setNullableInt(ps, 3, t.getContractId());
+                        ps.setString(4, t.getTicketType());
+                        ps.setString(5, t.getPriority());
+                        ps.setString(6, t.getReceptionChannel());
+                        setNullableTimestamp(ps, 7, t.getSlaDeadline());
+                        ps.setInt(8, t.getAssignedTechnicianId());
+                        ps.setInt(9, t.getCreatedBy());
+                        ps.setDate(10, t.getCreatedDate());
+                        ps.setString(11, t.getDescription());
+                        ps.setBoolean(12, t.isWarranty());
+                        ps.setString(13, t.getStatus());
+                        // Phiếu vừa tiếp nhận thì chưa ai đánh giá nguyên nhân -- form
+                        // tạo phiếu không có 2 ô này nên thực tế luôn ghi NULL. Vẫn bind
+                        // ở đây để insert() không phải là con đường duy nhất bỏ sót cột
+                        // nếu sau này có chỗ tạo phiếu kèm sẵn nguyên nhân.
+                        ps.setString(14, t.getRootCause());
+                        ps.setString(15, t.getCauseCategory());
+                        ps.setString(16, t.getHandlingPlan());
 
-                int affected = ps.executeUpdate();
-                if (affected == 0) {
-                    return -1;
-                }
-                try (ResultSet keys = ps.getGeneratedKeys()) {
-                    if (keys.next()) {
-                        return keys.getInt(1);
+                        if (ps.executeUpdate() == 0) {
+                            return -1;
+                        }
+                        try (ResultSet keys = ps.getGeneratedKeys()) {
+                            if (!keys.next()) {
+                                return -1;
+                            }
+                            newId = keys.getInt(1);
+                        }
+                    }
+                    // Người lập phiếu là người tạo ra bước đầu tiên; không có ghi
+                    // chú -- mô tả sự cố đã nằm trên chính phiếu.
+                    insertStatusChange(conn, newId, FROM_STATUS_CREATED, t.getStatus(), t.getCreatedBy(), null);
+
+                    conn.commit();
+                    committed = true;
+                    return newId;
+                } finally {
+                    if (!committed) {
+                        try {
+                            conn.rollback();
+                        } catch (SQLException rollbackEx) {
+                            LOG.error("Loi rollback khi them phieu ho tro (ticketCode={})", t.getTicketCode(), rollbackEx);
+                        }
+                    }
+                    try {
+                        conn.setAutoCommit(true);
+                    } catch (SQLException autoCommitEx) {
+                        LOG.error("Loi reset autocommit sau khi them phieu ho tro (ticketCode={})",
+                                t.getTicketCode(), autoCommitEx);
                     }
                 }
             } catch (SQLException ex) {
