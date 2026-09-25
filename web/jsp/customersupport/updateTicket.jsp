@@ -39,7 +39,7 @@
 
     <style>
         .page-container { max-width: 900px; margin: 28px auto; padding: 0 20px 32px; }
-        .page-header-row { margin-bottom: 22px; }
+        .page-header-row { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 22px; flex-wrap: wrap; gap: 14px; }
         .page-header-row h2 { font-weight: 700; color: var(--primary-dark); font-size: 1.4rem; margin-bottom: 4px; }
         .page-header-row p { color: #6b7280; font-size: 0.9rem; }
         .back-link-top { color: var(--primary); font-size: 0.85rem; text-decoration: none; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; margin-bottom: 10px; }
@@ -119,8 +119,12 @@
         <a href="${pageContext.request.contextPath}/ticket?action=view&id=${ticket.ticketId}" class="back-link-top"><i class="fa-solid fa-arrow-left-long"></i> Quay lại chi tiết phiếu</a>
 
         <div class="page-header-row">
-            <h2>Cập nhật phiếu hỗ trợ</h2>
-            <p>Mã phiếu: <strong style="color:var(--primary-dark)">${fn:escapeXml(ticket.ticketCode)}</strong></p>
+            <div>
+                <h2>Cập nhật phiếu hỗ trợ</h2>
+                <p>Mã phiếu: <strong style="color:var(--primary-dark)">${fn:escapeXml(ticket.ticketCode)}</strong></p>
+            </div>
+            <%-- Kỹ thuật viên được giao đọc thẳng mục của mình (cập nhật xử lý). --%>
+            <a href="${pageContext.request.contextPath}/guide?module=ticket#${lockGeneral ? 'cap-nhat-xu-ly' : 'sua'}" target="_blank" rel="noopener" class="guide-btn" title="Mở hướng dẫn sử dụng ở tab mới"><i class="fa-regular fa-circle-question"></i> Hướng dẫn</a>
         </div>
 
         <div class="card-box">

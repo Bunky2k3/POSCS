@@ -201,6 +201,7 @@
                 <p>Theo dõi và xử lý các yêu cầu hỗ trợ kỹ thuật từ khách hàng</p>
             </div>
             <div class="header-actions">
+                <a href="${pageContext.request.contextPath}/guide?module=ticket#danh-sach" target="_blank" rel="noopener" class="guide-btn" title="Mở hướng dẫn sử dụng ở tab mới"><i class="fa-regular fa-circle-question"></i> Hướng dẫn</a>
                 <%-- Giữ nguyên bộ lọc đang áp để file xuất ra khớp đúng những gì đang thấy trên màn hình. --%>
                 <%-- Xuất Excel là thao tác ĐỌC: chỉ lấy đúng dữ liệu vai trò này vốn đã
                      xem được trên màn hình, đổi sang dạng file. Nên KHÔNG khoá theo

@@ -56,6 +56,18 @@ public class GuideControllerTest {
         verify(dispatcher).forward(request, response);
     }
 
+    /** Nút "Hướng dẫn" trên các trang phiếu hỗ trợ mở /guide?module=ticket#mục. */
+    @Test
+    public void moduleTicket_moTrangHuongDanPhieuHoTro() throws Exception {
+        when(request.getParameter("module")).thenReturn("ticket");
+
+        controller.doGet(request, response);
+
+        verify(request).getRequestDispatcher("/jsp/guide/ticket.jsp");
+        verify(request).setAttribute("guideModule", "ticket");
+        verify(dispatcher).forward(request, response);
+    }
+
     /** Link cũ hoặc gõ tay /guide không kèm module: mở phân hệ mặc định, không báo lỗi. */
     @Test
     public void thieuModule_moPhanHeMacDinh() throws Exception {
