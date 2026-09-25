@@ -5,12 +5,14 @@
 <%--
     Request attribute do TechnicalSupportTicketController#showDetail thiết
     lập trước khi forward tới trang này:
-      - ticket    : poscs.model.TechnicalRequest (có sẵn .enterprise, .contract,
-                    .assignedTechnician, .createdByUser đã join nếu tồn tại)
-      - canDelete : boolean -- true nếu phiếu chưa có ai xử lý dở dang (status != "Đang xử lý")
+      - ticket        : poscs.model.TechnicalRequest (có sẵn .enterprise, .contract,
+                        .assignedTechnician, .createdByUser đã join nếu tồn tại)
+      - ticketHistory : List<poscs.model.TechnicalRequestHistory>, mới nhất trước
+      - canDelete     : boolean -- true nếu phiếu chưa có ai xử lý dở dang (status != "Đang xử lý")
+      - canEdit       : boolean -- quyền Full, HOẶC kỹ thuật viên đang được giao phiếu này
+      - canManage     : boolean -- quyền Full (nút Xóa)
 
-    technicalrequestdevices (thiết bị lỗi) và technicalrequesthistory (lịch
-    sử đổi trạng thái) chưa hiển thị dữ liệu thật -- thuộc phạm vi khác.
+    technicalrequestdevices (thiết bị lỗi) chưa hiển thị -- thuộc phạm vi khác.
 --%>
 <!DOCTYPE html>
 <html lang="vi">
@@ -61,6 +63,9 @@
         .status-new { background: #eaf6ff; color: var(--primary); } .status-new .dot { background: var(--primary); }
         .status-progress { background: #fff4e0; color: var(--warning); } .status-progress .dot { background: var(--warning); }
         .status-closed { background: #e8faf3; color: var(--success); } .status-closed .dot { background: var(--success); }
+        /* Cảnh báo hạn xử lý: cùng màu và cùng ngưỡng với danh sách phiếu. */
+        .sla-overdue { background: #fdecec; color: var(--danger, #d92d20); } .sla-overdue .dot { background: var(--danger, #d92d20); }
+        .sla-soon { background: #fff4e0; color: var(--warning); } .sla-soon .dot { background: var(--warning); }
 
         .header-actions { display: flex; gap: 10px; }
         .btn-edit-detail {
@@ -239,11 +244,28 @@
                         </c:choose>
                     </div>
                 </div>
-                <div class="col-md-6 field-row">
+                <%-- Ba mốc thời gian của phiếu đứng chung một hàng. Hạn xử lý trước
+                     đây chỉ thấy trong form sửa và bản PDF -- kỹ thuật viên xem
+                     phiếu không biết mình còn bao lâu, dù danh sách đã gắn nhãn
+                     "Quá hạn SLA" cho chính phiếu đó. --%>
+                <div class="col-md-4 field-row">
                     <label>Ngày tạo</label>
                     <div class="view-value"><fmt:formatDate value="${ticket.createdDate}" pattern="dd/MM/yyyy"/></div>
                 </div>
-                <div class="col-md-6 field-row">
+                <div class="col-md-4 field-row">
+                    <label>Hạn xử lý (SLA)</label>
+                    <div class="view-value">
+                        <c:choose>
+                            <c:when test="${ticket.slaDeadline != null}">
+                                <fmt:formatDate value="${ticket.slaDeadline}" pattern="dd/MM/yyyy HH:mm"/>
+                                <c:if test="${ticket.slaOverdue}"><span class="pill sla-overdue" title="Đã quá hạn xử lý theo SLA"><span class="dot"></span>Quá hạn SLA</span></c:if>
+                                <c:if test="${ticket.slaDueSoon}"><span class="pill sla-soon" title="Còn dưới 24 giờ tới hạn SLA"><span class="dot"></span>Sắp tới hạn</span></c:if>
+                            </c:when>
+                            <c:otherwise>Không đặt hạn</c:otherwise>
+                        </c:choose>
+                    </div>
+                </div>
+                <div class="col-md-4 field-row">
                     <label>Thời điểm hoàn tất</label>
                     <div class="view-value">
                         <c:choose>
