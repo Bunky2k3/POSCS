@@ -84,6 +84,16 @@
             <a href="${pageContext.request.contextPath}/employee?action=new" class="btn-add"><i class="fa-solid fa-plus"></i> Thêm nhân viên</a>
         </div>
 
+        <%-- Mở một nhân viên không còn (id sai, link cũ) thì EmployeeController
+             đưa về đây kèm ?error=notfound -- trước đây trang im lặng, người
+             dùng bấm một link rồi thấy lại danh sách mà không hiểu vì sao. --%>
+        <c:if test="${param.error == 'notfound'}">
+            <div class="alert alert-warning py-2 px-3 mb-3" style="font-size: 0.9rem; border-radius: 12px;">
+                <i class="fa-solid fa-circle-exclamation me-1"></i>
+                Không tìm thấy nhân viên này. Có thể đường dẫn đã cũ hoặc mã không đúng.
+            </div>
+        </c:if>
+
         <!-- ===== Bộ lọc / tìm kiếm ===== -->
         <form class="filter-bar card-box" method="GET" action="${pageContext.request.contextPath}/employee" id="filterForm">
             <input type="hidden" name="action" value="list">
