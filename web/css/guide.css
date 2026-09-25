@@ -125,7 +125,8 @@ figure.guide-shot img {
     border: 1px solid var(--g-line); box-shadow: 0 8px 24px rgba(0, 40, 80, 0.1);
 }
 /* Ảnh DỌC (cả một form, trang chi tiết) để tràn bề ngang thì chiếm gần một
-   màn hình -- thu lại và căn giữa. */
+   màn hình -- thu lại và căn giữa. Ảnh NHỎ (một hộp thoại) cũng dùng lớp
+   này để đứng giữa thay vì dạt về lề trái. */
 figure.guide-shot.narrow img { max-width: 720px; margin: 0 auto; }
 figure.guide-shot figcaption {
     margin-top: 8px; text-align: center; font-size: 0.84rem; color: var(--g-muted); font-style: italic;

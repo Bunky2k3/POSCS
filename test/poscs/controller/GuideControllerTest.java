@@ -44,6 +44,18 @@ public class GuideControllerTest {
         verify(dispatcher).forward(request, response);
     }
 
+    /** Nút "Hướng dẫn" trên các trang hợp đồng mở /guide?module=contract#mục. */
+    @Test
+    public void moduleContract_moTrangHuongDanHopDong() throws Exception {
+        when(request.getParameter("module")).thenReturn("contract");
+
+        controller.doGet(request, response);
+
+        verify(request).getRequestDispatcher("/jsp/guide/contract.jsp");
+        verify(request).setAttribute("guideModule", "contract");
+        verify(dispatcher).forward(request, response);
+    }
+
     /** Link cũ hoặc gõ tay /guide không kèm module: mở phân hệ mặc định, không báo lỗi. */
     @Test
     public void thieuModule_moPhanHeMacDinh() throws Exception {

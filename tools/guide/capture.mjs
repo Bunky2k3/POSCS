@@ -336,8 +336,14 @@ async function capture(page, shot, outFile) {
     // giữa trôi sang phải ~10px, còn khung đỏ đứng yên ở toạ độ cũ, nên mọi khung
     // lệch trái (cả loạt ảnh mẫu Khách hàng dính). Giờ nới khung nhìn cho chứa
     // trọn vùng chụp TRƯỚC, đo lại, rồi mới vẽ khung và chụp.
-    await page.eval('window.scrollTo(0, 0)');
-    let clip = await clipOf(page, shot.clip, shot.margin);
+    //
+    // Chụp nguyên khung nhìn (không clip) thì giữ nguyên chỗ đang cuộn tới --
+    // kịch bản có thể đã cuộn tới đúng mục cần chụp.
+    let clip = null;
+    if (shot.clip) {
+        await page.eval('window.scrollTo(0, 0)');
+        clip = await clipOf(page, shot.clip, shot.margin);
+    }
     for (let i = 0; clip && i < 3; i++) {
         const view = await page.eval('({ w: window.innerWidth, h: window.innerHeight })');
         const bottom = Math.ceil(clip.y + clip.height);

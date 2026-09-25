@@ -27,7 +27,7 @@
             <%-- Phân hệ chưa có hướng dẫn thì hiện mờ, không bấm được -- xem
                  GuideController.PAGES. --%>
             <a href="${pageContext.request.contextPath}/guide?module=customer" class="${guideModule == 'customer' ? 'active' : ''}">Khách hàng</a>
-            <span class="soon" title="Đang soạn">Hợp đồng</span>
+            <a href="${pageContext.request.contextPath}/guide?module=contract" class="${guideModule == 'contract' ? 'active' : ''}">Hợp đồng</a>
             <span class="soon" title="Đang soạn">Phiếu hỗ trợ</span>
             <span class="soon" title="Đang soạn">Nhân viên</span>
         </nav>

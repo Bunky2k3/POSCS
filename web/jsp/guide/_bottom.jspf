@@ -23,6 +23,7 @@
             // đề đi QUA dải theo dõi, nên bấm mục lục nhảy thẳng tới giữa một
             // mục dài là mục lục vẫn sáng mục cũ.
             var pending = false;
+            var shown = null;
             function highlight() {
                 pending = false;
                 // Tiêu đề đã lên tới 1/3 trên màn hình là người đọc đã vào mục đó.
@@ -34,6 +35,22 @@
                     }
                 });
                 links.forEach(function (l) { l.a.classList.toggle('active', l === current); });
+                // Mục lục dài hơn màn hình (Hợp đồng có hơn 30 mục) thì cuộn CHÍNH
+                // mục lục cho mục đang sáng lọt vào tầm nhìn -- không thì đọc tới
+                // cuối trang mà mục lục vẫn đứng ở đầu, không thấy mình ở đâu. Chỉ
+                // cuộn khi mục đang sáng vừa ĐỔI, để không giành tay người đang tự
+                // cuộn mục lục. Tính bằng scrollTop chứ không dùng scrollIntoView:
+                // cái đó cuộn luôn cả trang.
+                if (current && current !== shown) {
+                    shown = current;
+                    var top = current.a.offsetTop;
+                    var bottom = top + current.a.offsetHeight;
+                    if (top < toc.scrollTop + 40) {
+                        toc.scrollTop = Math.max(0, top - 40);
+                    } else if (bottom > toc.scrollTop + toc.clientHeight - 20) {
+                        toc.scrollTop = bottom - toc.clientHeight + 20;
+                    }
+                }
             }
             window.addEventListener('scroll', function () {
                 if (!pending) {
