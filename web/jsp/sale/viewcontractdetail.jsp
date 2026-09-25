@@ -267,6 +267,14 @@
             <span>Không xuất được PDF: hợp đồng có quá nhiều dòng sản phẩm/ghi chú dài để vừa 1 trang. Hãy rút gọn ghi chú hoặc liên hệ quản trị viên.</span>
         </div>
     </c:if>
+    <%-- Nút Xuất PDF đã ẩn ở hợp đồng mua, nên câu này chỉ hiện khi ai đó mở
+         thẳng link xuất PDF (link cũ, URL gõ tay) -- xem ContractController.exportPdf. --%>
+    <c:if test="${param.error == 'pdf_buy_unsupported'}">
+        <div class="toast-msg blocked show">
+            <i class="fa-solid fa-circle-xmark"></i>
+            <span>Chưa xuất được PDF cho hợp đồng mua: mẫu in hiện chỉ dành cho hợp đồng bán.</span>
+        </div>
+    </c:if>
     <%-- Chỉ những mã controller gửi về TRANG NÀY (action=view). Lỗi hàng hoá và
          kỳ thanh toán thì về trang quản lý -- câu của chúng nằm bên đó. --%>
     <c:if test="${param.error == 'amendment_not_allowed'}">
@@ -372,7 +380,12 @@
                         <i class="fa-solid fa-up-right-from-square"></i> Mở bản PDF
                     </a>
                 </c:if>
-                <a href="${pageContext.request.contextPath}/contract?action=exportPdf&id=${contract.contractId}" class="btn-delete-detail" style="cursor:pointer; color:var(--primary); border-color:#e5e7eb;"><i class="fa-solid fa-file-pdf"></i> Xuất PDF</a>
+                <%-- Không có ở hợp đồng mua: mẫu in là mẫu hợp đồng BÁN, in hợp
+                     đồng mua ra thì hai bên đổi vai. Controller cũng chặn, đây
+                     chỉ là để khỏi bày một nút bấm vào là báo lỗi. --%>
+                <c:if test="${contract.direction != 'Mua'}">
+                    <a href="${pageContext.request.contextPath}/contract?action=exportPdf&id=${contract.contractId}" class="btn-delete-detail" style="cursor:pointer; color:var(--primary); border-color:#e5e7eb;"><i class="fa-solid fa-file-pdf"></i> Xuất PDF</a>
+                </c:if>
                 <%-- Link duy nhất dẫn tới nơi có thao tác. Mở được cả khi hợp
                      đồng đã đóng băng: lúc đó nội dung khoá lại nhưng vẫn phải
                      ghi nhận được tiền về (tiền bảo hành giữ lại thường về sau
