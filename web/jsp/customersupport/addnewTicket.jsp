@@ -4,7 +4,7 @@
 <%--
     Request attribute do TechnicalSupportTicketController#showCreateForm
     thiết lập trước khi forward tới trang này:
-      - customerList : List<poscs.model.Enterprise> (toàn bộ khách hàng, để đổ dropdown "Khách hàng")
+      - customerList : List<poscs.model.Enterprise> (khách giữ vai "Khách mua", để đổ ô chọn "Khách hàng")
       - userList      : List<poscs.model.User>       (nhân viên vai Kỹ thuật, để đổ dropdown "Kỹ thuật viên phụ trách")
 
     Dropdown "Hợp đồng liên quan" KHÔNG đổ sẵn từ server -- JS nạp qua AJAX
@@ -108,6 +108,7 @@
                     <div class="alert alert-danger py-2 px-3 mb-3" style="font-size: 0.9rem; border-radius: 12px;">
                         <c:choose>
                             <c:when test="${param.error == 'contract_mismatch'}">Hợp đồng đã chọn không thuộc về khách hàng của phiếu này. Vui lòng chọn lại hợp đồng, hoặc bỏ gắn hợp đồng.</c:when>
+                            <c:when test="${param.error == 'not_buyer'}">Phiếu hỗ trợ chỉ lập cho khách hàng mua. Vui lòng chọn lại khách hàng.</c:when>
                             <c:when test="${param.error == 'invalid'}">Vui lòng nhập đầy đủ các trường bắt buộc.</c:when>
                             <c:when test="${param.error == 'update_failed'}">Không lưu được thay đổi. Vui lòng thử lại.</c:when>
                             <c:when test="${param.error == 'create_failed'}">Không tạo được phiếu hỗ trợ. Vui lòng thử lại.</c:when>

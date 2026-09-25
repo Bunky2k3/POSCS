@@ -135,6 +135,7 @@
                     <div class="alert alert-danger py-2 px-3 mb-3" style="font-size: 0.9rem; border-radius: 12px;">
                         <c:choose>
                             <c:when test="${param.error == 'contract_mismatch'}">Hợp đồng đã chọn không thuộc về khách hàng của phiếu này. Vui lòng chọn lại hợp đồng, hoặc bỏ gắn hợp đồng.</c:when>
+                            <c:when test="${param.error == 'not_buyer'}">Phiếu hỗ trợ chỉ lập cho khách hàng mua. Vui lòng chọn lại khách hàng.</c:when>
                             <c:when test="${param.error == 'invalid'}">Vui lòng nhập đầy đủ các trường bắt buộc.</c:when>
                             <c:when test="${param.error == 'update_failed'}">Không lưu được thay đổi. Vui lòng thử lại.</c:when>
                             <c:when test="${param.error == 'create_failed'}">Không tạo được phiếu hỗ trợ. Vui lòng thử lại.</c:when>

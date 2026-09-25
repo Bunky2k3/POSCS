@@ -84,6 +84,9 @@ public class TechnicalSupportTicketControllerTest {
         when(request.getContextPath()).thenReturn(CONTEXT_PATH);
 
         loginAs("Sales", 99); // role được Full access trên TICKET (gộp CSKH), xem PERMISSIONS.md
+        // Mặc định khách của phiếu là khách mua -- vai duy nhất lập được phiếu.
+        // Các test về luật vai tự ghi đè dòng này.
+        when(customerDAO.findRolesOf(anyInt())).thenReturn(Collections.singletonList("Khách mua"));
 
         // exportPdf đọc font tiếng Việt qua ServletContext. Dùng ĐÚNG file font
         // trong web/WEB-INF/fonts thay vì mock trả byte giả: PDType0Font.load
@@ -979,6 +982,80 @@ public class TechnicalSupportTicketControllerTest {
 
         verify(ticketDAO, never()).update(any(TechnicalRequest.class), anyInt(), any());
         verify(response).sendRedirect(CONTEXT_PATH + "/ticket?action=edit&id=3&error=contract_mismatch");
+    }
+
+    // ------------------------------------------------------------------
+    // Khách hàng của phiếu phải giữ vai "Khách mua"
+    // ------------------------------------------------------------------
+    //
+    // Trước đây ô chọn khách hàng đổ mọi doanh nghiệp, kể cả nhà cung cấp --
+    // chọn nhầm thì ô hợp đồng bên cạnh liệt kê hợp đồng MUA. Ô chọn giờ lọc
+    // theo vai, và server kiểm lại (ô chọn chỉ là khoá hình).
+
+    @Test
+    public void create_customerIsOnlyASupplier_isRejected() throws Exception {
+        when(request.getParameter("action")).thenReturn("create");
+        stubValidCreateFields();
+        when(customerDAO.findRolesOf(10)).thenReturn(Collections.singletonList("Nhà cung cấp"));
+
+        controller.doPost(request, response);
+
+        verify(ticketDAO, never()).insert(any(TechnicalRequest.class));
+        verify(response).sendRedirect(CONTEXT_PATH + "/ticket?action=new&error=not_buyer");
+    }
+
+    @Test
+    public void update_switchToASupplierOnlyCustomer_isRejected() throws Exception {
+        when(ticketDAO.findById(3)).thenReturn(fullyValidExistingTicket()); // khách hiện tại: 10
+        stubValidUpdateParams();
+        when(request.getParameter("enterpriseId")).thenReturn("21");
+        when(customerDAO.findRolesOf(21)).thenReturn(Collections.singletonList("Nhà cung cấp"));
+
+        controller.doPost(request, response);
+
+        verify(ticketDAO, never()).update(any(TechnicalRequest.class), anyInt(), any());
+        verify(response).sendRedirect(CONTEXT_PATH + "/ticket?action=edit&id=3&error=not_buyer");
+    }
+
+    /**
+     * Phiếu lập trước khi có luật này mà khách không giữ vai khách mua: giữ
+     * nguyên khách thì vẫn lưu được -- không bắt người sửa ngày hạn phải đổi
+     * cả khách hàng.
+     */
+    @Test
+    public void update_keepingTheCurrentNonBuyerCustomer_stillSaves() throws Exception {
+        when(ticketDAO.findById(3)).thenReturn(fullyValidExistingTicket()); // khách hiện tại: 10
+        stubValidUpdateParams(); // gửi lại đúng enterpriseId=10
+        when(customerDAO.findRolesOf(10)).thenReturn(Collections.singletonList("Nhà cung cấp"));
+
+        controller.doPost(request, response);
+
+        verify(ticketDAO).update(any(TechnicalRequest.class), anyInt(), any());
+        verify(response).sendRedirect(CONTEXT_PATH + "/ticket?action=view&id=3");
+    }
+
+    @Test
+    public void createForm_customerPickerListsOnlyBuyers() throws Exception {
+        when(request.getParameter("action")).thenReturn("new");
+        RequestDispatcher dispatcher = mock(RequestDispatcher.class);
+        when(request.getRequestDispatcher("/jsp/customersupport/addnewTicket.jsp")).thenReturn(dispatcher);
+
+        controller.doGet(request, response);
+
+        verify(customerDAO).findAllByRole("Khách mua", null);
+    }
+
+    @Test
+    public void editForm_customerPickerKeepsTheTicketsCurrentCustomer() throws Exception {
+        when(request.getParameter("action")).thenReturn("edit");
+        when(request.getParameter("id")).thenReturn("3");
+        when(ticketDAO.findById(3)).thenReturn(fullyValidExistingTicket()); // khách hiện tại: 10
+        RequestDispatcher dispatcher = mock(RequestDispatcher.class);
+        when(request.getRequestDispatcher("/jsp/customersupport/updateTicket.jsp")).thenReturn(dispatcher);
+
+        controller.doGet(request, response);
+
+        verify(customerDAO).findAllByRole("Khách mua", 10);
     }
 
     // ------------------------------------------------------------------

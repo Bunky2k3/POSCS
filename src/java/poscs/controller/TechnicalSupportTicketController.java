@@ -60,6 +60,13 @@ public class TechnicalSupportTicketController extends HttpServlet {
      * người tiếp nhận và người đi sửa là hai người khác nhau.
      */
     private static final String TECHNICIAN_ROLE = "Kỹ thuật";
+    /**
+     * Vai khách hàng được lập phiếu hỗ trợ -- khớp enterprise_roles.role (V20).
+     * Phiếu là yêu cầu hỗ trợ của bên MUA hàng của mình; nhà cung cấp không
+     * gửi phiếu hỗ trợ cho mình, và chọn nhầm một nhà cung cấp thì ô "Hợp
+     * đồng liên quan" liệt kê hợp đồng MUA.
+     */
+    private static final String ROLE_BUYER = "Khách mua";
 
     private static final String LIST_VIEW = "/jsp/customersupport/listTicket.jsp";
     private static final String DETAIL_VIEW = "/jsp/customersupport/viewdetailTicket.jsp";
@@ -423,7 +430,7 @@ public class TechnicalSupportTicketController extends HttpServlet {
         if (!AccessControl.requireFullAccess(request, response, AccessControl.Resource.TICKET)) {
             return;
         }
-        setDropdownAttributes(request, null);
+        setDropdownAttributes(request, null, null);
         request.getRequestDispatcher(CREATE_VIEW).forward(request, response);
     }
 
@@ -446,7 +453,7 @@ public class TechnicalSupportTicketController extends HttpServlet {
         }
 
         request.setAttribute("ticket", ticket);
-        setDropdownAttributes(request, ticket.getAssignedTechnicianId());
+        setDropdownAttributes(request, ticket.getAssignedTechnicianId(), ticket.getEnterpriseId());
         request.getRequestDispatcher(UPDATE_VIEW).forward(request, response);
     }
 
@@ -465,6 +472,10 @@ public class TechnicalSupportTicketController extends HttpServlet {
 
         if (!isValid(t)) {
             response.sendRedirect(request.getContextPath() + "/ticket?action=new&error=invalid");
+            return;
+        }
+        if (!customerIsBuyer(t, null)) {
+            response.sendRedirect(request.getContextPath() + "/ticket?action=new&error=not_buyer");
             return;
         }
         if (!contractMatchesEnterprise(t)) {
@@ -587,6 +598,10 @@ public class TechnicalSupportTicketController extends HttpServlet {
             response.sendRedirect(request.getContextPath() + "/ticket?action=edit&id=" + id + "&error=invalid");
             return;
         }
+        if (!customerIsBuyer(t, existing.getEnterpriseId())) {
+            response.sendRedirect(request.getContextPath() + "/ticket?action=edit&id=" + id + "&error=not_buyer");
+            return;
+        }
         if (!contractMatchesEnterprise(t)) {
             response.sendRedirect(request.getContextPath() + "/ticket?action=edit&id=" + id + "&error=contract_mismatch");
             return;
@@ -635,10 +650,16 @@ public class TechnicalSupportTicketController extends HttpServlet {
      * @param keepUserId kỹ thuật viên đang được giao phiếu đang sửa -- giữ
      *        trong dropdown kể cả khi họ đã đổi vai, xem
      *        EmployeeDAO.findActiveByRole.
+     * @param keepCustomerId khách hàng đang đứng trên phiếu đang sửa -- giữ
+     *        trong ô chọn kể cả khi họ không (còn) giữ vai khách mua (phiếu cũ
+     *        lập trước khi ô này lọc theo vai), nếu không thì mở form sửa lên ô
+     *        trống. Cùng cái bẫy ContractController đã chữa cho ô khách hàng.
      */
-    private void setDropdownAttributes(HttpServletRequest request, Integer keepUserId) {
-        // Toàn bộ khách hàng chưa xoá, phục vụ dropdown "Khách hàng"
-        request.setAttribute("customerList", customerDAO.findAll(1, Integer.MAX_VALUE, null, null, null));
+    private void setDropdownAttributes(HttpServletRequest request, Integer keepUserId, Integer keepCustomerId) {
+        // Chỉ khách giữ vai "Khách mua". Trước đây đổ mọi doanh nghiệp, kể cả
+        // nhà cung cấp -- chọn nhầm một nhà cung cấp thì ô hợp đồng bên cạnh
+        // liệt kê hợp đồng MUA của mình với họ.
+        request.setAttribute("customerList", customerDAO.findAllByRole(ROLE_BUYER, keepCustomerId));
         // Phiếu giao cho Kỹ thuật. Trước đây đổ cả 15 người vào đây trong khi
         // ô này tên là "Kỹ thuật viên phụ trách" -- chọn nhầm một CSKH thì
         // phiếu nằm im vì người đó không có quyền sửa phiếu được giao.
@@ -674,6 +695,24 @@ public class TechnicalSupportTicketController extends HttpServlet {
             }
         }
         return fallbackUserId;
+    }
+
+    /**
+     * Khách hàng của phiếu phải giữ vai "Khách mua".
+     *
+     * <p>Ô chọn ở form đã lọc theo vai, nhưng đó chỉ là khoá hình: một POST tự
+     * dựng gửi được enterprise_id của một nhà cung cấp. Kiểm lại ở đây, như
+     * ContractController kiểm vai của đối tác theo chiều hợp đồng.
+     *
+     * @param keepEnterpriseId khách đang đứng trên phiếu đang sửa (null khi tạo
+     *        mới) -- giữ nguyên khách cũ thì luôn hợp lệ, để phiếu lập trước khi
+     *        có luật này vẫn lưu được mà không phải đổi khách hàng.
+     */
+    private boolean customerIsBuyer(TechnicalRequest t, Integer keepEnterpriseId) {
+        if (keepEnterpriseId != null && t.getEnterpriseId() == keepEnterpriseId) {
+            return true;
+        }
+        return customerDAO.findRolesOf(t.getEnterpriseId()).contains(ROLE_BUYER);
     }
 
     /**
