@@ -19,6 +19,7 @@ import jakarta.servlet.http.HttpSession;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.ArgumentCaptor;
+import poscs.common.Period;
 import poscs.dao.ContractDAO;
 import poscs.dao.CustomerDAO;
 import poscs.dao.EmployeeDAO;
@@ -596,7 +597,7 @@ public class TechnicalSupportTicketControllerTest {
     @Test
     public void exportExcel_writesRealWorkbookWithHeaderAndOneRowPerTicket() throws Exception {
         when(request.getParameter("action")).thenReturn("exportExcel");
-        when(ticketDAO.findAll(eq(1), eq(Integer.MAX_VALUE), any(), any(), any()))
+        when(ticketDAO.findAll(eq(1), eq(Integer.MAX_VALUE), any(), any(), any(), any()))
                 .thenReturn(Arrays.asList(ticketForExport(), ticketForExport()));
         ByteArrayOutputStream captured = captureResponseBody();
 
@@ -624,7 +625,7 @@ public class TechnicalSupportTicketControllerTest {
     @Test
     public void exportExcel_sendsFileAsAttachmentNotHtml() throws Exception {
         when(request.getParameter("action")).thenReturn("exportExcel");
-        when(ticketDAO.findAll(eq(1), eq(Integer.MAX_VALUE), any(), any(), any()))
+        when(ticketDAO.findAll(eq(1), eq(Integer.MAX_VALUE), any(), any(), any(), any()))
                 .thenReturn(Collections.emptyList());
         captureResponseBody();
 
@@ -643,13 +644,35 @@ public class TechnicalSupportTicketControllerTest {
         when(request.getParameter("keyword")).thenReturn("trạm BTS");
         when(request.getParameter("status")).thenReturn("Đang xử lý");
         when(request.getParameter("priority")).thenReturn("Cao");
-        when(ticketDAO.findAll(anyInt(), anyInt(), any(), any(), any()))
+        when(ticketDAO.findAll(anyInt(), anyInt(), any(), any(), any(), any()))
                 .thenReturn(Collections.emptyList());
         captureResponseBody();
 
         controller.doGet(request, response);
 
-        verify(ticketDAO).findAll(1, Integer.MAX_VALUE, "trạm BTS", "Đang xử lý", "Cao");
+        // Không chọn năm = mọi thời điểm (kỳ null), như màn hình danh sách.
+        verify(ticketDAO).findAll(1, Integer.MAX_VALUE, "trạm BTS", "Đang xử lý", "Cao", null);
+    }
+
+    @Test
+    public void exportExcel_appliesTheSelectedPeriodLikeTheList() throws Exception {
+        // Link "Xuất Excel" gửi kèm year/period của thanh lọc. Trước đây controller
+        // bỏ qua hai tham số này: lọc Tháng 8 thì màn hình còn vài phiếu mà file
+        // vẫn ra toàn bộ.
+        when(request.getParameter("action")).thenReturn("exportExcel");
+        when(request.getParameter("year")).thenReturn("2026");
+        when(request.getParameter("period")).thenReturn("m8");
+        when(ticketDAO.findAll(anyInt(), anyInt(), any(), any(), any(), any()))
+                .thenReturn(Collections.emptyList());
+        captureResponseBody();
+
+        controller.doGet(request, response);
+
+        ArgumentCaptor<Period> period = ArgumentCaptor.forClass(Period.class);
+        verify(ticketDAO).findAll(eq(1), eq(Integer.MAX_VALUE), any(), any(), any(), period.capture());
+        assertNotNull("Có chọn năm thì phải lọc theo kỳ", period.getValue());
+        assertEquals(Date.valueOf("2026-08-01"), period.getValue().getFrom());
+        assertEquals(Date.valueOf("2026-08-31"), period.getValue().getTo());
     }
 
     @Test
@@ -659,7 +682,7 @@ public class TechnicalSupportTicketControllerTest {
         when(request.getParameter("action")).thenReturn("exportExcel");
         TechnicalRequest t = ticketForExport();
         t.setDescription("=HYPERLINK(\"http://kegian.example\",\"Bấm vào đây\")");
-        when(ticketDAO.findAll(eq(1), eq(Integer.MAX_VALUE), any(), any(), any()))
+        when(ticketDAO.findAll(eq(1), eq(Integer.MAX_VALUE), any(), any(), any(), any()))
                 .thenReturn(Collections.singletonList(t));
         ByteArrayOutputStream captured = captureResponseBody();
 

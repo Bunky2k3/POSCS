@@ -194,9 +194,13 @@ public class TechnicalSupportTicketController extends HttpServlet {
      * Xuất danh sách phiếu hỗ trợ ra Excel -- nút "Xuất Excel" ở listTicket.jsp.
      *
      * Xuất theo ĐÚNG bộ lọc đang áp trên màn hình (từ khoá/trạng thái/độ ưu
-     * tiên) nhưng bỏ phân trang: người dùng lọc ra cái họ cần rồi muốn cả tập
-     * đó, không phải đúng 10 dòng của trang đang mở. Cùng cách làm với xuất
-     * Excel của khách hàng và hợp đồng.
+     * tiên/kỳ) nhưng bỏ phân trang: người dùng lọc ra cái họ cần rồi muốn cả
+     * tập đó, không phải đúng 10 dòng của trang đang mở. Cùng cách làm với
+     * xuất Excel của khách hàng và hợp đồng.
+     *
+     * Kỳ (năm + quý/tháng) trước đây bị bỏ qua dù link "Xuất Excel" có gửi
+     * kèm: lọc Tháng 8 thì màn hình còn 5 phiếu mà file vẫn ra cả 16, người
+     * nhận file không có cách nào biết mình đang đọc một tập khác.
      *
      * Nhiều cột hơn bảng trên màn hình (thêm kênh tiếp nhận, hạn SLA, thời
      * điểm đóng, bảo hành, mô tả, kết quả xử lý) -- file Excel là để đem đi
@@ -206,8 +210,10 @@ public class TechnicalSupportTicketController extends HttpServlet {
         String keyword = request.getParameter("keyword");
         String statusFilter = request.getParameter("status");
         String priorityFilter = request.getParameter("priority");
+        Period period = Period.parse(request.getParameter("year"), request.getParameter("period"));
 
-        List<TechnicalRequest> all = ticketDAO.findAll(1, Integer.MAX_VALUE, keyword, statusFilter, priorityFilter);
+        List<TechnicalRequest> all = ticketDAO.findAll(1, Integer.MAX_VALUE, keyword, statusFilter, priorityFilter,
+                period);
         String[] headers = {"Mã phiếu", "Loại phiếu", "Khách hàng", "Hợp đồng liên quan",
             "Mức ưu tiên", "Kênh tiếp nhận", "Trạng thái", "Người xử lý", "Người tạo",
             "Ngày tạo", "Hạn xử lý (SLA)", "Thời điểm đóng", "Bảo hành",
