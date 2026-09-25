@@ -192,8 +192,15 @@
         .field-row label { font-size: 0.75rem; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: .3px; margin-bottom: 6px; display: block; }
         .field-row .view-value {
             font-size: 0.95rem; color: #111827; font-weight: 500; min-height: 40px; display: flex; align-items: center;
+            flex-wrap: wrap;
             border: 1px solid #eef2f6; background: #f9fafb; border-radius: 10px; padding: 8px 14px;
         }
+        /* Dòng phụ dưới một con số (số đọc thành chữ, dòng giải thích giá trị
+           hiện hành) phải XUỐNG DÒNG. Ô là hàng flex nên thiếu hai dòng này thì
+           dòng phụ bị ép đứng cạnh con số -- "1.800.000.000 ₫Một tỷ tám trăm..."
+           dính liền, còn dòng giải thích bóp con số xuống hai hàng. */
+        .field-row .view-value > .money-words,
+        .field-row .view-value > div { flex-basis: 100%; }
         .field-row .view-value a { color: var(--primary); font-weight: 600; text-decoration: none; }
         .field-row .view-value a:hover { text-decoration: underline; }
 
@@ -260,22 +267,12 @@
             <span>Không xuất được PDF: hợp đồng có quá nhiều dòng sản phẩm/ghi chú dài để vừa 1 trang. Hãy rút gọn ghi chú hoặc liên hệ quản trị viên.</span>
         </div>
     </c:if>
-    <c:if test="${param.error == 'add_product_invalid'}">
+    <%-- Chỉ những mã controller gửi về TRANG NÀY (action=view). Lỗi hàng hoá và
+         kỳ thanh toán thì về trang quản lý -- câu của chúng nằm bên đó. --%>
+    <c:if test="${param.error == 'amendment_not_allowed'}">
         <div class="toast-msg blocked show">
             <i class="fa-solid fa-circle-xmark"></i>
-            <span>Không thêm được sản phẩm: vui lòng chọn sản phẩm và nhập số lượng hợp lệ.</span>
-        </div>
-    </c:if>
-    <c:if test="${param.error == 'add_product_failed'}">
-        <div class="toast-msg blocked show">
-            <i class="fa-solid fa-circle-xmark"></i>
-            <span>Thêm sản phẩm thất bại -- vui lòng thử lại.</span>
-        </div>
-    </c:if>
-    <c:if test="${param.error == 'remove_product_failed'}">
-        <div class="toast-msg blocked show">
-            <i class="fa-solid fa-circle-xmark"></i>
-            <span>Không gỡ được sản phẩm này -- vui lòng thử lại.</span>
+            <span>Không lập được phụ lục: phụ lục chỉ lập từ hợp đồng gốc đã ký và chưa thanh lý. Có thể hợp đồng vừa được thanh lý hoặc chấm dứt.</span>
         </div>
     </c:if>
     <c:if test="${param.error == 'void_reason_required'}">
@@ -284,16 +281,10 @@
             <span>Phải có lý do thì mới huỷ được bản ghi hợp đồng.</span>
         </div>
     </c:if>
-    <c:if test="${param.error == 'payment_failed'}">
-        <div class="toast-msg blocked show">
-            <i class="fa-solid fa-circle-xmark"></i>
-            <span>Không thực hiện được trên kỳ thanh toán &mdash; kiểm lại số tiền, ngày đến hạn, hoặc hợp đồng đã đóng băng.</span>
-        </div>
-    </c:if>
     <c:if test="${param.error == 'missing_term'}">
         <div class="toast-msg blocked show">
             <i class="fa-solid fa-circle-xmark"></i>
-            <span>Chưa ký được: hợp đồng còn thiếu ngày hiệu lực hoặc ngày kết thúc. Vào Sửa thông tin để điền thời hạn trước.</span>
+            <span>Chưa ký được: hợp đồng còn thiếu ngày hiệu lực hoặc ngày kết thúc. Bấm Quản lý hợp đồng, điền thời hạn và lưu trước.</span>
         </div>
     </c:if>
     <c:if test="${param.error == 'progress_failed'}">
@@ -363,6 +354,7 @@
                 </div>
             </div>
             <div class="header-actions">
+                <a href="${pageContext.request.contextPath}/guide?module=contract#chi-tiet" target="_blank" rel="noopener" class="guide-btn" title="Mở hướng dẫn sử dụng ở tab mới"><i class="fa-regular fa-circle-question"></i> Hướng dẫn</a>
                 <%-- Link tới bản PDF đã ký trên Drive, do người dùng tự dán vào
                      form. Controller đã bắt buộc scheme http/https trước khi lưu
                      (xem TextRules.isSafeHttpUrl) -- escape ở đây thôi không đủ,
@@ -395,8 +387,9 @@
 
              Mọi thao tác làm thay đổi dữ liệu -- ký, thanh lý, chấm dứt sớm,
              huỷ bản ghi, gắn/gỡ hàng hoá, lập kỳ thanh toán, ghi nhận đã thu --
-             đã chuyển sang trang Sửa thông tin (updatecontract.jsp). Trang xem
-             chỉ trình bày, không có nút nào gây thay đổi.
+             đã chuyển sang trang Quản lý hợp đồng (updatecontract.jsp). Trang
+             xem chỉ trình bày; ngoại lệ duy nhất là nút "Đã xử lý xong" của
+             chặng bàn giao (xem ghi chú đầu file).
 
              Đừng thêm nút thao tác vào đây. Nếu cần một hành động mới thì nó
              thuộc về trang sửa. --%>

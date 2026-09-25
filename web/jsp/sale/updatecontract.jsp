@@ -8,8 +8,8 @@
       - customerList : List<poscs.model.Enterprise>
       - userList      : List<poscs.model.User>
 
-    Form này chỉ sửa bản ghi trong bảng contracts. Hạng mục sản phẩm/dịch vụ
-    được thêm/gỡ ở trang chi tiết hợp đồng, không sửa tại đây.
+    Form sửa ở đầu trang chỉ sửa bản ghi trong bảng contracts. Hạng mục sản
+    phẩm/dịch vụ thêm/gỡ ở tab Hàng hoá bên dưới (form riêng, đứng ngoài form sửa).
 --%>
 <!DOCTYPE html>
 <html lang="vi">
@@ -27,7 +27,7 @@
 
     <style>
         .page-container { max-width: 1180px; margin: 28px auto; padding: 0 20px 32px; }
-        .page-header-row { margin-bottom: 22px; }
+        .page-header-row { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 22px; flex-wrap: wrap; gap: 14px; }
         .page-header-row h2 { font-weight: 700; color: var(--primary-dark); font-size: 1.4rem; margin-bottom: 4px; }
         .page-header-row p { color: #6b7280; font-size: 0.9rem; }
         .back-link-top { color: var(--primary); font-size: 0.85rem; text-decoration: none; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; margin-bottom: 10px; }
@@ -159,9 +159,12 @@
         <a href="${pageContext.request.contextPath}/contract?action=view&id=${contract.contractId}" class="back-link-top"><i class="fa-solid fa-arrow-left-long"></i> Quay lại chi tiết hợp đồng</a>
 
         <div class="page-header-row">
-            <h2>${contract.amendment ? 'Cập nhật phụ lục' : 'Cập nhật hợp đồng'}</h2>
-            <p>Mã ${contract.amendment ? 'phụ lục' : 'hợp đồng'}:
-               <strong style="color:var(--primary-dark)">${fn:escapeXml(contract.contractCode)}</strong></p>
+            <div>
+                <h2>${contract.amendment ? 'Cập nhật phụ lục' : 'Cập nhật hợp đồng'}</h2>
+                <p>Mã ${contract.amendment ? 'phụ lục' : 'hợp đồng'}:
+                   <strong style="color:var(--primary-dark)">${fn:escapeXml(contract.contractCode)}</strong></p>
+            </div>
+            <a href="${pageContext.request.contextPath}/guide?module=contract#quan-ly" target="_blank" rel="noopener" class="guide-btn" title="Mở hướng dẫn sử dụng ở tab mới"><i class="fa-regular fa-circle-question"></i> Hướng dẫn</a>
         </div>
 
         <%-- Đường ngược về hợp đồng gốc. Đứng ở đây thay vì trong khối "Phụ lục"
@@ -188,7 +191,8 @@
                     <i class="fa-solid fa-lock" style="margin-top:3px;"></i>
                     <span><strong>Hợp đồng ở trạng thái “${fn:escapeXml(contract.progressStatus)}”.</strong>
                         Nội dung không sửa được nữa, kể cả bởi quản trị viên — phát sinh sau thời điểm
-                        này phải lập hợp đồng mới. Bên dưới chỉ còn phần ghi nhận tiền về.</span>
+                        này phải lập hợp đồng mới. Bên dưới vẫn làm được: ghi nhận tiền về, thêm/huỷ tài liệu,
+                        nối hợp đồng bán – mua, và đóng các chặng bàn giao còn đang treo.</span>
                 </div>
             </div>
         </c:if>
@@ -225,6 +229,14 @@
                         <c:when test="${param.error == 'link_invalid'}">Không nối được hai hợp đồng này: phải là một hợp đồng bán với một hợp đồng mua, và cả hai đều phải là hợp đồng gốc (không phải phụ lục).</c:when>
                         <c:when test="${param.error == 'link_duplicate'}">Hai hợp đồng này đã nối với nhau rồi.</c:when>
                         <c:when test="${param.error == 'unlink_failed'}">Không gỡ được liên kết. Vui lòng thử lại.</c:when>
+                        <%-- Năm mã dưới đây controller gửi về CHÍNH trang này (action=edit).
+                             Câu của chúng từng nằm ở trang xem -- nơi không bao giờ nhận
+                             chúng -- nên ở đây người dùng chỉ thấy câu chung chung cuối cùng. --%>
+                        <c:when test="${param.error == 'add_product_invalid'}">Không thêm được hàng hoá: chọn một sản phẩm và nhập số lượng là số nguyên lớn hơn 0 (viết 1.000 cũng được).</c:when>
+                        <c:when test="${param.error == 'add_product_failed'}">Không thêm được hàng hoá — hàng hoá chỉ sửa được khi hợp đồng còn là bản Nháp. Nếu vừa có người ký hợp đồng này, tải lại trang để xem.</c:when>
+                        <c:when test="${param.error == 'remove_product_failed'}">Không gỡ được hàng hoá này — hàng hoá chỉ sửa được khi hợp đồng còn là bản Nháp.</c:when>
+                        <c:when test="${param.error == 'payment_failed'}">Không thực hiện được trên kỳ thanh toán — kiểm lại số tiền (phải lớn hơn 0) và ngày đến hạn. Kỳ đã ghi nhận thu thì không ghi lại được; hợp đồng đã thanh lý hoặc chấm dứt thì không lập hay xoá kỳ được nữa.</c:when>
+                        <c:when test="${param.error == 'handover_done_failed'}">Không xác nhận được chặng bàn giao — có thể phòng đó đã báo xong trước rồi. Ô ghi chú là bắt buộc.</c:when>
                         <c:otherwise>Đã có lỗi xảy ra. Vui lòng thử lại.</c:otherwise>
                     </c:choose>
                 </div>
@@ -237,7 +249,7 @@
             <form id="createContractForm" action="${pageContext.request.contextPath}/contract" method="POST" onsubmit="return validateForm();">
                 <input type="hidden" name="csrfToken" value="${csrfToken}">
                 <%-- Một form, hai đích. Bình thường gửi "update" (sau khi ký thì
-                     server chỉ nhận người phụ trách + link). Admin bật chế độ
+                     server chỉ nhận người phụ trách). Admin bật chế độ
                      chữa sai sót thì script đổi ô này thành "correct" -- đường
                      duy nhất chạm được vào điều khoản của hợp đồng đã ký, và nó
                      bắt buộc kèm lý do. --%>
@@ -252,8 +264,9 @@
                             <i class="fa-solid fa-file-signature" style="margin-top:3px;"></i>
                             <div>
                                 <strong>Hợp đồng đã ký — điều khoản đã khoá.</strong>
-                                Chỉ còn <strong>người phụ trách</strong> và <strong>link bản PDF</strong> sửa được;
-                                hai thứ đó là dữ liệu quản trị nội bộ, không nằm trên tờ giấy hai bên ký.
+                                Chỉ còn <strong>người phụ trách</strong> sửa được — đó là phân công nội bộ,
+                                không nằm trên tờ giấy hai bên ký. Bản PDF đã ký và các biên bản thì treo ở
+                                tab <strong>Tài liệu</strong> bên dưới.
                                 <div style="margin-top:6px;">
                                     Cần thay đổi điều khoản thì <strong>lập phụ lục</strong> — một văn bản riêng, có chữ ký.
                                     <c:if test="${canCorrect}">
@@ -448,9 +461,11 @@
                 </div>
 
                 <div class="section-header"><h5>Hạng mục sản phẩm / dịch vụ</h5></div>
+                <%-- Không còn link #hang-hoa: khối đó giờ nằm trong một tab đang ẩn,
+                     nhảy tới neo của nó không hiện ra gì. Gọi tên tab thay vì chỉ đường. --%>
                 <p style="font-size:0.86rem; color:#6b7280; margin:0 0 4px;">
-                    Hạng mục không sửa trong form này — nó có khối riêng
-                    <a href="#hang-hoa">ngay bên dưới</a>, vì thêm/gỡ là thao tác ghi ngay chứ không chờ bấm Lưu.
+                    Hạng mục không sửa trong form này — thêm/gỡ ở tab <strong>Hàng hoá</strong> bên dưới;
+                    thao tác ở đó ghi ngay, không chờ bấm Lưu.
                 </p>
 
 
@@ -1035,12 +1050,12 @@
             </c:if>
         </div>
 
-        <%-- Khối hợp đồng nối kèm đứng ở cột hẹp, giống trang xem. Đã thử cả hai
-             chỗ và đo: ở cột hẹp, hợp đồng KHÔNG có liên kết nào (đa số) cho trang
-             ngắn hơn 265px; đổi lại, hợp đồng có hai liên kết dài thêm 124px. Lấy
-             ca phổ biến. --%>
             </div>
-            <c:if test="${canLinkContracts}">
+            <%-- Tab Tài liệu KHÔNG nằm trong c:if nào: nút của nó luôn hiện, kể cả
+                 trên phụ lục (biên bản, bản scan của chính phụ lục treo ở đây).
+                 Trước đây khung này lọt vào c:if canLinkContracts của tab Nối bán –
+                 mua ngay dưới, nên trên phụ lục nút có mà khung không -- bấm vào
+                 trống trơn, không thêm được tài liệu nào. --%>
             <div class="tab-pane fade" id="pane-tai-lieu" role="tabpanel">
         <!-- ===== Giấy tờ kèm theo (V34) ===== -->
         <%-- CHỈ LƯU LINK, không tải file lên. Khách hàng chốt như vậy: hồ sơ của
@@ -1141,6 +1156,9 @@
         </div>
 
             </div>
+            <%-- Điều kiện GIỐNG HỆT nút tab ở trên: canLinkContracts. Chỉ bọc đúng
+                 khung này thôi -- xem ghi chú ở khung Tài liệu. --%>
+            <c:if test="${canLinkContracts}">
             <div class="tab-pane fade" id="pane-noi-hd" role="tabpanel">
         <!-- ===== Đầu ra kéo theo đầu vào ===== -->
         <%-- Hợp đồng BÁN nối với các đơn MUA sinh ra vì nó, và ngược lại. Quan

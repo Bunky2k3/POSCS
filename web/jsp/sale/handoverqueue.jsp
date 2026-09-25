@@ -89,10 +89,21 @@
                 <h2>Bàn giao xử lý</h2>
                 <p>Hợp đồng đang nằm chờ ở các phòng &mdash; để lâu nhất xếp trước.</p>
             </div>
-            <a href="${pageContext.request.contextPath}/contract" class="btn-outline-action">
-                <i class="fa-solid fa-arrow-left-long"></i> Danh sách hợp đồng
-            </a>
+            <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                <a href="${pageContext.request.contextPath}/guide?module=contract#hang-doi-ban-giao" target="_blank" rel="noopener" class="guide-btn" title="Mở hướng dẫn sử dụng ở tab mới"><i class="fa-regular fa-circle-question"></i> Hướng dẫn</a>
+                <a href="${pageContext.request.contextPath}/contract" class="btn-outline-action">
+                    <i class="fa-solid fa-arrow-left-long"></i> Danh sách hợp đồng
+                </a>
+            </div>
         </div>
+
+        <%-- Bấm "Xong" hỏng thì controller quay về đây kèm error -- trước đây
+             trang không đọc tham số đó, nên bấm hỏng là màn hình đứng im. --%>
+        <c:if test="${param.error == 'handover_done_failed'}">
+            <div class="alert alert-danger py-2 px-3 mb-3" style="font-size: 0.9rem; border-radius: 12px;">
+                Không xác nhận được chặng bàn giao &mdash; có thể phòng đó đã báo xong trước rồi. Ô ghi chú là bắt buộc.
+            </div>
+        </c:if>
 
         <%-- Phạm vi. Mặc định TOÀN CHI NHÁNH, khác hai màn danh sách -- lý do ghi
              ở ContractController#showHandoverQueue: người phòng Kế toán/Dự án

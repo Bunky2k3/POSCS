@@ -28,7 +28,7 @@
 
     <style>
         .page-container { max-width: 780px; margin: 28px auto; padding: 0 20px 32px; }
-        .page-header-row { margin-bottom: 22px; }
+        .page-header-row { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 22px; flex-wrap: wrap; gap: 14px; }
         .page-header-row h2 { font-weight: 700; color: var(--primary-dark); font-size: 1.4rem; margin-bottom: 4px; }
         .page-header-row p { color: #6b7280; font-size: 0.9rem; }
         .back-link-top { color: var(--primary); font-size: 0.85rem; text-decoration: none; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; margin-bottom: 10px; }
@@ -80,8 +80,12 @@
         <a href="${pageContext.request.contextPath}/contract" class="back-link-top"><i class="fa-solid fa-arrow-left-long"></i> Quay lại danh sách</a>
 
         <div class="page-header-row">
-            <h2>Nhập PDF hợp đồng</h2>
-            <p>Dùng cho hợp đồng mới chưa có trong hệ thống: tải file mẫu, điền thông tin vào các ô rồi tải lên. Mỗi lần chỉ nhập được 1 hợp đồng.</p>
+            <%-- flex: 1 1 0 để đoạn mô tả dài không đẩy nút Hướng dẫn xuống dòng. --%>
+            <div style="flex: 1 1 0; min-width: 260px;">
+                <h2>Nhập PDF hợp đồng</h2>
+                <p>Dùng cho hợp đồng mới chưa có trong hệ thống: tải file mẫu, điền thông tin vào các ô rồi tải lên. Mỗi lần chỉ nhập được 1 hợp đồng.</p>
+            </div>
+            <a href="${pageContext.request.contextPath}/guide?module=contract#nhap-pdf" target="_blank" rel="noopener" class="guide-btn" title="Mở hướng dẫn sử dụng ở tab mới"><i class="fa-regular fa-circle-question"></i> Hướng dẫn</a>
         </div>
 
         <c:if test="${not empty importError}">

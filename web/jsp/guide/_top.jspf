@@ -1,0 +1,40 @@
+<%@page pageEncoding="UTF-8"%>
+<%--
+    Phần ĐẦU dùng chung của trang Hướng dẫn sử dụng. Trang nội dung khai
+    taglib, đặt biến guideTitle (tên phân hệ) rồi include file này, viết nội
+    dung, cuối cùng include _bottom.jspf. guideModule do GuideController đặt.
+
+    Mục lục bên trái KHÔNG khai tay: _bottom.jspf dựng từ các h2/h3 có id.
+--%>
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hướng dẫn: ${guideTitle} - POSCS Portal</title>
+    <link rel="icon" type="image/png" href="${pageContext.request.contextPath}/img/favicon.png">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="${pageContext.request.contextPath}/css/guide.css">
+</head>
+<body class="guide">
+    <header class="guide-topbar">
+        <a class="brand" href="${pageContext.request.contextPath}/dashboard" title="Về ứng dụng">
+            <img src="${pageContext.request.contextPath}/img/poscs-logo.png" alt="POSCS">
+        </a>
+        <span class="title">Hướng dẫn sử dụng</span>
+        <nav class="guide-tabs">
+            <%-- Phân hệ chưa có hướng dẫn thì hiện mờ, không bấm được -- xem
+                 GuideController.PAGES. --%>
+            <a href="${pageContext.request.contextPath}/guide?module=customer" class="${guideModule == 'customer' ? 'active' : ''}">Khách hàng</a>
+            <a href="${pageContext.request.contextPath}/guide?module=contract" class="${guideModule == 'contract' ? 'active' : ''}">Hợp đồng</a>
+            <span class="soon" title="Đang soạn">Phiếu hỗ trợ</span>
+            <span class="soon" title="Đang soạn">Nhân viên</span>
+        </nav>
+        <span class="spacer"></span>
+        <button type="button" class="tool" onclick="window.print()"><i class="fa-solid fa-print"></i> In / Lưu PDF</button>
+        <a class="tool" href="${pageContext.request.contextPath}/dashboard"><i class="fa-solid fa-arrow-left"></i> Về ứng dụng</a>
+    </header>
+    <div class="guide-layout">
+        <nav class="guide-toc" id="guideToc" aria-label="Mục lục"><h4>Mục lục</h4></nav>
+        <main class="guide-content" id="guideContent">

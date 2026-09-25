@@ -131,6 +131,7 @@
                 <h2>Thêm ${noun}</h2>
                 <p>${isSupplier ? 'Tạo mới hồ sơ nhà cung cấp (bên bán hàng cho mình)' : 'Tạo mới hồ sơ khách hàng doanh nghiệp'}</p>
             </div>
+            <a href="${pageContext.request.contextPath}/guide?module=customer#${isSupplier ? 'them-nha-cung-cap' : 'them-khach-hang'}" target="_blank" rel="noopener" class="guide-btn" title="Mở hướng dẫn sử dụng ở tab mới"><i class="fa-regular fa-circle-question"></i> Hướng dẫn</a>
         </div>
 
         <div class="card-box">
