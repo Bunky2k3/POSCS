@@ -147,6 +147,8 @@
         .action-icons .act-view:hover { background: #eaf6ff; color: var(--primary); }
         .action-icons .act-edit:hover { background: #fff4e0; color: var(--warning); }
         .action-icons .act-delete:hover { background: #fdecef; color: var(--danger); }
+        /* Phiếu đang xử lý không xoá được -- nút mờ như ở trang chi tiết. */
+        .action-icons .act-delete:disabled { opacity: .45; cursor: not-allowed; background: #f3f4f6; color: #6b7280; }
 
         .empty-state { text-align: center; padding: 60px 20px; color: #9ca3af; }
         .empty-state i { font-size: 2.4rem; margin-bottom: 12px; color: #d1d5db; }
@@ -209,6 +211,16 @@
                 </c:if>
             </div>
         </div>
+
+        <%-- Mở một phiếu không còn (id sai, hoặc phiếu vừa bị xoá) thì controller
+             đưa về đây kèm ?error=notfound -- trước đây trang im lặng, người
+             dùng bấm một link rồi thấy lại danh sách mà không hiểu vì sao. --%>
+        <c:if test="${param.error == 'notfound'}">
+            <div class="alert alert-warning py-2 px-3 mb-3" style="font-size: 0.9rem; border-radius: 12px;">
+                <i class="fa-solid fa-circle-exclamation me-1"></i>
+                Không tìm thấy phiếu hỗ trợ này. Có thể phiếu đã bị xoá.
+            </div>
+        </c:if>
 
         <!-- ===== Dải trạng thái tổng quan ===== -->
         <div class="status-strip">
@@ -323,7 +335,17 @@
                                         <button class="act-view" title="Xem chi tiết" onclick="location.href='${pageContext.request.contextPath}/ticket?action=view&id=${ticket.ticketId}'"><i class="fa-regular fa-eye"></i></button>
                                         <c:if test="${canManage}">
                                             <button class="act-edit" title="Sửa" onclick="location.href='${pageContext.request.contextPath}/ticket?action=edit&id=${ticket.ticketId}'"><i class="fa-solid fa-pen"></i></button>
-                                            <button class="act-delete" title="Xóa" onclick="openDeleteModal(${ticket.ticketId}, '${fn:escapeXml(ticket.ticketCode)}')"><i class="fa-solid fa-trash"></i></button>
+                                            <%-- Cùng điều kiện với TechnicalSupportTicketDAO.canDelete: phiếu
+                                                 đang xử lý thì server từ chối xoá, nên nút mờ sẵn thay vì
+                                                 để người dùng bấm, xác nhận, rồi bị đưa sang trang khác. --%>
+                                            <c:choose>
+                                                <c:when test="${ticket.status == 'Đang xử lý'}">
+                                                    <button class="act-delete" disabled title="Không thể xóa phiếu đang có người xử lý dở dang"><i class="fa-solid fa-trash"></i></button>
+                                                </c:when>
+                                                <c:otherwise>
+                                                    <button class="act-delete" title="Xóa" onclick="openDeleteModal(${ticket.ticketId}, '${fn:escapeXml(ticket.ticketCode)}')"><i class="fa-solid fa-trash"></i></button>
+                                                </c:otherwise>
+                                            </c:choose>
                                         </c:if>
                                     </div>
                                 </td>

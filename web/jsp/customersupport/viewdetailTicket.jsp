@@ -142,6 +142,17 @@
     <div class="page-container">
         <a href="${pageContext.request.contextPath}/ticket" class="back-link-top"><i class="fa-solid fa-arrow-left-long"></i> Quay lại danh sách</a>
 
+        <%-- Xoá bị từ chối (phiếu đang xử lý) thì controller đưa về ĐÚNG trang
+             này kèm ?error=cannot_delete. Trước đây trang không đọc tham số đó:
+             bấm xoá từ danh sách xong là rơi vào trang chi tiết, không một dòng
+             nào nói vì sao phiếu vẫn còn. --%>
+        <c:if test="${param.error == 'cannot_delete'}">
+            <div class="alert alert-danger py-2 px-3 mb-3" style="font-size: 0.9rem; border-radius: 12px;">
+                <i class="fa-solid fa-circle-exclamation me-1"></i>
+                Không xoá được phiếu này vì phiếu đang có người xử lý (trạng thái <strong>Đang xử lý</strong>). Chỉ xoá được phiếu Mới tiếp nhận hoặc Đã đóng.
+            </div>
+        </c:if>
+
         <!-- ===== Header ===== -->
         <div class="detail-header card-box">
             <div class="doc-info">
