@@ -34,6 +34,7 @@
     <tr><td>Loại hợp đồng</td><td>Cung cấp thiết bị, Thi công lắp đặt, Bảo trì bảo dưỡng</td><td>Mua thiết bị, Mua vật tư, Thuê thi công lắp đặt, Thuê bảo trì</td></tr>
     <tr><td>Lọc theo tỉnh</td><td>Có (tỉnh của khách hàng)</td><td>Không, vì nhà cung cấp không chia theo địa bàn</td></tr>
     <tr><td>Nhập từ file PDF</td><td>Có</td><td>Không</td></tr>
+    <tr><td>Xuất PDF bản hợp đồng</td><td>Có</td><td>Không, vì mẫu in hiện chỉ dành cho hợp đồng bán</td></tr>
 </table>
 <p><strong>Mã hợp đồng</strong> là số ghi trên bản hợp đồng giấy, do người dùng nhập (ví dụ <code>01/2026/HĐKT-POSTEF</code>). Hệ thống không tự sinh mã, và không hợp đồng hay phụ lục nào được trùng mã.</p>
 
@@ -179,7 +180,7 @@
 <ol class="guide-steps">
     <li><strong>Hai nhãn</strong>: trạng thái theo lịch và tiến độ (<a href="#hai-loai-trang-thai">mục 1.2</a>).</li>
     <li><strong>Mở bản PDF</strong>: mở bản hợp đồng đã ký ở tab mới. Nút chỉ hiện khi tab Tài liệu có một tài liệu loại <em>Hợp đồng đã ký</em> (<a href="#tai-lieu">mục 9</a>).</li>
-    <li><strong>Xuất PDF</strong>: tải về bản hợp đồng in theo mẫu của công ty (<a href="#xuat-file">mục 15</a>).</li>
+    <li><strong>Xuất PDF</strong>: tải về bản hợp đồng in theo mẫu của công ty (<a href="#xuat-file">mục 15</a>). Chỉ có ở hợp đồng bán.</li>
     <li><strong>Quản lý hợp đồng</strong>: sang trang có các nút thao tác. Chỉ người có quyền sửa mới thấy nút này.</li>
     <li><strong>Tiến trình hợp đồng</strong>: Soạn thảo → Ký hợp đồng → Thanh lý (hoặc Chấm dứt sớm). Mỗi bước đã qua ghi ngày và người làm; bước thanh lý ghi kèm căn cứ.</li>
     <li><strong>Thông tin hợp đồng</strong>: mã, loại, khách hàng (bấm để mở hồ sơ khách), người phụ trách, chiều mua/bán, người ký, nơi ký, giá trị. Thẻ này luôn hiện, dù đang đứng ở tab nào.</li>
@@ -540,9 +541,9 @@
 <h2 id="xuat-file">15. Xuất Excel và xuất PDF</h2>
 <div class="guide-who"><span class="lbl">Ai làm được:</span><span class="role">Admin</span><span class="role">Sales</span><span class="role">Kỹ thuật</span></div>
 <p><strong>Xuất Excel</strong> (số 8 ở Hình 1) tải về file <code>.xls</code> chứa <strong>toàn bộ</strong> hợp đồng khớp bộ lọc đang bật — mọi trang, cùng phạm vi và cùng dải “Đang xem” —, xếp theo tỉnh. Các cột gồm: STT, Mã HĐ, Phụ lục của, Tiêu đề, Loại HĐ, Tỉnh/Thành phố, Khách hàng, Người phụ trách, Ngày ký, Ngày hiệu lực, Ngày kết thúc, Trạng thái, Tiến độ. Khách chưa có địa chỉ ghi <em>Chưa xác định</em> ở cột tỉnh.</p>
-<p><strong>Xuất PDF</strong> (số 3 ở Hình 5) tải về bản hợp đồng mua bán in theo mẫu của công ty cho một hợp đồng: mã, ngày ký, thời hạn, người đại diện bên bán (người phụ trách), thông tin bên mua (tên, mã số thuế, địa chỉ, người đại diện, điện thoại, email) và bảng hàng hoá (không có đơn giá). Nếu hàng hoá quá dài không vừa trang, hệ thống báo lỗi thay vì xuất một file thiếu dòng.</p>
-<div class="guide-warn">
-    <p>Mẫu xuất PDF là mẫu <strong>hợp đồng bán</strong>: công ty là bên bán, đối tác là bên mua. Với hợp đồng mua, file vẫn điền nhà cung cấp vào phần bên mua — chưa dùng được cho hợp đồng mua.</p>
+<p><strong>Xuất PDF</strong> (số 3 ở Hình 5) tải về bản hợp đồng mua bán in theo mẫu của công ty cho một hợp đồng bán: công ty là bên bán (Bên A), khách hàng là bên mua (Bên B). File gồm mã, ngày ký, thời hạn, người đại diện bên bán (người phụ trách), thông tin bên mua (tên, mã số thuế, địa chỉ, người đại diện, điện thoại, email) và bảng hàng hoá (không có đơn giá). Nếu hàng hoá quá dài không vừa trang, hệ thống báo lỗi thay vì xuất một file thiếu dòng.</p>
+<div class="guide-note">
+    <p>Xuất PDF <strong>chỉ có ở hợp đồng bán</strong>. Mẫu in hiện có viết cho chiều bán — công ty đứng ở phần bên bán — nên chưa dùng được cho hợp đồng mua: trang chi tiết của hợp đồng mua, và của các phụ lục của nó, không có nút Xuất PDF.</p>
 </div>
 
 <h2 id="loi-thuong-gap">16. Thông báo lỗi thường gặp</h2>
@@ -565,6 +566,7 @@
     <tr><td>Phải có lý do thì mới huỷ được bản ghi hợp đồng.</td><td>Điền ô Lý do trong hộp huỷ bản ghi.</td></tr>
     <tr><td>Không huỷ được bản ghi này…</td><td>Thường do hợp đồng vừa có phụ lục: huỷ các phụ lục trước.</td></tr>
     <tr><td>Không xuất được PDF: hợp đồng có quá nhiều dòng sản phẩm/ghi chú dài…</td><td>Rút gọn ghi chú của các dòng hàng hoá, hoặc báo quản trị viên.</td></tr>
+    <tr><td>Chưa xuất được PDF cho hợp đồng mua…</td><td>Mẫu in chỉ dành cho hợp đồng bán. Thông báo này hiện khi mở một link xuất PDF cũ của hợp đồng mua; trang chi tiết hợp đồng mua không có nút Xuất PDF.</td></tr>
     <tr><td>Vui lòng chọn file .pdf để nhập. / File không đúng mẫu… / Không đọc được file…</td><td>Tải lại file mẫu, điền trên chính file đó và lưu dạng PDF có form.</td></tr>
 </table>
 

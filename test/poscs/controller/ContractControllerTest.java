@@ -1,13 +1,22 @@
 package poscs.controller;
 
+import java.io.ByteArrayOutputStream;
+import java.io.FileInputStream;
 import java.lang.reflect.Field;
 import java.util.List;
 import java.sql.Date;
 import java.time.LocalDate;
 import jakarta.servlet.RequestDispatcher;
+import jakarta.servlet.ServletConfig;
+import jakarta.servlet.ServletContext;
+import jakarta.servlet.ServletOutputStream;
+import jakarta.servlet.WriteListener;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
+import org.apache.pdfbox.Loader;
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.text.PDFTextStripper;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.ArgumentCaptor;
@@ -21,6 +30,7 @@ import poscs.model.Contract;
 import poscs.model.ContractDocument;
 import poscs.model.ContractHandover;
 import poscs.model.ContractProduct;
+import poscs.model.Enterprise;
 import poscs.model.Product;
 import poscs.model.Role;
 import poscs.model.User;
@@ -34,9 +44,10 @@ import static org.mockito.Mockito.*;
  * nghiệp vụ chạy trước khi chạm DB (BR-36 ngày ký &le; hiệu lực &le; kết
  * thúc, UC-34 chỉ xoá hợp đồng "Chưa hiệu lực", parse số lượng kiểu VN khi
  * gắn sản phẩm, phân quyền Full access CONTRACT) chứ không test lại
- * ContractDAO/JDBC hay 2 action xuất/nhập PDF (exportPdf/handleImportPdf --
- * cần PDDocument mẫu thật từ WEB-INF/templates qua ServletContext, thuộc
- * phạm vi test tích hợp, không phải unit test tầng controller).
+ * ContractDAO/JDBC hay luồng nhập PDF (handleImportPdf -- ghi thật xuống CSDL,
+ * nằm ở ContractImportIntegrationTest). Xuất PDF thì có: file mẫu và font đọc
+ * thẳng từ web/WEB-INF qua một ServletContext giả, xem
+ * initWithRealPdfResources().
  *
  * JUnit 4 (không phải 5) vì build-impl.xml của project chỉ nối sẵn Ant
  * &lt;junit&gt; task cổ điển -- xem CustomerControllerTest.
@@ -191,6 +202,128 @@ public class ContractControllerTest {
         }
         verify(dispatcher).forward(request, response);
         verify(response, never()).sendRedirect(anyString());
+    }
+
+    // ------------------------------------------------------------------
+    // GET ?action=exportPdf
+    // ------------------------------------------------------------------
+
+    /**
+     * Mẫu in là mẫu hợp đồng BÁN (công ty in sẵn ở "BÊN A (BÊN BÁN)"), nên
+     * hợp đồng mua phải dừng lại TRƯỚC khi in bất cứ gì -- một tờ hợp đồng
+     * đổi vai trông vẫn hợp lệ, không ai nhìn ra để mà vứt đi. Không cần
+     * ServletContext: chạm tới file mẫu là đã đi quá chỗ phải dừng.
+     */
+    @Test
+    public void exportPdf_buyContract_redirectsBackWithoutPrinting() throws Exception {
+        Contract contract = new Contract();
+        contract.setContractId(15);
+        contract.setDirection("Mua");
+        when(request.getParameter("action")).thenReturn("exportPdf");
+        when(request.getParameter("id")).thenReturn("15");
+        when(contractDAO.findById(15)).thenReturn(contract);
+
+        controller.doGet(request, response);
+
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=view&id=15&error=pdf_buy_unsupported");
+        verify(response, never()).getOutputStream();
+        verify(response, never()).setContentType(anyString());
+        verify(contractDAO, never()).findProductsByContractId(anyInt());
+        verify(customerDAO, never()).findById(anyInt());
+    }
+
+    /**
+     * Mặt kia của chỗ chặn trên: hợp đồng BÁN vẫn ra PDF, và đối tác nằm ở
+     * khối bên mua. Chạy trên ĐÚNG file mẫu + font trong web/WEB-INF (như
+     * TechnicalSupportTicketControllerTest), vì chỉ file mẫu thật mới nói được
+     * đối tác rơi vào khối nào.
+     */
+    @Test
+    public void exportPdf_sellContract_printsPartnerUnderBuyerSide() throws Exception {
+        initWithRealPdfResources();
+        ByteArrayOutputStream captured = captureResponseBody();
+        Contract contract = new Contract();
+        contract.setContractId(1);
+        contract.setDirection("Bán");
+        contract.setContractCode("01/2026/HDKT-TEST");
+        contract.setEnterpriseId(7);
+        User owner = new User();
+        owner.setLastName("Tran");
+        owner.setFirstName("Sales");
+        contract.setOwner(owner);
+        Enterprise buyer = new Enterprise();
+        buyer.setEnterpriseId(7);
+        buyer.setEnterpriseName("Cong ty Khach Mua Kiem Thu");
+        buyer.setTaxCode("0101234567");
+        when(request.getParameter("action")).thenReturn("exportPdf");
+        when(request.getParameter("id")).thenReturn("1");
+        when(contractDAO.findById(1)).thenReturn(contract);
+        when(contractDAO.findProductsByContractId(1)).thenReturn(List.of());
+        when(customerDAO.findById(7)).thenReturn(buyer);
+
+        controller.doGet(request, response);
+
+        verify(response, never()).sendRedirect(anyString());
+        verify(response).setContentType("application/pdf");
+        try (PDDocument pdf = Loader.loadPDF(captured.toByteArray())) {
+            PDFTextStripper stripper = new PDFTextStripper();
+            // Theo vị trí trên trang: ô điền được làm phẳng thành nội dung vẽ
+            // SAU toàn bộ chữ in sẵn, đọc theo thứ tự luồng thì mọi giá trị điền
+            // đều đứng sau "BÊN B" dù nằm ở khối nào.
+            stripper.setSortByPosition(true);
+            stripper.setStartPage(1);
+            stripper.setEndPage(1);
+            String page1 = stripper.getText(pdf);
+            int sideA = page1.indexOf("BÊN A (BÊN BÁN)");
+            int company = page1.indexOf("(POSTEF)");
+            int sideB = page1.indexOf("BÊN B (BÊN MUA)");
+            int partner = page1.indexOf("Cong ty Khach Mua Kiem Thu");
+            assertTrue("Thiếu nhãn khối bên bán/bên mua: " + page1, sideA >= 0 && sideB > sideA);
+            assertTrue("Công ty phải nằm ở khối bên bán", company > sideA && company < sideB);
+            assertTrue("Khách hàng của hợp đồng bán phải nằm ở khối bên mua", partner > sideB);
+        }
+    }
+
+    /**
+     * exportPdf đọc file mẫu và font qua ServletContext. Trỏ vào ĐÚNG file
+     * trong web/WEB-INF thay vì mock trả byte giả: file mẫu phải có AcroForm
+     * thật, và PDType0Font.load phân tích thật file TTF.
+     */
+    private void initWithRealPdfResources() throws Exception {
+        ServletContext servletContext = mock(ServletContext.class);
+        when(servletContext.getResourceAsStream("/WEB-INF/templates/hopdong_template.pdf"))
+                .thenAnswer(inv -> new FileInputStream("web/WEB-INF/templates/hopdong_template.pdf"));
+        when(servletContext.getResourceAsStream("/WEB-INF/fonts/NotoSans-Regular.ttf"))
+                .thenAnswer(inv -> new FileInputStream("web/WEB-INF/fonts/NotoSans-Regular.ttf"));
+        ServletConfig servletConfig = mock(ServletConfig.class);
+        when(servletConfig.getServletContext()).thenReturn(servletContext);
+        controller.init(servletConfig);
+    }
+
+    /** Hứng byte controller ghi ra response để mở lại bằng chính PDFBox. */
+    private ByteArrayOutputStream captureResponseBody() throws Exception {
+        ByteArrayOutputStream captured = new ByteArrayOutputStream();
+        when(response.getOutputStream()).thenReturn(new ServletOutputStream() {
+            @Override
+            public void write(int b) {
+                captured.write(b);
+            }
+
+            @Override
+            public void write(byte[] b, int off, int len) {
+                captured.write(b, off, len);
+            }
+
+            @Override
+            public boolean isReady() {
+                return true;
+            }
+
+            @Override
+            public void setWriteListener(WriteListener listener) {
+            }
+        });
+        return captured;
     }
 
     // ------------------------------------------------------------------

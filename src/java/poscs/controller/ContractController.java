@@ -549,12 +549,29 @@ public class ContractController extends HttpServlet {
      * contract.enterprise (từ ContractDAO) chỉ có id+tên nên phải gọi lại
      * customerDAO.findById() lấy Enterprise đầy đủ (địa chỉ/MST/người đại
      * diện) để in vào PDF. Không có đơn giá/thành tiền (xem javadoc đầu file).
+     *
+     * <p>CHỈ hợp đồng BÁN -- xem chỗ chặn hợp đồng mua ngay dưới.
      */
     private void exportPdf(HttpServletRequest request, HttpServletResponse response) throws IOException {
         Integer id = parseIntOrNull(request.getParameter("id"));
         Contract contract = id != null ? contractDAO.findById(id) : null;
         if (contract == null) {
             response.sendRedirect(request.getContextPath() + "/contract?error=notfound");
+            return;
+        }
+        // hopdong_template.pdf là mẫu hợp đồng BÁN: công ty in sẵn ở khối
+        // "BÊN A (BÊN BÁN)", đối tác điền vào "BÊN B (BÊN MUA)". Đem nó in một
+        // hợp đồng MUA thì hai bên đổi vai -- nhà cung cấp thành người mua hàng
+        // của chính mình -- ra một tờ hợp đồng sai mà trông vẫn hợp lệ. Không có
+        // tờ nào còn hơn có tờ sai, nên chặn ở đây cho tới khi có mẫu cho chiều
+        // mua.
+        //
+        // Trang xem đã ẩn nút với hợp đồng mua; chặn cả ở đây vì link cũ hay
+        // URL gõ tay vẫn tới được. Phụ lục mang chiều của hợp đồng gốc
+        // (ContractDAO.insert), nên phụ lục của hợp đồng mua cũng dừng ở đây.
+        if (DIRECTION_BUY.equals(contract.getDirection())) {
+            response.sendRedirect(request.getContextPath() + "/contract?action=view&id=" + id
+                    + "&error=pdf_buy_unsupported");
             return;
         }
         List<ContractProduct> items = contractDAO.findProductsByContractId(id);
