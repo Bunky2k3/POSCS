@@ -89,7 +89,7 @@
             <input type="hidden" name="action" value="list">
             <div class="search-input-wrap">
                 <i class="fa-solid fa-magnifying-glass"></i>
-                <input type="text" name="keyword" value="${fn:escapeXml(keyword)}" placeholder="Tìm theo tên, số điện thoại...">
+                <input type="text" id="searchInput" name="keyword" value="${fn:escapeXml(keyword)}" placeholder="Tìm theo họ tên, tên đăng nhập, số điện thoại...">
             </div>
             <select id="filterRole" name="roleId">
                 <option value="">Tất cả vai trò</option>

@@ -468,9 +468,16 @@ public class EmployeeDAO {
 
     private void appendFilters(StringBuilder sql, List<Object> params, String keyword, String statusFilter, Integer roleFilter) {
         if (keyword != null && !keyword.trim().isEmpty()) {
-            sql.append(" AND (u.last_name LIKE ? OR u.middle_name LIKE ? OR u.first_name LIKE ? OR u.phone LIKE ?)");
+            // So trên HỌ TÊN GHÉP LIỀN chứ không từng cột một: họ tên người
+            // dùng gõ thường vắt qua hai cột ("Ngọc Anh" = cuối tên đệm + tên),
+            // so riêng từng cột thì không cột nào chứa trọn cụm đó và kết quả
+            // rỗng. CONCAT_WS bỏ qua tên đệm NULL, nên "Trần Sales" vẫn khớp.
+            // Thêm username: nó in ngay trên thẻ nhân viên mà trước đây gõ vào
+            // ô tìm lại không ra ai.
+            sql.append(" AND (CONCAT_WS(' ', u.last_name, u.middle_name, u.first_name) LIKE ?"
+                    + " OR u.username LIKE ? OR u.phone LIKE ?)");
             String like = "%" + keyword.trim() + "%";
-            for (int i = 0; i < 4; i++) {
+            for (int i = 0; i < 3; i++) {
                 params.add(like);
             }
         }

@@ -212,10 +212,12 @@ public class EmployeeDAOTest {
             dao.findAll(1, 10, "  an  ", null, null);
 
             verify(conn).prepareStatement(sqlCaptor.capture());
-            assertTrue(sqlCaptor.getValue().contains("last_name LIKE ?"));
-            // Từ khoá được trim rồi bọc %...% và lặp cho cả 4 cột tìm kiếm
-            // (họ, tên đệm, tên, SĐT -- không còn email từ V36).
-            verify(ps, times(4)).setObject(anyInt(), eq("%an%"));
+            // Họ tên so trên chuỗi ghép liền (xem appendFilters), kèm username.
+            assertTrue(sqlCaptor.getValue().contains("CONCAT_WS(' ', u.last_name, u.middle_name, u.first_name) LIKE ?"));
+            assertTrue(sqlCaptor.getValue().contains("u.username LIKE ?"));
+            // Từ khoá được trim rồi bọc %...% và lặp cho cả 3 chỗ tìm kiếm
+            // (họ tên, tên đăng nhập, SĐT -- không còn email từ V36).
+            verify(ps, times(3)).setObject(anyInt(), eq("%an%"));
         }
     }
 
