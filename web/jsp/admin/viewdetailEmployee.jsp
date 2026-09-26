@@ -31,6 +31,9 @@
 
         .back-link { display: inline-flex; align-items: center; gap: 6px; color: #6b7280; font-size: 0.87rem; font-weight: 600; text-decoration: none; margin-bottom: 16px; }
         .back-link:hover { color: var(--primary-dark); }
+        /* Hàng trên cùng: link quay lại bên trái, nút Hướng dẫn bên phải. */
+        .page-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+        .page-top .back-link { margin-bottom: 0; }
 
         .profile-card { background: #ffffff; border-radius: 20px; overflow: hidden; box-shadow: 0 15px 40px rgba(0,40,80,0.12); }
         .profile-banner { background: linear-gradient(120deg, var(--primary-dark), var(--primary), var(--primary-light)); padding: 40px 30px 28px; text-align: center; color: #fff; }
@@ -82,7 +85,10 @@
         <div class="main-content">
 
     <div class="page-container">
-        <a href="${pageContext.request.contextPath}/employee" class="back-link"><i class="fa-solid fa-arrow-left"></i> Quay lại danh sách nhân viên</a>
+        <div class="page-top">
+            <a href="${pageContext.request.contextPath}/employee" class="back-link"><i class="fa-solid fa-arrow-left"></i> Quay lại danh sách nhân viên</a>
+            <a href="${pageContext.request.contextPath}/guide?module=employee#chi-tiet" target="_blank" rel="noopener" class="guide-btn" title="Mở hướng dẫn sử dụng ở tab mới"><i class="fa-regular fa-circle-question"></i> Hướng dẫn</a>
+        </div>
 
         <c:if test="${not empty param.sent && param.sent == '1'}">
             <div class="alert alert-success py-2 px-3 mb-3" style="font-size: 0.9rem; border-radius: 12px;">

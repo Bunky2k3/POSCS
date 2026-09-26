@@ -30,6 +30,7 @@
 
         .btn-add { background: linear-gradient(120deg, var(--primary), var(--primary-light)); color: #fff; border: none; border-radius: 10px; padding: 10px 20px; font-weight: 600; font-size: 0.9rem; text-decoration: none; display: inline-flex; align-items: center; gap: 8px; box-shadow: 0 8px 18px rgba(5,104,166,0.3); white-space: nowrap; }
         .btn-add:hover { background: linear-gradient(120deg, var(--primary-dark), var(--primary)); color: #fff; }
+        .header-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 
         .filter-bar { padding: 18px 20px; margin-bottom: 20px; display: flex; flex-wrap: wrap; gap: 14px; align-items: center; }
         .search-input-wrap { position: relative; flex: 1 1 280px; min-width: 220px; }
@@ -81,7 +82,10 @@
                 <h2>Danh sách nhân viên</h2>
                 <p>Quản lý tài khoản và hồ sơ nhân viên nội bộ</p>
             </div>
-            <a href="${pageContext.request.contextPath}/employee?action=new" class="btn-add"><i class="fa-solid fa-plus"></i> Thêm nhân viên</a>
+            <div class="header-actions">
+                <a href="${pageContext.request.contextPath}/guide?module=employee#danh-sach" target="_blank" rel="noopener" class="guide-btn" title="Mở hướng dẫn sử dụng ở tab mới"><i class="fa-regular fa-circle-question"></i> Hướng dẫn</a>
+                <a href="${pageContext.request.contextPath}/employee?action=new" class="btn-add"><i class="fa-solid fa-plus"></i> Thêm nhân viên</a>
+            </div>
         </div>
 
         <%-- Mở một nhân viên không còn (id sai, link cũ) thì EmployeeController
