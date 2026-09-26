@@ -33,6 +33,7 @@
 </table>
 <div class="guide-note">
     <p>(*) Sales đã có <strong>cấp trên</strong> trong sơ đồ tổ chức thì chỉ được xem, không tạo/sửa/xoá được. Các nút đó sẽ không hiện ra.</p>
+    <p>(*) Sales <strong>đã được giao tỉnh</strong> chỉ sửa, xoá, đánh giá được <strong>khách của mình</strong>: khách mình phụ trách chính, hoặc khách nằm trong tỉnh mình phụ trách — đúng những khách ở phạm vi <em>Của tôi</em> (<a href="#danh-sach">mục 2</a>). Nhà cung cấp thì chỉ sửa được nhà cung cấp mình phụ trách chính. Khách của người khác vẫn xem được, chỉ không có nút Sửa, Xóa, Đánh giá. Sales chưa được giao tỉnh thì sửa được mọi khách hàng mua, như Admin.</p>
 </div>
 
 <h2 id="danh-sach">2. Xem và tìm khách hàng</h2>
@@ -52,7 +53,7 @@
     <li><strong>Tỉnh</strong>: lọc theo một hoặc nhiều tỉnh (xem <a href="#loc-tinh">mục 2.1</a>).</li>
     <li><strong>Xuất Excel</strong>: tải danh sách đang lọc về máy (xem <a href="#xuat-excel">mục 9</a>).</li>
     <li><strong>Thêm khách hàng</strong>: mở trang tạo khách hàng mới (xem <a href="#them-khach-hang">mục 3</a>).</li>
-    <li><strong>Cột Thao tác</strong> ở cuối mỗi dòng: <i class="fa-solid fa-eye"></i> xem chi tiết, <i class="fa-solid fa-pen"></i> sửa, <i class="fa-solid fa-trash"></i> xoá. Bảng rộng hơn màn hình nên cột này thường nằm khuất bên phải: kéo thanh cuộn ngang dưới bảng, hoặc bấm giữ chuột trên bảng rồi kéo sang trái. Bấm vào tên khách cũng mở trang chi tiết.</li>
+    <li><strong>Cột Thao tác</strong> ở cuối mỗi dòng: <i class="fa-solid fa-eye"></i> xem chi tiết, <i class="fa-solid fa-pen"></i> sửa, <i class="fa-solid fa-trash"></i> xoá. Bảng rộng hơn màn hình nên cột này thường nằm khuất bên phải: kéo thanh cuộn ngang dưới bảng, hoặc bấm giữ chuột trên bảng rồi kéo sang trái. Bấm vào tên khách cũng mở trang chi tiết. Dòng có dấu <i class="fa-solid fa-lock"></i> thay cho nút sửa, xoá là khách của người khác: bạn chỉ xem được (xem <a href="#tong-quan">mục 1</a>).</li>
 </ol>
 <div class="guide-note">
     <p>Dòng <strong>“Bạn phụ trách:”</strong> ngay dưới ô lọc liệt kê các tỉnh bạn đang được giao. Dải xanh <strong>“Đang xem…”</strong> cho biết danh sách đang hiển thị theo phạm vi nào. Nếu danh sách của bạn khác của đồng nghiệp thì xem dải này trước.</p>
@@ -144,6 +145,7 @@
     <li><strong>Lịch sử đánh giá xếp hạng</strong>: mỗi lần đánh giá, ai đánh giá, ngày nào, kèm ghi chú.</li>
     <li><strong>Hoạt động gần đây</strong>: hai tab <em>Hợp đồng</em> và <em>Phiếu hỗ trợ kỹ thuật</em> của khách này.</li>
 </ol>
+<div class="guide-note"><p>Mở chi tiết khách của người khác (tài khoản Sales đã được giao tỉnh) thì ba nút ở bước 2–4 không hiện; thay vào đó là dòng <em>Do … phụ trách, bạn chỉ xem được</em> kèm tên người phụ trách chính.</p></div>
 
 <h2 id="danh-gia">6. Đánh giá lại xếp hạng quan hệ</h2>
 <div class="guide-who"><span class="lbl">Ai làm được:</span><span class="role">Admin</span><span class="role">Sales</span><span class="role no">Kỹ thuật</span></div>
@@ -168,10 +170,20 @@
 <ol class="guide-steps">
     <li><strong>Mã khách hàng</strong> và <strong>Mã số thuế</strong> chỉ hiển thị, không sửa được.</li>
     <li><strong>Vai của khách hàng</strong>: tick cả <em>Khách hàng mua</em> và <em>Nhà cung cấp</em> nếu công ty vừa mua vừa bán. Phải còn ít nhất một vai.</li>
-    <li><strong>Người phụ trách chính</strong> đi theo tỉnh của địa chỉ: đổi địa chỉ sang tỉnh đã có người phụ trách thì khách tự chuyển sang tên người đó.</li>
+    <li><strong>Người phụ trách chính</strong> đi theo tỉnh của địa chỉ: đổi địa chỉ sang tỉnh đã có người phụ trách thì khách tự chuyển sang tên người đó.
+        <ul>
+            <li>Sales <strong>đã được giao tỉnh</strong>: ô Tỉnh chỉ có các tỉnh bạn phụ trách, cộng tỉnh hiện tại của khách. Tỉnh chưa ai phụ trách thì giữ người đang phụ trách.</li>
+            <li><strong>Nhà cung cấp</strong> không đi theo tỉnh: Admin tự chọn người phụ trách, Sales thì giữ nguyên.</li>
+        </ul></li>
     <li><strong>Người hỗ trợ</strong>: cùng luật như lúc tạo. Nếu người đang chọn trở nên không hợp lệ thì ô tự bỏ chọn và báo ngay bên dưới.</li>
     <li>Bấm <strong>Lưu thay đổi</strong>.</li>
 </ol>
+<table class="guide-table">
+    <tr><th>Thông báo</th><th>Nguyên nhân và cách xử lý</th></tr>
+    <tr><td>Bạn chỉ xem được khách hàng này: khách do người khác phụ trách.</td><td>Sales đã được giao tỉnh mở trang Sửa (hoặc Xóa, Đánh giá) của khách ngoài phạm vi <em>Của tôi</em>. Nhờ người phụ trách khách đó hoặc Admin.</td></tr>
+    <tr><td>Xã / phường đã chọn không thuộc các tỉnh bạn phụ trách.</td><td>Sales chỉ chuyển được khách sang các tỉnh mình phụ trách. Chọn lại tỉnh.</td></tr>
+</table>
+<p>Các thông báo khác giống khi thêm khách hàng (<a href="#loi-them">mục 3.1</a>).</p>
 
 <h2 id="xoa">8. Xoá khách hàng</h2>
 <div class="guide-who"><span class="lbl">Ai làm được:</span><span class="role">Admin</span><span class="role">Sales</span><span class="role no">Kỹ thuật</span></div>
