@@ -186,4 +186,17 @@ public class DaoSchemaIntegrationTest {
         assertFalse("Xã/phường của tỉnh đầu tiên phải đọc được",
                 addressDAO.findWardsByProvinceId(Fixtures.PROVINCE_ID).isEmpty());
     }
+
+    /** Trang Sửa khách hàng kiểm tỉnh theo xã/phường gửi lên -- câu tra phải đúng cột. */
+    @Test
+    public void addressDao_findProvinceIdOfWard_traDungTinhCuaXaPhuong() {
+        IntegrationDb.assumeAvailable();
+
+        Integer provinceId = addressDAO.findProvinceIdOfWard(Fixtures.WARD_ID);
+        assertNotNull(provinceId);
+        assertTrue("Xã/phường phải nằm trong danh sách xã của chính tỉnh vừa tra ra",
+                addressDAO.findWardsByProvinceId(provinceId).stream()
+                        .anyMatch(w -> w.getDistrictId() == Fixtures.WARD_ID));
+        assertNull(addressDAO.findProvinceIdOfWard(-1));
+    }
 }

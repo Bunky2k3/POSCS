@@ -207,6 +207,47 @@ public class AddressDAOTest {
     }
 
     // ------------------------------------------------------------------
+    // findProvinceIdOfWard -- trang Sửa khách hàng kiểm tỉnh theo xã/phường
+    // ------------------------------------------------------------------
+
+    @Test
+    public void findProvinceIdOfWard_traTinhCuaXaPhuong() throws Exception {
+        List<Map<String, Object>> rows = new ArrayList<>();
+        rows.add(row("province_id", 7));
+        PreparedStatement ps = statementReturning(resultSetOf(rows));
+        Connection conn = connectionReturning(ps);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            assertEquals(Integer.valueOf(7), dao.findProvinceIdOfWard(10));
+            verify(ps).setInt(1, 10);
+        }
+    }
+
+    /** Không có xã/phường đó: null, không phải 0 -- tỉnh 0 không phải tỉnh nào cả. */
+    @Test
+    public void findProvinceIdOfWard_khongCoXaPhuongDo_traNull() throws Exception {
+        PreparedStatement ps = statementReturning(emptyResultSet());
+        Connection conn = connectionReturning(ps);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            assertNull(dao.findProvinceIdOfWard(999));
+        }
+    }
+
+    @Test
+    public void findProvinceIdOfWard_loiSql_traNull() throws Exception {
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenThrow(new SQLException("hỏng"));
+
+            assertNull(dao.findProvinceIdOfWard(10));
+        }
+    }
+
+    // ------------------------------------------------------------------
     // findBranchProvinces -- địa bàn Chi nhánh Miền Bắc
     // ------------------------------------------------------------------
 

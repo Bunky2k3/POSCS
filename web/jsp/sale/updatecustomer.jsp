@@ -10,7 +10,10 @@
     Request attribute cần có:
       - customer      : poscs.model.Enterprise (đã join .address.district)
       - userList      : List<poscs.model.User>
-      - provinceList  : List<poscs.model.Province>
+      - provinceList  : List<poscs.model.Province> (Sales đã có tỉnh: chỉ tỉnh mình cầm + tỉnh hiện tại)
+      - territoryAssignments : Map tỉnh -> người cầm; KHÔNG có với nhà cung cấp (không theo địa bàn)
+      - lockedOwner   : poscs.model.User, CHỈ khi Sales sửa nhà cung cấp -- khoá người đang phụ trách
+      - keepOwnerWhenUnassigned : Sales đã có tỉnh -- tỉnh chưa ai cầm thì giữ người đang phụ trách
 
     Dropdown "Xã / Phường" KHÔNG đổ sẵn từ server -- JS nạp qua AJAX
     (GET /address/wards?provinceId=..., xem AddressController), tự chọn sẵn
@@ -144,6 +147,7 @@
                         <c:when test="${param.error == 'duplicate_phone'}">Số điện thoại này đã thuộc về một khách hàng khác. Vui lòng kiểm tra lại.</c:when>
                         <c:when test="${param.error == 'duplicate_tax_code'}">Mã số thuế này đã được đăng ký cho một khách hàng khác.</c:when>
                         <c:when test="${param.error == 'support_is_superior'}">Người hỗ trợ không được là cấp trên trực tiếp của người phụ trách chính. Vui lòng chọn người khác.</c:when>
+                        <c:when test="${param.error == 'province_not_allowed'}">Xã / phường đã chọn không thuộc các tỉnh bạn phụ trách. Vui lòng chọn lại.</c:when>
                         <c:when test="${param.error == 'update_failed'}">Không lưu được thay đổi. Vui lòng thử lại.</c:when>
                         <c:otherwise>Đã có lỗi xảy ra. Vui lòng thử lại.</c:otherwise>
                     </c:choose>
@@ -216,16 +220,31 @@
                     </div>
                     <div class="col-md-6 field-row">
                         <label>Người phụ trách chính <span class="req">*</span></label>
-                        <select class="form-select" id="assignee" name="accountOwnerId">
-                            <option value="">-- Chọn nhân viên --</option>
-                            <c:forEach var="staff" items="${userList}">
-                                <option value="${staff.userId}" ${staff.userId == customer.accountOwnerId ? 'selected' : ''}>${fn:escapeXml(staff.fullName)}</option>
-                            </c:forEach>
-                        </select>
-                        <%-- Xem ghi chú ở addnewcustomer.jsp: ô select bị disabled thì
-                             trình duyệt không gửi giá trị lên, input này gánh thay. --%>
-                        <input type="hidden" id="accountOwnerHidden" name="accountOwnerId" disabled>
-                        <div id="goiYDiaBan" class="text-muted" style="display:none; font-size: 0.8rem; margin-top: 6px; text-transform: none; font-weight: 400;"></div>
+                        <c:choose>
+                            <c:when test="${not empty lockedOwner}">
+                                <%-- Sales sửa nhà cung cấp của mình: giữ người đang phụ trách,
+                                     như trang Thêm nhà cung cấp khoá tên người tạo. Server tự
+                                     giữ lại (CustomerController.ownerForUpdate) -- đây chỉ là
+                                     khoá hình. --%>
+                                <select class="form-select" id="assignee" disabled>
+                                    <option value="${lockedOwner.userId}" selected>${fn:escapeXml(lockedOwner.fullName)}</option>
+                                </select>
+                                <input type="hidden" name="accountOwnerId" value="${lockedOwner.userId}">
+                                <div class="text-muted" style="font-size: 0.8rem; margin-top: 6px; text-transform: none; font-weight: 400;">Nhà cung cấp giữ người đang phụ trách.</div>
+                            </c:when>
+                            <c:otherwise>
+                                <select class="form-select" id="assignee" name="accountOwnerId">
+                                    <option value="">-- Chọn nhân viên --</option>
+                                    <c:forEach var="staff" items="${userList}">
+                                        <option value="${staff.userId}" ${staff.userId == customer.accountOwnerId ? 'selected' : ''}>${fn:escapeXml(staff.fullName)}</option>
+                                    </c:forEach>
+                                </select>
+                                <%-- Xem ghi chú ở addnewcustomer.jsp: ô select bị disabled thì
+                                     trình duyệt không gửi giá trị lên, input này gánh thay. --%>
+                                <input type="hidden" id="accountOwnerHidden" name="accountOwnerId" disabled>
+                                <div id="goiYDiaBan" class="text-muted" style="display:none; font-size: 0.8rem; margin-top: 6px; text-transform: none; font-weight: 400;"></div>
+                            </c:otherwise>
+                        </c:choose>
                         <span class="error-text" id="err-assignee">Vui lòng chọn người phụ trách chính.</span>
                     </div>
                     <div class="col-md-6 field-row">
@@ -373,6 +392,14 @@
         //
         // Form sửa BẮT BUỘC phải có khoá này, nếu không thì mở form sửa rồi
         // đổi người phụ trách là đường vòng thoát khoá của form tạo.
+        //
+        // Chỉ chạy khi server nhúng bảng phân công, tức khách mua. Nhà cung cấp
+        // không theo địa bàn: Admin chọn tự do, Sales thì ô đã khoá sẵn.
+        var suyTheoDiaBan = ${not empty territoryAssignments};
+        // Sales đã có tỉnh: tỉnh chưa ai cầm thì KHÔNG mở ô cho chọn tự do mà
+        // giữ người đang phụ trách -- server cũng giữ đúng như vậy
+        // (CustomerController.ownerForUpdate).
+        var giuNguoiDangPhuTrach = ${keepOwnerWhenUnassigned ? customer.accountOwnerId : 'null'};
         var phanCongDiaBan = {
             <c:forEach var="e" items="${territoryAssignments}" varStatus="st">'${e.key}': ${e.value}<c:if test="${!st.last}">,</c:if></c:forEach>
         };
@@ -389,7 +416,14 @@
         var dienBoiDiaBan = false;
 
         function apDungPhanCongDiaBan(provinceId) {
+            if (!suyTheoDiaBan) {
+                return;
+            }
             var userId = provinceId ? phanCongDiaBan[provinceId] : null;
+            var giuNguoiCu = !userId && giuNguoiDangPhuTrach;
+            if (giuNguoiCu) {
+                userId = giuNguoiDangPhuTrach;
+            }
             var opt = userId ? Array.prototype.find.call(oNguoiPhuTrach.options, function (o) {
                 return o.value === String(userId);
             }) : null;
@@ -409,7 +443,9 @@
             oNguoiPhuTrachAn.disabled = false;
             oNguoiPhuTrachAn.value = opt.value;
             dienBoiDiaBan = true;
-            goiYDiaBan.textContent = 'Theo phân công địa bàn. Muốn đổi thì sửa người phụ trách tỉnh ở trang Nhân viên.';
+            goiYDiaBan.textContent = giuNguoiCu
+                    ? 'Tỉnh này chưa ai cầm: giữ người đang phụ trách.'
+                    : 'Theo phân công địa bàn. Muốn đổi thì sửa người phụ trách tỉnh ở trang Nhân viên.';
             goiYDiaBan.style.display = 'block';
         }
 
