@@ -150,6 +150,23 @@ public class DaoSchemaIntegrationTest {
         assertTrue(employeeDAO.existsByCitizenId(Fixtures.CITIZEN_ID, null));
     }
 
+    /**
+     * Ô tìm kiếm ở danh sách nhân viên so trên họ tên GHÉP LIỀN và username.
+     * Người mẫu là "Nguyễn Quản Trị", tên đệm NULL: cụm "Nguyễn Quản" vắt qua
+     * hai cột nên cách so từng cột cũ không tìm ra. Chạy trên CSDL thật để
+     * chắc CONCAT_WS bỏ qua NULL thay vì biến cả chuỗi thành NULL.
+     */
+    @Test
+    public void employeeDao_searchMatchesFullNameAcrossColumnsAndUsername() {
+        IntegrationDb.assumeAvailable();
+
+        assertEquals(1, employeeDAO.countAll("Nguyễn Quản", null, null));
+        assertEquals(1, employeeDAO.findAll(1, 10, "Nguyễn Quản", null, null).size());
+        assertEquals(1, employeeDAO.countAll(Fixtures.USERNAME, null, null));
+        assertEquals(1, employeeDAO.countAll(Fixtures.PHONE, null, null));
+        assertEquals(0, employeeDAO.countAll("Không ai tên này", null, null));
+    }
+
     @Test
     public void notificationDao_readQueriesRun() {
         IntegrationDb.assumeAvailable();

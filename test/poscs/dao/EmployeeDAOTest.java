@@ -178,6 +178,28 @@ public class EmployeeDAOTest {
         }
     }
 
+    /**
+     * Sắp theo created_at thôi là chưa đủ: nhiều người trùng mốc tạo thì MySQL
+     * trả các dòng đó theo thứ tự tuỳ ý ở mỗi câu LIMIT/OFFSET -- chạy thật
+     * trên bản sao CSDL, "Ngô Văn Hiếu" hiện ở cả trang 1 lẫn trang 2 còn
+     * "Vũ Đình Nam" không ở trang nào. Phải có khoá duy nhất đứng sau.
+     */
+    @Test
+    public void findAll_ordersByAUniqueTieBreakerSoPagesNeitherRepeatNorSkip() throws Exception {
+        PreparedStatement ps = statementReturning(emptyResultSet());
+        Connection conn = connectionReturning(ps);
+        ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            dao.findAll(2, 10, null, null, null);
+
+            verify(conn).prepareStatement(sqlCaptor.capture());
+            assertTrue(sqlCaptor.getValue().contains("ORDER BY u.created_at DESC, u.user_id DESC"));
+        }
+    }
+
     @Test
     public void findAll_keyword_isWrappedInWildcardsAndBoundToEverySearchedColumn() throws Exception {
         PreparedStatement ps = statementReturning(emptyResultSet());
@@ -190,10 +212,12 @@ public class EmployeeDAOTest {
             dao.findAll(1, 10, "  an  ", null, null);
 
             verify(conn).prepareStatement(sqlCaptor.capture());
-            assertTrue(sqlCaptor.getValue().contains("last_name LIKE ?"));
-            // Từ khoá được trim rồi bọc %...% và lặp cho cả 4 cột tìm kiếm
-            // (họ, tên đệm, tên, SĐT -- không còn email từ V36).
-            verify(ps, times(4)).setObject(anyInt(), eq("%an%"));
+            // Họ tên so trên chuỗi ghép liền (xem appendFilters), kèm username.
+            assertTrue(sqlCaptor.getValue().contains("CONCAT_WS(' ', u.last_name, u.middle_name, u.first_name) LIKE ?"));
+            assertTrue(sqlCaptor.getValue().contains("u.username LIKE ?"));
+            // Từ khoá được trim rồi bọc %...% và lặp cho cả 3 chỗ tìm kiếm
+            // (họ tên, tên đăng nhập, SĐT -- không còn email từ V36).
+            verify(ps, times(3)).setObject(anyInt(), eq("%an%"));
         }
     }
 

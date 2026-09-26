@@ -31,7 +31,8 @@ public class GuideController extends HttpServlet {
     private static final Map<String, String> PAGES = Map.of(
             "customer", "/jsp/guide/customer.jsp",
             "contract", "/jsp/guide/contract.jsp",
-            "ticket", "/jsp/guide/ticket.jsp");
+            "ticket", "/jsp/guide/ticket.jsp",
+            "employee", "/jsp/guide/employee.jsp");
 
     private static final String DEFAULT_MODULE = "customer";
 

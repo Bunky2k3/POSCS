@@ -154,7 +154,8 @@
             <div class="profile-banner">
                 <div class="avatar-wrap">
                     <%-- Ảnh đại diện đã tải lên nếu có; chưa có thì rơi về ảnh chữ cái đầu. --%>
-                    <c:set var="avatarSrc" value="https://ui-avatars.com/api/?name=${fn:escapeXml(profile.firstName)}&amp;background=ffffff&amp;color=0568a6&amp;size=128"/>
+                    <%-- c:url + c:param mã hoá tham số đúng một lần. Viết sẵn "&amp;" trong chuỗi như trước thì src="${fn:escapeXml(...)}" escape thêm lần nữa: trình duyệt nhận "amp;background", ui-avatars bỏ qua màu. --%>
+                    <c:url var="avatarSrc" value="https://ui-avatars.com/api/"><c:param name="name" value="${profile.firstName}"/><c:param name="background" value="ffffff"/><c:param name="color" value="0568a6"/><c:param name="size" value="128"/></c:url>
                     <c:if test="${not empty profile.avatarUrl}">
                         <c:set var="avatarSrc" value="${pageContext.request.contextPath}${profile.avatarUrl}"/>
                     </c:if>

@@ -30,6 +30,7 @@
 
         .btn-add { background: linear-gradient(120deg, var(--primary), var(--primary-light)); color: #fff; border: none; border-radius: 10px; padding: 10px 20px; font-weight: 600; font-size: 0.9rem; text-decoration: none; display: inline-flex; align-items: center; gap: 8px; box-shadow: 0 8px 18px rgba(5,104,166,0.3); white-space: nowrap; }
         .btn-add:hover { background: linear-gradient(120deg, var(--primary-dark), var(--primary)); color: #fff; }
+        .header-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 
         .filter-bar { padding: 18px 20px; margin-bottom: 20px; display: flex; flex-wrap: wrap; gap: 14px; align-items: center; }
         .search-input-wrap { position: relative; flex: 1 1 280px; min-width: 220px; }
@@ -81,15 +82,28 @@
                 <h2>Danh sách nhân viên</h2>
                 <p>Quản lý tài khoản và hồ sơ nhân viên nội bộ</p>
             </div>
-            <a href="${pageContext.request.contextPath}/employee?action=new" class="btn-add"><i class="fa-solid fa-plus"></i> Thêm nhân viên</a>
+            <div class="header-actions">
+                <a href="${pageContext.request.contextPath}/guide?module=employee#danh-sach" target="_blank" rel="noopener" class="guide-btn" title="Mở hướng dẫn sử dụng ở tab mới"><i class="fa-regular fa-circle-question"></i> Hướng dẫn</a>
+                <a href="${pageContext.request.contextPath}/employee?action=new" class="btn-add"><i class="fa-solid fa-plus"></i> Thêm nhân viên</a>
+            </div>
         </div>
+
+        <%-- Mở một nhân viên không còn (id sai, link cũ) thì EmployeeController
+             đưa về đây kèm ?error=notfound -- trước đây trang im lặng, người
+             dùng bấm một link rồi thấy lại danh sách mà không hiểu vì sao. --%>
+        <c:if test="${param.error == 'notfound'}">
+            <div class="alert alert-warning py-2 px-3 mb-3" style="font-size: 0.9rem; border-radius: 12px;">
+                <i class="fa-solid fa-circle-exclamation me-1"></i>
+                Không tìm thấy nhân viên này. Có thể đường dẫn đã cũ hoặc mã không đúng.
+            </div>
+        </c:if>
 
         <!-- ===== Bộ lọc / tìm kiếm ===== -->
         <form class="filter-bar card-box" method="GET" action="${pageContext.request.contextPath}/employee" id="filterForm">
             <input type="hidden" name="action" value="list">
             <div class="search-input-wrap">
                 <i class="fa-solid fa-magnifying-glass"></i>
-                <input type="text" name="keyword" value="${fn:escapeXml(keyword)}" placeholder="Tìm theo tên, số điện thoại...">
+                <input type="text" id="searchInput" name="keyword" value="${fn:escapeXml(keyword)}" placeholder="Tìm theo họ tên, tên đăng nhập, số điện thoại...">
             </div>
             <select id="filterRole" name="roleId">
                 <option value="">Tất cả vai trò</option>
@@ -110,7 +124,8 @@
                 <a class="employee-card" href="${pageContext.request.contextPath}/employee?action=view&id=${emp.userId}">
                     <div class="employee-card-top">
                         <%-- Ảnh đại diện đã tải lên nếu có; chưa có thì rơi về ảnh chữ cái đầu. --%>
-                        <c:set var="avatarSrc" value="https://ui-avatars.com/api/?name=${fn:escapeXml(emp.firstName)}&amp;background=0568a6&amp;color=fff"/>
+                        <%-- c:url + c:param mã hoá tham số đúng một lần. Viết sẵn "&amp;" trong chuỗi như trước thì src="${fn:escapeXml(...)}" escape thêm lần nữa: trình duyệt nhận "amp;background", ui-avatars bỏ qua màu. --%>
+                        <c:url var="avatarSrc" value="https://ui-avatars.com/api/"><c:param name="name" value="${emp.firstName}"/><c:param name="background" value="0568a6"/><c:param name="color" value="fff"/></c:url>
                         <c:if test="${not empty emp.avatarUrl}">
                             <c:set var="avatarSrc" value="${pageContext.request.contextPath}${emp.avatarUrl}"/>
                         </c:if>

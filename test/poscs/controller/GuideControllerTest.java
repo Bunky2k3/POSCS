@@ -68,6 +68,18 @@ public class GuideControllerTest {
         verify(dispatcher).forward(request, response);
     }
 
+    /** Nút "Hướng dẫn" trên các trang nhân viên mở /guide?module=employee#mục. */
+    @Test
+    public void moduleEmployee_moTrangHuongDanNhanVien() throws Exception {
+        when(request.getParameter("module")).thenReturn("employee");
+
+        controller.doGet(request, response);
+
+        verify(request).getRequestDispatcher("/jsp/guide/employee.jsp");
+        verify(request).setAttribute("guideModule", "employee");
+        verify(dispatcher).forward(request, response);
+    }
+
     /** Link cũ hoặc gõ tay /guide không kèm module: mở phân hệ mặc định, không báo lỗi. */
     @Test
     public void thieuModule_moPhanHeMacDinh() throws Exception {
