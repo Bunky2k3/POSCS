@@ -183,8 +183,9 @@
                         <div class="upload-dropzone">
                             <label for="imagesInput" class="upload-btn"><i class="fa-solid fa-images"></i> Chọn ảnh từ máy</label>
                             <input type="file" name="images" id="imagesInput" accept=".jpg,.jpeg,.png,.gif,.webp" multiple hidden>
-                            <div class="upload-hint">Có thể chọn nhiều ảnh cùng lúc (JPG, PNG, WEBP...).</div>
+                            <div class="upload-hint">Có thể chọn nhiều ảnh cùng lúc (JPG, PNG, GIF, WEBP), mỗi ảnh tối đa 20 MB.</div>
                         </div>
+                        <span class="error-text" id="err-imagesInput"></span>
                         <div class="file-preview-grid" id="imagePreviewGrid"></div>
                     </div>
                     <div class="col-12 field-row">
@@ -192,9 +193,11 @@
                         <div class="upload-dropzone">
                             <label for="cataloguesInput" class="upload-btn"><i class="fa-solid fa-file-pdf"></i> Chọn file catalogue</label>
                             <input type="file" name="catalogues" id="cataloguesInput" accept=".pdf" multiple hidden>
-                            <div class="upload-hint">Có thể chọn nhiều file catalogue (PDF) cùng lúc.</div>
+                            <div class="upload-hint">Có thể chọn nhiều file catalogue (PDF) cùng lúc, mỗi file tối đa 20 MB. Tổng ảnh và catalogue chọn thêm mỗi lần lưu tối đa 100 MB.</div>
                         </div>
+                        <span class="error-text" id="err-cataloguesInput"></span>
                         <div class="file-chip-list" id="catalogueChipList"></div>
+                        <span class="error-text" id="err-files-total">Tổng dung lượng ảnh và catalogue chọn thêm vượt 100 MB. Bớt tệp rồi lưu lại.</span>
                     </div>
                 </div>
 
@@ -215,6 +218,14 @@
         // submit -- input[type=file][multiple] không cho xoá bớt 1 file trực tiếp
         // nên giữ danh sách File trong JS rồi dựng lại input.files bằng DataTransfer
         // mỗi khi thêm/gỡ, đảm bảo input luôn khớp với những gì đang hiển thị.
+        //
+        // Giới hạn khớp @MultipartConfig của ProductController (maxFileSize,
+        // maxRequestSize) -- đổi ở đó thì đổi ở đây. Quá giới hạn mà để lọt tới
+        // lúc lưu thì Tomcat từ chối cả lần lưu (trang 413) và người dùng mất
+        // hết những gì vừa nhập; chặn ngay lúc chọn thì báo được đúng tệp nào.
+        var MAX_FILE_BYTES = 20 * 1024 * 1024;
+        var MAX_TOTAL_BYTES = 100 * 1024 * 1024;
+
         function setupMultiFileField(inputId, previewContainerId, renderItem) {
             var input = document.getElementById(inputId);
             var container = document.getElementById(previewContainerId);
@@ -237,7 +248,17 @@
                 render();
             }
             input.addEventListener('change', function (e) {
-                Array.from(e.target.files).forEach(function (f) { files.push(f); });
+                var quaLon = [];
+                Array.from(e.target.files).forEach(function (f) {
+                    if (f.size > MAX_FILE_BYTES) {
+                        quaLon.push(f.name);
+                    } else {
+                        files.push(f);
+                    }
+                });
+                var err = document.getElementById('err-' + inputId);
+                err.textContent = quaLon.length ? 'Không thêm tệp quá 20 MB: ' + quaLon.join(', ') + '.' : '';
+                err.style.display = quaLon.length ? 'block' : 'none';
                 sync();
                 render();
             });
@@ -299,6 +320,12 @@
 
             var category = document.getElementById('category');
             if (!category.value) { document.getElementById('err-category').style.display = 'block'; valid = false; }
+
+            var tongDungLuong = 0;
+            ['imagesInput', 'cataloguesInput'].forEach(function (id) {
+                Array.from(document.getElementById(id).files).forEach(function (f) { tongDungLuong += f.size; });
+            });
+            if (tongDungLuong > MAX_TOTAL_BYTES) { document.getElementById('err-files-total').style.display = 'block'; valid = false; }
 
             return valid;
         }
