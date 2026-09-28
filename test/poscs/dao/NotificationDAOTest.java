@@ -160,6 +160,59 @@ public class NotificationDAOTest {
         }
     }
 
+    // ------------------------------------------------------------------
+    // findByIdForUser -- bấm vào thông báo để mở thẳng thứ nó nói tới
+    // ------------------------------------------------------------------
+
+    @Test
+    public void findByIdForUser_mapsRefTypeAndRefIdAndBindsBothIds() throws Exception {
+        List<Map<String, Object>> rows = new ArrayList<>();
+        rows.add(row("notification_id", 42, "user_id", 7, "title", "Hợp đồng 01/2026 sắp hết hạn",
+                "is_read", 0, "created_at", Timestamp.valueOf("2026-09-28 08:00:00"),
+                "ref_type", "contract_expiring", "ref_id", 15));
+        PreparedStatement ps = statementReturning(resultSetOf(rows));
+        Connection conn = connectionReturning(ps);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            Notification n = dao.findByIdForUser(42, 7);
+
+            assertEquals("contract_expiring", n.getRefType());
+            assertEquals(Integer.valueOf(15), n.getRefId());
+            // Thông báo của người khác thì không được tìm thấy: phải lọc theo cả user_id.
+            verify(ps).setInt(1, 42);
+            verify(ps).setInt(2, 7);
+        }
+    }
+
+    @Test
+    public void findByIdForUser_nullRefId_staysNullNotZero() throws Exception {
+        List<Map<String, Object>> rows = new ArrayList<>();
+        rows.add(row("notification_id", 43, "user_id", 7, "title", "x", "is_read", 0,
+                "created_at", Timestamp.valueOf("2026-09-28 08:00:00"), "ref_type", null, "ref_id", null));
+        PreparedStatement ps = statementReturning(resultSetOf(rows));
+        Connection conn = connectionReturning(ps);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            assertNull(dao.findByIdForUser(43, 7).getRefId());
+        }
+    }
+
+    @Test
+    public void findByIdForUser_noRow_returnsNull() throws Exception {
+        PreparedStatement ps = statementReturning(emptyResultSet());
+        Connection conn = connectionReturning(ps);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            assertNull(dao.findByIdForUser(99, 7));
+        }
+    }
+
     @Test
     public void findAllByUser_bindsNoLimitParameter() throws Exception {
         PreparedStatement ps = statementReturning(emptyResultSet());

@@ -38,8 +38,10 @@
                     </c:when>
                     <c:otherwise>
                         <c:forEach var="notif" items="${requestScope.recentNotifications}">
+                            <%-- action=open: đánh dấu đã đọc rồi mở thẳng hợp đồng / phiếu
+                                 thông báo nói tới (NotificationController.targetOf). --%>
                             <li><a class="dropdown-item notif-item ${notif.read ? '' : 'unread'}"
-                                   href="${pageContext.request.contextPath}/notifications?action=read&id=${notif.notificationId}">
+                                   href="${pageContext.request.contextPath}/notifications?action=open&id=${notif.notificationId}">
                                 <span class="notif-icon"><i class="fa-regular fa-bell"></i></span>
                                 <div><div class="notif-text"><c:out value="${notif.title}"/></div><div class="notif-time">${notif.relativeTime}</div></div>
                             </a></li>

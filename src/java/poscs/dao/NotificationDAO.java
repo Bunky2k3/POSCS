@@ -139,6 +139,35 @@ public class NotificationDAO {
         }
     }
 
+    /**
+     * Một thông báo của chính {@code userId}, kèm thứ nó nói tới (ref_type,
+     * ref_id) -- để bấm vào thông báo là mở thẳng hợp đồng / phiếu đó. Thông
+     * báo của người khác thì coi như không có (null), cùng điều kiện với
+     * markAsRead. Lỗi CSDL cũng trả null: bên gọi quay về trang Thông báo.
+     */
+    public Notification findByIdForUser(int notificationId, int userId) {
+        String sql = "SELECT notification_id, user_id, title, is_read, created_at, ref_type, ref_id " +
+                "FROM notifications WHERE notification_id = ? AND user_id = ?";
+        try (Connection conn = DBContext.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, notificationId);
+            ps.setInt(2, userId);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (!rs.next()) {
+                    return null;
+                }
+                Notification n = map(rs);
+                n.setRefType(rs.getString("ref_type"));
+                int refId = rs.getInt("ref_id");
+                n.setRefId(rs.wasNull() ? null : refId);
+                return n;
+            }
+        } catch (SQLException ex) {
+            LOG.error("Loi doc thong bao (notificationId={}, userId={})", notificationId, userId, ex);
+            return null;
+        }
+    }
+
     private Notification map(ResultSet rs) throws SQLException {
         Notification n = new Notification();
         n.setNotificationId(rs.getInt("notification_id"));

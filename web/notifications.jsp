@@ -38,7 +38,8 @@
         .notif-row .notif-time { font-size: 0.75rem; color: #9ca3af; margin-top: 3px; }
         .notif-row:not(.unread) .notif-text { font-weight: 400; color: #6b7280; }
         .notif-row:not(.unread) .notif-icon { background: #f3f4f6; color: #9ca3af; }
-        .notif-row-body { flex: 1; min-width: 0; }
+        .notif-row-body { flex: 1; min-width: 0; text-decoration: none; }
+        .notif-row-body:hover .notif-text { text-decoration: underline; }
         .notif-row-action { flex-shrink: 0; align-self: center; }
         .mark-read-link {
             font-size: 0.75rem; color: var(--primary); font-weight: 600; text-decoration: none;
@@ -78,10 +79,12 @@
                     <c:forEach var="notif" items="${notifications}">
                         <div class="notif-row ${notif.read ? '' : 'unread'}">
                             <span class="notif-icon"><i class="fa-regular fa-bell"></i></span>
-                            <div class="notif-row-body">
+                            <%-- Bấm vào thông báo: đánh dấu đã đọc và mở thẳng hợp đồng / phiếu
+                                 nó nói tới -- NotificationController, action=open. --%>
+                            <a class="notif-row-body" href="${pageContext.request.contextPath}/notifications?action=open&id=${notif.notificationId}">
                                 <div class="notif-text"><c:out value="${notif.title}"/></div>
                                 <div class="notif-time">${notif.relativeTime}</div>
-                            </div>
+                            </a>
                             <div class="notif-row-action">
                                 <c:if test="${not notif.read}">
                                     <a class="mark-read-link" href="${pageContext.request.contextPath}/notifications?action=read&id=${notif.notificationId}">Đánh dấu đã đọc</a>

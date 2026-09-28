@@ -11,6 +11,11 @@ public class Notification {
     private String title;
     private boolean read; // Ánh xạ với is_read (tinyint(1))
     private Timestamp createdAt;
+    // Thông báo nói về cái gì: ref_type ("contract_expiring", "ticket_sla",
+    // "CHANGE_REQUEST") + id của hợp đồng / phiếu / yêu cầu đó. Chỉ
+    // NotificationDAO.findByIdForUser đọc hai cột này -- danh sách thì không cần.
+    private String refType;
+    private Integer refId;
 
     public Notification() {
     }
@@ -29,6 +34,12 @@ public class Notification {
 
     public Timestamp getCreatedAt() { return createdAt; }
     public void setCreatedAt(Timestamp createdAt) { this.createdAt = createdAt; }
+
+    public String getRefType() { return refType; }
+    public void setRefType(String refType) { this.refType = refType; }
+
+    public Integer getRefId() { return refId; }
+    public void setRefId(Integer refId) { this.refId = refId; }
 
     /**
      * Thời gian tương đối kiểu "10 phút trước" / "Hôm qua" để hiển thị ở
