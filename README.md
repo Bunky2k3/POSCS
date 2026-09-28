@@ -129,8 +129,9 @@ Two cautions, both learned the hard way:
 
 This project is set up as a NetBeans Ant-based web application:
 
-1. Open the project folder in NetBeans (or run Ant directly with
-   `ant build` / `ant run` from the repository root).
+1. Open the project folder in NetBeans, or build the WAR with Ant from
+   the repository root — outside the IDE `ant dist` needs two `-D`
+   values, see [DEPLOY.md](DEPLOY.md) §2.
 2. Set up the database (see **Database Setup** above).
 3. Configure connection settings via the `DB_URL` / `DB_USER` /
    `DB_PASSWORD` environment variables, read by `poscs.dao.DBContext`

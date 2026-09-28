@@ -17,12 +17,19 @@ staging path.
 From the repository root:
 
 ```bash
-ant dist
+ant -Dj2ee.platform.classpath=lib-build/jakarta.servlet-api-6.1.jar \
+    -Dlibs.CopyLibs.classpath=lib-build/org-netbeans-modules-java-j2seproject-copylibstask.jar \
+    dist
 ```
 
-This produces the deployable archive under `dist/`. This works outside
-NetBeans since it's a standard Ant project (`build.xml`) — no IDE
-required on the server.
+This produces `dist/POSCS.war`. No IDE is required, but the two `-D`
+values are: NetBeans normally supplies them (the registered server's
+classpath and its CopyLibs task), and plain `ant dist` stops with "The
+Java EE server classpath is not correctly set up" without them. Both jars
+are committed under `lib-build/` for this reason — CI
+(`.github/workflows/tests.yml`) builds the same way. They are needed at
+compile time only and do not end up in the WAR. In NetBeans, Clean and
+Build does the same.
 
 ## 3. Set up the database
 
