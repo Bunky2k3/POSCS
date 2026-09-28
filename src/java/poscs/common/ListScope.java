@@ -126,6 +126,24 @@ public final class ListScope {
     }
 
     /**
+     * Một bản ghi đã nạp lên có nằm trong phạm vi này không -- đúng luật của
+     * {@link #predicate}, chỉ khác là hỏi trên một bản ghi thay vì sinh SQL.
+     *
+     * <p>Để trang Sửa/Xoá gác đúng thứ mà danh sách "Của tôi" đang hiện: hai
+     * nơi tự viết luật riêng thì sớm muộn lệch nhau, và người dùng thấy khách
+     * trong danh sách của mình mà bấm Sửa thì bị từ chối.
+     *
+     * @param provinceId tỉnh của bản ghi, null nếu chưa có địa chỉ
+     */
+    public boolean includes(int ownerId, Integer provinceId) {
+        if (!isNarrowed()) {
+            return true;
+        }
+        return ownerIds.contains(ownerId)
+                || (provinceId != null && provinceIds.contains(provinceId));
+    }
+
+    /**
      * Mệnh đề "còn hiệu lực ở bất kỳ ngày nào trong cửa sổ", hay null khi không lọc.
      *
      * <p>Hai cột ngày ĐỀU cho phép NULL và NULL ở đây được coi là KHỚP: hợp đồng

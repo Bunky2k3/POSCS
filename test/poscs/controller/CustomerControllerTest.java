@@ -3,6 +3,7 @@ package poscs.controller;
 import java.lang.reflect.Field;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import jakarta.servlet.RequestDispatcher;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -19,7 +20,9 @@ import poscs.dao.ContractDAO;
 import poscs.dao.CustomerDAO;
 import poscs.dao.EmployeeDAO;
 import poscs.dao.TechnicalSupportTicketDAO;
+import poscs.model.Address;
 import poscs.model.CustomerLifecycleEvent;
+import poscs.model.District;
 import poscs.model.Enterprise;
 import poscs.model.Province;
 import poscs.model.RelationshipRating;
@@ -81,6 +84,9 @@ public class CustomerControllerTest {
         when(request.getContextPath()).thenReturn(CONTEXT_PATH);
 
         loginAs("Sales"); // role được Full access trên CUSTOMER, xem PERMISSIONS.md
+        // EmployeeDAO.findTeamUserIds thật luôn có chính người hỏi, kể cả khi
+        // họ chưa có cấp dưới nào.
+        when(employeeDAO.findTeamUserIds(99)).thenReturn(List.of(99));
     }
 
     private void loginAs(String roleName) {
@@ -1180,6 +1186,332 @@ public class CustomerControllerTest {
         controller.doGet(request, response);
 
         verify(request).setAttribute("managerOf", cay);
+    }
+
+    // ------------------------------------------------------------------
+    // Sửa / Xoá / Đánh giá: Sales chỉ ghi lên khách của mình
+    // ------------------------------------------------------------------
+    //
+    // Chốt với người dùng 2026-09-26. Nút đã ẩn ở danh sách và trang chi tiết,
+    // nhưng ẩn nút chỉ là lớp trình bày -- các test dưới gọi thẳng GET/POST.
+    // Người đang đăng nhập là user 99; tỉnh 1 là tỉnh của 99, tỉnh 2 của
+    // người 42, tỉnh 3 chưa ai cầm.
+
+    private static final Province TINH_1 = new Province(1, "Thành phố Hà Nội");
+    private static final Province TINH_2 = new Province(2, "Tỉnh Bắc Ninh");
+
+    /** Khách 5 đứng tên {@code ownerId}, địa chỉ ở tỉnh {@code provinceId}. */
+    private Enterprise khach5(int ownerId, int provinceId, String... roles) {
+        District ward = new District();
+        ward.setProvinceId(provinceId);
+        Address address = new Address();
+        address.setDistrict(ward);
+        Enterprise e = new Enterprise();
+        e.setEnterpriseId(5);
+        e.setAccountOwnerId(ownerId);
+        e.setAddressId(31);
+        e.setAddress(address);
+        when(customerDAO.findById(5)).thenReturn(e);
+        when(customerDAO.findRolesOf(5)).thenReturn(List.of(roles.length == 0 ? new String[]{"Khách mua"} : roles));
+        return e;
+    }
+
+    private void openEditForm5() {
+        when(request.getRequestDispatcher("/jsp/sale/updatecustomer.jsp")).thenReturn(mock(RequestDispatcher.class));
+        when(request.getParameter("action")).thenReturn("edit");
+        when(request.getParameter("id")).thenReturn("5");
+    }
+
+    /** POST sửa khách 5, xã/phường 10 thuộc tỉnh {@code wardProvinceId}. */
+    private void postUpdate5(int wardProvinceId) {
+        when(request.getParameter("action")).thenReturn("update");
+        when(request.getParameter("customerId")).thenReturn("5");
+        stubValidCreateFields(); // accountOwnerId=9, districtId=10, vai Khách mua
+        when(addressDAO.findProvinceIdOfWard(10)).thenReturn(wardProvinceId);
+        when(customerDAO.update(any(Enterprise.class))).thenReturn(true);
+    }
+
+    private int savedOwner() {
+        ArgumentCaptor<Enterprise> saved = ArgumentCaptor.forClass(Enterprise.class);
+        verify(customerDAO).update(saved.capture());
+        return saved.getValue().getAccountOwnerId();
+    }
+
+    @Test
+    public void editForm_salesCoTinh_khachNguoiKhac_quayVeChiTietKemThongBao() throws Exception {
+        holdsProvinces(TINH_1);
+        khach5(42, 2);
+        openEditForm5();
+
+        controller.doGet(request, response);
+
+        verify(response).sendRedirect(CONTEXT_PATH + "/customer?action=view&id=5&error=not_your_customer");
+        verify(request, never()).getRequestDispatcher("/jsp/sale/updatecustomer.jsp");
+    }
+
+    @Test
+    public void update_salesCoTinh_khachNguoiKhac_biChanKhongGhi() throws Exception {
+        holdsProvinces(TINH_1);
+        khach5(42, 2);
+        postUpdate5(1);
+
+        controller.doPost(request, response);
+
+        verify(customerDAO, never()).update(any());
+        verify(response).sendRedirect(CONTEXT_PATH + "/customer?action=view&id=5&error=not_your_customer");
+    }
+
+    @Test
+    public void delete_salesCoTinh_khachNguoiKhac_biChanKhongXoa() throws Exception {
+        holdsProvinces(TINH_1);
+        khach5(42, 2);
+        when(request.getParameter("action")).thenReturn("delete");
+        when(request.getParameter("id")).thenReturn("5");
+
+        controller.doPost(request, response);
+
+        verify(customerDAO, never()).softDelete(anyInt());
+        verify(response).sendRedirect(CONTEXT_PATH + "/customer?action=view&id=5&error=not_your_customer");
+    }
+
+    @Test
+    public void evaluate_salesCoTinh_khachNguoiKhac_biChanKhongGhiXepHang() throws Exception {
+        holdsProvinces(TINH_1);
+        khach5(42, 2);
+        when(request.getParameter("action")).thenReturn("evaluate");
+        when(request.getParameter("id")).thenReturn("5");
+        when(request.getParameter("rating")).thenReturn("GOOD");
+
+        controller.doPost(request, response);
+
+        verify(customerDAO, never()).updateRelationshipRating(anyInt(), any());
+        verify(customerDAO, never()).insertLifecycleEvent(any());
+        verify(response).sendRedirect(CONTEXT_PATH + "/customer?action=view&id=5&error=not_your_customer");
+    }
+
+    /** Khách ở tỉnh mình cầm mà người khác đứng tên vẫn là việc của mình -- như danh sách "Của tôi". */
+    @Test
+    public void editForm_salesCoTinh_khachOTinhMinhDoNguoiKhacDungTen_vanMoDuoc() throws Exception {
+        holdsProvinces(TINH_1);
+        khach5(42, 1);
+        openEditForm5();
+
+        controller.doGet(request, response);
+
+        verify(response, never()).sendRedirect(anyString());
+        verify(request).setAttribute("keepOwnerWhenUnassigned", true);
+    }
+
+    /**
+     * Khách mình đứng tên nhưng nằm ở tỉnh người khác (dữ liệu cũ): mở được, ô
+     * tỉnh gồm tỉnh mình cầm CỘNG tỉnh hiện tại của khách -- thiếu nó thì mở form
+     * lên ô tỉnh trống, bấm lưu là mất địa chỉ.
+     */
+    @Test
+    public void editForm_salesCoTinh_khachMinhOTinhNguoiKhac_giuTinhHienTaiTrongDanhSach() throws Exception {
+        holdsProvinces(TINH_1);
+        khach5(99, 2);
+        when(addressDAO.findAllProvinces()).thenReturn(List.of(TINH_2, TINH_1));
+        openEditForm5();
+
+        controller.doGet(request, response);
+
+        verify(request).setAttribute("provinceList", List.of(TINH_1, TINH_2));
+        verify(addressDAO, never()).findBranchProvincesIncluding(any());
+    }
+
+    /** Chuyển khách sang một tỉnh không phải của mình và không phải tỉnh hiện tại: chặn, chưa ghi gì. */
+    @Test
+    public void update_salesCoTinh_chuyenSangTinhNguoiKhac_biChan() throws Exception {
+        holdsProvinces(TINH_1);
+        khach5(99, 1);
+        postUpdate5(2);
+
+        controller.doPost(request, response);
+
+        verify(customerDAO, never()).update(any());
+        verify(response).sendRedirect(CONTEXT_PATH + "/customer?action=edit&id=5&error=province_not_allowed");
+    }
+
+    /** Trong tỉnh mình cầm: lưu được, khách đứng tên mình dù form gửi tên người khác. */
+    @Test
+    public void update_salesCoTinh_trongTinhMinh_khachDungTenMinh() throws Exception {
+        holdsProvinces(TINH_1);
+        khach5(99, 1);
+        postUpdate5(1);
+        when(employeeDAO.findAssigneeOfWard(10)).thenReturn(99);
+
+        controller.doPost(request, response);
+
+        assertEquals(99, savedOwner());
+    }
+
+    /**
+     * Giữ tỉnh hiện tại của khách (người khác cầm) thì lưu được, và vẫn theo địa
+     * bàn: khách về người cầm tỉnh -- form hiện sẵn tên đó trước khi bấm lưu.
+     */
+    @Test
+    public void update_salesCoTinh_giuTinhHienTaiCuaNguoiKhac_theoDiaBan() throws Exception {
+        holdsProvinces(TINH_1);
+        khach5(99, 2);
+        postUpdate5(2);
+        when(employeeDAO.findAssigneeOfWard(10)).thenReturn(42);
+
+        controller.doPost(request, response);
+
+        assertEquals(42, savedOwner());
+    }
+
+    /** Tỉnh chưa ai cầm: giữ người đang phụ trách, bỏ qua tên form gửi lên (9). */
+    @Test
+    public void update_salesCoTinh_tinhChuaAiCam_giuNguoiDangPhuTrach() throws Exception {
+        holdsProvinces(TINH_1);
+        khach5(99, 3);
+        postUpdate5(3);
+        when(employeeDAO.findAssigneeOfWard(10)).thenReturn(null);
+
+        controller.doPost(request, response);
+
+        assertEquals(99, savedOwner());
+    }
+
+    /** Sales chưa có tỉnh (CSKH) vẫn sửa hộ như Admin -- giống trang Thêm. */
+    @Test
+    public void update_salesChuaCoTinh_khachNguoiKhac_vanSuaNhuAdmin() throws Exception {
+        holdsProvinces();
+        khach5(42, 2);
+        postUpdate5(2);
+        when(employeeDAO.findAssigneeOfWard(10)).thenReturn(42);
+
+        controller.doPost(request, response);
+
+        assertEquals(42, savedOwner());
+    }
+
+    /** Nhà cung cấp của người khác: Sales nào cũng bị chặn, có tỉnh hay chưa. */
+    @Test
+    public void editForm_nhaCungCapCuaNguoiKhac_salesChuaCoTinhCungBiChan() throws Exception {
+        holdsProvinces();
+        khach5(42, 2, "Nhà cung cấp");
+        openEditForm5();
+
+        controller.doGet(request, response);
+
+        verify(response).sendRedirect(CONTEXT_PATH + "/customer?action=view&id=5&error=not_your_customer");
+    }
+
+    /** Tick thêm vai "Khách mua" lúc gửi không phải là cách mở khoá: phạm vi xét trên vai đang lưu. */
+    @Test
+    public void update_nhaCungCapCuaNguoiKhac_tickThemVaiKhachMua_vanBiChan() throws Exception {
+        holdsProvinces();
+        khach5(42, 2, "Nhà cung cấp");
+        postUpdate5(2);
+        when(request.getParameterValues("roles")).thenReturn(new String[]{"Khách mua", "Nhà cung cấp"});
+
+        controller.doPost(request, response);
+
+        verify(customerDAO, never()).update(any());
+    }
+
+    /** Nhà cung cấp của mình: giữ người đang phụ trách, không theo địa bàn, bỏ qua tên gửi lên. */
+    @Test
+    public void update_nhaCungCapCuaMinh_salesGiuNguoiDangPhuTrach() throws Exception {
+        holdsProvinces(TINH_1);
+        khach5(99, 2, "Nhà cung cấp");
+        postUpdate5(2);
+        when(request.getParameterValues("roles")).thenReturn(new String[]{"Nhà cung cấp"});
+        when(employeeDAO.findAssigneeOfWard(10)).thenReturn(42);
+
+        controller.doPost(request, response);
+
+        assertEquals(99, savedOwner());
+    }
+
+    /**
+     * Admin sửa nhà cung cấp: giữ người được chọn, bảng phân công không ghi đè --
+     * như trang Thêm nhà cung cấp. Trước bản này trang Sửa vẫn ép theo địa bàn.
+     */
+    @Test
+    public void update_nhaCungCapDoAdminSua_giuNguoiDuocChon() throws Exception {
+        loginAs("Admin");
+        khach5(42, 2, "Nhà cung cấp");
+        postUpdate5(2);
+        when(request.getParameterValues("roles")).thenReturn(new String[]{"Nhà cung cấp"});
+        when(employeeDAO.findAssigneeOfWard(10)).thenReturn(42);
+
+        controller.doPost(request, response);
+
+        assertEquals(9, savedOwner());
+    }
+
+    /** Form sửa nhà cung cấp: cả 34 tỉnh, không nhúng bảng phân công, Sales bị khoá người đang phụ trách. */
+    @Test
+    public void editForm_nhaCungCapCuaMinh_ca34TinhVaKhoaNguoiPhuTrach() throws Exception {
+        holdsProvinces(TINH_1);
+        khach5(99, 2, "Nhà cung cấp");
+        openEditForm5();
+
+        controller.doGet(request, response);
+
+        verify(addressDAO).findAllProvinces();
+        verify(employeeDAO, never()).findAllAssignments();
+        verify(request).setAttribute(eq("lockedOwner"), any());
+    }
+
+    @Test
+    public void view_salesCoTinh_khachNguoiKhac_anBaNutGhi() throws Exception {
+        holdsProvinces(TINH_1);
+        khach5(42, 2);
+        when(request.getRequestDispatcher("/jsp/sale/viewcustomerdetail.jsp")).thenReturn(mock(RequestDispatcher.class));
+        when(request.getParameter("action")).thenReturn("view");
+        when(request.getParameter("id")).thenReturn("5");
+
+        controller.doGet(request, response);
+
+        verify(request).setAttribute("canWrite", false);
+        verify(request).setAttribute("outOfScope", true);
+    }
+
+    @Test
+    public void view_admin_khachCuaAi_cungGhiDuoc() throws Exception {
+        loginAs("Admin");
+        khach5(42, 2);
+        when(request.getRequestDispatcher("/jsp/sale/viewcustomerdetail.jsp")).thenReturn(mock(RequestDispatcher.class));
+        when(request.getParameter("action")).thenReturn("view");
+        when(request.getParameter("id")).thenReturn("5");
+
+        controller.doGet(request, response);
+
+        verify(request).setAttribute("canWrite", true);
+        verify(request).setAttribute("outOfScope", false);
+    }
+
+    /** Danh sách "Toàn chi nhánh": khoá đúng dòng của người khác, dòng của mình vẫn có nút. */
+    @Test
+    public void list_salesCoTinh_khoaDungDongCuaNguoiKhac() throws Exception {
+        holdsProvinces(TINH_1);
+        when(request.getRequestDispatcher("/jsp/sale/listcustomer.jsp")).thenReturn(mock(RequestDispatcher.class));
+        when(request.getParameter("view")).thenReturn("all");
+        Enterprise cuaMinh = khach5(99, 1);
+        Enterprise cuaNguoiKhac = new Enterprise();
+        cuaNguoiKhac.setEnterpriseId(6);
+        cuaNguoiKhac.setAccountOwnerId(42);
+        when(customerDAO.findAll(anyInt(), anyInt(), any(), any(), any(), any(), eq(false), any(), any()))
+                .thenReturn(List.of(cuaMinh, cuaNguoiKhac));
+
+        controller.doGet(request, response);
+
+        verify(request).setAttribute("lockedIds", Set.of(6));
+    }
+
+    @Test
+    public void list_admin_khongKhoaDongNao() throws Exception {
+        loginAs("Admin");
+        when(request.getRequestDispatcher("/jsp/sale/listcustomer.jsp")).thenReturn(mock(RequestDispatcher.class));
+
+        controller.doGet(request, response);
+
+        verify(request).setAttribute("lockedIds", Set.of());
     }
 
 }

@@ -135,6 +135,26 @@ public class AddressDAO {
         return result;
     }
 
+    /**
+     * Tỉnh của một xã/phường, hay null nếu không có xã/phường đó (hoặc truy
+     * vấn lỗi). Form chỉ gửi lên xã/phường là đáng tin -- ô tỉnh là ô rời,
+     * request nặn tay khai tỉnh nào cũng được -- nên mọi phép kiểm theo tỉnh
+     * phải suy từ đây.
+     */
+    public Integer findProvinceIdOfWard(int wardId) {
+        String sql = "SELECT province_id FROM districts WHERE districts_id = ?";
+        try (Connection conn = DBContext.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, wardId);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next() ? rs.getInt(1) : null;
+            }
+        } catch (SQLException ex) {
+            LOG.error("Loi tra tinh cua xa/phuong (wardId={})", wardId, ex);
+            return null;
+        }
+    }
+
     /** Lấy xã/phường của 1 tỉnh, phục vụ dropdown "Xã / Phường" nạp qua AJAX sau khi chọn tỉnh. */
     public List<District> findWardsByProvinceId(int provinceId) {
         List<District> cached = wardsByProvinceCache.get(provinceId);

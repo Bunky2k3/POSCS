@@ -279,6 +279,39 @@ Scope and consequences worth knowing before implementing:
   silently looks like a manager: no error, no log, the restriction just
   quietly stops applying.
 
+## Row-level write access on Customer for Sales
+
+Role and hierarchy decide *whether* someone may write customers at all; for
+`Sales` the row decides *which ones* (agreed with the user 2026-09-24 for the
+create page, 2026-09-26 for edit, delete and rating). Enforced in
+`CustomerController` (`outsideSalesScope`, `ownerForUpdate`); the pages only
+hide what the controller would refuse.
+
+- **Buyers follow the territory** — `Khách mua`, including companies that are
+  also suppliers. A Sales user who directly holds provinces (`user_provinces`)
+  may write only the customers in their own "Của tôi" scope: owned by them or
+  their subordinates, or located in a province they hold. That is exactly the
+  list screen's default scope, checked through the same `ListScope`
+  (`includes` answers what `predicate` filters), so a customer shown as theirs
+  is never refused on Edit and vice versa.
+  - Create: only wards in their own provinces, and the customer is theirs.
+  - Edit: the province dropdown offers their provinces plus the customer's
+    current one; the owner still follows the territory, and a province nobody
+    holds keeps the current owner rather than taking the submitted one.
+- **Sales with no provinces yet are not restricted on buyers** — the former
+  CSKH accounts create and edit on behalf of the province holders, with the
+  owner resolved from the territory exactly as for Admin.
+- **Supplier-only rows are not territorial.** Any Sales may write only the
+  suppliers they or their subordinates own: the owner is locked to the creator
+  on create and to the current owner on edit. Admin picks the owner freely and
+  the territory table never overrides it. All 34 provinces are offered.
+- **Out of scope means read-only.** The list and detail pages hide
+  Edit/Delete/Rate and say whose customer it is; `?action=edit` and the three
+  POSTs redirect to the detail page with `error=not_your_customer`.
+- Scope is judged on the roles the customer *has*, not on the ones the form
+  submits — ticking an extra role is not a way in. Owner and province rules
+  follow the roles being *saved*.
+
 ## Notes for implementation
 
 - Enforce this per-controller (e.g. `CustomerController` checks the

@@ -6,8 +6,10 @@ import java.text.Collator;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import java.util.stream.Collectors;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.MultipartConfig;
@@ -207,6 +209,10 @@ public class CustomerController extends HttpServlet {
         int totalPages = Math.max(1, (int) Math.ceil(totalCount / (double) PAGE_SIZE));
 
         request.setAttribute("customerList", customerList);
+        // "Toàn chi nhánh" vẫn hiện khách của người khác: ẩn nút Sửa/Xoá ở những
+        // dòng Sales không được ghi (xem outsideSalesScope), thay vì để bấm vào
+        // rồi mới bị từ chối.
+        request.setAttribute("lockedIds", lockedIdsOf(request, customerList, roleFilter));
         // Khách hàng giao cho Sales, nên ô lọc "người phụ trách" chỉ liệt kê
         // Sales -- đổ cả Admin/Kỹ thuật vào là mời người dùng lọc theo những
         // người không bao giờ phụ trách khách hàng nào.
@@ -251,7 +257,16 @@ public class CustomerController extends HttpServlet {
         request.setAttribute("contractList", contractDAO.findByEnterpriseId(id));
         request.setAttribute("ticketList", ticketDAO.findByEnterpriseId(id));
         request.setAttribute("lifecycleEventList", customerDAO.findLifecycleEventsByEnterpriseId(id));
-        request.setAttribute("customerRoles", customerDAO.findRolesOf(id));
+        List<String> roles = customerDAO.findRolesOf(id);
+        request.setAttribute("customerRoles", roles);
+        // Ba nút ghi (Sửa, Xoá, Đánh giá) tính theo TỪNG khách chứ không chỉ theo
+        // vai: Sales xem được khách của người khác nhưng không ghi được. Kèm cờ
+        // riêng để trang nói rõ vì sao không có nút, không để người dùng tưởng
+        // mình mất quyền.
+        boolean canManage = AccessControl.hasFullAccess(request, AccessControl.Resource.CUSTOMER);
+        boolean outside = outsideSalesScope(request, customer, roles);
+        request.setAttribute("canWrite", canManage && !outside);
+        request.setAttribute("outOfScope", canManage && outside);
 
         request.getRequestDispatcher(DETAIL_VIEW).forward(request, response);
     }
@@ -327,6 +342,154 @@ public class CustomerController extends HttpServlet {
         return provinces;
     }
 
+    private List<Integer> myProvinceIds(HttpServletRequest request) {
+        return territoryOf(request).stream().map(Province::getProvinceId).collect(Collectors.toList());
+    }
+
+    /**
+     * Sales có bị chặn GHI lên khách này không -- Sửa, Xoá, Đánh giá xếp hạng.
+     * Chốt với người dùng 2026-09-26, cùng tinh thần trang Thêm:
+     *
+     * <ul>
+     *   <li>Không phải Sales thì không chặn ở đây: Admin quản trị toàn bộ, còn
+     *       vai chỉ-xem đã bị requireFullAccess chặn từ trước.</li>
+     *   <li>Khách mua -- kể cả khách vừa mua vừa bán -- đi theo địa bàn. Sales
+     *       đã được giao tỉnh chỉ ghi được khách nằm trong danh sách "Của tôi"
+     *       của mình: mình hoặc cấp dưới đứng tên, hoặc khách ở tỉnh mình cầm
+     *       ({@link ListScope#includes}). Sales CHƯA được giao tỉnh thì không
+     *       chặn, như ở trang Thêm: CSKH vẫn làm hộ người cầm tỉnh.</li>
+     *   <li>Chỉ là nhà cung cấp thì không theo địa bàn: Sales nào cũng chỉ ghi
+     *       được nhà cung cấp mình hoặc cấp dưới đứng tên -- trang Thêm nhà cung
+     *       cấp cũng khoá tên người tạo.</li>
+     * </ul>
+     *
+     * <p>Xét trên vai ĐANG LƯU của khách, không phải vai form gửi lên: tick thêm
+     * một vai không được là cách mở khoá.
+     */
+    private boolean outsideSalesScope(HttpServletRequest request, Enterprise customer, List<String> roles) {
+        if (!AccessControl.isSales(request)) {
+            return false;
+        }
+        return outsideScope(customer, roles, teamOf(request), myProvinceIds(request));
+    }
+
+    private static boolean outsideScope(Enterprise customer, List<String> roles,
+            List<Integer> team, List<Integer> myProvinceIds) {
+        if (isSupplierOnly(roles)) {
+            return !team.contains(customer.getAccountOwnerId());
+        }
+        if (myProvinceIds.isEmpty()) {
+            return false;
+        }
+        return !ListScope.of(team, myProvinceIds).includes(customer.getAccountOwnerId(), provinceIdOf(customer));
+    }
+
+    /** Mình + cấp dưới -- cùng tập mà danh sách "Của tôi" dùng. */
+    private List<Integer> teamOf(HttpServletRequest request) {
+        return employeeDAO.findTeamUserIds(AccessControl.currentUser(request).getUserId());
+    }
+
+    /**
+     * Các dòng trong trang danh sách mà người đang xem KHÔNG ghi được -- xem
+     * {@link #outsideSalesScope}. Tính một lần cho cả trang thay vì hỏi lại
+     * đội và địa bàn ở từng dòng.
+     */
+    private Set<Integer> lockedIdsOf(HttpServletRequest request, List<Enterprise> customers, String listRole) {
+        if (!AccessControl.isSales(request)) {
+            return Set.of();
+        }
+        List<Integer> team = teamOf(request);
+        List<Integer> myProvinceIds = myProvinceIds(request);
+        Set<Integer> locked = new HashSet<>();
+        for (Enterprise c : customers) {
+            // Danh sách khách mua thì dòng nào cũng mang vai khách mua. Danh sách
+            // nhà cung cấp thì có dòng còn là khách mua nữa -- phải hỏi vai thật.
+            List<String> roles = ROLE_BUYER.equals(listRole)
+                    ? List.of(ROLE_BUYER)
+                    : customerDAO.findRolesOf(c.getEnterpriseId());
+            if (outsideScope(c, roles, team, myProvinceIds)) {
+                locked.add(c.getEnterpriseId());
+            }
+        }
+        return locked;
+    }
+
+    /** Chỉ mang vai nhà cung cấp. Không vai nào thì coi như khách mua, như roleFromKind. */
+    private static boolean isSupplierOnly(List<String> roles) {
+        return roles.contains(ROLE_SUPPLIER) && !roles.contains(ROLE_BUYER);
+    }
+
+    /** Tỉnh của khách qua xã/phường của địa chỉ, null nếu chưa có địa chỉ. */
+    private static Integer provinceIdOf(Enterprise customer) {
+        Address address = customer.getAddress();
+        District district = address != null ? address.getDistrict() : null;
+        return district != null ? district.getProvinceId() : null;
+    }
+
+    /** {@code provinces} cộng thêm tỉnh {@code provinceId} nếu còn thiếu -- xem showEditForm. */
+    private List<Province> withProvince(List<Province> provinces, Integer provinceId) {
+        if (provinceId == null || provinces.stream().anyMatch(p -> p.getProvinceId() == provinceId)) {
+            return provinces;
+        }
+        List<Province> result = new ArrayList<>(provinces);
+        addressDAO.findAllProvinces().stream()
+                .filter(p -> p.getProvinceId() == provinceId)
+                .findFirst()
+                .ifPresent(result::add);
+        return result;
+    }
+
+    /**
+     * Trang Sửa, khách mua: Sales đã có tỉnh chỉ chuyển khách trong các tỉnh
+     * mình cầm, như trang Thêm -- hoặc giữ nguyên tỉnh hiện tại của khách (khách
+     * cũ có thể nằm ở tỉnh người khác, xem showEditForm). Admin và Sales chưa có
+     * tỉnh thì không giới hạn.
+     *
+     * <p>Kiểm theo XÃ/PHƯỜNG gửi lên chứ không theo ô tỉnh rời, cùng lý do với
+     * {@link #resolveAccountOwnerId}. Không gửi xã/phường nào thì địa chỉ giữ
+     * nguyên (setAddressFromRequest), không có gì để kiểm.
+     */
+    private boolean provinceAllowedForSales(HttpServletRequest request, Enterprise existing) {
+        List<Integer> myProvinceIds = myProvinceIds(request);
+        Integer wardId = parseIntOrNull(request.getParameter("districtId"));
+        if (myProvinceIds.isEmpty() || wardId == null) {
+            return true;
+        }
+        Integer wardProvinceId = addressDAO.findProvinceIdOfWard(wardId);
+        return wardProvinceId != null
+                && (myProvinceIds.contains(wardProvinceId) || wardProvinceId.equals(provinceIdOf(existing)));
+    }
+
+    /**
+     * Người phụ trách chính khi SỬA -- chỗ khoá thật, JSP chỉ khoá hình.
+     *
+     * <ul>
+     *   <li>Chỉ là nhà cung cấp: không theo địa bàn. Admin chọn tay; Sales giữ
+     *       người đang phụ trách -- trang Thêm nhà cung cấp khoá tên người tạo,
+     *       trang Sửa không được là chỗ đổi tên đó đi.</li>
+     *   <li>Khách mua, người sửa là Sales đã có tỉnh: vẫn theo địa bàn, nhưng
+     *       tỉnh chưa ai cầm thì giữ người đang phụ trách chứ không nhận tên gửi
+     *       lên -- Sales không tự chuyển khách cho người khác được.</li>
+     *   <li>Còn lại (Admin, Sales chưa có tỉnh): như trước,
+     *       {@link #resolveAccountOwnerId}.</li>
+     * </ul>
+     */
+    private Integer ownerForUpdate(HttpServletRequest request, Enterprise existing, List<String> roles) {
+        if (isSupplierOnly(roles)) {
+            return AccessControl.isSales(request)
+                    ? Integer.valueOf(existing.getAccountOwnerId())
+                    : parseIntOrNull(request.getParameter("accountOwnerId"));
+        }
+        if (!territoryOf(request).isEmpty()) {
+            Integer wardId = parseIntOrNull(request.getParameter("districtId"));
+            Integer territoryOwnerId = wardId != null ? employeeDAO.findAssigneeOfWard(wardId) : null;
+            return territoryOwnerId != null && territoryOwnerId > 0
+                    ? territoryOwnerId
+                    : Integer.valueOf(existing.getAccountOwnerId());
+        }
+        return resolveAccountOwnerId(request);
+    }
+
     private void showEditForm(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
         // Trang form cũng là thao tác quản trị: vai trò chỉ-xem không được
@@ -340,6 +503,12 @@ public class CustomerController extends HttpServlet {
             response.sendRedirect(request.getContextPath() + "/customer?error=notfound");
             return;
         }
+        List<String> roles = customerDAO.findRolesOf(id);
+        if (outsideSalesScope(request, customer, roles)) {
+            response.sendRedirect(request.getContextPath()
+                    + "/customer?action=view&id=" + id + "&error=not_your_customer");
+            return;
+        }
 
         request.setAttribute("customer", customer);
         // Cùng lý do với danh sách tỉnh ngay dưới: người đang phụ trách khách
@@ -347,21 +516,39 @@ public class CustomerController extends HttpServlet {
         // mở form sửa lên ô trống rồi bấm lưu là thay mất người phụ trách.
         request.setAttribute("userList", employeeDAO.findActiveByRole(
                 SALES_ROLE, customer.getAccountOwnerId(), customer.getSupportOwnerId()));
-        // Khách cũ có thể nằm ngoài 18 tỉnh địa bàn -- giữ tỉnh đó trong danh
-        // sách, nếu không thì mở form sửa lên ô tỉnh trống và bấm lưu là mất
-        // địa chỉ dù người dùng chỉ định sửa số điện thoại.
-        Integer currentProvinceId = customer.getAddress() != null && customer.getAddress().getDistrict() != null
-                ? customer.getAddress().getDistrict().getProvinceId()
-                : null;
-        request.setAttribute("provinceList", addressDAO.findBranchProvincesIncluding(currentProvinceId));
-        // Như showCreateForm: form sửa cũng phải khoá ô người phụ trách theo
-        // địa bàn, nếu không thì đổi tỉnh ở đây là đường vòng thoát khoá.
-        request.setAttribute("territoryAssignments", employeeDAO.findAllAssignments());
-        request.setAttribute("customerRoles", customerDAO.findRolesOf(id));
+        Integer currentProvinceId = provinceIdOf(customer);
+        if (isSupplierOnly(roles)) {
+            // ĐỊA BÀN KHÔNG ÁP CHO NHÀ CUNG CẤP, như trang Thêm nhà cung cấp: cả
+            // 34 tỉnh, và không nhúng bảng phân công nên ô người phụ trách không
+            // nhảy theo tỉnh. Sales thì không đổi được người đang phụ trách --
+            // họ chỉ vào được nhà cung cấp của mình (outsideSalesScope).
+            request.setAttribute("provinceList", addressDAO.findAllProvinces());
+            if (AccessControl.isSales(request)) {
+                request.setAttribute("lockedOwner", customer.getAccountOwner());
+            }
+        } else {
+            List<Province> myProvinces = territoryOf(request);
+            if (myProvinces.isEmpty()) {
+                // Khách cũ có thể nằm ngoài 18 tỉnh địa bàn -- giữ tỉnh đó trong
+                // danh sách, nếu không thì mở form sửa lên ô tỉnh trống và bấm lưu
+                // là mất địa chỉ dù người dùng chỉ định sửa số điện thoại.
+                request.setAttribute("provinceList", addressDAO.findBranchProvincesIncluding(currentProvinceId));
+            } else {
+                // Sales đã có tỉnh, như trang Thêm: chỉ chuyển khách trong các tỉnh
+                // mình cầm -- cộng tỉnh hiện tại của khách, cùng lý do như trên.
+                request.setAttribute("provinceList", withProvince(myProvinces, currentProvinceId));
+                // Tỉnh chưa ai cầm thì giữ người đang phụ trách chứ không mở ô cho
+                // chọn tự do -- xem ownerForUpdate.
+                request.setAttribute("keepOwnerWhenUnassigned", true);
+            }
+            // Như showCreateForm: form sửa cũng phải khoá ô người phụ trách theo
+            // địa bàn, nếu không thì đổi tỉnh ở đây là đường vòng thoát khoá.
+            request.setAttribute("territoryAssignments", employeeDAO.findAllAssignments());
+        }
+        request.setAttribute("customerRoles", roles);
         // Loại khách hàng theo ĐÚNG VAI của khách đang sửa: mở một nhà cung
         // cấp ra mà dropdown đổ toàn loại của khách mua thì bấm lưu là đổi mất
         // phân loại của họ.
-        List<String> roles = customerDAO.findRolesOf(customer.getEnterpriseId());
         request.setAttribute("customerTypeOptions",
                 customerTypesFor(roles.contains(ROLE_SUPPLIER) ? ROLE_SUPPLIER : ROLE_BUYER));
         request.setAttribute("managerOf", employeeDAO.findManagerMap());
@@ -545,6 +732,12 @@ public class CustomerController extends HttpServlet {
             response.sendRedirect(request.getContextPath() + "/customer?error=notfound");
             return;
         }
+        // Trang form đã chặn, nhưng POST thẳng thì không đi qua trang form.
+        if (outsideSalesScope(request, existing, customerDAO.findRolesOf(id))) {
+            response.sendRedirect(request.getContextPath()
+                    + "/customer?action=view&id=" + id + "&error=not_your_customer");
+            return;
+        }
         if (!logoIsAcceptable(request, response, request.getContextPath() + "/customer?action=edit&id=" + id)) {
             return;
         }
@@ -559,7 +752,15 @@ public class CustomerController extends HttpServlet {
         e.setWebsite(emptyToNull(request.getParameter("website")));
         e.setJoinDate(parseDateOrNull(request.getParameter("joinDate")));
 
-        Integer accountOwnerId = resolveAccountOwnerId(request);
+        // Luật tỉnh và người phụ trách đi theo vai SẼ LƯU, không phải vai cũ:
+        // tick thêm "Khách mua" cho một nhà cung cấp là từ đó nó theo địa bàn.
+        List<String> roles = rolesFromRequest(request);
+        if (!isSupplierOnly(roles) && !provinceAllowedForSales(request, existing)) {
+            response.sendRedirect(request.getContextPath()
+                    + "/customer?action=edit&id=" + id + "&error=province_not_allowed");
+            return;
+        }
+        Integer accountOwnerId = ownerForUpdate(request, existing, roles);
         if (accountOwnerId != null) {
             e.setAccountOwnerId(accountOwnerId);
         }
@@ -571,7 +772,6 @@ public class CustomerController extends HttpServlet {
         // request không gửi lên địa chỉ mới nhưng khách đã có sẵn address_id
         // (DAO giữ nguyên địa chỉ cũ) -- sửa tên/SĐT của khách cũ không vì thế
         // mà bị chặn.
-        List<String> roles = rolesFromRequest(request);
         if (!isValidCommonFields(e) || (e.getAddress() == null && existing.getAddressId() == null)
                 || roles.isEmpty()) {
             response.sendRedirect(request.getContextPath() + "/customer?action=edit&id=" + id + "&error=invalid");
@@ -618,8 +818,14 @@ public class CustomerController extends HttpServlet {
         // Phải kiểm bản ghi có tồn tại TRƯỚC các ràng buộc nghiệp vụ: id rác chạy
         // thẳng xuống softDelete thì UPDATE không chạm dòng nào và người dùng bị
         // đẩy về danh sách không kèm thông báo gì, tưởng đã xoá xong.
-        if (id == null || customerDAO.findById(id) == null) {
+        Enterprise existing = id != null ? customerDAO.findById(id) : null;
+        if (existing == null) {
             response.sendRedirect(request.getContextPath() + "/customer?error=notfound");
+            return;
+        }
+        if (outsideSalesScope(request, existing, customerDAO.findRolesOf(id))) {
+            response.sendRedirect(request.getContextPath()
+                    + "/customer?action=view&id=" + id + "&error=not_your_customer");
             return;
         }
 
@@ -652,8 +858,14 @@ public class CustomerController extends HttpServlet {
             return;
         }
         Integer id = parseIntOrNull(request.getParameter("id"));
-        if (id == null || customerDAO.findById(id) == null) {
+        Enterprise existing = id != null ? customerDAO.findById(id) : null;
+        if (existing == null) {
             response.sendRedirect(request.getContextPath() + "/customer?error=notfound");
+            return;
+        }
+        if (outsideSalesScope(request, existing, customerDAO.findRolesOf(id))) {
+            response.sendRedirect(request.getContextPath()
+                    + "/customer?action=view&id=" + id + "&error=not_your_customer");
             return;
         }
 

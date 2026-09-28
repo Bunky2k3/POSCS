@@ -8,6 +8,7 @@
       - userList      : List<poscs.model.User>        (nhân viên vai Sales, để đổ dropdown lọc "Người phụ trách")
       - provinceList  : List<poscs.model.Province>    (18 tỉnh địa bàn chi nhánh, để đổ dropdown lọc "Tỉnh/Thành")
       - currentPage, totalPages, totalCount : thông tin phân trang (BR-12)
+      - lockedIds    : Set<Integer> các dòng người đang xem không sửa/xoá được (Sales, khách ngoài phạm vi)
       - keyword, typeFilter, assigneeFilter, provinceFilters : giá trị filter hiện tại (để giữ lại lúc submit lại form tìm kiếm)
 --%>
 <!DOCTYPE html>
@@ -222,6 +223,10 @@
         .action-icons .act-view:hover { background: #eaf6ff; color: var(--primary); }
         .action-icons .act-edit:hover { background: #fff4e0; color: var(--warning); }
         .action-icons .act-delete:hover { background: #fdecef; color: var(--danger); }
+        .action-icons .act-lock {
+            width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;
+            color: #b6bcc6; font-size: 0.78rem; cursor: help;
+        }
 
         .empty-state {
             text-align: center; padding: 60px 20px; color: #9ca3af;
@@ -559,9 +564,19 @@
                                 <td>
                                     <div class="action-icons">
                                         <button class="act-view" title="Xem chi tiết" onclick="location.href='${pageContext.request.contextPath}/customer?action=view&id=${customer.enterpriseId}&kind=${kind}'"><i class="fa-regular fa-eye"></i></button>
+                                        <%-- lockedIds: dòng Sales xem được mà không ghi được
+                                             (khách của người khác, hiện ở "Toàn chi nhánh") --
+                                             xem CustomerController.outsideSalesScope. --%>
                                         <c:if test="${canManage}">
-                                            <button class="act-edit" title="Sửa" onclick="location.href='${pageContext.request.contextPath}/customer?action=edit&id=${customer.enterpriseId}'"><i class="fa-solid fa-pen"></i></button>
-                                            <button class="act-delete" title="Xóa" onclick="openDeleteModal(${customer.enterpriseId}, '${fn:escapeXml(customer.enterpriseName)}')"><i class="fa-solid fa-trash"></i></button>
+                                            <c:choose>
+                                                <c:when test="${lockedIds.contains(customer.enterpriseId)}">
+                                                    <span class="act-lock" title="Do người khác phụ trách, bạn chỉ xem được"><i class="fa-solid fa-lock"></i></span>
+                                                </c:when>
+                                                <c:otherwise>
+                                                    <button class="act-edit" title="Sửa" onclick="location.href='${pageContext.request.contextPath}/customer?action=edit&id=${customer.enterpriseId}'"><i class="fa-solid fa-pen"></i></button>
+                                                    <button class="act-delete" title="Xóa" onclick="openDeleteModal(${customer.enterpriseId}, '${fn:escapeXml(customer.enterpriseName)}')"><i class="fa-solid fa-trash"></i></button>
+                                                </c:otherwise>
+                                            </c:choose>
                                         </c:if>
                                     </div>
                                 </td>

@@ -13,6 +13,8 @@
       - contactList    : List<poscs.model.EnterpriseContact>
       - contractList    : List<poscs.model.Contract> (đã join .owner nếu cần hiển thị thêm)
       - ticketList      : List<poscs.model.TechnicalRequest>
+      - canWrite        : hiện ba nút Sửa / Xoá / Đánh giá (quyền theo vai VÀ khách thuộc phạm vi)
+      - outOfScope      : có quyền theo vai nhưng khách của người khác -- hiện dòng "chỉ xem được"
 --%>
 <!DOCTYPE html>
 <html lang="vi">
@@ -60,7 +62,10 @@
         .rating-good { background: #e8faf3; color: var(--success); }
         .rating-watch { background: #fff4e0; color: var(--warning); }
         .rating-bad, .rating-risk { background: #fdecef; color: var(--danger); }
-        .header-actions { display: flex; gap: 10px; }
+        .header-actions { display: flex; gap: 10px; align-items: center; }
+        /* Thay cho ba nút ghi khi khách không thuộc phạm vi của người đang xem:
+           không có dòng này thì người dùng tưởng trang lỗi hoặc mình mất quyền. */
+        .view-only-note { font-size: 0.85rem; color: #6b7280; display: inline-flex; align-items: center; gap: 6px; }
         .btn-edit-detail {
             background: linear-gradient(120deg, var(--primary), var(--primary-light));
             color: #fff; border: none; border-radius: 10px; padding: 9px 18px;
@@ -246,10 +251,16 @@
             </div>
             <div class="header-actions">
                 <a href="${pageContext.request.contextPath}/guide?module=customer#chi-tiet" target="_blank" rel="noopener" class="guide-btn" title="Mở hướng dẫn sử dụng ở tab mới"><i class="fa-regular fa-circle-question"></i> Hướng dẫn</a>
-                <c:if test="${canManage}">
+                <%-- canWrite, không phải canManage: Sales xem được khách của người
+                     khác nhưng không ghi được (CustomerController.outsideSalesScope). --%>
+                <c:if test="${canWrite}">
                     <button class="btn-edit-detail" type="button" onclick="openEvaluateModal()"><i class="fa-solid fa-chart-line"></i> Đánh giá lại xếp hạng</button>
                     <a href="${pageContext.request.contextPath}/customer?action=edit&id=${customer.enterpriseId}" class="btn-edit-detail"><i class="fa-solid fa-pen"></i> Sửa thông tin</a>
                     <button class="btn-delete-detail" onclick="openDeleteModal()"><i class="fa-solid fa-trash"></i> Xóa</button>
+                </c:if>
+                <c:if test="${outOfScope}">
+                    <span class="view-only-note"><i class="fa-solid fa-lock"></i>
+                        Do ${customer.accountOwner != null ? fn:escapeXml(customer.accountOwner.fullName) : 'người khác'} phụ trách, bạn chỉ xem được</span>
                 </c:if>
             </div>
         </div>
@@ -565,6 +576,15 @@
         <div class="toast-msg blocked show">
             <i class="fa-solid fa-circle-xmark"></i>
             <span>Không thể xoá: khách hàng còn hợp đồng đang hiệu lực.</span>
+        </div>
+    </c:if>
+
+    <!-- Sales mở thẳng link Sửa (hoặc gửi Xoá / Đánh giá) trên khách ngoài phạm
+         vi của mình -- xem CustomerController.outsideSalesScope. -->
+    <c:if test="${param.error == 'not_your_customer'}">
+        <div class="toast-msg blocked show">
+            <i class="fa-solid fa-circle-xmark"></i>
+            <span>Bạn chỉ xem được khách hàng này: khách do người khác phụ trách.</span>
         </div>
     </c:if>
 
