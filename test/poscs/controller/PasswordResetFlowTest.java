@@ -11,6 +11,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 import org.junit.Before;
 import org.junit.Test;
+import org.mindrot.jbcrypt.BCrypt;
 import org.mockito.MockedStatic;
 import poscs.common.EmailUtil;
 import poscs.dao.EmployeeDAO;
@@ -585,6 +586,33 @@ public class PasswordResetFlowTest {
         controller.doPost(request, response);
 
         verify(response).sendRedirect(CONTEXT_PATH + "/resetPassword.jsp?error=mismatch");
+    }
+
+    /**
+     * Trang đặt lại ghi "Không trùng với mật khẩu cũ" -- server phải kiểm thật,
+     * như trang Đổi mật khẩu. Không đổi gì, và giữ trạng thái OTP đã xác thực
+     * để người dùng gõ lại ngay trên trang này.
+     */
+    @Test
+    public void resetPassword_sameAsOldPassword_redirectsWithErrorAndKeepsVerifiedOtp() throws Exception {
+        when(request.getServletPath()).thenReturn("/ResetPasswordServlet");
+        Map<String, Object> attrs = new HashMap<>();
+        attrs.put("resetUsername", "annd");
+        attrs.put("otpVerified", Boolean.TRUE);
+        HttpSession session = fakeSession(attrs);
+        when(request.getSession(false)).thenReturn(session);
+        when(request.getParameter("newPassword")).thenReturn("current-password1");
+        when(request.getParameter("confirmPassword")).thenReturn("current-password1");
+        User account = new User();
+        account.setUsername("annd");
+        account.setPasswordHash(BCrypt.hashpw("current-password1", BCrypt.gensalt()));
+        when(employeeDAO.findByUsername("annd")).thenReturn(account);
+
+        controller.doPost(request, response);
+
+        verify(response).sendRedirect(CONTEXT_PATH + "/resetPassword.jsp?error=same_as_old");
+        verify(employeeDAO, never()).updatePasswordByUsername(anyString(), anyString());
+        org.junit.Assert.assertEquals(Boolean.TRUE, attrs.get("otpVerified"));
     }
 
     @Test
