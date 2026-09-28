@@ -134,6 +134,7 @@
                 <h2>Thêm sản phẩm</h2>
                 <p>Tạo mới thiết bị / sản phẩm trong danh mục POS</p>
             </div>
+            <a href="${pageContext.request.contextPath}/guide?module=product#them-san-pham" target="_blank" rel="noopener" class="guide-btn" title="Mở hướng dẫn sử dụng ở tab mới"><i class="fa-regular fa-circle-question"></i> Hướng dẫn</a>
         </div>
 
         <div class="card-box">

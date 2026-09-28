@@ -240,6 +240,7 @@
                 <p>Quản lý danh mục thiết bị / sản phẩm POS</p>
             </div>
             <div class="header-actions">
+                <a href="${pageContext.request.contextPath}/guide?module=product#danh-sach" target="_blank" rel="noopener" class="guide-btn" title="Mở hướng dẫn sử dụng ở tab mới"><i class="fa-regular fa-circle-question"></i> Hướng dẫn</a>
                 <c:if test="${canManage}">
                     <a href="${pageContext.request.contextPath}/product?action=new" class="btn-add"><i class="fa-solid fa-plus"></i> Thêm sản phẩm</a>
                 </c:if>

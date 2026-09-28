@@ -55,7 +55,7 @@
             font-size: 0.72rem; font-weight: 600; background: #eaf6ff; color: var(--primary-dark);
             margin-left: 8px;
         }
-        .header-actions { display: flex; gap: 10px; }
+        .header-actions { display: flex; gap: 10px; align-items: center; }
         .btn-edit-detail {
             background: linear-gradient(120deg, var(--primary), var(--primary-light));
             color: #fff; border: none; border-radius: 10px; padding: 9px 18px;
@@ -196,6 +196,7 @@
                 </div>
             </div>
             <div class="header-actions">
+                <a href="${pageContext.request.contextPath}/guide?module=product#chi-tiet" target="_blank" rel="noopener" class="guide-btn" title="Mở hướng dẫn sử dụng ở tab mới"><i class="fa-regular fa-circle-question"></i> Hướng dẫn</a>
                 <c:if test="${canManage}">
                     <a href="${pageContext.request.contextPath}/product?action=edit&id=${product.productId}" class="btn-edit-detail"><i class="fa-solid fa-pen"></i> Sửa thông tin</a>
                     <button class="btn-delete-detail" onclick="openDeleteModal()"><i class="fa-solid fa-trash"></i> Xóa</button>

@@ -140,6 +140,7 @@
                 <h2>Cập nhật sản phẩm</h2>
                 <p>Mã sản phẩm: <strong style="color:var(--primary-dark)">${fn:escapeXml(product.productCode)}</strong></p>
             </div>
+            <a href="${pageContext.request.contextPath}/guide?module=product#sua" target="_blank" rel="noopener" class="guide-btn" title="Mở hướng dẫn sử dụng ở tab mới"><i class="fa-regular fa-circle-question"></i> Hướng dẫn</a>
         </div>
 
         <div class="card-box">
