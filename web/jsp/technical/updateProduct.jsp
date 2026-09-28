@@ -12,7 +12,7 @@
 
     Request attribute cần có trước khi forward tới trang này:
       - product      : poscs.model.Product (đã join .category, .images, .catalogues)
-      - categoryList : List<poscs.model.ProductCategory>  (để đổ dropdown "Danh mục")
+      - categoryOptions : Map<Integer, String> danh mục cuối -> tên kèm nhánh, cộng danh mục đang lưu (ProductController.categoryOptions)
       - csrfToken
 --%>
 <!DOCTYPE html>
@@ -149,6 +149,7 @@
                         <c:when test="${param.error == 'invalid_image_type'}">Ảnh sản phẩm chỉ nhận file JPG, PNG, GIF hoặc WEBP. Vui lòng chọn lại.</c:when>
                         <c:when test="${param.error == 'invalid_catalogue_type'}">Catalogue chỉ nhận file PDF. Vui lòng chọn lại.</c:when>
                         <c:when test="${param.error == 'invalid'}">Thông tin sản phẩm chưa hợp lệ. Vui lòng kiểm tra lại các ô bắt buộc.</c:when>
+                        <c:when test="${param.error == 'invalid_category'}">Danh mục đã chọn không còn dùng được (danh mục cha hoặc đã bị xoá). Vui lòng chọn lại danh mục.</c:when>
                         <c:when test="${param.error == 'update_failed'}">Không lưu được thay đổi. Vui lòng thử lại.</c:when>
                         <c:otherwise>Đã có lỗi xảy ra. Vui lòng thử lại.</c:otherwise>
                     </c:choose>
@@ -177,8 +178,9 @@
                         <label>Danh mục <span class="req">*</span></label>
                         <select class="form-select" id="category" name="categoryId">
                             <option value="">-- Chọn danh mục --</option>
-                            <c:forEach var="cat" items="${categoryList}">
-                                <option value="${cat.categoryId}" ${product.category != null && cat.categoryId == product.category.categoryId ? 'selected' : ''}>${fn:escapeXml(cat.categoryName)}</option>
+                            <%-- Chỉ danh mục cuối, ghi kèm cả nhánh -- xem ProductController.categoryOptions. --%>
+                            <c:forEach var="opt" items="${categoryOptions}">
+                                <option value="${opt.key}" ${opt.key == product.categoryId ? 'selected' : ''}>${fn:escapeXml(opt.value)}</option>
                             </c:forEach>
                         </select>
                         <span class="error-text" id="err-category">Vui lòng chọn danh mục sản phẩm.</span>
