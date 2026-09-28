@@ -177,6 +177,21 @@ public class DaoSchemaIntegrationTest {
         assertFalse(notificationDAO.existsForUserAndRef(Fixtures.USER_ID, "contract_expiring", 999));
     }
 
+    /** findByIdForUser đọc thêm ref_type / ref_id -- DAO nuốt SQLException thành null, nên phải đọc lại thấy bản ghi. */
+    @Test
+    public void notificationDao_findByIdForUser_readsRefColumnsOnlyForOwner() {
+        IntegrationDb.assumeAvailable();
+
+        assertTrue(notificationDAO.insert(Fixtures.USER_ID, "IT: hợp đồng sắp hết hạn", "contract_expiring", 777));
+        int id = notificationDAO.findRecentByUser(Fixtures.USER_ID, 1).get(0).getNotificationId();
+
+        poscs.model.Notification n = notificationDAO.findByIdForUser(id, Fixtures.USER_ID);
+        assertNotNull(n);
+        assertEquals("contract_expiring", n.getRefType());
+        assertEquals(Integer.valueOf(777), n.getRefId());
+        assertNull(notificationDAO.findByIdForUser(id, Fixtures.USER_ID + 1000));
+    }
+
     @Test
     public void addressDao_lookupTablesAreSeededBySchema() {
         IntegrationDb.assumeAvailable();

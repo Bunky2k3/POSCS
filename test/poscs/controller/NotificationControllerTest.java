@@ -8,6 +8,7 @@ import jakarta.servlet.http.HttpSession;
 import org.junit.Before;
 import org.junit.Test;
 import poscs.dao.NotificationDAO;
+import poscs.model.Notification;
 import poscs.model.User;
 
 import static org.mockito.ArgumentMatchers.*;
@@ -72,6 +73,80 @@ public class NotificationControllerTest {
     public void actionRead_withoutId_doesNotCallDaoButStillRedirects() throws Exception {
         when(request.getParameter("action")).thenReturn("read");
         when(request.getParameter("id")).thenReturn(null);
+
+        controller.doGet(request, response);
+
+        verify(notificationDAO, never()).markAsRead(anyInt(), anyInt());
+        verify(response).sendRedirect(CONTEXT_PATH + "/notifications");
+    }
+
+    // ------------------------------------------------------------------
+    // action=open -- bấm vào thông báo: đánh dấu đã đọc, mở thẳng thứ nó nói tới
+    // ------------------------------------------------------------------
+
+    private static Notification notification(int id, String refType, Integer refId) {
+        Notification n = new Notification();
+        n.setNotificationId(id);
+        n.setUserId(7);
+        n.setRefType(refType);
+        n.setRefId(refId);
+        return n;
+    }
+
+    @Test
+    public void actionOpen_contractExpiring_marksReadAndOpensTheContract() throws Exception {
+        when(request.getParameter("action")).thenReturn("open");
+        when(request.getParameter("id")).thenReturn("42");
+        when(notificationDAO.findByIdForUser(42, 7)).thenReturn(notification(42, "contract_expiring", 15));
+
+        controller.doGet(request, response);
+
+        verify(notificationDAO).markAsRead(42, 7);
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=view&id=15");
+    }
+
+    @Test
+    public void actionOpen_ticketSla_opensTheTicket() throws Exception {
+        when(request.getParameter("action")).thenReturn("open");
+        when(request.getParameter("id")).thenReturn("43");
+        when(notificationDAO.findByIdForUser(43, 7)).thenReturn(notification(43, "ticket_sla", 9));
+
+        controller.doGet(request, response);
+
+        verify(notificationDAO).markAsRead(43, 7);
+        verify(response).sendRedirect(CONTEXT_PATH + "/ticket?action=view&id=9");
+    }
+
+    @Test
+    public void actionOpen_changeRequest_opensTheRequest() throws Exception {
+        when(request.getParameter("action")).thenReturn("open");
+        when(request.getParameter("id")).thenReturn("44");
+        when(notificationDAO.findByIdForUser(44, 7)).thenReturn(notification(44, "CHANGE_REQUEST", 3));
+
+        controller.doGet(request, response);
+
+        verify(response).sendRedirect(CONTEXT_PATH + "/changerequest?action=view&id=3");
+    }
+
+    /** Loại lạ hoặc thiếu id: vẫn đánh dấu đã đọc, quay về trang Thông báo như trước. */
+    @Test
+    public void actionOpen_unknownRefType_marksReadAndFallsBackToNotificationsPage() throws Exception {
+        when(request.getParameter("action")).thenReturn("open");
+        when(request.getParameter("id")).thenReturn("45");
+        when(notificationDAO.findByIdForUser(45, 7)).thenReturn(notification(45, "something_new", null));
+
+        controller.doGet(request, response);
+
+        verify(notificationDAO).markAsRead(45, 7);
+        verify(response).sendRedirect(CONTEXT_PATH + "/notifications");
+    }
+
+    /** Id của người khác (hoặc không có): không đánh dấu gì, không lộ ra nó nói về hợp đồng nào. */
+    @Test
+    public void actionOpen_notificationOfSomeoneElse_marksNothingAndStaysOnNotificationsPage() throws Exception {
+        when(request.getParameter("action")).thenReturn("open");
+        when(request.getParameter("id")).thenReturn("99");
+        when(notificationDAO.findByIdForUser(99, 7)).thenReturn(null);
 
         controller.doGet(request, response);
 

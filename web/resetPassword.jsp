@@ -224,6 +224,7 @@
                         <c:choose>
                             <c:when test="${param.error == 'weak_password'}">Mật khẩu mới phải có ít nhất 8 ký tự.</c:when>
                             <c:when test="${param.error == 'mismatch'}">Mật khẩu xác nhận không khớp.</c:when>
+                            <c:when test="${param.error == 'same_as_old'}">Mật khẩu mới không được trùng với mật khẩu cũ.</c:when>
                             <c:otherwise>Đã có lỗi xảy ra. Vui lòng thử lại.</c:otherwise>
                         </c:choose>
                     </div>

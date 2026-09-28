@@ -29,6 +29,7 @@ public class GuideController extends HttpServlet {
 
     /** Phân hệ đã có hướng dẫn -> trang nội dung. Thêm phân hệ mới thì thêm dòng ở đây. */
     private static final Map<String, String> PAGES = Map.of(
+            "general", "/jsp/guide/general.jsp",
             "customer", "/jsp/guide/customer.jsp",
             "contract", "/jsp/guide/contract.jsp",
             "product", "/jsp/guide/product.jsp",

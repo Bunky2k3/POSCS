@@ -263,14 +263,10 @@
                         </div>
                     </div>
 
-                    <!-- Ghi nhớ & Quên mật khẩu (Vẫn giữ link forgotPassword.jsp) -->
-                    <div class="d-flex justify-content-between align-items-center mb-4">
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" id="rememberMe" style="cursor: pointer;">
-                            <label class="form-check-label text-muted" for="rememberMe" style="font-size: 0.9rem; cursor: pointer;">
-                                Ghi nhớ thiết bị
-                            </label>
-                        </div>
+                    <%-- Từng có ô "Ghi nhớ thiết bị" ở đây: không có name, server không đọc,
+                         nên tích hay không cũng như nhau. Đã gỡ -- làm "ghi nhớ" thật cần token
+                         đăng nhập lâu dài, là một thiết kế bảo mật riêng. --%>
+                    <div class="d-flex justify-content-end align-items-center mb-4">
                         <a href="forgotPassword.jsp" class="custom-link" style="font-size: 0.9rem;">Quên mật khẩu?</a>
                     </div>
 

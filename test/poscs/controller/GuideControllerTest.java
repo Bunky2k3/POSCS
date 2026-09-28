@@ -80,6 +80,18 @@ public class GuideControllerTest {
         verify(dispatcher).forward(request, response);
     }
 
+    /** Phần chung (tab "Bắt đầu"): trang chủ, hồ sơ, thông báo, đổi mật khẩu mở /guide?module=general#mục. */
+    @Test
+    public void moduleGeneral_moTrangHuongDanPhanChung() throws Exception {
+        when(request.getParameter("module")).thenReturn("general");
+
+        controller.doGet(request, response);
+
+        verify(request).getRequestDispatcher("/jsp/guide/general.jsp");
+        verify(request).setAttribute("guideModule", "general");
+        verify(dispatcher).forward(request, response);
+    }
+
     /** Nút "Hướng dẫn" trên các trang sản phẩm mở /guide?module=product#mục. */
     @Test
     public void moduleProduct_moTrangHuongDanSanPham() throws Exception {

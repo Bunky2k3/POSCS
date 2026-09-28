@@ -26,6 +26,7 @@
         <nav class="guide-tabs">
             <%-- Phân hệ chưa có hướng dẫn thì hiện mờ, không bấm được -- xem
                  GuideController.PAGES. --%>
+            <a href="${pageContext.request.contextPath}/guide?module=general" class="${guideModule == 'general' ? 'active' : ''}">Bắt đầu</a>
             <a href="${pageContext.request.contextPath}/guide?module=customer" class="${guideModule == 'customer' ? 'active' : ''}">Khách hàng</a>
             <a href="${pageContext.request.contextPath}/guide?module=contract" class="${guideModule == 'contract' ? 'active' : ''}">Hợp đồng</a>
             <a href="${pageContext.request.contextPath}/guide?module=product" class="${guideModule == 'product' ? 'active' : ''}">Sản phẩm</a>

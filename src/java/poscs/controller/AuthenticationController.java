@@ -843,6 +843,15 @@ public class AuthenticationController extends HttpServlet {
             response.sendRedirect(request.getContextPath() + "/resetPassword.jsp?error=mismatch");
             return;
         }
+        // resetPassword.jsp ghi "Không trùng với mật khẩu cũ" -- kiểm thật ở
+        // đây như handleChangePassword, không chỉ ghi chữ. Giữ nguyên trạng
+        // thái OTP đã xác thực để người dùng gõ lại ngay trên trang này.
+        User account = employeeDAO.findByUsername(username);
+        if (account != null && account.getPasswordHash() != null
+                && BCrypt.checkpw(newPassword, account.getPasswordHash())) {
+            response.sendRedirect(request.getContextPath() + "/resetPassword.jsp?error=same_as_old");
+            return;
+        }
 
         String newHash = BCrypt.hashpw(newPassword, BCrypt.gensalt());
         boolean ok = employeeDAO.updatePasswordByUsername(username, newHash);

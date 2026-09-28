@@ -226,7 +226,10 @@ class Page {
 // Đăng nhập, khoanh số, chụp
 // ----------------------------------------------------------------------
 
-async function login(page, user) {
+// onboarding = true: tài khoản thử đang bị buộc đổi mật khẩu tạm (ảnh "lần đầu
+// đăng nhập" của hướng dẫn phần chung), nên dừng ở changePassword.jsp là đúng
+// chứ không phải đăng nhập hỏng.
+async function login(page, user, onboarding = false) {
     if (!(user in ACCOUNTS)) {
         throw new Error('Chưa khai mật khẩu tài khoản thử ' + user + ' trong ACCOUNTS');
     }
@@ -242,7 +245,7 @@ async function login(page, user) {
     await loaded;
     await page.settle(300);
     const where = await page.eval('location.pathname');
-    if (where.endsWith('/login.jsp') || where.endsWith('/changePassword.jsp')) {
+    if (where.endsWith('/login.jsp') || (!onboarding && where.endsWith('/changePassword.jsp'))) {
         throw new Error(`Đăng nhập ${user} không vào được app (dừng ở ${where})`);
     }
 }
@@ -460,7 +463,13 @@ async function main() {
             });
             try {
                 if (shot.user !== currentUser) {
-                    await login(page, shot.user);
+                    if (shot.user) {
+                        await login(page, shot.user, shot.onboarding);
+                    } else {
+                        // user: null = ảnh trang công khai (đăng nhập, quên mật
+                        // khẩu): mở login.jsp là đủ đăng xuất người trước.
+                        await page.goto('/login.jsp');
+                    }
                     currentUser = shot.user;
                 }
                 if (shot.url) {
