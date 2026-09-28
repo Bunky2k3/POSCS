@@ -101,6 +101,9 @@
         .category-sublist .cat-link { font-size: 0.83rem; font-weight: 500; padding: 7px 10px; }
         .category-sublist .category-sublist { margin-left: 8px; }
         .category-sublist .category-sublist .cat-link { font-size: 0.8rem; color: #4b5563; }
+        /* Dòng trên cụ thể hơn .cat-link.active nên đè màu chữ trắng: danh mục
+           cấp 3 đang chọn ra chữ xám trên nền xanh, gần như không đọc được. */
+        .category-sublist .category-sublist .cat-link.active { color: #fff; }
 
         /* ===== Ô tìm kiếm ===== */
         .search-bar { padding: 16px 18px; margin-bottom: 20px; }
