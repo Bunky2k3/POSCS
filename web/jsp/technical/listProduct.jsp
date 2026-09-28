@@ -374,7 +374,11 @@
                                                 <button class="act-view" title="Xem chi tiết" onclick="location.href='${pageContext.request.contextPath}/product?action=view&id=${product.productId}'"><i class="fa-regular fa-eye"></i></button>
                                                 <c:if test="${canManage}">
                                                     <button class="act-edit" title="Sửa" onclick="location.href='${pageContext.request.contextPath}/product?action=edit&id=${product.productId}'"><i class="fa-solid fa-pen"></i></button>
-                                                    <button class="act-delete" title="Xóa" onclick="openDeleteModal(${product.productId}, '${fn:escapeXml(product.productName)}')"><i class="fa-solid fa-trash"></i></button>
+                                                    <%-- Tên đi qua data-name, KHÔNG chèn vào chuỗi JS trong onclick:
+                                                         trình duyệt giải mã &#039; lại thành ' trước khi chạy onclick,
+                                                         nên tên có dấu nháy đơn làm hỏng nút, hoặc chạy luôn mã cài
+                                                         trong tên. Xem test/js/jsp-onclick.test.js. --%>
+                                                    <button class="act-delete" title="Xóa" data-name="${fn:escapeXml(product.productName)}" onclick="openDeleteModal(${product.productId}, this.dataset.name)"><i class="fa-solid fa-trash"></i></button>
                                                 </c:if>
                                             </div>
                                         </div>

@@ -344,7 +344,7 @@
                                                     <button class="act-delete" disabled title="Không thể xóa phiếu đang có người xử lý dở dang"><i class="fa-solid fa-trash"></i></button>
                                                 </c:when>
                                                 <c:otherwise>
-                                                    <button class="act-delete" title="Xóa" onclick="openDeleteModal(${ticket.ticketId}, '${fn:escapeXml(ticket.ticketCode)}')"><i class="fa-solid fa-trash"></i></button>
+                                                    <button class="act-delete" title="Xóa" data-name="${fn:escapeXml(ticket.ticketCode)}" onclick="openDeleteModal(${ticket.ticketId}, this.dataset.name)"><i class="fa-solid fa-trash"></i></button>
                                                 </c:otherwise>
                                             </c:choose>
                                         </c:if>
