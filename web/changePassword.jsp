@@ -361,6 +361,11 @@
                 </form>
 
                 <a href="${pageContext.request.contextPath}/viewProfile" class="back-link">← Quay lại trang cá nhân</a>
+                <%-- Không hiện lúc đang bị buộc đổi mật khẩu tạm: AuthenticationFilter chặn
+                     mọi trang khác (kể cả /guide) cho tới khi đổi xong. --%>
+                <c:if test="${param.onboarding != '1'}">
+                    <a href="${pageContext.request.contextPath}/guide?module=general#doi-mat-khau" target="_blank" rel="noopener" class="back-link" title="Mở hướng dẫn sử dụng ở tab mới"><i class="fa-regular fa-circle-question"></i> Hướng dẫn</a>
+                </c:if>
             </div>
         </div>
     </div>

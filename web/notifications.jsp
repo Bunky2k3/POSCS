@@ -60,11 +60,14 @@
     <div class="page-container">
         <div class="page-head">
             <h2><i class="fa-regular fa-bell me-2"></i>Thông báo</h2>
-            <c:if test="${not empty notifications}">
-                <a class="btn-mark-all" href="${pageContext.request.contextPath}/notifications?action=readAll">
-                    <i class="fa-solid fa-check-double"></i> Đánh dấu tất cả đã đọc
-                </a>
-            </c:if>
+            <div class="d-flex align-items-center gap-2">
+                <a href="${pageContext.request.contextPath}/guide?module=general#thong-bao" target="_blank" rel="noopener" class="guide-btn" title="Mở hướng dẫn sử dụng ở tab mới"><i class="fa-regular fa-circle-question"></i> Hướng dẫn</a>
+                <c:if test="${not empty notifications}">
+                    <a class="btn-mark-all" href="${pageContext.request.contextPath}/notifications?action=readAll">
+                        <i class="fa-solid fa-check-double"></i> Đánh dấu tất cả đã đọc
+                    </a>
+                </c:if>
+            </div>
         </div>
 
         <div class="notif-list-card">

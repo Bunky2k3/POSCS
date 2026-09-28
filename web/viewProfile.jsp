@@ -106,7 +106,10 @@
 
 
     <div class="page-container">
-        <a href="${pageContext.request.contextPath}/dashboard" class="back-link-top"><i class="fa-solid fa-arrow-left-long"></i> Về trang chủ</a>
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <a href="${pageContext.request.contextPath}/dashboard" class="back-link-top"><i class="fa-solid fa-arrow-left-long"></i> Về trang chủ</a>
+            <a href="${pageContext.request.contextPath}/guide?module=general#ho-so" target="_blank" rel="noopener" class="guide-btn mb-2" title="Mở hướng dẫn sử dụng ở tab mới"><i class="fa-regular fa-circle-question"></i> Hướng dẫn</a>
+        </div>
 
         <div class="profile-card">
 

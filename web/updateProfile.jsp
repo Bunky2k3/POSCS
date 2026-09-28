@@ -148,6 +148,13 @@
 
 
     <div class="page-container">
+        <%-- Không hiện lúc đang bị buộc bổ sung hồ sơ: AuthenticationFilter chặn mọi
+             trang khác (kể cả /guide) cho tới khi lưu xong. --%>
+        <c:if test="${param.onboarding != '1'}">
+            <div class="d-flex justify-content-end mb-2">
+                <a href="${pageContext.request.contextPath}/guide?module=general#sua-ho-so" target="_blank" rel="noopener" class="guide-btn" title="Mở hướng dẫn sử dụng ở tab mới"><i class="fa-regular fa-circle-question"></i> Hướng dẫn</a>
+            </div>
+        </c:if>
         <div class="profile-card">
 
             <!-- ===== Banner ===== -->
