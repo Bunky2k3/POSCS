@@ -243,6 +243,17 @@
             </div>
         </div>
 
+        <%-- Mở / sửa / xoá một sản phẩm không còn (đã xoá, link cũ, id sai) thì
+             ProductController đưa về đây kèm ?error=notfound -- trước đây trang
+             im lặng, người dùng bấm một link rồi thấy lại danh sách mà không
+             hiểu vì sao. Cùng cách với danh sách nhân viên. --%>
+        <c:if test="${param.error == 'notfound'}">
+            <div class="alert alert-warning py-2 px-3 mb-3" style="font-size: 0.9rem; border-radius: 12px;">
+                <i class="fa-solid fa-circle-exclamation me-1"></i>
+                Không tìm thấy sản phẩm này. Có thể sản phẩm đã bị xoá hoặc đường dẫn không đúng.
+            </div>
+        </c:if>
+
         <div class="catalog-layout">
             <!-- ===== Panel "Danh mục sản phẩm" ===== -->
             <aside class="category-panel card-box">
