@@ -66,6 +66,13 @@ public class ProductControllerTest {
         // liên quan tới cây danh mục khỏi phải lo NPE khi vô tình đi qua nhánh này.
         when(request.getRequestDispatcher(anyString())).thenReturn(mock(RequestDispatcher.class));
         when(request.getParts()).thenReturn(Collections.emptyList());
+
+        // Mặc định: hai danh mục gốc không có con, tức hai danh mục cuối. Form
+        // Thêm / Sửa chỉ nhận danh mục cuối (xem categoryOptions), nên các test
+        // tạo / sửa dùng categoryId 1 hoặc 2 đều hợp lệ. Test về cây tự stub lại.
+        when(productDAO.findAllCategories()).thenReturn(Arrays.asList(
+                category(1, "Viễn thông", null),
+                category(2, "Tin học", null)));
     }
 
     private static void setField(Object target, String fieldName, Object value) throws Exception {
@@ -473,6 +480,136 @@ public class ProductControllerTest {
 
         verify(productDAO, never()).update(any(Product.class));
         verify(response).sendRedirect(CONTEXT_PATH + "/product?error=notfound");
+    }
+
+    // ------------------------------------------------------------------
+    // Ô "Danh mục" ở form Thêm / Sửa -- chỉ danh mục cuối, ghi kèm nhánh
+    // ------------------------------------------------------------------
+
+    /** CNTT & IOT(1) › LoRa(2) › {Sensors(3), Gateways(4)} ; CNTT & IOT › Router wifi(5) ; Điện thoại di động(6). */
+    private static List<ProductCategory> sampleTree() {
+        return Arrays.asList(
+                category(1, "CNTT & IOT", null),
+                category(2, "LoRa", 1),
+                category(3, "Sensors", 2),
+                category(4, "Gateways", 2),
+                category(5, "Router wifi", 1),
+                category(6, "Điện thoại di động", null));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    public void createForm_offersOnlyLeafCategoriesLabelledWithTheirBranch() throws Exception {
+        when(productDAO.findAllCategories()).thenReturn(sampleTree());
+        when(request.getParameter("action")).thenReturn("new");
+
+        controller.doGet(request, response);
+
+        // Không có 1 (CNTT & IOT) hay 2 (LoRa): còn danh mục con. Thứ tự theo cây.
+        verify(request).setAttribute(eq("categoryOptions"), argThat((Map<Integer, String> m) ->
+                List.copyOf(m.keySet()).equals(List.of(3, 4, 5, 6))
+                        && m.get(3).equals("CNTT & IOT › LoRa › Sensors")
+                        && m.get(5).equals("CNTT & IOT › Router wifi")
+                        && m.get(6).equals("Điện thoại di động")));
+    }
+
+    @Test
+    public void create_parentCategory_isRejectedAndNeverInserted() throws Exception {
+        when(productDAO.findAllCategories()).thenReturn(sampleTree());
+        when(request.getParameter("action")).thenReturn("create");
+        when(request.getParameter("productName")).thenReturn("Cảm biến nhiệt độ T100");
+        when(request.getParameter("categoryId")).thenReturn("2"); // LoRa -- còn danh mục con
+
+        controller.doPost(request, response);
+
+        verify(productDAO, never()).insert(any());
+        verify(response).sendRedirect(CONTEXT_PATH + "/product?action=new&error=invalid_category");
+    }
+
+    /** Danh mục đã xoá (form mở từ trước) hay id nặn tay: không có trong ô chọn thì không nhận. */
+    @Test
+    public void create_unknownCategory_isRejectedAndNeverInserted() throws Exception {
+        when(productDAO.findAllCategories()).thenReturn(sampleTree());
+        when(request.getParameter("action")).thenReturn("create");
+        when(request.getParameter("productName")).thenReturn("Cảm biến nhiệt độ T100");
+        when(request.getParameter("categoryId")).thenReturn("99");
+
+        controller.doPost(request, response);
+
+        verify(productDAO, never()).insert(any());
+        verify(response).sendRedirect(CONTEXT_PATH + "/product?action=new&error=invalid_category");
+    }
+
+    @Test
+    public void create_leafCategoryDeepInTree_isAccepted() throws Exception {
+        when(productDAO.findAllCategories()).thenReturn(sampleTree());
+        when(request.getParameter("action")).thenReturn("create");
+        when(request.getParameter("productName")).thenReturn("Cảm biến nhiệt độ T100");
+        when(request.getParameter("categoryId")).thenReturn("3"); // Sensors -- danh mục cuối
+        when(productDAO.generateNextProductCode()).thenReturn("SP-0090");
+        when(productDAO.insert(any(Product.class))).thenReturn(90);
+
+        controller.doPost(request, response);
+
+        verify(productDAO).insert(argThat((Product p) -> p.getCategoryId() == 3));
+        verify(response).sendRedirect(CONTEXT_PATH + "/product?action=view&id=90");
+    }
+
+    /**
+     * Sản phẩm cũ đang nằm ở danh mục cha: form Sửa vẫn giữ danh mục đó trong ô
+     * chọn, nên sửa tên mà để nguyên danh mục thì phải lưu được.
+     */
+    @Test
+    public void update_keepingCurrentParentCategory_isAccepted() throws Exception {
+        when(productDAO.findAllCategories()).thenReturn(sampleTree());
+        Product old = new Product();
+        old.setCategoryId(2); // LoRa -- danh mục cha, dữ liệu cũ
+        when(productDAO.findById(7)).thenReturn(old);
+        when(request.getParameter("action")).thenReturn("update");
+        when(request.getParameter("productId")).thenReturn("7");
+        when(request.getParameter("productName")).thenReturn("Gateway LoRa đời cũ");
+        when(request.getParameter("categoryId")).thenReturn("2");
+        when(productDAO.update(any(Product.class))).thenReturn(true);
+
+        controller.doPost(request, response);
+
+        verify(productDAO).update(argThat((Product p) -> p.getCategoryId() == 2));
+        verify(response).sendRedirect(CONTEXT_PATH + "/product?action=view&id=7");
+    }
+
+    @Test
+    public void update_movingToAnotherParentCategory_isRejected() throws Exception {
+        when(productDAO.findAllCategories()).thenReturn(sampleTree());
+        Product current = new Product();
+        current.setCategoryId(3); // Sensors
+        when(productDAO.findById(7)).thenReturn(current);
+        when(request.getParameter("action")).thenReturn("update");
+        when(request.getParameter("productId")).thenReturn("7");
+        when(request.getParameter("productName")).thenReturn("Cảm biến nhiệt độ T100");
+        when(request.getParameter("categoryId")).thenReturn("1"); // CNTT & IOT -- danh mục cha
+
+        controller.doPost(request, response);
+
+        verify(productDAO, never()).update(any(Product.class));
+        verify(response).sendRedirect(CONTEXT_PATH + "/product?action=edit&id=7&error=invalid_category");
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    public void editForm_keepsCurrentParentCategoryInTheOptions() throws Exception {
+        when(productDAO.findAllCategories()).thenReturn(sampleTree());
+        Product old = new Product();
+        old.setProductId(7);
+        old.setCategoryId(2); // LoRa -- danh mục cha, dữ liệu cũ
+        when(productDAO.findById(7)).thenReturn(old);
+        when(request.getParameter("action")).thenReturn("edit");
+        when(request.getParameter("id")).thenReturn("7");
+
+        controller.doGet(request, response);
+
+        verify(request).setAttribute(eq("categoryOptions"), argThat((Map<Integer, String> m) ->
+                List.copyOf(m.keySet()).equals(List.of(2, 3, 4, 5, 6))
+                        && m.get(2).equals("CNTT & IOT › LoRa")));
     }
 
 }

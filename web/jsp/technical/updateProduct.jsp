@@ -12,7 +12,7 @@
 
     Request attribute cần có trước khi forward tới trang này:
       - product      : poscs.model.Product (đã join .category, .images, .catalogues)
-      - categoryList : List<poscs.model.ProductCategory>  (để đổ dropdown "Danh mục")
+      - categoryOptions : Map<Integer, String> danh mục cuối -> tên kèm nhánh, cộng danh mục đang lưu (ProductController.categoryOptions)
       - csrfToken
 --%>
 <!DOCTYPE html>
@@ -140,6 +140,7 @@
                 <h2>Cập nhật sản phẩm</h2>
                 <p>Mã sản phẩm: <strong style="color:var(--primary-dark)">${fn:escapeXml(product.productCode)}</strong></p>
             </div>
+            <a href="${pageContext.request.contextPath}/guide?module=product#sua" target="_blank" rel="noopener" class="guide-btn" title="Mở hướng dẫn sử dụng ở tab mới"><i class="fa-regular fa-circle-question"></i> Hướng dẫn</a>
         </div>
 
         <div class="card-box">
@@ -149,6 +150,7 @@
                         <c:when test="${param.error == 'invalid_image_type'}">Ảnh sản phẩm chỉ nhận file JPG, PNG, GIF hoặc WEBP. Vui lòng chọn lại.</c:when>
                         <c:when test="${param.error == 'invalid_catalogue_type'}">Catalogue chỉ nhận file PDF. Vui lòng chọn lại.</c:when>
                         <c:when test="${param.error == 'invalid'}">Thông tin sản phẩm chưa hợp lệ. Vui lòng kiểm tra lại các ô bắt buộc.</c:when>
+                        <c:when test="${param.error == 'invalid_category'}">Danh mục đã chọn không còn dùng được (danh mục cha hoặc đã bị xoá). Vui lòng chọn lại danh mục.</c:when>
                         <c:when test="${param.error == 'update_failed'}">Không lưu được thay đổi. Vui lòng thử lại.</c:when>
                         <c:otherwise>Đã có lỗi xảy ra. Vui lòng thử lại.</c:otherwise>
                     </c:choose>
@@ -177,8 +179,9 @@
                         <label>Danh mục <span class="req">*</span></label>
                         <select class="form-select" id="category" name="categoryId">
                             <option value="">-- Chọn danh mục --</option>
-                            <c:forEach var="cat" items="${categoryList}">
-                                <option value="${cat.categoryId}" ${product.category != null && cat.categoryId == product.category.categoryId ? 'selected' : ''}>${fn:escapeXml(cat.categoryName)}</option>
+                            <%-- Chỉ danh mục cuối, ghi kèm cả nhánh -- xem ProductController.categoryOptions. --%>
+                            <c:forEach var="opt" items="${categoryOptions}">
+                                <option value="${opt.key}" ${opt.key == product.categoryId ? 'selected' : ''}>${fn:escapeXml(opt.value)}</option>
                             </c:forEach>
                         </select>
                         <span class="error-text" id="err-category">Vui lòng chọn danh mục sản phẩm.</span>
@@ -209,8 +212,9 @@
                         <div class="upload-dropzone">
                             <label for="imagesInput" class="upload-btn"><i class="fa-solid fa-images"></i> Chọn ảnh từ máy</label>
                             <input type="file" name="images" id="imagesInput" accept=".jpg,.jpeg,.png,.gif,.webp" multiple hidden>
-                            <div class="upload-hint">Có thể chọn nhiều ảnh cùng lúc (JPG, PNG, WEBP...).</div>
+                            <div class="upload-hint">Có thể chọn nhiều ảnh cùng lúc (JPG, PNG, GIF, WEBP), mỗi ảnh tối đa 20 MB.</div>
                         </div>
+                        <span class="error-text" id="err-imagesInput"></span>
                         <div class="file-preview-grid" id="imagePreviewGrid"></div>
                     </div>
                     <div class="col-12 field-row">
@@ -232,9 +236,11 @@
                         <div class="upload-dropzone">
                             <label for="cataloguesInput" class="upload-btn"><i class="fa-solid fa-file-pdf"></i> Chọn file catalogue</label>
                             <input type="file" name="catalogues" id="cataloguesInput" accept=".pdf" multiple hidden>
-                            <div class="upload-hint">Có thể chọn nhiều file catalogue (PDF) cùng lúc.</div>
+                            <div class="upload-hint">Có thể chọn nhiều file catalogue (PDF) cùng lúc, mỗi file tối đa 20 MB. Tổng ảnh và catalogue chọn thêm mỗi lần lưu tối đa 100 MB.</div>
                         </div>
+                        <span class="error-text" id="err-cataloguesInput"></span>
                         <div class="file-chip-list" id="catalogueChipList"></div>
+                        <span class="error-text" id="err-files-total">Tổng dung lượng ảnh và catalogue chọn thêm vượt 100 MB. Bớt tệp rồi lưu lại.</span>
                     </div>
                 </div>
 
@@ -275,6 +281,14 @@
         // submit -- input[type=file][multiple] không cho xoá bớt 1 file trực tiếp
         // nên giữ danh sách File trong JS rồi dựng lại input.files bằng DataTransfer
         // mỗi khi thêm/gỡ, đảm bảo input luôn khớp với những gì đang hiển thị.
+        //
+        // Giới hạn khớp @MultipartConfig của ProductController (maxFileSize,
+        // maxRequestSize) -- đổi ở đó thì đổi ở đây. Quá giới hạn mà để lọt tới
+        // lúc lưu thì Tomcat từ chối cả lần lưu (trang 413) và người dùng mất
+        // hết những gì vừa nhập; chặn ngay lúc chọn thì báo được đúng tệp nào.
+        var MAX_FILE_BYTES = 20 * 1024 * 1024;
+        var MAX_TOTAL_BYTES = 100 * 1024 * 1024;
+
         function setupMultiFileField(inputId, previewContainerId, renderItem) {
             var input = document.getElementById(inputId);
             var container = document.getElementById(previewContainerId);
@@ -297,7 +311,17 @@
                 render();
             }
             input.addEventListener('change', function (e) {
-                Array.from(e.target.files).forEach(function (f) { files.push(f); });
+                var quaLon = [];
+                Array.from(e.target.files).forEach(function (f) {
+                    if (f.size > MAX_FILE_BYTES) {
+                        quaLon.push(f.name);
+                    } else {
+                        files.push(f);
+                    }
+                });
+                var err = document.getElementById('err-' + inputId);
+                err.textContent = quaLon.length ? 'Không thêm tệp quá 20 MB: ' + quaLon.join(', ') + '.' : '';
+                err.style.display = quaLon.length ? 'block' : 'none';
                 sync();
                 render();
             });
@@ -359,6 +383,12 @@
 
             var category = document.getElementById('category');
             if (!category.value) { document.getElementById('err-category').style.display = 'block'; valid = false; }
+
+            var tongDungLuong = 0;
+            ['imagesInput', 'cataloguesInput'].forEach(function (id) {
+                Array.from(document.getElementById(id).files).forEach(function (f) { tongDungLuong += f.size; });
+            });
+            if (tongDungLuong > MAX_TOTAL_BYTES) { document.getElementById('err-files-total').style.display = 'block'; valid = false; }
 
             return valid;
         }

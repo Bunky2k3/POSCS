@@ -101,6 +101,9 @@
         .category-sublist .cat-link { font-size: 0.83rem; font-weight: 500; padding: 7px 10px; }
         .category-sublist .category-sublist { margin-left: 8px; }
         .category-sublist .category-sublist .cat-link { font-size: 0.8rem; color: #4b5563; }
+        /* Dòng trên cụ thể hơn .cat-link.active nên đè màu chữ trắng: danh mục
+           cấp 3 đang chọn ra chữ xám trên nền xanh, gần như không đọc được. */
+        .category-sublist .category-sublist .cat-link.active { color: #fff; }
 
         /* ===== Ô tìm kiếm ===== */
         .search-bar { padding: 16px 18px; margin-bottom: 20px; }
@@ -237,11 +240,23 @@
                 <p>Quản lý danh mục thiết bị / sản phẩm POS</p>
             </div>
             <div class="header-actions">
+                <a href="${pageContext.request.contextPath}/guide?module=product#danh-sach" target="_blank" rel="noopener" class="guide-btn" title="Mở hướng dẫn sử dụng ở tab mới"><i class="fa-regular fa-circle-question"></i> Hướng dẫn</a>
                 <c:if test="${canManage}">
                     <a href="${pageContext.request.contextPath}/product?action=new" class="btn-add"><i class="fa-solid fa-plus"></i> Thêm sản phẩm</a>
                 </c:if>
             </div>
         </div>
+
+        <%-- Mở / sửa / xoá một sản phẩm không còn (đã xoá, link cũ, id sai) thì
+             ProductController đưa về đây kèm ?error=notfound -- trước đây trang
+             im lặng, người dùng bấm một link rồi thấy lại danh sách mà không
+             hiểu vì sao. Cùng cách với danh sách nhân viên. --%>
+        <c:if test="${param.error == 'notfound'}">
+            <div class="alert alert-warning py-2 px-3 mb-3" style="font-size: 0.9rem; border-radius: 12px;">
+                <i class="fa-solid fa-circle-exclamation me-1"></i>
+                Không tìm thấy sản phẩm này. Có thể sản phẩm đã bị xoá hoặc đường dẫn không đúng.
+            </div>
+        </c:if>
 
         <div class="catalog-layout">
             <!-- ===== Panel "Danh mục sản phẩm" ===== -->
@@ -374,7 +389,11 @@
                                                 <button class="act-view" title="Xem chi tiết" onclick="location.href='${pageContext.request.contextPath}/product?action=view&id=${product.productId}'"><i class="fa-regular fa-eye"></i></button>
                                                 <c:if test="${canManage}">
                                                     <button class="act-edit" title="Sửa" onclick="location.href='${pageContext.request.contextPath}/product?action=edit&id=${product.productId}'"><i class="fa-solid fa-pen"></i></button>
-                                                    <button class="act-delete" title="Xóa" onclick="openDeleteModal(${product.productId}, '${fn:escapeXml(product.productName)}')"><i class="fa-solid fa-trash"></i></button>
+                                                    <%-- Tên đi qua data-name, KHÔNG chèn vào chuỗi JS trong onclick:
+                                                         trình duyệt giải mã &#039; lại thành ' trước khi chạy onclick,
+                                                         nên tên có dấu nháy đơn làm hỏng nút, hoặc chạy luôn mã cài
+                                                         trong tên. Xem test/js/jsp-onclick.test.js. --%>
+                                                    <button class="act-delete" title="Xóa" data-name="${fn:escapeXml(product.productName)}" onclick="openDeleteModal(${product.productId}, this.dataset.name)"><i class="fa-solid fa-trash"></i></button>
                                                 </c:if>
                                             </div>
                                         </div>

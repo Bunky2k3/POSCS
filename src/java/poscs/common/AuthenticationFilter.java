@@ -1,6 +1,7 @@
 package poscs.common;
 
 import java.io.IOException;
+import java.util.Locale;
 import java.util.Set;
 import jakarta.servlet.Filter;
 import jakarta.servlet.FilterChain;
@@ -136,9 +137,27 @@ public class AuthenticationFilter implements Filter {
         String csrfToken = CsrfUtil.getOrCreateToken(session);
         request.setAttribute("csrfToken", csrfToken);
 
-        if ("POST".equalsIgnoreCase(request.getMethod()) && !CsrfUtil.isValid(request, session)) {
-            response.sendError(HttpServletResponse.SC_FORBIDDEN, "Yêu cầu không hợp lệ (thiếu hoặc sai CSRF token).");
-            return;
+        if ("POST".equalsIgnoreCase(request.getMethod())) {
+            boolean csrfOk;
+            try {
+                csrfOk = CsrfUtil.isValid(request, session);
+            } catch (IllegalStateException ex) {
+                // Form tải tệp vượt @MultipartConfig của servlet đích (ví dụ
+                // catalogue sản phẩm quá 20 MB): Tomcat không đọc thân request,
+                // và lần getParameter đầu tiên -- chính là dòng đọc csrfToken
+                // ở trên -- ném ra. Không bắt thì người dùng nhận trang 500
+                // "Đã có lỗi xảy ra" mà không biết vì sao (chạy thật 2026-09-28).
+                // 413 đi tới error413.jsp, nói rõ là tệp quá lớn.
+                if (!isMultipart(request)) {
+                    throw ex;
+                }
+                response.sendError(HttpServletResponse.SC_REQUEST_ENTITY_TOO_LARGE);
+                return;
+            }
+            if (!csrfOk) {
+                response.sendError(HttpServletResponse.SC_FORBIDDEN, "Yêu cầu không hợp lệ (thiếu hoặc sai CSRF token).");
+                return;
+            }
         }
 
         if (isPublicPath) {
@@ -253,5 +272,11 @@ public class AuthenticationFilter implements Filter {
      */
     private static boolean rendersTopbar(String servletPath) {
         return !isStaticAssetPath(servletPath) && !servletPath.startsWith(UPLOAD_PATH_PREFIX);
+    }
+
+    /** Form gửi tệp (enctype multipart/form-data) -- chỉ loại này mới vướng giới hạn dung lượng của @MultipartConfig. */
+    private static boolean isMultipart(HttpServletRequest request) {
+        String contentType = request.getContentType();
+        return contentType != null && contentType.toLowerCase(Locale.ROOT).startsWith("multipart/");
     }
 }

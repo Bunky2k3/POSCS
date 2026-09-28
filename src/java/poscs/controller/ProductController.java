@@ -249,6 +249,52 @@ public class ProductController extends HttpServlet {
         return result;
     }
 
+    /**
+     * Ô "Danh mục" của form Thêm / Sửa: CHỈ danh mục cuối (lá), mỗi mục ghi kèm
+     * cả nhánh -- "CNTT &amp; IOT › LoRa › Sensors" -- theo đúng thứ tự của cây
+     * ở panel danh sách. handleCreate/handleUpdate cũng kiểm bằng chính danh
+     * sách này, nên form đưa ra gì thì server nhận đúng thứ đó.
+     *
+     * <p>Trước đây ô này đổ phẳng cả 33 danh mục, lẫn danh mục cha: không nhìn
+     * ra mục nào thuộc nhánh nào, và chọn được "Năng lượng tái tạo" dù mọi sản
+     * phẩm đều nằm ở danh mục lá (xem {@link #subtreeCategoryCounts}).
+     *
+     * @param keepCategoryId danh mục ĐANG LƯU của sản phẩm (form Sửa), null ở
+     *        form Thêm. Lỡ là danh mục cha (dữ liệu cũ) thì vẫn giữ trong danh
+     *        sách -- không thì mở form lên ô trống, bấm lưu là báo lỗi dù người
+     *        dùng không đụng tới ô này.
+     */
+    private Map<Integer, String> categoryOptions(List<ProductCategory> categoryList, Integer keepCategoryId) {
+        Map<Integer, List<ProductCategory>> children = childrenByParent(categoryList);
+        Set<Integer> ids = new HashSet<>();
+        for (ProductCategory c : categoryList) {
+            ids.add(c.getCategoryId());
+        }
+        Map<Integer, String> result = new LinkedHashMap<>();
+        for (ProductCategory c : categoryList) {
+            // Gốc = không có cha, hoặc cha không còn trong danh sách (đã xoá):
+            // danh mục đó vẫn chọn được như trước, chỉ không có tên nhánh.
+            if (c.getParentCategoryId() == null || !ids.contains(c.getParentCategoryId())) {
+                addLeafOptions(c, "", children, keepCategoryId, result);
+            }
+        }
+        return result;
+    }
+
+    private void addLeafOptions(ProductCategory category, String branch,
+            Map<Integer, List<ProductCategory>> children, Integer keepCategoryId, Map<Integer, String> result) {
+        String label = branch + category.getCategoryName();
+        List<ProductCategory> kids = children.get(category.getCategoryId());
+        if (kids == null || Integer.valueOf(category.getCategoryId()).equals(keepCategoryId)) {
+            result.put(category.getCategoryId(), label);
+        }
+        if (kids != null) {
+            for (ProductCategory kid : kids) {
+                addLeafOptions(kid, label + " › ", children, keepCategoryId, result);
+            }
+        }
+    }
+
     private void showDetail(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
         Integer id = parseIntOrNull(request.getParameter("id"));
@@ -271,7 +317,7 @@ public class ProductController extends HttpServlet {
         if (!AccessControl.requireFullAccess(request, response, AccessControl.Resource.PRODUCT)) {
             return;
         }
-        request.setAttribute("categoryList", productDAO.findAllCategories());
+        request.setAttribute("categoryOptions", categoryOptions(productDAO.findAllCategories(), null));
         request.getRequestDispatcher(CREATE_VIEW).forward(request, response);
     }
 
@@ -290,7 +336,8 @@ public class ProductController extends HttpServlet {
         }
 
         request.setAttribute("product", product);
-        request.setAttribute("categoryList", productDAO.findAllCategories());
+        request.setAttribute("categoryOptions",
+                categoryOptions(productDAO.findAllCategories(), product.getCategoryId()));
         request.getRequestDispatcher(UPDATE_VIEW).forward(request, response);
     }
 
@@ -314,6 +361,13 @@ public class ProductController extends HttpServlet {
 
         if (!isValidCommonFields(p)) {
             response.sendRedirect(request.getContextPath() + "/product?action=new&error=invalid");
+            return;
+        }
+        // Chỉ nhận đúng các mục ô chọn đưa ra: danh mục cuối còn hiệu lực. Danh
+        // mục cha, danh mục đã xoá (form mở từ trước) hay request nặn tay đều bị
+        // từ chối ở đây, không thì sản phẩm lọt vào giữa cây.
+        if (!categoryOptions(productDAO.findAllCategories(), null).containsKey(p.getCategoryId())) {
+            response.sendRedirect(request.getContextPath() + "/product?action=new&error=invalid_category");
             return;
         }
 
@@ -343,7 +397,8 @@ public class ProductController extends HttpServlet {
         Integer id = parseIntOrNull(request.getParameter("productId"));
         // Kiểm tồn tại trước khi kiểm dữ liệu -- xem ghi chú cùng loại ở
         // ContractController.handleUpdate.
-        if (id == null || productDAO.findById(id) == null) {
+        Product existing = id != null ? productDAO.findById(id) : null;
+        if (existing == null) {
             response.sendRedirect(request.getContextPath() + "/product?error=notfound");
             return;
         }
@@ -360,6 +415,12 @@ public class ProductController extends HttpServlet {
 
         if (!isValidCommonFields(p)) {
             response.sendRedirect(request.getContextPath() + "/product?action=edit&id=" + id + "&error=invalid");
+            return;
+        }
+        // Như handleCreate, cộng thêm danh mục đang lưu của sản phẩm -- form Sửa
+        // cũng giữ nó trong ô chọn (xem categoryOptions).
+        if (!categoryOptions(productDAO.findAllCategories(), existing.getCategoryId()).containsKey(p.getCategoryId())) {
+            response.sendRedirect(request.getContextPath() + "/product?action=edit&id=" + id + "&error=invalid_category");
             return;
         }
 

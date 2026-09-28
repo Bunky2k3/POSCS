@@ -574,7 +574,7 @@
                                                 </c:when>
                                                 <c:otherwise>
                                                     <button class="act-edit" title="Sửa" onclick="location.href='${pageContext.request.contextPath}/customer?action=edit&id=${customer.enterpriseId}'"><i class="fa-solid fa-pen"></i></button>
-                                                    <button class="act-delete" title="Xóa" onclick="openDeleteModal(${customer.enterpriseId}, '${fn:escapeXml(customer.enterpriseName)}')"><i class="fa-solid fa-trash"></i></button>
+                                                    <button class="act-delete" title="Xóa" data-name="${fn:escapeXml(customer.enterpriseName)}" onclick="openDeleteModal(${customer.enterpriseId}, this.dataset.name)"><i class="fa-solid fa-trash"></i></button>
                                                 </c:otherwise>
                                             </c:choose>
                                         </c:if>

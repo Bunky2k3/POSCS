@@ -80,6 +80,18 @@ public class GuideControllerTest {
         verify(dispatcher).forward(request, response);
     }
 
+    /** Nút "Hướng dẫn" trên các trang sản phẩm mở /guide?module=product#mục. */
+    @Test
+    public void moduleProduct_moTrangHuongDanSanPham() throws Exception {
+        when(request.getParameter("module")).thenReturn("product");
+
+        controller.doGet(request, response);
+
+        verify(request).getRequestDispatcher("/jsp/guide/product.jsp");
+        verify(request).setAttribute("guideModule", "product");
+        verify(dispatcher).forward(request, response);
+    }
+
     /** Link cũ hoặc gõ tay /guide không kèm module: mở phân hệ mặc định, không báo lỗi. */
     @Test
     public void thieuModule_moPhanHeMacDinh() throws Exception {

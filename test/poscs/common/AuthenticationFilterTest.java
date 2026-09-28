@@ -283,6 +283,44 @@ public class AuthenticationFilterTest {
         verify(response, never()).sendError(anyInt(), anyString());
     }
 
+    /**
+     * Form tải tệp vượt @MultipartConfig: Tomcat ném IllegalStateException ngay
+     * ở lần đọc tham số đầu tiên -- chính là csrfToken. Phải trả 413 (trang báo
+     * tệp quá lớn) chứ không để lọt thành trang 500, và không cho đi tiếp.
+     */
+    @Test
+    public void post_multipartOverSizeLimit_isRejectedWith413NotServerError() throws Exception {
+        when(request.getMethod()).thenReturn("POST");
+        when(request.getServletPath()).thenReturn("/product");
+        when(request.getContentType()).thenReturn("multipart/form-data; boundary=----poscs");
+        Map<String, Object> attrs = new HashMap<>();
+        attrs.put("currentUser", loggedInUser());
+        HttpSession session = fakeSession(attrs);
+        when(request.getSession(true)).thenReturn(session);
+        when(request.getParameter("csrfToken"))
+                .thenThrow(new IllegalStateException("The field catalogues exceeds its maximum permitted size"));
+
+        filter.doFilter(request, response, chain);
+
+        verify(response).sendError(HttpServletResponse.SC_REQUEST_ENTITY_TOO_LARGE);
+        verify(chain, never()).doFilter(any(), any());
+    }
+
+    /** Form thường (không tải tệp) thì IllegalStateException là lỗi khác -- không được giấu thành "tệp quá lớn". */
+    @Test(expected = IllegalStateException.class)
+    public void post_nonMultipartIllegalState_isNotDisguisedAsFileTooLarge() throws Exception {
+        when(request.getMethod()).thenReturn("POST");
+        when(request.getServletPath()).thenReturn("/customer");
+        when(request.getContentType()).thenReturn("application/x-www-form-urlencoded");
+        Map<String, Object> attrs = new HashMap<>();
+        attrs.put("currentUser", loggedInUser());
+        HttpSession session = fakeSession(attrs);
+        when(request.getSession(true)).thenReturn(session);
+        when(request.getParameter("csrfToken")).thenThrow(new IllegalStateException("too many parameters"));
+
+        filter.doFilter(request, response, chain);
+    }
+
     private HttpServletRequest mockGetRequestForTokenSeed(HttpSession session) {
         HttpServletRequest seedRequest = mock(HttpServletRequest.class);
         when(seedRequest.getContextPath()).thenReturn("/POSCS");
