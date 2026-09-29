@@ -575,6 +575,100 @@ public class TechnicalSupportTicketControllerTest {
     }
 
     // ------------------------------------------------------------------
+    // GET ?action=list -- ô lọc "Người xử lý"
+    // ------------------------------------------------------------------
+
+    private void stubListView() {
+        when(request.getParameter("action")).thenReturn("list");
+        when(request.getRequestDispatcher("/jsp/customersupport/listTicket.jsp"))
+                .thenReturn(mock(jakarta.servlet.RequestDispatcher.class));
+    }
+
+    /**
+     * Kỹ thuật viên mở danh sách không kèm tham số: mặc định "Phiếu của tôi" --
+     * cả bảng, phân trang lẫn bốn ô đếm đều chỉ tính phiếu giao cho mình.
+     */
+    @Test
+    public void list_technicianNoParam_defaultsToOwnTickets() throws Exception {
+        loginAs("Kỹ thuật", 50);
+        stubListView();
+
+        controller.doGet(request, response);
+
+        verify(ticketDAO).findAll(eq(1), anyInt(), any(), any(), any(), any(), eq(50));
+        verify(ticketDAO).countAll(any(), any(), any(), any(), eq(50));
+        verify(ticketDAO).countListSummary(any(), eq(50));
+        verify(request).setAttribute("assigneeFilter", "mine");
+        verify(request).setAttribute("isTechnician", true);
+    }
+
+    /** Admin / Sales mặc định thấy mọi phiếu. */
+    @Test
+    public void list_salesNoParam_defaultsToEveryone() throws Exception {
+        stubListView();
+
+        controller.doGet(request, response);
+
+        verify(ticketDAO).findAll(eq(1), anyInt(), any(), any(), any(), any(), isNull());
+        verify(ticketDAO).countListSummary(any(), isNull());
+        verify(request).setAttribute("assigneeFilter", "all");
+    }
+
+    /**
+     * Kỹ thuật viên chủ động chọn "Tất cả": assignee=all tường minh, mặc định
+     * "của tôi" không được đè lên lựa chọn đó (nhất là khi sang trang 2).
+     */
+    @Test
+    public void list_technicianChoosesAll_seesEveryone() throws Exception {
+        loginAs("Kỹ thuật", 50);
+        stubListView();
+        when(request.getParameter("assignee")).thenReturn("all");
+
+        controller.doGet(request, response);
+
+        verify(ticketDAO).findAll(eq(1), anyInt(), any(), any(), any(), any(), isNull());
+        verify(request).setAttribute("assigneeFilter", "all");
+    }
+
+    /** Lọc theo một kỹ thuật viên cụ thể (Admin / Sales dùng). */
+    @Test
+    public void list_specificTechnician_filtersByThatId() throws Exception {
+        stubListView();
+        when(request.getParameter("assignee")).thenReturn("16");
+
+        controller.doGet(request, response);
+
+        verify(ticketDAO).findAll(eq(1), anyInt(), any(), any(), any(), any(), eq(16));
+        verify(request).setAttribute("assigneeFilter", "16");
+    }
+
+    /** Giá trị lạ trên URL -> về "Tất cả", không lọc bừa. */
+    @Test
+    public void list_garbageAssignee_fallsBackToEveryone() throws Exception {
+        stubListView();
+        when(request.getParameter("assignee")).thenReturn("x' OR 1=1");
+
+        controller.doGet(request, response);
+
+        verify(ticketDAO).findAll(eq(1), anyInt(), any(), any(), any(), any(), isNull());
+        verify(request).setAttribute("assigneeFilter", "all");
+    }
+
+    /** Xuất Excel theo đúng ô "Người xử lý" như danh sách, kể cả mặc định của kỹ thuật viên. */
+    @Test
+    public void exportExcel_technicianNoParam_exportsOwnTickets() throws Exception {
+        loginAs("Kỹ thuật", 50);
+        when(request.getParameter("action")).thenReturn("exportExcel");
+        when(ticketDAO.findAll(anyInt(), anyInt(), any(), any(), any(), any(), any()))
+                .thenReturn(Collections.emptyList());
+        captureResponseBody();
+
+        controller.doGet(request, response);
+
+        verify(ticketDAO).findAll(eq(1), eq(Integer.MAX_VALUE), any(), any(), any(), any(), eq(50));
+    }
+
+    // ------------------------------------------------------------------
     // GET ?action=exportExcel
     // ------------------------------------------------------------------
 
@@ -619,7 +713,7 @@ public class TechnicalSupportTicketControllerTest {
     @Test
     public void exportExcel_writesRealWorkbookWithHeaderAndOneRowPerTicket() throws Exception {
         when(request.getParameter("action")).thenReturn("exportExcel");
-        when(ticketDAO.findAll(eq(1), eq(Integer.MAX_VALUE), any(), any(), any(), any()))
+        when(ticketDAO.findAll(eq(1), eq(Integer.MAX_VALUE), any(), any(), any(), any(), any()))
                 .thenReturn(Arrays.asList(ticketForExport(), ticketForExport()));
         ByteArrayOutputStream captured = captureResponseBody();
 
@@ -647,7 +741,7 @@ public class TechnicalSupportTicketControllerTest {
     @Test
     public void exportExcel_sendsFileAsAttachmentNotHtml() throws Exception {
         when(request.getParameter("action")).thenReturn("exportExcel");
-        when(ticketDAO.findAll(eq(1), eq(Integer.MAX_VALUE), any(), any(), any(), any()))
+        when(ticketDAO.findAll(eq(1), eq(Integer.MAX_VALUE), any(), any(), any(), any(), any()))
                 .thenReturn(Collections.emptyList());
         captureResponseBody();
 
@@ -666,14 +760,14 @@ public class TechnicalSupportTicketControllerTest {
         when(request.getParameter("keyword")).thenReturn("trạm BTS");
         when(request.getParameter("status")).thenReturn("Đang xử lý");
         when(request.getParameter("priority")).thenReturn("Cao");
-        when(ticketDAO.findAll(anyInt(), anyInt(), any(), any(), any(), any()))
+        when(ticketDAO.findAll(anyInt(), anyInt(), any(), any(), any(), any(), any()))
                 .thenReturn(Collections.emptyList());
         captureResponseBody();
 
         controller.doGet(request, response);
 
         // Không chọn năm = mọi thời điểm (kỳ null), như màn hình danh sách.
-        verify(ticketDAO).findAll(1, Integer.MAX_VALUE, "trạm BTS", "Đang xử lý", "Cao", null);
+        verify(ticketDAO).findAll(1, Integer.MAX_VALUE, "trạm BTS", "Đang xử lý", "Cao", null, null);
     }
 
     @Test
@@ -684,14 +778,14 @@ public class TechnicalSupportTicketControllerTest {
         when(request.getParameter("action")).thenReturn("exportExcel");
         when(request.getParameter("year")).thenReturn("2026");
         when(request.getParameter("period")).thenReturn("m8");
-        when(ticketDAO.findAll(anyInt(), anyInt(), any(), any(), any(), any()))
+        when(ticketDAO.findAll(anyInt(), anyInt(), any(), any(), any(), any(), any()))
                 .thenReturn(Collections.emptyList());
         captureResponseBody();
 
         controller.doGet(request, response);
 
         ArgumentCaptor<Period> period = ArgumentCaptor.forClass(Period.class);
-        verify(ticketDAO).findAll(eq(1), eq(Integer.MAX_VALUE), any(), any(), any(), period.capture());
+        verify(ticketDAO).findAll(eq(1), eq(Integer.MAX_VALUE), any(), any(), any(), period.capture(), any());
         assertNotNull("Có chọn năm thì phải lọc theo kỳ", period.getValue());
         assertEquals(Date.valueOf("2026-08-01"), period.getValue().getFrom());
         assertEquals(Date.valueOf("2026-08-31"), period.getValue().getTo());
@@ -704,7 +798,7 @@ public class TechnicalSupportTicketControllerTest {
         when(request.getParameter("action")).thenReturn("exportExcel");
         TechnicalRequest t = ticketForExport();
         t.setDescription("=HYPERLINK(\"http://kegian.example\",\"Bấm vào đây\")");
-        when(ticketDAO.findAll(eq(1), eq(Integer.MAX_VALUE), any(), any(), any(), any()))
+        when(ticketDAO.findAll(eq(1), eq(Integer.MAX_VALUE), any(), any(), any(), any(), any()))
                 .thenReturn(Collections.singletonList(t));
         ByteArrayOutputStream captured = captureResponseBody();
 

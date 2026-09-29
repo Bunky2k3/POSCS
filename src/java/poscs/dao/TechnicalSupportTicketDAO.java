@@ -185,10 +185,19 @@ public class TechnicalSupportTicketDAO {
      */
     public List<TechnicalRequest> findAll(int page, int pageSize, String keyword, String statusFilter,
             String priorityFilter, Period period) {
+        return findAll(page, pageSize, keyword, statusFilter, priorityFilter, period, null);
+    }
+
+    /**
+     * Như trên, kèm lọc theo người xử lý ({@code assigned_technician_id};
+     * null = mọi người). Cột đó NOT NULL nên không có phiếu "chưa giao".
+     */
+    public List<TechnicalRequest> findAll(int page, int pageSize, String keyword, String statusFilter,
+            String priorityFilter, Period period, Integer assigneeId) {
         List<TechnicalRequest> result = new ArrayList<>();
         StringBuilder sql = new StringBuilder(SELECT_BASE);
         List<Object> params = new ArrayList<>();
-        appendFilters(sql, params, keyword, statusFilter, priorityFilter, period);
+        appendFilters(sql, params, keyword, statusFilter, priorityFilter, period, assigneeId);
         sql.append(" ORDER BY t.ticket_id DESC LIMIT ? OFFSET ?");
         params.add(pageSize);
         params.add(Math.max(0, (page - 1) * pageSize));
@@ -214,10 +223,16 @@ public class TechnicalSupportTicketDAO {
 
     /** Như trên, kèm lọc theo kỳ (ngày tạo phiếu). */
     public int countAll(String keyword, String statusFilter, String priorityFilter, Period period) {
+        return countAll(keyword, statusFilter, priorityFilter, period, null);
+    }
+
+    /** Như trên, kèm lọc theo người xử lý (null = mọi người). */
+    public int countAll(String keyword, String statusFilter, String priorityFilter, Period period,
+            Integer assigneeId) {
         StringBuilder sql = new StringBuilder(
             "SELECT COUNT(*) FROM technicalrequests t LEFT JOIN enterprises e ON t.enterprise_id = e.enterprise_id ");
         List<Object> params = new ArrayList<>();
-        appendFilters(sql, params, keyword, statusFilter, priorityFilter, period);
+        appendFilters(sql, params, keyword, statusFilter, priorityFilter, period, assigneeId);
 
         try (Connection conn = DBContext.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql.toString())) {
@@ -305,6 +320,48 @@ public class TechnicalSupportTicketDAO {
             }
         } catch (SQLException ex) {
             LOG.error("Loi thong ke trang thai phieu ho tro", ex);
+        }
+        return summary;
+    }
+
+    /**
+     * Bốn ô đếm ở đầu trang DANH SÁCH phiếu: theo kỳ và theo ô lọc "Người xử
+     * lý" (null = mọi người), để kỹ thuật viên đang xem "Phiếu của tôi" thấy
+     * số của chính mình, khớp với bảng bên dưới. Không theo ô tìm / trạng
+     * thái / mức ưu tiên -- đếm theo trạng thái mà lọc cả trạng thái thì ba
+     * ô kia luôn bằng 0.
+     *
+     * <p>Tách khỏi {@link #countStatusSummary(List, Period, List)}: bản đó là
+     * phạm vi Dashboard, khớp người xử lý HOẶC người tiếp nhận (Sales).
+     */
+    public Map<String, Integer> countListSummary(Period period, Integer assigneeId) {
+        Map<String, Integer> summary = new HashMap<>();
+        summary.put(STATUS_NEW, 0);
+        summary.put(STATUS_IN_PROGRESS, 0);
+        summary.put(STATUS_CLOSED, 0);
+        summary.put(PRIORITY_URGENT, 0);
+        StringBuilder sql = new StringBuilder(
+            "SELECT " +
+            "  SUM(CASE WHEN t.status = ? THEN 1 ELSE 0 END) AS new_count, " +
+            "  SUM(CASE WHEN t.status = ? THEN 1 ELSE 0 END) AS progress_count, " +
+            "  SUM(CASE WHEN t.status = ? THEN 1 ELSE 0 END) AS closed_count, " +
+            "  SUM(CASE WHEN t.priority = ? THEN 1 ELSE 0 END) AS urgent_count " +
+            "FROM technicalrequests t LEFT JOIN enterprises e ON t.enterprise_id = e.enterprise_id ");
+        List<Object> params = new ArrayList<>(List.of(STATUS_NEW, STATUS_IN_PROGRESS, STATUS_CLOSED, PRIORITY_URGENT));
+        appendFilters(sql, params, null, null, null, period, assigneeId);
+        try (Connection conn = DBContext.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql.toString())) {
+            bindParams(ps, params);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    summary.put(STATUS_NEW, rs.getInt("new_count"));
+                    summary.put(STATUS_IN_PROGRESS, rs.getInt("progress_count"));
+                    summary.put(STATUS_CLOSED, rs.getInt("closed_count"));
+                    summary.put(PRIORITY_URGENT, rs.getInt("urgent_count"));
+                }
+            }
+        } catch (SQLException ex) {
+            LOG.error("Loi thong ke trang thai phieu ho tro (assigneeId={})", assigneeId, ex);
         }
         return summary;
     }
@@ -758,7 +815,7 @@ public class TechnicalSupportTicketDAO {
     // ------------------------------------------------------------------
 
     private void appendFilters(StringBuilder sql, List<Object> params, String keyword, String statusFilter,
-            String priorityFilter, Period period) {
+            String priorityFilter, Period period, Integer assigneeId) {
         List<String> conditions = new ArrayList<>();
         conditions.add("t.is_deleted = 0");
 
@@ -782,6 +839,10 @@ public class TechnicalSupportTicketDAO {
             conditions.add("t.created_date BETWEEN ? AND ?");
             params.add(period.getFrom());
             params.add(period.getTo());
+        }
+        if (assigneeId != null) {
+            conditions.add("t.assigned_technician_id = ?");
+            params.add(assigneeId);
         }
 
         sql.append("WHERE ").append(String.join(" AND ", conditions));

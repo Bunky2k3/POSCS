@@ -206,7 +206,7 @@
                 <%-- Xuất Excel là thao tác ĐỌC: chỉ lấy đúng dữ liệu vai trò này vốn đã
                      xem được trên màn hình, đổi sang dạng file. Nên KHÔNG khoá theo
                      canManage -- xem PERMISSIONS.md. --%>
-                <a href="${pageContext.request.contextPath}/ticket?action=exportExcel&keyword=${keywordParam}&status=${fn:escapeXml(statusFilter)}&priority=${fn:escapeXml(priorityFilter)}&year=${yearFilter}&period=${periodFilter}" class="btn-outline-action"><i class="fa-solid fa-file-excel"></i> Xuất Excel</a>
+                <a href="${pageContext.request.contextPath}/ticket?action=exportExcel&keyword=${keywordParam}&assignee=${assigneeFilter}&status=${fn:escapeXml(statusFilter)}&priority=${fn:escapeXml(priorityFilter)}&year=${yearFilter}&period=${periodFilter}" class="btn-outline-action"><i class="fa-solid fa-file-excel"></i> Xuất Excel</a>
                 <c:if test="${canManage}">
                     <a href="${pageContext.request.contextPath}/ticket?action=new" class="btn-add"><i class="fa-solid fa-plus"></i> Tạo phiếu hỗ trợ</a>
                 </c:if>
@@ -250,6 +250,18 @@
                 <option value="Cao" ${priorityFilter == 'Cao' ? 'selected' : ''}>Cao</option>
                 <option value="Bình thường" ${priorityFilter == 'Bình thường' ? 'selected' : ''}>Bình thường</option>
                 <option value="Thấp" ${priorityFilter == 'Thấp' ? 'selected' : ''}>Thấp</option>
+            </select>
+            <%-- Người xử lý. Kỹ thuật viên mặc định "Phiếu của tôi" (controller chọn
+                 khi không có tham số); chọn "Tất cả" gửi assignee=all tường minh.
+                 Không có mục "chưa giao": cột assigned_technician_id NOT NULL. --%>
+            <select id="filterAssignee" name="assignee">
+                <option value="all" ${assigneeFilter == 'all' ? 'selected' : ''}>Tất cả người xử lý</option>
+                <c:if test="${isTechnician}">
+                    <option value="mine" ${assigneeFilter == 'mine' ? 'selected' : ''}>Phiếu của tôi</option>
+                </c:if>
+                <c:forEach var="tech" items="${technicianList}">
+                    <option value="${tech.userId}" ${assigneeFilter == tech.userId.toString() ? 'selected' : ''}>${fn:escapeXml(tech.fullName)}</option>
+                </c:forEach>
             </select>
             <select id="filterYear" name="year">
                 <option value="">Mọi thời điểm</option>
@@ -367,11 +379,11 @@
                 <span class="pagination-info" id="paginationInfo">Hiển thị ${fn:length(ticketList)} trong tổng số ${totalCount} phiếu hỗ trợ</span>
                 <nav>
                     <ul class="pagination pagination-sm mb-0">
-                        <li class="page-item ${currentPage <= 1 ? 'disabled' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/ticket?action=list&page=${currentPage - 1}&keyword=${keywordParam}&status=${fn:escapeXml(statusFilter)}&priority=${fn:escapeXml(priorityFilter)}&year=${yearFilter}&period=${periodFilter}">Trước</a></li>
+                        <li class="page-item ${currentPage <= 1 ? 'disabled' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/ticket?action=list&page=${currentPage - 1}&keyword=${keywordParam}&assignee=${assigneeFilter}&status=${fn:escapeXml(statusFilter)}&priority=${fn:escapeXml(priorityFilter)}&year=${yearFilter}&period=${periodFilter}">Trước</a></li>
                         <c:forEach begin="1" end="${totalPages}" var="p">
-                            <li class="page-item ${p == currentPage ? 'active' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/ticket?action=list&page=${p}&keyword=${keywordParam}&status=${fn:escapeXml(statusFilter)}&priority=${fn:escapeXml(priorityFilter)}&year=${yearFilter}&period=${periodFilter}">${p}</a></li>
+                            <li class="page-item ${p == currentPage ? 'active' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/ticket?action=list&page=${p}&keyword=${keywordParam}&assignee=${assigneeFilter}&status=${fn:escapeXml(statusFilter)}&priority=${fn:escapeXml(priorityFilter)}&year=${yearFilter}&period=${periodFilter}">${p}</a></li>
                         </c:forEach>
-                        <li class="page-item ${currentPage >= totalPages ? 'disabled' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/ticket?action=list&page=${currentPage + 1}&keyword=${keywordParam}&status=${fn:escapeXml(statusFilter)}&priority=${fn:escapeXml(priorityFilter)}&year=${yearFilter}&period=${periodFilter}">Sau</a></li>
+                        <li class="page-item ${currentPage >= totalPages ? 'disabled' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/ticket?action=list&page=${currentPage + 1}&keyword=${keywordParam}&assignee=${assigneeFilter}&status=${fn:escapeXml(statusFilter)}&priority=${fn:escapeXml(priorityFilter)}&year=${yearFilter}&period=${periodFilter}">Sau</a></li>
                     </ul>
                 </nav>
             </div>
@@ -467,6 +479,7 @@
         // Tự động submit lại form lọc khi đổi trạng thái / mức ưu tiên
         document.getElementById('filterStatus').addEventListener('change', function () { document.getElementById('filterForm').submit(); });
         document.getElementById('filterPriority').addEventListener('change', function () { document.getElementById('filterForm').submit(); });
+        document.getElementById('filterAssignee').addEventListener('change', function () { document.getElementById('filterForm').submit(); });
         document.getElementById('filterYear').addEventListener('change', function () { document.getElementById('filterForm').submit(); });
         document.getElementById('filterPeriod').addEventListener('change', function () { document.getElementById('filterForm').submit(); });
     </script>
