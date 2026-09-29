@@ -107,12 +107,12 @@ export default {
             user: 'sales5',
             url: '/updateProfile?onboarding=1',
             marks: [
-                { sel: '.alert', text: 'bổ sung đầy đủ', n: 1 },
+                { sel: '.alert', text: 'Còn thiếu', n: 1 },
                 { sel: '.field-row', text: 'Giới tính', n: 2 },
                 { sel: '.field-row', text: 'Ngày sinh', n: 2 },
                 { sel: '.field-row', text: 'Số CCCD/CMND', n: 2 },
                 { sel: '.field-row', text: 'Số điện thoại', n: 2 },
-                // Dải nhắc không kể địa chỉ, nhưng lưu vẫn bắt buộc chọn tới xã / phường.
+                // sales5 trong bản sao có email nhưng chưa có địa chỉ: dải nhắc kể cả địa chỉ.
                 { sel: '.field-row', text: 'Tỉnh / Thành phố', n: 3 },
                 { sel: '.field-row', text: 'Xã / Phường', n: 3 },
                 { sel: '.action-bar button[type=submit]', n: 4 }

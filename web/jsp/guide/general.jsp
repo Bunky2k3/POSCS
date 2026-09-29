@@ -68,9 +68,9 @@
     <figcaption>Hình 3. Bổ sung thông tin cá nhân còn thiếu</figcaption>
 </figure>
 <ol class="guide-steps">
-    <li><strong>Dải nhắc</strong>: cần bổ sung thông tin trước khi dùng hệ thống.</li>
-    <li><strong>Bốn ô dải nhắc kể ra</strong>: giới tính, ngày sinh, số CCCD/CMND, số điện thoại. Ô Giới tính mặc định hiện <em>Nam</em>, nên kiểm lại cho đúng.</li>
-    <li><strong>Địa chỉ</strong>: dải nhắc không kể, nhưng trang vẫn bắt buộc chọn Tỉnh / Thành phố và Xã / Phường khi lưu. Email cá nhân cũng phải đúng định dạng.</li>
+    <li><strong>Dải nhắc</strong>: kể đúng những ô còn trống mà trang bắt buộc khi lưu — ngoài giới tính, ngày sinh, số CCCD/CMND, số điện thoại còn có thể có email cá nhân và địa chỉ.</li>
+    <li><strong>Các ô còn thiếu</strong>: điền đủ. Ô Giới tính chưa khai hiện <em>-- Chọn giới tính --</em>; phải chọn một giá trị mới lưu được.</li>
+    <li><strong>Địa chỉ</strong>: chọn Tỉnh / Thành phố rồi Xã / Phường (bắt buộc); địa chỉ chi tiết thì không bắt buộc. Email cá nhân phải đúng định dạng.</li>
     <li>Bấm <strong>Lưu thay đổi</strong>. Xong bước này là dùng được mọi trang theo quyền của bạn.</li>
 </ol>
 <p>Các ô khác và thông báo lỗi xem ở <a href="#sua-ho-so">mục 7.1</a>.</p>

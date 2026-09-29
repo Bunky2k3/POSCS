@@ -749,6 +749,8 @@ CHANGES = [
                         'không lưu được (PR #163).'),
     ('29/09/2026', 'S', 'Hợp đồng: hợp đồng mua ghi nhãn Nhà cung cấp; tạo hỏng về đúng form; danh sách báo khi không tìm '
                         'thấy hợp đồng (PR #164).'),
+    ('29/09/2026', 'S', 'Thông tin cá nhân: dải nhắc bổ sung hồ sơ kể đủ ô còn thiếu; ô Giới tính chưa khai không tự '
+                        'chọn "Nam" (PR #165).'),
 ]
 
 
