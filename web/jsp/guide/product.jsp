@@ -118,7 +118,7 @@
     <li><strong>Xóa</strong> (<a href="#xoa">mục 6</a>). Hai nút này chỉ hiện với Admin và Kỹ thuật.</li>
     <li><strong>Hình ảnh</strong>: bấm một ảnh để mở ảnh gốc ở tab mới.</li>
     <li><strong>Catalogue</strong>: bấm tên tệp để mở ở tab mới, xem hoặc tải về.</li>
-    <li><strong>Hợp đồng sử dụng sản phẩm này</strong>: các hợp đồng, kể cả phụ lục, có sản phẩm trong phần Hàng hoá, kèm khách hàng và trạng thái. Bấm mã hợp đồng để mở. Hợp đồng đã huỷ bản ghi không hiện ở đây.</li>
+    <li><strong>Hợp đồng sử dụng sản phẩm này</strong>: các hợp đồng, kể cả phụ lục, có sản phẩm trong phần Hàng hoá, kèm đối tác (khách hàng, hoặc nhà cung cấp ở hợp đồng mua) và trạng thái. Bấm mã hợp đồng để mở. Hợp đồng đã huỷ bản ghi không hiện ở đây.</li>
 </ol>
 
 <h2 id="sua">5. Sửa sản phẩm</h2>
