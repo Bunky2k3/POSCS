@@ -747,6 +747,8 @@ CHANGES = [
     ('29/09/2026', 'S', 'Sản phẩm: báo rõ số ảnh, catalogue chưa gỡ hoặc chưa tải lên được khi lưu (PR #162).'),
     ('29/09/2026', 'S', 'Khách hàng, Nhân viên: báo khi đánh giá xếp hạng, ghi vai khách hàng, khoá / mở khoá tài khoản '
                         'không lưu được (PR #163).'),
+    ('29/09/2026', 'S', 'Hợp đồng: hợp đồng mua ghi nhãn Nhà cung cấp; tạo hỏng về đúng form; danh sách báo khi không tìm '
+                        'thấy hợp đồng (PR #164).'),
 ]
 
 
