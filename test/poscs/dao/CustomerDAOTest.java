@@ -716,6 +716,79 @@ public class CustomerDAOTest {
     }
 
     // ------------------------------------------------------------------
+    // recordEvaluation -- xếp hạng + lịch sử trong một transaction
+    // ------------------------------------------------------------------
+
+    @Test
+    public void recordEvaluation_bothWritten_commits() throws Exception {
+        ResultSet keys = singleRow(row("id", 31));
+        PreparedStatement rating = mock(PreparedStatement.class);
+        when(rating.executeUpdate()).thenReturn(1);
+        PreparedStatement history = mock(PreparedStatement.class);
+        when(history.executeUpdate()).thenReturn(1);
+        when(history.getGeneratedKeys()).thenReturn(keys);
+        Connection conn = connectionRoutingOn("UPDATE enterprises", rating, history);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            assertTrue(dao.recordEvaluation(event()));
+
+            verify(rating).setString(1, event().getRelationshipRating().getDbValue());
+            verify(rating).setInt(2, 3);
+            verify(history).setInt(1, 3);
+            InOrder inOrder = inOrder(conn);
+            inOrder.verify(conn).setAutoCommit(false);
+            inOrder.verify(conn).commit();
+            inOrder.verify(conn).setAutoCommit(true);
+            verify(conn, never()).rollback();
+        }
+    }
+
+    /** Khách đã xoá mềm (tab khác): UPDATE không chạm dòng nào -- không ghi lịch sử. */
+    @Test
+    public void recordEvaluation_customerGone_rollsBackWithoutHistory() throws Exception {
+        PreparedStatement rating = mock(PreparedStatement.class);
+        when(rating.executeUpdate()).thenReturn(0);
+        PreparedStatement history = mock(PreparedStatement.class);
+        Connection conn = connectionRoutingOn("UPDATE enterprises", rating, history);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            assertFalse(dao.recordEvaluation(event()));
+
+            verify(history, never()).executeUpdate();
+            verify(conn).rollback();
+            verify(conn, never()).commit();
+        }
+    }
+
+    /**
+     * Xếp hạng đã UPDATE xong mà dòng lịch sử hỏng: phải rollback cả xếp hạng
+     * -- đúng cái lệch mà hai lời gọi rời trước đây để lại (đổi hạng mà không
+     * ai biết ai đổi).
+     */
+    @Test
+    public void recordEvaluation_historyFails_rollsBackRatingToo() throws Exception {
+        PreparedStatement rating = mock(PreparedStatement.class);
+        when(rating.executeUpdate()).thenReturn(1);
+        PreparedStatement history = mock(PreparedStatement.class);
+        when(history.executeUpdate()).thenThrow(new SQLException("hỏng"));
+        Connection conn = connectionRoutingOn("UPDATE enterprises", rating, history);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            assertFalse(dao.recordEvaluation(event()));
+
+            verify(rating).executeUpdate();
+            verify(conn).rollback();
+            verify(conn, never()).commit();
+        }
+    }
+
+    // ------------------------------------------------------------------
     // findByEnterpriseId
     // ------------------------------------------------------------------
 

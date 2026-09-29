@@ -486,7 +486,12 @@ public class EmployeeController extends HttpServlet {
         }
 
         boolean makeActive = target.isDeleted(); // đang Inactive -> Mở khóa; đang Active -> Khóa
-        employeeDAO.setActive(id, makeActive);
+        if (!employeeDAO.setActive(id, makeActive)) {
+            LOG.warn("Khoa/mo khoa nhan vien that bai (actor={}, userId={}, moKhoa={})",
+                    Logs.actor(request), id, makeActive);
+            response.sendRedirect(request.getContextPath() + "/employee?action=view&id=" + id + "&error=toggle_failed");
+            return;
+        }
         response.sendRedirect(request.getContextPath() + "/employee?action=view&id=" + id);
     }
 

@@ -117,6 +117,12 @@
                 Không thể tự khóa tài khoản đang đăng nhập của chính bạn.
             </div>
         </c:if>
+        <%-- Lệnh khoá / mở khoá hỏng ở CSDL: trạng thái tài khoản không đổi. --%>
+        <c:if test="${not empty param.error && param.error == 'toggle_failed'}">
+            <div class="alert alert-danger py-2 px-3 mb-3" style="font-size: 0.9rem; border-radius: 12px;">
+                Chưa đổi được trạng thái tài khoản. Tài khoản vẫn như trước, vui lòng thử lại.
+            </div>
+        </c:if>
 
         <div class="profile-card">
             <div class="profile-banner">

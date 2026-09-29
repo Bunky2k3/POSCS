@@ -403,6 +403,7 @@ public class EmployeeControllerTest {
         target.setUserId(50);
         target.setDeleted(false); // đang Active
         when(employeeDAO.findById(50)).thenReturn(target);
+        when(employeeDAO.setActive(50, false)).thenReturn(true);
 
         controller.doPost(request, response);
 
@@ -418,10 +419,31 @@ public class EmployeeControllerTest {
         target.setUserId(50);
         target.setDeleted(true); // đang Inactive
         when(employeeDAO.findById(50)).thenReturn(target);
+        when(employeeDAO.setActive(50, true)).thenReturn(true);
 
         controller.doPost(request, response);
 
         verify(employeeDAO).setActive(50, true); // Inactive -> Mở khoá (makeActive=true)
+        verify(response).sendRedirect(CONTEXT_PATH + "/employee?action=view&id=50");
+    }
+
+    /**
+     * Lệnh khoá hỏng ở CSDL: trạng thái không đổi, nên trang chi tiết phải báo
+     * -- trước đây về y như đã khoá xong, người dùng tưởng tài khoản đã bị khoá.
+     */
+    @Test
+    public void toggleStatus_setActiveFails_redirectsWithToggleFailed() throws Exception {
+        when(request.getParameter("action")).thenReturn("toggleStatus");
+        when(request.getParameter("id")).thenReturn("50");
+        User target = new User();
+        target.setUserId(50);
+        target.setDeleted(false);
+        when(employeeDAO.findById(50)).thenReturn(target);
+        when(employeeDAO.setActive(50, false)).thenReturn(false);
+
+        controller.doPost(request, response);
+
+        verify(response).sendRedirect(CONTEXT_PATH + "/employee?action=view&id=50&error=toggle_failed");
     }
 
     // ------------------------------------------------------------------

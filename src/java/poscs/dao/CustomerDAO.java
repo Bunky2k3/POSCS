@@ -550,20 +550,6 @@ public class CustomerDAO {
         }
     }
 
-    /** Ghi kết quả CustomerEvaluator vào enterprises.current_relationship_rating. */
-    public boolean updateRelationshipRating(int enterpriseId, RelationshipRating rating) {
-        String sql = "UPDATE enterprises SET current_relationship_rating = ? WHERE enterprise_id = ?";
-        try (Connection conn = DBContext.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, rating.getDbValue());
-            ps.setInt(2, enterpriseId);
-            return ps.executeUpdate() > 0;
-        } catch (SQLException ex) {
-            LOG.error("Loi cap nhat xep hang khach hang (enterpriseId={})", enterpriseId, ex);
-            return false;
-        }
-    }
-
     /**
      * BR-27: email và số điện thoại khách hàng phải duy nhất toàn hệ thống --
      * true nếu email này đã thuộc về một khách hàng khác.
@@ -984,11 +970,66 @@ public class CustomerDAO {
 
     /** Ghi 1 sự kiện mới. Trả về event_id vừa tạo, hoặc -1 nếu thất bại. */
     public int insertLifecycleEvent(CustomerLifecycleEvent event) {
+        try (Connection conn = DBContext.getConnection()) {
+            return insertLifecycleEvent(conn, event);
+        } catch (SQLException ex) {
+            LOG.error("Loi ghi lich su danh gia khach hang (enterpriseId={})", event.getEnterpriseId(), ex);
+            return -1;
+        }
+    }
+
+    /**
+     * Một lần đánh giá xếp hạng THỦ CÔNG: đổi
+     * {@code enterprises.current_relationship_rating} VÀ ghi dòng lịch sử, trong
+     * CÙNG một transaction.
+     *
+     * <p>Trước đây là hai lời gọi rời, không bên nào được kiểm: câu UPDATE hỏng
+     * thì trang vẫn báo "Đã đánh giá lại", còn UPDATE xong mà dòng lịch sử hỏng
+     * thì xếp hạng đổi mà không ai biết ai đổi, lúc nào. Gộp lại để hai thứ
+     * luôn khớp nhau: được cả hoặc không gì cả.
+     *
+     * <p>Khách đã xoá mềm (ở tab khác) thì UPDATE không chạm dòng nào -- tính
+     * là thất bại, không ghi lịch sử cho một khách đã biến khỏi danh sách.
+     *
+     * @return true nếu đã ghi cả hai.
+     */
+    public boolean recordEvaluation(CustomerLifecycleEvent event) {
+        try (Connection conn = DBContext.getConnection()) {
+            conn.setAutoCommit(false);
+            boolean committed = false;
+            try {
+                try (PreparedStatement ps = conn.prepareStatement(
+                        "UPDATE enterprises SET current_relationship_rating = ? "
+                        + "WHERE enterprise_id = ? AND is_deleted = 0")) {
+                    ps.setString(1, event.getRelationshipRating().getDbValue());
+                    ps.setInt(2, event.getEnterpriseId());
+                    if (ps.executeUpdate() == 0) {
+                        return false;
+                    }
+                }
+                if (insertLifecycleEvent(conn, event) <= 0) {
+                    return false;
+                }
+                conn.commit();
+                committed = true;
+                return true;
+            } finally {
+                if (!committed) {
+                    conn.rollback();
+                }
+                conn.setAutoCommit(true);
+            }
+        } catch (SQLException ex) {
+            LOG.error("Loi ghi danh gia xep hang khach hang (enterpriseId={})", event.getEnterpriseId(), ex);
+            return false;
+        }
+    }
+
+    private int insertLifecycleEvent(Connection conn, CustomerLifecycleEvent event) throws SQLException {
         String sql = "INSERT INTO customer_lifecycle_events " +
                 "(enterprise_id, event_type, relationship_rating, is_auto_generated, description, event_date, recorded_by) " +
                 "VALUES (?, ?, ?, ?, ?, ?, ?)";
-        try (Connection conn = DBContext.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+        try (PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
             ps.setInt(1, event.getEnterpriseId());
             ps.setString(2, event.getEventType());
             ps.setString(3, event.getRelationshipRating().getDbValue());
@@ -1004,9 +1045,6 @@ public class CustomerDAO {
             try (ResultSet keys = ps.getGeneratedKeys()) {
                 return keys.next() ? keys.getInt(1) : -1;
             }
-        } catch (SQLException ex) {
-            LOG.error("Loi ghi lich su danh gia khach hang (enterpriseId={})", event.getEnterpriseId(), ex);
-            return -1;
         }
     }
 

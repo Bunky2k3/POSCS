@@ -716,8 +716,16 @@ public class CustomerController extends HttpServlet {
             response.sendRedirect(formUrl + "&error=create_failed");
             return;
         }
-        // Vai nằm ở bảng riêng nên phải ghi tách khỏi hồ sơ khách hàng.
-        customerDAO.replaceRolesOf(newId, List.of(role));
+        // Vai nằm ở bảng riêng nên phải ghi tách khỏi hồ sơ khách hàng. Hỏng thì
+        // khách đã lưu mà không nằm trong danh sách nào (bộ lọc theo vai) --
+        // phải báo, và đưa về trang chi tiết để người dùng mở Sửa tick lại vai.
+        // KHÔNG xoá mềm bản vừa tạo để "làm lại": các cột mã số thuế / email /
+        // số điện thoại UNIQUE cả trên bản ghi đã xoá mềm, tạo lại sẽ bị báo trùng.
+        if (!customerDAO.replaceRolesOf(newId, List.of(role))) {
+            LOG.warn("Ghi vai khach hang moi that bai (actor={}, enterpriseId={})", Logs.actor(request), newId);
+            response.sendRedirect(request.getContextPath() + "/customer?action=view&id=" + newId + "&error=roles_not_saved");
+            return;
+        }
         response.sendRedirect(request.getContextPath() + "/customer?action=view&id=" + newId);
     }
 
@@ -799,12 +807,16 @@ public class CustomerController extends HttpServlet {
         e.setLogoUrl(newLogoUrl != null ? newLogoUrl : existing.getLogoUrl());
 
         boolean ok = customerDAO.update(e);
-        if (ok) {
-            customerDAO.replaceRolesOf(id, roles);
-        }
         if (!ok) {
             LOG.warn("Cap nhat khach hang that bai (actor={}, enterpriseId={})", Logs.actor(request), id);
             response.sendRedirect(request.getContextPath() + "/customer?action=edit&id=" + id + "&error=update_failed");
+            return;
+        }
+        // replaceRolesOf tự bọc transaction: hỏng thì vai cũ còn nguyên, chỉ phần
+        // vai vừa tick chưa được ghi. Hồ sơ thì đã lưu -- về trang chi tiết báo rõ.
+        if (!customerDAO.replaceRolesOf(id, roles)) {
+            LOG.warn("Ghi vai khach hang that bai (actor={}, enterpriseId={})", Logs.actor(request), id);
+            response.sendRedirect(request.getContextPath() + "/customer?action=view&id=" + id + "&error=roles_not_saved");
             return;
         }
         response.sendRedirect(request.getContextPath() + "/customer?action=view&id=" + id);
@@ -885,8 +897,6 @@ public class CustomerController extends HttpServlet {
             return;
         }
 
-        customerDAO.updateRelationshipRating(id, rating);
-
         User currentUser = AccessControl.currentUser(request);
         CustomerLifecycleEvent event = new CustomerLifecycleEvent();
         event.setEnterpriseId(id);
@@ -896,7 +906,13 @@ public class CustomerController extends HttpServlet {
         event.setDescription(emptyToNull(request.getParameter("description")));
         event.setEventDate(Date.valueOf(LocalDate.now()));
         event.setRecordedBy(currentUser.getUserId());
-        customerDAO.insertLifecycleEvent(event);
+        // Xếp hạng + dòng lịch sử ghi trong một transaction (xem recordEvaluation):
+        // hỏng thì không ghi gì, và trang KHÔNG được báo "Đã đánh giá lại".
+        if (!customerDAO.recordEvaluation(event)) {
+            LOG.warn("Danh gia khach hang that bai (actor={}, enterpriseId={})", Logs.actor(request), id);
+            response.sendRedirect(request.getContextPath() + "/customer?action=view&id=" + id + "&error=evaluate_failed");
+            return;
+        }
 
         response.sendRedirect(request.getContextPath() + "/customer?action=view&id=" + id + "&evaluated=1");
     }
