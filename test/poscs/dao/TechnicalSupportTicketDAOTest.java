@@ -540,6 +540,40 @@ public class TechnicalSupportTicketDAOTest {
         }
     }
 
+    /** Lọc theo người xử lý: một điều kiện trên assigned_technician_id, tham số đứng trước LIMIT/OFFSET. */
+    @Test
+    public void findAll_assignee_addsTechnicianConditionBeforePaging() throws Exception {
+        PreparedStatement ps = statementReturning(emptyResultSet());
+        Connection conn = connectionReturning(ps);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            dao.findAll(1, 10, null, null, null, null, 50);
+
+            verify(conn).prepareStatement(contains("t.assigned_technician_id = ?"));
+            verify(ps).setObject(1, 50);
+            verify(ps).setObject(2, 10);
+            verify(ps).setObject(3, 0);
+        }
+    }
+
+    /** Bốn ô đếm của danh sách: bốn tham số trạng thái trước, rồi người xử lý. */
+    @Test
+    public void countListSummary_assignee_bindsAfterStatusParams() throws Exception {
+        PreparedStatement ps = statementReturning(emptyResultSet());
+        Connection conn = connectionReturning(ps);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            dao.countListSummary(null, 50);
+
+            verify(conn).prepareStatement(contains("t.assigned_technician_id = ?"));
+            verify(ps).setObject(5, 50);
+        }
+    }
+
     @Test
     public void findAll_sqlError_returnsEmptyListNotNull() throws Exception {
         try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {

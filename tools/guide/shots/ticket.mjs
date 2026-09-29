@@ -50,10 +50,11 @@ export default {
                 { sel: '#searchInput', n: 2 },
                 { sel: '#filterStatus', n: 3 },
                 { sel: '#filterPriority', n: 4 },
-                { sel: '#filterYear', n: 5 },
-                { sel: '#filterPeriod', n: 5 },
-                { sel: '.header-actions a[href*="exportExcel"]', n: 6 },
-                { sel: '.header-actions .btn-add', n: 7 }
+                { sel: '#filterAssignee', n: 5 },
+                { sel: '#filterYear', n: 6 },
+                { sel: '#filterPeriod', n: 6 },
+                { sel: '.header-actions a[href*="exportExcel"]', n: 7 },
+                { sel: '.header-actions .btn-add', n: 8 }
             ],
             // Đầu trang tới hết thanh lọc; bảng có ảnh riêng (02). Lề rộng hơn
             // mặc định: nút Tạo phiếu nằm sát mép phải của hàng tiêu đề.

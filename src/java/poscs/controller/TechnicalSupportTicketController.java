@@ -155,16 +155,19 @@ public class TechnicalSupportTicketController extends HttpServlet {
         String statusFilter = request.getParameter("status");
         String priorityFilter = request.getParameter("priority");
         Period period = Period.parse(request.getParameter("year"), request.getParameter("period"));
+        String assigneeFilter = assigneeFilterOf(request);
+        Integer assigneeId = assigneeIdOf(assigneeFilter, request);
 
         List<TechnicalRequest> ticketList = ticketDAO.findAll(page, PAGE_SIZE, keyword, statusFilter,
-                priorityFilter, period);
-        int totalCount = ticketDAO.countAll(keyword, statusFilter, priorityFilter, period);
+                priorityFilter, period, assigneeId);
+        int totalCount = ticketDAO.countAll(keyword, statusFilter, priorityFilter, period, assigneeId);
         int totalPages = Math.max(1, (int) Math.ceil(totalCount / (double) PAGE_SIZE));
 
         request.setAttribute("ticketList", ticketList);
-        // Dải KPI ở đầu trang cũng thu theo kỳ, nếu không thì con số tổng nằm
-        // ngay trên một bảng đã lọc -- hai phạm vi khác nhau trên cùng màn hình.
-        request.setAttribute("statusSummary", ticketDAO.countStatusSummary(null, period));
+        // Dải KPI ở đầu trang cũng thu theo kỳ VÀ theo người xử lý, nếu không
+        // thì con số tổng nằm ngay trên một bảng đã lọc -- hai phạm vi khác
+        // nhau trên cùng màn hình.
+        request.setAttribute("statusSummary", ticketDAO.countListSummary(period, assigneeId));
         request.setAttribute("currentPage", page);
         request.setAttribute("totalPages", totalPages);
         request.setAttribute("totalCount", totalCount);
@@ -173,9 +176,54 @@ public class TechnicalSupportTicketController extends HttpServlet {
         request.setAttribute("keywordParam", QueryStrings.param(keyword));
         request.setAttribute("statusFilter", statusFilter);
         request.setAttribute("priorityFilter", priorityFilter);
+        request.setAttribute("assigneeFilter", assigneeFilter);
+        request.setAttribute("isTechnician", isTechnician(request));
+        // Giữ người đang lọc trong ô chọn dù họ đã đổi vai / nghỉ, như ô chọn ở form.
+        request.setAttribute("technicianList", employeeDAO.findActiveByRole(TECHNICIAN_ROLE,
+                ASSIGNEE_MINE.equals(assigneeFilter) ? null : assigneeId));
         ContractController.setPeriodAttributes(request, period);
 
         request.getRequestDispatcher(LIST_VIEW).forward(request, response);
+    }
+
+    /** Giá trị của ô lọc "Người xử lý" (tham số assignee), ngoài user_id. */
+    static final String ASSIGNEE_ALL = "all";
+    static final String ASSIGNEE_MINE = "mine";
+
+    /**
+     * Ô lọc "Người xử lý" đã chuẩn hoá: "all", "mine", hoặc user_id dạng chuỗi.
+     *
+     * <p>Vắng tham số thì kỹ thuật viên mặc định "mine" -- việc của họ là phiếu
+     * được giao cho mình, cùng lẽ Sales mặc định phạm vi "Của tôi" ở danh
+     * sách khách hàng / hợp đồng; vai khác mặc định "all". Chọn "Tất cả" thì
+     * gửi assignee=all tường minh, nên mặc định không đè lên lựa chọn đó khi
+     * sang trang. Giá trị lạ -> "all".
+     */
+    private String assigneeFilterOf(HttpServletRequest request) {
+        String raw = request.getParameter("assignee");
+        if (raw == null || raw.trim().isEmpty()) {
+            return isTechnician(request) ? ASSIGNEE_MINE : ASSIGNEE_ALL;
+        }
+        raw = raw.trim();
+        if (ASSIGNEE_MINE.equals(raw)) {
+            return ASSIGNEE_MINE;
+        }
+        Integer id = parseIntOrNull(raw);
+        return id != null && id > 0 ? String.valueOf(id) : ASSIGNEE_ALL;
+    }
+
+    /** user_id cần lọc theo ô "Người xử lý", null = mọi người. */
+    private Integer assigneeIdOf(String assigneeFilter, HttpServletRequest request) {
+        if (ASSIGNEE_MINE.equals(assigneeFilter)) {
+            User me = AccessControl.currentUser(request);
+            return me != null ? me.getUserId() : null;
+        }
+        return ASSIGNEE_ALL.equals(assigneeFilter) ? null : parseIntOrNull(assigneeFilter);
+    }
+
+    private boolean isTechnician(HttpServletRequest request) {
+        User me = AccessControl.currentUser(request);
+        return me != null && me.getRole() != null && TECHNICIAN_ROLE.equals(me.getRole().getRoleName());
     }
 
     private void showDetail(HttpServletRequest request, HttpServletResponse response)
@@ -221,9 +269,11 @@ public class TechnicalSupportTicketController extends HttpServlet {
         String statusFilter = request.getParameter("status");
         String priorityFilter = request.getParameter("priority");
         Period period = Period.parse(request.getParameter("year"), request.getParameter("period"));
+        // Cùng cách đọc ô "Người xử lý" với danh sách -- file là đúng thứ đang nhìn thấy.
+        Integer assigneeId = assigneeIdOf(assigneeFilterOf(request), request);
 
         List<TechnicalRequest> all = ticketDAO.findAll(1, Integer.MAX_VALUE, keyword, statusFilter, priorityFilter,
-                period);
+                period, assigneeId);
         String[] headers = {"Mã phiếu", "Loại phiếu", "Khách hàng", "Hợp đồng liên quan",
             "Mức ưu tiên", "Kênh tiếp nhận", "Trạng thái", "Người xử lý", "Người tạo",
             "Ngày tạo", "Hạn xử lý (SLA)", "Thời điểm đóng", "Bảo hành",
