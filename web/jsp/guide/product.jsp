@@ -152,6 +152,7 @@
     <li>Hộp xác nhận hiện tên sản phẩm. Bấm <strong>Xóa sản phẩm</strong> để xoá, <strong>Hủy</strong> để thôi.</li>
 </ol>
 <p>Sản phẩm đã xoá biến khỏi danh sách và không chọn được khi thêm hàng hoá cho hợp đồng. Phần mềm chưa có chức năng khôi phục sản phẩm đã xoá.</p>
+<p>Nếu trang chi tiết mở lại với thông báo <em>Không xoá được sản phẩm. Vui lòng thử lại.</em> thì sản phẩm chưa bị xoá do lỗi hệ thống: xoá lại; vẫn lỗi thì báo người quản trị hệ thống.</p>
 <figure class="guide-shot">
     <a href="${img}/07-xoa-bi-chan.png" target="_blank"><img src="${img}/07-xoa-bi-chan.png" alt="Thông báo không xoá được sản phẩm đang có trong hợp đồng"></a>
     <figcaption>Hình 7. Sản phẩm đang có trong hợp đồng thì không xoá được</figcaption>
