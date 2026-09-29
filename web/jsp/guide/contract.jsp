@@ -135,6 +135,7 @@
     <li><strong>“Chờ … · N ngày”</strong>: hợp đồng đang nằm ở những phòng nào, bao lâu rồi. Chữ chuyển vàng nâu từ 7 ngày, đỏ từ 14 ngày.</li>
     <li><strong>Thao tác</strong>: <i class="fa-regular fa-eye"></i> xem chi tiết, <i class="fa-solid fa-pen"></i> mở trang Quản lý (chỉ người có quyền sửa mới thấy). Bảng rộng hơn màn hình nên cột này thường nằm khuất bên phải: kéo thanh cuộn ngang dưới bảng, hoặc giữ chuột trên bảng rồi kéo sang trái. Bấm vào tiêu đề cũng mở trang chi tiết.</li>
 </ol>
+<div class="guide-note"><p>Mở một hợp đồng đã bị huỷ bản ghi (hoặc link cũ) thì danh sách hiện dải vàng <em>Không tìm thấy hợp đồng này</em>.</p></div>
 <div class="guide-note"><p>Danh sách không có nút xoá. Xoá bản nháp và huỷ bản ghi nằm ở trang Quản lý (xem <a href="#huy-ban-ghi">mục 13</a>).</p></div>
 
 <h2 id="tao-hop-dong">3. Tạo hợp đồng</h2>
@@ -147,7 +148,7 @@
 <ol class="guide-steps">
     <li><strong>Mã hợp đồng</strong>: nhập đúng số ghi trên bản hợp đồng giấy. Không được trùng với hợp đồng hay phụ lục nào khác.</li>
     <li><strong>Tiêu đề hợp đồng</strong>.</li>
-    <li><strong>Khách hàng</strong>: hợp đồng bán chỉ chọn được khách hàng mua; hợp đồng mua chỉ chọn được nhà cung cấp (ô vẫn mang nhãn “Khách hàng”). Đối tác chưa có trong danh sách thì tạo ở phân hệ Khách hàng trước, hoặc tick thêm vai còn thiếu ở trang Sửa của họ.</li>
+    <li><strong>Khách hàng</strong> (ở hợp đồng mua ô này mang nhãn <strong>Nhà cung cấp</strong>): hợp đồng bán chỉ chọn được khách hàng mua; hợp đồng mua chỉ chọn được nhà cung cấp. Đối tác chưa có trong danh sách thì tạo ở phân hệ Khách hàng trước, hoặc tick thêm vai còn thiếu ở trang Sửa của họ.</li>
     <li><strong>Người phụ trách</strong>: chọn một nhân viên Sales.</li>
     <li><strong>Loại hợp đồng</strong>: bộ loại khác nhau giữa hợp đồng bán và mua (xem bảng ở <a href="#tong-quan">mục 1</a>).</li>
     <li><strong>Thông tin ký kết</strong> (không bắt buộc): người ký hai bên và chức vụ, căn cứ uỷ quyền (chỉ khi người ký không phải đại diện pháp luật), nơi ký. Nên điền đủ trước khi ký.</li>
