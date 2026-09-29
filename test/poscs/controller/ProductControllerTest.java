@@ -17,6 +17,8 @@ import org.mockito.MockedStatic;
 import poscs.common.FileStorage;
 import poscs.dao.ProductDAO;
 import poscs.model.Product;
+import poscs.model.ProductCatalogue;
+import poscs.model.ProductImage;
 import poscs.model.ProductCategory;
 import poscs.model.Role;
 import poscs.model.User;
@@ -267,11 +269,53 @@ public class ProductControllerTest {
             fs.when(() -> FileStorage.isAcceptable(imagePart, FileStorage.IMAGE_EXTENSIONS)).thenReturn(true);
             fs.when(() -> FileStorage.save(imagePart, "products/images", FileStorage.IMAGE_EXTENSIONS))
                     .thenReturn("/uploads/products/images/x.jpg");
+            when(productDAO.addImage(42, "/uploads/products/images/x.jpg")).thenReturn(5);
 
             controller.doPost(request, response);
 
             verify(productDAO).addImage(42, "/uploads/products/images/x.jpg");
+            verify(response).sendRedirect(CONTEXT_PATH + "/product?action=view&id=42");
         }
+    }
+
+    /**
+     * Ảnh ghi đĩa được nhưng ghi CSDL hỏng (addImage trả -1), và một ảnh ghi
+     * đĩa hỏng luôn (save trả null): sản phẩm đã tạo nên vẫn về trang chi tiết,
+     * nhưng phải kèm số tệp chưa lưu -- trước đây hai ảnh này rơi mất lặng lẽ.
+     */
+    @Test
+    public void create_imagesNotSaved_redirectsToDetailWithCount() throws Exception {
+        when(request.getParameter("action")).thenReturn("create");
+        when(request.getParameter("productName")).thenReturn("Router ABC");
+        when(request.getParameter("categoryId")).thenReturn("1");
+        when(productDAO.generateNextProductCode()).thenReturn("SP-0001");
+        when(productDAO.insert(any(Product.class))).thenReturn(42);
+
+        Part dbFails = imagePart("a.jpg");
+        Part diskFails = imagePart("b.jpg");
+        when(request.getParts()).thenReturn(Arrays.asList(dbFails, diskFails));
+
+        try (MockedStatic<FileStorage> fs = mockStatic(FileStorage.class)) {
+            fs.when(() -> FileStorage.isAcceptable(any(Part.class), eq(FileStorage.IMAGE_EXTENSIONS))).thenReturn(true);
+            fs.when(() -> FileStorage.save(dbFails, "products/images", FileStorage.IMAGE_EXTENSIONS))
+                    .thenReturn("/uploads/products/images/a.jpg");
+            fs.when(() -> FileStorage.save(diskFails, "products/images", FileStorage.IMAGE_EXTENSIONS))
+                    .thenReturn(null);
+            when(productDAO.addImage(42, "/uploads/products/images/a.jpg")).thenReturn(-1);
+
+            controller.doPost(request, response);
+
+            verify(response).sendRedirect(CONTEXT_PATH
+                    + "/product?action=view&id=42&error=files_not_saved&notRemoved=0&notAdded=2");
+        }
+    }
+
+    private static Part imagePart(String fileName) {
+        Part part = mock(Part.class);
+        when(part.getName()).thenReturn("images");
+        when(part.getSize()).thenReturn(1024L);
+        when(part.getSubmittedFileName()).thenReturn(fileName);
+        return part;
     }
 
     @Test
@@ -374,6 +418,86 @@ public class ProductControllerTest {
         verify(productDAO).deleteImage(12, 70);
         // Token "x" không parse được số -- phải bị bỏ qua, không có lần gọi thứ 4 nào khác.
         verify(productDAO, times(3)).deleteImage(anyInt(), anyInt());
+    }
+
+    /** Sản phẩm 70 đang có ảnh 3, 7 và catalogue 5 -- như findById đọc lên ở đầu request. */
+    private static Product productWithFiles() {
+        Product p = new Product();
+        p.setProductId(70);
+        ProductImage a = new ProductImage();
+        a.setImageId(3);
+        ProductImage b = new ProductImage();
+        b.setImageId(7);
+        p.setImages(Arrays.asList(a, b));
+        ProductCatalogue c = new ProductCatalogue();
+        c.setCatalogueId(5);
+        p.setCatalogues(Arrays.asList(c));
+        return p;
+    }
+
+    private void updateProduct70() {
+        when(request.getParameter("action")).thenReturn("update");
+        when(request.getParameter("productId")).thenReturn("70");
+        when(productDAO.findById(70)).thenReturn(productWithFiles());
+        when(request.getParameter("productName")).thenReturn("Router XYZ");
+        when(request.getParameter("categoryId")).thenReturn("2");
+        when(productDAO.update(any(Product.class))).thenReturn(true);
+    }
+
+    /**
+     * Ảnh 3 còn trong sản phẩm mà lệnh xoá hỏng: phải báo, không để trang chi
+     * tiết hiện lại chính ảnh người dùng vừa bấm gỡ mà không nói gì.
+     */
+    @Test
+    public void update_imageStillThereButDeleteFails_reportsNotRemoved() throws Exception {
+        updateProduct70();
+        when(request.getParameter("removedImageIds")).thenReturn("3,7");
+        when(productDAO.deleteImage(3, 70)).thenReturn(false);
+        when(productDAO.deleteImage(7, 70)).thenReturn(true);
+
+        controller.doPost(request, response);
+
+        verify(response).sendRedirect(CONTEXT_PATH
+                + "/product?action=view&id=70&error=files_not_saved&notRemoved=1&notAdded=0");
+    }
+
+    /**
+     * Ảnh 9 không còn trong sản phẩm (đã gỡ ở tab khác từ trước): xoá trả false
+     * nhưng đó KHÔNG phải lỗi -- thứ người dùng muốn (ảnh biến mất) đã đúng.
+     */
+    @Test
+    public void update_imageAlreadyGone_isNotReportedAsFailure() throws Exception {
+        updateProduct70();
+        when(request.getParameter("removedImageIds")).thenReturn("9");
+        when(productDAO.deleteImage(9, 70)).thenReturn(false);
+
+        controller.doPost(request, response);
+
+        verify(response).sendRedirect(CONTEXT_PATH + "/product?action=view&id=70");
+    }
+
+    @Test
+    public void update_catalogueNotRemovedAndCatalogueNotAdded_reportsBoth() throws Exception {
+        updateProduct70();
+        when(request.getParameter("removedCatalogueIds")).thenReturn("5");
+        when(productDAO.deleteCatalogue(5, 70)).thenReturn(false);
+        Part doc = mock(Part.class);
+        when(doc.getName()).thenReturn("catalogues");
+        when(doc.getSize()).thenReturn(2048L);
+        when(doc.getSubmittedFileName()).thenReturn("cat.pdf");
+        when(request.getParts()).thenReturn(Arrays.asList(doc));
+
+        try (MockedStatic<FileStorage> fs = mockStatic(FileStorage.class)) {
+            fs.when(() -> FileStorage.isAcceptable(doc, FileStorage.DOCUMENT_EXTENSIONS)).thenReturn(true);
+            fs.when(() -> FileStorage.save(doc, "products/catalogues", FileStorage.DOCUMENT_EXTENSIONS))
+                    .thenReturn("/uploads/products/catalogues/cat.pdf");
+            when(productDAO.addCatalogue(70, "/uploads/products/catalogues/cat.pdf", "cat.pdf")).thenReturn(-1);
+
+            controller.doPost(request, response);
+
+            verify(response).sendRedirect(CONTEXT_PATH
+                    + "/product?action=view&id=70&error=files_not_saved&notRemoved=1&notAdded=1");
+        }
     }
 
     // ------------------------------------------------------------------

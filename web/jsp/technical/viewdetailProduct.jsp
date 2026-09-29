@@ -364,6 +364,23 @@
         </div>
     </c:if>
 
+    <%-- Thông tin sản phẩm đã lưu, nhưng có ảnh/catalogue chưa gỡ hoặc chưa tải
+         lên được (ProductController.filesNotSavedQuery). Trước đây những tệp đó
+         rơi mất lặng lẽ, trang vẫn như đã lưu xong. So sánh với '0' dạng chuỗi
+         chứ không "> 0": tham số gõ tay không phải số thì EL ném lỗi 500. --%>
+    <c:if test="${param.error == 'files_not_saved'}">
+        <c:set var="coGo" value="${not empty param.notRemoved and param.notRemoved != '0'}"/>
+        <c:set var="coThem" value="${not empty param.notAdded and param.notAdded != '0'}"/>
+        <c:if test="${coGo or coThem}">
+        <div class="toast-msg blocked show">
+            <i class="fa-solid fa-circle-xmark"></i>
+            <span>Đã lưu thông tin sản phẩm, nhưng
+                <c:if test="${coGo}"><c:out value="${param.notRemoved}"/> tệp chưa gỡ được</c:if><c:if test="${coGo and coThem}"> và </c:if><c:if test="${coThem}"><c:out value="${param.notAdded}"/> tệp chưa tải lên được</c:if>.
+                Bấm Sửa để làm lại phần này.</span>
+        </div>
+        </c:if>
+    </c:if>
+
     <!-- Form ẩn để gửi yêu cầu xoá qua POST (không đổi state bằng GET) -->
     <form id="deleteForm" method="POST" action="${pageContext.request.contextPath}/product" style="display:none">
         <input type="hidden" name="csrfToken" value="${csrfToken}">

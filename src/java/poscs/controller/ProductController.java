@@ -383,10 +383,10 @@ public class ProductController extends HttpServlet {
             return;
         }
 
-        saveNewImages(request, newId);
-        saveNewCatalogues(request, newId);
+        int notAdded = saveNewImages(request, newId) + saveNewCatalogues(request, newId);
 
-        response.sendRedirect(request.getContextPath() + "/product?action=view&id=" + newId);
+        response.sendRedirect(request.getContextPath() + "/product?action=view&id=" + newId
+                + filesNotSavedQuery(request, newId, 0, notAdded));
     }
 
     private void handleUpdate(HttpServletRequest request, HttpServletResponse response)
@@ -435,12 +435,12 @@ public class ProductController extends HttpServlet {
             return;
         }
 
-        removeMarkedFiles(request, "removedImageIds", id, true);
-        removeMarkedFiles(request, "removedCatalogueIds", id, false);
-        saveNewImages(request, id);
-        saveNewCatalogues(request, id);
+        int notRemoved = removeMarkedFiles(request, "removedImageIds", id, existing, true)
+                + removeMarkedFiles(request, "removedCatalogueIds", id, existing, false);
+        int notAdded = saveNewImages(request, id) + saveNewCatalogues(request, id);
 
-        response.sendRedirect(request.getContextPath() + "/product?action=view&id=" + id);
+        response.sendRedirect(request.getContextPath() + "/product?action=view&id=" + id
+                + filesNotSavedQuery(request, id, notRemoved, notAdded));
     }
 
     private void handleDelete(HttpServletRequest request, HttpServletResponse response) throws IOException {
@@ -478,24 +478,46 @@ public class ProductController extends HttpServlet {
     // Helpers: upload
     // ------------------------------------------------------------------
 
-    /** Lưu mọi file được chọn ở input "images" (name lặp lại vì có "multiple") vào productimages. */
-    private void saveNewImages(HttpServletRequest request, int productId) throws ServletException, IOException {
+    /**
+     * Lưu mọi file được chọn ở input "images" (name lặp lại vì có "multiple") vào
+     * productimages. Trả về số tệp KHÔNG lưu được (ghi đĩa hỏng, hoặc ghi CSDL
+     * hỏng) -- trước đây những tệp đó rơi mất lặng lẽ, trang vẫn báo lưu xong.
+     */
+    private int saveNewImages(HttpServletRequest request, int productId) throws ServletException, IOException {
+        int failed = 0;
         for (Part part : filePartsNamed(request, "images")) {
             String url = FileStorage.save(part, IMAGE_SUBFOLDER, FileStorage.IMAGE_EXTENSIONS);
-            if (url != null) {
-                productDAO.addImage(productId, url);
+            if (url == null || productDAO.addImage(productId, url) <= 0) {
+                failed++;
             }
         }
+        return failed;
     }
 
-    /** Lưu mọi file được chọn ở input "catalogues" (name lặp lại vì có "multiple") vào productcatalogues. */
-    private void saveNewCatalogues(HttpServletRequest request, int productId) throws ServletException, IOException {
+    /** Như saveNewImages, cho input "catalogues" và bảng productcatalogues. */
+    private int saveNewCatalogues(HttpServletRequest request, int productId) throws ServletException, IOException {
+        int failed = 0;
         for (Part part : filePartsNamed(request, "catalogues")) {
             String url = FileStorage.save(part, CATALOGUE_SUBFOLDER, FileStorage.DOCUMENT_EXTENSIONS);
-            if (url != null) {
-                productDAO.addCatalogue(productId, url, part.getSubmittedFileName());
+            if (url == null || productDAO.addCatalogue(productId, url, part.getSubmittedFileName()) <= 0) {
+                failed++;
             }
         }
+        return failed;
+    }
+
+    /**
+     * Đuôi query báo tệp chưa lưu được, "" nếu không có. Thông tin sản phẩm đã
+     * lưu rồi nên vẫn về trang chi tiết -- chỉ kèm thêm số tệp để trang nói rõ
+     * phần nào chưa xong, người dùng mở Sửa làm lại đúng phần đó.
+     */
+    private String filesNotSavedQuery(HttpServletRequest request, int productId, int notRemoved, int notAdded) {
+        if (notRemoved == 0 && notAdded == 0) {
+            return "";
+        }
+        LOG.warn("Tep san pham chua luu duoc (actor={}, productId={}, chuaGo={}, chuaThem={})",
+                Logs.actor(request), productId, notRemoved, notAdded);
+        return "&error=files_not_saved&notRemoved=" + notRemoved + "&notAdded=" + notAdded;
     }
 
     /**
@@ -539,23 +561,38 @@ public class ProductController extends HttpServlet {
      * 1 hidden input dạng CSV (vd "3,7,12") thay vì tự submit xoá ngay, để
      * việc xoá chỉ thật sự có hiệu lực khi bấm "Lưu thay đổi" (khớp với thao
      * tác "Hủy" ở form vẫn bỏ được các lựa chọn xoá đó).
+     *
+     * <p>Trả về số tệp KHÔNG gỡ được. Lệnh xoá trả false vì hai lẽ: CSDL hỏng,
+     * hoặc tệp đã không còn (gỡ ở tab khác từ trước, id rác). Chỉ lẽ thứ nhất
+     * là lỗi, nên đối chiếu với danh sách tệp của sản phẩm đọc ở đầu request:
+     * tệp còn trong đó mà xoá không được mới tính.
      */
-    private void removeMarkedFiles(HttpServletRequest request, String paramName, int productId, boolean isImage) {
+    private int removeMarkedFiles(HttpServletRequest request, String paramName, int productId, Product product,
+            boolean isImage) {
         String raw = request.getParameter(paramName);
         if (raw == null || raw.trim().isEmpty()) {
-            return;
+            return 0;
         }
+        Set<Integer> present = new HashSet<>();
+        if (isImage && product.getImages() != null) {
+            product.getImages().forEach(img -> present.add(img.getImageId()));
+        } else if (!isImage && product.getCatalogues() != null) {
+            product.getCatalogues().forEach(cat -> present.add(cat.getCatalogueId()));
+        }
+        int failed = 0;
         for (String token : raw.split(",")) {
             Integer fileId = parseIntOrNull(token);
             if (fileId == null) {
                 continue;
             }
-            if (isImage) {
-                productDAO.deleteImage(fileId, productId);
-            } else {
-                productDAO.deleteCatalogue(fileId, productId);
+            boolean deleted = isImage
+                    ? productDAO.deleteImage(fileId, productId)
+                    : productDAO.deleteCatalogue(fileId, productId);
+            if (!deleted && present.contains(fileId)) {
+                failed++;
             }
         }
+        return failed;
     }
 
     // ------------------------------------------------------------------

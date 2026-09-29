@@ -103,6 +103,7 @@
     <tr><td>Không lưu được sản phẩm. Vui lòng thử lại.</td><td>Lỗi hệ thống. Thử lại; vẫn lỗi thì báo người quản trị hệ thống.</td></tr>
     <tr><td>Trang <em>Tệp tải lên quá lớn</em> (lỗi 413)</td><td>Tệp vượt giới hạn mà trang chưa chặn được. Chưa có gì được lưu: bấm <strong>Quay lại</strong>, chọn tệp nhỏ hơn rồi lưu lại.</td></tr>
 </table>
+<p>Nếu trang chi tiết mở ra với thông báo đỏ <em>Đã lưu thông tin sản phẩm, nhưng … tệp chưa gỡ được</em> (hoặc <em>… tệp chưa tải lên được</em>) thì tên, mô tả, danh mục đã lưu, chỉ riêng số tệp nêu trong thông báo gặp lỗi hệ thống. Xem lại ảnh và catalogue ở trang chi tiết, bấm <strong>Sửa</strong> gỡ hoặc chọn lại đúng những tệp đó; vẫn lỗi thì báo người quản trị hệ thống.</p>
 
 <h2 id="chi-tiet">4. Xem chi tiết sản phẩm</h2>
 <div class="guide-who"><span class="lbl">Ai làm được:</span><span class="role">Admin</span><span class="role">Kỹ thuật</span><span class="role">Sales</span></div>
