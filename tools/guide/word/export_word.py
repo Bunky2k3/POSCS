@@ -742,6 +742,8 @@ CHANGES = [
     ('29/09/2026', 'S', 'Phiếu hỗ trợ, Sản phẩm, Khách hàng: xoá không thành công thì trang chi tiết mở lại kèm '
                         'thông báo (PR #159).'),
     ('29/09/2026', 'X', 'Hợp đồng: gỡ xuất PDF và nhập PDF theo yêu cầu khách hàng (PR #160).'),
+    ('29/09/2026', 'S', 'Khách hàng: xoá từ danh sách Nhà cung cấp về đúng danh sách; danh sách báo khi không tìm thấy '
+                        'bản ghi (PR #161).'),
 ]
 
 

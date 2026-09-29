@@ -196,6 +196,7 @@
     <li>Kiểm lại tên khách hàng trong hộp xác nhận rồi bấm <strong>Xóa khách hàng</strong>. Bấm <strong>Hủy</strong> nếu đổi ý.</li>
 </ol>
 <p>Nếu trang chi tiết mở lại với thông báo <em>Không xoá được khách hàng. Vui lòng thử lại.</em> thì khách chưa bị xoá do lỗi hệ thống: xoá lại; vẫn lỗi thì báo quản trị viên.</p>
+<p>Xoá xong, trang quay về đúng danh sách bạn vừa đứng (Khách hàng mua hoặc Nhà cung cấp). Nếu danh sách hiện dải vàng <em>Không tìm thấy khách hàng này</em> (hoặc <em>nhà cung cấp này</em>) thì bản ghi đã bị xoá trước đó — thường do người khác vừa xoá, hoặc bạn mở một link cũ.</p>
 <div class="guide-warn">
     <p><strong>Không xoá được khách hàng còn hợp đồng đang hiệu lực.</strong> Khi đó trang báo như Hình 10; cần thanh lý hoặc kết thúc các hợp đồng đó trước.</p>
 </div>

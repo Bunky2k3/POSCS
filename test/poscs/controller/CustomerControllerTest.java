@@ -946,6 +946,56 @@ public class CustomerControllerTest {
         verify(response).sendRedirect(CONTEXT_PATH + "/customer?error=notfound");
     }
 
+    /**
+     * Xoá từ danh sách Nhà cung cấp một bản ghi đã không còn (tab khác vừa xoá):
+     * phải về lại danh sách Nhà cung cấp kèm thông báo, không bị đẩy sang danh
+     * sách Khách hàng mua. Form xoá ở listcustomer.jsp gửi kèm kind cho việc này.
+     */
+    @Test
+    public void delete_notFoundFromSupplierList_keepsSupplierList() throws Exception {
+        when(request.getParameter("action")).thenReturn("delete");
+        when(request.getParameter("id")).thenReturn("999999");
+        when(request.getParameter("kind")).thenReturn("supplier");
+        when(customerDAO.findById(999999)).thenReturn(null);
+
+        controller.doPost(request, response);
+
+        verify(customerDAO, never()).softDelete(anyInt());
+        verify(response).sendRedirect(CONTEXT_PATH + "/customer?error=notfound&kind=supplier");
+    }
+
+    /** Cùng lẽ với trên, cho link Xem / Sửa mở từ danh sách Nhà cung cấp. */
+    @Test
+    public void viewVaEdit_notFoundFromSupplierList_keepsSupplierList() throws Exception {
+        for (String action : new String[]{"view", "edit"}) {
+            HttpServletRequest req = mock(HttpServletRequest.class);
+            HttpServletResponse resp = mock(HttpServletResponse.class);
+            when(req.getSession(false)).thenReturn(session);
+            when(req.getContextPath()).thenReturn(CONTEXT_PATH);
+            when(req.getParameter("action")).thenReturn(action);
+            when(req.getParameter("id")).thenReturn("123");
+            when(req.getParameter("kind")).thenReturn("supplier");
+            when(customerDAO.findById(123)).thenReturn(null);
+
+            controller.doGet(req, resp);
+
+            verify(resp).sendRedirect(CONTEXT_PATH + "/customer?error=notfound&kind=supplier");
+        }
+    }
+
+    /** kind lạ (hoặc buyer) thì về danh sách mặc định -- không chép nguyên chuỗi lên URL. */
+    @Test
+    public void view_notFoundWithOddKind_fallsBackToDefaultList() throws Exception {
+        when(request.getParameter("action")).thenReturn("view");
+        when(request.getParameter("id")).thenReturn("123");
+        when(request.getParameter("kind")).thenReturn("x&evil=1");
+        when(customerDAO.findById(123)).thenReturn(null);
+
+        controller.doGet(request, response);
+
+        verify(response).sendRedirect(CONTEXT_PATH + "/customer?error=notfound");
+    }
+
     // ------------------------------------------------------------------
     // Sales đã được giao tỉnh: khách đứng tên mình, chỉ trong tỉnh mình cầm
     // ------------------------------------------------------------------
