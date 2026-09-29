@@ -159,6 +159,7 @@
     <li>Bấm <strong>Lưu đánh giá</strong>. Xếp hạng mới hiện ngay ở đầu trang và được thêm vào Lịch sử đánh giá xếp hạng.</li>
 </ol>
 <div class="guide-note"><p>Xếp hạng do người dùng tự chọn; hệ thống không tự chấm điểm. Mỗi lần lưu là một dòng lịch sử mới, kể cả khi chọn lại đúng mức cũ.</p></div>
+<p>Nếu trang báo <em>Chưa lưu được đánh giá. Xếp hạng vẫn như trước…</em> thì chưa có gì được ghi — cả xếp hạng lẫn dòng lịch sử. Bấm Lưu đánh giá lại; vẫn lỗi thì báo quản trị viên.</p>
 
 <h2 id="sua">7. Sửa thông tin khách hàng</h2>
 <div class="guide-who"><span class="lbl">Ai làm được:</span><span class="role">Admin</span><span class="role">Sales</span><span class="role no">Kỹ thuật</span></div>
@@ -184,6 +185,7 @@
     <tr><td>Xã / phường đã chọn không thuộc các tỉnh bạn phụ trách.</td><td>Sales chỉ chuyển được khách sang các tỉnh mình phụ trách. Chọn lại tỉnh.</td></tr>
 </table>
 <p>Các thông báo khác giống khi thêm khách hàng (<a href="#loi-them">mục 3.1</a>).</p>
+<p>Nếu sau khi lưu (thêm hoặc sửa), trang chi tiết báo <em>Đã lưu thông tin nhưng chưa ghi được vai Khách mua / Nhà cung cấp…</em> thì hồ sơ đã lưu, riêng ô vai gặp lỗi hệ thống. Khách mới tạo lúc này chưa hiện trong danh sách nào. Bấm <strong>Sửa</strong>, tick lại vai rồi <strong>Lưu thay đổi</strong>.</p>
 
 <h2 id="xoa">8. Xoá khách hàng</h2>
 <div class="guide-who"><span class="lbl">Ai làm được:</span><span class="role">Admin</span><span class="role">Sales</span><span class="role no">Kỹ thuật</span></div>
