@@ -224,6 +224,8 @@ public class CustomerController extends HttpServlet {
         // JSP cần pageSize để đánh STT liên tục qua các trang (trang 2 bắt đầu từ 11).
         request.setAttribute("pageSize", PAGE_SIZE);
         request.setAttribute("keyword", keyword);
+        // Bản đã mã hoá URL cho các link phân trang / lọc / xuất -- xem QueryStrings.param.
+        request.setAttribute("keywordParam", QueryStrings.param(keyword));
         request.setAttribute("typeFilter", typeFilter);
         request.setAttribute("assigneeFilter", assigneeFilter);
         request.setAttribute("provinceFilters", provinceFilters);

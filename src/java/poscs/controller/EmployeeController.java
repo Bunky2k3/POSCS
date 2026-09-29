@@ -17,6 +17,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.mindrot.jbcrypt.BCrypt;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import poscs.common.QueryStrings;
 import poscs.common.AccessControl;
 import poscs.common.EmailUtil;
 import poscs.common.Logs;
@@ -142,6 +143,8 @@ public class EmployeeController extends HttpServlet {
         request.setAttribute("totalPages", totalPages);
         request.setAttribute("totalCount", totalCount);
         request.setAttribute("keyword", keyword);
+        // Bản đã mã hoá URL cho các link phân trang / lọc / xuất -- xem QueryStrings.param.
+        request.setAttribute("keywordParam", QueryStrings.param(keyword));
         request.setAttribute("statusFilter", statusFilter);
         request.setAttribute("roleFilter", roleFilter);
 

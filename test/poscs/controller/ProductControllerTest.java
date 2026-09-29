@@ -189,6 +189,22 @@ public class ProductControllerTest {
         verify(request).setAttribute(eq("expandedCategoryIds"), argThat((Set<?> s) -> s.isEmpty()));
     }
 
+    /**
+     * Từ khoá có "&" / "#": link phân trang và lọc danh mục trước đây ghép nó
+     * qua fn:escapeXml (không mã hoá URL) nên sang trang 2 từ khoá bị cụt.
+     * Controller giờ đưa thêm bản đã mã hoá cho JSP dùng trong mọi link.
+     */
+    @Test
+    public void showList_keywordWithAmpersandAndHash_exposesEncodedKeywordParam() throws Exception {
+        when(productDAO.findAllCategories()).thenReturn(Collections.emptyList());
+        when(productDAO.countByCategory()).thenReturn(Collections.emptyMap());
+        when(request.getParameter("keyword")).thenReturn("A&B #1");
+
+        controller.doGet(request, response);
+
+        verify(request).setAttribute("keywordParam", "A%26B+%231");
+    }
+
     // ------------------------------------------------------------------
     // GET ?action=view
     // ------------------------------------------------------------------

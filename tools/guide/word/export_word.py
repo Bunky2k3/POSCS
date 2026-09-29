@@ -751,6 +751,8 @@ CHANGES = [
                         'thấy hợp đồng (PR #164).'),
     ('29/09/2026', 'S', 'Thông tin cá nhân: dải nhắc bổ sung hồ sơ kể đủ ô còn thiếu; ô Giới tính chưa khai không tự '
                         'chọn "Nam" (PR #165).'),
+    ('29/09/2026', 'S', 'Sản phẩm, Khách hàng: hợp đồng "Chưa hiệu lực" không còn hiện màu đỏ; các danh sách giữ đúng từ khoá '
+                        'có dấu & hoặc # khi sang trang (PR #166).'),
 ]
 
 

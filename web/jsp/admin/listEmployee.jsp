@@ -155,11 +155,11 @@
             <span class="pagination-info">Hiển thị ${fn:length(employeeList)} trong tổng số ${totalCount} nhân viên</span>
             <nav>
                 <ul class="pagination pagination-sm mb-0">
-                    <li class="page-item ${currentPage <= 1 ? 'disabled' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/employee?action=list&page=${currentPage - 1}&keyword=${fn:escapeXml(keyword)}&status=${fn:escapeXml(statusFilter)}&roleId=${roleFilter}">Trước</a></li>
+                    <li class="page-item ${currentPage <= 1 ? 'disabled' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/employee?action=list&page=${currentPage - 1}&keyword=${keywordParam}&status=${fn:escapeXml(statusFilter)}&roleId=${roleFilter}">Trước</a></li>
                     <c:forEach begin="1" end="${totalPages}" var="p">
-                        <li class="page-item ${p == currentPage ? 'active' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/employee?action=list&page=${p}&keyword=${fn:escapeXml(keyword)}&status=${fn:escapeXml(statusFilter)}&roleId=${roleFilter}">${p}</a></li>
+                        <li class="page-item ${p == currentPage ? 'active' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/employee?action=list&page=${p}&keyword=${keywordParam}&status=${fn:escapeXml(statusFilter)}&roleId=${roleFilter}">${p}</a></li>
                     </c:forEach>
-                    <li class="page-item ${currentPage >= totalPages ? 'disabled' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/employee?action=list&page=${currentPage + 1}&keyword=${fn:escapeXml(keyword)}&status=${fn:escapeXml(statusFilter)}&roleId=${roleFilter}">Sau</a></li>
+                    <li class="page-item ${currentPage >= totalPages ? 'disabled' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/employee?action=list&page=${currentPage + 1}&keyword=${keywordParam}&status=${fn:escapeXml(statusFilter)}&roleId=${roleFilter}">Sau</a></li>
                 </ul>
             </nav>
         </div>
