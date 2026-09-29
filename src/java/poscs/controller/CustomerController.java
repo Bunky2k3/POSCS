@@ -248,7 +248,7 @@ public class CustomerController extends HttpServlet {
         Enterprise customer = id != null ? customerDAO.findById(id) : null;
         if (customer == null) {
             // MSG-021: khách hàng không tồn tại
-            response.sendRedirect(request.getContextPath() + "/customer?error=notfound");
+            response.sendRedirect(notFoundUrl(request));
             return;
         }
 
@@ -500,7 +500,7 @@ public class CustomerController extends HttpServlet {
         Integer id = parseIntOrNull(request.getParameter("id"));
         Enterprise customer = id != null ? customerDAO.findById(id) : null;
         if (customer == null) {
-            response.sendRedirect(request.getContextPath() + "/customer?error=notfound");
+            response.sendRedirect(notFoundUrl(request));
             return;
         }
         List<String> roles = customerDAO.findRolesOf(id);
@@ -729,7 +729,7 @@ public class CustomerController extends HttpServlet {
         Integer id = parseIntOrNull(request.getParameter("customerId"));
         Enterprise existing = id != null ? customerDAO.findById(id) : null;
         if (existing == null) {
-            response.sendRedirect(request.getContextPath() + "/customer?error=notfound");
+            response.sendRedirect(notFoundUrl(request));
             return;
         }
         // Trang form đã chặn, nhưng POST thẳng thì không đi qua trang form.
@@ -820,7 +820,7 @@ public class CustomerController extends HttpServlet {
         // đẩy về danh sách không kèm thông báo gì, tưởng đã xoá xong.
         Enterprise existing = id != null ? customerDAO.findById(id) : null;
         if (existing == null) {
-            response.sendRedirect(request.getContextPath() + "/customer?error=notfound");
+            response.sendRedirect(notFoundUrl(request));
             return;
         }
         if (outsideSalesScope(request, existing, customerDAO.findRolesOf(id))) {
@@ -870,7 +870,7 @@ public class CustomerController extends HttpServlet {
         Integer id = parseIntOrNull(request.getParameter("id"));
         Enterprise existing = id != null ? customerDAO.findById(id) : null;
         if (existing == null) {
-            response.sendRedirect(request.getContextPath() + "/customer?error=notfound");
+            response.sendRedirect(notFoundUrl(request));
             return;
         }
         if (outsideSalesScope(request, existing, customerDAO.findRolesOf(id))) {
@@ -927,6 +927,19 @@ public class CustomerController extends HttpServlet {
      */
     private String roleFromKind(String kind) {
         return "supplier".equals(kind) ? ROLE_SUPPLIER : ROLE_BUYER;
+    }
+
+    /**
+     * Về danh sách kèm error=notfound, giữ đúng danh sách người dùng vừa đứng.
+     *
+     * <p>Bản ghi đã không còn nên không suy được vai từ nó; chỉ còn tham số kind
+     * do trang gửi lên. Thiếu bước này thì mở/xoá một nhà cung cấp đã bị xoá từ
+     * danh sách Nhà cung cấp sẽ bị đẩy sang danh sách Khách hàng mua, và thông
+     * báo hiện ở một danh sách khác chỗ người dùng vừa bấm.
+     */
+    private String notFoundUrl(HttpServletRequest request) {
+        return request.getContextPath() + "/customer?error=notfound"
+                + (ROLE_SUPPLIER.equals(roleFromKind(request.getParameter("kind"))) ? "&kind=supplier" : "");
     }
 
     /**

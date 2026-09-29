@@ -331,6 +331,16 @@
             </div>
         </div>
 
+        <%-- Mở / sửa / xoá một khách hàng không còn (đã xoá, link cũ, id sai) thì
+             CustomerController đưa về đây kèm ?error=notfound -- trước đây trang
+             im lặng. Cùng cách với danh sách sản phẩm, phiếu hỗ trợ. --%>
+        <c:if test="${param.error == 'notfound'}">
+            <div class="alert alert-warning py-2 px-3 mb-3" style="font-size: 0.9rem; border-radius: 12px;">
+                <i class="fa-solid fa-circle-exclamation me-1"></i>
+                Không tìm thấy ${kind == 'supplier' ? 'nhà cung cấp' : 'khách hàng'} này. Có thể bản ghi đã bị xoá hoặc đường dẫn không đúng.
+            </div>
+        </c:if>
+
         <!-- ===== Bộ lọc / tìm kiếm ===== -->
         <form class="filter-bar card-box" method="GET" action="${pageContext.request.contextPath}/customer" id="filterForm">
             <input type="hidden" name="action" value="list">
@@ -573,7 +583,7 @@
                                                     <span class="act-lock" title="Do người khác phụ trách, bạn chỉ xem được"><i class="fa-solid fa-lock"></i></span>
                                                 </c:when>
                                                 <c:otherwise>
-                                                    <button class="act-edit" title="Sửa" onclick="location.href='${pageContext.request.contextPath}/customer?action=edit&id=${customer.enterpriseId}'"><i class="fa-solid fa-pen"></i></button>
+                                                    <button class="act-edit" title="Sửa" onclick="location.href='${pageContext.request.contextPath}/customer?action=edit&id=${customer.enterpriseId}&kind=${kind}'"><i class="fa-solid fa-pen"></i></button>
                                                     <button class="act-delete" title="Xóa" data-name="${fn:escapeXml(customer.enterpriseName)}" onclick="openDeleteModal(${customer.enterpriseId}, this.dataset.name)"><i class="fa-solid fa-trash"></i></button>
                                                 </c:otherwise>
                                             </c:choose>
@@ -635,6 +645,10 @@
         <input type="hidden" name="csrfToken" value="${csrfToken}">
         <input type="hidden" name="action" value="delete">
         <input type="hidden" name="id" id="deleteFormId">
+        <%-- Gửi kèm danh sách đang đứng: xoá xong (hoặc xoá hỏng vì bản ghi đã
+             không còn) controller đưa về đúng danh sách này. Thiếu nó thì xoá
+             một nhà cung cấp xong bị đẩy sang danh sách Khách hàng mua. --%>
+        <input type="hidden" name="kind" value="${kind}">
     </form>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
