@@ -316,7 +316,7 @@
                 <%-- Xuất Excel là thao tác ĐỌC: chỉ lấy đúng dữ liệu vai trò này vốn đã
                      xem được trên màn hình, đổi sang dạng file. Nên KHÔNG khoá theo
                      canManage -- xem PERMISSIONS.md. --%>
-                <a href="${pageContext.request.contextPath}/customer?action=exportExcel&kind=${kind}&keyword=${fn:escapeXml(keyword)}&type=${fn:escapeXml(typeFilter)}&assigneeId=${assigneeFilter}${provinceQuery}" class="btn-outline-action"><i class="fa-solid fa-file-excel"></i> Xuất Excel</a>
+                <a href="${pageContext.request.contextPath}/customer?action=exportExcel&kind=${kind}&keyword=${keywordParam}&type=${fn:escapeXml(typeFilter)}&assigneeId=${assigneeFilter}${provinceQuery}" class="btn-outline-action"><i class="fa-solid fa-file-excel"></i> Xuất Excel</a>
                 <c:if test="${canManage}">
                     <a href="${pageContext.request.contextPath}/customer?action=new&kind=${kind}" class="btn-add"><i class="fa-solid fa-plus"></i> ${kind == 'supplier' ? 'Thêm nhà cung cấp' : 'Thêm khách hàng'}</a>
                 </c:if>
@@ -607,11 +607,11 @@
                 <span class="pagination-info" id="paginationInfo">Hiển thị ${fn:length(customerList)} trong tổng số ${totalCount} khách hàng</span>
                 <nav>
                     <ul class="pagination pagination-sm mb-0">
-                        <li class="page-item ${currentPage <= 1 ? 'disabled' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/customer?action=list&kind=${kind}&page=${currentPage - 1}&keyword=${fn:escapeXml(keyword)}&type=${fn:escapeXml(typeFilter)}&assigneeId=${assigneeFilter}${provinceQuery}">Trước</a></li>
+                        <li class="page-item ${currentPage <= 1 ? 'disabled' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/customer?action=list&kind=${kind}&page=${currentPage - 1}&keyword=${keywordParam}&type=${fn:escapeXml(typeFilter)}&assigneeId=${assigneeFilter}${provinceQuery}">Trước</a></li>
                         <c:forEach begin="1" end="${totalPages}" var="p">
-                            <li class="page-item ${p == currentPage ? 'active' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/customer?action=list&kind=${kind}&page=${p}&keyword=${fn:escapeXml(keyword)}&type=${fn:escapeXml(typeFilter)}&assigneeId=${assigneeFilter}${provinceQuery}">${p}</a></li>
+                            <li class="page-item ${p == currentPage ? 'active' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/customer?action=list&kind=${kind}&page=${p}&keyword=${keywordParam}&type=${fn:escapeXml(typeFilter)}&assigneeId=${assigneeFilter}${provinceQuery}">${p}</a></li>
                         </c:forEach>
-                        <li class="page-item ${currentPage >= totalPages ? 'disabled' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/customer?action=list&kind=${kind}&page=${currentPage + 1}&keyword=${fn:escapeXml(keyword)}&type=${fn:escapeXml(typeFilter)}&assigneeId=${assigneeFilter}${provinceQuery}">Sau</a></li>
+                        <li class="page-item ${currentPage >= totalPages ? 'disabled' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/customer?action=list&kind=${kind}&page=${currentPage + 1}&keyword=${keywordParam}&type=${fn:escapeXml(typeFilter)}&assigneeId=${assigneeFilter}${provinceQuery}">Sau</a></li>
                     </ul>
                 </nav>
             </div>

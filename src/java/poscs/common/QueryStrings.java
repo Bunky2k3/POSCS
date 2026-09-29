@@ -56,6 +56,19 @@ public final class QueryStrings {
         return sb.toString();
     }
 
+    /**
+     * Mã hoá MỘT giá trị để ghép vào query string trong JSP ({@code null} ra "").
+     *
+     * <p>Cho những link dựng tay trong JSP như phân trang, lọc danh mục, xuất
+     * Excel: trước đây chúng ghép từ khoá qua fn:escapeXml -- thứ đó chỉ chống
+     * HTML, không mã hoá URL, nên tìm "A&B" thì sang trang 2 chỉ còn "A" (dấu
+     * & tách thành tham số khác), còn "#" cắt cụt mọi thứ phía sau. Giá trị đã
+     * mã hoá chỉ còn chữ, số và %+.-*_ nên in thẳng vào href được.
+     */
+    public static String param(String raw) {
+        return raw == null ? "" : encode(raw);
+    }
+
     private static String encode(String raw) {
         return URLEncoder.encode(raw, StandardCharsets.UTF_8);
     }

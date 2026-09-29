@@ -21,6 +21,7 @@ import org.apache.pdfbox.pdmodel.common.PDRectangle;
 import org.apache.pdfbox.pdmodel.font.PDFont;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import poscs.common.QueryStrings;
 import poscs.common.AccessControl;
 import poscs.common.ExcelUtil;
 import poscs.common.Logs;
@@ -168,6 +169,8 @@ public class TechnicalSupportTicketController extends HttpServlet {
         request.setAttribute("totalPages", totalPages);
         request.setAttribute("totalCount", totalCount);
         request.setAttribute("keyword", keyword);
+        // Bản đã mã hoá URL cho các link phân trang / lọc / xuất -- xem QueryStrings.param.
+        request.setAttribute("keywordParam", QueryStrings.param(keyword));
         request.setAttribute("statusFilter", statusFilter);
         request.setAttribute("priorityFilter", priorityFilter);
         ContractController.setPeriodAttributes(request, period);

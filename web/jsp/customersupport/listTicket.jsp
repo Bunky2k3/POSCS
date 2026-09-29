@@ -206,7 +206,7 @@
                 <%-- Xuất Excel là thao tác ĐỌC: chỉ lấy đúng dữ liệu vai trò này vốn đã
                      xem được trên màn hình, đổi sang dạng file. Nên KHÔNG khoá theo
                      canManage -- xem PERMISSIONS.md. --%>
-                <a href="${pageContext.request.contextPath}/ticket?action=exportExcel&keyword=${fn:escapeXml(keyword)}&status=${fn:escapeXml(statusFilter)}&priority=${fn:escapeXml(priorityFilter)}&year=${yearFilter}&period=${periodFilter}" class="btn-outline-action"><i class="fa-solid fa-file-excel"></i> Xuất Excel</a>
+                <a href="${pageContext.request.contextPath}/ticket?action=exportExcel&keyword=${keywordParam}&status=${fn:escapeXml(statusFilter)}&priority=${fn:escapeXml(priorityFilter)}&year=${yearFilter}&period=${periodFilter}" class="btn-outline-action"><i class="fa-solid fa-file-excel"></i> Xuất Excel</a>
                 <c:if test="${canManage}">
                     <a href="${pageContext.request.contextPath}/ticket?action=new" class="btn-add"><i class="fa-solid fa-plus"></i> Tạo phiếu hỗ trợ</a>
                 </c:if>
@@ -367,11 +367,11 @@
                 <span class="pagination-info" id="paginationInfo">Hiển thị ${fn:length(ticketList)} trong tổng số ${totalCount} phiếu hỗ trợ</span>
                 <nav>
                     <ul class="pagination pagination-sm mb-0">
-                        <li class="page-item ${currentPage <= 1 ? 'disabled' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/ticket?action=list&page=${currentPage - 1}&keyword=${fn:escapeXml(keyword)}&status=${fn:escapeXml(statusFilter)}&priority=${fn:escapeXml(priorityFilter)}&year=${yearFilter}&period=${periodFilter}">Trước</a></li>
+                        <li class="page-item ${currentPage <= 1 ? 'disabled' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/ticket?action=list&page=${currentPage - 1}&keyword=${keywordParam}&status=${fn:escapeXml(statusFilter)}&priority=${fn:escapeXml(priorityFilter)}&year=${yearFilter}&period=${periodFilter}">Trước</a></li>
                         <c:forEach begin="1" end="${totalPages}" var="p">
-                            <li class="page-item ${p == currentPage ? 'active' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/ticket?action=list&page=${p}&keyword=${fn:escapeXml(keyword)}&status=${fn:escapeXml(statusFilter)}&priority=${fn:escapeXml(priorityFilter)}&year=${yearFilter}&period=${periodFilter}">${p}</a></li>
+                            <li class="page-item ${p == currentPage ? 'active' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/ticket?action=list&page=${p}&keyword=${keywordParam}&status=${fn:escapeXml(statusFilter)}&priority=${fn:escapeXml(priorityFilter)}&year=${yearFilter}&period=${periodFilter}">${p}</a></li>
                         </c:forEach>
-                        <li class="page-item ${currentPage >= totalPages ? 'disabled' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/ticket?action=list&page=${currentPage + 1}&keyword=${fn:escapeXml(keyword)}&status=${fn:escapeXml(statusFilter)}&priority=${fn:escapeXml(priorityFilter)}&year=${yearFilter}&period=${periodFilter}">Sau</a></li>
+                        <li class="page-item ${currentPage >= totalPages ? 'disabled' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/ticket?action=list&page=${currentPage + 1}&keyword=${keywordParam}&status=${fn:escapeXml(statusFilter)}&priority=${fn:escapeXml(priorityFilter)}&year=${yearFilter}&period=${periodFilter}">Sau</a></li>
                     </ul>
                 </nav>
             </div>

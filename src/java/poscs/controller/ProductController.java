@@ -17,6 +17,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.Part;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import poscs.common.QueryStrings;
 import poscs.common.AccessControl;
 import poscs.common.FileStorage;
 import poscs.common.Logs;
@@ -149,6 +150,8 @@ public class ProductController extends HttpServlet {
         request.setAttribute("totalPages", totalPages);
         request.setAttribute("totalCount", totalCount);
         request.setAttribute("keyword", keyword);
+        // Bản đã mã hoá URL cho các link phân trang / lọc / xuất -- xem QueryStrings.param.
+        request.setAttribute("keywordParam", QueryStrings.param(keyword));
         request.setAttribute("categoryFilter", categoryFilter);
 
         request.getRequestDispatcher(LIST_VIEW).forward(request, response);

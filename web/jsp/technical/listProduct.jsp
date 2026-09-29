@@ -264,7 +264,7 @@
                 <div class="category-panel-title">Danh mục sản phẩm</div>
                 <ul class="category-list">
                     <li>
-                        <a href="${pageContext.request.contextPath}/product?action=list&keyword=${fn:escapeXml(keyword)}"
+                        <a href="${pageContext.request.contextPath}/product?action=list&keyword=${keywordParam}"
                            class="cat-link ${empty categoryFilter ? 'active' : ''}">
                             <span>Tất cả sản phẩm</span>
                             <span class="category-count">(${grandTotal})</span>
@@ -275,7 +275,7 @@
                     <c:forEach var="l1" items="${rootCategories}">
                         <li class="cat-node">
                             <div class="cat-row">
-                                <a href="${pageContext.request.contextPath}/product?action=list&categoryId=${l1.categoryId}&keyword=${fn:escapeXml(keyword)}"
+                                <a href="${pageContext.request.contextPath}/product?action=list&categoryId=${l1.categoryId}&keyword=${keywordParam}"
                                    class="cat-link ${categoryFilter == l1.categoryId ? 'active' : ''}">
                                     <span>${fn:escapeXml(l1.categoryName)}</span>
                                     <span class="category-count">(${empty categoryCounts[l1.categoryId] ? 0 : categoryCounts[l1.categoryId]})</span>
@@ -294,7 +294,7 @@
                                         <c:forEach var="l2" items="${childrenByParent[l1.categoryId]}">
                                             <li class="cat-node">
                                                 <div class="cat-row">
-                                                    <a href="${pageContext.request.contextPath}/product?action=list&categoryId=${l2.categoryId}&keyword=${fn:escapeXml(keyword)}"
+                                                    <a href="${pageContext.request.contextPath}/product?action=list&categoryId=${l2.categoryId}&keyword=${keywordParam}"
                                                        class="cat-link ${categoryFilter == l2.categoryId ? 'active' : ''}">
                                                         <span>${fn:escapeXml(l2.categoryName)}</span>
                                                         <span class="category-count">(${empty categoryCounts[l2.categoryId] ? 0 : categoryCounts[l2.categoryId]})</span>
@@ -312,7 +312,7 @@
                                                         <ul class="category-sublist">
                                                             <c:forEach var="l3" items="${childrenByParent[l2.categoryId]}">
                                                                 <li>
-                                                                    <a href="${pageContext.request.contextPath}/product?action=list&categoryId=${l3.categoryId}&keyword=${fn:escapeXml(keyword)}"
+                                                                    <a href="${pageContext.request.contextPath}/product?action=list&categoryId=${l3.categoryId}&keyword=${keywordParam}"
                                                                        class="cat-link ${categoryFilter == l3.categoryId ? 'active' : ''}">
                                                                         <span>${fn:escapeXml(l3.categoryName)}</span>
                                                                         <span class="category-count">(${empty categoryCounts[l3.categoryId] ? 0 : categoryCounts[l3.categoryId]})</span>
@@ -344,7 +344,7 @@
                     <c:if test="${not empty categoryFilter}">
                         <span class="active-filter-chip">
                             <i class="fa-solid fa-filter"></i> Đang lọc theo danh mục
-                            <a href="${pageContext.request.contextPath}/product?action=list&keyword=${fn:escapeXml(keyword)}" title="Bỏ lọc"><i class="fa-solid fa-xmark"></i></a>
+                            <a href="${pageContext.request.contextPath}/product?action=list&keyword=${keywordParam}" title="Bỏ lọc"><i class="fa-solid fa-xmark"></i></a>
                         </span>
                     </c:if>
                 </form>
@@ -407,11 +407,11 @@
                             <span class="pagination-info">Hiển thị ${fn:length(productList)} trong tổng số ${totalCount} sản phẩm</span>
                             <nav>
                                 <ul class="pagination pagination-sm mb-0">
-                                    <li class="page-item ${currentPage <= 1 ? 'disabled' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/product?action=list&page=${currentPage - 1}&keyword=${fn:escapeXml(keyword)}&categoryId=${categoryFilter}">Trước</a></li>
+                                    <li class="page-item ${currentPage <= 1 ? 'disabled' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/product?action=list&page=${currentPage - 1}&keyword=${keywordParam}&categoryId=${categoryFilter}">Trước</a></li>
                                     <c:forEach begin="1" end="${totalPages}" var="p">
-                                        <li class="page-item ${p == currentPage ? 'active' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/product?action=list&page=${p}&keyword=${fn:escapeXml(keyword)}&categoryId=${categoryFilter}">${p}</a></li>
+                                        <li class="page-item ${p == currentPage ? 'active' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/product?action=list&page=${p}&keyword=${keywordParam}&categoryId=${categoryFilter}">${p}</a></li>
                                     </c:forEach>
-                                    <li class="page-item ${currentPage >= totalPages ? 'disabled' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/product?action=list&page=${currentPage + 1}&keyword=${fn:escapeXml(keyword)}&categoryId=${categoryFilter}">Sau</a></li>
+                                    <li class="page-item ${currentPage >= totalPages ? 'disabled' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/product?action=list&page=${currentPage + 1}&keyword=${keywordParam}&categoryId=${categoryFilter}">Sau</a></li>
                                 </ul>
                             </nav>
                         </div>
