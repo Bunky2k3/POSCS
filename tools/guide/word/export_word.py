@@ -753,6 +753,7 @@ CHANGES = [
                         'chọn "Nam" (PR #165).'),
     ('29/09/2026', 'S', 'Sản phẩm, Khách hàng: hợp đồng "Chưa hiệu lực" không còn hiện màu đỏ; các danh sách giữ đúng từ khoá '
                         'có dấu & hoặc # khi sang trang (PR #166).'),
+    ('29/09/2026', 'T', 'Phiếu hỗ trợ: ô lọc Người xử lý; kỹ thuật viên mặc định xem phiếu của mình (PR #167).'),
 ]
 
 
