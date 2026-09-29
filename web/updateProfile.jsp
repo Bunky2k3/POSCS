@@ -178,7 +178,9 @@
 
                 <c:if test="${param.onboarding == '1'}">
                     <div class="alert alert-danger py-2 px-3 mb-4" style="font-size: 0.9rem; border-radius: 12px;">
-                        Vui lòng bổ sung đầy đủ thông tin cá nhân (giới tính, ngày sinh, CCCD/CMND, số điện thoại) trước khi tiếp tục sử dụng hệ thống.
+                        <%-- Danh sách lấy từ AuthenticationController.missingRequiredProfileFields:
+                             đúng những ô BẮT BUỘC khi lưu mà hồ sơ đang trống, không chép cứng. --%>
+                        Vui lòng bổ sung thông tin cá nhân trước khi tiếp tục sử dụng hệ thống<c:if test="${not empty missingFields}">. Còn thiếu: <strong><c:out value="${missingFields}"/></strong></c:if>.
                     </div>
                 </c:if>
 
@@ -249,11 +251,15 @@
 
                         <div class="col-md-4 field-row">
                             <label for="gender">Giới tính</label>
+                            <%-- Chưa khai thì để trống chứ không để trình duyệt tự chọn dòng đầu
+                                 ("Nam") -- người dùng dễ bấm Lưu mà không để ý. --%>
                             <select class="form-select" id="gender" name="gender">
+                                <c:if test="${empty profile.gender}"><option value="" selected>-- Chọn giới tính --</option></c:if>
                                 <option value="Nam" ${profile.gender == 'Nam' ? 'selected' : ''}>Nam</option>
                                 <option value="Nữ" ${profile.gender == 'Nữ' ? 'selected' : ''}>Nữ</option>
                                 <option value="Khác" ${profile.gender == 'Khác' ? 'selected' : ''}>Khác</option>
                             </select>
+                            <span class="error-text" id="err-gender">Vui lòng chọn giới tính.</span>
                         </div>
                         <div class="col-md-4 field-row">
                             <label for="dob">Ngày sinh</label>
@@ -394,7 +400,7 @@
             var valid = true;
             document.querySelectorAll('.error-text').forEach(function (el) { el.style.display = 'none'; });
 
-            var requiredIds = ['lastName', 'firstName', 'citizenId', 'dob', 'province', 'district'];
+            var requiredIds = ['lastName', 'firstName', 'gender', 'citizenId', 'dob', 'province', 'district'];
             requiredIds.forEach(function (id) {
                 var el = document.getElementById(id);
                 if (!el.value.trim()) {

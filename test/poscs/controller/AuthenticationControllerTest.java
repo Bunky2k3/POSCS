@@ -1,6 +1,8 @@
 package poscs.controller;
 
 import java.lang.reflect.Field;
+import java.sql.Date;
+import java.util.List;
 import jakarta.servlet.RequestDispatcher;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -14,6 +16,7 @@ import org.mockito.MockedStatic;
 import poscs.common.FileStorage;
 import poscs.dao.AddressDAO;
 import poscs.dao.EmployeeDAO;
+import poscs.model.Address;
 import poscs.model.Role;
 import poscs.model.User;
 
@@ -182,6 +185,68 @@ public class AuthenticationControllerTest {
 
         verify(request).setAttribute("profile", profile);
         verify(dispatcher).forward(request, response);
+    }
+
+    /** Hồ sơ đủ mọi ô bắt buộc khi lưu -- mẫu gốc cho các ca "thiếu" bên dưới. */
+    private static User fullProfile() {
+        User p = new User();
+        p.setLastName("Nguyễn");
+        p.setFirstName("An");
+        p.setGender("Nữ");
+        p.setDateOfBirth(Date.valueOf("1995-05-05"));
+        p.setCitizenId("001095000001");
+        p.setPhone("0912345678");
+        p.setPersonalEmail("an@example.vn");
+        Address a = new Address();
+        a.setDistrictId(120);
+        p.setAddress(a);
+        return p;
+    }
+
+    @Test
+    public void missingRequiredProfileFields_fullProfile_isEmpty() {
+        assertEquals(List.of(), AuthenticationController.missingRequiredProfileFields(fullProfile()));
+    }
+
+    /**
+     * Nhân viên mới do Admin tạo sau V35: thiếu bốn ô cũ VÀ email, địa chỉ. Dải
+     * nhắc trước đây chỉ kể bốn ô -- điền xong bốn ô bấm Lưu mới bị báo thiếu
+     * email, rồi thiếu địa chỉ. Giờ kể đủ một lần.
+     */
+    @Test
+    public void missingRequiredProfileFields_newEmployee_listsEveryFieldSaveRequires() {
+        User p = new User();
+        p.setLastName("Nguyễn");
+        p.setFirstName("An");
+
+        assertEquals(List.of("giới tính", "ngày sinh", "số CCCD/CMND", "số điện thoại",
+                        "email cá nhân", "địa chỉ (tỉnh / thành phố và xã / phường)"),
+                AuthenticationController.missingRequiredProfileFields(p));
+    }
+
+    /** Chỗ trắng (chỉ dấu cách) cũng là trống -- server lưu cũng trim rồi mới kiểm. */
+    @Test
+    public void missingRequiredProfileFields_blankEmailAndNoWard_listsOnlyThose() {
+        User p = fullProfile();
+        p.setPersonalEmail("   ");
+        p.getAddress().setDistrictId(0);
+
+        assertEquals(List.of("email cá nhân", "địa chỉ (tỉnh / thành phố và xã / phường)"),
+                AuthenticationController.missingRequiredProfileFields(p));
+    }
+
+    @Test
+    public void updateProfileForm_setsMissingFieldsAttribute() throws Exception {
+        when(request.getServletPath()).thenReturn("/updateProfile");
+        loggedInSession(userWithPassword("whatever"));
+        User profile = fullProfile();
+        profile.setPersonalEmail(null);
+        when(employeeDAO.findProfileById(7)).thenReturn(profile);
+        when(request.getRequestDispatcher("/updateProfile.jsp")).thenReturn(mock(RequestDispatcher.class));
+
+        controller.doGet(request, response);
+
+        verify(request).setAttribute("missingFields", "email cá nhân");
     }
 
     // ------------------------------------------------------------------

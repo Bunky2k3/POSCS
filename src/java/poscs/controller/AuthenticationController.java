@@ -7,6 +7,8 @@ import java.nio.charset.StandardCharsets;
 import java.sql.Date;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
@@ -187,11 +189,53 @@ public class AuthenticationController extends HttpServlet {
 
         request.setAttribute("profile", profile);
         request.setAttribute("hireDateText", formatDate(profile.getHireDate()));
+        request.setAttribute("missingFields", String.join(", ", missingRequiredProfileFields(profile)));
         // Dropdown "Tỉnh/Thành phố" đổ sẵn (34 dòng, rẻ); dropdown "Xã/Phường"
         // nạp qua AJAX theo tỉnh đã chọn (xem AddressController) thay vì đổ
         // sẵn toàn bộ ~3.321 xã/phường vào trang.
         request.setAttribute("provinceList", addressDAO.findAllProvinces());
         request.getRequestDispatcher("/updateProfile.jsp").forward(request, response);
+    }
+
+    /**
+     * Nhãn các ô mà handleUpdateProfile BẮT BUỘC khi lưu nhưng hồ sơ đang để
+     * trống -- dải nhắc ở updateProfile.jsp in đúng danh sách này.
+     *
+     * <p>Trước đây dải nhắc chép cứng bốn ô của User.isProfileIncomplete (giới
+     * tính, ngày sinh, CCCD, SĐT), trong khi lưu còn bắt buộc email cá nhân và
+     * địa chỉ tới xã/phường: người dùng điền đủ bốn ô, bấm Lưu, rồi mới bị báo
+     * thiếu thêm. Luật ép vào trang (isProfileIncomplete) thì GIỮ NGUYÊN: tài
+     * khoản cũ như admin chưa có email, thêm email vào đó là chặn họ ngay lần
+     * đăng nhập sau.
+     */
+    static List<String> missingRequiredProfileFields(User profile) {
+        List<String> missing = new ArrayList<>();
+        if (isBlank(profile.getLastName()) || isBlank(profile.getFirstName())) {
+            missing.add("họ tên");
+        }
+        if (isBlank(profile.getGender())) {
+            missing.add("giới tính");
+        }
+        if (profile.getDateOfBirth() == null) {
+            missing.add("ngày sinh");
+        }
+        if (isBlank(profile.getCitizenId())) {
+            missing.add("số CCCD/CMND");
+        }
+        if (isBlank(profile.getPhone())) {
+            missing.add("số điện thoại");
+        }
+        if (isBlank(profile.getPersonalEmail())) {
+            missing.add("email cá nhân");
+        }
+        if (profile.getAddress() == null || profile.getAddress().getDistrictId() <= 0) {
+            missing.add("địa chỉ (tỉnh / thành phố và xã / phường)");
+        }
+        return missing;
+    }
+
+    private static boolean isBlank(String value) {
+        return value == null || value.trim().isEmpty();
     }
 
     // ------------------------------------------------------------------
