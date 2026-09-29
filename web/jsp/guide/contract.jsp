@@ -2,7 +2,7 @@
 <%@taglib prefix="c" uri="jakarta.tags.core"%>
 <%--
     Hướng dẫn sử dụng -- phân hệ Hợp đồng (hợp đồng bán, hợp đồng mua, phụ lục,
-    bàn giao, tài liệu, kỳ thanh toán, nhập PDF).
+    bàn giao, tài liệu, kỳ thanh toán).
 
     Viết theo CODE hiện tại (ContractController, ContractDAO, AccessControl và
     các JSP trong jsp/sale/), không theo tài liệu cũ. Ảnh ở web/guide/contract/
@@ -33,8 +33,6 @@
     <tr><td>Đối tác</td><td>Khách hàng mua</td><td>Nhà cung cấp</td></tr>
     <tr><td>Loại hợp đồng</td><td>Cung cấp thiết bị, Thi công lắp đặt, Bảo trì bảo dưỡng</td><td>Mua thiết bị, Mua vật tư, Thuê thi công lắp đặt, Thuê bảo trì</td></tr>
     <tr><td>Lọc theo tỉnh</td><td>Có (tỉnh của khách hàng)</td><td>Không, vì nhà cung cấp không chia theo địa bàn</td></tr>
-    <tr><td>Nhập từ file PDF</td><td>Có</td><td>Không</td></tr>
-    <tr><td>Xuất PDF bản hợp đồng</td><td>Có</td><td>Không, vì mẫu in hiện chỉ dành cho hợp đồng bán</td></tr>
 </table>
 <p><strong>Mã hợp đồng</strong> là số ghi trên bản hợp đồng giấy, do người dùng nhập (ví dụ <code>01/2026/HĐKT-POSTEF</code>). Hệ thống không tự sinh mã, và không hợp đồng hay phụ lục nào được trùng mã.</p>
 
@@ -68,8 +66,8 @@
 <h3 id="quyen">1.3. Ai làm được gì</h3>
 <table class="guide-table">
     <tr><th>Việc</th><th>Admin</th><th>Sales</th><th>Kỹ thuật</th></tr>
-    <tr><td>Xem danh sách, chi tiết, hàng đợi bàn giao; xuất Excel, xuất PDF</td><td>Được</td><td>Được</td><td>Được</td></tr>
-    <tr><td>Tạo hợp đồng, nhập PDF, sửa bản nháp, lập phụ lục</td><td>Được</td><td>Được (*)</td><td>Không</td></tr>
+    <tr><td>Xem danh sách, chi tiết, hàng đợi bàn giao; xuất Excel</td><td>Được</td><td>Được</td><td>Được</td></tr>
+    <tr><td>Tạo hợp đồng, sửa bản nháp, lập phụ lục</td><td>Được</td><td>Được (*)</td><td>Không</td></tr>
     <tr><td>Ký hợp đồng</td><td>Được</td><td>Được (*)</td><td>Không</td></tr>
     <tr><td>Kỳ thanh toán, bàn giao, tài liệu, nối bán – mua, thanh lý, chấm dứt sớm</td><td>Được</td><td>Được (*)</td><td>Không</td></tr>
     <tr><td>Xoá bản nháp</td><td>Được</td><td>Được (*)</td><td>Không</td></tr>
@@ -98,8 +96,7 @@
     <li><strong>Chỉ hợp đồng gốc</strong>: ẩn các phụ lục (mặc định phụ lục hiện thành dòng riêng). <strong>Đang bàn giao</strong>: chỉ những hợp đồng còn chờ ở một phòng nào đó.</li>
     <li><strong>Lọc thêm</strong>: loại hợp đồng, tỉnh, ngày ký, đang chờ ở phòng nào (xem <a href="#loc-them">mục 2.1</a>).</li>
     <li><strong>Dải “Đang xem”</strong>: danh sách đang thu hẹp tới đâu — của ai, và còn hiệu lực trong khoảng nào. Bấm <em>Xem mọi thời điểm</em> (hoặc <em>Chỉ tháng này</em>) để đổi.</li>
-    <li><strong>Xuất Excel</strong>: tải danh sách đang lọc về máy (xem <a href="#xuat-file">mục 15</a>).</li>
-    <li><strong>Nhập PDF</strong>: tạo hợp đồng từ file PDF điền theo mẫu (xem <a href="#nhap-pdf">mục 14</a>).</li>
+    <li><strong>Xuất Excel</strong>: tải danh sách đang lọc về máy (xem <a href="#xuat-file">mục 14</a>).</li>
     <li><strong>Tạo hợp đồng</strong> (xem <a href="#tao-hop-dong">mục 3</a>).</li>
 </ol>
 <div class="guide-warn">
@@ -180,7 +177,6 @@
 <ol class="guide-steps">
     <li><strong>Hai nhãn</strong>: trạng thái theo lịch và tiến độ (<a href="#hai-loai-trang-thai">mục 1.2</a>).</li>
     <li><strong>Mở bản PDF</strong>: mở bản hợp đồng đã ký ở tab mới. Nút chỉ hiện khi tab Tài liệu có một tài liệu loại <em>Hợp đồng đã ký</em> (<a href="#tai-lieu">mục 9</a>).</li>
-    <li><strong>Xuất PDF</strong>: tải về bản hợp đồng in theo mẫu của công ty (<a href="#xuat-file">mục 15</a>). Chỉ có ở hợp đồng bán.</li>
     <li><strong>Quản lý hợp đồng</strong>: sang trang có các nút thao tác. Chỉ người có quyền sửa mới thấy nút này.</li>
     <li><strong>Tiến trình hợp đồng</strong>: Soạn thảo → Ký hợp đồng → Thanh lý (hoặc Chấm dứt sớm). Mỗi bước đã qua ghi ngày và người làm; bước thanh lý ghi kèm căn cứ.</li>
     <li><strong>Thông tin hợp đồng</strong>: mã, loại, khách hàng (bấm để mở hồ sơ khách), người phụ trách, chiều mua/bán, người ký, nơi ký, giá trị. Thẻ này luôn hiện, dù đang đứng ở tab nào.</li>
@@ -262,7 +258,6 @@
 </ol>
 <div class="guide-note">
     <p><strong>Ai ký được:</strong> Admin, và Sales chưa có cấp trên trong sơ đồ tổ chức. Nhân viên có cấp trên không tự ký được — việc ký thuộc về cấp trên.</p>
-    <p>Hợp đồng nhập từ file PDF đã mang sẵn ngày ký ghi trong file: bấm Ký thì giữ nguyên ngày đó.</p>
 </div>
 <div class="guide-warn">
     <p>Ký rồi thì <strong>không quay lại bản nháp được</strong>. Từ lúc này nội dung hợp đồng là chứng cứ: mọi điều khoản bị khoá (<a href="#sau-khi-ky">mục 6.1</a>).</p>
@@ -497,56 +492,10 @@
     <p>Bản ghi bị huỷ biến khỏi mọi danh sách nhưng vẫn nằm trong cơ sở dữ liệu, kèm dòng nhật ký ghi lý do và người huỷ. Huỷ một phụ lục đã ký thì phần giá trị của nó rút khỏi hợp đồng gốc.</p>
 </div>
 
-<h2 id="nhap-pdf">14. Nhập hợp đồng từ file PDF</h2>
-<div class="guide-who"><span class="lbl">Ai làm được:</span><span class="role">Admin</span><span class="role">Sales</span><span class="role no">Kỹ thuật</span></div>
-<p>Dùng khi đã có sẵn thông tin một hợp đồng bán: điền vào file mẫu rồi tải lên, hệ thống tạo hợp đồng — và cả khách hàng, nếu khách chưa có. Mỗi file một hợp đồng. Ở danh sách, bấm <strong>Nhập PDF</strong> (số 9 ở Hình 1).</p>
-<figure class="guide-shot narrow">
-    <a href="${img}/25-nhap-pdf.png" target="_blank"><img src="${img}/25-nhap-pdf.png" alt="Trang Nhập PDF hợp đồng"></a>
-    <figcaption>Hình 25. Trang Nhập PDF hợp đồng</figcaption>
-</figure>
-<ol class="guide-steps">
-    <li><strong>Tải file mẫu (.pdf)</strong>. Mở file bằng một trình đọc PDF điền được form (Adobe Acrobat Reader, Foxit, trình duyệt…), điền theo bảng dưới rồi lưu lại. Giữ nguyên file, đừng in ra PDF khác: hệ thống đọc các ô của chính file mẫu.</li>
-    <li><strong>Chọn tệp</strong>: chọn file đã điền.</li>
-    <li>Bấm <strong>Nhập dữ liệu</strong>.</li>
-</ol>
-<table class="guide-table">
-    <tr><th>Ô trong file mẫu</th><th>Quy định</th></tr>
-    <tr><td>Mã hợp đồng</td><td>Bắt buộc, không trùng mã nào đã có. Dòng “để trống = tự sinh” in trên file mẫu đã cũ: để trống sẽ bị từ chối.</td></tr>
-    <tr><td>Tiêu đề hợp đồng</td><td>Bắt buộc.</td></tr>
-    <tr><td>Loại hợp đồng</td><td>Cung cấp thiết bị, Thi công lắp đặt hoặc Bảo trì bảo dưỡng — file mẫu chỉ dành cho hợp đồng bán.</td></tr>
-    <tr><td>Ngày ký, Hiệu lực từ, Đến ngày</td><td>Bắt buộc, dạng <code>dd/MM/yyyy</code>; ngày ký ≤ hiệu lực từ ≤ đến ngày.</td></tr>
-    <tr><td>Người phụ trách</td><td>Tên đăng nhập của nhân viên. Để trống thì hợp đồng đứng tên người nhập file.</td></tr>
-    <tr><td>Mã số thuế, Tên doanh nghiệp, Email, Điện thoại</td><td>Bắt buộc. Mã số thuế trùng một khách hàng đã có thì hợp đồng gắn vào khách đó.</td></tr>
-    <tr><td>Loại KH, Nhóm KH, Tỉnh/Thành, Xã/Phường, Địa chỉ chi tiết</td><td>Chỉ cần khi mã số thuế chưa có trong hệ thống: hệ thống tạo khách hàng mới từ các ô này. Email và điện thoại không được trùng khách hàng khác.</td></tr>
-    <tr><td>Website, Người đại diện</td><td>Không bắt buộc; chỉ dùng khi tạo khách hàng mới.</td></tr>
-    <tr><td>Hạng mục sản phẩm (tối đa 15 dòng)</td><td>Mỗi dòng: <em>Mã SP</em> đúng như ở trang Sản phẩm và <em>Số lượng</em> (viết <code>1.000</code> cũng được); Đơn vị để trống là “Cái”. Dòng không có Mã SP bị bỏ qua.</td></tr>
-</table>
-<div class="guide-warn">
-    <p>Gõ sai tên đăng nhập ở ô Người phụ trách (không có nhân viên đó) thì hệ thống <strong>không báo lỗi</strong> mà gán hợp đồng cho chính người nhập file. Kiểm lại người phụ trách ở trang chi tiết sau khi nhập.</p>
-</div>
-<div class="guide-note">
-    <p>Nút Nhập PDF có ở cả danh sách hợp đồng mua, nhưng file luôn tạo ra một hợp đồng <strong>bán</strong>.</p>
-</div>
-
-<h3 id="loi-nhap-pdf">14.1. Khi nhập không được</h3>
-<p>Chỉ cần một lỗi là hệ thống <strong>không ghi gì cả</strong>, và liệt kê mọi lỗi một lượt để sửa một lần. Sửa file rồi tải lên lại.</p>
-<figure class="guide-shot narrow">
-    <a href="${img}/26-nhap-pdf-loi.png" target="_blank"><img src="${img}/26-nhap-pdf-loi.png" alt="Danh sách lỗi khi nhập PDF"></a>
-    <figcaption>Hình 26. Tải lên chính file mẫu còn trống: tám lỗi cần sửa</figcaption>
-</figure>
-<div class="guide-note">
-    <p>Nhập thành công thì trang báo “Đã tạo hợp đồng &lt;mã&gt;”, kèm link xem chi tiết. Hợp đồng nhập vào vẫn ở trạng thái <strong>Nháp</strong>: kiểm lại rồi <a href="#ky">Ký</a> — ngày ký giữ theo file.</p>
-</div>
-
-<h2 id="xuat-file">15. Xuất Excel và xuất PDF</h2>
+<h2 id="xuat-file">14. Xuất Excel</h2>
 <div class="guide-who"><span class="lbl">Ai làm được:</span><span class="role">Admin</span><span class="role">Sales</span><span class="role">Kỹ thuật</span></div>
 <p><strong>Xuất Excel</strong> (số 8 ở Hình 1) tải về file <code>.xls</code> chứa <strong>toàn bộ</strong> hợp đồng khớp bộ lọc đang bật — mọi trang, cùng phạm vi và cùng dải “Đang xem” —, xếp theo tỉnh. Các cột gồm: STT, Mã HĐ, Phụ lục của, Tiêu đề, Loại HĐ, Tỉnh/Thành phố, Khách hàng, Người phụ trách, Ngày ký, Ngày hiệu lực, Ngày kết thúc, Trạng thái, Tiến độ. Khách chưa có địa chỉ ghi <em>Chưa xác định</em> ở cột tỉnh.</p>
-<p><strong>Xuất PDF</strong> (số 3 ở Hình 5) tải về bản hợp đồng mua bán in theo mẫu của công ty cho một hợp đồng bán: công ty là bên bán (Bên A), khách hàng là bên mua (Bên B). File gồm mã, ngày ký, thời hạn, người đại diện bên bán (người phụ trách), thông tin bên mua (tên, mã số thuế, địa chỉ, người đại diện, điện thoại, email) và bảng hàng hoá (không có đơn giá). Nếu hàng hoá quá dài không vừa trang, hệ thống báo lỗi thay vì xuất một file thiếu dòng.</p>
-<div class="guide-note">
-    <p>Xuất PDF <strong>chỉ có ở hợp đồng bán</strong>. Mẫu in hiện có viết cho chiều bán — công ty đứng ở phần bên bán — nên chưa dùng được cho hợp đồng mua: trang chi tiết của hợp đồng mua, và của các phụ lục của nó, không có nút Xuất PDF.</p>
-</div>
-
-<h2 id="loi-thuong-gap">16. Thông báo lỗi thường gặp</h2>
+<h2 id="loi-thuong-gap">15. Thông báo lỗi thường gặp</h2>
 <table class="guide-table">
     <tr><th>Thông báo</th><th>Nguyên nhân và cách xử lý</th></tr>
     <tr><td>Chưa ký được: hợp đồng còn thiếu ngày hiệu lực hoặc ngày kết thúc…</td><td>Bấm Quản lý hợp đồng, điền đủ hai ngày ở form, Lưu thay đổi rồi Ký lại.</td></tr>
@@ -565,9 +514,6 @@
     <tr><td>Hai hợp đồng này đã nối với nhau rồi.</td><td>Không cần nối lại.</td></tr>
     <tr><td>Phải có lý do thì mới huỷ được bản ghi hợp đồng.</td><td>Điền ô Lý do trong hộp huỷ bản ghi.</td></tr>
     <tr><td>Không huỷ được bản ghi này…</td><td>Thường do hợp đồng vừa có phụ lục: huỷ các phụ lục trước.</td></tr>
-    <tr><td>Không xuất được PDF: hợp đồng có quá nhiều dòng sản phẩm/ghi chú dài…</td><td>Rút gọn ghi chú của các dòng hàng hoá, hoặc báo quản trị viên.</td></tr>
-    <tr><td>Chưa xuất được PDF cho hợp đồng mua…</td><td>Mẫu in chỉ dành cho hợp đồng bán. Thông báo này hiện khi mở một link xuất PDF cũ của hợp đồng mua; trang chi tiết hợp đồng mua không có nút Xuất PDF.</td></tr>
-    <tr><td>Vui lòng chọn file .pdf để nhập. / File không đúng mẫu… / Không đọc được file…</td><td>Tải lại file mẫu, điền trên chính file đó và lưu dạng PDF có form.</td></tr>
 </table>
 
 <%@ include file="/jsp/guide/_bottom.jspf" %>

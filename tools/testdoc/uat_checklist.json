@@ -253,20 +253,10 @@
     },
     {
       "m": "Quản lý hợp đồng",
-      "c": "Nhập nhanh một hợp đồng mới từ file PDF điền theo mẫu do hệ thống phát ra",
-      "ref": [
-        "TC_CTRIMPORT_001",
-        "TC_CTRIMPORT_002",
-        "TC_CTRIMPORT_003"
-      ]
-    },
-    {
-      "m": "Quản lý hợp đồng",
-      "c": "Xuất danh sách hợp đồng ra Excel và xuất một hợp đồng ra PDF tiếng Việt có dấu",
+      "c": "Xuất danh sách hợp đồng đang lọc ra Excel",
       "ref": [
         "TC_CTREXP_001",
-        "TC_CTREXP_003",
-        "TC_CTREXP_004"
+        "TC_CTREXP_002"
       ]
     },
     {

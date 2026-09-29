@@ -250,8 +250,6 @@ PERM_CASES = [
      {"action": "removeProduct", "contractId": "1",
       "contractProductId": "1"}, 403,
      "CSKH gọi contract action=removeProduct"),
-    ("TC_CTRIMPORT_008", "tech", "POST", "/contract", {"action": "importPdf"}, 403,
-     "Kỹ thuật gọi contract action=importPdf"),
     ("TC_PRDADD_011", "sales", "POST", "/product", {"action": "create"}, 403,
      "Sales gọi product action=create"),
     ("TC_PRDEDIT_009", "cskh", "POST", "/product",
@@ -548,11 +546,6 @@ def test_contract_validation(sessions):
     r = s.get(BASE + "/contract?action=list&status=hacked", allow_redirects=False)
     expect("TC_CTRLIST_008", r.status_code == 200,
            "status=hacked -> HTTP %s (không lỗi 500)" % r.status_code)
-
-    r = s.get(BASE + "/contract?action=exportPdf&id=999999", allow_redirects=False)
-    loc = r.headers.get("Location") or ""
-    expect("TC_CTREXP_005", r.status_code == 302 and "notfound" in loc,
-           "xuất PDF hợp đồng id=999999 -> %s" % loc)
 
 
 def test_ticket_validation(sessions):

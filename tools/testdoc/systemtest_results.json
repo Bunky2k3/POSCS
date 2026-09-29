@@ -174,11 +174,6 @@
     "actual": "Excel hợp đồng lọc Sắp hết hạn: 13 dòng, có chứa hợp đồng vừa tạo",
     "note": ""
   },
-  "ST_CUS_019": {
-    "status": "Đạt",
-    "actual": "PDF hợp đồng: 4 trang, 1223771 byte",
-    "note": ""
-  },
   "ST_CUS_020": {
     "status": "Đạt",
     "actual": "Xoá khách hàng còn hợp đồng hiệu lực -> /POSCS/customer?action=view&id=161&error=has_active_contracts",

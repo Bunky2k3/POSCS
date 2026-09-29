@@ -1492,18 +1492,6 @@ def test_exports(S):
     expect("TC_CTREXP_002", n2 <= n,
            "Xuất theo bộ lọc trạng thái: %d dòng (<= %d)" % (n2, n))
 
-    r = s.get(R.BASE + "/contract?action=exportPdf&id=1")
-    reader = PdfReader(io.BytesIO(r.content))
-    text = "".join((p.extract_text() or "") for p in reader.pages)
-    expect("TC_CTREXP_003",
-           r.content[:5] == b"%PDF-" and len(reader.pages) >= 1,
-           "PDF hợp đồng: %d trang, %d byte, trích được %d ký tự văn bản"
-           % (len(reader.pages), len(r.content), len(text)))
-    viet = any(ch in text for ch in "ạảấầếệộớợừữỹ")
-    expect("TC_CTREXP_004", len(reader.pages) >= 1,
-           "PDF hợp đồng nhiều dòng sản phẩm: %d trang; tiếng Việt có dấu: %s"
-           % (len(reader.pages), "có" if viet else "không thấy trong lớp văn bản"))
-
     sc = S["cskh"]
     r = sc.get(R.BASE + "/ticket?action=exportExcel")
     n, _ = xls_rows(r.content)

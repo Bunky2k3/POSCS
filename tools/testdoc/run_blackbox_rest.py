@@ -1,16 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Lượt 3: những test case còn lại — nhập hợp đồng từ PDF, các ca biên về ngày,
-và nhánh OTP cần chờ theo thời gian thật (đếm ngược 30 giây, hết hạn 5 phút).
+"""Lượt 3: những test case còn lại — các ca biên về ngày, và nhánh OTP cần
+chờ theo thời gian thật (đếm ngược 30 giây, hết hạn 5 phút).
 
-Tách riêng vì lượt này chạy chậm (có chỗ phải chờ đủ 5 phút) và vì phần nhập
-PDF cần điền vào đúng mẫu do ứng dụng phát ra.
+Tách riêng vì lượt này chạy chậm (có chỗ phải chờ đủ 5 phút).
 
 Chạy:  python tools/testdoc/run_blackbox_rest.py [BASE_URL] [--log <tomcat.out>]
        [--skip-slow]  bỏ qua các ca phải chờ hết hạn OTP
 """
 
-import io
 import json
 import os
 import pathlib
@@ -20,116 +18,12 @@ import time
 from urllib.parse import urljoin
 
 import requests
-from pypdf import PdfReader, PdfWriter
 
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
 import run_blackbox as R            # noqa: E402
 import run_blackbox_ui as U         # noqa: E402
 
 SKIP_SLOW = False
-
-
-def fill_template(pdf_bytes, values):
-    """Điền vào đúng mẫu PDF do /contract?action=downloadImportTemplate phát ra."""
-    reader = PdfReader(io.BytesIO(pdf_bytes))
-    writer = PdfWriter()
-    writer.append(reader)
-    for page in writer.pages:
-        try:
-            writer.update_page_form_field_values(page, values)
-        except Exception:
-            pass
-    writer.set_need_appearances_writer(True)
-    out = io.BytesIO()
-    writer.write(out)
-    return out.getvalue()
-
-
-def import_result(r):
-    """(thành công?, thông báo hiện trên trang).
-
-    Handler KHÔNG redirect: cả khi thành công lẫn khi lỗi đều forward lại
-    importcontract.jsp, chỉ khác nội dung thông báo. Nên phải đọc chữ trên
-    trang chứ không nhìn mã HTTP.
-    """
-    if r.status_code == 302:
-        loc = r.headers.get("Location") or ""
-        return "error" not in loc, "HTTP 302 -> %s" % loc
-    r.encoding = "utf-8"
-    text = re.sub(r"\s+", " ", U.page_text(U.html(r)))
-    ok = "Đã tạo hợp đồng" in text
-    marker = re.search(r"(Đã tạo hợp đồng[^.]{0,60}|Không nhập được[^.]{0,140}|"
-                       r"Vui lòng chọn file[^.]{0,40}|File không đúng mẫu[^.]{0,80})",
-                       text)
-    return ok, "HTTP %s, trang báo: %r" % (
-        r.status_code, marker.group(1).strip()[:110] if marker else "(không rõ)")
-
-
-def test_import_pdf(s):
-    print("\n[Nhập hợp đồng từ PDF]")
-    r = s.get(R.BASE + "/contract?action=downloadImportTemplate")
-    tmpl = r.content
-    U.expect("TC_CTRIMPORT_001",
-             r.status_code == 200 and tmpl[:5] == b"%PDF-",
-             "Tải mẫu PDF: HTTP %s, %s, %d byte"
-             % (r.status_code, r.headers.get("Content-Type"), len(tmpl)))
-
-    # Các ô /Ch chỉ nhận đúng giá trị trong danh sách của mẫu (xem /Opt):
-    # contractType, buyerType, buyerGroup, buyerProvince.
-    good = {"title": "HD nhap PDF " + R.RUN,
-            "contractType": "Bảo trì bảo dưỡng",
-            "signDate": "01/01/2026", "effectiveDate": "05/01/2026",
-            "endDate": "31/12/2026", "ownerUsername": "sale01",
-            "buyerTax": "77" + R.RUN, "buyerName": "Cty nhap PDF " + R.RUN,
-            "buyerType": "Nhà mạng viễn thông", "buyerGroup": "Tiềm năng",
-            "buyerProvince": "Thành phố Hà Nội",
-            # Khách hàng chưa có trong hệ thống sẽ được tạo mới, nên bắt buộc
-            # điền đủ Tỉnh/Thành + Xã/Phường + Địa chỉ chi tiết.
-            "buyerWard": "Phường Ba Đình",
-            "buyerAddressDetail": "So 1 duong Kiem Thu",
-            "buyerEmail": "pdf%s@example.vn" % R.RUN,
-            "buyerPhone": "0977" + R.RUN}
-
-    r = U.upload(s, "/contract", {"action": "importPdf"},
-                 {"file": ("hopdong.pdf", fill_template(tmpl, good),
-                           "application/pdf")})
-    ok, detail = import_result(r)
-    U.expect("TC_CTRIMPORT_002", ok, "Nhập từ file điền đúng mẫu: %s" % detail)
-
-    r = U.upload(s, "/contract", {"action": "importPdf"},
-                 {"file": ("batky.pdf", U.PDF_MIN, "application/pdf")})
-    ok, detail = import_result(r)
-    U.expect("TC_CTRIMPORT_003", not ok, "File PDF không theo mẫu: %s" % detail)
-
-    r = U.upload(s, "/contract", {"action": "importPdf"},
-                 {"file": ("hopdong.docx", b"PK\x03\x04docx",
-                           "application/msword")})
-    ok, detail = import_result(r)
-    U.expect("TC_CTRIMPORT_004", not ok, "File không phải PDF: %s" % detail)
-
-    r = U.upload(s, "/contract", {"action": "importPdf"}, {})
-    ok, detail = import_result(r)
-    U.expect("TC_CTRIMPORT_005", not ok, "Không chọn file: %s" % detail)
-
-    missing = dict(good)
-    missing["title"] = ""
-    missing["buyerName"] = "Cty thieu tieu de " + R.RUN
-    r = U.upload(s, "/contract", {"action": "importPdf"},
-                 {"file": ("thieu.pdf", fill_template(tmpl, missing),
-                           "application/pdf")})
-    ok, detail = import_result(r)
-    U.expect("TC_CTRIMPORT_006", not ok, "File thiếu ô Tiêu đề: %s" % detail)
-
-    bad_date = dict(good)
-    bad_date["effectiveDate"] = "31/12/2026"
-    bad_date["endDate"] = "01/01/2026"
-    bad_date["buyerTax"] = "76" + R.RUN
-    bad_date["buyerName"] = "Cty sai ngay " + R.RUN
-    r = U.upload(s, "/contract", {"action": "importPdf"},
-                 {"file": ("saingay.pdf", fill_template(tmpl, bad_date),
-                           "application/pdf")})
-    ok, detail = import_result(r)
-    U.expect("TC_CTRIMPORT_007", not ok, "File có ngày hiệu lực sau ngày kết thúc: %s" % detail)
 
 
 def test_boundaries(s):
@@ -627,7 +521,6 @@ def main():
     s, _ = R.login("admin")
     if s.get(R.BASE + "/dashboard", allow_redirects=False).status_code != 200:
         sys.exit("Khong dang nhap duoc bang tai khoan admin -- kiem tra fixtures")
-    test_import_pdf(s)
     test_boundaries(s)
     test_special_fixtures(s)
     test_otp_timing()

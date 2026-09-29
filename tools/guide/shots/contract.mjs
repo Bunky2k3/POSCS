@@ -7,9 +7,7 @@
  * đánh số theo thứ tự xuất hiện trong trang hướng dẫn (Hình 1, Hình 2...).
  *
  * KHÔNG ảnh nào ghi dữ liệu: các hộp xác nhận (Ký, Thanh lý, Huỷ bản ghi) chỉ
- * mở ra rồi chụp, không bấm Xác nhận; form chỉ điền ví dụ, không gửi. Riêng
- * ảnh 26 có gửi file -- chính file mẫu còn trống -- và bị từ chối trước khi
- * ghi (nhập PDF có lỗi thì không ghi gì).
+ * mở ra rồi chụp, không bấm Xác nhận; form chỉ điền ví dụ, không gửi.
  *
  * Dữ liệu mẫu (bản sao poscs_db, xem V30): sales4 phụ trách 5 tỉnh và đứng tên
  * 05/2026 (id 5), 06/2026 (id 6, hai phụ lục +300tr / -120tr, kỳ đã thu + kỳ
@@ -22,10 +20,6 @@
  * Trang hợp đồng NHỚ TAB cuối cùng (sessionStorage), nên ảnh nào cần tab nào
  * thì tự bấm tab đó -- đừng dựa vào tab mặc định.
  */
-import { fileURLToPath } from 'node:url';
-
-const TEMPLATE = fileURLToPath(new URL('../../../web/WEB-INF/templates/hopdong_import_template.pdf', import.meta.url));
-
 const view = (id) => '/contract?action=view&id=' + id;
 const edit = (id) => '/contract?action=edit&id=' + id;
 const tab = (pane) => '#contractTabs [data-bs-target="#' + pane + '"]';
@@ -62,8 +56,7 @@ export default {
                 { sel: '#toggleAdvanced', n: 6 },
                 { sel: '.filter-bar .scope-note', n: 7 },
                 { sel: '.header-actions a[href*="exportExcel"]', n: 8 },
-                { sel: '.header-actions a[href*="importForm"]', n: 9 },
-                { sel: '.header-actions .btn-add', n: 10 }
+                { sel: '.header-actions .btn-add', n: 9 }
             ],
             // Phần đầu trang tới hết thanh lọc; bảng có ảnh riêng (03). Lề rộng
             // hơn mặc định: nút Tạo hợp đồng nằm sát mép phải của hàng tiêu đề.
@@ -138,11 +131,10 @@ export default {
                 { sel: '.detail-header .status-pill', n: 1 },
                 { sel: '.detail-header .progress-pill', n: 1 },
                 { sel: '.header-actions a[href^="http"]', n: 2 },
-                { sel: '.header-actions a[href*="exportPdf"]', n: 3 },
-                { sel: '.header-actions a[href*="action=edit"]', n: 4 },
-                { sel: '.lifecycle-card', n: 5 },
-                { sel: '.info-card:not(.lifecycle-card)', n: 6 },
-                { sel: '#contractTabs', n: 7 }
+                { sel: '.header-actions a[href*="action=edit"]', n: 3 },
+                { sel: '.lifecycle-card', n: 4 },
+                { sel: '.info-card:not(.lifecycle-card)', n: 5 },
+                { sel: '#contractTabs', n: 6 }
             ],
             clip: '.page-container'
         },
@@ -451,35 +443,6 @@ export default {
                 { sel: '#askOk', n: 2 }
             ],
             clip: '.modal.show .modal-content'
-        },
-
-        // ===== 14. Nhập PDF =====
-        {
-            file: '25-nhap-pdf.png',
-            user: 'sales4',
-            url: '/contract?action=importForm',
-            marks: [
-                { sel: '.template-link', n: 1 },
-                { sel: 'input[type=file]', n: 2 },
-                { sel: '.btn-submit-import', n: 3 }
-            ],
-            clip: '.page-container'
-        },
-        {
-            file: '26-nhap-pdf-loi.png',
-            user: 'sales4',
-            url: '/contract?action=importForm',
-            // Gửi THẬT chính file mẫu còn trống: server liệt kê lỗi và không
-            // ghi gì (nhập PDF có lỗi là không ghi phần nào).
-            before: async (page) => {
-                await page.upload('input[type=file]', TEMPLATE);
-                await page.clickAndWait('.btn-submit-import');
-                await page.waitFor('.error-list');
-            },
-            marks: [
-                { sel: '.error-list', n: null }
-            ],
-            clip: '.page-container'
         }
     ]
 };
