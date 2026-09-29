@@ -325,16 +325,15 @@ hide what the controller would refuse.
   visible to every role that can open that list, and `?action=exportExcel`
   is deliberately *not* gated by `AccessControl.requireFullAccess`. The
   file contains exactly the rows the role can already read on screen — a
-  different container for the same data, not extra access. Contrast with
-  Contract's "Nhập PDF" (`?action=importForm` / `importPdf`), which
-  *creates* contracts and stays Full-access only.
+  different container for the same data, not extra access. (Contract's
+  PDF export/import — `?action=exportPdf`, `importForm`, `importPdf` — was
+  removed at the client's request; those URLs now fall back to the list.)
 - Buttons for Full-access actions (create/update/delete/import) are hidden
   from "View only" roles via the `canManage` request attribute the
   controllers set from `AccessControl.hasFullAccess(...)`. That is a
   presentation convenience so nobody clicks into a 403 — never the
   enforcement itself, which stays in the controller.
-- The **form pages themselves** (`?action=new`, `?action=edit`, and
-  Contract's `?action=importForm`) are gated the same way as the POST that
+- The **form pages themselves** (`?action=new`, `?action=edit`) are gated the same way as the POST that
   submits them, so typing the URL by hand gets a 403 instead of a form that
   can only fail on submit. Ticket's `?action=edit` follows the same rule as
   `handleUpdate`: Full access *or* the assigned technician — gating the form

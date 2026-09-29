@@ -81,7 +81,7 @@
         <p class="text-muted mb-2">Tệp bạn chọn vượt quá dung lượng cho phép nên hệ thống <strong>chưa lưu gì</strong>. Hãy quay lại, chọn tệp nhỏ hơn rồi lưu lại.</p>
         <ul class="text-muted text-start small mb-0">
             <li>Ảnh và catalogue sản phẩm: tối đa 20 MB mỗi tệp, 100 MB mỗi lần lưu.</li>
-            <li>Logo khách hàng, tệp PDF nhập hợp đồng: tối đa 5 MB.</li>
+            <li>Logo khách hàng: tối đa 5 MB.</li>
         </ul>
         <a href="javascript:history.back()" class="btn-back">
             <i class="fa-solid fa-arrow-left me-1"></i> Quay lại

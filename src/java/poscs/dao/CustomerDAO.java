@@ -385,7 +385,7 @@ public class CustomerDAO {
 
     /**
      * Tính mã khách hàng kế tiếp dựa trên 1 mã enterprise_code đã biết, không
-     * cần đọc CSDL -- dùng khi nhập hàng loạt (import Excel/PDF) để không phải
+     * cần đọc CSDL -- dùng khi nhập hàng loạt (import Excel) để không phải
      * lặp lại truy vấn SELECT MAX cho từng dòng, chỉ cần gọi generateNextEnterpriseCode()
      * 1 lần rồi tăng dần bằng hàm này.
      */

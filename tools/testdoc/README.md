@@ -206,7 +206,7 @@ Lưu ý khi viết thêm ca tự động:
 |---|---|---|
 | `run_blackbox.py` | Mã HTTP và tham số redirect: đăng nhập, kiểm tra dữ liệu vào, phân quyền 403, endpoint JSON, path traversal | ~30 giây |
 | `run_blackbox_ui.py` | Nội dung thật: HTML trả về (số dòng, thông báo), file .xls/.pdf tải xuống, tải file lên, mã OTP đọc từ log | ~3 phút |
-| `run_blackbox_rest.py` | Nhập hợp đồng từ PDF, các ca biên về ngày, và những ca phải **chờ theo đồng hồ thật** | ~22 phút |
+| `run_blackbox_rest.py` | Các ca biên về ngày, và những ca phải **chờ theo đồng hồ thật** | ~22 phút |
 
 Chạy theo đúng thứ tự trên; mỗi lượt gộp kết quả vào cùng `blackbox_results.json`.
 
@@ -257,11 +257,6 @@ phút); ba ca tương ứng sẽ thành "N/A" kèm lý do.
   đếm `<tr>` sẽ luôn ra 0. Lưới rỗng vẫn có một phần tử con `.empty-state`.
 - Khi kiểm "kết quả lọc không lẫn giá trị khác", chỉ đọc chữ trong khối kết
   quả: đọc cả trang sẽ dính tên mọi trạng thái trong `<option>` của bộ lọc.
-- Nhập hợp đồng từ PDF: ô chọn file tên là `file`; các ô `/Ch` chỉ nhận đúng
-  giá trị trong `/Opt` của mẫu; khách hàng chưa có trong hệ thống thì phải điền
-  đủ Tỉnh/Thành + Xã/Phường + Địa chỉ chi tiết. Handler **forward** lại trang
-  nhập cả khi thành công lẫn khi lỗi, phải đọc chữ trên trang chứ đừng nhìn mã
-  HTTP.
 - Luôn có ca đối chứng đường đi đúng cho mỗi module. Không có nó thì một payload
   sai toàn tập vẫn làm mọi ca "thiếu trường X" đều đạt.
 

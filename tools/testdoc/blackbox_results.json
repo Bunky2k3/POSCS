@@ -129,11 +129,6 @@
     "actual": "CSKH gọi contract action=removeProduct -> HTTP 403 (mong đợi 403)",
     "note": ""
   },
-  "TC_CTRIMPORT_008": {
-    "status": "Đạt",
-    "actual": "Kỹ thuật gọi contract action=importPdf -> HTTP 403 (mong đợi 403)",
-    "note": ""
-  },
   "TC_PRDADD_011": {
     "status": "Đạt",
     "actual": "Sales gọi product action=create -> HTTP 403 (mong đợi 403)",
@@ -457,11 +452,6 @@
   "TC_CTRLIST_008": {
     "status": "Đạt",
     "actual": "status=hacked -> HTTP 200 (không lỗi 500)",
-    "note": ""
-  },
-  "TC_CTREXP_005": {
-    "status": "Đạt",
-    "actual": "xuất PDF hợp đồng id=999999 -> /POSCS/contract?error=notfound",
     "note": ""
   },
   "TC_TKADD_001": {
@@ -1077,16 +1067,6 @@
   "TC_CTREXP_002": {
     "status": "Đạt",
     "actual": "Xuất theo bộ lọc trạng thái: 8 dòng (<= 133)",
-    "note": ""
-  },
-  "TC_CTREXP_003": {
-    "status": "Đạt",
-    "actual": "PDF hợp đồng: 4 trang, 1224143 byte, trích được 4258 ký tự văn bản",
-    "note": ""
-  },
-  "TC_CTREXP_004": {
-    "status": "Đạt",
-    "actual": "PDF hợp đồng nhiều dòng sản phẩm: 4 trang; tiếng Việt có dấu: có",
     "note": ""
   },
   "TC_TKEXP_001": {
@@ -1852,41 +1832,6 @@
   "TC_ACL_011": {
     "status": "Đạt",
     "actual": "Đổi vai trò có hiệu lực ở phiên sau: đã xác nhận ở TC_EMPEDIT_003 (đổi vai trò lưu thành công) cộng các ca 403 theo vai trò",
-    "note": ""
-  },
-  "TC_CTRIMPORT_001": {
-    "status": "Đạt",
-    "actual": "Tải mẫu PDF: HTTP 200, application/pdf, 1215278 byte",
-    "note": ""
-  },
-  "TC_CTRIMPORT_002": {
-    "status": "Đạt",
-    "actual": "Nhập từ file điền đúng mẫu: HTTP 200, trang báo: 'Đã tạo hợp đồng HD-0147 -- xem chi tiết Tải file mẫu ('",
-    "note": ""
-  },
-  "TC_CTRIMPORT_003": {
-    "status": "Đạt",
-    "actual": "File PDF không theo mẫu: HTTP 200, trang báo: 'File không đúng mẫu (không có field để đọc) -- hãy tải lại file mẫu và điền trên chính file đó'",
-    "note": ""
-  },
-  "TC_CTRIMPORT_004": {
-    "status": "Đạt",
-    "actual": "File không phải PDF: HTTP 200, trang báo: '(không rõ)'",
-    "note": ""
-  },
-  "TC_CTRIMPORT_005": {
-    "status": "Đạt",
-    "actual": "Không chọn file: HTTP 200, trang báo: 'Vui lòng chọn file'",
-    "note": ""
-  },
-  "TC_CTRIMPORT_006": {
-    "status": "Đạt",
-    "actual": "File thiếu ô Tiêu đề: HTTP 200, trang báo: 'Không nhập được -- 1 lỗi cần sửa Thiếu \"Tiêu đề hợp đồng\"'",
-    "note": ""
-  },
-  "TC_CTRIMPORT_007": {
-    "status": "Đạt",
-    "actual": "File có ngày hiệu lực sau ngày kết thúc: HTTP 200, trang báo: 'Không nhập được -- 1 lỗi cần sửa Ngày ký phải ≤ Hiệu lực từ phải ≤ Đến ngày'",
     "note": ""
   },
   "TC_CTRLIST_003": {

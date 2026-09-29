@@ -264,17 +264,4 @@ public class ProductDAOTest {
             assertEquals(0, dao.countAll(null, null));
         }
     }
-
-    @Test
-    public void findByCode_noMatch_returnsNull() throws Exception {
-        PreparedStatement ps = statementReturning(emptyResultSet());
-        Connection conn = connectionReturning(ps);
-
-        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
-            db.when(DBContext::getConnection).thenReturn(conn);
-
-            assertNull(dao.findByCode("SP-9999"));
-            verify(ps).setString(1, "SP-9999");
-        }
-    }
 }

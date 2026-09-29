@@ -393,13 +393,15 @@ def flow_customer():
     expect("ST_CUS_018", n > 1 and any(run in str(c) for c in cells),
            "Excel hợp đồng lọc Sắp hết hạn: %d dòng, có chứa hợp đồng vừa tạo" % n)
 
-    from pypdf import PdfReader
-    import io
+    # Xuất PDF hợp đồng đã gỡ: link cũ phải rơi về danh sách, không ra file.
     r = sales.get(R.BASE + "/contract?action=exportPdf&id=" + ctr_id)
-    ok_pdf = r.content[:5] == b"%PDF-"
-    pages = len(PdfReader(io.BytesIO(r.content)).pages) if ok_pdf else 0
-    expect("ST_CUS_019", ok_pdf and pages >= 1,
-           "PDF hợp đồng: %d trang, %d byte" % (pages, len(r.content)))
+    detail = sales.get(R.BASE + "/contract?action=view&id=" + ctr_id).text
+    expect("ST_CUS_019",
+           r.status_code == 200 and r.content[:5] != b"%PDF-"
+           and "action=exportPdf" not in detail,
+           "Link xuất PDF cũ -> HTTP %s, %s; trang chi tiết %s nút Xuất PDF"
+           % (r.status_code, r.headers.get("Content-Type"),
+              "còn" if "action=exportPdf" in detail else "không còn"))
 
     set_dates(today, time.strftime("%Y-%m-%d", time.localtime(time.time() + 90 * 86400)))
     r = R.post(sales, "/customer", {"action": "delete", "id": cus_id})

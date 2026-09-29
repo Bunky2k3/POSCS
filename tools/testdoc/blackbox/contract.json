@@ -1682,94 +1682,11 @@
       ]
     },
     {
-      "name": "Nhập hợp đồng từ file PDF",
-      "sheet": "ImportContractPdf",
-      "prefix": "TC_CTRIMPORT",
-      "screen": "/POSCS/contract?action=importForm — POST action=importPdf",
-      "description": "Tạo hợp đồng bằng cách tải lên file PDF điền theo mẫu",
-      "precondition": "Đăng nhập bằng Admin hoặc Sales; đã tải mẫu PDF về và điền đủ các ô",
-      "cases": [
-        {
-          "d": "Tải mẫu PDF về",
-          "s": [
-            "Mở màn hình Nhập hợp đồng từ PDF",
-            "Bấm Tải mẫu"
-          ],
-          "t": "-",
-          "e": "Trình duyệt tải về file PDF mẫu có sẵn các ô để điền"
-        },
-        {
-          "d": "Nhập hợp đồng từ file PDF điền đúng mẫu",
-          "s": [
-            "Điền đủ các ô trong file mẫu",
-            "Chọn file ở màn hình nhập",
-            "Bấm Tải lên"
-          ],
-          "t": "File: hopdong_mau_dien_du.pdf",
-          "e": "Tạo được hợp đồng mới với dữ liệu đọc từ file, chuyển sang trang chi tiết để rà lại"
-        },
-        {
-          "d": "Tải lên file PDF không theo mẫu",
-          "s": [
-            "Chọn một file PDF bất kỳ",
-            "Bấm Tải lên"
-          ],
-          "t": "File: tailieu_batky.pdf",
-          "e": "Báo lỗi không đọc được dữ liệu, không tạo hợp đồng rác"
-        },
-        {
-          "d": "Tải lên file không phải PDF",
-          "s": [
-            "Chọn file .docx",
-            "Bấm Tải lên"
-          ],
-          "t": "File: hopdong.docx",
-          "e": "Bị từ chối kèm thông báo chỉ nhận file PDF"
-        },
-        {
-          "d": "Không chọn file nào",
-          "s": [
-            "Bấm Tải lên khi chưa chọn file"
-          ],
-          "t": "File: (không chọn)",
-          "e": "Bị từ chối kèm thông báo thiếu file, không báo lỗi 500"
-        },
-        {
-          "d": "File PDF thiếu ô bắt buộc",
-          "s": [
-            "Xoá trắng ô Tiêu đề trong file mẫu",
-            "Tải lên"
-          ],
-          "t": "File mẫu bỏ trống ô tiêu đề",
-          "e": "Báo lỗi thông tin chưa hợp lệ, không tạo hợp đồng"
-        },
-        {
-          "d": "File PDF có ngày sai thứ tự",
-          "s": [
-            "Điền ngày hiệu lực sau ngày kết thúc trong file mẫu",
-            "Tải lên"
-          ],
-          "t": "Hiệu lực 31/12/2026, kết thúc 01/01/2026",
-          "e": "Bị từ chối đúng như khi nhập tay, không tạo hợp đồng"
-        },
-        {
-          "d": "Vai trò Kỹ thuật gọi thẳng action=importPdf",
-          "s": [
-            "Đăng nhập bằng Kỹ thuật",
-            "Gửi POST action=importPdf kèm file"
-          ],
-          "p": "Đăng nhập bằng vai trò Kỹ thuật",
-          "t": "POST action=importPdf",
-          "e": "Trả về trang lỗi 403, không tạo hợp đồng"
-        }
-      ]
-    },
-    {
-      "name": "Xuất hợp đồng ra Excel và PDF",
+      "name": "Xuất hợp đồng ra Excel",
       "sheet": "ExportContract",
       "prefix": "TC_CTREXP",
-      "screen": "/POSCS/contract?action=exportExcel | action=exportPdf",
-      "description": "Xuất danh sách hợp đồng ra Excel và xuất một hợp đồng ra PDF",
+      "screen": "/POSCS/contract?action=exportExcel",
+      "description": "Xuất danh sách hợp đồng đang lọc ra Excel",
       "precondition": "Đang đăng nhập",
       "cases": [
         {
@@ -1789,33 +1706,6 @@
           ],
           "t": "status: Sắp hết hạn",
           "e": "File chỉ chứa các hợp đồng thoả bộ lọc"
-        },
-        {
-          "d": "Xuất một hợp đồng ra PDF",
-          "s": [
-            "Mở chi tiết hợp đồng",
-            "Bấm Xuất PDF"
-          ],
-          "t": "id hợp đồng bất kỳ",
-          "e": "Tải về file PDF trình bày đúng thông tin hợp đồng, tiếng Việt hiển thị đủ dấu"
-        },
-        {
-          "d": "Xuất PDF hợp đồng có nhiều dòng sản phẩm",
-          "s": [
-            "Mở hợp đồng có trên 20 dòng sản phẩm",
-            "Bấm Xuất PDF"
-          ],
-          "p": "Hợp đồng có rất nhiều dòng sản phẩm hoặc ghi chú dài",
-          "t": "Hợp đồng nhiều dòng sản phẩm",
-          "e": "Hoặc nội dung tự tràn sang trang mới, hoặc hiện thông báo \"Không xuất được PDF: hợp đồng có quá nhiều dòng sản phẩm/ghi chú dài để vừa 1 trang.\" — không tải về file PDF bị cắt mất nội dung"
-        },
-        {
-          "d": "Xuất PDF hợp đồng không tồn tại",
-          "s": [
-            "Gõ thẳng URL xuất PDF với id không có thật"
-          ],
-          "t": "URL: /POSCS/contract?action=exportPdf&id=999999",
-          "e": "Chuyển về danh sách kèm thông báo không tìm thấy, không tải file rỗng"
         }
       ]
     }
