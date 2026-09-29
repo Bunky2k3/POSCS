@@ -739,6 +739,8 @@ CHANGES = [
                         '(PR #157).'),
     ('28/09/2026', 'T', 'Tài liệu này: dựng tự động từ hướng dẫn trong ứng dụng; thêm gói bàn giao, hướng dẫn '
                         'cài đặt, phần tổng quan.'),
+    ('29/09/2026', 'S', 'Phiếu hỗ trợ, Sản phẩm, Khách hàng: xoá không thành công thì trang chi tiết mở lại kèm '
+                        'thông báo (PR #159).'),
 ]
 
 
