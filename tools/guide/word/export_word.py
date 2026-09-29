@@ -745,6 +745,8 @@ CHANGES = [
     ('29/09/2026', 'S', 'Khách hàng: xoá từ danh sách Nhà cung cấp về đúng danh sách; danh sách báo khi không tìm thấy '
                         'bản ghi (PR #161).'),
     ('29/09/2026', 'S', 'Sản phẩm: báo rõ số ảnh, catalogue chưa gỡ hoặc chưa tải lên được khi lưu (PR #162).'),
+    ('29/09/2026', 'S', 'Khách hàng, Nhân viên: báo khi đánh giá xếp hạng, ghi vai khách hàng, khoá / mở khoá tài khoản '
+                        'không lưu được (PR #163).'),
 ]
 
 
