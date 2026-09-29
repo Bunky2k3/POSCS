@@ -355,6 +355,15 @@
         </div>
     </c:if>
 
+    <!-- Lệnh xoá hỏng ở CSDL: sản phẩm vẫn còn, controller đưa về đây thay vì
+         về danh sách như đã xoá xong -->
+    <c:if test="${param.error == 'delete_failed'}">
+        <div class="toast-msg blocked show">
+            <i class="fa-solid fa-circle-xmark"></i>
+            <span>Không xoá được sản phẩm. Vui lòng thử lại.</span>
+        </div>
+    </c:if>
+
     <!-- Form ẩn để gửi yêu cầu xoá qua POST (không đổi state bằng GET) -->
     <form id="deleteForm" method="POST" action="${pageContext.request.contextPath}/product" style="display:none">
         <input type="hidden" name="csrfToken" value="${csrfToken}">

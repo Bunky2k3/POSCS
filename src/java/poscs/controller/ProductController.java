@@ -463,7 +463,14 @@ public class ProductController extends HttpServlet {
             return;
         }
 
-        productDAO.softDelete(id);
+        // Câu UPDATE hỏng thì sản phẩm vẫn còn nguyên: về trang chi tiết của nó
+        // kèm lỗi, không về danh sách như đã xoá xong -- xem ghi chú cùng loại ở
+        // TechnicalSupportTicketController.handleDelete.
+        if (!productDAO.softDelete(id)) {
+            LOG.warn("Xoa san pham that bai (actor={}, productId={})", Logs.actor(request), id);
+            response.sendRedirect(request.getContextPath() + "/product?action=view&id=" + id + "&error=delete_failed");
+            return;
+        }
         response.sendRedirect(request.getContextPath() + "/product");
     }
 
