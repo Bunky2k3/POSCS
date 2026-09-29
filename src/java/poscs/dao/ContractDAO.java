@@ -880,10 +880,9 @@ public class ContractDAO {
                         return -1;
                     }
 
-                    // Chiều có thể null: luồng nhập PDF không gán direction, cột
-                    // trong CSDL tự rơi về DEFAULT 'Bán'. Câu nhật ký không được
-                    // đoán hộ giá trị đó, và càng không được ném NPE làm hỏng cả
-                    // lần tạo hợp đồng chỉ vì một dòng mô tả.
+                    // Chiều có thể null nếu bên gọi quên gán direction. Câu nhật
+                    // ký không được đoán hộ giá trị đó, và càng không được ném
+                    // NPE làm hỏng cả lần tạo hợp đồng chỉ vì một dòng mô tả.
                     insertHistory(conn, newId, ContractHistory.EVENT_CREATED,
                             (parent == null ? "Tạo bản nháp " : "Tạo bản nháp phụ lục ")
                                     + contract.getContractCode()
@@ -926,13 +925,12 @@ public class ContractDAO {
     }
 
     /**
-     * Thêm hàng loạt hạng mục sản phẩm/dịch vụ cho 1 hợp đồng (phục vụ nhập PDF
-     * hợp đồng). Tắt autocommit và tự commit/rollback quanh cả batch -- mặc định
+     * Thêm hạng mục sản phẩm/dịch vụ cho 1 hợp đồng (form Quản lý hợp đồng
+     * gọi với một dòng mỗi lần). Tắt autocommit và tự commit/rollback quanh cả batch -- mặc định
      * autocommit=true của connection thì 1 statement lỗi giữa batch vẫn để lại
      * các statement trước đó đã thi hành thành công, trong khi hàm này cần trả
-     * về true/false đúng nghĩa "tất cả hoặc không gì cả" để bên gọi (xem
-     * ContractController.handleImportPdf) có thể tin tưởng báo "chưa ghi gì vào
-     * CSDL" khi trả về false.
+     * về true/false đúng nghĩa "tất cả hoặc không gì cả" để bên gọi có thể tin
+     * tưởng báo "chưa ghi gì vào CSDL" khi trả về false.
      */
     public boolean insertProducts(int contractId, List<ContractProduct> items, int actorId) {
         if (items.isEmpty()) {
@@ -958,9 +956,8 @@ public class ContractDAO {
                     ps.executeBatch();
                 }
                 // MỘT lời gọi = MỘT dòng nhật ký, kể cả khi thêm nhiều hạng mục:
-                // luồng nhập PDF gắn cả chục dòng hàng hoá trong một lần, tách ra
-                // mỗi hạng mục một dòng lịch sử thì dòng thời gian của hợp đồng
-                // ngập trong các dòng của đúng một thao tác.
+                // tách ra mỗi hạng mục một dòng lịch sử thì dòng thời gian của
+                // hợp đồng ngập trong các dòng của đúng một thao tác.
                 insertHistory(conn, contractId, ContractHistory.EVENT_PRODUCT_ADDED,
                         "Thêm " + items.size() + " hạng mục: " + describeItems(conn, items),
                         actorId, null);
@@ -1953,9 +1950,9 @@ public class ContractDAO {
                     return false;
                 }
 
-                // COALESCE, không phải CURDATE() thẳng: hợp đồng nhập từ file
-                // PDF đã mang sẵn ngày ký đọc từ bản giấy, và đó mới là ngày
-                // ký thật. Đóng dấu đè lên nó là mất hẳn thông tin trên giấy,
+                // COALESCE, không phải CURDATE() thẳng: bản nháp nhập từ file
+                // PDF trước đây (tính năng đã gỡ) mang sẵn ngày ký đọc từ bản
+                // giấy, và đó mới là ngày ký thật. Đóng dấu đè lên nó là mất hẳn thông tin trên giấy,
                 // thay bằng ngày người nhập liệu tình cờ bấm nút. Cột trống
                 // (hợp đồng soạn thẳng trên hệ thống) thì vẫn lấy hôm nay.
                 String sql = PROGRESS_SIGNED.equals(toStatus)

@@ -32,7 +32,7 @@ import static poscs.dao.JdbcStub.*;
  *
  * <ul>
  *   <li>{@code insertProducts} tự quản transaction (tắt autocommit, commit hoặc
- *       rollback cả batch). Bên gọi -- ContractController.handleImportPdf --
+ *       rollback cả batch). Bên gọi (ContractController.handleAddProduct)
  *       dựa vào giá trị false để báo với người dùng "chưa ghi gì vào CSDL", nên
  *       nếu rollback không chạy thì thông báo đó thành nói dối, hợp đồng còn
  *       lại một nửa số hạng mục.</li>

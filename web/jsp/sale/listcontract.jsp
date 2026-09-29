@@ -290,9 +290,9 @@
                      xem được trên màn hình, đổi sang dạng file. Nên KHÔNG khoá theo
                      canManage -- xem PERMISSIONS.md. --%>
                 <a href="${pageContext.request.contextPath}/contract?action=exportExcel&kind=${kind}&keyword=${fn:escapeXml(keyword)}&status=${fn:escapeXml(statusFilter)}&progress=${fn:escapeXml(progressFilter)}&scope=${fn:escapeXml(scopeFilter)}&type=${fn:escapeXml(typeFilter)}${provinceQuery}&year=${yearFilter}&period=${periodFilter}&waitingDept=${waitingDeptFilter}&waiting=${waitingAnyFilter ? '1' : ''}" class="btn-outline-action"><i class="fa-solid fa-file-excel"></i> Xuất Excel</a>
-                <%-- Nhập PDF thì ngược lại: nó TẠO hợp đồng mới, nên vẫn khoá. --%>
+                <%-- Tạo hợp đồng thì ngược lại: nó GHI, nên vẫn khoá. (Nút "Nhập PDF"
+                     đã gỡ theo yêu cầu khách hàng.) --%>
                 <c:if test="${canManage}">
-                    <a href="${pageContext.request.contextPath}/contract?action=importForm" class="btn-outline-action"><i class="fa-solid fa-file-pdf"></i> Nhập PDF</a>
                     <a href="${pageContext.request.contextPath}/contract?action=new&kind=${kind}" class="btn-add"><i class="fa-solid fa-plus"></i> Tạo hợp đồng</a>
                 </c:if>
                 <%-- Nút "Gửi yêu cầu" đã ẩn cùng mục Yêu cầu thay đổi (21/09/2026)
