@@ -126,6 +126,7 @@
         .status-active { background: #e8faf3; color: var(--success); }
         .status-soon { background: #fff4e0; color: var(--warning); }
         .status-expired { background: #fdecef; color: var(--danger); }
+        .status-draft { background: #eef2f6; color: #6b7280; }
 
         .empty-mini { text-align: center; color: #9ca3af; font-size: 0.85rem; padding: 30px 10px; }
 
@@ -296,7 +297,8 @@
                 <c:otherwise>
                     <table class="mini-table">
                         <thead>
-                            <tr><th>Mã hợp đồng</th><th>Tên hợp đồng</th><th>Khách hàng</th><th>Trạng thái</th></tr>
+                            <%-- "Đối tác" chứ không "Khách hàng": sản phẩm có trong cả hợp đồng mua, khi đó bên kia là nhà cung cấp. --%>
+                            <tr><th>Mã hợp đồng</th><th>Tên hợp đồng</th><th>Đối tác</th><th>Trạng thái</th></tr>
                         </thead>
                         <tbody>
                             <c:forEach var="contract" items="${contractList}">
@@ -313,7 +315,10 @@
                                         <c:choose>
                                             <c:when test="${contract.status == 'Đang hiệu lực'}"><span class="status-pill status-active">${contract.status}</span></c:when>
                                             <c:when test="${contract.status == 'Sắp hết hạn'}"><span class="status-pill status-soon">${contract.status}</span></c:when>
-                                            <c:otherwise><span class="status-pill status-expired">${contract.status}</span></c:otherwise>
+                                            <c:when test="${contract.status == 'Đã hết hạn'}"><span class="status-pill status-expired">${contract.status}</span></c:when>
+                                            <%-- Còn lại là "Chưa hiệu lực" (bản nháp, chưa tới ngày hiệu lực): xám như ở
+                                                 danh sách hợp đồng. Trước đây rơi vào nhánh đỏ của "Đã hết hạn". --%>
+                                            <c:otherwise><span class="status-pill status-draft">${contract.status}</span></c:otherwise>
                                         </c:choose>
                                     </td>
                                 </tr>
