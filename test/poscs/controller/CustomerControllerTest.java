@@ -171,6 +171,7 @@ public class CustomerControllerTest {
         when(request.getParameter("id")).thenReturn("7");
         when(customerDAO.findById(7)).thenReturn(new Enterprise());
         when(customerDAO.hasActiveContracts(7)).thenReturn(false);
+        when(customerDAO.softDelete(7)).thenReturn(true);
 
         controller.doPost(request, response);
 
@@ -192,11 +193,46 @@ public class CustomerControllerTest {
         when(request.getParameter("kind")).thenReturn("supplier");
         when(customerDAO.findById(7)).thenReturn(new Enterprise());
         when(customerDAO.hasActiveContracts(7)).thenReturn(false);
+        when(customerDAO.softDelete(7)).thenReturn(true);
 
         controller.doPost(request, response);
 
         verify(customerDAO).softDelete(7);
         verify(response).sendRedirect(CONTEXT_PATH + "/customer?kind=supplier");
+    }
+
+    /**
+     * Câu UPDATE hỏng thì khách vẫn còn: về trang chi tiết kèm lỗi, không về danh
+     * sách như đã xoá xong. Request không gửi kind thì không tự thêm vào -- trang
+     * chi tiết tự suy từ vai của khách.
+     */
+    @Test
+    public void delete_softDeleteFails_redirectsToDetailWithDeleteFailed() throws Exception {
+        when(request.getParameter("action")).thenReturn("delete");
+        when(request.getParameter("id")).thenReturn("7");
+        when(customerDAO.findById(7)).thenReturn(new Enterprise());
+        when(customerDAO.hasActiveContracts(7)).thenReturn(false);
+        when(customerDAO.softDelete(7)).thenReturn(false);
+
+        controller.doPost(request, response);
+
+        verify(response).sendRedirect(CONTEXT_PATH + "/customer?action=view&id=7&error=delete_failed");
+        verify(response, never()).sendRedirect(startsWith(CONTEXT_PATH + "/customer?kind="));
+    }
+
+    /** Xoá hỏng từ phía nhà cung cấp: trang chi tiết vẫn phải ở đúng chiều đó. */
+    @Test
+    public void delete_softDeleteFailsFromSupplierSide_keepsKindOnDetail() throws Exception {
+        when(request.getParameter("action")).thenReturn("delete");
+        when(request.getParameter("id")).thenReturn("7");
+        when(request.getParameter("kind")).thenReturn("supplier");
+        when(customerDAO.findById(7)).thenReturn(new Enterprise());
+        when(customerDAO.hasActiveContracts(7)).thenReturn(false);
+        when(customerDAO.softDelete(7)).thenReturn(false);
+
+        controller.doPost(request, response);
+
+        verify(response).sendRedirect(CONTEXT_PATH + "/customer?action=view&id=7&kind=supplier&error=delete_failed");
     }
 
     // ------------------------------------------------------------------

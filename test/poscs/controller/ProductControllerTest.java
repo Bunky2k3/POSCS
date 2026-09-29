@@ -399,11 +399,27 @@ public class ProductControllerTest {
         when(request.getParameter("id")).thenReturn("7");
         when(productDAO.findById(7)).thenReturn(new Product());
         when(productDAO.isUsedInContracts(7)).thenReturn(false);
+        when(productDAO.softDelete(7)).thenReturn(true);
 
         controller.doPost(request, response);
 
         verify(productDAO).softDelete(7);
         verify(response).sendRedirect(CONTEXT_PATH + "/product");
+    }
+
+    /** Câu UPDATE hỏng thì sản phẩm vẫn còn: về trang chi tiết kèm lỗi, không về danh sách. */
+    @Test
+    public void delete_softDeleteFails_redirectsToDetailWithDeleteFailed() throws Exception {
+        when(request.getParameter("action")).thenReturn("delete");
+        when(request.getParameter("id")).thenReturn("7");
+        when(productDAO.findById(7)).thenReturn(new Product());
+        when(productDAO.isUsedInContracts(7)).thenReturn(false);
+        when(productDAO.softDelete(7)).thenReturn(false);
+
+        controller.doPost(request, response);
+
+        verify(response).sendRedirect(CONTEXT_PATH + "/product?action=view&id=7&error=delete_failed");
+        verify(response, never()).sendRedirect(CONTEXT_PATH + "/product");
     }
 
     // ------------------------------------------------------------------

@@ -244,6 +244,7 @@
     <tr><td>Hợp đồng đã chọn không thuộc về khách hàng của phiếu này…</td><td>Chọn lại hợp đồng của đúng khách, hoặc chọn <em>Không gắn hợp đồng</em>.</td></tr>
     <tr><td>Không tạo được phiếu hỗ trợ. / Không lưu được thay đổi. Vui lòng thử lại.</td><td>Lỗi hệ thống, hoặc phiếu vừa bị người khác xoá. Tải lại trang rồi thử lại; vẫn lỗi thì báo quản trị viên.</td></tr>
     <tr><td>Không xoá được phiếu này vì phiếu đang có người xử lý…</td><td>Phiếu đang ở trạng thái Đang xử lý. Chuyển trạng thái trước rồi xoá (<a href="#xoa">mục 8</a>).</td></tr>
+    <tr><td>Không xoá được phiếu hỗ trợ. Vui lòng thử lại.</td><td>Lỗi hệ thống lúc xoá: phiếu chưa bị xoá, trang chi tiết của phiếu mở lại. Xoá lại; vẫn lỗi thì báo quản trị viên.</td></tr>
     <tr><td>Không tìm thấy phiếu hỗ trợ này. Có thể phiếu đã bị xoá.</td><td>Mở một link cũ tới phiếu đã bị xoá, hoặc mã trên đường dẫn không đúng.</td></tr>
     <tr><td>Không tải được danh sách hợp đồng (trong ô Hợp đồng liên quan)</td><td>Mất kết nối lúc nạp danh sách hợp đồng. Chọn lại khách hàng, hoặc tải lại trang.</td></tr>
     <tr><td>Bạn không có quyền thực hiện thao tác này.</td><td>Kỹ thuật viên mở trang tạo phiếu, hoặc trang sửa của một phiếu không giao cho mình.</td></tr>

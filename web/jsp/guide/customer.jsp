@@ -195,6 +195,7 @@
     <li>Bấm <strong>Xóa</strong> ở trang chi tiết (hoặc nút <i class="fa-solid fa-trash"></i> ở danh sách).</li>
     <li>Kiểm lại tên khách hàng trong hộp xác nhận rồi bấm <strong>Xóa khách hàng</strong>. Bấm <strong>Hủy</strong> nếu đổi ý.</li>
 </ol>
+<p>Nếu trang chi tiết mở lại với thông báo <em>Không xoá được khách hàng. Vui lòng thử lại.</em> thì khách chưa bị xoá do lỗi hệ thống: xoá lại; vẫn lỗi thì báo quản trị viên.</p>
 <div class="guide-warn">
     <p><strong>Không xoá được khách hàng còn hợp đồng đang hiệu lực.</strong> Khi đó trang báo như Hình 10; cần thanh lý hoặc kết thúc các hợp đồng đó trước.</p>
 </div>

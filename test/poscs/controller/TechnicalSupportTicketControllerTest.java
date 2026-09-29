@@ -548,11 +548,30 @@ public class TechnicalSupportTicketControllerTest {
         when(request.getParameter("action")).thenReturn("delete");
         when(request.getParameter("id")).thenReturn("3");
         when(ticketDAO.canDelete(3)).thenReturn(true);
+        when(ticketDAO.softDelete(3)).thenReturn(true);
 
         controller.doPost(request, response);
 
         verify(ticketDAO).softDelete(3);
         verify(response).sendRedirect(CONTEXT_PATH + "/ticket");
+    }
+
+    /**
+     * Câu UPDATE hỏng thì phiếu vẫn còn: phải về trang chi tiết của nó kèm lỗi,
+     * không về danh sách như đã xoá xong -- đúng lỗi cũ, DAO trả false mà
+     * controller không nhìn.
+     */
+    @Test
+    public void delete_softDeleteFails_redirectsToDetailWithDeleteFailed() throws Exception {
+        when(request.getParameter("action")).thenReturn("delete");
+        when(request.getParameter("id")).thenReturn("3");
+        when(ticketDAO.canDelete(3)).thenReturn(true);
+        when(ticketDAO.softDelete(3)).thenReturn(false);
+
+        controller.doPost(request, response);
+
+        verify(response).sendRedirect(CONTEXT_PATH + "/ticket?action=view&id=3&error=delete_failed");
+        verify(response, never()).sendRedirect(CONTEXT_PATH + "/ticket");
     }
 
     // ------------------------------------------------------------------

@@ -157,6 +157,14 @@
                 Không xoá được phiếu này vì phiếu đang có người xử lý (trạng thái <strong>Đang xử lý</strong>). Chỉ xoá được phiếu Mới tiếp nhận hoặc Đã đóng.
             </div>
         </c:if>
+        <%-- Lệnh xoá hỏng ở CSDL: phiếu vẫn còn, controller đưa về đây thay vì
+             về danh sách như đã xoá xong. --%>
+        <c:if test="${param.error == 'delete_failed'}">
+            <div class="alert alert-danger py-2 px-3 mb-3" style="font-size: 0.9rem; border-radius: 12px;">
+                <i class="fa-solid fa-circle-exclamation me-1"></i>
+                Không xoá được phiếu hỗ trợ. Vui lòng thử lại.
+            </div>
+        </c:if>
 
         <!-- ===== Header ===== -->
         <div class="detail-header card-box">

@@ -579,6 +579,15 @@
         </div>
     </c:if>
 
+    <!-- Lệnh xoá hỏng ở CSDL: khách vẫn còn, controller đưa về đây thay vì về
+         danh sách như đã xoá xong -->
+    <c:if test="${param.error == 'delete_failed'}">
+        <div class="toast-msg blocked show">
+            <i class="fa-solid fa-circle-xmark"></i>
+            <span>Không xoá được khách hàng. Vui lòng thử lại.</span>
+        </div>
+    </c:if>
+
     <!-- Sales mở thẳng link Sửa (hoặc gửi Xoá / Đánh giá) trên khách ngoài phạm
          vi của mình -- xem CustomerController.outsideSalesScope. -->
     <c:if test="${param.error == 'not_your_customer'}">

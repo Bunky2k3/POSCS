@@ -638,7 +638,14 @@ public class TechnicalSupportTicketController extends HttpServlet {
             return;
         }
 
-        ticketDAO.softDelete(id);
+        // Câu UPDATE hỏng (mất kết nối, khoá bảng...) thì phiếu vẫn còn nguyên:
+        // về đúng trang chi tiết của nó kèm lỗi. Trước đây luôn về danh sách như
+        // đã xoá xong -- lỗi chỉ nằm trong log của DAO, người dùng không hề biết.
+        if (!ticketDAO.softDelete(id)) {
+            LOG.warn("Xoa phieu ho tro that bai (actor={}, ticketId={})", Logs.actor(request), id);
+            response.sendRedirect(request.getContextPath() + "/ticket?action=view&id=" + id + "&error=delete_failed");
+            return;
+        }
         response.sendRedirect(request.getContextPath() + "/ticket");
     }
 
