@@ -53,23 +53,23 @@
 
 <h2 id="danh-sach">2. Xem và tìm phiếu</h2>
 <div class="guide-who"><span class="lbl">Ai làm được:</span><span class="role">Admin</span><span class="role">Sales</span><span class="role">Kỹ thuật</span></div>
-<p>Bấm <strong>Phiếu hỗ trợ</strong> trên thanh bên trái. Danh sách hiện 10 phiếu mỗi trang, phiếu tạo sau cùng đứng đầu. Vai nào cũng thấy toàn bộ phiếu.</p>
+<p>Bấm <strong>Phiếu hỗ trợ</strong> trên thanh bên trái. Danh sách hiện 10 phiếu mỗi trang, phiếu tạo sau cùng đứng đầu. Vai nào cũng xem được mọi phiếu; riêng kỹ thuật viên mở ra mặc định thấy phiếu giao cho mình (xem số 5).</p>
 <figure class="guide-shot">
     <a href="${img}/01-danh-sach.png" target="_blank"><img src="${img}/01-danh-sach.png" alt="Đầu trang danh sách phiếu hỗ trợ"></a>
     <figcaption>Hình 1. Đầu trang danh sách phiếu hỗ trợ (tài khoản Sales)</figcaption>
 </figure>
 <ol class="guide-steps">
-    <li><strong>Bốn ô đếm</strong>: số phiếu Mới tiếp nhận, Đang xử lý, Đã đóng, và số phiếu mức Khẩn cấp (ở mọi trạng thái). Các ô đếm theo kỳ đang chọn ở số 5, không theo ô tìm kiếm hay ô lọc trạng thái, mức ưu tiên.</li>
+    <li><strong>Bốn ô đếm</strong>: số phiếu Mới tiếp nhận, Đang xử lý, Đã đóng, và số phiếu mức Khẩn cấp (ở mọi trạng thái). Các ô đếm theo người xử lý ở số 5 và kỳ ở số 6, không theo ô tìm kiếm hay ô lọc trạng thái, mức ưu tiên.</li>
     <li><strong>Ô tìm kiếm</strong>: gõ mã phiếu, một đoạn mô tả sự cố hoặc tên khách hàng rồi nhấn Enter.</li>
     <li><strong>Trạng thái</strong>: chỉ xem phiếu ở một trạng thái.</li>
     <li><strong>Mức ưu tiên</strong>: Khẩn cấp, Cao, Bình thường hoặc Thấp.</li>
+    <li><strong>Người xử lý</strong>: <em>Tất cả người xử lý</em>, hoặc một kỹ thuật viên. Kỹ thuật viên có thêm mục <em>Phiếu của tôi</em> và mặc định đứng ở mục này; muốn xem mọi phiếu thì chọn <em>Tất cả người xử lý</em>.</li>
     <li><strong>Năm</strong> và <strong>kỳ</strong>: chọn năm, rồi <em>Cả năm</em>, một quý hoặc một tháng. Lọc theo <strong>ngày tạo</strong> phiếu. <em>Mọi thời điểm</em> (mặc định) là không lọc; ô kỳ chỉ có tác dụng khi đã chọn năm.</li>
     <li><strong>Xuất Excel</strong>: tải danh sách đang lọc về máy (<a href="#xuat-file">mục 9</a>).</li>
     <li><strong>Tạo phiếu hỗ trợ</strong> (<a href="#tao-phieu">mục 3</a>). Chỉ Admin và Sales thấy nút này.</li>
 </ol>
 <div class="guide-note">
-    <p>Đổi ô Trạng thái, Mức ưu tiên, Năm hay Kỳ là danh sách tải lại ngay. Phiếu của một khách hàng còn xem được ở trang chi tiết khách hàng, tab <em>Phiếu hỗ trợ kỹ thuật</em>.</p>
-    <p>Danh sách chưa có ô lọc theo người xử lý. Kỹ thuật viên tìm phiếu của mình ở cột <strong>Người xử lý</strong> (số 4 ở Hình 2), hoặc qua thông báo nhắc hạn (<a href="#sla">mục 7</a>).</p>
+    <p>Đổi ô Trạng thái, Mức ưu tiên, Người xử lý, Năm hay Kỳ là danh sách tải lại ngay. Phiếu của một khách hàng còn xem được ở trang chi tiết khách hàng, tab <em>Phiếu hỗ trợ kỹ thuật</em>.</p>
 </div>
 
 <h3 id="doc-dong">2.1. Đọc một dòng của danh sách</h3>
@@ -233,7 +233,7 @@
 
 <h2 id="xuat-file">9. Xuất Excel và xuất phiếu PDF</h2>
 <div class="guide-who"><span class="lbl">Ai làm được:</span><span class="role">Admin</span><span class="role">Sales</span><span class="role">Kỹ thuật</span></div>
-<p><strong>Xuất Excel</strong> (số 6 ở Hình 1) tải về file <code>.xls</code> chứa <strong>toàn bộ</strong> phiếu khớp bộ lọc đang bật (tìm kiếm, trạng thái, mức ưu tiên, năm và kỳ) chứ không chỉ trang đang xem, phiếu mới nhất ở đầu. Các cột gồm: Mã phiếu, Loại phiếu, Khách hàng, Hợp đồng liên quan, Mức ưu tiên, Kênh tiếp nhận, Trạng thái, Người xử lý, Người tạo, Ngày tạo, Hạn xử lý (SLA), Thời điểm đóng, Bảo hành, Mô tả sự cố, Nguyên nhân sự cố, Nhóm nguyên nhân, Phương hướng xử lý, Kết quả xử lý.</p>
+<p><strong>Xuất Excel</strong> (số 7 ở Hình 1) tải về file <code>.xls</code> chứa <strong>toàn bộ</strong> phiếu khớp bộ lọc đang bật (tìm kiếm, trạng thái, mức ưu tiên, người xử lý, năm và kỳ) chứ không chỉ trang đang xem, phiếu mới nhất ở đầu. Các cột gồm: Mã phiếu, Loại phiếu, Khách hàng, Hợp đồng liên quan, Mức ưu tiên, Kênh tiếp nhận, Trạng thái, Người xử lý, Người tạo, Ngày tạo, Hạn xử lý (SLA), Thời điểm đóng, Bảo hành, Mô tả sự cố, Nguyên nhân sự cố, Nhóm nguyên nhân, Phương hướng xử lý, Kết quả xử lý.</p>
 <p><strong>Xuất phiếu</strong> (số 2 ở Hình 5) tải về bản PDF khổ A4 tiêu đề <em>PHIẾU HỖ TRỢ KỸ THUẬT</em>, để in hoặc gửi khách: mã phiếu, khách hàng, hợp đồng liên quan, loại phiếu, mức ưu tiên, kênh tiếp nhận, trạng thái, ngày tạo, hạn xử lý, kỹ thuật viên phụ trách, thời điểm đóng; rồi bốn đoạn Mô tả sự cố → Nguyên nhân sự cố (nhóm nguyên nhân đứng đầu, trong ngoặc vuông) → Phương hướng xử lý → Kết quả xử lý. Mục trống in dấu gạch ngang; nội dung dài tự sang trang.</p>
 
 <h2 id="loi-thuong-gap">10. Thông báo lỗi thường gặp</h2>
