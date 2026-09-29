@@ -597,6 +597,24 @@
         </div>
     </c:if>
 
+    <%-- Đánh giá lại hỏng ở CSDL: xếp hạng và dòng lịch sử ghi cùng một
+         transaction (CustomerDAO.recordEvaluation), nên không có gì được ghi. --%>
+    <c:if test="${param.error == 'evaluate_failed'}">
+        <div class="toast-msg blocked show">
+            <i class="fa-solid fa-circle-xmark"></i>
+            <span>Chưa lưu được đánh giá. Xếp hạng vẫn như trước, vui lòng thử lại.</span>
+        </div>
+    </c:if>
+
+    <%-- Hồ sơ đã lưu nhưng bước ghi vai (Khách mua / Nhà cung cấp) hỏng. Khách
+         mới tạo thì lúc này chưa nằm trong danh sách nào (bộ lọc theo vai). --%>
+    <c:if test="${param.error == 'roles_not_saved'}">
+        <div class="toast-msg blocked show">
+            <i class="fa-solid fa-circle-xmark"></i>
+            <span>Đã lưu thông tin nhưng chưa ghi được vai Khách mua / Nhà cung cấp. Bấm Sửa, kiểm lại ô vai rồi lưu lại.</span>
+        </div>
+    </c:if>
+
     <!-- Báo kết quả sau khi bấm "Đánh giá lại xếp hạng" -- không có toast này
          thì trang redirect về y hệt lúc trước, người dùng tưởng nút không
          hoạt động (nhất là khi kết quả không đổi so với lần đánh giá gần nhất). -->

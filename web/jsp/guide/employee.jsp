@@ -233,6 +233,7 @@
     <tr><td>Nhân viên này chưa có email cá nhân…</td><td>Bổ sung email ở trang Sửa rồi gửi lại tài khoản.</td></tr>
     <tr><td>Gửi email thất bại nên chưa cấp mật khẩu mới…</td><td>Mật khẩu cũ vẫn dùng được. Kiểm địa chỉ email hoặc cấu hình gửi thư.</td></tr>
     <tr><td>Không thể tự khóa tài khoản đang đăng nhập của chính bạn.</td><td>Admin không khoá được chính mình. Nhờ một Admin khác nếu thật sự cần.</td></tr>
+    <tr><td>Chưa đổi được trạng thái tài khoản. Tài khoản vẫn như trước…</td><td>Lỗi hệ thống khi khoá / mở khoá. Bấm lại; vẫn lỗi thì báo quản trị viên.</td></tr>
 </table>
 
 <%@ include file="/jsp/guide/_bottom.jspf" %>
