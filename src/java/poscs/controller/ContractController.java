@@ -422,7 +422,7 @@ public class ContractController extends HttpServlet {
         Contract contract = id != null ? contractDAO.findById(id) : null;
         if (contract == null) {
             // MSG-021: hợp đồng không tồn tại
-            response.sendRedirect(request.getContextPath() + "/contract?error=notfound");
+            response.sendRedirect(notFoundUrl(request));
             return;
         }
 
@@ -511,6 +511,16 @@ public class ContractController extends HttpServlet {
     }
 
     // static: FilterState (lớp lồng static) cũng dùng chung phép kiểm này.
+    /**
+     * Về danh sách kèm error=notfound, giữ danh sách Hợp đồng mua nếu trang gửi
+     * kind=buy. Bản ghi đã không còn nên không suy được chiều từ nó -- cùng cách
+     * với CustomerController.notFoundUrl.
+     */
+    private String notFoundUrl(HttpServletRequest request) {
+        return request.getContextPath() + "/contract?error=notfound"
+                + ("buy".equals(request.getParameter("kind")) ? "&kind=buy" : "");
+    }
+
     private static boolean isBlank(String value) {
         return value == null || value.trim().isEmpty();
     }
@@ -553,7 +563,7 @@ public class ContractController extends HttpServlet {
         Integer parentId = parseIntOrNull(request.getParameter("parentId"));
         Contract parent = parentId != null ? contractDAO.findById(parentId) : null;
         if (parent == null) {
-            response.sendRedirect(request.getContextPath() + "/contract?error=notfound");
+            response.sendRedirect(notFoundUrl(request));
             return;
         }
         // Kiểm lại ở đây để BÁO ĐÚNG LÝ DO thay vì đưa người dùng vào một form
@@ -584,7 +594,7 @@ public class ContractController extends HttpServlet {
         Integer id = parseIntOrNull(request.getParameter("id"));
         Contract contract = id != null ? contractDAO.findById(id) : null;
         if (contract == null) {
-            response.sendRedirect(request.getContextPath() + "/contract?error=notfound");
+            response.sendRedirect(notFoundUrl(request));
             return;
         }
 
@@ -681,7 +691,11 @@ public class ContractController extends HttpServlet {
         }
         if (newId <= 0) {
             LOG.warn("Tao hop dong that bai (actor={}, contractCode={})", Logs.actor(request), c.getContractCode());
-            response.sendRedirect(request.getContextPath() + "/contract?action=new&error=create_failed");
+            // Mang theo kind như các nhánh lỗi phía trên: thiếu nó thì tạo hợp đồng
+            // MUA hỏng xong bị đưa về form hợp đồng BÁN (bộ loại, ô đối tác đổi hết).
+            response.sendRedirect(request.getContextPath()
+                    + "/contract?action=new&kind=" + (DIRECTION_BUY.equals(c.getDirection()) ? "buy" : "sell")
+                    + "&error=create_failed");
             return;
         }
         response.sendRedirect(request.getContextPath() + "/contract?action=view&id=" + newId);
@@ -695,7 +709,7 @@ public class ContractController extends HttpServlet {
         // Kiểm tồn tại trước khi kiểm dữ liệu: sửa một id không có thật mà báo
         // "dữ liệu chưa hợp lệ" thì người dùng đi sửa form mãi không xong.
         if (id == null || contractDAO.findById(id) == null) {
-            response.sendRedirect(request.getContextPath() + "/contract?error=notfound");
+            response.sendRedirect(notFoundUrl(request));
             return;
         }
 
@@ -772,7 +786,7 @@ public class ContractController extends HttpServlet {
         Integer parentId = parseIntOrNull(request.getParameter("parentId"));
         Contract parent = parentId != null ? contractDAO.findById(parentId) : null;
         if (parent == null) {
-            response.sendRedirect(request.getContextPath() + "/contract?error=notfound");
+            response.sendRedirect(notFoundUrl(request));
             return;
         }
 
@@ -848,7 +862,7 @@ public class ContractController extends HttpServlet {
         Integer id = parseIntOrNull(request.getParameter("contractId"));
         Contract existing = id != null ? contractDAO.findById(id) : null;
         if (existing == null) {
-            response.sendRedirect(request.getContextPath() + "/contract?error=notfound");
+            response.sendRedirect(notFoundUrl(request));
             return;
         }
         String back = "/contract?action=edit&id=" + id;
@@ -907,7 +921,7 @@ public class ContractController extends HttpServlet {
         }
         Integer id = parseIntOrNull(request.getParameter("contractId"));
         if (id == null || contractDAO.findById(id) == null) {
-            response.sendRedirect(request.getContextPath() + "/contract?error=notfound");
+            response.sendRedirect(notFoundUrl(request));
             return;
         }
 
@@ -975,7 +989,7 @@ public class ContractController extends HttpServlet {
         // do, tưởng là vướng ràng buộc nghiệp vụ.
         Contract target = id == null ? null : contractDAO.findById(id);
         if (target == null) {
-            response.sendRedirect(request.getContextPath() + "/contract?error=notfound");
+            response.sendRedirect(notFoundUrl(request));
             return;
         }
 
@@ -1012,7 +1026,7 @@ public class ContractController extends HttpServlet {
         }
         Integer contractId = parseIntOrNull(request.getParameter("contractId"));
         if (contractId == null || contractDAO.findById(contractId) == null) {
-            response.sendRedirect(request.getContextPath() + "/contract?error=notfound");
+            response.sendRedirect(notFoundUrl(request));
             return;
         }
 
@@ -1054,7 +1068,7 @@ public class ContractController extends HttpServlet {
         Integer contractId = parseIntOrNull(request.getParameter("contractId"));
         Integer contractProductId = parseIntOrNull(request.getParameter("contractProductId"));
         if (contractId == null || contractProductId == null) {
-            response.sendRedirect(request.getContextPath() + "/contract?error=notfound");
+            response.sendRedirect(notFoundUrl(request));
             return;
         }
 
@@ -1324,7 +1338,7 @@ public class ContractController extends HttpServlet {
         }
         Integer contractId = parseIntOrNull(request.getParameter("contractId"));
         if (contractId == null || contractDAO.findById(contractId) == null) {
-            response.sendRedirect(request.getContextPath() + "/contract?error=notfound");
+            response.sendRedirect(notFoundUrl(request));
             return;
         }
         String back = "/contract?action=edit&id=" + contractId;
@@ -1375,7 +1389,7 @@ public class ContractController extends HttpServlet {
         Integer handoverId = parseIntOrNull(request.getParameter("handoverId"));
         Integer departmentId = parseIntOrNull(request.getParameter("departmentId"));
         if (contractId == null || handoverId == null || departmentId == null) {
-            response.sendRedirect(request.getContextPath() + "/contract?error=notfound");
+            response.sendRedirect(notFoundUrl(request));
             return;
         }
         if (!AccessControl.canCompleteHandover(request, departmentId)) {
@@ -1453,7 +1467,7 @@ public class ContractController extends HttpServlet {
         }
         Integer contractId = parseIntOrNull(request.getParameter("contractId"));
         if (contractId == null) {
-            response.sendRedirect(request.getContextPath() + "/contract?error=notfound");
+            response.sendRedirect(notFoundUrl(request));
             return;
         }
         String back = "/contract?action=edit&id=" + contractId;
@@ -1496,7 +1510,7 @@ public class ContractController extends HttpServlet {
         Integer contractId = parseIntOrNull(request.getParameter("contractId"));
         Integer documentId = parseIntOrNull(request.getParameter("documentId"));
         if (contractId == null || documentId == null) {
-            response.sendRedirect(request.getContextPath() + "/contract?error=notfound");
+            response.sendRedirect(notFoundUrl(request));
             return;
         }
         String back = "/contract?action=edit&id=" + contractId;
@@ -1534,7 +1548,7 @@ public class ContractController extends HttpServlet {
         Contract current = contractId == null ? null : contractDAO.findById(contractId);
         Contract other = otherId == null ? null : contractDAO.findById(otherId);
         if (current == null) {
-            response.sendRedirect(request.getContextPath() + "/contract?error=notfound");
+            response.sendRedirect(notFoundUrl(request));
             return;
         }
         String back = "/contract?action=edit&id=" + contractId;
@@ -1568,7 +1582,7 @@ public class ContractController extends HttpServlet {
         Integer contractId = parseIntOrNull(request.getParameter("contractId"));
         Integer linkId = parseIntOrNull(request.getParameter("linkId"));
         if (contractId == null || linkId == null) {
-            response.sendRedirect(request.getContextPath() + "/contract?error=notfound");
+            response.sendRedirect(notFoundUrl(request));
             return;
         }
         if (!contractDAO.unlinkContracts(linkId, actorId(request))) {
@@ -1586,7 +1600,7 @@ public class ContractController extends HttpServlet {
         }
         Integer contractId = parseIntOrNull(request.getParameter("contractId"));
         if (contractId == null || contractDAO.findById(contractId) == null) {
-            response.sendRedirect(request.getContextPath() + "/contract?error=notfound");
+            response.sendRedirect(notFoundUrl(request));
             return;
         }
 
@@ -1611,7 +1625,7 @@ public class ContractController extends HttpServlet {
         Integer contractId = parseIntOrNull(request.getParameter("contractId"));
         Integer paymentId = parseIntOrNull(request.getParameter("paymentId"));
         if (contractId == null || paymentId == null) {
-            response.sendRedirect(request.getContextPath() + "/contract?error=notfound");
+            response.sendRedirect(notFoundUrl(request));
             return;
         }
         // Ngày thu mặc định là hôm nay -- phần lớn thao tác là ghi nhận ngay
@@ -1638,7 +1652,7 @@ public class ContractController extends HttpServlet {
         Integer contractId = parseIntOrNull(request.getParameter("contractId"));
         Integer paymentId = parseIntOrNull(request.getParameter("paymentId"));
         if (contractId == null || paymentId == null) {
-            response.sendRedirect(request.getContextPath() + "/contract?error=notfound");
+            response.sendRedirect(notFoundUrl(request));
             return;
         }
 
