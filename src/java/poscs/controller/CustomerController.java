@@ -835,11 +835,21 @@ public class CustomerController extends HttpServlet {
             return;
         }
 
-        customerDAO.softDelete(id);
         // Quay về đúng danh sách người dùng vừa đứng: form xoá ở viewcustomerdetail.jsp
         // gửi kèm kind, vì sau softDelete thì không đọc lại được vai của bản ghi nữa.
         // Thiếu tham số này thì xoá một nhà cung cấp xong bị đẩy sang danh sách khách mua.
         String kind = ROLE_SUPPLIER.equals(roleFromKind(request.getParameter("kind"))) ? "supplier" : "buyer";
+        if (!customerDAO.softDelete(id)) {
+            LOG.warn("Xoa khach hang that bai (actor={}, enterpriseId={})", Logs.actor(request), id);
+            // Khách vẫn còn nguyên: về trang chi tiết của nó chứ không về danh sách
+            // như đã xoá xong. kind chỉ đi kèm khi request có gửi -- không có thì
+            // trang chi tiết tự suy từ vai của khách, đúng hơn là ép về "buyer"
+            // (một nhà cung cấp sẽ hiện như đang ở danh sách khách mua).
+            String kindQuery = request.getParameter("kind") != null ? "&kind=" + kind : "";
+            response.sendRedirect(request.getContextPath()
+                    + "/customer?action=view&id=" + id + kindQuery + "&error=delete_failed");
+            return;
+        }
         response.sendRedirect(request.getContextPath() + "/customer?kind=" + kind);
     }
 
