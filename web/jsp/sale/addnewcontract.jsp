@@ -60,6 +60,9 @@
     <div class="app-shell">
         <c:set var="activeNav" value="contract" scope="request"/>
         <c:set var="activeContractKind" value="${kind}" scope="request"/>
+        <%-- Hợp đồng mua thì đối tác là nhà cung cấp -- ô chọn đã lọc đúng vai
+             (ContractController.showCreateForm), nhãn cũng phải nói đúng. --%>
+        <c:set var="partnerLabel" value="${kind == 'buy' ? 'Nhà cung cấp' : 'Khách hàng'}"/>
         <%@ include file="/jsp/common/sidebar.jsp" %>
         <div class="main-content">
 
@@ -102,7 +105,7 @@
                 <div class="page-header-row">
                     <div>
                         <h2>Tạo hợp đồng</h2>
-                        <p>Khởi tạo hợp đồng mới với khách hàng doanh nghiệp</p>
+                        <p>Khởi tạo hợp đồng mới với ${kind == 'buy' ? 'nhà cung cấp' : 'khách hàng doanh nghiệp'}</p>
                     </div>
                     <a href="${pageContext.request.contextPath}/guide?module=contract#tao-hop-dong" target="_blank" rel="noopener" class="guide-btn" title="Mở hướng dẫn sử dụng ở tab mới"><i class="fa-regular fa-circle-question"></i> Hướng dẫn</a>
                 </div>
@@ -167,7 +170,7 @@
                         <span class="error-text" id="err-title">Tiêu đề không được để trống.</span>
                     </div>
                     <div class="col-md-6 field-row">
-                        <label>Khách hàng <span class="req">*</span></label>
+                        <label>${partnerLabel} <span class="req">*</span></label>
                         <c:choose>
                             <%-- Phụ lục ký với đúng đối tác của hợp đồng gốc, nên đây
                                  chỉ còn là thông tin hiển thị. Không gửi lên (không có
@@ -181,12 +184,12 @@
                             </c:when>
                             <c:otherwise>
                                 <select class="form-select" id="customer" name="enterpriseId">
-                                    <option value="">-- Chọn khách hàng --</option>
+                                    <option value="">-- Chọn ${kind == 'buy' ? 'nhà cung cấp' : 'khách hàng'} --</option>
                                     <c:forEach var="customer" items="${customerList}">
                                         <option value="${customer.enterpriseId}">${fn:escapeXml(customer.enterpriseName)}</option>
                                     </c:forEach>
                                 </select>
-                                <span class="error-text" id="err-customer">Vui lòng chọn khách hàng.</span>
+                                <span class="error-text" id="err-customer">Vui lòng chọn ${kind == 'buy' ? 'nhà cung cấp' : 'khách hàng'}.</span>
                             </c:otherwise>
                         </c:choose>
                     </div>

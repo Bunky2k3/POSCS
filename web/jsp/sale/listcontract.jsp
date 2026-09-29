@@ -302,6 +302,16 @@
             </div>
         </div>
 
+        <%-- Mở / sửa một hợp đồng không còn (đã huỷ bản ghi, link cũ, id sai) thì
+             ContractController đưa về đây kèm ?error=notfound -- trước đây trang
+             im lặng. Cùng cách với danh sách khách hàng, sản phẩm, phiếu hỗ trợ. --%>
+        <c:if test="${param.error == 'notfound'}">
+            <div class="alert alert-warning py-2 px-3 mb-3" style="font-size: 0.9rem; border-radius: 12px;">
+                <i class="fa-solid fa-circle-exclamation me-1"></i>
+                Không tìm thấy hợp đồng này. Có thể bản ghi đã bị huỷ hoặc đường dẫn không đúng.
+            </div>
+        </c:if>
+
         <!-- ===== Dải trạng thái tổng quan (BR-17) ===== -->
         <%-- Bốn ô số này giờ là ĐƯỜNG LỌC theo trạng thái lịch, nên thanh lọc
              bên dưới không còn ô chọn trạng thái nữa. Link mang theo mọi lọc
@@ -614,7 +624,7 @@
                                      vì ba cột cùng bị cắt cụt. --%>
                                 <td class="cell-wrap">
                                     <div class="cell-2line">
-                                        <a href="${pageContext.request.contextPath}/contract?action=view&id=${contract.contractId}" class="contract-title-link">${fn:escapeXml(contract.title)}</a>
+                                        <a href="${pageContext.request.contextPath}/contract?action=view&id=${contract.contractId}&kind=${kind}" class="contract-title-link">${fn:escapeXml(contract.title)}</a>
                                         <span class="cell-sub">
                                             <%-- Nhãn phụ lục đứng TRƯỚC tên khách hàng: nó trả lời
                                                  "dòng này là cái gì", mà câu đó phải đọc được trước
@@ -680,9 +690,9 @@
                                 </td>
                                 <td>
                                     <div class="action-icons">
-                                        <button class="act-view" title="Xem chi tiết" onclick="location.href='${pageContext.request.contextPath}/contract?action=view&id=${contract.contractId}'"><i class="fa-regular fa-eye"></i></button>
+                                        <button class="act-view" title="Xem chi tiết" onclick="location.href='${pageContext.request.contextPath}/contract?action=view&id=${contract.contractId}&kind=${kind}'"><i class="fa-regular fa-eye"></i></button>
                                         <c:if test="${canManage}">
-                                            <button class="act-edit" title="Sửa" onclick="location.href='${pageContext.request.contextPath}/contract?action=edit&id=${contract.contractId}'"><i class="fa-solid fa-pen"></i></button>
+                                            <button class="act-edit" title="Sửa" onclick="location.href='${pageContext.request.contextPath}/contract?action=edit&id=${contract.contractId}&kind=${kind}'"><i class="fa-solid fa-pen"></i></button>
                                             <%-- Không còn nút xoá ở danh sách. Hợp đồng đã ký không
                                                  xoá được theo nghiệp vụ; thứ còn lại là huỷ một bản
                                                  ghi NHẬP NHẦM -- việc của Admin, bắt buộc có lý do,

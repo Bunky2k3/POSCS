@@ -136,6 +136,38 @@ public class ContractControllerTest {
         verify(response).sendRedirect(CONTEXT_PATH + "/contract?error=notfound");
     }
 
+    /** Mở từ danh sách Hợp đồng mua một bản ghi đã không còn: về lại đúng danh sách mua. */
+    @Test
+    public void viewVaEdit_notFoundFromBuyList_keepsBuyList() throws Exception {
+        for (String action : new String[]{"view", "edit"}) {
+            HttpServletRequest req = mock(HttpServletRequest.class);
+            HttpServletResponse resp = mock(HttpServletResponse.class);
+            when(req.getSession(false)).thenReturn(session);
+            when(req.getContextPath()).thenReturn(CONTEXT_PATH);
+            when(req.getParameter("action")).thenReturn(action);
+            when(req.getParameter("id")).thenReturn("123");
+            when(req.getParameter("kind")).thenReturn("buy");
+            when(contractDAO.findById(123)).thenReturn(null);
+
+            controller.doGet(req, resp);
+
+            verify(resp).sendRedirect(CONTEXT_PATH + "/contract?error=notfound&kind=buy");
+        }
+    }
+
+    /** kind lạ thì về danh sách mặc định -- không chép nguyên chuỗi lên URL. */
+    @Test
+    public void view_notFoundWithOddKind_fallsBackToDefaultList() throws Exception {
+        when(request.getParameter("action")).thenReturn("view");
+        when(request.getParameter("id")).thenReturn("123");
+        when(request.getParameter("kind")).thenReturn("x&evil=1");
+        when(contractDAO.findById(123)).thenReturn(null);
+
+        controller.doGet(request, response);
+
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?error=notfound");
+    }
+
     /**
      * Link bản PDF của hợp đồng đi thẳng ra màn hình, KHÔNG qua bước đổi sang
      * link /preview nữa.
@@ -1236,6 +1268,24 @@ public class ContractControllerTest {
         ArgumentCaptor<Contract> saved = ArgumentCaptor.forClass(Contract.class);
         verify(contractDAO).insert(saved.capture(), anyInt());
         assertEquals("Mua", saved.getValue().getDirection());
+    }
+
+    /**
+     * Tạo hợp đồng MUA mà insert hỏng: phải về lại form hợp đồng mua. Trước đây
+     * nhánh create_failed quên kind nên bị đưa sang form hợp đồng bán -- bộ loại
+     * hợp đồng và ô đối tác đổi hết, người dùng tưởng mình bấm nhầm mục.
+     */
+    @Test
+    public void create_kindBuyInsertFails_backToBuyForm() throws Exception {
+        when(request.getParameter("action")).thenReturn("create");
+        stubValidContractFields();
+        when(request.getParameter("kind")).thenReturn("buy");
+        when(customerDAO.findRolesOf(10)).thenReturn(List.of("Nhà cung cấp"));
+        when(contractDAO.insert(any(Contract.class), anyInt())).thenReturn(-1);
+
+        controller.doPost(request, response);
+
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=new&kind=buy&error=create_failed");
     }
 
     /**
