@@ -2,15 +2,15 @@
   "name": "Xử lý phiếu hỗ trợ kỹ thuật",
   "sheet": "WF_PhieuHoTro",
   "prefix": "ST_TK",
-  "description": "CSKH tiếp nhận yêu cầu của khách hàng, gắn đúng hợp đồng và giao cho kỹ thuật viên; kỹ thuật viên cập nhật tiến độ trong phạm vi quyền của mình rồi đóng phiếu; hệ thống ghi lịch sử và cảnh báo khi quá hạn SLA",
-  "precondition": "Đăng nhập được bằng CSKH và Kỹ thuật; đã có khách hàng kèm hợp đồng",
-  "roles": "CSKH (tiếp nhận), Kỹ thuật (xử lý), Sales (chỉ được xem)",
+  "description": "Sales tiếp nhận yêu cầu của khách hàng, gắn đúng hợp đồng và giao cho kỹ thuật viên; kỹ thuật viên cập nhật tiến độ trong phạm vi quyền của mình rồi đóng phiếu; hệ thống ghi lịch sử và cảnh báo khi quá hạn SLA",
+  "precondition": "Đăng nhập được bằng Sales và Kỹ thuật; đã có khách hàng kèm hợp đồng",
+  "roles": "Sales (tiếp nhận — gồm cả tài khoản CSKH cũ), Kỹ thuật (xử lý)",
   "sections": [
     {
-      "name": "Bước 1 — CSKH tiếp nhận phiếu",
+      "name": "Bước 1 — Sales tiếp nhận phiếu",
       "cases": [
         {"d": "Tạo phiếu hỗ trợ gắn đúng hợp đồng của khách hàng",
-         "s": ["Đăng nhập bằng CSKH", "Mở Phiếu hỗ trợ > Thêm phiếu",
+         "s": ["Đăng nhập bằng Sales", "Mở Phiếu hỗ trợ > Thêm phiếu",
                "Chọn khách hàng đã có hợp đồng",
                "Mở dropdown Hợp đồng, chọn một hợp đồng của chính khách hàng đó",
                "Chọn loại phiếu, mức ưu tiên, kênh tiếp nhận, kỹ thuật viên phụ trách",
@@ -54,10 +54,12 @@
          "s": ["Đăng nhập bằng Kỹ thuật",
                "Gửi yêu cầu tạo phiếu mới và yêu cầu xoá phiếu đang giao cho mình"],
          "e": "Cả hai đều trả về 403 — quyền cập nhật phiếu được giao không bao gồm tạo hay xoá"},
-        {"d": "Vai trò Sales chỉ xem được phiếu",
-         "s": ["Đăng nhập bằng Sales", "Mở danh sách phiếu",
-               "Gửi yêu cầu cập nhật một phiếu bất kỳ"],
-         "e": "Xem được danh sách nhưng yêu cầu cập nhật trả về 403"}
+        {"d": "Kỹ thuật viên mặc định chỉ thấy phiếu của mình",
+         "s": ["Đăng nhập bằng kỹ thuật viên thứ hai",
+               "Mở danh sách phiếu",
+               "Chọn \"Tất cả người xử lý\" ở ô Người xử lý"],
+         "e": "Ban đầu ô Người xử lý chọn sẵn \"Phiếu của tôi\": phiếu giao cho người thứ nhất không có trong danh sách, dải KPI chỉ đếm phiếu của người thứ hai. Chọn Tất cả thì phiếu đó hiện ra",
+         "n": "PR #167. Ca \"Sales chỉ xem được phiếu\" cũ bỏ: từ V37 Sales có toàn quyền với phiếu"}
       ]
     },
     {
@@ -100,13 +102,17 @@
         {"d": "Xuất một phiếu ra PDF",
          "s": ["Mở chi tiết phiếu", "Bấm Xuất PDF", "Mở file"],
          "e": "File PDF mở được, nội dung phiếu đầy đủ, tiếng Việt đủ dấu"},
-        {"d": "CSKH xoá phiếu đủ điều kiện",
-         "s": ["Đăng nhập bằng CSKH", "Mở phiếu đủ điều kiện xoá",
+        {"d": "Sales xoá phiếu đủ điều kiện",
+         "s": ["Đăng nhập bằng Sales", "Mở phiếu đủ điều kiện xoá",
                "Bấm Xoá", "Xác nhận"],
          "e": "Xoá thành công; phiếu biến mất khỏi danh sách"},
         {"d": "Mở lại phiếu đã xoá bằng đường dẫn cũ",
          "s": ["Gõ lại URL chi tiết của phiếu vừa xoá"],
-         "e": "Chuyển về danh sách kèm thông báo không tìm thấy, không hiện dữ liệu"}
+         "e": "Chuyển về danh sách kèm thông báo không tìm thấy, không hiện dữ liệu"},
+        {"d": "Lọc theo kỹ thuật viên được giao rồi xuất Excel",
+         "s": ["Đăng nhập bằng Sales", "Chọn kỹ thuật viên thứ nhất ở ô Người xử lý", "Bấm Xuất Excel, mở file"],
+         "e": "Danh sách, dải KPI và file Excel đều chỉ gồm phiếu giao cho kỹ thuật viên đó",
+         "n": "PR #167"}
       ]
     }
   ]

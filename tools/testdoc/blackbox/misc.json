@@ -85,11 +85,12 @@
         {
           "d": "Mọi vai trò đều mở được Dashboard",
           "s": [
-            "Lần lượt đăng nhập bằng Admin, Sales, Kỹ thuật, CSKH",
+            "Lần lượt đăng nhập bằng Admin, Sales, Kỹ thuật",
             "Mở Dashboard"
           ],
           "t": "-",
-          "e": "Cả bốn vai trò đều xem được Dashboard"
+          "e": "Cả ba vai trò đều xem được Dashboard",
+          "n": "Vai CSKH đã gộp vào Sales (V37): hệ thống còn ba vai Admin, Sales, Kỹ thuật"
         },
         {
           "d": "Ô chọn phạm vi \"Của tôi / Toàn chi nhánh\"",
@@ -103,7 +104,7 @@
         {
           "d": "Nhân viên mở trang lần đầu thấy phần việc của mình",
           "s": [
-            "Đăng nhập bằng một tài khoản nhân viên (Sales/Kỹ thuật/CSKH)",
+            "Đăng nhập bằng một tài khoản nhân viên (Sales/Kỹ thuật)",
             "Mở Dashboard"
           ],
           "p": "Tài khoản nhân viên có khách hàng và hợp đồng đứng tên",
@@ -174,13 +175,13 @@
         {
           "d": "Phiếu hỗ trợ trong \"Của tôi\" tính theo hai vai",
           "s": [
-            "Đăng nhập bằng tài khoản CSKH đã tạo phiếu nhưng giao cho kỹ thuật viên khác",
+            "Đăng nhập bằng tài khoản Sales đã tạo phiếu nhưng giao cho kỹ thuật viên khác",
             "Mở Dashboard ở phạm vi \"Của tôi\""
           ],
           "p": "Có phiếu do người này tạo nhưng giao cho người khác xử lý",
           "t": "-",
           "e": "Phiếu đó vẫn nằm trong số liệu của người tạo; kỹ thuật viên được giao mở Dashboard của mình cũng thấy phiếu đó",
-          "n": "Kỹ thuật và CSKH nhìn chung một trang mà \"phiếu của tôi\" với họ là hai nghĩa khác nhau"
+          "n": "Kỹ thuật và Sales nhìn chung một trang mà \"phiếu của tôi\" với họ là hai nghĩa khác nhau"
         },
         {
           "d": "Phạm vi dùng chung với lọc tỉnh và lọc kỳ",
@@ -415,10 +416,10 @@
         {
           "d": "Vai trò không phải Admin gọi thẳng action=download",
           "s": [
-            "Đăng nhập bằng CSKH",
+            "Đăng nhập bằng Sales",
             "Gõ /POSCS/systemLog?action=download&file=poscs.log"
           ],
-          "p": "Đăng nhập bằng vai trò CSKH",
+          "p": "Đăng nhập bằng vai trò Sales",
           "t": "URL: /POSCS/systemLog?action=download&file=poscs.log",
           "e": "Trả về trang lỗi 403 và không có nội dung file nào được trả về"
         }
@@ -585,8 +586,8 @@
       "sheet": "AccessControl",
       "prefix": "TC_ACL",
       "screen": "Toàn hệ thống",
-      "description": "Kiểm tra chéo quyền truy cập của bốn vai trò trên năm nhóm tài nguyên",
-      "precondition": "Có sẵn tài khoản thuộc đủ bốn vai trò: Admin, Sales, Kỹ thuật, CSKH",
+      "description": "Kiểm tra chéo quyền truy cập của ba vai trò trên năm nhóm tài nguyên",
+      "precondition": "Có sẵn tài khoản thuộc đủ ba vai trò: Admin, Sales, Kỹ thuật",
       "cases": [
         {
           "d": "Admin có toàn quyền trên mọi tài nguyên",
@@ -607,14 +608,15 @@
           "e": "Thực hiện được đầy đủ"
         },
         {
-          "d": "Sales chỉ được xem Sản phẩm và Phiếu hỗ trợ",
+          "d": "Sales chỉ được xem Sản phẩm",
           "s": [
             "Đăng nhập bằng Sales",
-            "Mở danh sách Sản phẩm và Phiếu hỗ trợ",
-            "Thử gọi thẳng action=create của hai tài nguyên này"
+            "Mở danh sách Sản phẩm",
+            "Thử gọi thẳng action=create của Sản phẩm"
           ],
-          "t": "POST /POSCS/product action=create và /POSCS/ticket action=create",
-          "e": "Xem được danh sách nhưng mọi thao tác thêm/sửa/xoá đều trả về 403"
+          "t": "POST /POSCS/product action=create",
+          "e": "Xem được danh sách nhưng thêm/sửa/xoá sản phẩm đều trả về 403",
+          "n": "Trước V37 ca này kiểm cả Phiếu hỗ trợ; nay Sales có toàn quyền với phiếu — xem TC_ACL_007"
         },
         {
           "d": "Kỹ thuật toàn quyền với Sản phẩm",
@@ -645,31 +647,33 @@
           "e": "Cập nhật được — đây là ngoại lệ duy nhất của vai trò Kỹ thuật với Phiếu hỗ trợ"
         },
         {
-          "d": "CSKH toàn quyền với Phiếu hỗ trợ",
+          "d": "Sales toàn quyền với Phiếu hỗ trợ",
           "s": [
-            "Đăng nhập bằng CSKH",
+            "Đăng nhập bằng Sales",
             "Thêm/sửa/xoá phiếu hỗ trợ"
           ],
           "t": "-",
-          "e": "Thực hiện được đầy đủ"
+          "e": "Thực hiện được đầy đủ",
+          "n": "Vai CSKH đã gộp vào Sales (V37): hệ thống còn ba vai Admin, Sales, Kỹ thuật; quyền với phiếu của vai CSKH cũ chuyển sang Sales"
         },
         {
-          "d": "CSKH chỉ được xem Khách hàng, Hợp đồng, Sản phẩm",
+          "d": "Kỹ thuật không tạo và không xoá được phiếu hỗ trợ",
           "s": [
-            "Đăng nhập bằng CSKH",
-            "Thử gọi thẳng action=create của ba tài nguyên này"
+            "Đăng nhập bằng Kỹ thuật",
+            "Gửi thẳng POST action=create và action=delete tới /POSCS/ticket"
           ],
-          "t": "POST action=create ở ba tài nguyên",
-          "e": "Đều trả về 403"
+          "t": "POST /POSCS/ticket action=create | action=delete&id=<phiếu của chính mình>",
+          "e": "Đều trả về 403 — ngoại lệ của Kỹ thuật chỉ là cập nhật phiếu được giao cho mình",
+          "n": "Ca CSKH cũ bỏ vì vai này không còn"
         },
         {
           "d": "Chỉ Admin truy cập được Nhân viên và Nhật ký hệ thống",
           "s": [
-            "Lần lượt đăng nhập bằng Sales, Kỹ thuật, CSKH",
+            "Lần lượt đăng nhập bằng Sales, Kỹ thuật",
             "Gõ thẳng /POSCS/employee và /POSCS/systemLog"
           ],
           "t": "-",
-          "e": "Cả ba vai trò đều nhận 403 ở cả hai đường dẫn"
+          "e": "Cả hai vai trò đều nhận 403 ở cả hai đường dẫn"
         },
         {
           "d": "Ẩn nút trên giao diện không phải là lớp bảo vệ duy nhất",
@@ -693,12 +697,12 @@
         {
           "d": "Đổi vai trò có hiệu lực ở phiên đăng nhập tiếp theo",
           "s": [
-            "Admin đổi vai trò của nhân viên B từ Sales sang CSKH",
+            "Admin đổi vai trò của nhân viên B từ Sales sang Kỹ thuật",
             "B đăng xuất và đăng nhập lại",
-            "B thử thêm khách hàng"
+            "B thử thêm khách hàng rồi thêm sản phẩm"
           ],
           "t": "-",
-          "e": "B không còn thêm được khách hàng, nhưng thêm được phiếu hỗ trợ — quyền khớp với vai trò mới"
+          "e": "B không còn thêm được khách hàng (403), nhưng thêm được sản phẩm — quyền khớp với vai trò mới"
         }
       ]
     },

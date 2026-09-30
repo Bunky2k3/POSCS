@@ -3,7 +3,7 @@
   "sheet": "WF_KhachHang_HopDong",
   "prefix": "ST_CUS",
   "description": "Sales tiếp nhận khách hàng mới, đánh giá quan hệ, ký hợp đồng kèm sản phẩm, theo dõi hợp đồng đổi trạng thái theo thời gian, nhận thông báo sắp hết hạn và xuất báo cáo",
-  "precondition": "Đăng nhập bằng tài khoản Sales; danh mục sản phẩm đã có dữ liệu",
+  "precondition": "Đăng nhập bằng tài khoản Sales đã được giao tỉnh (vd sales4 cầm Hà Nội); danh mục sản phẩm đã có dữ liệu",
   "roles": "Sales (chính), Admin (đối chiếu Dashboard)",
   "sections": [
     {
@@ -13,8 +13,8 @@
          "s": ["Đăng nhập bằng Sales", "Mở Khách hàng > Thêm khách hàng",
                "Nhập tên doanh nghiệp, loại, nhóm, mã số thuế",
                "Nhập điện thoại, email, chọn Tỉnh/Thành và Xã/Phường",
-               "Chọn chính mình làm người phụ trách", "Bấm Lưu"],
-         "e": "Lưu thành công, chuyển sang trang chi tiết, mã khách hàng sinh tự động"},
+               "Kiểm ô Người phụ trách chính: đã khoá sẵn tên mình, không có bước chọn", "Bấm Lưu"],
+         "e": "Ô tỉnh chỉ có các tỉnh mình cầm; lưu thành công, chuyển sang trang chi tiết, mã khách hàng KH-xxxx sinh tự động, người phụ trách là chính người tạo"},
         {"d": "Khách hàng mới xuất hiện trong danh sách và tìm được theo mã số thuế",
          "s": ["Quay về danh sách khách hàng",
                "Nhập mã số thuế vừa tạo vào ô tìm kiếm", "Bấm Tìm"],
@@ -25,7 +25,7 @@
          "e": "Số tổng khách hàng tăng đúng 1 đơn vị"},
         {"d": "Đánh giá mức quan hệ lần đầu cho khách hàng",
          "s": ["Mở chi tiết khách hàng", "Bấm Đánh giá",
-               "Chọn mức Tiềm năng/Tốt và nhập lý do", "Bấm Lưu"],
+               "Chọn mức Tốt và nhập lý do", "Bấm Lưu"],
          "e": "Mức quan hệ hiện tại đổi theo lựa chọn; lịch sử đánh giá thêm một dòng ghi đúng người và ngày"}
       ]
     },
@@ -33,11 +33,12 @@
       "name": "Bước 2 — Ký hợp đồng và gắn sản phẩm",
       "cases": [
         {"d": "Tạo hợp đồng cho đúng khách hàng vừa tiếp nhận",
-         "s": ["Mở Hợp đồng > Thêm hợp đồng", "Nhập tiêu đề và loại hợp đồng",
+         "s": ["Mở Hợp đồng bán > Thêm hợp đồng", "Nhập mã hợp đồng (số trên bản giấy), tiêu đề và loại hợp đồng",
                "Chọn khách hàng vừa tạo, chọn người phụ trách",
-               "Chọn ngày ký, ngày hiệu lực trong tương lai, ngày kết thúc",
-               "Bấm Lưu"],
-         "e": "Lưu thành công, mã hợp đồng sinh tự động; trạng thái hiển thị là Chưa hiệu lực vì chưa tới ngày hiệu lực"},
+               "Bấm Lưu",
+               "Bấm Quản lý hợp đồng, nhập ngày hiệu lực trong tương lai và ngày kết thúc, bấm Lưu thay đổi"],
+         "e": "Form tạo không có ô ngày; lưu ra bản Nháp mang đúng mã đã nhập. Sau khi nhập thời hạn ở trang Quản lý, trạng thái hiển thị là Chưa hiệu lực vì chưa tới ngày hiệu lực",
+         "n": "PR #164: thời hạn nhập ở trang Quản lý hợp đồng, ngày ký đóng dấu lúc bấm Ký"},
         {"d": "Hợp đồng xuất hiện trong khối hợp đồng của khách hàng",
          "s": ["Mở lại trang chi tiết khách hàng"],
          "e": "Khối hợp đồng liệt kê đúng hợp đồng vừa tạo kèm trạng thái tương ứng"},
@@ -72,10 +73,11 @@
         {"d": "Hợp đồng quá ngày kết thúc thì chuyển sang Đã hết hạn",
          "s": ["Sửa ngày kết thúc về một ngày trong quá khứ", "Lưu và xem lại"],
          "e": "Trạng thái hiển thị là Đã hết hạn"},
-        {"d": "Hợp đồng đã có hiệu lực thì không xoá được",
-         "s": ["Mở chi tiết hợp đồng đang hoặc đã có hiệu lực", "Bấm Xoá", "Xác nhận"],
-         "e": "Bị chặn kèm thông báo không thể xoá; hợp đồng vẫn còn trong danh sách",
-         "n": "BR-46: chỉ hợp đồng Chưa hiệu lực mới được xoá"}
+        {"d": "Hợp đồng đã ký thì Sales không huỷ được bản ghi",
+         "s": ["Mở trang Quản lý của một hợp đồng Đã ký (dữ liệu demo)",
+               "Gửi thẳng POST action=delete kèm lý do"],
+         "e": "Không có nút Huỷ bản ghi; POST trả về trang lỗi 403; hợp đồng vẫn còn trong danh sách",
+         "n": "\"Huỷ bản ghi\" thay cho \"Xoá hợp đồng\": hợp đồng đã ký chỉ Admin huỷ được, bắt buộc lý do; bản Nháp thì Sales huỷ được. Dùng hợp đồng demo đã ký vì hợp đồng của luồng này còn phải sửa thời hạn ở các bước sau"}
       ]
     },
     {
@@ -103,7 +105,15 @@
         {"d": "Xoá khách hàng bị chặn khi còn hợp đồng hiệu lực",
          "s": ["Đưa hợp đồng về trạng thái Đang hiệu lực",
                "Mở chi tiết khách hàng", "Bấm Xoá", "Xác nhận"],
-         "e": "Bị chặn kèm thông báo khách hàng còn hợp đồng đang hiệu lực"}
+         "e": "Bị chặn kèm thông báo khách hàng còn hợp đồng đang hiệu lực"},
+        {"d": "Sales tạo nhà cung cấp rồi lập hợp đồng mua với nhà cung cấp đó",
+         "s": ["Mở Khách hàng > Nhà cung cấp, bấm Thêm nhà cung cấp, điền đủ, bấm Lưu", "Mở Hợp đồng mua > Thêm hợp đồng", "Chọn nhà cung cấp vừa tạo ở ô Nhà cung cấp, điền nốt các ô, bấm Lưu"],
+         "e": "Nhà cung cấp mang mã NCC-xxx, người phụ trách khoá đúng tên người tạo, nằm ở danh sách Nhà cung cấp; form Hợp đồng mua ghi nhãn Nhà cung cấp và liệt kê nhà cung cấp vừa tạo; hợp đồng lưu xong nằm ở mục Hợp đồng mua",
+         "n": "PR #149, #164"},
+        {"d": "Sales khác, ngoài phạm vi, chỉ xem được khách vừa tạo",
+         "s": ["Đăng nhập bằng sales1 (chỉ cầm Lai Châu)", "Mở chi tiết khách hàng tạo ở bước 1 (Hà Nội, do sales4 phụ trách)", "Gõ thẳng URL action=edit của khách đó"],
+         "e": "Trang chi tiết không có nút Sửa / Xóa / Đánh giá, ghi \"Do <tên sales4> phụ trách, bạn chỉ xem được\"; link Sửa đưa về trang chi tiết với \"Bạn chỉ xem được khách hàng này: khách do người khác phụ trách.\"",
+         "n": "PR #155"}
       ]
     }
   ]
