@@ -3,28 +3,28 @@
   "items": [
     {
       "m": "Xác thực & tài khoản",
-      "c": "Đăng nhập được bằng tên đăng nhập hoặc email công ty, sai thông tin thì bị từ chối",
+      "c": "Đăng nhập được bằng tên đăng nhập, sai thông tin thì bị từ chối",
       "ref": [
         "TC_LOGIN_001",
         "TC_LOGIN_002",
-        "TC_LOGIN_005",
-        "TC_LOGIN_006"
+        "TC_LOGIN_004",
+        "TC_LOGIN_005"
       ]
     },
     {
       "m": "Xác thực & tài khoản",
       "c": "Báo lỗi khi sai tài khoản giống hệt khi sai mật khẩu, không để lộ tài khoản nào có thật",
       "ref": [
-        "TC_LOGIN_005"
+        "TC_LOGIN_004"
       ]
     },
     {
       "m": "Xác thực & tài khoản",
       "c": "Khoá tạm đăng nhập từ một máy sau 5 lần sai liên tiếp, tự mở lại sau 15 phút",
       "ref": [
+        "TC_LOGIN_006",
         "TC_LOGIN_007",
-        "TC_LOGIN_008",
-        "TC_LOGIN_009"
+        "TC_LOGIN_008"
       ]
     },
     {
@@ -57,14 +57,14 @@
       "c": "Chặn dò mã OTP: sai 5 lần thì huỷ mã, giới hạn 10 lần yêu cầu gửi mã trong 15 phút",
       "ref": [
         "TC_OTP_003",
-        "TC_FORGOT_005"
+        "TC_FORGOT_004"
       ]
     },
     {
       "m": "Xác thực & tài khoản",
       "c": "Chưa đăng nhập thì không mở được bất kỳ màn hình nghiệp vụ nào",
       "ref": [
-        "TC_LOGIN_014",
+        "TC_LOGIN_013",
         "ST_ACL_019"
       ]
     },
@@ -124,6 +124,40 @@
       ]
     },
     {
+      "m": "Quản lý khách hàng",
+      "c": "Khách hàng mua và nhà cung cấp tạo ở hai trang riêng; người phụ trách chính do hệ thống gán theo người tạo và địa bàn chứ không chọn tay; nhà cung cấp mang mã NCC-xxx",
+      "ref": [
+        "TC_CUSADD_001",
+        "TC_CUSADD_016",
+        "TC_CUSADD_017",
+        "TC_CUSADD_019",
+        "TC_CUSADD_020"
+      ]
+    },
+    {
+      "m": "Quản lý khách hàng",
+      "c": "Người hỗ trợ không được trùng người phụ trách chính, cũng không được là cấp trên trực tiếp của họ",
+      "ref": [
+        "TC_CUSADD_021",
+        "TC_CUSADD_022",
+        "TC_CUSADD_023",
+        "TC_CUSEDIT_015"
+      ]
+    },
+    {
+      "m": "Quản lý khách hàng",
+      "c": "Sales chỉ sửa, xoá, đánh giá được khách trong phạm vi của mình; khách của người khác chỉ xem được, kể cả khi gõ thẳng đường dẫn",
+      "ref": [
+        "TC_CUSLIST_015",
+        "TC_CUSVIEW_009",
+        "TC_CUSEDIT_010",
+        "TC_CUSEDIT_011",
+        "TC_CUSDEL_008",
+        "TC_CUSEVAL_009",
+        "ST_CUS_022"
+      ]
+    },
+    {
       "m": "Quản lý hợp đồng",
       "c": "Thêm và sửa hợp đồng gắn với khách hàng và người phụ trách; mọi thay đổi để lại dấu vết trong Nhật ký thay đổi. Hợp đồng đã ký không xoá được — chỉ Admin huỷ được bản ghi nhập nhầm, kèm lý do",
       "ref": [
@@ -139,7 +173,7 @@
       "c": "Mã hợp đồng do người dùng nhập, chính là số in trên bản giấy; trùng mã thì báo lỗi để nhập lại, và tìm kiếm được theo mã đó",
       "ref": [
         "TC_CTRADD_014",
-        "TC_CTRADD_015",
+        "TC_CTRADD_006",
         "TC_CTRLIST_011"
       ]
     },
@@ -163,12 +197,14 @@
     },
     {
       "m": "Quản lý hợp đồng",
-      "c": "Ràng buộc thứ tự ngày ký ≤ ngày hiệu lực ≤ ngày kết thúc",
+      "c": "Hợp đồng tạo ra bản nháp chưa có ngày; thời hạn nhập ở trang Quản lý hợp đồng với ngày hiệu lực ≤ ngày kết thúc (bằng nhau vẫn được), đủ hai mốc mới ký được; ngày ký do hệ thống đóng dấu lúc bấm Ký, không gõ tay",
       "ref": [
-        "TC_CTRADD_006",
+        "TC_CTRADD_001",
         "TC_CTRADD_007",
-        "TC_CTRADD_008",
-        "TC_CTRADD_009"
+        "TC_CTRADD_009",
+        "TC_CTREDIT_004",
+        "TC_CTREDIT_015",
+        "TC_CTREDIT_017"
       ]
     },
     {
@@ -208,7 +244,7 @@
     },
     {
       "m": "Quản lý hợp đồng",
-      "c": "Hợp đồng đã ký thì điều khoản khoá lại — tiêu đề, khách hàng, loại, thời hạn, người ký, giá trị, hàng hoá đều không sửa được nữa; chỉ còn người phụ trách và link bản PDF đã ký là đổi được",
+      "c": "Hợp đồng đã ký thì điều khoản khoá lại — tiêu đề, khách hàng, loại, thời hạn, người ký, giá trị, hàng hoá đều không sửa được nữa; chỉ còn người phụ trách là đổi được. Giấy tờ đã ký treo ở phần Tài liệu",
       "ref": [
         "TC_CTREDIT_010",
         "TC_CTREDIT_011",
@@ -451,6 +487,19 @@
       ]
     },
     {
+      "m": "Phiếu hỗ trợ kỹ thuật",
+      "c": "Lọc danh sách phiếu theo người xử lý; kỹ thuật viên mở ra thấy phiếu của mình trước; số liệu đầu trang và file Excel theo đúng người đang lọc",
+      "ref": [
+        "TC_TKLIST_011",
+        "TC_TKLIST_012",
+        "TC_TKLIST_013",
+        "TC_TKLIST_014",
+        "TC_TKLIST_016",
+        "ST_TK_010",
+        "ST_TK_022"
+      ]
+    },
+    {
       "m": "Quản lý nhân viên",
       "c": "Admin tạo hồ sơ nhân viên, hệ thống tự sinh tên đăng nhập từ họ tên đã bỏ dấu",
       "ref": [
@@ -503,13 +552,24 @@
       ]
     },
     {
+      "m": "Quản lý nhân viên",
+      "c": "Nhân viên mới tự hoàn thiện hồ sơ ở lần đăng nhập đầu và được nhắc đúng những ô còn thiếu",
+      "ref": [
+        "TC_EMPADD_005",
+        "TC_UPDPROF_012",
+        "TC_UPDPROF_013",
+        "TC_UPDPROF_014"
+      ]
+    },
+    {
       "m": "Phân quyền & an toàn",
-      "c": "Bốn vai trò Admin, Sales, Kỹ thuật, CSKH có quyền đúng theo ma trận đã thống nhất",
+      "c": "Ba vai trò Admin, Sales, Kỹ thuật có quyền đúng theo ma trận đã thống nhất (vai CSKH cũ đã gộp vào Sales)",
       "ref": [
         "ST_ACL_001",
         "ST_ACL_002",
         "ST_ACL_003",
-        "ST_ACL_004"
+        "ST_ACL_004",
+        "ST_ACL_007"
       ]
     },
     {
@@ -518,7 +578,6 @@
       "ref": [
         "ST_ACL_005",
         "ST_ACL_006",
-        "ST_ACL_007",
         "ST_ACL_008"
       ]
     },
@@ -550,8 +609,8 @@
       "m": "Phân quyền & an toàn",
       "c": "Chống chèn mã độc qua ô nhập liệu và qua tệp tải lên",
       "ref": [
+        "TC_LOGIN_011",
         "TC_LOGIN_012",
-        "TC_LOGIN_013",
         "TC_UPDPROF_005",
         "TC_PRDADD_009"
       ]
@@ -677,6 +736,42 @@
         "TC_CRINTENT_003",
         "TC_CRINTENT_005",
         "TC_CRINTENT_007"
+      ]
+    },
+    {
+      "m": "Chức năng dùng chung",
+      "c": "Thao tác lưu hoặc xoá hỏng giữa chừng thì báo rõ ngay trên màn hình và dữ liệu giữ như cũ, không báo như đã xong",
+      "ref": [
+        "TC_CUSADD_024",
+        "TC_CUSDEL_007",
+        "TC_CUSEVAL_008",
+        "TC_CTRADD_017",
+        "TC_PRDADD_012",
+        "TC_PRDDEL_006",
+        "TC_TKDEL_006",
+        "TC_EMPEDIT_010",
+        "TC_EMPBAN_007"
+      ]
+    },
+    {
+      "m": "Chức năng dùng chung",
+      "c": "Mở một bản ghi không còn tồn tại thì quay về đúng danh sách đang đứng (khách mua / nhà cung cấp, hợp đồng bán / mua) kèm thông báo không tìm thấy",
+      "ref": [
+        "TC_CUSLIST_013",
+        "TC_CUSVIEW_006",
+        "TC_CUSDEL_006",
+        "TC_CTRLIST_027"
+      ]
+    },
+    {
+      "m": "Chức năng dùng chung",
+      "c": "Tìm kiếm với từ khoá có ký tự đặc biệt (&, #) vẫn giữ đúng từ khoá khi phân trang và khi xuất Excel",
+      "ref": [
+        "TC_CUSLIST_014",
+        "TC_CTRLIST_028",
+        "TC_PRDLIST_010",
+        "TC_TKLIST_017",
+        "TC_EMPLIST_012"
       ]
     }
   ]

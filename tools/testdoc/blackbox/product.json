@@ -12,7 +12,7 @@
         {"d": "Mở danh sách sản phẩm",
          "s": ["Đăng nhập bằng tài khoản Kỹ thuật", "Bấm Sản phẩm trên thanh bên trái"],
          "t": "-",
-         "e": "Hiện bảng sản phẩm kèm mã, tên, danh mục, đơn giá và ảnh đại diện"},
+         "e": "Hiện lưới thẻ sản phẩm, mỗi thẻ có ảnh đại diện, danh mục, mã và tên sản phẩm"},
         {"d": "Cây danh mục hiển thị đủ ba cấp",
          "s": ["Xem khối cây danh mục bên trái"],
          "p": "Danh mục có cấu trúc ba cấp",
@@ -47,7 +47,13 @@
          "s": ["Đăng nhập bằng tài khoản Sales", "Mở danh sách sản phẩm"],
          "p": "Đăng nhập bằng vai trò Sales",
          "t": "-",
-         "e": "Xem được danh sách nhưng không có nút Thêm/Sửa/Xoá sản phẩm"}
+         "e": "Xem được danh sách nhưng không có nút Thêm/Sửa/Xoá sản phẩm"},
+        {"d": "Từ khoá có ký tự & và # vẫn giữ nguyên khi phân trang",
+         "s": ["Tìm theo từ khoá chứa & và #", "Bấm sang trang 2"],
+         "p": "Có đủ sản phẩm tên chứa chuỗi R&D #1 để kết quả sang trang 2",
+         "t": "keyword: R&D #1",
+         "e": "Trang 2 vẫn lọc theo đủ chuỗi \"R&D #1\" (URL mang keyword=R%26D+%231, ô tìm kiếm hiện đủ chuỗi), không quay về toàn bộ danh mục",
+         "n": "PR #166"}
       ]
     },
     {
@@ -61,7 +67,8 @@
         {"d": "Mở chi tiết sản phẩm",
          "s": ["Ở danh sách sản phẩm, bấm vào tên sản phẩm"],
          "t": "id sản phẩm bất kỳ",
-         "e": "Hiện đủ mã, tên, danh mục, đơn giá, mô tả và bộ ảnh của sản phẩm"},
+         "e": "Hiện đủ mã, tên, danh mục, mô tả, bộ ảnh và catalogue của sản phẩm",
+         "n": "Sản phẩm không có đơn giá — hệ thống không quản lý giá bán"},
         {"d": "Bộ ảnh sản phẩm",
          "s": ["Mở chi tiết sản phẩm đã tải nhiều ảnh"],
          "p": "Sản phẩm có từ hai ảnh trở lên",
@@ -97,8 +104,8 @@
       "precondition": "Đăng nhập bằng Admin hoặc Kỹ thuật; danh mục sản phẩm đã có dữ liệu",
       "cases": [
         {"d": "Thêm sản phẩm với thông tin hợp lệ",
-         "s": ["Bấm Thêm sản phẩm", "Nhập tên sản phẩm", "Chọn danh mục", "Nhập đơn giá và mô tả", "Bấm Lưu"],
-         "t": "Tên: Phần mềm quản lý bán hàng — Danh mục: Phần mềm — Đơn giá: 15000000",
+         "s": ["Bấm Thêm sản phẩm", "Nhập tên sản phẩm", "Chọn danh mục", "Nhập mô tả", "Bấm Lưu"],
+         "t": "Tên: Phần mềm quản lý bán hàng — Danh mục: Phần mềm",
          "e": "Lưu thành công, chuyển sang trang chi tiết, mã sản phẩm sinh tự động theo định dạng SP-xxxx",
          "o": "Thêm một dòng vào bảng products"},
         {"d": "Bỏ trống tên sản phẩm",
@@ -134,16 +141,21 @@
          "s": ["Đổi tên một file HTML thành .jpg", "Chọn ở ô ảnh", "Bấm Lưu"],
          "t": "File: doc.html đổi tên thành doc.jpg",
          "e": "Nếu lưu được thì khi mở file qua /POSCS/uploads/... trình duyệt phải tải về hoặc hiển thị dạng văn bản, tuyệt đối không chạy như trang HTML"},
-        {"d": "Đơn giá âm",
-         "s": ["Nhập đơn giá là số âm", "Bấm Lưu"],
-         "t": "Đơn giá: -1000",
-         "e": "Bị từ chối hoặc ghi nhận rõ ràng — sản phẩm không được lưu với đơn giá âm",
-         "n": "Ghi kết quả quan sát được vào cột Kết quả thực tế"},
+        {"d": "Chọn danh mục cha thay vì danh mục lá",
+         "s": ["Dùng công cụ trình duyệt đổi categoryId sang id một danh mục cha (có danh mục con)", "Bấm Lưu"],
+         "t": "categoryId: id danh mục cha",
+         "e": "Ở lại form với \"Danh mục đã chọn không còn dùng được (danh mục cha hoặc đã bị xoá). Vui lòng chọn lại danh mục.\", sản phẩm chưa được tạo",
+         "n": "error=invalid_category. Ca Đơn giá âm cũ bỏ vì sản phẩm không có ô đơn giá"},
         {"d": "Vai trò Sales gọi thẳng action=create",
          "s": ["Đăng nhập bằng Sales", "Gửi POST action=create"],
          "p": "Đăng nhập bằng vai trò Sales",
          "t": "POST action=create kèm dữ liệu hợp lệ",
-         "e": "Trả về trang lỗi 403, không sản phẩm nào được tạo"}
+         "e": "Trả về trang lỗi 403, không sản phẩm nào được tạo"},
+        {"d": "Sản phẩm lưu được nhưng có ảnh tải lên hỏng",
+         "s": ["Giả lập lỗi CSDL: trigger chặn INSERT vào productimages (README, mục Ca cần giả lập lỗi CSDL)", "Thêm sản phẩm hợp lệ kèm 2 ảnh", "Bấm Lưu", "Xoá trigger"],
+         "t": "File: anh1.jpg, anh2.png",
+         "e": "Chuyển sang trang chi tiết sản phẩm vừa tạo (URL mang error=files_not_saved&notRemoved=0&notAdded=2) với \"Đã lưu thông tin sản phẩm, nhưng 2 tệp chưa tải lên được. Bấm Sửa để làm lại phần này.\"; sản phẩm không có ảnh nào",
+         "n": "PR #162. Trước đây ảnh hỏng rơi mất lặng lẽ, trang vẫn như đã lưu xong"}
       ]
     },
     {
@@ -158,9 +170,9 @@
          "s": ["Mở chi tiết sản phẩm", "Bấm Sửa"],
          "t": "id sản phẩm bất kỳ",
          "e": "Form hiện đúng dữ liệu hiện tại, danh mục đang chọn đúng, các ảnh hiện có đều hiển thị"},
-        {"d": "Sửa tên và đơn giá",
-         "s": ["Sửa tên sản phẩm và đơn giá", "Bấm Lưu"],
-         "t": "Tên mới: Phần mềm POS bản Pro — Đơn giá: 20000000",
+        {"d": "Sửa tên và mô tả",
+         "s": ["Sửa tên sản phẩm và mô tả", "Bấm Lưu"],
+         "t": "Tên mới: Phần mềm POS bản Pro — Mô tả: Bản dành cho chuỗi cửa hàng",
          "e": "Lưu thành công, trang chi tiết hiện giá trị mới"},
         {"d": "Gỡ một ảnh khỏi sản phẩm",
          "s": ["Bấm dấu x trên một ảnh", "Bấm Lưu"],
@@ -188,11 +200,26 @@
          "s": ["Gửi POST action=update với id không có thật"],
          "t": "id: 999999",
          "e": "Chuyển về danh sách kèm thông báo không tìm thấy"},
-        {"d": "Vai trò CSKH gọi thẳng action=update",
-         "s": ["Đăng nhập bằng CSKH", "Gửi POST action=update"],
-         "p": "Đăng nhập bằng vai trò CSKH",
+        {"d": "Vai trò Sales gọi thẳng action=update",
+         "s": ["Đăng nhập bằng Sales", "Gửi POST action=update"],
+         "p": "Đăng nhập bằng vai trò Sales",
          "t": "POST action=update kèm dữ liệu hợp lệ",
-         "e": "Trả về trang lỗi 403, sản phẩm không đổi"}
+         "e": "Trả về trang lỗi 403, sản phẩm không đổi",
+         "n": "Vai CSKH đã gộp vào Sales (V37); Sales chỉ View only với Sản phẩm"},
+        {"d": "Gỡ ảnh hỏng khi sửa sản phẩm",
+         "s": ["Giả lập lỗi CSDL: trigger chặn DELETE trên productimages", "Mở Sửa một sản phẩm có ảnh, bấm dấu x trên một ảnh", "Bấm Lưu", "Xoá trigger"],
+         "t": "Gỡ 1 ảnh",
+         "e": "Về trang chi tiết với \"Đã lưu thông tin sản phẩm, nhưng 1 tệp chưa gỡ được. Bấm Sửa để làm lại phần này.\"; ảnh đó vẫn còn",
+         "n": "PR #162, error=files_not_saved&notRemoved=1&notAdded=0"},
+        {"d": "Vừa có tệp chưa gỡ vừa có tệp chưa tải lên được",
+         "s": ["Giả lập lỗi CSDL: trigger chặn cả DELETE và INSERT trên productimages", "Mở Sửa sản phẩm, gỡ 1 ảnh cũ và chọn thêm 2 ảnh mới", "Bấm Lưu", "Xoá trigger"],
+         "t": "Gỡ 1 ảnh — thêm anh_moi1.png, anh_moi2.png",
+         "e": "Thông tin sản phẩm vẫn lưu; trang chi tiết hiện \"Đã lưu thông tin sản phẩm, nhưng 1 tệp chưa gỡ được và 2 tệp chưa tải lên được. Bấm Sửa để làm lại phần này.\"",
+         "n": "PR #162"},
+        {"d": "Tham số báo lỗi tệp bằng 0 thì không hiện thông báo",
+         "s": ["Gõ thẳng URL chi tiết sản phẩm kèm error=files_not_saved&notRemoved=0&notAdded=0"],
+         "t": "URL: /POSCS/product?action=view&id=<id>&error=files_not_saved&notRemoved=0&notAdded=0",
+         "e": "Trang chi tiết hiện bình thường, không có thông báo lỗi tệp nào, không báo lỗi 500"}
       ]
     },
     {
@@ -226,7 +253,12 @@
          "s": ["Đăng nhập bằng Sales", "Gửi POST action=delete"],
          "p": "Đăng nhập bằng vai trò Sales",
          "t": "POST action=delete&id=<id>",
-         "e": "Trả về trang lỗi 403, sản phẩm vẫn còn"}
+         "e": "Trả về trang lỗi 403, sản phẩm vẫn còn"},
+        {"d": "Lệnh xoá hỏng ở CSDL",
+         "s": ["Giả lập lỗi CSDL: trigger chặn UPDATE is_deleted trên products", "Mở chi tiết một sản phẩm chưa dùng trong hợp đồng, bấm Xoá, xác nhận", "Xoá trigger"],
+         "t": "id sản phẩm đủ điều kiện xoá",
+         "e": "Ở lại trang chi tiết sản phẩm (không về danh sách như đã xoá xong) với \"Không xoá được sản phẩm. Vui lòng thử lại.\"; sản phẩm vẫn còn trong danh sách",
+         "n": "PR #159, error=delete_failed"}
       ]
     }
   ]

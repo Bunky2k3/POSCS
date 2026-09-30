@@ -52,7 +52,7 @@
             "Nhập mã hợp đồng vào ô tìm kiếm",
             "Bấm Tìm"
           ],
-          "t": "keyword: HD-0015",
+          "t": "keyword: 01/2026/HĐKT-POSTEF",
           "e": "Chỉ hiện đúng hợp đồng có mã đó"
         },
         {
@@ -102,14 +102,14 @@
           "e": "Xem được danh sách nhưng không có nút Thêm/Sửa/Xoá hợp đồng"
         },
         {
-          "d": "Tìm kiếm theo số hợp đồng",
+          "d": "Tìm kiếm theo một phần mã hợp đồng (số trên bản giấy)",
           "s": [
-            "Ở danh sách, gõ một phần số hợp đồng vào ô tìm kiếm"
+            "Ở danh sách, gõ một phần mã hợp đồng vào ô tìm kiếm"
           ],
-          "p": "Có hợp đồng đã nhập số",
-          "t": "keyword: 123/2026",
-          "e": "Ra đúng hợp đồng mang số đó",
-          "n": "Khách gọi điện đọc số trên giấy chứ không đọc mã HD-xxxx, nên đây là đường tra chính"
+          "p": "Có hợp đồng mã 01/2026/HĐKT-POSTEF",
+          "t": "keyword: 01/2026",
+          "e": "Ra các hợp đồng có mã chứa chuỗi đó",
+          "n": "Từ V28 mã hợp đồng chính là số ghi trên bản giấy, do người dùng nhập — không còn mã HD-xxxx do máy sinh và ô Số hợp đồng riêng"
         },
         {
           "d": "Bốn ô số ở đầu trang bấm được để lọc theo trạng thái",
@@ -258,6 +258,28 @@
           "t": "-",
           "e": "Ngày hiệu lực và ngày kết thúc nằm quanh ngày hiện tại chứ không phải ngày cứng của một năm cũ; chạy lại sau vài tháng thì bốn nhóm trạng thái vẫn còn đủ",
           "n": "Ngày ghi cứng nghĩa là vài tháng nữa cả bộ dữ liệu trôi hết sang \"Đã hết hạn\""
+        },
+        {
+          "d": "Hợp đồng mua không còn tồn tại thì quay về đúng danh sách Hợp đồng mua",
+          "s": [
+            "Mở mục Hợp đồng mua",
+            "Gõ thẳng URL chi tiết một hợp đồng không có thật, giữ tham số kind=buy"
+          ],
+          "t": "URL: /POSCS/contract?action=view&id=999999&kind=buy",
+          "e": "Về danh sách Hợp đồng mua (URL mang error=notfound&kind=buy) với dải vàng \"Không tìm thấy hợp đồng này. Có thể bản ghi đã bị huỷ hoặc đường dẫn không đúng.\"; không bị đẩy sang danh sách Hợp đồng bán",
+          "n": "PR #164. Link Xem / Sửa ở danh sách Hợp đồng mua đều mang sẵn kind=buy"
+        },
+        {
+          "d": "Từ khoá có ký tự & và # vẫn giữ nguyên khi phân trang và xuất Excel",
+          "s": [
+            "Tìm theo từ khoá chứa & và #",
+            "Bấm sang trang 2",
+            "Quay lại trang 1, bấm Xuất Excel"
+          ],
+          "p": "Có hơn 10 hợp đồng bán có tiêu đề chứa chuỗi R&D #1",
+          "t": "keyword: R&D #1",
+          "e": "Trang 2 vẫn lọc theo đủ chuỗi \"R&D #1\" (URL mang keyword=R%26D+%231, chip từ khoá hiện đủ chuỗi); file Excel chỉ chứa các hợp đồng khớp chuỗi đó",
+          "n": "PR #166"
         }
       ]
     },
@@ -266,7 +288,7 @@
       "sheet": "ViewContract",
       "prefix": "TC_CTRVIEW",
       "screen": "/POSCS/contract?action=view&id=<id>",
-      "description": "Xem hợp đồng kèm danh sách sản phẩm, đợt thanh toán và file đính kèm",
+      "description": "Xem hợp đồng kèm hàng hoá, kỳ thanh toán, tài liệu kèm theo, phụ lục và nhật ký thay đổi",
       "precondition": "Đang đăng nhập; có hợp đồng đã tạo",
       "cases": [
         {
@@ -280,11 +302,13 @@
         {
           "d": "Danh sách sản phẩm trong hợp đồng",
           "s": [
-            "Mở chi tiết hợp đồng đã gắn sản phẩm"
+            "Mở chi tiết hợp đồng đã gắn sản phẩm",
+            "Chọn tab Hàng hoá"
           ],
           "p": "Hợp đồng có ít nhất một dòng sản phẩm",
           "t": "-",
-          "e": "Bảng sản phẩm hiện đúng tên, số lượng và đơn giá từng dòng"
+          "e": "Bảng hạng mục hiện đúng tên sản phẩm (kèm mã), số lượng, đơn vị và ghi chú từng dòng",
+          "n": "Hợp đồng không lưu đơn giá từng dòng — giá trị hợp đồng là một con số nhập ở form"
         },
         {
           "d": "Đợt thanh toán của hợp đồng",
@@ -296,31 +320,36 @@
           "e": "Liệt kê các đợt kèm số tiền và ngày, tổng khớp với dữ liệu trong CSDL"
         },
         {
-          "d": "Xem trước file PDF đính kèm từ link Google Drive",
+          "d": "Tài liệu kèm theo mở ở tab mới bằng nút Mở",
           "s": [
-            "Mở chi tiết hợp đồng có link Drive ở ô file đính kèm"
+            "Mở chi tiết hợp đồng có tài liệu là link Google Drive",
+            "Chọn tab Tài liệu",
+            "Bấm Mở ở dòng tài liệu"
           ],
-          "p": "Hợp đồng có attachment_url là link Google Drive",
-          "t": "attachmentUrl: link chia sẻ Google Drive",
-          "e": "Khung xem trước PDF hiện đúng nội dung file"
+          "p": "Hợp đồng có ít nhất một dòng trong contract_documents",
+          "t": "fileUrl: link chia sẻ Google Drive",
+          "e": "Bảng Tài liệu kèm theo hiện loại, tên tài liệu, người thêm, ngày thêm; bấm Mở thì file mở ở tab mới. Trang không nhúng khung xem PDF nào",
+          "n": "V34 bỏ cột attachment_url, giấy tờ thành danh sách nhiều dòng; khung xem nhúng bỏ từ 2026-09-21"
         },
         {
-          "d": "Link đính kèm không phải Drive",
+          "d": "Tài liệu có link không phải Drive vẫn mở cùng một cách",
           "s": [
-            "Mở chi tiết hợp đồng có link http thường"
+            "Mở chi tiết hợp đồng có tài liệu là link http thường",
+            "Chọn tab Tài liệu"
           ],
-          "p": "Hợp đồng có attachment_url là link http thường",
-          "t": "attachmentUrl: https://example.com/hd.pdf",
-          "e": "Hiện link để bấm mở, không dựng khung xem trước"
+          "p": "Hợp đồng có tài liệu với link https://example.com/hd.pdf",
+          "t": "fileUrl: https://example.com/hd.pdf",
+          "e": "Dòng tài liệu hiển thị như mọi dòng khác; nút Mở mở link ở tab mới (rel=\"noopener noreferrer\")"
         },
         {
-          "d": "Hợp đồng không có file đính kèm",
+          "d": "Hợp đồng chưa có tài liệu nào",
           "s": [
-            "Mở chi tiết hợp đồng chưa gắn file"
+            "Mở chi tiết hợp đồng chưa có tài liệu",
+            "Chọn tab Tài liệu"
           ],
-          "p": "Hợp đồng không có attachment_url",
+          "p": "Hợp đồng chưa có dòng nào trong contract_documents",
           "t": "-",
-          "e": "Khối file đính kèm để trống, trang không báo lỗi"
+          "e": "Tab hiện \"Chưa có tài liệu nào. Treo biên bản nghiệm thu, bàn giao, thanh lý, hoá đơn… ở trang quản lý.\", trang không báo lỗi"
         },
         {
           "d": "Mở chi tiết với id không tồn tại",
@@ -331,13 +360,13 @@
           "e": "Chuyển về danh sách kèm thông báo không tìm thấy"
         },
         {
-          "d": "Mở chi tiết hợp đồng đã xoá mềm",
+          "d": "Mở chi tiết hợp đồng đã huỷ bản ghi",
           "s": [
-            "Xoá một hợp đồng",
+            "Huỷ bản ghi một hợp đồng",
             "Gõ lại URL chi tiết của hợp đồng đó"
           ],
-          "p": "Hợp đồng đã bị xoá mềm",
-          "t": "URL chi tiết hợp đồng đã xoá",
+          "p": "Hợp đồng đã bị huỷ bản ghi (xoá mềm)",
+          "t": "URL chi tiết hợp đồng đã huỷ",
           "e": "Không hiện dữ liệu, chuyển về danh sách kèm thông báo không tìm thấy"
         },
         {
@@ -356,22 +385,22 @@
       "name": "Thêm hợp đồng",
       "sheet": "CreateContract",
       "prefix": "TC_CTRADD",
-      "screen": "/POSCS/contract?action=new — POST action=create",
-      "description": "Tạo hợp đồng mới cho một khách hàng",
+      "screen": "/POSCS/contract?action=new&kind=sell (Hợp đồng bán) | /POSCS/contract?action=new&kind=buy (Hợp đồng mua) — POST action=create",
+      "description": "Tạo hợp đồng mới ở dạng bản Nháp. Form tạo KHÔNG có ô ngày: thời hạn (ngày hiệu lực, ngày kết thúc) nhập ở trang Quản lý hợp đồng, ngày ký được đóng dấu lúc bấm Ký. Mã hợp đồng do người dùng nhập theo số trên bản giấy",
       "precondition": "Đăng nhập bằng Admin hoặc Sales; đã có khách hàng trong hệ thống",
       "cases": [
         {
           "d": "Tạo hợp đồng với thông tin hợp lệ",
           "s": [
-            "Bấm Thêm hợp đồng",
-            "Nhập tiêu đề và chọn loại hợp đồng",
-            "Chọn khách hàng và người phụ trách",
-            "Chọn ngày ký, ngày hiệu lực, ngày kết thúc",
+            "Ở mục Hợp đồng bán, bấm Thêm hợp đồng",
+            "Nhập mã hợp đồng (số trên bản giấy) và tiêu đề",
+            "Chọn khách hàng, người phụ trách và loại hợp đồng",
             "Bấm Lưu"
           ],
-          "t": "Tiêu đề: Hợp đồng bảo trì 2026 — Ngày ký 01/01/2026, hiệu lực 05/01/2026, kết thúc 31/12/2026",
-          "e": "Lưu thành công, chuyển sang trang chi tiết, mã hợp đồng sinh tự động theo định dạng HD-xxxx",
-          "o": "Thêm một dòng vào bảng contracts, trạng thái được tính từ ngày hiệu lực và ngày kết thúc"
+          "t": "Mã: 01/2026/HĐKT-TEST — Tiêu đề: Hợp đồng bảo trì 2026",
+          "e": "Form không có ô ngày ký / hiệu lực / kết thúc. Lưu thành công, chuyển sang trang chi tiết; mã hợp đồng đúng như đã nhập; tiến độ Nháp, chưa có ngày ký và thời hạn",
+          "o": "Thêm một dòng vào contracts với progress_status = Nháp; signing_date, effective_date, end_date để NULL",
+          "n": "PR #164"
         },
         {
           "d": "Bỏ trống tiêu đề",
@@ -402,114 +431,148 @@
           "e": "Bị từ chối với thông báo thông tin chưa hợp lệ"
         },
         {
-          "d": "Thiếu ngày kết thúc",
+          "d": "Bỏ trống mã hợp đồng",
           "s": [
-            "Bỏ trống ngày kết thúc",
+            "Để trống ô Mã hợp đồng",
+            "Điền các ô còn lại",
             "Bấm Lưu"
           ],
-          "t": "endDate: (trống)",
-          "e": "Bị từ chối với thông báo thông tin chưa hợp lệ"
+          "t": "contractCode: (trống)",
+          "e": "Form không gửi đi, dưới ô hiện \"Mã hợp đồng không được để trống.\"; gửi thẳng POST thiếu mã thì ở lại form với \"Thông tin hợp đồng chưa hợp lệ. Vui lòng kiểm tra lại các ô bắt buộc.\""
         },
         {
-          "d": "Ngày ký sau ngày hiệu lực",
+          "d": "Trùng mã hợp đồng với hợp đồng đã có",
           "s": [
-            "Chọn ngày ký muộn hơn ngày hiệu lực",
+            "Nhập mã của một hợp đồng đã tồn tại",
+            "Điền các ô còn lại",
             "Bấm Lưu"
           ],
-          "t": "Ngày ký 10/01/2026 — hiệu lực 05/01/2026",
-          "e": "Bị từ chối, không tạo hợp đồng"
+          "p": "Đã có hợp đồng mã 01/2026/HĐKT-POSTEF",
+          "t": "contractCode: 01/2026/HĐKT-POSTEF",
+          "e": "Ở lại form với \"Mã hợp đồng này đã có hợp đồng khác dùng. Kiểm lại số trên bản giấy hoặc nhập mã khác.\", không tạo hợp đồng",
+          "n": "error=duplicate_code; UNIQUE KEY trên contract_code là chốt chặn thật"
         },
         {
-          "d": "Ngày hiệu lực sau ngày kết thúc",
+          "d": "POST thẳng thời hạn ngược (hiệu lực sau kết thúc)",
           "s": [
-            "Chọn ngày hiệu lực muộn hơn ngày kết thúc",
+            "Gửi POST action=create kèm effectiveDate muộn hơn endDate, các ô khác hợp lệ"
+          ],
+          "t": "effectiveDate: 2026-12-31 — endDate: 2026-01-01",
+          "e": "Ở lại form với thông báo thông tin chưa hợp lệ, không tạo hợp đồng",
+          "n": "Form không có ô ngày nhưng máy chủ vẫn giữ BR-36 cho request nặn tay"
+        },
+        {
+          "d": "Để trống giá trị hợp đồng",
+          "s": [
+            "Điền đủ các ô bắt buộc, để trống ô Giá trị hợp đồng",
             "Bấm Lưu"
           ],
-          "t": "Hiệu lực 31/12/2026 — kết thúc 01/01/2026",
-          "e": "Bị từ chối, không tạo hợp đồng"
+          "t": "contractValue: (trống)",
+          "e": "Lưu thành công — giá trị không phải ô bắt buộc ở bản nháp"
         },
         {
-          "d": "Ngày ký trùng ngày hiệu lực",
+          "d": "Nhập thời hạn một ngày ở trang Quản lý hợp đồng",
           "s": [
-            "Chọn ngày ký đúng bằng ngày hiệu lực",
-            "Bấm Lưu"
-          ],
-          "t": "Ngày ký = hiệu lực = 05/01/2026",
-          "e": "Lưu thành công — đây là giá trị biên được chấp nhận"
-        },
-        {
-          "d": "Ngày hiệu lực trùng ngày kết thúc",
-          "s": [
-            "Chọn ngày hiệu lực đúng bằng ngày kết thúc",
-            "Bấm Lưu"
+            "Tạo xong bản nháp, bấm Quản lý hợp đồng",
+            "Nhập ngày hiệu lực bằng đúng ngày kết thúc",
+            "Bấm Lưu thay đổi"
           ],
           "t": "Hiệu lực = kết thúc = 31/12/2026",
-          "e": "Lưu thành công — hợp đồng có hiệu lực đúng một ngày"
+          "e": "Lưu thành công — hợp đồng có hiệu lực đúng một ngày (giá trị biên được chấp nhận)"
         },
         {
-          "d": "Link file đính kèm không phải http/https",
+          "d": "Form tạo không còn ô link file PDF",
           "s": [
-            "Dán chuỗi không phải URL vào ô link file",
-            "Bấm Lưu"
+            "Bấm Thêm hợp đồng",
+            "Xem khối Thông tin chung"
           ],
-          "t": "attachmentUrl: javascript:alert(1)",
-          "e": "Hiện \"Link file PDF phải là địa chỉ bắt đầu bằng http:// hoặc https://. Vui lòng dán lại.\", hợp đồng chưa được tạo"
+          "t": "-",
+          "e": "Không có ô link file PDF / file đính kèm nào; giấy tờ treo sau khi lưu, ở phần Tài liệu của trang Quản lý hợp đồng",
+          "n": "V34: giấy tờ là danh sách nhiều dòng, mỗi dòng cần contract_id — thứ chỉ có sau khi lưu"
         },
         {
-          "d": "Link Google Drive hợp lệ",
+          "d": "Treo tài liệu link Google Drive ngay sau khi tạo",
           "s": [
-            "Dán link chia sẻ Google Drive vào ô link file",
-            "Bấm Lưu"
+            "Tạo xong bản nháp, bấm Quản lý hợp đồng",
+            "Ở phần Tài liệu chọn loại \"Hợp đồng đã ký\", dán link Drive, bấm Thêm",
+            "Mở lại trang chi tiết, chọn tab Tài liệu"
           ],
-          "t": "attachmentUrl: https://drive.google.com/file/d/<id>/view",
-          "e": "Lưu thành công, trang chi tiết dựng được khung xem trước PDF"
+          "t": "fileUrl: https://drive.google.com/file/d/<id>/view",
+          "e": "Dòng tài liệu xuất hiện với đúng loại và người thêm; bấm Mở thì mở file ở tab mới",
+          "n": "Tài liệu thêm được ở mọi tiến độ, kể cả bản Nháp và sau thanh lý"
         },
         {
-          "d": "Hợp đồng ngày hiệu lực trong tương lai",
+          "d": "Hợp đồng có ngày hiệu lực trong tương lai",
           "s": [
-            "Chọn ngày hiệu lực sau hôm nay",
-            "Bấm Lưu"
+            "Tạo bản nháp",
+            "Ở trang Quản lý hợp đồng nhập ngày hiệu lực sau hôm nay và ngày kết thúc sau đó",
+            "Bấm Lưu thay đổi"
           ],
-          "t": "Hiệu lực: hôm nay + 10 ngày",
+          "t": "Hiệu lực: hôm nay + 10 ngày — Kết thúc: hôm nay + 1 năm",
           "e": "Lưu thành công và trạng thái hiển thị là Chưa hiệu lực"
         },
         {
-          "d": "Vai trò CSKH gọi thẳng action=create",
+          "d": "Vai trò Kỹ thuật gọi thẳng action=create",
           "s": [
-            "Đăng nhập bằng CSKH",
+            "Đăng nhập bằng Kỹ thuật",
             "Gửi POST action=create"
           ],
-          "p": "Đăng nhập bằng vai trò CSKH",
+          "p": "Đăng nhập bằng vai trò Kỹ thuật",
           "t": "POST action=create kèm dữ liệu hợp lệ",
-          "e": "Trả về trang lỗi 403, không hợp đồng nào được tạo"
+          "e": "Trả về trang lỗi 403, không hợp đồng nào được tạo",
+          "n": "Vai CSKH đã gộp vào Sales (V37), nên ca chặn chuyển sang vai Kỹ thuật"
         },
         {
-          "d": "Nhập số hợp đồng thật lúc tạo",
+          "d": "Mã hợp đồng là số ghi trên bản giấy",
           "s": [
             "Bấm Thêm hợp đồng",
-            "Điền ô Số hợp đồng theo số ghi trên bản giấy",
+            "Nhập ô Mã hợp đồng đúng số ghi trên bản giấy",
             "Điền nốt các ô bắt buộc rồi Lưu"
           ],
-          "t": "Số hợp đồng: 123/2026/HĐKT-POSTEF",
-          "e": "Lưu thành công; trang chi tiết hiện CẢ HAI — mã nội bộ HD-xxxx do hệ thống sinh và số hợp đồng vừa nhập",
-          "n": "Hai thứ song song, không thay thế nhau: mã là định danh nội bộ, số là thứ in trên giấy"
+          "t": "Mã: 123/2026/HĐKT-POSTEF",
+          "e": "Lưu thành công; trang chi tiết và danh sách hiện đúng mã vừa nhập — không còn mã HD-xxxx do hệ thống sinh, cũng không còn ô Số hợp đồng riêng",
+          "n": "V28 gộp số hợp đồng vào mã, do người dùng nhập"
         },
         {
-          "d": "Để trống số hợp đồng",
+          "d": "Form Hợp đồng bán ghi nhãn Khách hàng",
           "s": [
-            "Tạo hợp đồng, không điền ô Số hợp đồng"
+            "Mở mục Hợp đồng bán",
+            "Bấm Thêm hợp đồng",
+            "Mở ô đối tác"
           ],
-          "t": "Số hợp đồng: (để trống)",
-          "e": "Vẫn lưu được — bản nháp thường chưa được cấp số, điền sau khi ký cũng được"
+          "t": "-",
+          "e": "Ô đối tác mang nhãn \"Khách hàng\", lựa chọn đầu là \"-- Chọn khách hàng --\"; chỉ liệt kê các doanh nghiệp mang vai khách mua"
         },
         {
-          "d": "Hai hợp đồng trùng số",
+          "d": "Form tạo nhắc thời hạn nhập ở màn hình sửa",
           "s": [
-            "Tạo hai hợp đồng cùng nhập một số"
+            "Bấm Thêm hợp đồng",
+            "Đọc khung ghi chú cuối khối Thông tin chung"
           ],
-          "t": "cả hai: 123/2026/HĐKT-POSTEF",
-          "e": "Cả hai đều lưu được, mã nội bộ HD-xxxx vẫn khác nhau",
-          "n": "Cố ý không đặt UNIQUE lên số hợp đồng: đây là chuỗi tự do, hai chi nhánh đánh số riêng hoặc lặp qua các năm đều có thật. Chống trùng đã có contract_code lo"
+          "t": "-",
+          "e": "Có khung nhắc: lưu xong hợp đồng ở trạng thái Nháp — còn sửa và xoá thoải mái; thời hạn (ngày hiệu lực, ngày kết thúc) điền ở màn hình sửa khi đã chốt với khách; ngày ký được ghi vào lúc bấm Ký hợp đồng"
+        },
+        {
+          "d": "Tạo hợp đồng mua hỏng ở CSDL thì về đúng form mua",
+          "s": [
+            "Giả lập lỗi CSDL: trigger chặn INSERT vào contracts (README, mục Ca cần giả lập lỗi CSDL)",
+            "Mở mục Hợp đồng mua, bấm Thêm hợp đồng, điền đủ các ô, bấm Lưu",
+            "Xoá trigger"
+          ],
+          "t": "Mã: 99/2026/HĐMB-TEST — Nhà cung cấp: một nhà cung cấp bất kỳ",
+          "e": "Ở lại form Hợp đồng mua (URL action=new&kind=buy&error=create_failed; ô đối tác vẫn là Nhà cung cấp, bộ loại hợp đồng mua) với \"Không lưu được hợp đồng. Vui lòng thử lại.\"; không bị đưa sang form Hợp đồng bán",
+          "n": "PR #164"
+        },
+        {
+          "d": "Form Hợp đồng mua ghi nhãn Nhà cung cấp",
+          "s": [
+            "Mở mục Hợp đồng mua",
+            "Bấm Thêm hợp đồng",
+            "Để trống ô đối tác rồi bấm Lưu"
+          ],
+          "t": "enterpriseId: (chưa chọn)",
+          "e": "Ô đối tác mang nhãn \"Nhà cung cấp\", lựa chọn đầu là \"-- Chọn nhà cung cấp --\", chỉ liệt kê doanh nghiệp mang vai nhà cung cấp; bỏ trống thì hiện \"Vui lòng chọn nhà cung cấp.\"",
+          "n": "PR #164"
         }
       ]
     },
@@ -518,14 +581,14 @@
       "sheet": "UpdateContract",
       "prefix": "TC_CTREDIT",
       "screen": "/POSCS/contract?action=edit&id=<id> — POST action=update",
-      "description": "Cập nhật hợp đồng. Bản NHÁP sửa được mọi trường; từ khi KÝ thì điều khoản khoá lại và chỉ còn người phụ trách + link bản PDF sửa được — đổi điều khoản phải đi qua phụ lục.",
+      "description": "Cập nhật hợp đồng ở trang Quản lý hợp đồng. Bản NHÁP sửa được mọi trường, kể cả thời hạn; từ khi KÝ thì điều khoản khoá lại và chỉ còn người phụ trách sửa được — đổi điều khoản phải đi qua phụ lục. Giấy tờ treo ở phần Tài liệu, không còn là một ô của form",
       "precondition": "Đăng nhập bằng Admin hoặc Sales; có hợp đồng đã tạo",
       "cases": [
         {
           "d": "Mở form sửa với dữ liệu điền sẵn",
           "s": [
             "Mở chi tiết hợp đồng",
-            "Bấm Sửa"
+            "Bấm Quản lý hợp đồng"
           ],
           "t": "id hợp đồng bất kỳ",
           "e": "Form hiện đúng dữ liệu hiện tại, các dropdown chọn sẵn đúng khách hàng và người phụ trách"
@@ -551,13 +614,15 @@
           "e": "Trạng thái tự chuyển thành Đang hiệu lực"
         },
         {
-          "d": "Sửa sang ngày ký sau ngày hiệu lực",
+          "d": "Ô Ngày ký không sửa được",
           "s": [
-            "Đổi ngày ký muộn hơn ngày hiệu lực",
-            "Bấm Lưu"
+            "Mở trang Quản lý của một bản nháp",
+            "Xem ô Ngày ký",
+            "Gửi POST action=update kèm signDate"
           ],
-          "t": "Ngày ký sau ngày hiệu lực",
-          "e": "Bị từ chối, dữ liệu cũ giữ nguyên"
+          "t": "signDate: 2026-01-01",
+          "e": "Ô Ngày ký bị khoá, ghi \"Chưa ký — ngày ký ghi vào lúc bấm “Ký hợp đồng”.\"; lưu xong hợp đồng vẫn chưa có ngày ký",
+          "n": "Ngày ký là dấu của hành động Ký, không đọc từ form sửa"
         },
         {
           "d": "Đổi khách hàng của hợp đồng",
@@ -569,22 +634,25 @@
           "e": "Lưu thành công, hợp đồng xuất hiện ở trang chi tiết của khách hàng mới"
         },
         {
-          "d": "Sửa link file đính kèm sang link không hợp lệ",
+          "d": "Treo tài liệu với link không phải http/https",
           "s": [
-            "Dán chuỗi không phải URL",
-            "Bấm Lưu"
+            "Ở phần Tài liệu của trang Quản lý, chọn loại tài liệu",
+            "Dùng công cụ trình duyệt bỏ kiểm tra của ô link, dán ftp://abc",
+            "Bấm Thêm"
           ],
-          "t": "attachmentUrl: ftp://abc",
-          "e": "Bị từ chối kèm thông báo về link http/https, link cũ giữ nguyên"
+          "t": "fileUrl: ftp://abc",
+          "e": "Hiện \"Không thêm được tài liệu: link phải bắt đầu bằng http:// hoặc https://, và loại tài liệu phải chọn trong danh sách.\", không có dòng tài liệu mới",
+          "n": "error=document_invalid"
         },
         {
-          "d": "Xoá trắng link file đính kèm",
+          "d": "Huỷ tài liệu mà không nêu lý do",
           "s": [
-            "Xoá trắng ô link file",
-            "Bấm Lưu"
+            "Gửi POST action=voidDocument cho một tài liệu đang treo, để trống lý do"
           ],
-          "t": "attachmentUrl: (trống)",
-          "e": "Lưu thành công, hợp đồng không còn file đính kèm"
+          "p": "Hợp đồng có ít nhất một tài liệu",
+          "t": "reason: (trống)",
+          "e": "Về trang Quản lý với \"Phải nêu lý do thì mới huỷ được tài liệu.\"; tài liệu vẫn còn",
+          "n": "Huỷ tài liệu là huỷ mềm, bắt buộc lý do và ghi vào nhật ký hợp đồng"
         },
         {
           "d": "Sửa hợp đồng không tồn tại",
@@ -612,18 +680,18 @@
           ],
           "p": "Có hợp đồng ở trạng thái Đã ký",
           "t": "-",
-          "e": "Đầu form có khối cảnh báo \"Hợp đồng đã ký — điều khoản đã khoá\"; các ô mã, tiêu đề, khách hàng, loại, người ký, nơi ký, uỷ quyền, giá trị, ngày hiệu lực và ngày kết thúc đều mờ, không gõ được; ô Người phụ trách và ô Link file PDF vẫn gõ được",
-          "n": "Mở được hai ô đó là cố ý: cả hai đều không nằm trên tờ giấy hai bên ký, và link PDF thường chỉ có SAU khi ký"
+          "e": "Đầu form có khối cảnh báo \"Hợp đồng đã ký — điều khoản đã khoá\"; các ô mã, tiêu đề, khách hàng, loại, người ký, nơi ký, uỷ quyền, giá trị, ngày hiệu lực và ngày kết thúc đều mờ, không gõ được; chỉ còn ô Người phụ trách gõ được",
+          "n": "Người phụ trách không nằm trên tờ giấy hai bên ký nên vẫn đổi được. Giấy tờ sau khi ký treo ở phần Tài liệu"
         },
         {
-          "d": "Hợp đồng đã ký: đổi người phụ trách và dán link PDF",
+          "d": "Hợp đồng đã ký: đổi người phụ trách",
           "s": [
-            "Mở form sửa của một hợp đồng Đã ký",
-            "Chọn người phụ trách khác, dán link Google Drive vào ô Link file PDF",
+            "Mở trang Quản lý của một hợp đồng Đã ký",
+            "Chọn người phụ trách khác",
             "Bấm Lưu thay đổi"
           ],
-          "t": "Người phụ trách: một Sales khác; Link: https://drive.google.com/file/d/abc/view",
-          "e": "Lưu thành công; trang chi tiết hiện người phụ trách mới và khung xem PDF; nhật ký có dòng \"Sửa thông tin\" kể đúng hai thay đổi đó"
+          "t": "Người phụ trách: một Sales khác",
+          "e": "Lưu thành công; trang chi tiết hiện người phụ trách mới; nhật ký có dòng \"Sửa thông tin\" kể đúng thay đổi đó"
         },
         {
           "d": "Hợp đồng đã ký: POST thẳng để đổi tiêu đề",
@@ -632,7 +700,7 @@
           ],
           "t": "title: Tiêu đề bị đổi lén",
           "e": "Tiêu đề KHÔNG đổi; nhật ký không sinh dòng nào kể về tiêu đề",
-          "n": "Ô mờ trên form chỉ là lớp trình bày; chặn thật nằm ở ContractDAO.update — nó chỉ ghi owner_id và attachment_url"
+          "n": "Ô mờ trên form chỉ là lớp trình bày; chặn thật nằm ở ContractDAO.update — với hợp đồng đã ký nó chỉ ghi owner_id"
         },
         {
           "d": "Hợp đồng đã thanh lý: không còn form sửa",
@@ -642,6 +710,45 @@
           "p": "Có hợp đồng đã thanh lý",
           "t": "-",
           "e": "Form thông tin biến mất, thay bằng thông báo \"Hợp đồng đã Đã thanh lý\"; chỉ còn phần ghi nhận tiền về"
+        },
+        {
+          "d": "Nhập thời hạn cho bản nháp",
+          "s": [
+            "Mở trang Quản lý của một bản nháp chưa có thời hạn",
+            "Nhập ngày hiệu lực và ngày kết thúc hợp lệ",
+            "Bấm Lưu thay đổi"
+          ],
+          "t": "Hiệu lực: hôm nay — Kết thúc: hôm nay + 90 ngày",
+          "e": "Lưu thành công; trang chi tiết hiện đúng hai mốc và trạng thái Đang hiệu lực"
+        },
+        {
+          "d": "Ngày hiệu lực sau ngày kết thúc",
+          "s": [
+            "Ở trang Quản lý của bản nháp, nhập ngày hiệu lực muộn hơn ngày kết thúc",
+            "Bấm Lưu thay đổi"
+          ],
+          "t": "Hiệu lực: 31/12/2026 — Kết thúc: 01/01/2026",
+          "e": "Form không gửi đi, hiện \"Điền cả hai mốc, và ngày hiệu lực phải trước hoặc bằng ngày kết thúc.\"; gửi thẳng POST thì về form với \"Thông tin hợp đồng chưa hợp lệ. Vui lòng kiểm tra lại các ô bắt buộc.\", dữ liệu cũ giữ nguyên"
+        },
+        {
+          "d": "Chỉ điền một trong hai mốc thời hạn",
+          "s": [
+            "Ở trang Quản lý của bản nháp, chỉ nhập ngày hiệu lực, để trống ngày kết thúc",
+            "Bấm Lưu thay đổi"
+          ],
+          "t": "Hiệu lực: hôm nay — Kết thúc: (trống)",
+          "e": "Form không gửi đi, hiện \"Điền cả hai mốc, và ngày hiệu lực phải trước hoặc bằng ngày kết thúc.\"",
+          "n": "Để trống CẢ HAI thì lưu được — bản nháp chưa chốt thời hạn"
+        },
+        {
+          "d": "Bản nháp thiếu thời hạn thì chưa ký được",
+          "s": [
+            "Mở chi tiết một bản nháp chưa có ngày hiệu lực / kết thúc",
+            "Bấm Ký hợp đồng và xác nhận"
+          ],
+          "t": "-",
+          "e": "Không ký; hiện \"Chưa ký được: hợp đồng còn thiếu ngày hiệu lực hoặc ngày kết thúc. Bấm Quản lý hợp đồng, điền thời hạn và lưu trước.\"",
+          "n": "error=missing_term"
         }
       ]
     },
@@ -661,7 +768,7 @@
             "Nhập lý do rồi xác nhận"
           ],
           "p": "Đăng nhập bằng Admin",
-          "t": "id hợp đồng bất kỳ; lý do: Nhập trùng với HD-0042",
+          "t": "id hợp đồng bất kỳ; lý do: Nhập trùng với 01/2026/HĐKT-POSTEF",
           "e": "Huỷ thành công, quay về danh sách và hợp đồng biến mất khỏi đó",
           "o": "Bản ghi chỉ bị đánh dấu is_deleted; contract_history có thêm dòng Huỷ bản ghi, cột note chứa đúng lý do đã nhập"
         },
@@ -713,7 +820,7 @@
           "d": "Huỷ ở hộp thoại nhập lý do",
           "s": [
             "Bấm Huỷ bản ghi",
-            "Chọn Cancel"
+            "Chọn Huỷ ở hộp thoại nhập lý do"
           ],
           "t": "-",
           "e": "Không có gì bị huỷ"
@@ -751,12 +858,12 @@
           "d": "Tạo hợp đồng mới ra bản nháp, chưa có ngày ký",
           "s": [
             "Vào Hợp đồng bán, bấm Thêm hợp đồng",
-            "Điền tiêu đề, loại, khách hàng, người phụ trách, ngày hiệu lực và ngày kết thúc",
-            "ĐỂ TRỐNG ô ngày ký, bấm Lưu"
+            "Điền mã, tiêu đề, loại, khách hàng, người phụ trách (form không có ô ngày nào)",
+            "Bấm Lưu"
           ],
-          "t": "ngày ký: (để trống)",
+          "t": "-",
           "e": "Lưu thành công; trang chi tiết hiện nhãn tiến độ 'Nháp', cột Thời hạn ghi 'chưa ký'",
-          "n": "Trước V24 ô ngày ký là bắt buộc, nên tạo hợp đồng là đã ký — không có chỗ nào để chặn việc ký"
+          "n": "Trước V24 ô ngày ký là bắt buộc, nên tạo hợp đồng là đã ký. Từ PR #164 form tạo bỏ hẳn các ô ngày"
         },
         {
           "d": "Ký hợp đồng",
@@ -1530,17 +1637,17 @@
       "prefix": "TC_CTRADDPRD",
       "screen": "POST /POSCS/contract action=addProduct",
       "description": "Gắn một dòng sản phẩm kèm số lượng vào hợp đồng",
-      "precondition": "Đăng nhập bằng Admin hoặc Sales; đang mở chi tiết một hợp đồng; danh mục sản phẩm đã có dữ liệu",
+      "precondition": "Đăng nhập bằng Admin hoặc Sales; đang mở trang Quản lý của một hợp đồng còn là bản Nháp; danh mục sản phẩm đã có dữ liệu",
       "cases": [
         {
           "d": "Thêm sản phẩm với số lượng hợp lệ",
           "s": [
-            "Ở trang chi tiết hợp đồng, chọn sản phẩm ở dropdown",
-            "Nhập số lượng",
+            "Ở phần Hàng hoá của trang Quản lý hợp đồng, chọn sản phẩm",
+            "Nhập số lượng, để trống đơn vị",
             "Bấm Thêm"
           ],
           "t": "Sản phẩm: Phần mềm quản lý bán hàng — Số lượng: 3",
-          "e": "Dòng sản phẩm xuất hiện trong bảng, tổng giá trị hợp đồng được tính lại",
+          "e": "Dòng sản phẩm xuất hiện trong bảng hàng hoá với đúng số lượng, đơn vị mặc định \"Cái\"; nhật ký có dòng kể hạng mục vừa thêm",
           "o": "Thêm một dòng vào bảng sản phẩm của hợp đồng"
         },
         {
@@ -1551,7 +1658,7 @@
             "Bấm Thêm"
           ],
           "t": "productId: (chưa chọn) — số lượng: 2",
-          "e": "Hiện \"Không thêm được sản phẩm: vui lòng chọn sản phẩm và nhập số lượng hợp lệ.\""
+          "e": "Hiện \"Không thêm được hàng hoá: chọn một sản phẩm và nhập số lượng là số nguyên lớn hơn 0 (viết 1.000 cũng được).\""
         },
         {
           "d": "Số lượng bằng 0",
@@ -1601,8 +1708,7 @@
             "Bấm Thêm"
           ],
           "t": "Số lượng: 1.000",
-          "e": "Hệ thống xử lý nhất quán: hoặc hiểu đúng là 1000, hoặc từ chối rõ ràng — không được lưu nhầm thành 1",
-          "n": "Ghi rõ kết quả quan sát được vào cột Kết quả thực tế"
+          "e": "Hiểu đúng là 1000 và lưu dòng với số lượng 1000 — dấu chấm là phân cách nghìn"
         },
         {
           "d": "Thêm cùng một sản phẩm hai lần",
@@ -1622,6 +1728,14 @@
           "p": "Đăng nhập bằng vai trò Kỹ thuật",
           "t": "POST action=addProduct kèm dữ liệu hợp lệ",
           "e": "Trả về trang lỗi 403, hợp đồng không có thêm dòng sản phẩm nào"
+        },
+        {
+          "d": "Hợp đồng đã ký thì không thêm được hàng hoá",
+          "s": [
+            "Với một hợp đồng Đã ký, gửi POST action=addProduct kèm sản phẩm và số lượng hợp lệ"
+          ],
+          "t": "POST action=addProduct",
+          "e": "Về trang Quản lý với \"Không thêm được hàng hoá — hàng hoá chỉ sửa được khi hợp đồng còn là bản Nháp. Nếu vừa có người ký hợp đồng này, tải lại trang để xem.\"; bảng hàng hoá không đổi"
         }
       ]
     },
@@ -1636,11 +1750,11 @@
         {
           "d": "Gỡ một dòng sản phẩm",
           "s": [
-            "Ở bảng sản phẩm của hợp đồng, bấm Gỡ ở một dòng",
+            "Ở bảng hàng hoá của trang Quản lý hợp đồng (bản Nháp), bấm Gỡ ở một dòng",
             "Xác nhận"
           ],
           "t": "Dòng sản phẩm bất kỳ",
-          "e": "Dòng đó biến mất khỏi bảng, tổng giá trị hợp đồng được tính lại"
+          "e": "Dòng đó biến mất khỏi bảng hàng hoá, các dòng khác giữ nguyên"
         },
         {
           "d": "Gỡ dòng sản phẩm cuối cùng",
@@ -1657,7 +1771,7 @@
             "Gửi POST action=removeProduct với id dòng không có thật"
           ],
           "t": "id dòng: 999999",
-          "e": "Hiện \"Không gỡ được sản phẩm này -- vui lòng thử lại.\", các dòng khác không bị ảnh hưởng"
+          "e": "Hiện \"Không gỡ được hàng hoá này — hàng hoá chỉ sửa được khi hợp đồng còn là bản Nháp.\", các dòng khác không bị ảnh hưởng"
         },
         {
           "d": "Gỡ dòng sản phẩm thuộc hợp đồng khác",
@@ -1670,14 +1784,15 @@
           "e": "Không gỡ được — thao tác bị giới hạn trong phạm vi hợp đồng đang mở, dòng của hợp đồng B vẫn nguyên"
         },
         {
-          "d": "Vai trò CSKH gọi thẳng action=removeProduct",
+          "d": "Vai trò Kỹ thuật gọi thẳng action=removeProduct",
           "s": [
-            "Đăng nhập bằng CSKH",
+            "Đăng nhập bằng Kỹ thuật",
             "Gửi POST action=removeProduct"
           ],
-          "p": "Đăng nhập bằng vai trò CSKH",
+          "p": "Đăng nhập bằng vai trò Kỹ thuật",
           "t": "POST action=removeProduct",
-          "e": "Trả về trang lỗi 403, dòng sản phẩm vẫn còn"
+          "e": "Trả về trang lỗi 403, dòng sản phẩm vẫn còn",
+          "n": "Vai CSKH đã gộp vào Sales (V37)"
         }
       ]
     },

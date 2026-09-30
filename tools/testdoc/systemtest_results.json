@@ -84,11 +84,6 @@
     "actual": "Sau khi mở khoá, đăng nhập bằng mật khẩu cũ: được",
     "note": ""
   },
-  "ST_CUS_001": {
-    "status": "Đạt",
-    "actual": "Tạo khách hàng -> /POSCS/customer?action=view&id=161",
-    "note": ""
-  },
   "ST_CUS_002": {
     "status": "Đạt",
     "actual": "Tìm theo mã số thuế 66160415 -> 1 dòng",
@@ -102,11 +97,6 @@
   "ST_CUS_004": {
     "status": "Đạt",
     "actual": "Đánh giá mức Tốt -> /POSCS/customer?action=view&id=161&evaluated=1; trang chi tiết hiện nhãn tiếng Việt: có",
-    "note": ""
-  },
-  "ST_CUS_005": {
-    "status": "Đạt",
-    "actual": "Tạo hợp đồng hiệu lực từ 2026-09-26 -> trạng thái Chưa hiệu lực",
     "note": ""
   },
   "ST_CUS_006": {
@@ -149,11 +139,6 @@
     "actual": "Quá ngày kết thúc -> trạng thái Đã hết hạn",
     "note": ""
   },
-  "ST_CUS_014": {
-    "status": "Đạt",
-    "actual": "Xoá hợp đồng đã có hiệu lực -> /POSCS/contract?action=view&id=165&error=cannot_delete",
-    "note": ""
-  },
   "ST_CUS_015": {
     "status": "Đạt",
     "actual": "Sau khi khởi động lại, tác vụ nền sinh 11 thông báo hợp đồng sắp hết hạn; trang thông báo của người phụ trách hiện 16 mục",
@@ -177,11 +162,6 @@
   "ST_CUS_020": {
     "status": "Đạt",
     "actual": "Xoá khách hàng còn hợp đồng hiệu lực -> /POSCS/customer?action=view&id=161&error=has_active_contracts",
-    "note": ""
-  },
-  "ST_TK_001": {
-    "status": "Đạt",
-    "actual": "Tạo phiếu gắn hợp đồng 165 -> /POSCS/ticket?action=view&id=155",
     "note": ""
   },
   "ST_TK_002": {
@@ -222,11 +202,6 @@
   "ST_TK_009": {
     "status": "Đạt",
     "actual": "Kỹ thuật tạo phiếu -> HTTP 403; xoá phiếu -> HTTP 403",
-    "note": ""
-  },
-  "ST_TK_010": {
-    "status": "Đạt",
-    "actual": "Sales xem danh sách -> HTTP 200; cập nhật phiếu -> HTTP 403",
     "note": ""
   },
   "ST_TK_011": {
@@ -274,19 +249,9 @@
     "actual": "PDF phiếu: 8198 byte, đọc được",
     "note": ""
   },
-  "ST_TK_020": {
-    "status": "Đạt",
-    "actual": "CSKH xoá phiếu -> /POSCS/ticket",
-    "note": ""
-  },
   "ST_TK_021": {
     "status": "Đạt",
     "actual": "Mở lại phiếu đã xoá -> HTTP 302 /POSCS/ticket?error=notfound",
-    "note": ""
-  },
-  "ST_PRD_001": {
-    "status": "Đạt",
-    "actual": "Tạo sản phẩm kèm ảnh và catalogue -> /POSCS/product?action=view&id=221",
     "note": ""
   },
   "ST_PRD_002": {
@@ -312,11 +277,6 @@
   "ST_PRD_006": {
     "status": "Đạt",
     "actual": "Form sửa điền sẵn tên: 'SP he thong 160415'",
-    "note": ""
-  },
-  "ST_PRD_007": {
-    "status": "Đạt",
-    "actual": "Sửa tên và đơn giá -> trang chi tiết hiện giá trị mới",
     "note": ""
   },
   "ST_PRD_008": {
@@ -394,24 +354,9 @@
     "actual": "Kỹ thuật tạo được sản phẩm -> /POSCS/product?action=view&id=224",
     "note": ""
   },
-  "ST_ACL_004": {
-    "status": "Đạt",
-    "actual": "CSKH tạo được phiếu hỗ trợ -> /POSCS/ticket?action=view&id=159",
-    "note": ""
-  },
-  "ST_ACL_005": {
-    "status": "Đạt",
-    "actual": "Sales xem sản phẩm/phiếu HTTP 200/200; tạo sản phẩm 403, cập nhật phiếu 403",
-    "note": ""
-  },
   "ST_ACL_006": {
     "status": "Đạt",
     "actual": "Kỹ thuật tạo khách hàng 403, cập nhật hợp đồng 403",
-    "note": ""
-  },
-  "ST_ACL_007": {
-    "status": "Đạt",
-    "actual": "CSKH cập nhật khách hàng 403, tạo hợp đồng 403, cập nhật sản phẩm 403",
     "note": ""
   },
   "ST_ACL_008": {
@@ -437,26 +382,6 @@
   "ST_ACL_012": {
     "status": "Đạt",
     "actual": "tech01 thử đổi người phụ trách sang 18 -> CSDL vẫn ghi 16",
-    "note": ""
-  },
-  "ST_ACL_013": {
-    "status": "Đạt",
-    "actual": "Đổi vai trò nhân viên sang CSKH -> /POSCS/employee?action=view&id=69",
-    "note": ""
-  },
-  "ST_ACL_014": {
-    "status": "Đạt",
-    "actual": "Sau khi đổi sang CSKH: tạo khách hàng HTTP 403, tạo phiếu HTTP 302",
-    "note": ""
-  },
-  "ST_ACL_015": {
-    "status": "Đạt",
-    "actual": "Sales/Kỹ thuật/CSKH mở màn hình Nhân viên -> HTTP [403, 403, 403]",
-    "note": ""
-  },
-  "ST_ACL_016": {
-    "status": "Đạt",
-    "actual": "Ba vai trò mở nhật ký -> [403, 403, 403]; tải file log -> [403, 403, 403]",
     "note": ""
   },
   "ST_ACL_017": {

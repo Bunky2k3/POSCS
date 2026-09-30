@@ -277,6 +277,60 @@ Không chạy được trong lượt tự động thường; dựng thêm rồi 
   (`NotificationScheduler` chạy lần đầu sau 1 phút, sau đó mỗi 60 phút). Khởi
   động lại lần nữa để xác nhận không sinh bản ghi trùng.
 
+### Ca cần giả lập lỗi CSDL
+
+Các nhánh `delete_failed`, `evaluate_failed`, `roles_not_saved`,
+`toggle_failed`, `province_not_saved`, `files_not_saved`, `create_failed`
+chỉ chạy khi câu lệnh ghi xuống CSDL hỏng giữa chừng — bấm trên giao diện
+không tạo ra được. Cách dựng: trên **CSDL kiểm thử** (không bao giờ trên
+`poscs_db`), tạo một trigger `SIGNAL` chặn đúng câu lệnh đó, chạy ca, rồi xoá
+trigger ngay.
+
+```sql
+DELIMITER //
+-- Xoá mềm hỏng: đổi tên bảng theo ca (enterprises / products / technicalrequests)
+CREATE TRIGGER tt_gia_lap_loi BEFORE UPDATE ON enterprises FOR EACH ROW
+BEGIN
+  IF NEW.is_deleted <> OLD.is_deleted THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'gia lap loi';
+  END IF;
+END//
+DELIMITER ;
+-- ... chạy ca trên giao diện ...
+DROP TRIGGER tt_gia_lap_loi;
+```
+
+| Ca | Trigger |
+|---|---|
+| TC_CUSDEL_007 | `BEFORE UPDATE ON enterprises`, điều kiện `is_deleted` đổi |
+| TC_PRDDEL_006 | như trên, bảng `products` |
+| TC_TKDEL_006 | như trên, bảng `technicalrequests` |
+| TC_EMPBAN_007 | như trên, bảng `users` |
+| TC_CUSEVAL_008 | `BEFORE INSERT ON customer_lifecycle_events` (không cần điều kiện) |
+| TC_CUSADD_024, TC_CUSEDIT_016 | `BEFORE INSERT ON enterprise_roles` |
+| TC_EMPADD_018, TC_EMPEDIT_010 | `BEFORE INSERT ON user_provinces` |
+| TC_PRDADD_012 | `BEFORE INSERT ON productimages` |
+| TC_PRDEDIT_010 | `BEFORE DELETE ON productimages` |
+| TC_PRDEDIT_011 | cả hai trigger `productimages` trên |
+| TC_CTRADD_017 | `BEFORE INSERT ON contracts` |
+
+Mỗi trigger dùng một tên riêng nếu cần hai cái cùng lúc (TC_PRDEDIT_011).
+Quên xoá trigger thì mọi ca sau đó trên cùng bảng đều hỏng oan.
+
+### Lưu ý sau lần cập nhật 30/09/2026
+
+Test case đã được viết lại cho khớp code `main` @ 5309da6 (PR #149–#167, vai
+CSKH gộp vào Sales, hợp đồng không còn ô ngày ở form tạo / mã HD-xxxx / link
+PDF, sản phẩm không có đơn giá). Ca nào đổi nội dung thì kết quả cũ đã gỡ về
+"Chưa chạy"; ca mới đều "Chưa chạy".
+
+**`run_blackbox*.py`, `run_systemtest.py` và `blackbox/fixtures.sql` CHƯA được
+viết lại theo đợt này** — chúng vẫn dùng tài khoản vai CSKH (không còn tồn
+tại) và ghi kết quả theo mã ca cũ, trong khi một số mã giờ mang nội dung khác
+(ví dụ TC_LOGIN đã dồn lên một số sau khi bỏ ca đăng nhập bằng email công ty).
+Chạy lại chúng lúc này sẽ ghi "Đạt" nhầm vào ca khác. Cập nhật script trước
+khi chạy lượt mới.
+
 ---
 
 # Report 5.3 - System Test
