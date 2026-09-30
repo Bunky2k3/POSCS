@@ -335,6 +335,15 @@ public class ContractDAOTest {
     }
 
     @Test
+    public void changeProgressStatus_nullTarget_refusesInsteadOfThrowing() throws Exception {
+        // Map.of(...).containsKey(null) ném NPE -- POST thiếu toStatus từng ra HTTP 500.
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            assertFalse(dao.changeProgressStatus(5, null, ACTOR, null));
+            db.verify(DBContext::getConnection, never());
+        }
+    }
+
+    @Test
     public void changeProgressStatus_liquidateWithoutNote_refusesWithoutTouchingDatabase() throws Exception {
         try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
             // Thanh lý và chấm dứt sớm đóng băng hợp đồng vĩnh viễn, không có

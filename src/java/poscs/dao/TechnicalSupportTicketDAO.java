@@ -71,14 +71,20 @@ public class TechnicalSupportTicketDAO {
     private static final java.util.Set<String> ALLOWED_PRIORITIES =
             java.util.Set.of(PRIORITY_URGENT, PRIORITY_HIGH, PRIORITY_NORMAL, PRIORITY_LOW);
 
-    /** true nếu chuỗi này là một trong ba trạng thái hợp lệ. null coi là KHÔNG hợp lệ (trạng thái là cột NOT NULL). */
+    /**
+     * true nếu chuỗi này là một trong ba trạng thái hợp lệ. null coi là KHÔNG hợp lệ (trạng thái là cột NOT NULL).
+     *
+     * <p>Phải chặn null TRƯỚC khi hỏi tập: Set.of(...).contains(null) ném
+     * NullPointerException chứ không trả false -- form gửi ô trống lên
+     * (emptyToNull) từng làm trang trả HTTP 500 thay vì báo error=invalid.
+     */
     public static boolean isAllowedStatus(String status) {
-        return ALLOWED_STATUSES.contains(status);
+        return status != null && ALLOWED_STATUSES.contains(status);
     }
 
-    /** true nếu chuỗi này là một trong bốn mức ưu tiên hợp lệ. null coi là KHÔNG hợp lệ (cột NOT NULL). */
+    /** true nếu chuỗi này là một trong bốn mức ưu tiên hợp lệ. null coi là KHÔNG hợp lệ (cột NOT NULL) -- xem {@link #isAllowedStatus}. */
     public static boolean isAllowedPriority(String priority) {
-        return ALLOWED_PRIORITIES.contains(priority);
+        return priority != null && ALLOWED_PRIORITIES.contains(priority);
     }
 
     /** Join khách hàng cho các truy vấn đếm (SELECT_BASE đã có sẵn join này). */
