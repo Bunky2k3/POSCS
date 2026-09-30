@@ -928,6 +928,48 @@ public class TechnicalSupportTicketControllerTest {
         verify(response).sendRedirect(contains("error=invalid"));
     }
 
+    // Ô để trống thành null (emptyToNull), mà Set.of(...).contains(null) ném
+    // NullPointerException -- từng ra HTTP 500 thay vì báo error=invalid.
+    @Test
+    public void create_priorityTrong_biTuChoiKhongLoi500() throws Exception {
+        when(request.getParameter("action")).thenReturn("create");
+        when(request.getParameter("enterpriseId")).thenReturn("10");
+        when(request.getParameter("ticketType")).thenReturn("Bảo hành");
+        when(request.getParameter("priority")).thenReturn("");
+        when(request.getParameter("receptionChannel")).thenReturn("Điện thoại");
+        when(request.getParameter("assignedTechnicianId")).thenReturn("50");
+        when(request.getParameter("description")).thenReturn("Thiết bị lỗi nguồn");
+
+        controller.doPost(request, response);
+
+        verify(ticketDAO, never()).insert(any(TechnicalRequest.class));
+        verify(response).sendRedirect(contains("error=invalid"));
+    }
+
+    @Test
+    public void update_priorityTrong_biTuChoiKhongLoi500() throws Exception {
+        when(ticketDAO.findById(3)).thenReturn(fullyValidExistingTicket());
+        stubValidUpdateParams();
+        when(request.getParameter("priority")).thenReturn("");
+
+        controller.doPost(request, response);
+
+        verify(ticketDAO, never()).update(any(TechnicalRequest.class), anyInt(), any());
+        verify(response).sendRedirect(contains("error=invalid"));
+    }
+
+    @Test
+    public void update_statusTrong_biTuChoiKhongLoi500() throws Exception {
+        when(ticketDAO.findById(3)).thenReturn(fullyValidExistingTicket());
+        stubValidUpdateParams();
+        when(request.getParameter("status")).thenReturn("");
+
+        controller.doPost(request, response);
+
+        verify(ticketDAO, never()).update(any(TechnicalRequest.class), anyInt(), any());
+        verify(response).sendRedirect(contains("error=invalid"));
+    }
+
     /** "Trung bình" là nhãn của tài liệu, hệ thống dùng "Bình thường" -- phải bị từ chối. */
     @Test
     public void create_priorityNgoaiDanhSach_biTuChoi() throws Exception {

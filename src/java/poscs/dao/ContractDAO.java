@@ -1921,7 +1921,9 @@ public class ContractDAO {
      *         chuyển không hợp lệ, hoặc thiếu lý do ở bước bắt buộc.
      */
     public boolean changeProgressStatus(int contractId, String toStatus, int actorId, String note) {
-        if (!ALLOWED_TRANSITIONS.containsKey(toStatus)) {
+        // Map.of(...).containsKey(null) ném NullPointerException chứ không trả
+        // false -- POST thiếu toStatus từng làm trang trả HTTP 500.
+        if (toStatus == null || !ALLOWED_TRANSITIONS.containsKey(toStatus)) {
             return false;
         }
         boolean needsNote = PROGRESS_LIQUIDATED.equals(toStatus) || PROGRESS_TERMINATED.equals(toStatus);
