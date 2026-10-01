@@ -63,7 +63,7 @@ public final class ExcelUtil {
         try (Workbook workbook = new HSSFWorkbook()) {
             Sheet sheet = workbook.createSheet("Data");
             writeHeaderRow(workbook, sheet, headers);
-            writeDataRows(sheet, headers.length, rows);
+            writeDataRows(workbook, sheet, headers.length, rows);
             setDefaultColumnWidths(sheet, headers.length);
             streamAsAttachment(response, workbook, fileNamePrefix);
         }
@@ -99,22 +99,31 @@ public final class ExcelUtil {
      * khiến máy của đồng nghiệp mở file đó chạy công thức -- kéo dữ liệu ô
      * khác gửi ra ngoài, hoặc hiện link dụ bấm.
      *
-     * Thêm dấu nháy đơn ở đầu: Excel hiểu đó là "ép kiểu chữ", hiển thị đúng
-     * nội dung gốc mà không tính toán gì.
+     * <p>Chặn bằng cờ "quote prefix" của định dạng ô ({@link #quotedTextStyle}),
+     * KHÔNG nối thêm dấu nháy vào nội dung: dấu nháy nằm trong giá trị thì
+     * Excel hiện nguyên nó ra ({@code '=1+1}), người xem thấy sai chữ mình đã
+     * nhập. Cờ quote prefix chính là dấu nháy ẩn Excel tự đặt khi ta gõ
+     * {@code '=1+1} vào ô: hiện đúng {@code =1+1}, bấm sửa rồi Enter vẫn không
+     * biến thành công thức.
      */
-    private static String neutralizeFormula(String value) {
+    static boolean looksLikeFormula(String value) {
         if (value.isEmpty()) {
-            return value;
+            return false;
         }
         char first = value.charAt(0);
-        if (first == '=' || first == '+' || first == '-' || first == '@'
-                || first == '\t' || first == '\r' || first == '\n') {
-            return "'" + value;
-        }
-        return value;
+        return first == '=' || first == '+' || first == '-' || first == '@'
+                || first == '\t' || first == '\r' || first == '\n';
     }
 
-    private static void writeDataRows(Sheet sheet, int columnCount, List<Object[]> rows) {
+    /** Một định dạng dùng chung cho mọi ô cần quote prefix -- .xls giới hạn ~4000 định dạng. */
+    private static CellStyle quotedTextStyle(Workbook workbook) {
+        CellStyle style = workbook.createCellStyle();
+        style.setQuotePrefixed(true);
+        return style;
+    }
+
+    private static void writeDataRows(Workbook workbook, Sheet sheet, int columnCount, List<Object[]> rows) {
+        CellStyle quoted = null;
         int rowIndex = 1;
         for (Object[] rowData : rows) {
             Row row = sheet.createRow(rowIndex++);
@@ -128,7 +137,14 @@ public final class ExcelUtil {
                 } else if (value instanceof java.util.Date) {
                     cell.setCellValue(new SimpleDateFormat("dd/MM/yyyy").format((java.util.Date) value));
                 } else {
-                    cell.setCellValue(neutralizeFormula(value.toString()));
+                    String text = value.toString();
+                    cell.setCellValue(text);
+                    if (looksLikeFormula(text)) {
+                        if (quoted == null) {
+                            quoted = quotedTextStyle(workbook);
+                        }
+                        cell.setCellStyle(quoted);
+                    }
                 }
             }
         }
