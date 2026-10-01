@@ -7,7 +7,14 @@
     để biết provinceId hiện tại) đổ vào request attribute "customer", xử lý POST cập nhật vào
     bảng enterprises. Kiểm tra bản ghi tồn tại (MSG-021) trước khi hiển thị.
 
+    MỘT khung cho HAI trang, như addnewcustomer.jsp: Sửa khách hàng (kind=buyer)
+    và Sửa nhà cung cấp (kind=supplier). Vai của trang luôn giữ; vai kia là một
+    ô tick "Đồng thời là ..." -- muốn bỏ vai của trang thì sang trang Sửa của
+    vai kia mà bỏ tick (CustomerController.rolesForUpdate).
+
     Request attribute cần có:
+      - kind          : "buyer" | "supplier" (CustomerController.editRoleOf)
+      - customerRoles : List<String> vai đang lưu
       - customer      : poscs.model.Enterprise (đã join .address.district)
       - userList      : List<poscs.model.User>
       - provinceList  : List<poscs.model.Province> (Sales đã có tỉnh: chỉ tỉnh mình cầm + tỉnh hiện tại)
@@ -19,13 +26,17 @@
     (GET /address/wards?provinceId=..., xem AddressController), tự chọn sẵn
     xã/phường hiện tại của khách hàng sau khi nạp xong.
 --%>
+<c:set var="isSupplier" value="${kind == 'supplier'}"/>
+<c:set var="noun" value="${isSupplier ? 'nhà cung cấp' : 'khách hàng'}"/>
+<%-- Vai kia -- vai duy nhất còn tick/bỏ được ở trang này. --%>
+<c:set var="otherRole" value="${isSupplier ? 'Khách mua' : 'Nhà cung cấp'}"/>
 <!DOCTYPE html>
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cập nhật khách hàng - POSCS Portal</title>
+    <title>Cập nhật ${noun} - POSCS Portal</title>
     <link rel="icon" type="image/png" href="${pageContext.request.contextPath}/img/favicon.png">
 
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -62,9 +73,8 @@
 
         .error-text { color: var(--danger); font-size: 12px; margin-top: 5px; display: none; }
 
-        /* Hai vai là hai ô tick ĐỘC LẬP, không phải radio: khách vừa mua vừa
-           bán thì tick cả hai. Viền + nền để nhìn ra ngay đây là ô chọn được,
-           khác hẳn dòng chữ thường. */
+        /* Ô tick "Đồng thời là ...": viền + nền để nhìn ra ngay đây là ô chọn
+           được, khác hẳn dòng chữ thường. */
         .role-check-group { display: flex; gap: 10px; flex-wrap: wrap; }
         .role-check {
             display: inline-flex; align-items: center; gap: 8px; cursor: pointer;
@@ -75,6 +85,8 @@
         .role-check:hover { border-color: var(--primary-light); background: #fff; }
         .role-check small { color: #9ca3af; font-weight: 500; }
         .role-check input { width: 15px; height: 15px; accent-color: var(--primary); }
+        /* Dòng giải thích dưới ô, như addnewcustomer.jsp. */
+        .field-hint { font-size: 0.8rem; margin-top: 6px; color: #6b7280; }
 
         /* ===== Logo doanh nghiệp ===== */
         .logo-upload-wrap { display: flex; flex-direction: column; align-items: center; margin-bottom: 24px; }
@@ -115,23 +127,21 @@
     <%@ include file="/jsp/common/topbar.jsp" %>
     <div class="app-shell">
         <c:set var="activeNav" value="customer" scope="request"/>
-        <%-- Trang này không có tham số kind trên URL, nên suy mục con cần tô
-             sáng từ chính vai của khách: chỉ khi khách CHỈ là bên bán mới sáng
-             "Nhà cung cấp". Khách hai vai thì sáng "Khách hàng mua" -- phải
-             chọn một, và đó là danh sách mặc định. --%>
-        <c:set var="activeCustomerKind" scope="request"
-               value="${not empty customerRoles and customerRoles.contains('Nhà cung cấp') and not customerRoles.contains('Khách mua') ? 'supplier' : 'buyer'}"/>
+        <%-- Mục con cần tô sáng = đúng trang đang đứng. Controller đã chọn
+             trang theo danh sách người dùng vừa đi ra, hoặc suy từ vai. --%>
+        <c:set var="activeCustomerKind" scope="request" value="${isSupplier ? 'supplier' : 'buyer'}"/>
+        <c:set var="kindQuery" value="${isSupplier ? '&kind=supplier' : ''}"/>
         <%@ include file="/jsp/common/sidebar.jsp" %>
         <div class="main-content">
 
 
     <div class="page-container">
-        <a href="${pageContext.request.contextPath}/customer?action=view&id=${customer.enterpriseId}" class="back-link-top"><i class="fa-solid fa-arrow-left-long"></i> Quay lại chi tiết khách hàng</a>
+        <a href="${pageContext.request.contextPath}/customer?action=view&id=${customer.enterpriseId}${kindQuery}" class="back-link-top"><i class="fa-solid fa-arrow-left-long"></i> Quay lại chi tiết ${noun}</a>
 
         <div class="page-header-row">
             <div>
-                <h2>Cập nhật thông tin khách hàng</h2>
-                <p>Mã khách hàng: <strong style="color:var(--primary-dark)">${fn:escapeXml(customer.enterpriseCode)}</strong> &middot; Mã số thuế: <strong style="color:var(--primary-dark)">${fn:escapeXml(customer.taxCode)}</strong></p>
+                <h2>Cập nhật thông tin ${noun}</h2>
+                <p>Mã ${noun}: <strong style="color:var(--primary-dark)">${fn:escapeXml(customer.enterpriseCode)}</strong> &middot; Mã số thuế: <strong style="color:var(--primary-dark)">${fn:escapeXml(customer.taxCode)}</strong></p>
             </div>
             <a href="${pageContext.request.contextPath}/guide?module=customer#sua" target="_blank" rel="noopener" class="guide-btn" title="Mở hướng dẫn sử dụng ở tab mới"><i class="fa-regular fa-circle-question"></i> Hướng dẫn</a>
         </div>
@@ -139,13 +149,16 @@
         <div class="card-box">
             <c:if test="${not empty param.error}">
                 <div class="alert alert-danger py-2 px-3 mb-3" style="font-size: 0.9rem; border-radius: 12px;">
+                    <%-- Như addnewcustomer.jsp: ba cột UNIQUE áp trên CẢ bảng, nên ở
+                         trang nhà cung cấp bản ghi bị trùng rất có thể là một khách hàng. --%>
+                    <c:set var="other" value="${isSupplier ? 'một doanh nghiệp khác (khách hàng hoặc nhà cung cấp)' : 'một khách hàng khác'}"/>
                     <c:choose>
                         <c:when test="${param.error == 'invalid_image_type'}">Logo chỉ nhận file ảnh JPG, PNG, GIF hoặc WEBP. Logo cũ được giữ nguyên.</c:when>
-                        <c:when test="${param.error == 'invalid'}">Thông tin khách hàng chưa hợp lệ. Vui lòng kiểm tra lại các ô bắt buộc.</c:when>
+                        <c:when test="${param.error == 'invalid'}">Thông tin ${noun} chưa hợp lệ. Vui lòng kiểm tra lại các ô bắt buộc.</c:when>
                         <%-- BR-27, xem addnewcustomer.jsp: mỗi cột UNIQUE một thông báo riêng. --%>
-                        <c:when test="${param.error == 'duplicate_email'}">Email này đã thuộc về một khách hàng khác. Vui lòng nhập email khác.</c:when>
-                        <c:when test="${param.error == 'duplicate_phone'}">Số điện thoại này đã thuộc về một khách hàng khác. Vui lòng kiểm tra lại.</c:when>
-                        <c:when test="${param.error == 'duplicate_tax_code'}">Mã số thuế này đã được đăng ký cho một khách hàng khác.</c:when>
+                        <c:when test="${param.error == 'duplicate_email'}">Email này đã thuộc về ${other}. Vui lòng nhập email khác.</c:when>
+                        <c:when test="${param.error == 'duplicate_phone'}">Số điện thoại này đã thuộc về ${other}. Vui lòng kiểm tra lại.</c:when>
+                        <c:when test="${param.error == 'duplicate_tax_code'}">Mã số thuế này đã được đăng ký cho ${other}.</c:when>
                         <c:when test="${param.error == 'support_is_superior'}">Người hỗ trợ không được là cấp trên trực tiếp của người phụ trách chính. Vui lòng chọn người khác.</c:when>
                         <c:when test="${param.error == 'province_not_allowed'}">Xã / phường đã chọn không thuộc các tỉnh bạn phụ trách. Vui lòng chọn lại.</c:when>
                         <c:when test="${param.error == 'update_failed'}">Không lưu được thay đổi. Vui lòng thử lại.</c:when>
@@ -158,8 +171,10 @@
                 <input type="hidden" name="csrfToken" value="${csrfToken}">
                 <input type="hidden" name="action" value="update">
                 <input type="hidden" name="customerId" value="${customer.enterpriseId}">
+                <%-- Vai của trang -- luôn giữ khi lưu, xem CustomerController.rolesForUpdate. --%>
+                <input type="hidden" name="kind" value="${isSupplier ? 'supplier' : 'buyer'}">
 
-                <div class="section-header"><h5>Thông tin khách hàng</h5></div>
+                <div class="section-header"><h5>Thông tin ${noun}</h5></div>
 
                 <div class="logo-upload-wrap">
                     <div class="logo-avatar-wrap">
@@ -177,46 +192,67 @@
 
                 <div class="row">
                     <div class="col-md-6 field-row">
-                        <label>Tên khách hàng <span class="req">*</span></label>
+                        <label>Tên ${noun} <span class="req">*</span></label>
                         <input type="text" class="form-control" id="customerName" name="customerName" value="${fn:escapeXml(customer.enterpriseName)}">
-                        <span class="error-text" id="err-customerName">Tên khách hàng không được để trống.</span>
+                        <span class="error-text" id="err-customerName">Tên ${noun} không được để trống.</span>
                     </div>
                     <div class="col-md-6 field-row">
-                        <label>Loại khách hàng <span class="req">*</span></label>
+                        <label>Loại ${noun} <span class="req">*</span></label>
                         <select class="form-select" id="customerType" name="customerType">
-                            <option value="">-- Chọn loại khách hàng --</option>
-                            <%-- Loại khách hàng theo VAI, đổ từ CustomerController --%>
+                            <option value="">-- Chọn loại ${noun} --</option>
+                            <%-- Loại theo trang, cộng loại đang lưu nếu thuộc vai kia --
+                                 xem CustomerController.showEditForm. --%>
                             <c:forEach var="ct" items="${customerTypeOptions}">
                                 <option value="${fn:escapeXml(ct)}" ${customer.customerType == ct ? 'selected' : ''}>${fn:escapeXml(ct)}</option>
                             </c:forEach>
                         </select>
-                        <span class="error-text" id="err-customerType">Vui lòng chọn loại khách hàng.</span>
+                        <span class="error-text" id="err-customerType">Vui lòng chọn loại ${noun}.</span>
                     </div>
 
                     <div class="col-md-6 field-row">
-                        <label>Nhóm khách hàng <span class="req">*</span></label>
+                        <label>Nhóm ${noun} <span class="req">*</span></label>
+                        <c:set var="groupPrefix" value="${isSupplier ? 'Nhà cung cấp' : 'Khách hàng'}"/>
                         <select class="form-select" id="customerGroup" name="customerGroup">
-                            <option value="">-- Chọn nhóm khách hàng --</option>
-                            <option value="VIP" ${customer.customerGroup == 'VIP' ? 'selected' : ''}>Khách hàng VIP</option>
-                            <option value="Thân thiết" ${customer.customerGroup == 'Thân thiết' ? 'selected' : ''}>Khách hàng thân thiết</option>
-                            <option value="Tiềm năng" ${customer.customerGroup == 'Tiềm năng' ? 'selected' : ''}>Khách hàng tiềm năng</option>
-                            <option value="Thường" ${customer.customerGroup == 'Thường' ? 'selected' : ''}>Khách hàng thường</option>
+                            <option value="">-- Chọn nhóm ${noun} --</option>
+                            <option value="VIP" ${customer.customerGroup == 'VIP' ? 'selected' : ''}>${groupPrefix} VIP</option>
+                            <option value="Thân thiết" ${customer.customerGroup == 'Thân thiết' ? 'selected' : ''}>${groupPrefix} thân thiết</option>
+                            <option value="Tiềm năng" ${customer.customerGroup == 'Tiềm năng' ? 'selected' : ''}>${groupPrefix} tiềm năng</option>
+                            <option value="Thường" ${customer.customerGroup == 'Thường' ? 'selected' : ''}>${groupPrefix} thường</option>
                         </select>
-                        <span class="error-text" id="err-customerGroup">Vui lòng chọn nhóm khách hàng.</span>
+                        <span class="error-text" id="err-customerGroup">Vui lòng chọn nhóm ${noun}.</span>
                     </div>
                     <div class="col-md-6 field-row">
-                        <label>Vai của khách hàng <span class="req">*</span></label>
-                        <%-- Hai vai độc lập, không phải hai lựa chọn loại trừ: một công
-                             ty vừa mua thiết bị vừa cung cấp linh kiện thì tick cả hai và
-                             nó xuất hiện ở cả hai danh sách. Đó là lý do vai nằm ở bảng
-                             riêng chứ không phải một cột trên enterprises (xem V20). --%>
+                        <label>Vai khác</label>
+                        <%-- Vai của trang luôn giữ, ở đây chỉ tick/bỏ vai KIA: công ty
+                             vừa mua thiết bị vừa cung cấp linh kiện thì nằm ở cả hai
+                             danh sách. Vai ở bảng riêng chứ không phải một cột trên
+                             enterprises (xem V20). --%>
                         <div class="role-check-group">
-                            <label class="role-check"><input type="checkbox" name="roles" value="Khách mua"
-                                ${customerRoles.contains('Khách mua') ? 'checked' : ''}> Khách hàng mua <small>(mua của mình)</small></label>
-                            <label class="role-check"><input type="checkbox" name="roles" value="Nhà cung cấp"
-                                ${customerRoles.contains('Nhà cung cấp') ? 'checked' : ''}> Nhà cung cấp <small>(bán cho mình)</small></label>
+                            <label class="role-check"><input type="checkbox" id="otherRole" name="roles" value="${otherRole}"
+                                ${customerRoles.contains(otherRole) ? 'checked' : ''}>
+                                <c:choose>
+                                    <c:when test="${isSupplier}">Đồng thời là khách hàng mua <small>(mua của mình)</small></c:when>
+                                    <c:otherwise>Đồng thời là nhà cung cấp <small>(bán cho mình)</small></c:otherwise>
+                                </c:choose>
+                            </label>
                         </div>
-                        <span class="error-text" id="err-roles">Chọn ít nhất một vai.</span>
+                        <c:if test="${customerRoles.contains(otherRole)}">
+                            <%-- Hai vai: vai của trang không bỏ được ở đây -- chỉ đường sang trang kia. --%>
+                            <div class="field-hint">
+                                Muốn bỏ vai ${noun}? Mở
+                                <a href="${pageContext.request.contextPath}/customer?action=edit&id=${customer.enterpriseId}${isSupplier ? '' : '&kind=supplier'}">trang sửa ${isSupplier ? 'khách hàng' : 'nhà cung cấp'}</a>
+                                của công ty này rồi bỏ tick.
+                            </div>
+                        </c:if>
+                        <c:if test="${isSupplier and empty territoryAssignments}">
+                            <%-- Nhà cung cấp thuần đang không theo địa bàn. Thêm vai khách
+                                 mua là từ lúc lưu nó chia theo tỉnh (CustomerController
+                                 .ownerForUpdate) -- báo trước, đừng để người phụ trách
+                                 tự đổi mà không ai hay. --%>
+                            <div class="field-hint" id="goiYThemVaiKhachMua" style="display:none;">
+                                Khách hàng mua chia theo địa bàn: khi lưu, người phụ trách chính đổi theo người cầm tỉnh (nếu tỉnh đã có người).
+                            </div>
+                        </c:if>
                     </div>
                     <div class="col-md-6 field-row">
                         <label>Người phụ trách chính <span class="req">*</span></label>
@@ -320,7 +356,7 @@
                 </div>
 
                 <div class="action-bar">
-                    <a href="${pageContext.request.contextPath}/customer?action=view&id=${customer.enterpriseId}" class="btn-cancel">Hủy</a>
+                    <a href="${pageContext.request.contextPath}/customer?action=view&id=${customer.enterpriseId}${kindQuery}" class="btn-cancel">Hủy</a>
                     <button type="submit" class="btn-primary"><i class="fa-solid fa-check me-1"></i> Lưu thay đổi</button>
                 </div>
             </form>
@@ -480,6 +516,15 @@
         // ngay tên đúng theo địa bàn, không phải chờ lưu xong mới biết.
         apDungPhanCongDiaBan(document.getElementById('province').value);
 
+        // Nhà cung cấp thuần tick thêm "khách hàng mua": báo trước người phụ
+        // trách sẽ theo địa bàn khi lưu (ô chỉ có ở trang đó).
+        var goiYThemVaiKhachMua = document.getElementById('goiYThemVaiKhachMua');
+        if (goiYThemVaiKhachMua) {
+            document.getElementById('otherRole').addEventListener('change', function () {
+                goiYThemVaiKhachMua.style.display = this.checked ? 'block' : 'none';
+            });
+        }
+
         function validateForm() {
             var valid = true;
             document.querySelectorAll('.error-text').forEach(function (el) { el.style.display = 'none'; });
@@ -491,12 +536,6 @@
                 var el = document.getElementById(id);
                 if (!el.value) { document.getElementById('err-' + id).style.display = 'block'; valid = false; }
             });
-
-            // Ít nhất một vai. Server chặn lại lần nữa -- không có vai nào thì
-            // khách lưu được nhưng biến khỏi cả hai danh sách.
-            if (document.querySelectorAll('input[name="roles"]:checked').length === 0) {
-                document.getElementById('err-roles').style.display = 'block'; valid = false;
-            }
 
             var name = document.getElementById('customerName');
             if (!name.value.trim()) { document.getElementById('err-customerName').style.display = 'block'; valid = false; }

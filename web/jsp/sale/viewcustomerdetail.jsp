@@ -256,7 +256,7 @@
                      khác nhưng không ghi được (CustomerController.outsideSalesScope). --%>
                 <c:if test="${canWrite}">
                     <button class="btn-edit-detail" type="button" onclick="openEvaluateModal()"><i class="fa-solid fa-chart-line"></i> Đánh giá lại xếp hạng</button>
-                    <a href="${pageContext.request.contextPath}/customer?action=edit&id=${customer.enterpriseId}" class="btn-edit-detail"><i class="fa-solid fa-pen"></i> Sửa thông tin</a>
+                    <a href="${pageContext.request.contextPath}/customer?action=edit&id=${customer.enterpriseId}&kind=${activeCustomerKind}" class="btn-edit-detail"><i class="fa-solid fa-pen"></i> Sửa thông tin</a>
                     <button class="btn-delete-detail" onclick="openDeleteModal()"><i class="fa-solid fa-trash"></i> Xóa</button>
                 </c:if>
                 <c:if test="${outOfScope}">

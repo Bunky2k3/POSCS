@@ -442,6 +442,34 @@ public class CustomerController extends HttpServlet {
     }
 
     /**
+     * Trang Sửa nào cho khách này -- vai của trang, xem showEditForm.
+     *
+     * <p>Theo danh sách người dùng vừa đứng ({@code kind} trên URL), nếu khách
+     * thật sự mang vai đó: công ty vừa mua vừa bán mở từ danh sách Nhà cung cấp
+     * thì ra trang Sửa nhà cung cấp. Không có kind, hoặc kind không khớp vai
+     * nào của khách (link gõ tay), thì suy từ vai: chỉ là nhà cung cấp mới ra
+     * trang nhà cung cấp, còn lại là trang khách hàng -- cùng luật với mục
+     * sáng trên thanh điều hướng ở trang chi tiết.
+     */
+    private static String editRoleOf(String kind, List<String> roles) {
+        String asked = "supplier".equals(kind) ? ROLE_SUPPLIER : "buyer".equals(kind) ? ROLE_BUYER : null;
+        if (asked != null && roles.contains(asked)) {
+            return asked;
+        }
+        return isSupplierOnly(roles) ? ROLE_SUPPLIER : ROLE_BUYER;
+    }
+
+    /** {@code types} cộng thêm {@code current} nếu còn thiếu -- xem showEditForm. */
+    private List<String> withCurrentType(List<String> types, String current) {
+        if (isBlank(current) || types.contains(current)) {
+            return types;
+        }
+        List<String> result = new ArrayList<>(types);
+        result.add(current);
+        return result;
+    }
+
+    /**
      * Trang Sửa, khách mua: Sales đã có tỉnh chỉ chuyển khách trong các tỉnh
      * mình cầm, như trang Thêm -- hoặc giữ nguyên tỉnh hiện tại của khách (khách
      * cũ có thể nằm ở tỉnh người khác, xem showEditForm). Admin và Sales chưa có
@@ -513,6 +541,13 @@ public class CustomerController extends HttpServlet {
         }
 
         request.setAttribute("customer", customer);
+        // Hai trang -- Sửa khách hàng / Sửa nhà cung cấp -- chung một khung JSP
+        // như trang Thêm. Trang chỉ quyết định CHỮ (tiêu đề, nhãn, loại, nhóm)
+        // và vai nào là vai của trang; luật địa bàn bên dưới vẫn theo vai đang
+        // lưu, không theo trang: một công ty vừa mua vừa bán mở từ danh sách
+        // Nhà cung cấp vẫn là khách mua, vẫn chia theo tỉnh.
+        String pageRole = editRoleOf(request.getParameter("kind"), roles);
+        request.setAttribute("kind", ROLE_SUPPLIER.equals(pageRole) ? "supplier" : "buyer");
         // Cùng lý do với danh sách tỉnh ngay dưới: người đang phụ trách khách
         // này phải còn trong danh sách kể cả khi họ đã đổi vai, nếu không thì
         // mở form sửa lên ô trống rồi bấm lưu là thay mất người phụ trách.
@@ -548,11 +583,11 @@ public class CustomerController extends HttpServlet {
             request.setAttribute("territoryAssignments", employeeDAO.findAllAssignments());
         }
         request.setAttribute("customerRoles", roles);
-        // Loại khách hàng theo ĐÚNG VAI của khách đang sửa: mở một nhà cung
-        // cấp ra mà dropdown đổ toàn loại của khách mua thì bấm lưu là đổi mất
-        // phân loại của họ.
+        // Loại theo trang đang đứng, cộng loại ĐANG LƯU nếu nó thuộc vai kia:
+        // công ty hai vai chỉ có một cột loại, mở trang này ra mà dropdown
+        // thiếu loại hiện tại thì bấm lưu là đổi mất phân loại của họ.
         request.setAttribute("customerTypeOptions",
-                customerTypesFor(roles.contains(ROLE_SUPPLIER) ? ROLE_SUPPLIER : ROLE_BUYER));
+                withCurrentType(customerTypesFor(pageRole), customer.getCustomerType()));
         request.setAttribute("managerOf", employeeDAO.findManagerMap());
         request.getRequestDispatcher(UPDATE_VIEW).forward(request, response);
     }
@@ -742,13 +777,18 @@ public class CustomerController extends HttpServlet {
             response.sendRedirect(notFoundUrl(request));
             return;
         }
+        // Lỗi thì quay về đúng trang vừa gửi (Sửa khách hàng / Sửa nhà cung
+        // cấp), xong thì về chi tiết vẫn sáng đúng danh sách -- như trang Thêm.
+        String pageRole = roleFromKind(request.getParameter("kind"));
+        String kindQuery = ROLE_SUPPLIER.equals(pageRole) ? "&kind=supplier" : "";
+        String formUrl = request.getContextPath() + "/customer?action=edit&id=" + id + kindQuery;
+        String detailUrl = request.getContextPath() + "/customer?action=view&id=" + id + kindQuery;
         // Trang form đã chặn, nhưng POST thẳng thì không đi qua trang form.
         if (outsideSalesScope(request, existing, customerDAO.findRolesOf(id))) {
-            response.sendRedirect(request.getContextPath()
-                    + "/customer?action=view&id=" + id + "&error=not_your_customer");
+            response.sendRedirect(detailUrl + "&error=not_your_customer");
             return;
         }
-        if (!logoIsAcceptable(request, response, request.getContextPath() + "/customer?action=edit&id=" + id)) {
+        if (!logoIsAcceptable(request, response, formUrl)) {
             return;
         }
 
@@ -764,10 +804,9 @@ public class CustomerController extends HttpServlet {
 
         // Luật tỉnh và người phụ trách đi theo vai SẼ LƯU, không phải vai cũ:
         // tick thêm "Khách mua" cho một nhà cung cấp là từ đó nó theo địa bàn.
-        List<String> roles = rolesFromRequest(request);
+        List<String> roles = rolesForUpdate(request, pageRole);
         if (!isSupplierOnly(roles) && !provinceAllowedForSales(request, existing)) {
-            response.sendRedirect(request.getContextPath()
-                    + "/customer?action=edit&id=" + id + "&error=province_not_allowed");
+            response.sendRedirect(formUrl + "&error=province_not_allowed");
             return;
         }
         Integer accountOwnerId = ownerForUpdate(request, existing, roles);
@@ -782,22 +821,19 @@ public class CustomerController extends HttpServlet {
         // request không gửi lên địa chỉ mới nhưng khách đã có sẵn address_id
         // (DAO giữ nguyên địa chỉ cũ) -- sửa tên/SĐT của khách cũ không vì thế
         // mà bị chặn.
-        if (!isValidCommonFields(e) || (e.getAddress() == null && existing.getAddressId() == null)
-                || roles.isEmpty()) {
-            response.sendRedirect(request.getContextPath() + "/customer?action=edit&id=" + id + "&error=invalid");
+        if (!isValidCommonFields(e) || (e.getAddress() == null && existing.getAddressId() == null)) {
+            response.sendRedirect(formUrl + "&error=invalid");
             return;
         }
         if (supportIsOwnersManager(e)) {
-            response.sendRedirect(request.getContextPath()
-                    + "/customer?action=edit&id=" + id + "&error=support_is_superior");
+            response.sendRedirect(formUrl + "&error=support_is_superior");
             return;
         }
         // Loại chính khách đang sửa ra khỏi phép kiểm, nếu không thì mở form
         // lên bấm Lưu mà không đổi gì cũng báo trùng với chính nó.
         String duplicate = findDuplicateField(e, id);
         if (duplicate != null) {
-            response.sendRedirect(request.getContextPath()
-                    + "/customer?action=edit&id=" + id + "&error=" + duplicate);
+            response.sendRedirect(formUrl + "&error=" + duplicate);
             return;
         }
 
@@ -811,17 +847,17 @@ public class CustomerController extends HttpServlet {
         boolean ok = customerDAO.update(e);
         if (!ok) {
             LOG.warn("Cap nhat khach hang that bai (actor={}, enterpriseId={})", Logs.actor(request), id);
-            response.sendRedirect(request.getContextPath() + "/customer?action=edit&id=" + id + "&error=update_failed");
+            response.sendRedirect(formUrl + "&error=update_failed");
             return;
         }
         // replaceRolesOf tự bọc transaction: hỏng thì vai cũ còn nguyên, chỉ phần
         // vai vừa tick chưa được ghi. Hồ sơ thì đã lưu -- về trang chi tiết báo rõ.
         if (!customerDAO.replaceRolesOf(id, roles)) {
             LOG.warn("Ghi vai khach hang that bai (actor={}, enterpriseId={})", Logs.actor(request), id);
-            response.sendRedirect(request.getContextPath() + "/customer?action=view&id=" + id + "&error=roles_not_saved");
+            response.sendRedirect(detailUrl + "&error=roles_not_saved");
             return;
         }
-        response.sendRedirect(request.getContextPath() + "/customer?action=view&id=" + id);
+        response.sendRedirect(detailUrl);
     }
 
     private void handleDelete(HttpServletRequest request, HttpServletResponse response) throws IOException {
@@ -961,23 +997,26 @@ public class CustomerController extends HttpServlet {
     }
 
     /**
-     * Các vai người dùng tick trên form, đã lọc bỏ giá trị lạ.
+     * Các vai sẽ lưu khi SỬA: vai của trang (luôn giữ) cộng vai kia nếu ô
+     * "Đồng thời là..." được tick.
+     *
+     * <p>Vai của trang không bỏ được ở chính trang đó -- muốn bỏ thì sang trang
+     * Sửa của vai kia mà bỏ tick (chốt với người dùng 2026-10-01). Nhờ vậy cũng
+     * không còn đường lưu khách không vai nào, thứ làm khách biến khỏi cả hai
+     * danh sách.
      *
      * <p>Lọc theo danh sách trắng chứ không nhận thẳng chuỗi gửi lên: cột
      * {@code role} là varchar tự do, một request nặn tay ghi được vai "Khách
-     * VIP" vào đó rồi khách hàng biến khỏi cả hai danh sách.
+     * VIP" vào đó. Xếp khách mua trước cho thứ tự ghi ổn định, trang nào gửi
+     * lên cũng vậy.
      */
-    private List<String> rolesFromRequest(HttpServletRequest request) {
-        List<String> result = new ArrayList<>();
+    private List<String> rolesForUpdate(HttpServletRequest request, String pageRole) {
         String[] submitted = request.getParameterValues("roles");
-        if (submitted == null) {
-            return result;
-        }
-        for (String value : submitted) {
-            if (ROLE_BUYER.equals(value) || ROLE_SUPPLIER.equals(value)) {
-                if (!result.contains(value)) {
-                    result.add(value);
-                }
+        List<String> ticked = submitted != null ? List.of(submitted) : List.of();
+        List<String> result = new ArrayList<>();
+        for (String role : List.of(ROLE_BUYER, ROLE_SUPPLIER)) {
+            if (role.equals(pageRole) || ticked.contains(role)) {
+                result.add(role);
             }
         }
         return result;

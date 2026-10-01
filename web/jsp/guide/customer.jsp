@@ -24,7 +24,7 @@
     <li><strong>Khách hàng mua</strong>: doanh nghiệp mua hàng của mình. Mã tự sinh dạng <code>KH-0001</code>, <code>KH-0002</code>…</li>
     <li><strong>Nhà cung cấp</strong>: doanh nghiệp bán hàng cho mình. Mã tự sinh dạng <code>NCC-001</code>, <code>NCC-002</code>…</li>
 </ul>
-<p>Một công ty vừa mua vừa bán thì nằm ở cả hai danh sách: tạo ở một trang, sau đó thêm vai còn lại ở trang Sửa (xem <a href="#sua">mục 7</a>).</p>
+<p>Một công ty vừa mua vừa bán thì nằm ở cả hai danh sách: tạo ở một trang, sau đó tick thêm vai còn lại ở trang Sửa (xem <a href="#sua">mục 7</a>).</p>
 
 <table class="guide-table">
     <tr><th>Việc</th><th>Admin</th><th>Sales</th><th>Kỹ thuật</th></tr>
@@ -94,7 +94,7 @@
     <li>Bấm <strong>Tạo khách hàng</strong>. Hệ thống tự sinh mã <code>KH-xxxx</code> rồi chuyển sang trang chi tiết của khách vừa tạo.</li>
 </ol>
 <div class="guide-warn">
-    <p>Nếu một công ty đã có trong hệ thống (ví dụ đang là nhà cung cấp) thì <strong>không tạo mới</strong>. Mở hồ sơ công ty đó rồi tick thêm vai <em>Khách hàng mua</em> ở trang Sửa. Tạo mới sẽ bị chặn vì trùng mã số thuế, email hoặc số điện thoại.</p>
+    <p>Nếu một công ty đã có trong hệ thống (ví dụ đang là nhà cung cấp) thì <strong>không tạo mới</strong>. Mở hồ sơ công ty đó rồi tick <em>Đồng thời là khách hàng mua</em> ở trang Sửa nhà cung cấp. Tạo mới sẽ bị chặn vì trùng mã số thuế, email hoặc số điện thoại.</p>
 </div>
 
 <h3 id="loi-them">3.1. Khi không lưu được</h3>
@@ -161,16 +161,16 @@
 <div class="guide-note"><p>Xếp hạng do người dùng tự chọn; hệ thống không tự chấm điểm. Mỗi lần lưu là một dòng lịch sử mới, kể cả khi chọn lại đúng mức cũ.</p></div>
 <p>Nếu trang báo <em>Chưa lưu được đánh giá. Xếp hạng vẫn như trước…</em> thì chưa có gì được ghi — cả xếp hạng lẫn dòng lịch sử. Bấm Lưu đánh giá lại; vẫn lỗi thì báo quản trị viên.</p>
 
-<h2 id="sua">7. Sửa thông tin khách hàng</h2>
+<h2 id="sua">7. Sửa thông tin khách hàng / nhà cung cấp</h2>
 <div class="guide-who"><span class="lbl">Ai làm được:</span><span class="role">Admin</span><span class="role">Sales</span><span class="role no">Kỹ thuật</span></div>
-<p>Ở trang chi tiết bấm <strong>Sửa thông tin</strong>, hoặc bấm nút <i class="fa-solid fa-pen"></i> ở danh sách.</p>
+<p>Ở trang chi tiết bấm <strong>Sửa thông tin</strong>, hoặc bấm nút <i class="fa-solid fa-pen"></i> ở danh sách. Như trang Thêm, có hai trang Sửa: đi từ danh sách <strong>Khách hàng mua</strong> thì ra <em>Cập nhật thông tin khách hàng</em>, từ danh sách <strong>Nhà cung cấp</strong> thì ra <em>Cập nhật thông tin nhà cung cấp</em>. Hai trang giống nhau, khác ở tên gọi, loại và nhóm.</p>
 <figure class="guide-shot narrow">
     <a href="${img}/08-sua.png" target="_blank"><img src="${img}/08-sua.png" alt="Trang sửa khách hàng"></a>
     <figcaption>Hình 8. Trang sửa thông tin khách hàng</figcaption>
 </figure>
 <ol class="guide-steps">
-    <li><strong>Mã khách hàng</strong> và <strong>Mã số thuế</strong> chỉ hiển thị, không sửa được.</li>
-    <li><strong>Vai của khách hàng</strong>: tick cả <em>Khách hàng mua</em> và <em>Nhà cung cấp</em> nếu công ty vừa mua vừa bán. Phải còn ít nhất một vai.</li>
+    <li><strong>Mã</strong> và <strong>Mã số thuế</strong> chỉ hiển thị, không sửa được.</li>
+    <li><strong>Vai khác</strong>: trang khách hàng có ô <em>Đồng thời là nhà cung cấp</em>, trang nhà cung cấp có ô <em>Đồng thời là khách hàng mua</em>. Tick vào nếu công ty vừa mua vừa bán. Vai của chính trang thì luôn giữ; muốn bỏ thì mở trang Sửa còn lại (trang có dòng chỉ đường ngay dưới ô) rồi bỏ tick.</li>
     <li><strong>Người phụ trách chính</strong> đi theo tỉnh của địa chỉ: đổi địa chỉ sang tỉnh đã có người phụ trách thì khách tự chuyển sang tên người đó.
         <ul>
             <li>Sales <strong>đã được giao tỉnh</strong>: ô Tỉnh chỉ có các tỉnh bạn phụ trách, cộng tỉnh hiện tại của khách. Tỉnh chưa ai phụ trách thì giữ người đang phụ trách.</li>
@@ -185,7 +185,7 @@
     <tr><td>Xã / phường đã chọn không thuộc các tỉnh bạn phụ trách.</td><td>Sales chỉ chuyển được khách sang các tỉnh mình phụ trách. Chọn lại tỉnh.</td></tr>
 </table>
 <p>Các thông báo khác giống khi thêm khách hàng (<a href="#loi-them">mục 3.1</a>).</p>
-<p>Nếu sau khi lưu (thêm hoặc sửa), trang chi tiết báo <em>Đã lưu thông tin nhưng chưa ghi được vai Khách mua / Nhà cung cấp…</em> thì hồ sơ đã lưu, riêng ô vai gặp lỗi hệ thống. Khách mới tạo lúc này chưa hiện trong danh sách nào. Bấm <strong>Sửa</strong>, tick lại vai rồi <strong>Lưu thay đổi</strong>.</p>
+<p>Nếu sau khi lưu (thêm hoặc sửa), trang chi tiết báo <em>Đã lưu thông tin nhưng chưa ghi được vai Khách mua / Nhà cung cấp…</em> thì hồ sơ đã lưu, riêng ô vai gặp lỗi hệ thống. Khách mới tạo lúc này chưa hiện trong danh sách nào. Bấm <strong>Sửa</strong> rồi <strong>Lưu thay đổi</strong> (tick lại ô <em>Đồng thời là…</em> nếu công ty có hai vai).</p>
 
 <h2 id="xoa">8. Xoá khách hàng</h2>
 <div class="guide-who"><span class="lbl">Ai làm được:</span><span class="role">Admin</span><span class="role">Sales</span><span class="role no">Kỹ thuật</span></div>

@@ -627,9 +627,8 @@ public class CustomerControllerTest {
     //
     // Từ khi tách hai trang tạo (2026-09-24), vai lúc TẠO suy từ trang (kind)
     // chứ không từ ô tick -- mỗi trang đúng một vai, nên "không vai nào" và
-    // "vai lạ" không lọt được qua đường tạo nữa. Ô tick hai vai chỉ còn ở
-    // trang Sửa, nên các test luật "ít nhất một vai" và danh sách trắng chuyển
-    // sang đó.
+    // "vai lạ" không lọt được qua đường tạo nữa. Trang Sửa tách theo cùng cách
+    // (2026-10-01): vai của trang luôn giữ, ô tick chỉ thêm/bỏ vai KIA.
     //
     // Vai nằm ở bảng riêng (enterprise_roles) nên CSDL không ép được luật
     // "ít nhất một vai" -- ràng buộc nói về sự tồn tại của dòng ở bảng khác,
@@ -711,34 +710,63 @@ public class CustomerControllerTest {
     }
 
     /**
-     * Trang Sửa: bỏ tick cả hai vai thì khách lưu được nhưng biến khỏi CẢ HAI
-     * danh sách -- không ai biết cho tới khi có người đi tìm không thấy.
+     * Trang Sửa khách hàng không tick gì: vẫn giữ vai khách mua của trang.
+     * Trước khi tách, bỏ tick cả hai vai là khách biến khỏi CẢ HAI danh sách.
      */
     @Test
-    public void update_khongCoVaiNao_khongLuuVaBaoLoi() throws Exception {
+    public void update_trangKhachHangKhongTickGi_giuVaiCuaTrang() throws Exception {
         stubValidUpdateOfCustomer5();
         when(request.getParameterValues("roles")).thenReturn(null);
+        when(customerDAO.update(any(Enterprise.class))).thenReturn(true);
+
+        controller.doPost(request, response);
+
+        verify(customerDAO).replaceRolesOf(5, List.of("Khách mua"));
+        verify(response).sendRedirect(CONTEXT_PATH + "/customer?action=view&id=5");
+    }
+
+    /** Trang Sửa nhà cung cấp: giữ vai nhà cung cấp, bỏ tick ô kia là bỏ vai khách mua. */
+    @Test
+    public void update_trangNhaCungCapKhongTickGi_chiConVaiNhaCungCap() throws Exception {
+        loginAs("Admin");
+        stubValidUpdateOfCustomer5();
+        when(request.getParameter("kind")).thenReturn("supplier");
+        when(request.getParameterValues("roles")).thenReturn(null);
+        when(customerDAO.update(any(Enterprise.class))).thenReturn(true);
+
+        controller.doPost(request, response);
+
+        verify(customerDAO).replaceRolesOf(5, List.of("Nhà cung cấp"));
+        verify(response).sendRedirect(CONTEXT_PATH + "/customer?action=view&id=5&kind=supplier");
+    }
+
+    /** Lỗi ở trang Sửa nhà cung cấp quay về ĐÚNG trang đó, như trang Thêm. */
+    @Test
+    public void update_trangNhaCungCapLoi_quayVeTrangNhaCungCap() throws Exception {
+        stubValidUpdateOfCustomer5();
+        when(request.getParameter("kind")).thenReturn("supplier");
+        when(request.getParameter("phone")).thenReturn("not-a-phone");
 
         controller.doPost(request, response);
 
         verify(customerDAO, never()).update(any());
-        verify(response).sendRedirect(CONTEXT_PATH + "/customer?action=edit&id=5&error=invalid");
+        verify(response).sendRedirect(CONTEXT_PATH + "/customer?action=edit&id=5&kind=supplier&error=invalid");
     }
 
     /**
      * Cột enterprise_roles.role là varchar tự do. Nhận thẳng chuỗi gửi lên là
-     * một request nặn tay ghi được vai "Khách VIP" vào đó, rồi khách hàng biến
-     * khỏi cả hai danh sách y như trường hợp không có vai.
+     * một request nặn tay ghi được vai "Khách VIP" vào đó -- bỏ qua, chỉ còn
+     * vai của trang.
      */
     @Test
     public void update_vaiLa_biLocBo() throws Exception {
         stubValidUpdateOfCustomer5();
         when(request.getParameterValues("roles")).thenReturn(new String[]{"Khách VIP"});
+        when(customerDAO.update(any(Enterprise.class))).thenReturn(true);
 
         controller.doPost(request, response);
 
-        verify(customerDAO, never()).update(any());
-        verify(response).sendRedirect(CONTEXT_PATH + "/customer?action=edit&id=5&error=invalid");
+        verify(customerDAO).replaceRolesOf(5, List.of("Khách mua"));
     }
 
     /** Công ty vừa mua vừa bán: thêm vai thứ hai ở trang Sửa, giữ cả hai. */
@@ -1557,7 +1585,8 @@ public class CustomerControllerTest {
         holdsProvinces(TINH_1);
         khach5(99, 2, "Nhà cung cấp");
         postUpdate5(2);
-        when(request.getParameterValues("roles")).thenReturn(new String[]{"Nhà cung cấp"});
+        when(request.getParameter("kind")).thenReturn("supplier");
+        when(request.getParameterValues("roles")).thenReturn(null);
         when(employeeDAO.findAssigneeOfWard(10)).thenReturn(42);
 
         controller.doPost(request, response);
@@ -1574,7 +1603,8 @@ public class CustomerControllerTest {
         loginAs("Admin");
         khach5(42, 2, "Nhà cung cấp");
         postUpdate5(2);
-        when(request.getParameterValues("roles")).thenReturn(new String[]{"Nhà cung cấp"});
+        when(request.getParameter("kind")).thenReturn("supplier");
+        when(request.getParameterValues("roles")).thenReturn(null);
         when(employeeDAO.findAssigneeOfWard(10)).thenReturn(42);
 
         controller.doPost(request, response);
@@ -1594,6 +1624,70 @@ public class CustomerControllerTest {
         verify(addressDAO).findAllProvinces();
         verify(employeeDAO, never()).findAllAssignments();
         verify(request).setAttribute(eq("lockedOwner"), any());
+    }
+
+    /** Không có kind: nhà cung cấp thuần ra trang Sửa nhà cung cấp. */
+    @Test
+    public void editForm_nhaCungCapKhongKind_raTrangNhaCungCap() throws Exception {
+        loginAs("Admin");
+        khach5(42, 2, "Nhà cung cấp");
+        openEditForm5();
+
+        controller.doGet(request, response);
+
+        verify(request).setAttribute("kind", "supplier");
+    }
+
+    /**
+     * Công ty hai vai mở từ danh sách Nhà cung cấp: trang Sửa nhà cung cấp, nhưng
+     * vẫn chia theo địa bàn -- nó vẫn là khách mua.
+     */
+    @Test
+    public void editForm_haiVaiTuDanhSachNhaCungCap_trangNhaCungCapVanTheoDiaBan() throws Exception {
+        loginAs("Admin");
+        khach5(42, 2, "Khách mua", "Nhà cung cấp");
+        openEditForm5();
+        when(request.getParameter("kind")).thenReturn("supplier");
+
+        controller.doGet(request, response);
+
+        verify(request).setAttribute("kind", "supplier");
+        verify(employeeDAO).findAllAssignments();
+    }
+
+    /** kind không khớp vai nào của khách (link gõ tay): suy từ vai. */
+    @Test
+    public void editForm_kindKhongKhopVai_suyTuVai() throws Exception {
+        loginAs("Admin");
+        khach5(42, 2, "Khách mua");
+        openEditForm5();
+        when(request.getParameter("kind")).thenReturn("supplier");
+
+        controller.doGet(request, response);
+
+        verify(request).setAttribute("kind", "buyer");
+    }
+
+    /**
+     * Một cột loại cho cả hai vai: mở trang nhà cung cấp của công ty đang mang
+     * loại khách mua thì dropdown vẫn phải có loại đó, nếu không bấm lưu là mất.
+     */
+    @Test
+    @SuppressWarnings("unchecked")
+    public void editForm_loaiThuocVaiKia_vanCoTrongDanhSach() throws Exception {
+        loginAs("Admin");
+        Enterprise e = khach5(42, 2, "Khách mua", "Nhà cung cấp");
+        e.setCustomerType("Nhà mạng viễn thông");
+        openEditForm5();
+        when(request.getParameter("kind")).thenReturn("supplier");
+
+        controller.doGet(request, response);
+
+        ArgumentCaptor<Object> types = ArgumentCaptor.forClass(Object.class);
+        verify(request).setAttribute(eq("customerTypeOptions"), types.capture());
+        List<String> options = (List<String>) types.getValue();
+        assertTrue(options.contains("Nhà sản xuất"));
+        assertTrue(options.contains("Nhà mạng viễn thông"));
     }
 
     @Test
