@@ -78,8 +78,11 @@ def csrf(session, page="/changePassword.jsp"):
     return m.group(1)
 
 
-def login(role, base=BASE):
+def login(role, base=None):
     """Trả về (session, response cuối) — không tự theo redirect."""
+    # Đọc BASE lúc gọi, không lúc định nghĩa hàm: main() các lượt đổi BASE theo
+    # tham số dòng lệnh, giá trị mặc định đóng băng thì vẫn đăng nhập vào 8099.
+    base = base or BASE
     s = requests.Session()
     # JSTL <fmt:formatDate> chỉ áp dụng pattern khi xác định được locale của
     # request; thiếu header này thì nó in thẳng Date.toString() và mọi phép
