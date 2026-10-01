@@ -166,7 +166,7 @@
 <p>Ở trang chi tiết bấm <strong>Sửa thông tin</strong>, hoặc bấm nút <i class="fa-solid fa-pen"></i> ở danh sách. Như trang Thêm, có hai trang Sửa: đi từ danh sách <strong>Khách hàng mua</strong> thì ra <em>Cập nhật thông tin khách hàng</em>, từ danh sách <strong>Nhà cung cấp</strong> thì ra <em>Cập nhật thông tin nhà cung cấp</em>. Hai trang giống nhau, khác ở tên gọi, loại và nhóm.</p>
 <figure class="guide-shot narrow">
     <a href="${img}/08-sua.png" target="_blank"><img src="${img}/08-sua.png" alt="Trang sửa khách hàng"></a>
-    <figcaption>Hình 8. Trang sửa thông tin khách hàng</figcaption>
+    <figcaption>Hình 8. Trang sửa thông tin khách hàng (tài khoản Sales)</figcaption>
 </figure>
 <ol class="guide-steps">
     <li><strong>Mã</strong> và <strong>Mã số thuế</strong> chỉ hiển thị, không sửa được.</li>
@@ -181,6 +181,11 @@
     <li><strong>Người hỗ trợ</strong>: cùng luật như lúc tạo. Nếu người đang chọn trở nên không hợp lệ thì ô tự bỏ chọn và báo ngay bên dưới.</li>
     <li>Bấm <strong>Lưu thay đổi</strong>.</li>
 </ol>
+<p>Trang sửa nhà cung cấp (Hình 9) có cùng các ô, chỉ khác tiêu đề, tên các ô, danh sách loại và nhóm; ô vai khác ở đây là <em>Đồng thời là khách hàng mua</em>.</p>
+<figure class="guide-shot narrow">
+    <a href="${img}/08b-sua-nha-cung-cap.png" target="_blank"><img src="${img}/08b-sua-nha-cung-cap.png" alt="Trang sửa nhà cung cấp"></a>
+    <figcaption>Hình 9. Trang sửa thông tin nhà cung cấp (tài khoản Sales)</figcaption>
+</figure>
 <table class="guide-table">
     <tr><th>Thông báo</th><th>Nguyên nhân và cách xử lý</th></tr>
     <tr><td>Bạn chỉ xem được khách hàng này: khách do người khác phụ trách.</td><td>Sales đã được giao tỉnh mở trang Sửa (hoặc Xóa, Đánh giá) của khách ngoài phạm vi <em>Của tôi</em>. Nhờ người phụ trách khách đó hoặc Admin.</td></tr>
@@ -193,7 +198,7 @@
 <div class="guide-who"><span class="lbl">Ai làm được:</span><span class="role">Admin</span><span class="role">Sales</span><span class="role no">Kỹ thuật</span></div>
 <figure class="guide-shot">
     <a href="${img}/09-xoa.png" target="_blank"><img src="${img}/09-xoa.png" alt="Hộp xác nhận xoá"></a>
-    <figcaption>Hình 9. Hộp xác nhận xoá khách hàng</figcaption>
+    <figcaption>Hình 10. Hộp xác nhận xoá khách hàng</figcaption>
 </figure>
 <ol class="guide-steps">
     <li>Bấm <strong>Xóa</strong> ở trang chi tiết (hoặc nút <i class="fa-solid fa-trash"></i> ở danh sách).</li>
@@ -202,11 +207,11 @@
 <p>Nếu trang chi tiết mở lại với thông báo <em>Không xoá được khách hàng. Vui lòng thử lại.</em> thì khách chưa bị xoá do lỗi hệ thống: xoá lại; vẫn lỗi thì báo quản trị viên.</p>
 <p>Xoá xong, trang quay về đúng danh sách bạn vừa đứng (Khách hàng mua hoặc Nhà cung cấp). Nếu danh sách hiện dải vàng <em>Không tìm thấy khách hàng này</em> (hoặc <em>nhà cung cấp này</em>) thì bản ghi đã bị xoá trước đó — thường do người khác vừa xoá, hoặc bạn mở một link cũ.</p>
 <div class="guide-warn">
-    <p><strong>Không xoá được khách hàng còn hợp đồng đang hiệu lực.</strong> Khi đó trang báo như Hình 10; cần thanh lý hoặc kết thúc các hợp đồng đó trước.</p>
+    <p><strong>Không xoá được khách hàng còn hợp đồng đang hiệu lực.</strong> Khi đó trang báo như Hình 11; cần thanh lý hoặc kết thúc các hợp đồng đó trước.</p>
 </div>
 <figure class="guide-shot">
     <a href="${img}/10-xoa-bi-chan.png" target="_blank"><img src="${img}/10-xoa-bi-chan.png" alt="Không xoá được vì còn hợp đồng"></a>
-    <figcaption>Hình 10. Thông báo khi khách còn hợp đồng đang hiệu lực</figcaption>
+    <figcaption>Hình 11. Thông báo khi khách còn hợp đồng đang hiệu lực</figcaption>
 </figure>
 <div class="guide-note"><p>Xoá là <strong>xoá mềm</strong>: khách biến khỏi mọi danh sách, nhưng dữ liệu vẫn được giữ lại để các hợp đồng, phiếu hỗ trợ cũ vẫn tra cứu được.</p></div>
 

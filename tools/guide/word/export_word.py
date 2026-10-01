@@ -754,6 +754,9 @@ CHANGES = [
     ('29/09/2026', 'S', 'Sản phẩm, Khách hàng: hợp đồng "Chưa hiệu lực" không còn hiện màu đỏ; các danh sách giữ đúng từ khoá '
                         'có dấu & hoặc # khi sang trang (PR #166).'),
     ('29/09/2026', 'T', 'Phiếu hỗ trợ: ô lọc Người xử lý; kỹ thuật viên mặc định xem phiếu của mình (PR #167).'),
+    ('01/10/2026', 'S', 'Khách hàng: tách trang Sửa khách hàng / Sửa nhà cung cấp; ô "Đồng thời là ..." thay hai ô tick '
+                        'vai (PR #172).'),
+    ('01/10/2026', 'S', 'Khách hàng: Sales không đổi được người phụ trách chính ở trang Sửa (PR #173).'),
 ]
 
 

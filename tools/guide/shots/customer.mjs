@@ -8,7 +8,8 @@
  * Dữ liệu mẫu (bản sao poscs_db): sales4 phụ trách 5 tỉnh (Hà Nội, Bắc Ninh,
  * Lào Cai, Phú Thọ, Quảng Ninh); KH-0001 (id 1, Sông Hồng) đứng tên sales4,
  * có người liên hệ, hợp đồng đang hiệu lực, phiếu hỗ trợ và lịch sử đánh giá
- * -- nên ảnh "xoá bị chặn" chạy thật mà KHÔNG xoá gì.
+ * -- nên ảnh "xoá bị chặn" chạy thật mà KHÔNG xoá gì. NCC-005 (id 35) là nhà
+ * cung cấp sales4 tạo 01/10, dùng cho ảnh trang Sửa nhà cung cấp.
  */
 const DETAIL = '/customer?action=view&id=1&kind=buyer';
 
@@ -138,13 +139,27 @@ export default {
         {
             file: '08-sua.png',
             user: 'sales4',
-            url: '/customer?action=edit&id=1',
+            url: '/customer?action=edit&id=1&kind=buyer',
             marks: [
                 { sel: '.page-header-row p', n: 1 },
                 { sel: '.role-check-group', n: 2 },
                 { sel: '#assignee', n: 3 },
-                { sel: '#supportAssignee', n: 4 },
-                { sel: '.action-bar .btn-primary', n: 5 }
+                { sel: '#province', n: 4 },
+                { sel: '#supportAssignee', n: 5 },
+                { sel: '.action-bar .btn-primary', n: 6 }
+            ],
+            clip: '.page-container'
+        },
+        {
+            // Trang Sửa nhà cung cấp: cùng khung, khác chữ. Khoanh không số --
+            // các bước đã đánh số ở Hình 8.
+            file: '08b-sua-nha-cung-cap.png',
+            user: 'sales4',
+            url: '/customer?action=edit&id=35&kind=supplier',
+            marks: [
+                { sel: '.page-header-row h2', n: null },
+                { sel: '.role-check-group', n: null },
+                { sel: '#assignee', n: null }
             ],
             clip: '.page-container'
         },
