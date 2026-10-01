@@ -18,9 +18,8 @@
       - customer      : poscs.model.Enterprise (đã join .address.district)
       - userList      : List<poscs.model.User>
       - provinceList  : List<poscs.model.Province> (Sales đã có tỉnh: chỉ tỉnh mình cầm + tỉnh hiện tại)
-      - territoryAssignments : Map tỉnh -> người cầm; KHÔNG có với nhà cung cấp (không theo địa bàn)
-      - lockedOwner   : poscs.model.User, CHỈ khi Sales sửa nhà cung cấp -- khoá người đang phụ trách
-      - keepOwnerWhenUnassigned : Sales đã có tỉnh -- tỉnh chưa ai cầm thì giữ người đang phụ trách
+      - territoryAssignments : Map tỉnh -> người cầm; CHỈ khi Admin sửa khách mua (theo địa bàn)
+      - lockedOwner   : poscs.model.User, CHỈ khi Sales sửa -- khoá người đang phụ trách
 
     Dropdown "Xã / Phường" KHÔNG đổ sẵn từ server -- JS nạp qua AJAX
     (GET /address/wards?provinceId=..., xem AddressController), tự chọn sẵn
@@ -244,11 +243,11 @@
                                 của công ty này rồi bỏ tick.
                             </div>
                         </c:if>
-                        <c:if test="${isSupplier and empty territoryAssignments}">
-                            <%-- Nhà cung cấp thuần đang không theo địa bàn. Thêm vai khách
-                                 mua là từ lúc lưu nó chia theo tỉnh (CustomerController
+                        <c:if test="${isSupplier and empty territoryAssignments and empty lockedOwner}">
+                            <%-- Admin sửa nhà cung cấp thuần (không theo địa bàn). Thêm vai
+                                 khách mua là từ lúc lưu nó chia theo tỉnh (CustomerController
                                  .ownerForUpdate) -- báo trước, đừng để người phụ trách
-                                 tự đổi mà không ai hay. --%>
+                                 tự đổi mà không ai hay. Sales thì người phụ trách luôn giữ. --%>
                             <div class="field-hint" id="goiYThemVaiKhachMua" style="display:none;">
                                 Khách hàng mua chia theo địa bàn: khi lưu, người phụ trách chính đổi theo người cầm tỉnh (nếu tỉnh đã có người).
                             </div>
@@ -258,15 +257,14 @@
                         <label>Người phụ trách chính <span class="req">*</span></label>
                         <c:choose>
                             <c:when test="${not empty lockedOwner}">
-                                <%-- Sales sửa nhà cung cấp của mình: giữ người đang phụ trách,
-                                     như trang Thêm nhà cung cấp khoá tên người tạo. Server tự
-                                     giữ lại (CustomerController.ownerForUpdate) -- đây chỉ là
-                                     khoá hình. --%>
+                                <%-- Sales sửa: giữ người đang phụ trách, đổi tỉnh cũng vậy.
+                                     Server tự giữ lại (CustomerController.ownerForUpdate) --
+                                     đây chỉ là khoá hình. --%>
                                 <select class="form-select" id="assignee" disabled>
                                     <option value="${lockedOwner.userId}" selected>${fn:escapeXml(lockedOwner.fullName)}</option>
                                 </select>
                                 <input type="hidden" name="accountOwnerId" value="${lockedOwner.userId}">
-                                <div class="text-muted" style="font-size: 0.8rem; margin-top: 6px; text-transform: none; font-weight: 400;">Nhà cung cấp giữ người đang phụ trách.</div>
+                                <div class="text-muted" style="font-size: 0.8rem; margin-top: 6px; text-transform: none; font-weight: 400;">Giữ người đang phụ trách. Muốn chuyển ${noun} cho người khác thì nhờ Admin.</div>
                             </c:when>
                             <c:otherwise>
                                 <select class="form-select" id="assignee" name="accountOwnerId">
@@ -429,13 +427,10 @@
         // Form sửa BẮT BUỘC phải có khoá này, nếu không thì mở form sửa rồi
         // đổi người phụ trách là đường vòng thoát khoá của form tạo.
         //
-        // Chỉ chạy khi server nhúng bảng phân công, tức khách mua. Nhà cung cấp
-        // không theo địa bàn: Admin chọn tự do, Sales thì ô đã khoá sẵn.
+        // Chỉ chạy khi server nhúng bảng phân công, tức Admin sửa khách mua.
+        // Nhà cung cấp không theo địa bàn (Admin chọn tự do), còn Sales thì ô
+        // đã khoá sẵn người đang phụ trách.
         var suyTheoDiaBan = ${not empty territoryAssignments};
-        // Sales đã có tỉnh: tỉnh chưa ai cầm thì KHÔNG mở ô cho chọn tự do mà
-        // giữ người đang phụ trách -- server cũng giữ đúng như vậy
-        // (CustomerController.ownerForUpdate).
-        var giuNguoiDangPhuTrach = ${keepOwnerWhenUnassigned ? customer.accountOwnerId : 'null'};
         var phanCongDiaBan = {
             <c:forEach var="e" items="${territoryAssignments}" varStatus="st">'${e.key}': ${e.value}<c:if test="${!st.last}">,</c:if></c:forEach>
         };
@@ -456,10 +451,6 @@
                 return;
             }
             var userId = provinceId ? phanCongDiaBan[provinceId] : null;
-            var giuNguoiCu = !userId && giuNguoiDangPhuTrach;
-            if (giuNguoiCu) {
-                userId = giuNguoiDangPhuTrach;
-            }
             var opt = userId ? Array.prototype.find.call(oNguoiPhuTrach.options, function (o) {
                 return o.value === String(userId);
             }) : null;
@@ -479,9 +470,7 @@
             oNguoiPhuTrachAn.disabled = false;
             oNguoiPhuTrachAn.value = opt.value;
             dienBoiDiaBan = true;
-            goiYDiaBan.textContent = giuNguoiCu
-                    ? 'Tỉnh này chưa ai cầm: giữ người đang phụ trách.'
-                    : 'Theo phân công địa bàn. Muốn đổi thì sửa người phụ trách tỉnh ở trang Nhân viên.';
+            goiYDiaBan.textContent = 'Theo phân công địa bàn. Muốn đổi thì sửa người phụ trách tỉnh ở trang Nhân viên.';
             goiYDiaBan.style.display = 'block';
         }
 

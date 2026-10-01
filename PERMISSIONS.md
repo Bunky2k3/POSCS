@@ -296,14 +296,19 @@ hide what the controller would refuse.
   is never refused on Edit and vice versa.
   - Create: only wards in their own provinces, and the customer is theirs.
   - Edit: the province dropdown offers their provinces plus the customer's
-    current one; the owner still follows the territory, and a province nobody
-    holds keeps the current owner rather than taking the submitted one.
+    current one.
 - **Sales with no provinces yet are not restricted on buyers** — the former
-  CSKH accounts create and edit on behalf of the province holders, with the
-  owner resolved from the territory exactly as for Admin.
+  CSKH accounts create and edit on behalf of the province holders; on create
+  the owner is resolved from the territory exactly as for Admin.
+- **Sales never change the account owner on Edit** (agreed with the user
+  2026-10-01) — buyer or supplier, provinces or not, moving the address to
+  another province or not: the current owner is kept and the submitted one is
+  ignored. Only Admin reassigns a customer (buyers follow the territory,
+  suppliers are picked by hand); the Edit page is the only place that does,
+  e.g. when an employee leaves.
 - **Supplier-only rows are not territorial.** Any Sales may write only the
   suppliers they or their subordinates own: the owner is locked to the creator
-  on create and to the current owner on edit. Admin picks the owner freely and
+  on create (and, like every Sales edit, to the current owner on edit). Admin picks the owner freely and
   the territory table never overrides it. All 34 provinces are offered.
 - **Out of scope means read-only.** The list and detail pages hide
   Edit/Delete/Rate and say whose customer it is; `?action=edit` and the three

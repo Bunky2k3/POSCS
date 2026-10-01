@@ -171,11 +171,13 @@
 <ol class="guide-steps">
     <li><strong>Mã</strong> và <strong>Mã số thuế</strong> chỉ hiển thị, không sửa được.</li>
     <li><strong>Vai khác</strong>: trang khách hàng có ô <em>Đồng thời là nhà cung cấp</em>, trang nhà cung cấp có ô <em>Đồng thời là khách hàng mua</em>. Tick vào nếu công ty vừa mua vừa bán. Vai của chính trang thì luôn giữ; muốn bỏ thì mở trang Sửa còn lại (trang có dòng chỉ đường ngay dưới ô) rồi bỏ tick.</li>
-    <li><strong>Người phụ trách chính</strong> đi theo tỉnh của địa chỉ: đổi địa chỉ sang tỉnh đã có người phụ trách thì khách tự chuyển sang tên người đó.
+    <li><strong>Người phụ trách chính</strong>:
         <ul>
-            <li>Sales <strong>đã được giao tỉnh</strong>: ô Tỉnh chỉ có các tỉnh bạn phụ trách, cộng tỉnh hiện tại của khách. Tỉnh chưa ai phụ trách thì giữ người đang phụ trách.</li>
-            <li><strong>Nhà cung cấp</strong> không đi theo tỉnh: Admin tự chọn người phụ trách, Sales thì giữ nguyên.</li>
+            <li><strong>Sales</strong>: ô bị khoá, luôn giữ người đang phụ trách, kể cả khi đổi địa chỉ sang tỉnh khác. Muốn chuyển khách cho người khác thì nhờ Admin.</li>
+            <li><strong>Admin</strong>, khách hàng mua: đi theo tỉnh của địa chỉ. Đổi sang tỉnh đã có người phụ trách thì khách tự chuyển sang tên người đó; tỉnh chưa ai phụ trách thì tự chọn.</li>
+            <li><strong>Admin</strong>, nhà cung cấp: không đi theo tỉnh, tự chọn người phụ trách.</li>
         </ul></li>
+    <li><strong>Tỉnh</strong>: Sales <strong>đã được giao tỉnh</strong> chỉ chọn được các tỉnh mình phụ trách, cộng tỉnh hiện tại của khách.</li>
     <li><strong>Người hỗ trợ</strong>: cùng luật như lúc tạo. Nếu người đang chọn trở nên không hợp lệ thì ô tự bỏ chọn và báo ngay bên dưới.</li>
     <li>Bấm <strong>Lưu thay đổi</strong>.</li>
 </ol>
