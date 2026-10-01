@@ -526,6 +526,41 @@ public class ContractControllerTest {
     }
 
     /**
+     * Ngày ký là dấu của hành động Ký, không phải ô nhập. Form tạo không có ô
+     * đó, nên signDate trong POST chỉ có thể là request nặn tay -- và nếu lọt
+     * xuống thì COALESCE lúc ký sẽ giữ nó thay cho ngày ký thật.
+     */
+    @Test
+    public void create_ignoresSignDateFromRequest() throws Exception {
+        when(request.getParameter("action")).thenReturn("create");
+        stubValidContractFields();
+        when(request.getParameter("signDate")).thenReturn("2020-01-01");
+        when(contractDAO.insert(any(Contract.class), anyInt())).thenReturn(90);
+
+        controller.doPost(request, response);
+
+        verify(contractDAO).insert(argThat((Contract c) -> c.getSigningDate() == null), anyInt());
+    }
+
+    /** Phụ lục đi qua cùng buildContractFromRequest, nên cũng không nhận signDate. */
+    @Test
+    public void createAmendment_ignoresSignDateFromRequest() throws Exception {
+        Contract parent = signedContract();
+        parent.setContractId(3);
+        parent.setEnterpriseId(10);
+        when(request.getParameter("action")).thenReturn("createAmendment");
+        when(request.getParameter("parentId")).thenReturn("3");
+        when(contractDAO.findById(3)).thenReturn(parent);
+        stubValidContractFields();
+        when(request.getParameter("signDate")).thenReturn("2020-01-01");
+        when(contractDAO.insert(any(Contract.class), anyInt())).thenReturn(90);
+
+        controller.doPost(request, response);
+
+        verify(contractDAO).insert(argThat((Contract c) -> c.getSigningDate() == null), anyInt());
+    }
+
+    /**
      * Đối chiếu tiền ở trang hợp đồng làm theo CỤM: giá trị hiện hành (đã cộng
      * phụ lục) so với tổng kỳ của cả cụm. So riêng bản ghi gốc thì cảnh báo
      * "không khớp" nổ ở mọi hợp đồng có phụ lục.
@@ -1148,7 +1183,6 @@ public class ContractControllerTest {
         when(request.getParameter("contractCode")).thenReturn("01/2026/HĐKT-POSTEF");
         when(request.getParameter("title")).thenReturn("Hợp đồng cung cấp thiết bị");
         when(request.getParameter("contractType")).thenReturn("Cung cấp thiết bị");
-        when(request.getParameter("signDate")).thenReturn("2026-01-01");
         when(request.getParameter("effectiveDate")).thenReturn("2026-01-15");
         when(request.getParameter("endDate")).thenReturn("2026-12-31");
         when(request.getParameter("enterpriseId")).thenReturn("10");
@@ -1164,22 +1198,6 @@ public class ContractControllerTest {
         when(request.getParameter("action")).thenReturn("create");
         stubValidContractFields();
         when(request.getParameter("title")).thenReturn(null);
-
-        controller.doPost(request, response);
-
-        verify(contractDAO, never()).insert(any(), anyInt());
-        // Redirect mang theo kind: mất nó là form tạo lại mở sai chiều, và ô
-        // "Khách hàng" liệt kê nhầm nhóm đối tác.
-        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=new&kind=sell&error=invalid");
-    }
-
-    @Test
-    public void create_signDateAfterEffectiveDate_violatesBr44_redirectsWithoutInserting() throws Exception {
-        when(request.getParameter("action")).thenReturn("create");
-        stubValidContractFields();
-        // Ngày ký SAU ngày hiệu lực -- vi phạm BR-36 (ký <= hiệu lực <= kết thúc)
-        when(request.getParameter("signDate")).thenReturn("2026-02-01");
-        when(request.getParameter("effectiveDate")).thenReturn("2026-01-15");
 
         controller.doPost(request, response);
 
