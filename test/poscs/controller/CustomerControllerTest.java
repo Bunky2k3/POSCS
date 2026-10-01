@@ -559,10 +559,12 @@ public class CustomerControllerTest {
 
     /**
      * Form sửa phải khoá y hệt form tạo, nếu không thì tạo khách xong mở
-     * trang sửa đổi lại người phụ trách là đường vòng thoát khoá.
+     * trang sửa đổi lại người phụ trách là đường vòng thoát khoá. (Admin --
+     * Sales thì luôn giữ người đang phụ trách, xem các test salesCoTinh.)
      */
     @Test
     public void update_provinceHasOwner_overridesSubmittedAccountOwner() throws Exception {
+        loginAs("Admin");
         when(request.getParameter("action")).thenReturn("update");
         when(request.getParameter("customerId")).thenReturn("5");
         Enterprise existing = new Enterprise();
@@ -705,6 +707,9 @@ public class CustomerControllerTest {
         Enterprise existing = new Enterprise();
         existing.setEnterpriseId(5);
         existing.setAddressId(31);
+        // Cột NOT NULL: khách nào cũng có người phụ trách, và Sales sửa thì giữ
+        // nguyên người đó -- cùng người với ô form gửi lên (9).
+        existing.setAccountOwnerId(9);
         when(customerDAO.findById(5)).thenReturn(existing);
         stubValidCreateFields();
     }
@@ -1465,7 +1470,10 @@ public class CustomerControllerTest {
         controller.doGet(request, response);
 
         verify(response, never()).sendRedirect(anyString());
-        verify(request).setAttribute("keepOwnerWhenUnassigned", true);
+        // Mở được nhưng không chuyển khách về tên mình: ô người phụ trách khoá
+        // người đang đứng tên, không nhúng bảng phân công.
+        verify(request).setAttribute(eq("lockedOwner"), any());
+        verify(employeeDAO, never()).findAllAssignments();
     }
 
     /**
@@ -1499,25 +1507,26 @@ public class CustomerControllerTest {
         verify(response).sendRedirect(CONTEXT_PATH + "/customer?action=edit&id=5&error=province_not_allowed");
     }
 
-    /** Trong tỉnh mình cầm: lưu được, khách đứng tên mình dù form gửi tên người khác. */
+    /**
+     * Sales sửa thì người phụ trách chính giữ cố định (chốt 2026-10-01): khách
+     * ở tỉnh mình cầm mà người khác đứng tên, lưu xong vẫn đứng tên người đó --
+     * không về tên mình theo địa bàn, không theo tên form gửi lên (9).
+     */
     @Test
-    public void update_salesCoTinh_trongTinhMinh_khachDungTenMinh() throws Exception {
+    public void update_salesCoTinh_trongTinhMinh_giuNguoiDangPhuTrach() throws Exception {
         holdsProvinces(TINH_1);
-        khach5(99, 1);
+        khach5(42, 1);
         postUpdate5(1);
         when(employeeDAO.findAssigneeOfWard(10)).thenReturn(99);
 
         controller.doPost(request, response);
 
-        assertEquals(99, savedOwner());
+        assertEquals(42, savedOwner());
     }
 
-    /**
-     * Giữ tỉnh hiện tại của khách (người khác cầm) thì lưu được, và vẫn theo địa
-     * bàn: khách về người cầm tỉnh -- form hiện sẵn tên đó trước khi bấm lưu.
-     */
+    /** Giữ tỉnh hiện tại của khách (người khác cầm) thì lưu được, vẫn đứng tên người cũ. */
     @Test
-    public void update_salesCoTinh_giuTinhHienTaiCuaNguoiKhac_theoDiaBan() throws Exception {
+    public void update_salesCoTinh_giuTinhHienTaiCuaNguoiKhac_giuNguoiDangPhuTrach() throws Exception {
         holdsProvinces(TINH_1);
         khach5(99, 2);
         postUpdate5(2);
@@ -1525,7 +1534,7 @@ public class CustomerControllerTest {
 
         controller.doPost(request, response);
 
-        assertEquals(42, savedOwner());
+        assertEquals(99, savedOwner());
     }
 
     /** Tỉnh chưa ai cầm: giữ người đang phụ trách, bỏ qua tên form gửi lên (9). */
@@ -1541,17 +1550,46 @@ public class CustomerControllerTest {
         assertEquals(99, savedOwner());
     }
 
-    /** Sales chưa có tỉnh (CSKH) vẫn sửa hộ như Admin -- giống trang Thêm. */
+    /**
+     * Sales chưa có tỉnh (CSKH) vẫn sửa hộ được khách người khác -- giống trang
+     * Thêm -- nhưng không đổi được người phụ trách, kể cả theo địa bàn.
+     */
     @Test
-    public void update_salesChuaCoTinh_khachNguoiKhac_vanSuaNhuAdmin() throws Exception {
+    public void update_salesChuaCoTinh_khachNguoiKhac_suaDuocNhungGiuNguoiDangPhuTrach() throws Exception {
         holdsProvinces();
         khach5(42, 2);
         postUpdate5(2);
-        when(employeeDAO.findAssigneeOfWard(10)).thenReturn(42);
+        when(employeeDAO.findAssigneeOfWard(10)).thenReturn(77);
 
         controller.doPost(request, response);
 
         assertEquals(42, savedOwner());
+    }
+
+    /** Admin vẫn đổi được: khách mua theo địa bàn -- chỗ duy nhất chuyển khách khi có người nghỉ. */
+    @Test
+    public void update_adminSuaKhachMua_theoDiaBan() throws Exception {
+        loginAs("Admin");
+        khach5(42, 2);
+        postUpdate5(2);
+        when(employeeDAO.findAssigneeOfWard(10)).thenReturn(77);
+
+        controller.doPost(request, response);
+
+        assertEquals(77, savedOwner());
+    }
+
+    /** Form sửa của Sales chưa có tỉnh: ô người phụ trách khoá, không nhúng bảng phân công. */
+    @Test
+    public void editForm_salesChuaCoTinh_khoaNguoiDangPhuTrach() throws Exception {
+        holdsProvinces();
+        khach5(42, 2);
+        openEditForm5();
+
+        controller.doGet(request, response);
+
+        verify(request).setAttribute(eq("lockedOwner"), any());
+        verify(employeeDAO, never()).findAllAssignments();
     }
 
     /** Nhà cung cấp của người khác: Sales nào cũng bị chặn, có tỉnh hay chưa. */

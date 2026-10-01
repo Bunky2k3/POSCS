@@ -494,30 +494,22 @@ public class CustomerController extends HttpServlet {
      * Người phụ trách chính khi SỬA -- chỗ khoá thật, JSP chỉ khoá hình.
      *
      * <ul>
-     *   <li>Chỉ là nhà cung cấp: không theo địa bàn. Admin chọn tay; Sales giữ
-     *       người đang phụ trách -- trang Thêm nhà cung cấp khoá tên người tạo,
-     *       trang Sửa không được là chỗ đổi tên đó đi.</li>
-     *   <li>Khách mua, người sửa là Sales đã có tỉnh: vẫn theo địa bàn, nhưng
-     *       tỉnh chưa ai cầm thì giữ người đang phụ trách chứ không nhận tên gửi
-     *       lên -- Sales không tự chuyển khách cho người khác được.</li>
-     *   <li>Còn lại (Admin, Sales chưa có tỉnh): như trước,
-     *       {@link #resolveAccountOwnerId}.</li>
+     *   <li>Sales: luôn giữ người đang phụ trách, bỏ qua tên gửi lên -- khách mua
+     *       hay nhà cung cấp, đổi tỉnh cũng vậy (chốt với người dùng 2026-10-01).
+     *       Sales không tự chuyển khách cho ai, kể cả cho chính mình.</li>
+     *   <li>Admin, chỉ là nhà cung cấp: không theo địa bàn, chọn tay.</li>
+     *   <li>Admin, khách mua: theo địa bàn, {@link #resolveAccountOwnerId}. Trang
+     *       Sửa của Admin là chỗ duy nhất chuyển khách sang người khác -- vd. khi
+     *       nhân viên nghỉ.</li>
      * </ul>
      */
     private Integer ownerForUpdate(HttpServletRequest request, Enterprise existing, List<String> roles) {
-        if (isSupplierOnly(roles)) {
-            return AccessControl.isSales(request)
-                    ? Integer.valueOf(existing.getAccountOwnerId())
-                    : parseIntOrNull(request.getParameter("accountOwnerId"));
+        if (AccessControl.isSales(request)) {
+            return existing.getAccountOwnerId();
         }
-        if (!territoryOf(request).isEmpty()) {
-            Integer wardId = parseIntOrNull(request.getParameter("districtId"));
-            Integer territoryOwnerId = wardId != null ? employeeDAO.findAssigneeOfWard(wardId) : null;
-            return territoryOwnerId != null && territoryOwnerId > 0
-                    ? territoryOwnerId
-                    : Integer.valueOf(existing.getAccountOwnerId());
-        }
-        return resolveAccountOwnerId(request);
+        return isSupplierOnly(roles)
+                ? parseIntOrNull(request.getParameter("accountOwnerId"))
+                : resolveAccountOwnerId(request);
     }
 
     private void showEditForm(HttpServletRequest request, HttpServletResponse response)
@@ -554,15 +546,16 @@ public class CustomerController extends HttpServlet {
         request.setAttribute("userList", employeeDAO.findActiveByRole(
                 SALES_ROLE, customer.getAccountOwnerId(), customer.getSupportOwnerId()));
         Integer currentProvinceId = provinceIdOf(customer);
+        // Sales không đổi được người đang phụ trách -- xem ownerForUpdate.
+        boolean sales = AccessControl.isSales(request);
+        if (sales) {
+            request.setAttribute("lockedOwner", customer.getAccountOwner());
+        }
         if (isSupplierOnly(roles)) {
             // ĐỊA BÀN KHÔNG ÁP CHO NHÀ CUNG CẤP, như trang Thêm nhà cung cấp: cả
             // 34 tỉnh, và không nhúng bảng phân công nên ô người phụ trách không
-            // nhảy theo tỉnh. Sales thì không đổi được người đang phụ trách --
-            // họ chỉ vào được nhà cung cấp của mình (outsideSalesScope).
+            // nhảy theo tỉnh.
             request.setAttribute("provinceList", addressDAO.findAllProvinces());
-            if (AccessControl.isSales(request)) {
-                request.setAttribute("lockedOwner", customer.getAccountOwner());
-            }
         } else {
             List<Province> myProvinces = territoryOf(request);
             if (myProvinces.isEmpty()) {
@@ -574,13 +567,13 @@ public class CustomerController extends HttpServlet {
                 // Sales đã có tỉnh, như trang Thêm: chỉ chuyển khách trong các tỉnh
                 // mình cầm -- cộng tỉnh hiện tại của khách, cùng lý do như trên.
                 request.setAttribute("provinceList", withProvince(myProvinces, currentProvinceId));
-                // Tỉnh chưa ai cầm thì giữ người đang phụ trách chứ không mở ô cho
-                // chọn tự do -- xem ownerForUpdate.
-                request.setAttribute("keepOwnerWhenUnassigned", true);
             }
-            // Như showCreateForm: form sửa cũng phải khoá ô người phụ trách theo
-            // địa bàn, nếu không thì đổi tỉnh ở đây là đường vòng thoát khoá.
-            request.setAttribute("territoryAssignments", employeeDAO.findAllAssignments());
+            if (!sales) {
+                // Admin: như showCreateForm, ô người phụ trách khoá theo địa bàn,
+                // nếu không thì đổi tỉnh ở đây là đường vòng thoát khoá. Sales
+                // thì ô đã khoá sẵn người đang phụ trách, không cần bảng này.
+                request.setAttribute("territoryAssignments", employeeDAO.findAllAssignments());
+            }
         }
         request.setAttribute("customerRoles", roles);
         // Loại theo trang đang đứng, cộng loại ĐANG LƯU nếu nó thuộc vai kia:
