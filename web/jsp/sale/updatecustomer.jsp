@@ -73,9 +73,10 @@
         .error-text { color: var(--danger); font-size: 12px; margin-top: 5px; display: none; }
 
         /* Ô tick "Đồng thời là ...": viền + nền để nhìn ra ngay đây là ô chọn
-           được, khác hẳn dòng chữ thường. */
+           được, khác hẳn dòng chữ thường. Viết .field-row .role-check để thắng
+           .field-row label (chữ HOA, cỡ nhỏ) -- ô tick cũng là một label. */
         .role-check-group { display: flex; gap: 10px; flex-wrap: wrap; }
-        .role-check {
+        .field-row .role-check {
             display: inline-flex; align-items: center; gap: 8px; cursor: pointer;
             padding: 0.55rem 0.9rem; border: 1px solid #e5e7eb; border-radius: 10px;
             background: #f9fafb; font-size: 0.86rem; font-weight: 600; color: #374151;

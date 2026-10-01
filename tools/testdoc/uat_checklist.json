@@ -158,6 +158,17 @@
       ]
     },
     {
+      "m": "Quản lý khách hàng",
+      "c": "Khách hàng mua và nhà cung cấp sửa ở hai trang riêng; công ty vừa mua vừa bán thêm/bỏ vai bằng ô \"Đồng thời là ...\"; Sales không đổi được người phụ trách chính",
+      "ref": [
+        "TC_CUSEDIT_017",
+        "TC_CUSEDIT_020",
+        "TC_CUSEDIT_021",
+        "TC_CUSEDIT_025",
+        "TC_CUSEDIT_026"
+      ]
+    },
+    {
       "m": "Quản lý hợp đồng",
       "c": "Thêm và sửa hợp đồng gắn với khách hàng và người phụ trách; mọi thay đổi để lại dấu vết trong Nhật ký thay đổi. Hợp đồng đã ký không xoá được — chỉ Admin huỷ được bản ghi nhập nhầm, kèm lý do",
       "ref": [
