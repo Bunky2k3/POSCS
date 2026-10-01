@@ -28,7 +28,7 @@
          "e": "Bảng chỉ còn sản phẩm thuộc danh mục đó và các danh mục con của nó"},
         {"d": "Tìm kiếm theo tên sản phẩm",
          "s": ["Nhập một phần tên sản phẩm", "Bấm Tìm"],
-         "t": "keyword: phần mềm",
+         "t": "keyword: Ắc quy",
          "e": "Chỉ hiện sản phẩm có tên khớp từ khoá"},
         {"d": "Tìm kiếm theo mã sản phẩm",
          "s": ["Nhập mã sản phẩm đầy đủ", "Bấm Tìm"],

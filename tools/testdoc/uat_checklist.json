@@ -90,7 +90,7 @@
     },
     {
       "m": "Quản lý khách hàng",
-      "c": "Tìm kiếm theo tên hoặc mã số thuế, lọc theo loại khách hàng và người phụ trách",
+      "c": "Tìm kiếm theo tên, mã khách hàng hoặc số điện thoại, lọc theo loại khách hàng và người phụ trách",
       "ref": [
         "TC_CUSLIST_002",
         "TC_CUSLIST_003",

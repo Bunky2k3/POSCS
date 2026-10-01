@@ -1,17 +1,17 @@
 {
   "ST_AUTH_001": {
     "status": "Đạt",
-    "actual": "Tạo hồ sơ nhân viên -> /POSCS/employee?action=view&id=68",
+    "actual": "Tạo hồ sơ nhân viên -> /POSCS/employee?action=view&id=25",
     "note": ""
   },
   "ST_AUTH_002": {
     "status": "Đạt",
-    "actual": "Chưa cấp mật khẩu: đăng nhập bằng nguyenvong160415 bị từ chối",
+    "actual": "Chưa cấp mật khẩu: đăng nhập bằng nguyenvong153353 bị từ chối",
     "note": ""
   },
   "ST_AUTH_003": {
     "status": "Đạt",
-    "actual": "Gửi thông tin tài khoản -> /POSCS/employee?action=view&id=68&sent=1; log ghi mật khẩu tạm (có)",
+    "actual": "Gửi thông tin tài khoản -> /POSCS/employee?action=view&id=25&sent=1; log ghi mật khẩu tạm (có)",
     "note": ""
   },
   "ST_AUTH_004": {
@@ -41,7 +41,7 @@
   },
   "ST_AUTH_009": {
     "status": "Đạt",
-    "actual": "Gửi OTP tới nguyenvong160415@postef.com.vn -> /POSCS/verifyOtp.jsp, mã 406646",
+    "actual": "Gửi OTP cho username nguyenvong153353 -> /POSCS/verifyOtp.jsp, mã 688617",
     "note": ""
   },
   "ST_AUTH_010": {
@@ -66,7 +66,7 @@
   },
   "ST_AUTH_014": {
     "status": "Đạt",
-    "actual": "Admin khoá tài khoản -> /POSCS/employee?action=view&id=68",
+    "actual": "Admin khoá tài khoản -> /POSCS/employee?action=view&id=25",
     "note": ""
   },
   "ST_AUTH_015": {
@@ -84,19 +84,29 @@
     "actual": "Sau khi mở khoá, đăng nhập bằng mật khẩu cũ: được",
     "note": ""
   },
+  "ST_CUS_001": {
+    "status": "Đạt",
+    "actual": "sales4 tạo khách: ô người phụ trách khoá sẵn: có; ô tỉnh ['Bắc Ninh', 'Hà Nội', 'Lào Cai', 'Phú Thọ', 'Quảng Ninh']; lưu -> /POSCS/customer?action=view&id=13, mã KH-0013, người phụ trách sales4",
+    "note": ""
+  },
   "ST_CUS_002": {
     "status": "Đạt",
-    "actual": "Tìm theo mã số thuế 66160415 -> 1 dòng",
+    "actual": "Tìm theo số điện thoại 0966153353 -> 1 dòng",
     "note": ""
   },
   "ST_CUS_003": {
     "status": "Đạt",
-    "actual": "Tổng khách hàng trên Dashboard: 122 -> 123",
+    "actual": "Tổng khách hàng trên Dashboard: 12 -> 13",
     "note": ""
   },
   "ST_CUS_004": {
     "status": "Đạt",
-    "actual": "Đánh giá mức Tốt -> /POSCS/customer?action=view&id=161&evaluated=1; trang chi tiết hiện nhãn tiếng Việt: có",
+    "actual": "Đánh giá mức Tốt -> /POSCS/customer?action=view&id=13&evaluated=1; lịch sử đánh giá thêm dòng ghi đúng nhãn và lý do: có",
+    "note": ""
+  },
+  "ST_CUS_005": {
+    "status": "Đạt",
+    "actual": "Form tạo có ô ngày: KHÔNG; lưu ra tiến độ Nháp; nhập hiệu lực 2026-10-15 ở trang Quản lý -> Chưa hiệu lực: có",
     "note": ""
   },
   "ST_CUS_006": {
@@ -106,12 +116,12 @@
   },
   "ST_CUS_007": {
     "status": "Đạt",
-    "actual": "Bảng sản phẩm của hợp đồng có 2 dòng",
+    "actual": "Bảng hàng hoá của hợp đồng có 2 dòng",
     "note": ""
   },
   "ST_CUS_008": {
     "status": "Đạt",
-    "actual": "Số lượng 0 -> /POSCS/contract?action=view&id=165&error=add_product_invalid; bảng sản phẩm vẫn 2 dòng",
+    "actual": "Số lượng 0 -> /POSCS/contract?action=edit&id=23&error=add_product_invalid; bảng hàng hoá vẫn 2 dòng",
     "note": ""
   },
   "ST_CUS_009": {
@@ -139,34 +149,61 @@
     "actual": "Quá ngày kết thúc -> trạng thái Đã hết hạn",
     "note": ""
   },
+  "ST_CUS_014": {
+    "status": "Đạt",
+    "actual": "Sales mở hợp đồng đã ký: nút Huỷ bản ghi không có; POST huỷ -> HTTP 403; hợp đồng vẫn còn",
+    "note": ""
+  },
   "ST_CUS_015": {
     "status": "Đạt",
-    "actual": "Sau khi khởi động lại, tác vụ nền sinh 11 thông báo hợp đồng sắp hết hạn; trang thông báo của người phụ trách hiện 16 mục",
-    "note": ""
+    "actual": "Sau khi khởi động lại, tác vụ nền sinh 3 thông báo hợp đồng sắp hết hạn; trang thông báo của sales4 có 'Hợp đồng VD/153353/HĐKT sắp hết hạn (còn 20 ngày)'",
+    "note": "",
+    "count": 3,
+    "contract_code": "VD/153353/HĐKT"
   },
   "ST_CUS_016": {
     "status": "Đạt",
-    "actual": "Chạy lại tác vụ nền: 11 thông báo (lần trước 11), 0 ref_id bị trùng",
+    "actual": "Chạy lại tác vụ nền: 3 thông báo (lần trước 3), 0 ref_id bị trùng",
     "note": ""
   },
   "ST_CUS_017": {
     "status": "Đạt",
-    "actual": "Dashboard có khối hợp đồng sắp hết hạn",
+    "actual": "Bảng hợp đồng trong kỳ trên Dashboard: hợp đồng VD/153353/HĐKT hiện trạng thái 'Sắp hết hạn'; 8 dòng xếp tăng dần theo ngày kết thúc",
     "note": ""
   },
   "ST_CUS_018": {
     "status": "Đạt",
-    "actual": "Excel hợp đồng lọc Sắp hết hạn: 13 dòng, có chứa hợp đồng vừa tạo",
+    "actual": "Excel hợp đồng lọc Sắp hết hạn: 4 dòng, có chứa hợp đồng vừa tạo",
+    "note": ""
+  },
+  "ST_CUS_019": {
+    "status": "Đạt",
+    "actual": "Link xuất PDF cũ -> HTTP 200, text/html;charset=UTF-8; trang chi tiết không còn nút Xuất PDF",
     "note": ""
   },
   "ST_CUS_020": {
     "status": "Đạt",
-    "actual": "Xoá khách hàng còn hợp đồng hiệu lực -> /POSCS/customer?action=view&id=161&error=has_active_contracts",
+    "actual": "Xoá khách hàng còn hợp đồng hiệu lực -> /POSCS/customer?action=view&id=13&error=has_active_contracts",
+    "note": ""
+  },
+  "ST_CUS_021": {
+    "status": "Đạt",
+    "actual": "NCC mã NCC-001, người phụ trách sales4, nằm ở danh sách NCC: 1 dòng; form Hợp đồng mua liệt kê NCC: có; hợp đồng lưu với chiều Mua",
+    "note": ""
+  },
+  "ST_CUS_022": {
+    "status": "Đạt",
+    "actual": "sales2 mở khách của sales4: chỉ xem được (không có nút Sửa); mở thẳng link Sửa -> /POSCS/customer?action=view&id=13&error=not_your_customer",
+    "note": "Tài liệu ghi sales1 (cầm Lai Châu); CSDL kiểm thử không có sales1 nên dùng sales2 -- cùng điều kiện 'không cầm Hà Nội'"
+  },
+  "ST_TK_001": {
+    "status": "Đạt",
+    "actual": "Tạo phiếu gắn hợp đồng 23 -> /POSCS/ticket?action=view&id=17",
     "note": ""
   },
   "ST_TK_002": {
     "status": "Đạt",
-    "actual": "Dropdown hợp đồng nạp theo khách hàng: khách 161 có 1 hợp đồng, khách 1 có 121 — hai danh sách khác nhau",
+    "actual": "Dropdown hợp đồng nạp theo khách hàng: khách 13 có 1 hợp đồng, khách 1 có 3 — hai danh sách khác nhau",
     "note": ""
   },
   "ST_TK_003": {
@@ -186,12 +223,12 @@
   },
   "ST_TK_006": {
     "status": "Đạt",
-    "actual": "Lịch sử ghi 1 dòng sau lần đổi trạng thái",
+    "actual": "Lịch sử ghi 2 dòng sau lần đổi trạng thái",
     "note": ""
   },
   "ST_TK_007": {
     "status": "Đạt",
-    "actual": "Lưu không đổi trạng thái: lịch sử vẫn 1 dòng (trước đó 1)",
+    "actual": "Lưu không đổi trạng thái: lịch sử vẫn 2 dòng (trước đó 2)",
     "note": ""
   },
   "ST_TK_008": {
@@ -204,6 +241,11 @@
     "actual": "Kỹ thuật tạo phiếu -> HTTP 403; xoá phiếu -> HTTP 403",
     "note": ""
   },
+  "ST_TK_010": {
+    "status": "Đạt",
+    "actual": "tech02 mở danh sách: ô lọc 'mine', thấy 0 phiếu của tech01 (chọn Tất cả thì 1); KPI ['0', '0', '0'] = CSDL ['0', '0', '0']",
+    "note": ""
+  },
   "ST_TK_011": {
     "status": "Đạt",
     "actual": "Đóng phiếu kèm kết quả xử lý -> trạng thái Đã đóng",
@@ -211,7 +253,7 @@
   },
   "ST_TK_012": {
     "status": "Đạt",
-    "actual": "Mốc đóng phiếu: lần đầu 2026-09-11 16:04:20, sau khi lưu lại 2026-09-11 16:04:20",
+    "actual": "Mốc đóng phiếu: lần đầu 2026-09-30 15:33:59, sau khi lưu lại 2026-09-30 15:33:59",
     "note": ""
   },
   "ST_TK_013": {
@@ -226,7 +268,7 @@
   },
   "ST_TK_015": {
     "status": "Đạt",
-    "actual": "Phiếu còn dưới 24 giờ hiện nhãn sắp tới hạn",
+    "actual": "Phiếu còn dưới 24 giờ hiện nhãn sắp tới hạn (không phải quá hạn)",
     "note": ""
   },
   "ST_TK_016": {
@@ -236,17 +278,22 @@
   },
   "ST_TK_017": {
     "status": "Đạt",
-    "actual": "Quy tắc cảnh báo: CSDL đếm 13 phiếu cần chú ý; con số này có xuất hiện trên Dashboard: có",
+    "actual": "Quy tắc cảnh báo: CSDL đếm 6 phiếu cần chú ý; con số này có xuất hiện trên Dashboard: có",
     "note": ""
   },
   "ST_TK_018": {
     "status": "Đạt",
-    "actual": "Excel lọc trạng thái Đã đóng: 10 dòng, không lẫn phiếu Mới tiếp nhận",
+    "actual": "Excel lọc trạng thái Đã đóng: 11 dòng, không lẫn phiếu Mới tiếp nhận",
     "note": ""
   },
   "ST_TK_019": {
     "status": "Đạt",
-    "actual": "PDF phiếu: 8198 byte, đọc được",
+    "actual": "PDF phiếu: 8320 byte, đọc được",
+    "note": ""
+  },
+  "ST_TK_020": {
+    "status": "Đạt",
+    "actual": "Sales xoá phiếu Mới tiếp nhận -> /POSCS/ticket; is_deleted=1",
     "note": ""
   },
   "ST_TK_021": {
@@ -254,9 +301,19 @@
     "actual": "Mở lại phiếu đã xoá -> HTTP 302 /POSCS/ticket?error=notfound",
     "note": ""
   },
+  "ST_TK_022": {
+    "status": "Đạt",
+    "actual": "Sales lọc tech01: bảng chỉ có ['Lê Kỹ Thuật']; Excel 2 dòng, đều người xử lý tech01",
+    "note": ""
+  },
+  "ST_PRD_001": {
+    "status": "Đạt",
+    "actual": "Tạo sản phẩm kèm ảnh và catalogue -> /POSCS/product?action=view&id=90",
+    "note": ""
+  },
   "ST_PRD_002": {
     "status": "Đạt",
-    "actual": "Mã sinh liên tiếp: SP-0221 -> SP-0222",
+    "actual": "Mã sinh liên tiếp: SP-0090 -> SP-0091",
     "note": ""
   },
   "ST_PRD_003": {
@@ -276,7 +333,12 @@
   },
   "ST_PRD_006": {
     "status": "Đạt",
-    "actual": "Form sửa điền sẵn tên: 'SP he thong 160415'",
+    "actual": "Form sửa điền sẵn tên: 'SP he thong 153353'",
+    "note": ""
+  },
+  "ST_PRD_007": {
+    "status": "Đạt",
+    "actual": "Sửa tên và mô tả -> trang chi tiết hiện giá trị mới",
     "note": ""
   },
   "ST_PRD_008": {
@@ -306,7 +368,7 @@
   },
   "ST_PRD_013": {
     "status": "Đạt",
-    "actual": "Gắn sản phẩm vào hợp đồng -> /POSCS/contract?action=view&id=165",
+    "actual": "Gắn sản phẩm vào hợp đồng -> /POSCS/contract?action=edit&id=23",
     "note": ""
   },
   "ST_PRD_014": {
@@ -316,7 +378,7 @@
   },
   "ST_PRD_015": {
     "status": "Đạt",
-    "actual": "Xoá sản phẩm đang trong hợp đồng -> /POSCS/product?action=view&id=221&error=has_active_contracts",
+    "actual": "Xoá sản phẩm đang trong hợp đồng -> /POSCS/product?action=view&id=90&error=has_active_contracts",
     "note": ""
   },
   "ST_PRD_016": {
@@ -341,22 +403,37 @@
   },
   "ST_ACL_001": {
     "status": "Đạt",
-    "actual": "Admin tạo được khách hàng/sản phẩm/phiếu/nhân viên: tất cả",
+    "actual": "Admin tạo khách hàng / hợp đồng / sản phẩm / phiếu / nhân viên: được tất cả",
     "note": ""
   },
   "ST_ACL_002": {
     "status": "Đạt",
-    "actual": "Sales tạo được khách hàng và hợp đồng -> /POSCS/contract?action=view&id=166",
+    "actual": "Sales tạo khách hàng -> /POSCS/customer?action=view&id=16; tạo hợp đồng -> /POSCS/contract?action=view&id=26",
     "note": ""
   },
   "ST_ACL_003": {
     "status": "Đạt",
-    "actual": "Kỹ thuật tạo được sản phẩm -> /POSCS/product?action=view&id=224",
+    "actual": "Kỹ thuật tạo được sản phẩm -> /POSCS/product?action=view&id=93",
+    "note": ""
+  },
+  "ST_ACL_004": {
+    "status": "Đạt",
+    "actual": "Sales tạo / sửa / xoá phiếu hỗ trợ -> /POSCS/ticket?action=view&id=21 / /POSCS/ticket?action=view&id=21 / /POSCS/ticket",
+    "note": ""
+  },
+  "ST_ACL_005": {
+    "status": "Đạt",
+    "actual": "Sales xem sản phẩm HTTP 200; tạo 403, sửa 403",
     "note": ""
   },
   "ST_ACL_006": {
     "status": "Đạt",
     "actual": "Kỹ thuật tạo khách hàng 403, cập nhật hợp đồng 403",
+    "note": ""
+  },
+  "ST_ACL_007": {
+    "status": "Đạt",
+    "actual": "cskh2 (vai Sales): tạo khách hàng -> /POSCS/customer?action=view&id=17; tạo phiếu -> /POSCS/ticket?action=view&id=22; tạo sản phẩm -> HTTP 403",
     "note": ""
   },
   "ST_ACL_008": {
@@ -366,12 +443,12 @@
   },
   "ST_ACL_009": {
     "status": "Đạt",
-    "actual": "Kỹ thuật xuất Excel khách hàng -> HTTP 200, 41984 byte",
+    "actual": "Kỹ thuật xuất Excel khách hàng -> HTTP 200, 12288 byte",
     "note": ""
   },
   "ST_ACL_010": {
     "status": "Đạt",
-    "actual": "tech01 cập nhật phiếu của mình -> HTTP 302 /POSCS/ticket?action=view&id=160",
+    "actual": "tech01 cập nhật phiếu của mình -> HTTP 302 /POSCS/ticket?action=view&id=23",
     "note": ""
   },
   "ST_ACL_011": {
@@ -381,7 +458,27 @@
   },
   "ST_ACL_012": {
     "status": "Đạt",
-    "actual": "tech01 thử đổi người phụ trách sang 18 -> CSDL vẫn ghi 16",
+    "actual": "tech01 thử đổi người xử lý sang tech02 -> CSDL vẫn ghi tech01",
+    "note": ""
+  },
+  "ST_ACL_013": {
+    "status": "Đạt",
+    "actual": "Đổi vai trò nhân viên Sales -> Kỹ thuật -> /POSCS/employee?action=view&id=26; trang chi tiết hiện vai mới",
+    "note": ""
+  },
+  "ST_ACL_014": {
+    "status": "Đạt",
+    "actual": "Đăng nhập lại sau khi đổi sang Kỹ thuật: tạo khách hàng HTTP 403, tạo sản phẩm /POSCS/product?action=view&id=94",
+    "note": ""
+  },
+  "ST_ACL_015": {
+    "status": "Đạt",
+    "actual": "Sales / Kỹ thuật mở màn hình Nhân viên -> HTTP [403, 403]",
+    "note": ""
+  },
+  "ST_ACL_016": {
+    "status": "Đạt",
+    "actual": "Sales / Kỹ thuật mở nhật ký -> [403, 403]; tải file log -> [403, 403]",
     "note": ""
   },
   "ST_ACL_017": {
@@ -398,15 +495,5 @@
     "status": "Đạt",
     "actual": "Chưa đăng nhập: 4 màn hình nội bộ đều bị đẩy về trang đăng nhập",
     "note": ""
-  },
-  "MAN_BCRYPT": {
-    "status": "Đạt",
-    "actual": "Kiểm trực tiếp CSDL: 56/56 bản ghi users lưu mật khẩu dạng bcrypt ($2a$/$2b$), độ dài hash nhỏ nhất 60 ký tự; bảng chỉ có cột password_hash, không có cột nào lưu bản rõ",
-    "note": "Kiểm tay ngày phát hành tài liệu"
-  },
-  "MAN_CSRF": {
-    "status": "Đạt",
-    "actual": "Gửi POST xoá khách hàng bằng phiên hợp lệ nhưng không kèm csrfToken -> HTTP 403; kèm token giả mạo -> HTTP 403",
-    "note": "Kiểm tay ngày phát hành tài liệu"
   }
 }

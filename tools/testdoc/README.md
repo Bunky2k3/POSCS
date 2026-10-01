@@ -155,110 +155,101 @@ trùng mã test case và thiếu trường bắt buộc — có lỗi thì dừn
 
 Thứ tự module trong tài liệu do `SPEC_ORDER` trong script quy định.
 
-## Chạy thật một phần test case
+## Chạy thật các test case
 
-`run_blackbox.py` tự động hoá các test case kiểm được bằng request/phản hồi:
-đăng nhập, kiểm tra dữ liệu đầu vào, phân quyền 403, endpoint JSON, chống path
-traversal. Những ca phải nhìn giao diện (bố cục, dropdown, hộp thoại xác nhận,
-nội dung file Excel/PDF) vẫn phải chạy tay.
+Bốn script tự động hoá những ca kiểm được bằng request / phản hồi và bằng cách
+đọc thẳng CSDL kiểm thử. Ca nào chỉ kiểm được bằng mắt (hộp thoại xác nhận,
+lọc bằng JavaScript phía trình duyệt) thì script **không ghi gì** — ca đó giữ
+"Chưa chạy" cho người test chạy tay; dòng in ra mang nhãn `TAY`.
 
-Dựng môi trường một lần:
-
-```bash
-mysql -h127.0.0.1 -uroot -p -e "CREATE DATABASE poscs_bbtest CHARACTER SET utf8mb4"
-mysql -h127.0.0.1 -uroot -p poscs_bbtest < db/schema.sql
-```
-
-`db/schema.sql` có sẵn khách hàng/hợp đồng/sản phẩm/phiếu mẫu nhưng **bảng
-users rỗng**, phải thêm tài khoản cho đủ 4 vai trò (mật khẩu băm bằng jbcrypt
-trong `lib/`). Các id 1, 15, 16, 17 đang bị dữ liệu mẫu tham chiếu nên tài khoản
-phải mang đúng các id đó.
-
-Triển khai WAR lên Tomcat với biến môi trường `DB_URL` trỏ vào `poscs_bbtest`,
-rồi:
+### Dựng môi trường một lần
 
 ```bash
-python tools/testdoc/run_blackbox.py http://localhost:8099/POSCS
-python tools/testdoc/gen_integration_blackbox.py
+mysql -h127.0.0.1 -uroot -p -e "CREATE DATABASE poscs_bbtest CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
+mysql -h127.0.0.1 -uroot -p --default-character-set=utf8mb4 poscs_bbtest -e "source db/schema.sql"
+mysql -h127.0.0.1 -uroot -p --default-character-set=utf8mb4 poscs_bbtest -e "source tools/testdoc/blackbox/fixtures.sql"
 ```
 
-Bước 1 ghi `blackbox_results.json`, bước 2 nối kết quả vào cột "Kết quả thực
-tế"/"Trạng thái" của vòng 1. Test case không có trong file kết quả vẫn giữ
-trạng thái "Chưa chạy".
+`db/schema.sql` gieo sẵn 12 nhân viên (sales2..6, kythuat2..5, cskh2..4 — mật
+khẩu chung `Poscs@123`, có sẵn địa bàn), khách hàng / hợp đồng / sản phẩm /
+phiếu mẫu; **không có Admin**. `fixtures.sql` thêm `admin`, `sale01`, `tech01`,
+`tech02`, `locked01`, `doimk01` (xem đầu file) — không cố định `user_id` nữa,
+dữ liệu demo tra người dùng theo username.
 
-Lưu ý khi viết thêm ca tự động:
+Triển khai bản build lên Tomcat riêng (cổng 8099 là mặc định của các script)
+với `DB_URL=jdbc:mysql://127.0.0.1:3306/poscs_bbtest`, `UPLOAD_DIR` trỏ vào một
+thư mục trống, và **bỏ `MAIL_USERNAME` / `MAIL_PASSWORD`** để `EmailUtil` chạy
+DEV MODE (in mã OTP và mật khẩu tạm ra stdout thay vì gửi thư thật).
 
-- POST tới `/customer`, `/product`, `/contract` phải gửi **multipart** — các
-  controller này khai báo `@MultipartConfig` và gọi `request.getPart(...)`,
-  gửi urlencoded sẽ thành HTTP 500.
-- Mọi POST cần tham số `csrfToken` lấy từ một trang có render ô ẩn đó
-  (`/changePassword.jsp` hợp với mọi vai trò).
-- Tên tham số id khác nhau giữa các handler: `customerId`, `contractId`,
-  `productId`, `ticketId`, `userId` khi cập nhật nhưng đều là `id` khi xoá.
-  Dùng sai tên thì request dừng ở nhánh "không tìm thấy" **trước** bước kiểm
-  quyền, và ca kiểm phân quyền sẽ đạt vì lý do sai.
-- Luôn có một ca đối chứng đường đi đúng cho mỗi module. Không có nó thì một
-  payload sai toàn tập vẫn làm mọi ca "thiếu trường X" đều đạt.
+`testdb.py` là chỗ duy nhất các script chạm CSDL (tra id, dựng trigger giả lỗi,
+gieo cấp trên); cấu hình qua `POSCS_TEST_DB` (mặc định `poscs_bbtest`),
+`MYSQL_EXE`, `DB_USER` / `DB_PASSWORD`. Nó **từ chối chạy trên `poscs_db`**.
 
-## Ba lượt chạy tự động
+### Bốn lượt hộp đen
 
 | Script | Kiểm cái gì | Thời gian |
 |---|---|---|
-| `run_blackbox.py` | Mã HTTP và tham số redirect: đăng nhập, kiểm tra dữ liệu vào, phân quyền 403, endpoint JSON, path traversal | ~30 giây |
-| `run_blackbox_ui.py` | Nội dung thật: HTML trả về (số dòng, thông báo), file .xls/.pdf tải xuống, tải file lên, mã OTP đọc từ log | ~3 phút |
-| `run_blackbox_rest.py` | Các ca biên về ngày, và những ca phải **chờ theo đồng hồ thật** | ~22 phút |
+| `run_blackbox.py` | Mã HTTP và tham số redirect: đăng nhập, kiểm tra dữ liệu vào, phân quyền 403, endpoint JSON, path traversal; form / thời hạn / tài liệu hợp đồng | ~5 giây |
+| `run_blackbox_ui.py` | Nội dung thật: cột bảng, thông báo trên trang đích, file .xls/.pdf, tải file lên, OTP / mật khẩu tạm đọc từ log, đối chiếu CSDL sau mỗi thao tác ghi | ~15 giây |
+| `run_blackbox_branches.py` | Các ca thêm theo PR #149–#167: phạm vi Sales, trang nhà cung cấp, luật Người hỗ trợ, nhánh ghi CSDL hỏng (trigger), notfound giữ đúng danh sách, từ khoá có `&` `#`, lọc Người xử lý, dải nhắc hồ sơ | ~10 giây |
+| `run_blackbox_rest.py` | Các ca biên về ngày, và những ca phải **chờ theo đồng hồ thật** (OTP hết hạn, khoá IP 15 phút) | ~22 phút |
 
-Chạy theo đúng thứ tự trên; mỗi lượt gộp kết quả vào cùng `blackbox_results.json`.
+**`run_blackbox.py` GHI ĐÈ** `blackbox_results.json`; ba lượt sau gộp thêm vào.
+Chạy lại cả bộ thì bắt đầu từ lượt này, không thì kết quả cũ của ca đã đổi
+nghĩa vẫn nằm lại trong file.
 
 ```bash
-mysql -h127.0.0.1 -uroot -p poscs_bbtest < tools/testdoc/blackbox/fixtures.sql
-python tools/testdoc/run_blackbox.py
-python tools/testdoc/run_blackbox_ui.py --log <đường dẫn catalina stdout>
-python tools/testdoc/run_blackbox_rest.py --log <đường dẫn catalina stdout>
+python tools/testdoc/run_blackbox.py http://localhost:8099/POSCS
+python tools/testdoc/run_blackbox_ui.py http://localhost:8099/POSCS --log <catalina stdout>
+python tools/testdoc/run_blackbox_branches.py http://localhost:8099/POSCS --log <catalina stdout>
+UPLOAD_DIR=<thư mục upload của Tomcat> python tools/testdoc/run_blackbox_rest.py http://localhost:8099/POSCS --log <catalina stdout>
 python tools/testdoc/gen_integration_blackbox.py
 ```
 
-`--log` trỏ tới file hứng stdout/stderr của Tomcat. `EmailUtil` chạy DEV MODE khi
-chưa cấu hình SMTP nên in mã OTP và mật khẩu tạm ra đó — nhờ vậy chạy được trọn
-luồng quên mật khẩu và gửi thông tin tài khoản mà không cần hộp thư thật.
-
 ### Bốn thứ bắt buộc phải làm đúng thứ tự
 
-1. **Nạp lại `blackbox/fixtures.sql` trước mỗi lượt.** Bộ test có ca đổi mật
-   khẩu thật và khoá tài khoản thật; không nạp lại thì lượt sau đăng nhập
-   không được và mọi ca phía sau trượt oan.
-2. **Khởi động lại Tomcat trước lượt 3.** Hạn mức 10 yêu cầu OTP/IP trong 15
-   phút nằm trong bộ nhớ máy chủ; lượt trước dùng hết thì nhánh OTP không chạy
-   được.
+1. **Nạp lại `blackbox/fixtures.sql` trước khi bắt đầu.** Bộ test đổi mật khẩu
+   thật (`tech02`, `doimk01`) và khoá tài khoản thật; lượt 3, lượt 4 và
+   `run_systemtest.py` tự nạp lại lúc bắt đầu.
+2. **Khởi động lại Tomcat trước khi chạy cả bộ.** Hạn mức 10 yêu cầu OTP/IP và
+   bộ đếm 5 lần đăng nhập sai nằm trong bộ nhớ máy chủ; lượt trước dùng hết thì
+   nhánh OTP / đăng nhập trượt oan.
 3. **`test_otp_quota` phải sau `test_otp_timing`** — nó cố tình làm cạn hạn mức.
-4. **`test_login_lockout` là phần cuối cùng** — nó khoá IP 15 phút, chạy sớm thì
-   chặn mọi ca đăng nhập sau đó.
+4. **`run_blackbox_rest.py` là lượt cuối** — `test_login_lockout` khoá IP 15 phút.
 
 Chạy kèm `--skip-slow` để bỏ hai đoạn chờ dài (OTP hết hạn 5 phút, khoá IP 15
 phút); ba ca tương ứng sẽ thành "N/A" kèm lý do.
 
 ### Cạm bẫy khi viết thêm ca tự động
 
-- POST tới `/customer`, `/product`, `/contract` phải gửi **multipart** — các
-  controller này khai báo `@MultipartConfig` và gọi `request.getPart(...)`;
-  gửi urlencoded sẽ thành HTTP 500.
+- POST tới `/customer`, `/product` phải gửi **multipart** (`@MultipartConfig`,
+  gọi `getPart`); gửi urlencoded thành HTTP 500. `/contract` thì **ngược lại**:
+  từ V34 không còn multipart, gửi multipart tới đó là mất `csrfToken` và nhận 403.
 - Mọi POST cần `csrfToken` lấy từ trang có render ô ẩn đó (`/changePassword.jsp`
   hợp với mọi vai trò đã đăng nhập).
 - Tên tham số không nhất quán giữa các handler: cập nhật dùng `customerId`,
   `contractId`, `productId`, `ticketId`, `userId`; xoá thì tất cả dùng `id`;
-  xác thực OTP dùng `otpCode`; gỡ sản phẩm khỏi hợp đồng dùng
-  `contractProductId`. Dùng sai tên thì request dừng ở nhánh "không tìm thấy"
-  **trước** bước kiểm quyền, và ca kiểm phân quyền sẽ đạt vì lý do sai.
+  xác thực OTP dùng `otpCode`; gỡ hàng hoá dùng `contractProductId`; huỷ bản ghi
+  hợp đồng cần `voidReason`. Dùng sai tên thì request dừng ở nhánh "không tìm
+  thấy" **trước** bước kiểm quyền, và ca kiểm phân quyền sẽ đạt vì lý do sai.
+- Sửa khách hàng phải gửi ô `roles` (một hoặc hai lần) — thiếu thì bị `invalid`.
 - Ô "Xếp hạng quan hệ" gửi **tên hằng enum** (`GOOD`/`NEEDS_REVIEW`/`BAD`/
   `AT_RISK`), không phải chuỗi tiếng Việt.
-- Quên mật khẩu tra theo **tên đăng nhập** (từ V36, không còn "email công ty"
-  để mà nhập); OTP thì luôn gửi tới **email cá nhân** đã lưu trong hồ sơ.
+- Quên mật khẩu tra theo **tên đăng nhập** (V36); OTP gửi tới **email cá nhân**
+  trong hồ sơ — lọc log theo đúng địa chỉ đó.
+- Đăng nhập bằng tài khoản không tồn tại cũng tính một lần sai vào hạn mức 5
+  lần / IP. Sau mỗi cụm ca sai mật khẩu, đăng nhập đúng một lần để xoá bộ đếm.
 - Danh sách Nhân viên và Sản phẩm dựng bằng lưới thẻ chứ không phải `<table>`;
-  đếm `<tr>` sẽ luôn ra 0. Lưới rỗng vẫn có một phần tử con `.empty-state`.
-- Khi kiểm "kết quả lọc không lẫn giá trị khác", chỉ đọc chữ trong khối kết
-  quả: đọc cả trang sẽ dính tên mọi trạng thái trong `<option>` của bộ lọc.
-- Luôn có ca đối chứng đường đi đúng cho mỗi module. Không có nó thì một payload
-  sai toàn tập vẫn làm mọi ca "thiếu trường X" đều đạt.
+  thẻ sản phẩm chưa có ảnh hiện biểu tượng thay cho `<img>`. Danh sách phiếu
+  của kỹ thuật viên mặc định chỉ "Phiếu của tôi" — kiểm toàn bộ thì gửi
+  `assignee=all`.
+- Kiểm câu thông báo thì **mở trang đích** (có trang đá tiếp sang trang khác),
+  và đọc chữ trong đúng khối kết quả / khối cảnh báo, không đọc cả trang.
+- Hồ sơ cá nhân chỉ nhận **số di động** (đầu 3/5/7/8/9); form nhân viên của
+  Admin thì nhận cả số bàn.
+- Luôn có ca đối chứng đường đi đúng cho mỗi module, và **đừng ghi Đạt vô điều
+  kiện** (`expect(..., True)`): không kiểm được thì dùng `manual()` để ca giữ
+  "Chưa chạy".
 
 ### Ba ca cần môi trường riêng
 
@@ -324,12 +315,10 @@ CSKH gộp vào Sales, hợp đồng không còn ô ngày ở form tạo / mã H
 PDF, sản phẩm không có đơn giá). Ca nào đổi nội dung thì kết quả cũ đã gỡ về
 "Chưa chạy"; ca mới đều "Chưa chạy".
 
-**`run_blackbox*.py`, `run_systemtest.py` và `blackbox/fixtures.sql` CHƯA được
-viết lại theo đợt này** — chúng vẫn dùng tài khoản vai CSKH (không còn tồn
-tại) và ghi kết quả theo mã ca cũ, trong khi một số mã giờ mang nội dung khác
-(ví dụ TC_LOGIN đã dồn lên một số sau khi bỏ ca đăng nhập bằng email công ty).
-Chạy lại chúng lúc này sẽ ghi "Đạt" nhầm vào ca khác. Cập nhật script trước
-khi chạy lượt mới.
+Script chạy tự động (`run_blackbox*.py`, `run_systemtest.py`) và
+`blackbox/fixtures.sql` đã cập nhật theo cùng đợt (vai CSKH bỏ, TC_LOGIN dồn
+số, lượt 4 `run_blackbox_branches.py` cho các ca mới). Trong đợt đó cũng bỏ
+mọi chỗ ghi "Đạt" vô điều kiện: ca không kiểm được tự động giờ giữ "Chưa chạy".
 
 ---
 
