@@ -320,6 +320,15 @@ Script chạy tự động (`run_blackbox*.py`, `run_systemtest.py`) và
 số, lượt 4 `run_blackbox_branches.py` cho các ca mới). Trong đợt đó cũng bỏ
 mọi chỗ ghi "Đạt" vô điều kiện: ca không kiểm được tự động giờ giữ "Chưa chạy".
 
+### Lưu ý sau lần cập nhật 01/10/2026
+
+Trang Sửa tách thành Sửa khách hàng / Sửa nhà cung cấp (PR #172) và Sales không
+đổi được người phụ trách chính ở trang Sửa (PR #173). TC_CUSEDIT_016 đổi bước
+(ô "Đồng thời là ..." thay hai ô tick) nên kết quả cũ đã gỡ; TC_CUSEDIT_017–028
+là ca mới, "Chưa chạy", chưa có trong `run_blackbox*.py`. TC_CUSEDIT_013/014 giữ
+kết quả vì vẫn đúng với luật mới. POST `action=update` giờ kèm `kind` của trang
+(thiếu thì coi là trang khách hàng): vai của trang luôn được giữ.
+
 ---
 
 # Report 5.3 - System Test

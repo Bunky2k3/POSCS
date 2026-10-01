@@ -1929,11 +1929,6 @@
     "actual": "Tạo khách khi INSERT enterprise_roles hỏng -> /POSCS/customer?action=view&id=26&error=roles_not_saved; số vai đã ghi: 0",
     "note": ""
   },
-  "TC_CUSEDIT_016": {
-    "status": "Đạt",
-    "actual": "Sửa khách, tick thêm vai NCC khi INSERT enterprise_roles hỏng -> /POSCS/customer?action=view&id=27&error=roles_not_saved; vai còn Khách mua; tên đã lưu: có",
-    "note": ""
-  },
   "TC_CUSEVAL_008": {
     "status": "Đạt",
     "actual": "Đánh giá khi INSERT lịch sử hỏng -> /POSCS/customer?action=view&id=27&error=evaluate_failed; xếp hạng None -> None; lịch sử 0 -> 0 dòng",
