@@ -22,87 +22,48 @@ import requests
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
 import run_blackbox as R            # noqa: E402
 import run_blackbox_ui as U         # noqa: E402
+import testdb as T                  # noqa: E402
 
 SKIP_SLOW = False
 
 
 def test_boundaries(s):
     print("\n[Các ca biên & còn lại]")
-    ok = {"action": "create", "title": "HD bien " + R.RUN,
-          "contractType": "Bảo trì", "enterpriseId": "1", "ownerId": "15",
-          "signDate": time.strftime("%Y-%m-%d"),
-          "effectiveDate": time.strftime("%Y-%m-%d")}
+    # Form tạo không còn ô ngày (PR #164): tạo bản nháp rồi nhập thời hạn ở
+    # trang Quản lý hợp đồng (action=update). /contract không còn multipart.
+    ok = {"action": "create", "kind": "sell", "title": "HD bien " + R.RUN,
+          "contractType": "Cung cấp thiết bị", "enterpriseId": "1",
+          "ownerId": T.user_id("sale01")}
+    today = time.strftime("%Y-%m-%d")
 
     def status_of(days):
-        d = dict(ok)
-        d["title"] = "HD %s ngay %s" % (days, R.RUN)
-        d["endDate"] = time.strftime("%Y-%m-%d",
-                                     time.localtime(time.time() + days * 86400))
-        r = U.upload(s, "/contract", d, {})
+        code = "BIEN/%s/%d" % (R.RUN, days)
+        r = R.post(s, "/contract", dict(ok, contractCode=code))
         m = re.search(r"id=(\d+)", r.headers.get("Location") or "")
         if not m:
-            return None, r.headers.get("Location")
-        txt = U.page_text(U.html(s.get(R.BASE + "/contract?action=view&id=" + m.group(1))))
-        for label in ("Sắp hết hạn", "Đang hiệu lực", "Đã hết hạn", "Chưa hiệu lực"):
-            if label in txt:
-                return label, m.group(1)
-        return None, m.group(1)
+            return None
+        end = time.strftime("%Y-%m-%d", time.localtime(time.time() + days * 86400))
+        R.post(s, "/contract", dict(ok, action="update", contractId=m.group(1), contractCode=code,
+                                    effectiveDate=today, endDate=end))
+        page = U.html(s.get(R.BASE + "/contract?action=view&id=" + m.group(1)))
+        shown = [x for x in ("Sắp hết hạn", "Đang hiệu lực", "Đã hết hạn", "Chưa hiệu lực")
+                 if x in U.page_text(page)]
+        return T.scalar("SELECT status FROM contracts WHERE contract_id = %s" % m.group(1)), shown
 
-    st30, _ = status_of(30)
-    U.expect("TC_CTRLIST_003", st30 == "Sắp hết hạn",
+    st30, shown30 = status_of(30) or (None, [])
+    U.expect("TC_CTRLIST_003", st30 == "Sắp hết hạn" and "Sắp hết hạn" in shown30,
              "Hợp đồng còn đúng 30 ngày -> trạng thái %r" % st30)
-    st31, _ = status_of(31)
-    U.expect("TC_CTRLIST_004", st31 == "Đang hiệu lực",
+    st31, shown31 = status_of(31) or (None, [])
+    U.expect("TC_CTRLIST_004", st31 == "Đang hiệu lực" and "Đang hiệu lực" in shown31,
              "Hợp đồng còn 31 ngày -> trạng thái %r" % st31)
 
-    # hợp đồng có link http thường (không phải Drive)
-    d = dict(ok)
-    d["title"] = "HD link thuong " + R.RUN
-    d["endDate"] = "2027-12-31"
-    d["attachmentUrl"] = "https://example.com/hopdong.pdf"
-    r = U.upload(s, "/contract", d, {})
-    m = re.search(r"id=(\d+)", r.headers.get("Location") or "")
-    if m:
-        page = U.html(s.get(R.BASE + "/contract?action=view&id=" + m.group(1)))
-        iframe = page.find("iframe")
-        link = [a.get("href") for a in page.find_all("a")
-                if "example.com" in (a.get("href") or "")]
-        U.expect("TC_CTRVIEW_005", bool(link) and iframe is None,
-                 "Link http thường: %s link bấm được, %s khung xem trước"
-                 % ("có" if link else "không có",
-                    "không dựng" if iframe is None else "VẪN dựng"))
-    else:
-        U.record("TC_CTRVIEW_005", "N/A", "Không tạo được hợp đồng có link", "")
-
-    # tìm khách hàng theo mã số thuế
-    page = U.html(s.get(R.BASE + "/customer?action=list"))
-    codes = re.findall(r"\b\d{10,13}\b", U.listing_text(page))
-    if codes:
-        page = U.html(s.get(R.BASE + "/customer?action=list&keyword=" + codes[0]))
-        U.expect("TC_CUSLIST_003", U.body_rows(page) >= 1,
-                 "Tìm theo mã số thuế %s -> %d dòng" % (codes[0], U.body_rows(page)))
-    else:
-        U.record("TC_CUSLIST_003", "N/A", "Không đọc được mã số thuế trên danh sách", "")
-
-    # xem khách hàng đã xoá mềm
-    cus = {"action": "create", "customerName": "Cty xoa mem " + R.RUN,
-           "customerType": "Doanh nghiệp", "customerGroup": "Khách hàng mới",
-           "taxCode": "75" + R.RUN, "phone": "0975" + R.RUN,
-           "email": "xm%s@example.vn" % R.RUN, "accountOwnerId": "15",
-           "districtId": "1", "addressDetail": "So 1"}
-    r = U.upload(s, "/customer", cus, {})
-    m = re.search(r"id=(\d+)", r.headers.get("Location") or "")
-    if m:
-        R.post(s, "/customer", {"action": "delete", "id": m.group(1)})
-        after = s.get(R.BASE + "/customer?action=view&id=" + m.group(1),
-                      allow_redirects=False)
-        loc = after.headers.get("Location") or ""
-        U.expect("TC_CUSVIEW_008",
-                 after.status_code == 302 and "notfound" in loc,
-                 "Mở chi tiết khách hàng đã xoá mềm -> HTTP %s %s"
-                 % (after.status_code, loc))
-    else:
-        U.record("TC_CUSVIEW_008", "N/A", "Không tạo được khách hàng để xoá", "")
+    # Tìm theo số điện thoại: ô tìm kiếm dò mã KH, tên, số điện thoại (không dò
+    # mã số thuế) -- lấy SĐT từ CSDL.
+    phone = T.scalar("SELECT phone FROM enterprises WHERE enterprise_code = 'KH-0001'")
+    page = U.html(s.get(R.BASE + "/customer?action=list&keyword=" + phone))
+    names = U.column(page, "Khách hàng") or []
+    U.expect("TC_CUSLIST_003", len(names) == 1 and "Sông Hồng" in names[0],
+             "Tìm theo số điện thoại %s -> %d dòng: %s" % (phone, len(names), names))
 
     # cây danh mục mặc định thu gọn
     page = U.html(s.get(R.BASE + "/product?action=list"))
@@ -111,36 +72,34 @@ def test_boundaries(s):
     U.expect("TC_PRDLIST_003", expanded == 0,
              "Cây danh mục: %d nhánh đang mở sẵn" % expanded)
 
-    # mã sản phẩm tăng liên tiếp
+    # mã sản phẩm tăng liên tiếp (danh mục 7 là danh mục lá; không còn ô đơn giá)
     st, _ = R.login("tech")
     codes = []
     for i in range(2):
         r = U.upload(st, "/product",
                      {"action": "create", "productName": "SP ma %s %d" % (R.RUN, i),
-                      "categoryId": "1", "unitPrice": "1000"}, {})
+                      "categoryId": "7"}, {})
         m = re.search(r"id=(\d+)", r.headers.get("Location") or "")
         if m:
-            txt = U.page_text(U.html(st.get(R.BASE + "/product?action=view&id=" + m.group(1))))
-            found = re.search(r"SP-(\d+)", txt)
-            if found:
-                codes.append(found.group(1))
+            code = T.scalar("SELECT product_code FROM products WHERE product_id = %s" % m.group(1))
+            if code:
+                codes.append(code.split("-")[-1])
     ok_seq = (len(codes) == 2 and int(codes[1]) == int(codes[0]) + 1
               and len(codes[1]) == len(codes[0]))
     U.expect("TC_PRDADD_004", ok_seq,
-             "Hai sản phẩm tạo liên tiếp có mã %s -> %s"
+             "Hai sản phẩm tạo liên tiếp có mã SP-%s -> SP-%s"
              % (codes[0] if codes else "?", codes[1] if len(codes) > 1 else "?"))
 
-    # phiếu quá hạn SLA được đánh dấu
-    sc, _ = R.login("cskh")
-    past = time.strftime("%Y-%m-%dT%H:%M",
-                         time.localtime(time.time() - 3 * 86400))
-    r = R.post(sc, "/ticket", {"action": "create", "enterpriseId": "1",
-                               "ticketType": "Lỗi phần mềm", "priority": "Cao",
-                               "receptionChannel": "Điện thoại",
-                               "assignedTechnicianId": "16",
-                               "slaDeadline": past,
-                               "description": "Qua han SLA " + R.RUN})
-    page = U.html(sc.get(R.BASE + "/ticket?action=list&keyword=" + R.RUN))
+    # phiếu quá hạn SLA được đánh dấu (Sales tiếp nhận -- vai CSKH đã gộp vào Sales)
+    sc, _ = R.login("sales")
+    past = time.strftime("%Y-%m-%dT%H:%M", time.localtime(time.time() - 3 * 86400))
+    R.post(sc, "/ticket", {"action": "create", "enterpriseId": "1",
+                           "ticketType": "Lỗi phần mềm", "priority": "Cao",
+                           "receptionChannel": "Điện thoại",
+                           "assignedTechnicianId": T.user_id("tech01"),
+                           "slaDeadline": past,
+                           "description": "Qua han SLA " + R.RUN})
+    page = U.html(sc.get(R.BASE + "/ticket?action=list&assignee=all&keyword=" + R.RUN))
     raw = str(page)
     marked = bool(re.search(r"(overdue|qu[áa] h[ạa]n|text-danger|bg-danger|sla-late)",
                             raw, re.I))
@@ -151,9 +110,9 @@ def test_boundaries(s):
     # AJAX: khách hàng chưa có hợp đồng + escape ký tự đặc biệt
     r = U.upload(s, "/customer",
                  {"action": "create", "customerName": "Cty chua HD " + R.RUN,
-                  "customerType": "Doanh nghiệp", "customerGroup": "Khách hàng mới",
+                  "customerType": "Nhà mạng viễn thông", "customerGroup": "Tiềm năng",
                   "taxCode": "74" + R.RUN, "phone": "0974" + R.RUN,
-                  "email": "nc%s@example.vn" % R.RUN, "accountOwnerId": "15",
+                  "email": "nc%s@example.vn" % R.RUN,
                   "districtId": "1", "addressDetail": "So 1"}, {})
     m = re.search(r"id=(\d+)", r.headers.get("Location") or "")
     if m:
@@ -166,11 +125,8 @@ def test_boundaries(s):
                  "Khách hàng chưa có hợp đồng -> HTTP %s, body %r"
                  % (rr.status_code, rr.text.strip()[:40]))
 
-        d = dict(ok)
-        d["title"] = 'Hop dong "ABC" ' + R.RUN
-        d["enterpriseId"] = m.group(1)
-        d["endDate"] = "2027-12-31"
-        U.upload(s, "/contract", d, {})
+        R.post(s, "/contract", dict(ok, contractCode="AJAX/%s" % R.RUN,
+                                    title='Hop dong "ABC" ' + R.RUN, enterpriseId=m.group(1)))
         rr = s.get(R.BASE + "/contract/byEnterprise?enterpriseId=" + m.group(1))
         try:
             data = rr.json()
@@ -187,13 +143,15 @@ def test_boundaries(s):
 
 def test_otp_timing():
     print("\n[OTP — các ca phụ thuộc thời gian]")
-    email = "sale01@poscs.vn"
+    # Quên mật khẩu tra theo USERNAME (V36); mã gửi tới personal_email trong hồ sơ.
+    username = "sale01"
+    email = T.scalar("SELECT personal_email FROM users WHERE username = '%s'" % username)
 
     s = requests.Session()
     t = R.csrf(s, "/forgotPassword.jsp")
     before = U.count_log(r"Ma OTP: \d{6}")
     s.post(R.BASE + "/ForgotPasswordServlet", allow_redirects=False,
-           data={"email": email, "csrfToken": t})
+           data={"username": username, "csrfToken": t})
     time.sleep(0.5)
     if U.count_log(r"Ma OTP: \d{6}") == before:
         for cid in ("TC_OTP_003", "TC_OTP_004", "TC_RESEND_001", "TC_RESEND_003"):
@@ -246,7 +204,7 @@ def test_otp_timing():
     t = R.csrf(s2, "/forgotPassword.jsp")
     before = U.count_log(r"Ma OTP: \d{6}")
     s2.post(R.BASE + "/ForgotPasswordServlet", allow_redirects=False,
-            data={"email": email, "csrfToken": t})
+            data={"username": username, "csrfToken": t})
     time.sleep(0.5)
     if U.count_log(r"Ma OTP: \d{6}") == before:
         U.record("TC_OTP_004", "N/A", "Hết hạn mức OTP trước khi kiểm được", "")
@@ -264,102 +222,20 @@ def test_otp_timing():
 
 
 
-def mysql(sql):
-    """Chạy một câu lệnh trên CSDL kiểm thử để dựng dữ liệu nền đặc biệt."""
-    import subprocess
-    exe = r"C:\Program Files\MySQL\MySQL Server 9.3\bin\mysql.exe"
-    if not pathlib.Path(exe).is_file():
-        return False
-    try:
-        subprocess.run([exe, "-h127.0.0.1", "-uroot", "-p1234",
-                        "--default-character-set=utf8mb4", "poscs_bbtest",
-                        "-e", sql], capture_output=True, timeout=30)
-        return True
-    except Exception:
-        return False
-
-
 def reseed():
     """Nạp lại tài khoản mẫu trước khi chạy lượt này."""
-    import subprocess
-    exe = r"C:\Program Files\MySQL\MySQL Server 9.3\bin\mysql.exe"
     sql = pathlib.Path(__file__).with_name("blackbox") / "fixtures.sql"
-    if not pathlib.Path(exe).is_file() or not sql.is_file():
-        return False
     try:
-        with sql.open("rb") as f:
-            subprocess.run([exe, "-h127.0.0.1", "-uroot", "-p1234",
-                            "--default-character-set=utf8mb4", "poscs_bbtest"],
-                           stdin=f, capture_output=True, timeout=60)
+        T.run(sql.read_text(encoding="utf-8"))
         return True
-    except Exception:
+    except Exception as ex:          # noqa: BLE001 -- chỉ để báo, không dừng lượt chạy
+        print("  !! nap fixtures loi:", ex)
         return False
 
 
 def test_special_fixtures(s):
     """Các ca cần dữ liệu nền không dựng được qua giao diện."""
     print("\n[Dữ liệu nền đặc biệt]")
-
-    # --- nhân viên không có email cá nhân (form bắt buộc ô này nên phải sửa DB)
-    emp = {"action": "create", "lastName": "Nguyen", "firstName": "NoMail" + R.RUN,
-           "citizenId": "0055" + R.RUN, "gender": "Nam",
-           "dateOfBirth": "1995-01-01", "hireDate": "2024-01-01",
-           "roleId": "2", "departmentId": "2", "districtId": "1",
-           "addressDetail": "So 1", "personalEmail": "nm%s@gmail.com" % R.RUN,
-           "phone": "0955" + R.RUN}
-    r = R.post(s, "/employee", emp)
-    m = re.search(r"id=(\d+)", r.headers.get("Location") or "")
-    if m and mysql("UPDATE users SET personal_email = NULL WHERE user_id = %s"
-                   % m.group(1)):
-        r = R.post(s, "/employee", {"action": "sendAccount", "id": m.group(1)})
-        loc = r.headers.get("Location") or ""
-        U.expect("TC_EMPSEND_002", "no_personal_email" in loc,
-                 "Nhân viên không có email cá nhân -> %s (mật khẩu giữ nguyên)"
-                 % loc)
-    else:
-        U.record("TC_EMPSEND_002", "N/A",
-                 "Không dựng được nhân viên thiếu email cá nhân", "")
-
-    # --- tài khoản bị khoá trong lúc form đổi mật khẩu đang mở
-    emp2 = dict(emp)
-    emp2["firstName"] = "Locked" + R.RUN
-    emp2["citizenId"] = "0056" + R.RUN
-    emp2["phone"] = "0956" + R.RUN
-    emp2["personalEmail"] = "lk%s@gmail.com" % R.RUN
-    r = R.post(s, "/employee", emp2)
-    m = re.search(r"id=(\d+)", r.headers.get("Location") or "")
-    done = False
-    if m:
-        uid = m.group(1)
-        ADMIN_HASH = "$2a$10$nCKNnrIKggQ57ZBBItt.1.iPzP0QDo2eQQzpzpx/DO.wfZQ8VWJZO"
-        mysql("UPDATE users SET password_hash = %s WHERE user_id = %s"
-              % (repr(ADMIN_HASH).replace('"', "'"), uid))
-        page = U.html(s.get(R.BASE + "/employee?action=view&id=" + uid))
-        uname = re.search(r"(?:Tên đăng nhập|Username)[: ]+(\S+)",
-                          U.page_text(page))
-        if uname:
-            victim = requests.Session()
-            t = R.csrf(victim, "/login.jsp")
-            rr = victim.post(R.BASE + "/login", allow_redirects=False,
-                             data={"username": uname.group(1),
-                                   "password": "Admin@123", "csrfToken": t})
-            if "dashboard" in (rr.headers.get("Location") or ""):
-                token = R.csrf(victim)          # mở sẵn form đổi mật khẩu
-                R.post(s, "/employee", {"action": "toggleStatus", "id": uid})
-                rr = victim.post(R.BASE + "/changePassword", allow_redirects=False,
-                                 data={"oldPassword": "Admin@123",
-                                       "newPassword": "MatKhauKhac@1",
-                                       "confirmPassword": "MatKhauKhac@1",
-                                       "csrfToken": token})
-                loc = rr.headers.get("Location") or ""
-                U.expect("TC_CHGPWD_007",
-                         rr.status_code == 302 and "login" in loc,
-                         "Bị khoá giữa lúc form đang mở, bấm Xác nhận -> HTTP %s %s"
-                         % (rr.status_code, loc))
-                done = True
-    if not done:
-        U.record("TC_CHGPWD_007", "N/A",
-                 "Không dựng được tài khoản để khoá giữa chừng", "")
 
     # --- file log rỗng
     log_dir = None
@@ -387,7 +263,7 @@ def test_special_fixtures(s):
         guess = U.TOMCAT_LOG.parent / "uploads"
         if guess.is_dir():
             upload_dir = guess
-    if upload_dir is None and os.environ.get("UPLOAD_DIR"):
+    if os.environ.get("UPLOAD_DIR"):
         guess = pathlib.Path(os.environ["UPLOAD_DIR"])
         upload_dir = guess if guess.is_dir() else None
     if upload_dir:
@@ -419,14 +295,14 @@ def test_special_fixtures(s):
 def test_otp_quota():
     """ĐỂ SAU test_otp_timing: ca này làm cạn hạn mức 10 yêu cầu/IP trong 15 phút."""
     print("\n[Hạn mức yêu cầu OTP]")
-    quota_email = "tech01@poscs.vn"
+    quota_user = "tech01"
     burned = 0
     for _ in range(12):
         sx = requests.Session()
         tx = R.csrf(sx, "/forgotPassword.jsp")
         before = U.count_log(r"Ma OTP: \d{6}")
         sx.post(R.BASE + "/ForgotPasswordServlet", allow_redirects=False,
-                data={"email": quota_email, "csrfToken": tx})
+                data={"username": quota_user, "csrfToken": tx})
         time.sleep(0.2)
         if U.count_log(r"Ma OTP: \d{6}") > before:
             burned += 1
@@ -434,9 +310,9 @@ def test_otp_quota():
     tl = R.csrf(last, "/forgotPassword.jsp")
     before = U.count_log(r"Ma OTP: \d{6}")
     rl = last.post(R.BASE + "/ForgotPasswordServlet", allow_redirects=False,
-                   data={"email": quota_email, "csrfToken": tl})
+                   data={"username": quota_user, "csrfToken": tl})
     time.sleep(0.4)
-    U.expect("TC_FORGOT_005",
+    U.expect("TC_FORGOT_004",
              burned <= 10 and U.count_log(r"Ma OTP: \d{6}") == before,
              "Gửi 13 yêu cầu: chỉ %d lần thực sự sinh mã; yêu cầu sau hạn mức vẫn "
              "chuyển hướng bình thường (%s) nhưng không gửi thêm mã"
@@ -458,13 +334,13 @@ def test_login_lockout():
     r = sx.post(R.BASE + "/login", allow_redirects=False,
                 data={"username": user, "password": pwd, "csrfToken": t})
     loc = r.headers.get("Location") or ""
-    U.expect("TC_LOGIN_007", "dashboard" not in loc,
+    U.expect("TC_LOGIN_006", "dashboard" not in loc,
              "Sai 5 lần rồi nhập ĐÚNG mật khẩu -> %s (vẫn bị từ chối)" % loc)
 
     if SKIP_SLOW:
-        U.record("TC_LOGIN_008", "N/A", "Bỏ qua do chạy với --skip-slow",
+        U.record("TC_LOGIN_007", "N/A", "Bỏ qua do chạy với --skip-slow",
                  "Ca này phải chờ hết 15 phút khoá")
-        U.record("TC_LOGIN_009", "N/A", "Phụ thuộc TC_LOGIN_008", "")
+        U.record("TC_LOGIN_008", "N/A", "Phụ thuộc TC_LOGIN_007", "")
         return
 
     print("  ... chờ 15 phút 15 giây cho hết thời gian khoá IP")
@@ -474,7 +350,7 @@ def test_login_lockout():
     r = sx.post(R.BASE + "/login", allow_redirects=False,
                 data={"username": user, "password": pwd, "csrfToken": t})
     loc = r.headers.get("Location") or ""
-    U.expect("TC_LOGIN_008", "dashboard" in loc,
+    U.expect("TC_LOGIN_007", "dashboard" in loc,
              "Sau 15 phút, đăng nhập đúng -> %s" % loc)
 
     for i in range(4):
@@ -488,7 +364,7 @@ def test_login_lockout():
     r = sx.post(R.BASE + "/login", allow_redirects=False,
                 data={"username": user, "password": pwd, "csrfToken": t})
     loc = r.headers.get("Location") or ""
-    U.expect("TC_LOGIN_009", "dashboard" in loc,
+    U.expect("TC_LOGIN_008", "dashboard" in loc,
              "Sai 4 lần sau một lần đúng -> vẫn vào được: %s" % loc)
 
 

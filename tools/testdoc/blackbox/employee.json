@@ -109,7 +109,7 @@
         {"d": "Tên đăng nhập sinh từ họ tên có dấu",
          "s": ["Nhập họ tên tiếng Việt có dấu", "Bấm Lưu"],
          "t": "Họ tên: Nguyễn Thị Ánh Nguyệt",
-         "e": "Tên đăng nhập sinh ra đã bỏ dấu và bỏ khoảng trắng, ví dụ nguyetnta"},
+         "e": "Tên đăng nhập ghép họ + tên đệm + tên, bỏ dấu và bỏ khoảng trắng: nguyenthianhnguyet"},
         {"d": "Họ tên trùng người đã có",
          "s": ["Tạo nhân viên trùng họ tên với người đã tồn tại", "Bấm Lưu"],
          "p": "Đã có nhân viên cùng họ tên",

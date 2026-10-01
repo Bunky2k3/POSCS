@@ -16,7 +16,7 @@
             "Bấm Hợp đồng trên thanh bên trái"
           ],
           "t": "-",
-          "e": "Hiện bảng hợp đồng kèm mã, tiêu đề, khách hàng, ngày hiệu lực, ngày kết thúc và trạng thái"
+          "e": "Hiện bảng hợp đồng với các cột STT, Hợp đồng (tiêu đề kèm tỉnh và đối tác), Loại HĐ, Thời hạn, Trạng thái, Tiến độ, Phụ trách và Thao tác"
         },
         {
           "d": "Trạng thái được tính theo ngày hiện tại",
@@ -61,7 +61,7 @@
             "Nhập một phần tên khách hàng",
             "Bấm Tìm"
           ],
-          "t": "keyword: Minh Anh",
+          "t": "keyword: Sông Hồng",
           "e": "Hiện các hợp đồng thuộc khách hàng khớp từ khoá"
         },
         {
