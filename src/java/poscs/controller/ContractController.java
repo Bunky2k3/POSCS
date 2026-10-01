@@ -1832,7 +1832,11 @@ public class ContractController extends HttpServlet {
         c.setContractCode(emptyToNull(request.getParameter("contractCode")));
         c.setTitle(emptyToNull(request.getParameter("title")));
         c.setContractType(emptyToNull(request.getParameter("contractType")));
-        c.setSigningDate(parseDateOrNull(request.getParameter("signDate")));
+        // Ngày ký KHÔNG đọc từ request: nó được đóng dấu lúc bấm Ký
+        // (ContractDAO.changeProgressStatus). Form tạo không có ô này, nhưng
+        // một POST nặn tay kèm signDate từng ghi được ngày đó xuống bản nháp,
+        // và COALESCE lúc ký giữ nguyên nó thay vì lấy ngày ký thật. Hai luồng
+        // sửa tự chép ngày ký từ bản ghi đang có.
         c.setEffectiveDate(parseDateOrNull(request.getParameter("effectiveDate")));
         c.setEndDate(parseDateOrNull(request.getParameter("endDate")));
 
