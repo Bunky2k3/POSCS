@@ -1095,8 +1095,8 @@
     "note": ""
   },
   "TC_CUSEXP_004": {
-    "status": "Trượt",
-    "actual": "Ô bắt đầu bằng '=' xuất ra ô chữ \"'=1+1 152001\" (mong đợi '=1+1 152001')",
+    "status": "Đạt",
+    "actual": "Ô bắt đầu bằng '=' xuất ra ô chữ '=1+1 081143' (mong đợi '=1+1 081143')",
     "note": ""
   },
   "TC_CTREXP_001": {
@@ -1135,8 +1135,8 @@
     "note": ""
   },
   "TC_TKEXP_006": {
-    "status": "Trượt",
-    "actual": "Mô tả bắt đầu bằng '=' xuất ra ô chữ \"'=1+1 152001\" (mong đợi '=1+1 152001')",
+    "status": "Đạt",
+    "actual": "Mô tả bắt đầu bằng '=' xuất ra ô chữ '=1+1 081143' (mong đợi '=1+1 081143')",
     "note": ""
   },
   "TC_CUSADD_013": {
