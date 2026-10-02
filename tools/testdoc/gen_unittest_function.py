@@ -49,7 +49,7 @@ GLOSSARY = pathlib.Path(__file__).with_name("vi_glossary.json")
 
 PROJECT_NAME = "POSCS - Point Of Sale & Customer Support System"
 PROJECT_CODE = "POSCS"
-VERSION = "2.0"
+VERSION = "2.1"
 DOC_CODE = "POSCS_UnitTest_v%s" % VERSION
 CREATOR = "G82"
 ISSUE_DATE = datetime.date.today()
@@ -59,9 +59,13 @@ ISSUE_DATE = datetime.date.today()
 CHANGE_LOG = [
     (datetime.date(2026, 9, 11), "1.0", "Toàn bộ", "A",
      "Tạo mới tài liệu Unit Test cho POSCS", ""),
-    (ISSUE_DATE, "2.0", "Toàn bộ", "M",
+    (datetime.date(2026, 9, 21), "2.0", "Toàn bộ", "M",
      "Cập nhật theo mã nguồn hiện tại (vòng đời hợp đồng, bàn giao, tài liệu "
      "hợp đồng, module tiền); bổ sung nhóm hàm JavaScript", ""),
+    (ISSUE_DATE, "2.1", "Toàn bộ", "M",
+     "Cập nhật theo mã nguồn tới PR #175 (phạm vi Sales, trang nhà cung cấp, "
+     "nhánh ghi CSDL hỏng, lọc Người xử lý, tạo hợp đồng không nhận ngày ký); "
+     "bổ sung bản dịch tiếng Việt còn thiếu", ""),
 ]
 
 # --- Nguồn test JavaScript -------------------------------------------------
@@ -74,6 +78,12 @@ JS_RESULT = RESULT_DIR / "TEST-js.xml"
 # Tên "lớp" cho phần JS: mã nguồn là web/js/appshell.js, không có lớp nào cả,
 # nên lấy tên file làm nhóm để sheet đọc ra vẫn là "<nguồn>_<hàm>".
 JS_PROD_CLASS = "appshell"
+
+# Test JS không kiểm hàm nào của appshell.js -- jsp-onclick.test.js dò cả thư
+# mục web/ tìm mẫu XSS trong thuộc tính sự kiện của JSP. Xếp nó vào sheet
+# "appshell_<hàm>" là sai nguồn, nên bỏ hẳn khỏi tài liệu Unit Test thay vì
+# cảnh báo "thiếu dấu ':'" mỗi lần chạy.
+JS_NOT_UNIT = {"jsp-onclick.test.js"}
 
 # Tiêu đề test JS theo quy ước "<hàm>: <điều kiện> → <kỳ vọng>" -- cùng một
 # cách chia ba phần như tên method Java, chỉ khác là viết bằng tiếng Việt cho
@@ -457,6 +467,8 @@ def collect_js(groups, unknown):
     ket_qua = load_js_results()
     thieu_ket_qua = not ket_qua
     for path in sorted(JS_TEST_DIR.glob("*.test.js")):
+        if path.name in JS_NOT_UNIT:
+            continue
         source = path.read_text(encoding="utf-8", errors="replace")
         for title in JS_TEST_PATTERN.findall(source):
             if ":" not in title:

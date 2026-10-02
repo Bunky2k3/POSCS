@@ -78,27 +78,27 @@ const CAY = { 22: 23, 15: 20 };
 // nguoiHoTroBiLoai -- hàm thuần
 // ----------------------------------------------------------------------
 
-test('nguoiHoTroBiLoai: chưa chọn người phụ trách thì chưa loại ai', () => {
+test('nguoiHoTroBiLoai: chưa chọn người phụ trách → chưa loại ai', () => {
     assert.deepStrictEqual(biLoai('', CAY), []);
 });
 
-test('nguoiHoTroBiLoai: loại chính người phụ trách và cấp trên trực tiếp của họ', () => {
+test('nguoiHoTroBiLoai: đã chọn người phụ trách → loại chính người đó và cấp trên trực tiếp của họ', () => {
     assert.deepStrictEqual(biLoai('22', CAY), ['22', '23']);
 });
 
-test('nguoiHoTroBiLoai: trưởng nhóm KHÁC không bị loại', () => {
+test('nguoiHoTroBiLoai: trưởng nhóm KHÁC → không bị loại', () => {
     assert.ok(!biLoai('22', CAY).includes('20'));
 });
 
-test('nguoiHoTroBiLoai: người phụ trách là cấp trên thì cấp dưới của họ vẫn làm người hỗ trợ được', () => {
+test('nguoiHoTroBiLoai: người phụ trách là cấp trên → cấp dưới của họ vẫn làm người hỗ trợ được', () => {
     assert.deepStrictEqual(biLoai('23', CAY), ['23']);
 });
 
-test('nguoiHoTroBiLoai: cây tổ chức còn trống thì chỉ loại chính người phụ trách', () => {
+test('nguoiHoTroBiLoai: cây tổ chức còn trống → chỉ loại chính người phụ trách', () => {
     assert.deepStrictEqual(biLoai('22', {}), ['22']);
 });
 
-test('nguoiHoTroBiLoai: id dạng số cũng ra chuỗi, để so thẳng với option.value', () => {
+test('nguoiHoTroBiLoai: id dạng số → vẫn ra chuỗi, để so thẳng với option.value', () => {
     assert.deepStrictEqual(biLoai(22, CAY), ['22', '23']);
 });
 
@@ -135,7 +135,7 @@ const dangBiLoai = oHoTro => oHoTro.options
     .filter(o => o.value && o.hidden && o.disabled)
     .map(o => o.value);
 
-test('ganLocNguoiHoTro: lọc ngay khi gắn, không đợi người dùng đổi gì', () => {
+test('ganLocNguoiHoTro: vừa gắn, người dùng chưa đổi gì → lọc ngay', () => {
     const chuTri = oSelectGia(['20', '22', '23'], '22');
     const hoTro = oSelectGia(['20', '22', '23'], '');
 
@@ -144,7 +144,7 @@ test('ganLocNguoiHoTro: lọc ngay khi gắn, không đợi người dùng đổ
     assert.deepStrictEqual(dangBiLoai(hoTro), ['22', '23']);
 });
 
-test('ganLocNguoiHoTro: người dùng đổi người phụ trách thì lọc lại theo người mới', () => {
+test('ganLocNguoiHoTro: người dùng đổi người phụ trách → lọc lại theo người mới', () => {
     const chuTri = oSelectGia(['15', '20', '22', '23'], '22');
     const hoTro = oSelectGia(['15', '20', '22', '23'], '');
     POSCS.ganLocNguoiHoTro(chuTri, hoTro, CAY, dongGoiY());
@@ -156,7 +156,7 @@ test('ganLocNguoiHoTro: người dùng đổi người phụ trách thì lọc l
     assert.deepStrictEqual(dangBiLoai(hoTro), ['15', '20']);
 });
 
-test('ganLocNguoiHoTro: người hỗ trợ đang chọn hoá không hợp lệ thì bỏ chọn VÀ báo', () => {
+test('ganLocNguoiHoTro: người hỗ trợ đang chọn hoá không hợp lệ → bỏ chọn VÀ báo', () => {
     const chuTri = oSelectGia(['22', '23'], '');
     const hoTro = oSelectGia(['22', '23'], '23');
     const goiY = dongGoiY();
@@ -173,7 +173,7 @@ test('ganLocNguoiHoTro: người hỗ trợ đang chọn hoá không hợp lệ 
     assert.match(goiY.textContent, /cấp trên trực tiếp/);
 });
 
-test('ganLocNguoiHoTro: người hỗ trợ hợp lệ thì giữ nguyên, không báo gì', () => {
+test('ganLocNguoiHoTro: người hỗ trợ hợp lệ → giữ nguyên, không báo gì', () => {
     const chuTri = oSelectGia(['20', '22', '23'], '22');
     const hoTro = oSelectGia(['20', '22', '23'], '20'); // trưởng nhóm khác
     const goiY = dongGoiY();
@@ -184,7 +184,7 @@ test('ganLocNguoiHoTro: người hỗ trợ hợp lệ thì giữ nguyên, khôn
     assert.strictEqual(goiY.style.display, 'none');
 });
 
-test('ganLocNguoiHoTro: chọn lại người hỗ trợ thì tắt dòng báo cũ', () => {
+test('ganLocNguoiHoTro: chọn lại người hỗ trợ → tắt dòng báo cũ', () => {
     const chuTri = oSelectGia(['20', '22', '23'], '22');
     const hoTro = oSelectGia(['20', '22', '23'], '23');
     const goiY = dongGoiY();
