@@ -1846,7 +1846,7 @@
   },
   "TC_CUSADD_019": {
     "status": "Đạt",
-    "actual": "Form NCC: loại ['Nhà sản xuất', 'Nhà nhập khẩu', 'Nhà phân phối', 'Đơn vị dịch vụ'], 34 tỉnh, khoá tên sales4: có; lưu -> mã NCC-001, vai Nhà cung cấp, người phụ trách sales4; nằm ở danh sách NCC: 1 dòng, danh sách khách mua: 0 dòng",
+    "actual": "Form NCC: loại ['Nhà sản xuất', 'Nhà nhập khẩu', 'Nhà phân phối', 'Đơn vị dịch vụ'], 34 tỉnh, khoá tên sales4: có; lưu -> mã NCC-005, vai Nhà cung cấp, người phụ trách sales4; nằm ở danh sách NCC: 1 dòng, danh sách khách mua: 0 dòng",
     "note": ""
   },
   "TC_CUSADD_020": {
@@ -1901,12 +1901,12 @@
   },
   "TC_CUSEDIT_013": {
     "status": "Đạt",
-    "actual": "sales3 đổi xã trong Lai Châu, gửi accountOwnerId=sales2 -> /POSCS/customer?action=view&id=25; người phụ trách sales3",
+    "actual": "sales3 đổi xã trong Lai Châu, gửi accountOwnerId=sales2 -> /POSCS/customer?action=view&id=41; người phụ trách sales3",
     "note": ""
   },
   "TC_CUSEDIT_014": {
     "status": "Đạt",
-    "actual": "sales4 sửa NCC: ô tỉnh 34 tỉnh; đổi sang Cà Mau, gửi accountOwnerId=sales2 -> /POSCS/customer?action=view&id=23; người phụ trách sales4",
+    "actual": "sales4 sửa NCC: ô tỉnh 34 tỉnh; đổi sang Cà Mau, gửi accountOwnerId=sales2 -> /POSCS/customer?action=view&id=39&kind=supplier; người phụ trách sales4",
     "note": ""
   },
   "TC_CUSLIST_013": {
@@ -1926,17 +1926,17 @@
   },
   "TC_CUSADD_024": {
     "status": "Đạt",
-    "actual": "Tạo khách khi INSERT enterprise_roles hỏng -> /POSCS/customer?action=view&id=26&error=roles_not_saved; số vai đã ghi: 0",
+    "actual": "Tạo khách khi INSERT enterprise_roles hỏng -> /POSCS/customer?action=view&id=42&error=roles_not_saved; số vai đã ghi: 0",
     "note": ""
   },
   "TC_CUSEVAL_008": {
     "status": "Đạt",
-    "actual": "Đánh giá khi INSERT lịch sử hỏng -> /POSCS/customer?action=view&id=27&error=evaluate_failed; xếp hạng None -> None; lịch sử 0 -> 0 dòng",
+    "actual": "Đánh giá khi INSERT lịch sử hỏng -> /POSCS/customer?action=view&id=43&error=evaluate_failed; xếp hạng None -> None; lịch sử 0 -> 0 dòng",
     "note": ""
   },
   "TC_CUSDEL_007": {
     "status": "Đạt",
-    "actual": "Xoá khi UPDATE is_deleted hỏng -> /POSCS/customer?action=view&id=27&error=delete_failed; khách vẫn còn",
+    "actual": "Xoá khi UPDATE is_deleted hỏng -> /POSCS/customer?action=view&id=43&error=delete_failed; khách vẫn còn",
     "note": ""
   },
   "TC_CTRLIST_027": {
@@ -1946,7 +1946,7 @@
   },
   "TC_TKLIST_011": {
     "status": "Đạt",
-    "actual": "tech01 mở danh sách: ô Người xử lý = 'mine'; người xử lý trên bảng ['Lê Kỹ Thuật']; KPI ['8', '0', '0'] (CSDL ['8', '0', '0'])",
+    "actual": "tech01 mở danh sách: ô Người xử lý = 'mine'; người xử lý trên bảng ['Lê Kỹ Thuật']; KPI ['13', '0', '0'] (CSDL ['13', '0', '0'])",
     "note": ""
   },
   "TC_TKLIST_012": {
@@ -1966,7 +1966,7 @@
   },
   "TC_TKLIST_015": {
     "status": "Đạt",
-    "actual": "assignee=abc -> ô lọc 'all'; KPI ['11', '4', '9'] bằng toàn bộ (CSDL ['11', '4', '9'])",
+    "actual": "assignee=abc -> ô lọc 'all'; KPI ['16', '4', '9'] bằng toàn bộ (CSDL ['16', '4', '9'])",
     "note": ""
   },
   "TC_TKLIST_016": {
@@ -1976,22 +1976,22 @@
   },
   "TC_TKDEL_006": {
     "status": "Đạt",
-    "actual": "Xoá phiếu khi UPDATE is_deleted hỏng -> /POSCS/ticket?action=view&id=26&error=delete_failed; phiếu vẫn còn",
+    "actual": "Xoá phiếu khi UPDATE is_deleted hỏng -> /POSCS/ticket?action=view&id=30&error=delete_failed; phiếu vẫn còn",
     "note": ""
   },
   "TC_PRDADD_012": {
     "status": "Đạt",
-    "actual": "Tạo sản phẩm kèm 2 ảnh khi INSERT productimages hỏng -> /POSCS/product?action=view&id=98&error=files_not_saved&notRemoved=0&notAdded=2; ảnh đã lưu: 0",
+    "actual": "Tạo sản phẩm kèm 2 ảnh khi INSERT productimages hỏng -> /POSCS/product?action=view&id=104&error=files_not_saved&notRemoved=0&notAdded=2; ảnh đã lưu: 0",
     "note": ""
   },
   "TC_PRDEDIT_010": {
     "status": "Đạt",
-    "actual": "Gỡ 1 ảnh khi DELETE productimages hỏng -> /POSCS/product?action=view&id=99&error=files_not_saved&notRemoved=1&notAdded=0; ảnh vẫn còn",
+    "actual": "Gỡ 1 ảnh khi DELETE productimages hỏng -> /POSCS/product?action=view&id=105&error=files_not_saved&notRemoved=1&notAdded=0; ảnh vẫn còn",
     "note": ""
   },
   "TC_PRDEDIT_011": {
     "status": "Đạt",
-    "actual": "Gỡ 1 + thêm 2 ảnh khi cả DELETE lẫn INSERT hỏng -> /POSCS/product?action=view&id=99&error=files_not_saved&notRemoved=1&notAdded=2; thông tin sản phẩm đã lưu",
+    "actual": "Gỡ 1 + thêm 2 ảnh khi cả DELETE lẫn INSERT hỏng -> /POSCS/product?action=view&id=105&error=files_not_saved&notRemoved=1&notAdded=2; thông tin sản phẩm đã lưu",
     "note": ""
   },
   "TC_PRDEDIT_012": {
@@ -2001,7 +2001,7 @@
   },
   "TC_PRDDEL_006": {
     "status": "Đạt",
-    "actual": "Xoá sản phẩm khi UPDATE is_deleted hỏng -> /POSCS/product?action=view&id=99&error=delete_failed; sản phẩm vẫn còn",
+    "actual": "Xoá sản phẩm khi UPDATE is_deleted hỏng -> /POSCS/product?action=view&id=105&error=delete_failed; sản phẩm vẫn còn",
     "note": ""
   },
   "TC_EMPADD_017": {
@@ -2011,22 +2011,22 @@
   },
   "TC_EMPADD_018": {
     "status": "Đạt",
-    "actual": "Tạo nhân viên khi INSERT user_provinces hỏng -> /POSCS/employee?action=edit&id=29&error=province_not_saved",
+    "actual": "Tạo nhân viên khi INSERT user_provinces hỏng -> /POSCS/employee?action=edit&id=27&error=province_not_saved",
     "note": ""
   },
   "TC_EMPEDIT_009": {
     "status": "Đạt",
-    "actual": "Sửa, nhận thêm Hà Nội (đã có người cầm) -> /POSCS/employee?action=edit&id=29&error=province_taken; hồ sơ và địa bàn giữ như cũ",
+    "actual": "Sửa, nhận thêm Hà Nội (đã có người cầm) -> /POSCS/employee?action=edit&id=27&error=province_taken; hồ sơ và địa bàn giữ như cũ",
     "note": ""
   },
   "TC_EMPEDIT_010": {
     "status": "Đạt",
-    "actual": "Sửa SĐT + nhận Lai Châu khi INSERT user_provinces hỏng -> /POSCS/employee?action=edit&id=29&error=province_not_saved; SĐT mới đã lưu; tỉnh đang cầm: 0",
+    "actual": "Sửa SĐT + nhận Lai Châu khi INSERT user_provinces hỏng -> /POSCS/employee?action=edit&id=27&error=province_not_saved; SĐT mới đã lưu; tỉnh đang cầm: 0",
     "note": ""
   },
   "TC_EMPBAN_007": {
     "status": "Đạt",
-    "actual": "Khoá tài khoản khi UPDATE is_deleted hỏng -> /POSCS/employee?action=view&id=29&error=toggle_failed; tài khoản vẫn hoạt động",
+    "actual": "Khoá tài khoản khi UPDATE is_deleted hỏng -> /POSCS/employee?action=view&id=27&error=toggle_failed; tài khoản vẫn hoạt động",
     "note": ""
   },
   "TC_UPDPROF_012": {
@@ -2046,22 +2046,22 @@
   },
   "TC_CUSLIST_014": {
     "status": "Đạt",
-    "actual": "Từ khoá 'R&D #1': link trang 2 mang keyword=R%26D+%231: có; trang 2 có 2 dòng khớp, ô tìm kiếm giữ 'R&D #1'; file Excel 12 dòng, đều khớp từ khoá: có",
+    "actual": "Từ khoá 'R&D #1': link trang 2 mang keyword=R%26D+%231: có; trang 2 có 10 dòng khớp, ô tìm kiếm giữ 'R&D #1'; file Excel 24 dòng, đều khớp từ khoá: có",
     "note": "PR #166"
   },
   "TC_CTRLIST_028": {
     "status": "Đạt",
-    "actual": "Từ khoá 'R&D #1': link trang 2 mang keyword=R%26D+%231: có; trang 2 có 2 dòng khớp, ô tìm kiếm giữ 'R&D #1'; file Excel 12 dòng, đều khớp từ khoá: có",
+    "actual": "Từ khoá 'R&D #1': link trang 2 mang keyword=R%26D+%231: có; trang 2 có 10 dòng khớp, ô tìm kiếm giữ 'R&D #1'; file Excel 24 dòng, đều khớp từ khoá: có",
     "note": "PR #166"
   },
   "TC_PRDLIST_010": {
     "status": "Đạt",
-    "actual": "Từ khoá 'R&D #1': link trang 2 mang keyword=R%26D+%231: có; trang 2 có 2 dòng khớp, ô tìm kiếm giữ 'R&D #1'",
+    "actual": "Từ khoá 'R&D #1': link trang 2 mang keyword=R%26D+%231: có; trang 2 có 10 dòng khớp, ô tìm kiếm giữ 'R&D #1'",
     "note": "PR #166"
   },
   "TC_TKLIST_017": {
     "status": "Đạt",
-    "actual": "Từ khoá 'R&D #1': link trang 2 mang keyword=R%26D+%231: có; trang 2 có 2 dòng khớp, ô tìm kiếm giữ 'R&D #1'; file Excel 12 dòng, đều khớp từ khoá: có",
+    "actual": "Từ khoá 'R&D #1': link trang 2 mang keyword=R%26D+%231: có; trang 2 có 10 dòng khớp, ô tìm kiếm giữ 'R&D #1'; file Excel 24 dòng, đều khớp từ khoá: có",
     "note": "PR #166"
   },
   "TC_CTRLIST_003": {
@@ -2142,6 +2142,71 @@
   "TC_LOGIN_008": {
     "status": "Đạt",
     "actual": "Sai 4 lần sau một lần đúng -> vẫn vào được: /POSCS/dashboard",
+    "note": ""
+  },
+  "TC_CUSEDIT_016": {
+    "status": "Đạt",
+    "actual": "Sửa khách, tick thêm vai NCC khi INSERT enterprise_roles hỏng -> /POSCS/customer?action=view&id=43&error=roles_not_saved; vai còn Khách mua; tên đã lưu: có",
+    "note": ""
+  },
+  "TC_CUSEDIT_017": {
+    "status": "Đạt",
+    "actual": "sales4 mở Sửa NCC (kind=supplier): tiêu đề 'Cập nhật thông tin nhà cung cấp'; loại ['Nhà sản xuất', 'Nhà nhập khẩu', 'Nhà phân phối', 'Đơn vị dịch vụ']; nhóm ['Nhà cung cấp VIP', 'Nhà cung cấp thân thiết', 'Nhà cung cấp tiềm năng', 'Nhà cung cấp thường']; ô tick 'Đồng thời là khách hàng mua (mua của mình)'; mục sáng 'Nhà cung cấp'; nút quay lại 'Quay lại chi tiết nhà cung cấp'",
+    "note": "PR #172"
+  },
+  "TC_CUSEDIT_019": {
+    "status": "Đạt",
+    "actual": "NCC thuần, không kind -> 'Cập nhật thông tin nhà cung cấp'; khách mua thuần, kind=supplier -> 'Cập nhật thông tin khách hàng'",
+    "note": ""
+  },
+  "TC_CUSEDIT_020": {
+    "status": "Đạt",
+    "actual": "Tick 'Đồng thời là nhà cung cấp' rồi lưu -> /POSCS/customer?action=view&id=45; vai Khách mua,Nhà cung cấp; ô Vai ở chi tiết 'Khách hàng mua, Nhà cung cấp'; dòng ở danh sách khách mua / NCC: (1, 1)",
+    "note": ""
+  },
+  "TC_CUSEDIT_018": {
+    "status": "Đạt",
+    "actual": "kind=buyer -> 'Cập nhật thông tin khách hàng', ô tick đã tick, dòng 'Muốn bỏ vai khách hàng? Mở trang sửa nhà cung cấp của công ty này rồi bỏ tick.'; kind=supplier -> 'Cập nhật thông tin nhà cung cấp', ô tick đã tick, dòng 'Muốn bỏ vai nhà cung cấp? Mở trang sửa khách hàng của công ty này rồi bỏ tick.'",
+    "note": "CustomerController.editRoleOf"
+  },
+  "TC_CUSEDIT_023": {
+    "status": "Đạt",
+    "actual": "Trang Sửa NCC của công ty hai vai (loại 'Nhà mạng viễn thông'): ô Loại ['Nhà sản xuất', 'Nhà nhập khẩu', 'Nhà phân phối', 'Đơn vị dịch vụ', 'Nhà mạng viễn thông'], đang chọn ['Nhà mạng viễn thông']; lưu không đổi gì -> /POSCS/customer?action=view&id=45&kind=supplier; loại sau khi lưu 'Nhà mạng viễn thông'",
+    "note": ""
+  },
+  "TC_CUSEDIT_021": {
+    "status": "Đạt",
+    "actual": "Bỏ tick 'Đồng thời là khách hàng mua' rồi lưu -> /POSCS/customer?action=view&id=45&kind=supplier; vai Nhà cung cấp; dòng ở danh sách khách mua / NCC: (0, 1); người phụ trách sales3 -> sales3",
+    "note": ""
+  },
+  "TC_CUSEDIT_022": {
+    "status": "Đạt",
+    "actual": "POST kind=buyer không gửi roles -> /POSCS/customer?action=view&id=46, vai Khách mua; gửi roles=Khách VIP -> /POSCS/customer?action=view&id=46, vai Khách mua",
+    "note": "CustomerController.rolesForUpdate"
+  },
+  "TC_CUSEDIT_024": {
+    "status": "Đạt",
+    "actual": "Sửa NCC, SĐT 00000 -> /POSCS/customer?action=edit&id=44&kind=supplier&error=invalid; trang đích 'Cập nhật thông tin nhà cung cấp', báo 'Thông tin nhà cung cấp chưa hợp lệ. Vui lòng kiểm tra lại các ô bắt buộc.'",
+    "note": ""
+  },
+  "TC_CUSEDIT_025": {
+    "status": "Đạt",
+    "actual": "sales4 mở Sửa KH-0003: ô người phụ trách khoá ở 'Lê Minh Quân', dòng 'Giữ người đang phụ trách' có; gửi accountOwnerId=sales4 -> /POSCS/customer?action=view&id=3; người phụ trách sales3",
+    "note": "PR #173"
+  },
+  "TC_CUSEDIT_026": {
+    "status": "Đạt",
+    "actual": "cskh2 (Sales chưa có tỉnh) sửa khách của sales3: ô người phụ trách khoá ở 'Lê Minh Quân'; đổi sang Hà Nội (sales4 cầm) -> /POSCS/customer?action=view&id=47; xã 1; người phụ trách sales3",
+    "note": ""
+  },
+  "TC_CUSEDIT_027": {
+    "status": "Đạt",
+    "actual": "Admin mở Sửa khách mua: bảng phân công nhúng trong trang có Bắc Ninh -> sales4; đổi sang Bắc Ninh, gửi accountOwnerId=sales3 -> /POSCS/customer?action=view&id=46; người phụ trách sales4. Admin mở Sửa NCC: ô người phụ trách mở, chọn tay",
+    "note": ""
+  },
+  "TC_CUSEDIT_028": {
+    "status": "Đạt",
+    "actual": "Admin mở Sửa NCC thuần ở Hà Nội: dòng báo trước có (ẩn tới khi tick); Sales mở NCC: dòng đó không có; tick 'Đồng thời là khách hàng mua' rồi lưu -> /POSCS/customer?action=view&id=48&kind=supplier; vai Khách mua,Nhà cung cấp; người phụ trách sale01 -> sales4",
     "note": ""
   }
 }

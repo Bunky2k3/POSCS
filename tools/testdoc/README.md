@@ -191,7 +191,7 @@ gieo cấp trên); cấu hình qua `POSCS_TEST_DB` (mặc định `poscs_bbtest`
 |---|---|---|
 | `run_blackbox.py` | Mã HTTP và tham số redirect: đăng nhập, kiểm tra dữ liệu vào, phân quyền 403, endpoint JSON, path traversal; form / thời hạn / tài liệu hợp đồng | ~5 giây |
 | `run_blackbox_ui.py` | Nội dung thật: cột bảng, thông báo trên trang đích, file .xls/.pdf, tải file lên, OTP / mật khẩu tạm đọc từ log, đối chiếu CSDL sau mỗi thao tác ghi | ~15 giây |
-| `run_blackbox_branches.py` | Các ca thêm theo PR #149–#167: phạm vi Sales, trang nhà cung cấp, luật Người hỗ trợ, nhánh ghi CSDL hỏng (trigger), notfound giữ đúng danh sách, từ khoá có `&` `#`, lọc Người xử lý, dải nhắc hồ sơ | ~10 giây |
+| `run_blackbox_branches.py` | Các ca thêm theo PR #149–#173: phạm vi Sales, trang nhà cung cấp, luật Người hỗ trợ, nhánh ghi CSDL hỏng (trigger), notfound giữ đúng danh sách, từ khoá có `&` `#`, lọc Người xử lý, dải nhắc hồ sơ, trang Sửa khách hàng / nhà cung cấp | ~10 giây |
 | `run_blackbox_rest.py` | Các ca biên về ngày, và những ca phải **chờ theo đồng hồ thật** (OTP hết hạn, khoá IP 15 phút) | ~22 phút |
 
 **`run_blackbox.py` GHI ĐÈ** `blackbox_results.json`; ba lượt sau gộp thêm vào.
@@ -324,10 +324,18 @@ mọi chỗ ghi "Đạt" vô điều kiện: ca không kiểm được tự đ�
 
 Trang Sửa tách thành Sửa khách hàng / Sửa nhà cung cấp (PR #172) và Sales không
 đổi được người phụ trách chính ở trang Sửa (PR #173). TC_CUSEDIT_016 đổi bước
-(ô "Đồng thời là ..." thay hai ô tick) nên kết quả cũ đã gỡ; TC_CUSEDIT_017–028
-là ca mới, "Chưa chạy", chưa có trong `run_blackbox*.py`. TC_CUSEDIT_013/014 giữ
-kết quả vì vẫn đúng với luật mới. POST `action=update` giờ kèm `kind` của trang
-(thiếu thì coi là trang khách hàng): vai của trang luôn được giữ.
+(ô "Đồng thời là ..." thay hai ô tick); TC_CUSEDIT_017–028 là ca mới. Cả 13 ca
+đã vào `run_blackbox_branches.py` (hàm `test_customer_edit_pages`) và chạy Đạt
+trên `main` @ ae80733 ngày 02/10/2026. POST `action=update` giờ kèm `kind` của
+trang (thiếu thì coi là trang khách hàng): vai của trang luôn được giữ -- sửa
+nhà cung cấp mà quên `kind=supplier` là server hiểu thành "thêm vai khách mua"
+rồi áp luật tỉnh (TC_CUSEDIT_014 từng trượt oan vì vậy).
+
+TC_CUSEDIT_026 viết cho `cskh1` (CSDL thật); CSDL kiểm thử chỉ gieo `cskh2..4`
+nên script chạy bằng `cskh2`, cùng là Sales chưa có tỉnh. Phần chạy bằng
+JavaScript của TC_CUSEDIT_027/028 (ô người phụ trách tự điền theo tỉnh, dòng
+báo hiện khi tick) script chỉ kiểm được dữ liệu nhúng trong trang; đã bấm thử
+trên trình duyệt một lần khi thêm ca.
 
 ---
 
