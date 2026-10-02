@@ -9,7 +9,9 @@ Gồm những thứ ba lượt trước không đụng tới:
   * các nhánh "ghi xuống CSDL hỏng" (PR #159/#162/#163/#164, PR #154) --
     dựng bằng trigger SIGNAL trên CSDL kiểm thử (testdb.FailingWrite);
   * notfound giữ đúng danh sách (PR #161/#164), từ khoá có & và # (PR #166),
-    ô lọc Người xử lý (PR #167), dải nhắc hồ sơ "Còn thiếu" (PR #165).
+    ô lọc Người xử lý (PR #167), dải nhắc hồ sơ "Còn thiếu" (PR #165);
+  * trang Sửa khách hàng / Sửa nhà cung cấp (PR #172) và Sales giữ người phụ
+    trách chính ở trang Sửa (PR #173) -- TC_CUSEDIT_017..028.
 
 Chạy SAU run_blackbox.py (lượt đó ghi đè file kết quả); lượt này gộp thêm.
 Cần CSDL kiểm thử là POSCS_TEST_DB (mặc định poscs_bbtest) -- xem testdb.py.
@@ -232,7 +234,10 @@ def test_customer_scope(S):
         form = html(s4.get(R.BASE + "/customer?action=edit&id=%s&kind=supplier" % sup4))
         n_prov = len([o for o in form.select("#province option") if o.get("value")])
         row = T.run("SELECT enterprise_name, tax_code, phone, email FROM enterprises WHERE enterprise_id = %s" % sup4)[0]
+        # kind=supplier như form Sửa nhà cung cấp gửi lên (PR #172) -- thiếu thì
+        # server coi là trang khách hàng, ô vai thành "thêm vai khách mua".
         loc = loc_of(multipart(s4, "/customer", customer_form(action="update", customerId=sup4, customerName=row[0],
+                                                              kind="supplier",
                                                               taxCode=row[1], phone=row[2], email=row[3],
                                                               customerType="Nhà sản xuất",
                                                               districtId=WARD_CA_MAU, accountOwnerId=sales2),
@@ -314,6 +319,249 @@ def test_customer_scope(S):
         expect("TC_CUSDEL_007", ("action=view&id=%s" % victim) in loc_of(r) and "error=delete_failed" in loc_of(r)
                and alive == "0" and "Không xoá được khách hàng. Vui lòng thử lại." in follow(admin, loc_of(r)),
                "Xoá khi UPDATE is_deleted hỏng -> %s; khách %s" % (loc_of(r), "vẫn còn" if alive == "0" else "ĐÃ XOÁ"))
+
+
+# --------------------------------------------------------------------------
+# Trang Sửa khách hàng / Sửa nhà cung cấp (PR #172), Sales giữ người phụ trách (PR #173)
+# --------------------------------------------------------------------------
+SUPPLIER_TYPES = ["Nhà sản xuất", "Nhà nhập khẩu", "Nhà phân phối", "Đơn vị dịch vụ"]
+
+
+def edit_form(eid, **over):
+    """Ô của form Sửa điền sẵn đúng như đang lưu -- như mở trang lên rồi bấm Lưu."""
+    row = T.run("SELECT e.enterprise_name, e.customer_type, e.customer_group, e.phone, IFNULL(e.email,''), "
+                "a.districts_id, a.street_and_local_name, e.account_owner_id, IFNULL(e.support_owner_id,'') "
+                "FROM enterprises e JOIN addresses a USING(address_id) WHERE e.enterprise_id = %s" % eid)[0]
+    data = {"action": "update", "customerId": eid, "customerName": row[0], "customerType": row[1],
+            "customerGroup": row[2], "phone": row[3], "email": row[4], "districtId": row[5],
+            "addressDetail": row[6], "accountOwnerId": row[7], "supportOwnerId": row[8]}
+    data.update(over)
+    return data
+
+
+def roles_of(eid):
+    return T.scalar("SELECT GROUP_CONCAT(role ORDER BY role) FROM enterprise_roles WHERE enterprise_id = %s" % eid)
+
+
+def ward_of(eid):
+    return T.scalar("SELECT a.districts_id FROM enterprises e JOIN addresses a USING(address_id) "
+                    "WHERE e.enterprise_id = %s" % eid)
+
+
+def heading(page):
+    h = page.select_one(".page-header-row h2")
+    return h.get_text(strip=True) if h else ""
+
+
+def other_role_box(page):
+    """(ô tick 'Đồng thời là ...' có tick không, chữ của nhãn, dòng chỉ đường + link)."""
+    box = page.find("input", {"id": "otherRole"})
+    label = box.find_parent("label").get_text(" ", strip=True) if box else ""
+    hint = box.find_parent(class_="field-row").find(class_="field-hint") if box else None
+    link = hint.find("a").get("href") if hint and hint.find("a") else ""
+    return (box is not None and box.has_attr("checked"), label,
+            re.sub(r"\s+", " ", hint.get_text(" ", strip=True)) if hint else "", link)
+
+
+def in_lists(session, name):
+    """Số dòng khớp tên ở (danh sách Khách hàng mua, danh sách Nhà cung cấp)."""
+    return tuple(U.body_rows(html(session.get(R.BASE + "/customer", params=dict(p, view="all", keyword=name))))
+                 for p in ({}, {"kind": "supplier"}))
+
+
+def test_customer_edit_pages(S):
+    print("\n[Khách hàng — trang Sửa khách hàng / nhà cung cấp, Sales giữ người phụ trách]")
+    admin = S["admin"]
+    s4, _ = R.login("sales4")
+    sales3, sales4, sale01 = (T.user_id(u) for u in ("sales3", "sales4", "sale01"))
+
+    # Dữ liệu riêng của nhóm ca này, không dựa vào bản ghi các ca khác đã sửa.
+    sup = created(loc_of(multipart(admin, "/customer", customer_form(
+        kind="supplier", customerType="Nhà sản xuất", districtId=WARD_HCM, accountOwnerId=sales4))), "customer")
+    buy = created(loc_of(multipart(admin, "/customer", customer_form(
+        districtId=WARD_LAI_CHAU, accountOwnerId=sales3))), "customer")
+    buy2 = created(loc_of(multipart(admin, "/customer", customer_form(
+        districtId=WARD_LAI_CHAU, accountOwnerId=sales3))), "customer")
+    if not (sup and buy and buy2):
+        for cid in range(17, 29):
+            record("TC_CUSEDIT_%03d" % cid, "N/A", "Không dựng được dữ liệu cho trang Sửa", "")
+        return
+
+    # --- 017: mở Sửa từ danh sách Nhà cung cấp
+    page = html(s4.get(R.BASE + "/customer?action=edit&id=%s&kind=supplier" % sup))
+    labels = [l.get_text(" ", strip=True).rstrip(" *") for l in page.select(".field-row > label")]
+    types = [o.get_text(strip=True) for o in page.select("#customerType option") if o.get("value")]
+    groups = [o.get_text(strip=True) for o in page.select("#customerGroup option") if o.get("value")]
+    _, box_label, _, _ = other_role_box(page)
+    active = page.select_one(".sidebar .sidebar-link.active")
+    active = active.get_text(strip=True) if active else ""
+    back = page.select_one(".back-link-top")
+    back = back.get_text(strip=True) if back else ""
+    expect("TC_CUSEDIT_017",
+           heading(page) == "Cập nhật thông tin nhà cung cấp"
+           and {"Tên nhà cung cấp", "Loại nhà cung cấp", "Nhóm nhà cung cấp"} <= set(labels)
+           and types == SUPPLIER_TYPES
+           and groups == ["Nhà cung cấp VIP", "Nhà cung cấp thân thiết", "Nhà cung cấp tiềm năng", "Nhà cung cấp thường"]
+           and box_label.startswith("Đồng thời là khách hàng mua")
+           and active == "Nhà cung cấp" and back == "Quay lại chi tiết nhà cung cấp",
+           "sales4 mở Sửa NCC (kind=supplier): tiêu đề %r; loại %s; nhóm %s; ô tick %r; mục sáng %r; nút quay lại %r"
+           % (heading(page), types, groups, box_label, active, back), "PR #172")
+
+    # --- 019: không có kind / kind không khớp vai thì suy từ vai
+    h_sup = heading(html(admin.get(R.BASE + "/customer?action=edit&id=%s" % sup)))
+    h_buy = heading(html(admin.get(R.BASE + "/customer?action=edit&id=%s&kind=supplier" % buy)))
+    expect("TC_CUSEDIT_019", h_sup == "Cập nhật thông tin nhà cung cấp" and h_buy == "Cập nhật thông tin khách hàng",
+           "NCC thuần, không kind -> %r; khách mua thuần, kind=supplier -> %r" % (h_sup, h_buy))
+
+    # --- 020: thêm vai nhà cung cấp cho khách mua
+    name = T.scalar("SELECT enterprise_name FROM enterprises WHERE enterprise_id = %s" % buy)
+    loc = loc_of(multipart(admin, "/customer", edit_form(buy, kind="buyer"), [("roles", "Nhà cung cấp")]))
+    detail = html(admin.get(R.BASE + "/customer?action=view&id=%s" % buy))
+    vai = detail.find("label", string="Vai")
+    vai = vai.find_next_sibling(class_="view-value").get_text(" ", strip=True) if vai else ""
+    lists = in_lists(admin, name)
+    expect("TC_CUSEDIT_020", loc.endswith("/customer?action=view&id=%s" % buy)
+           and roles_of(buy) == "Khách mua,Nhà cung cấp" and lists == (1, 1) and vai == "Khách hàng mua, Nhà cung cấp",
+           "Tick 'Đồng thời là nhà cung cấp' rồi lưu -> %s; vai %s; ô Vai ở chi tiết %r; "
+           "dòng ở danh sách khách mua / NCC: %s" % (loc, roles_of(buy), vai, lists))
+
+    # --- 018: công ty hai vai mở ra đúng trang theo danh sách đang đứng
+    p1 = html(admin.get(R.BASE + "/customer?action=edit&id=%s&kind=buyer" % buy))
+    p2 = html(admin.get(R.BASE + "/customer?action=edit&id=%s&kind=supplier" % buy))
+    c1, l1, hint1, link1 = other_role_box(p1)
+    c2, l2, hint2, link2 = other_role_box(p2)
+    expect("TC_CUSEDIT_018",
+           heading(p1) == "Cập nhật thông tin khách hàng" and c1 and l1.startswith("Đồng thời là nhà cung cấp")
+           and hint1.startswith("Muốn bỏ vai khách hàng? Mở trang sửa nhà cung cấp")
+           and link1.endswith("action=edit&id=%s&kind=supplier" % buy)
+           and heading(p2) == "Cập nhật thông tin nhà cung cấp" and c2 and l2.startswith("Đồng thời là khách hàng mua")
+           and hint2.startswith("Muốn bỏ vai nhà cung cấp? Mở trang sửa khách hàng")
+           and link2.endswith("action=edit&id=%s" % buy),
+           "kind=buyer -> %r, ô tick %s, dòng %r; kind=supplier -> %r, ô tick %s, dòng %r"
+           % (heading(p1), "đã tick" if c1 else "CHƯA tick", hint1, heading(p2), "đã tick" if c2 else "CHƯA tick", hint2),
+           "CustomerController.editRoleOf")
+
+    # --- 023: loại đang lưu thuộc vai kia vẫn có trong ô Loại (khách tạo với loại Nhà mạng viễn thông)
+    cur_type = T.scalar("SELECT customer_type FROM enterprises WHERE enterprise_id = %s" % buy)
+    opts = [o for o in p2.select("#customerType option") if o.get("value")]
+    chosen = [o.get_text(strip=True) for o in opts if o.has_attr("selected")]
+    loc = loc_of(multipart(admin, "/customer", edit_form(buy, kind="supplier"), [("roles", "Khách mua")]))
+    after_type = T.scalar("SELECT customer_type FROM enterprises WHERE enterprise_id = %s" % buy)
+    expect("TC_CUSEDIT_023", [o.get_text(strip=True) for o in opts] == SUPPLIER_TYPES + [cur_type]
+           and chosen == [cur_type] and "error" not in loc and after_type == cur_type,
+           "Trang Sửa NCC của công ty hai vai (loại %r): ô Loại %s, đang chọn %s; lưu không đổi gì -> %s; loại sau khi lưu %r"
+           % (cur_type, [o.get_text(strip=True) for o in opts], chosen, loc, after_type))
+
+    # --- 021: bỏ vai khách mua ở trang Sửa nhà cung cấp
+    owner_before = owner_of(buy)
+    loc = loc_of(multipart(admin, "/customer", edit_form(buy, kind="supplier")))
+    lists = in_lists(admin, name)
+    expect("TC_CUSEDIT_021", loc.endswith("/customer?action=view&id=%s&kind=supplier" % buy)
+           and roles_of(buy) == "Nhà cung cấp" and lists == (0, 1) and owner_of(buy) == owner_before
+           and T.scalar("SELECT customer_type FROM enterprises WHERE enterprise_id = %s" % buy) == cur_type,
+           "Bỏ tick 'Đồng thời là khách hàng mua' rồi lưu -> %s; vai %s; dòng ở danh sách khách mua / NCC: %s; "
+           "người phụ trách %s -> %s" % (loc, roles_of(buy), lists, owner_before, owner_of(buy)))
+
+    # --- 022: vai của trang không bỏ được bằng request nặn tay
+    loc1 = loc_of(multipart(admin, "/customer", edit_form(buy2, kind="buyer")))
+    r1 = roles_of(buy2)
+    loc2 = loc_of(multipart(admin, "/customer", edit_form(buy2, kind="buyer"), [("roles", "Khách VIP")]))
+    r2 = roles_of(buy2)
+    expect("TC_CUSEDIT_022", "error" not in loc1 and "error" not in loc2 and r1 == "Khách mua" and r2 == "Khách mua",
+           "POST kind=buyer không gửi roles -> %s, vai %s; gửi roles=Khách VIP -> %s, vai %s" % (loc1, r1, loc2, r2),
+           "CustomerController.rolesForUpdate")
+
+    # --- 024: lỗi ở trang Sửa nhà cung cấp quay về đúng trang đó
+    loc = loc_of(multipart(s4, "/customer", edit_form(sup, kind="supplier", phone="00000")))
+    back = html(s4.get(R.BASE + loc.split("/POSCS", 1)[-1])) if loc else None
+    alert = back.select_one(".card-box .alert-danger") if back is not None else None
+    alert = alert.get_text(" ", strip=True) if alert else ""
+    expect("TC_CUSEDIT_024", loc.endswith("/customer?action=edit&id=%s&kind=supplier&error=invalid" % sup)
+           and heading(back) == "Cập nhật thông tin nhà cung cấp"
+           and alert == "Thông tin nhà cung cấp chưa hợp lệ. Vui lòng kiểm tra lại các ô bắt buộc.",
+           "Sửa NCC, SĐT 00000 -> %s; trang đích %r, báo %r" % (loc, heading(back) if back is not None else "", alert))
+
+    # --- 025: sales4 sửa KH-0003 (Bắc Ninh -- tỉnh sales4 cầm -- nhưng sales3 đứng tên)
+    LOCK_HINT = "Giữ người đang phụ trách. Muốn chuyển khách hàng cho người khác thì nhờ Admin."
+
+    def locked_owner(page):
+        sel = page.find("select", {"id": "assignee"})
+        hidden = page.find("input", {"type": "hidden", "name": "accountOwnerId"})
+        opt = sel.find("option", selected=True) if sel else None
+        return (sel is not None and sel.has_attr("disabled") and not sel.has_attr("name"),
+                opt.get_text(strip=True) if opt else "", hidden.get("value") if hidden else None,
+                LOCK_HINT in page_text(page))
+
+    def full_name(uid):
+        return T.scalar("SELECT CONCAT_WS(' ', last_name, middle_name, first_name) FROM users WHERE user_id = %s" % uid)
+
+    kh3 = T.enterprise_id("KH-0003")
+    disabled, shown, hidden, hint = locked_owner(html(s4.get(R.BASE + "/customer?action=edit&id=%s" % kh3)))
+    loc = loc_of(multipart(s4, "/customer", edit_form(kh3, kind="buyer", accountOwnerId=sales4)))
+    expect("TC_CUSEDIT_025", disabled and shown == full_name(sales3) and hidden == sales3 and hint
+           and "error" not in loc and owner_of(kh3) == "sales3",
+           "sales4 mở Sửa KH-0003: ô người phụ trách %s ở %r, dòng 'Giữ người đang phụ trách' %s; "
+           "gửi accountOwnerId=sales4 -> %s; người phụ trách %s"
+           % ("khoá" if disabled else "MỞ", shown, "có" if hint else "KHÔNG", loc, owner_of(kh3)), "PR #173")
+
+    # --- 026: Sales chưa có tỉnh (cskh2) sửa hộ khách của sales3, đổi sang tỉnh sales4 cầm.
+    # Ca viết cho cskh1 (CSDL thật); CSDL kiểm thử gieo cskh2..4, cùng là Sales chưa có tỉnh.
+    c2, _ = R.login("cskh2")
+    lc = created(loc_of(multipart(admin, "/customer", customer_form(
+        districtId=WARD_LAI_CHAU, accountOwnerId=sales3))), "customer")
+    if lc:
+        disabled, shown, hidden, hint = locked_owner(html(c2.get(R.BASE + "/customer?action=edit&id=%s" % lc)))
+        loc = loc_of(multipart(c2, "/customer", edit_form(lc, kind="buyer", districtId=WARD_HA_NOI)))
+        expect("TC_CUSEDIT_026", disabled and shown == full_name(sales3) and hint and "error" not in loc
+               and ward_of(lc) == WARD_HA_NOI and owner_of(lc) == "sales3",
+               "cskh2 (Sales chưa có tỉnh) sửa khách của sales3: ô người phụ trách %s ở %r; đổi sang Hà Nội "
+               "(sales4 cầm) -> %s; xã %s; người phụ trách %s"
+               % ("khoá" if disabled else "MỞ", shown, loc, ward_of(lc), owner_of(lc)))
+    else:
+        record("TC_CUSEDIT_026", "N/A", "Không dựng được khách của sales3", "")
+
+    # --- 027: Admin sửa khách mua -> người phụ trách theo địa bàn; sửa NCC thì ô mở.
+    # Ô tự điền + khoá chạy bằng JavaScript từ bảng phân công nhúng trong trang:
+    # kiểm bảng đó có Bắc Ninh -> sales4, còn kết quả thật là người phụ trách sau khi lưu.
+    bac_ninh = T.scalar("SELECT province_id FROM provinces WHERE province_name = 'Tỉnh Bắc Ninh'")
+    ward_bn = T.scalar("SELECT districts_id FROM districts WHERE province_id = %s ORDER BY districts_id LIMIT 1" % bac_ninh)
+    raw = str(html(admin.get(R.BASE + "/customer?action=edit&id=%s" % buy2)))
+    mapped = re.search(r"var phanCongDiaBan = \{(.*?)\};", raw, re.S)
+    mapped = dict(re.findall(r"'(\d+)':\s*(\d+)", mapped.group(1))) if mapped else {}
+    loc = loc_of(multipart(admin, "/customer", edit_form(buy2, kind="buyer", districtId=ward_bn, accountOwnerId=sales3)))
+    sup_page = html(admin.get(R.BASE + "/customer?action=edit&id=%s&kind=supplier" % sup))
+    sup_sel = sup_page.find("select", {"id": "assignee"})
+    sup_raw = str(sup_page)
+    sup_open = (sup_sel is not None and sup_sel.get("name") == "accountOwnerId" and not sup_sel.has_attr("disabled")
+                and "var suyTheoDiaBan = false;" in sup_raw)
+    expect("TC_CUSEDIT_027", mapped.get(bac_ninh) == sales4 and "var suyTheoDiaBan = true;" in raw
+           and "Theo phân công địa bàn." in raw and "error" not in loc and owner_of(buy2) == "sales4" and sup_open,
+           "Admin mở Sửa khách mua: bảng phân công nhúng trong trang %s Bắc Ninh -> sales4; đổi sang Bắc Ninh, gửi "
+           "accountOwnerId=sales3 -> %s; người phụ trách %s. Admin mở Sửa NCC: ô người phụ trách %s"
+           % ("có" if mapped.get(bac_ninh) == sales4 else "KHÔNG có", loc, owner_of(buy2),
+              "mở, chọn tay" if sup_open else "KHOÁ"))
+
+    # --- 028: Admin thêm vai khách mua cho NCC thuần ở tỉnh đã có người cầm (Hà Nội -- sales4)
+    sup_hn = created(loc_of(multipart(admin, "/customer", customer_form(
+        kind="supplier", customerType="Nhà phân phối", districtId=WARD_HA_NOI, accountOwnerId=sale01))), "customer")
+    if sup_hn:
+        page = html(admin.get(R.BASE + "/customer?action=edit&id=%s&kind=supplier" % sup_hn))
+        warn = page.find(id="goiYThemVaiKhachMua")
+        warn_txt = re.sub(r"\s+", " ", warn.get_text(" ", strip=True)) if warn else ""
+        # Sales thì không có dòng này: sales4 mở NCC của chính mình.
+        sales_has = html(s4.get(R.BASE + "/customer?action=edit&id=%s&kind=supplier" % sup)).find(id="goiYThemVaiKhachMua")
+        loc = loc_of(multipart(admin, "/customer", edit_form(sup_hn, kind="supplier"), [("roles", "Khách mua")]))
+        expect("TC_CUSEDIT_028",
+               warn_txt == "Khách hàng mua chia theo địa bàn: khi lưu, người phụ trách chính đổi theo người cầm tỉnh "
+                           "(nếu tỉnh đã có người)." and "display:none" in (warn.get("style") or "").replace(" ", "")
+               and sales_has is None and "error" not in loc
+               and roles_of(sup_hn) == "Khách mua,Nhà cung cấp" and owner_of(sup_hn) == "sales4",
+               "Admin mở Sửa NCC thuần ở Hà Nội: dòng báo trước %s (ẩn tới khi tick); Sales mở NCC: dòng đó %s; "
+               "tick 'Đồng thời là khách hàng mua' rồi lưu -> %s; vai %s; người phụ trách sale01 -> %s"
+               % ("có" if warn else "KHÔNG có", "CÓ" if sales_has is not None else "không có", loc,
+                  roles_of(sup_hn), owner_of(sup_hn)))
+    else:
+        record("TC_CUSEDIT_028", "N/A", "Không dựng được nhà cung cấp ở Hà Nội", "")
 
 
 # --------------------------------------------------------------------------
@@ -697,6 +945,7 @@ def main():
         S[role], _ = R.login(role)
 
     test_customer_scope(S)
+    test_customer_edit_pages(S)
     test_contract_branches(S)
     test_ticket_assignee(S)
     test_product_files(S)
