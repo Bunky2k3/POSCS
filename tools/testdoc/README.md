@@ -58,6 +58,10 @@ test('<hàm>: <điều kiện> → <kỳ vọng>', ...)
 và script cảnh báo ở cuối - kỳ vọng để trống cho người viết tự điền, chứ không
 đoán bừa một câu vào tài liệu nộp.
 
+`test/js/jsp-onclick.test.js` không kiểm hàm nào của `appshell.js` (nó dò mọi JSP
+tìm mẫu XSS trong thuộc tính sự kiện), nên script bỏ qua nó (`JS_NOT_UNIT`)
+thay vì xếp vào một sheet `appshell_<hàm>` sai nguồn.
+
 Bộ xuất junit của Node escape hai lần (`"` ra thành `&amp;quot;`), script tự gỡ
 trước khi đối chiếu tên - không gỡ thì mọi tiêu đề có dấu nháy kép đều bị ghi
 nhầm là "Chưa chạy".
