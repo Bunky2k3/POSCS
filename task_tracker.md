@@ -20,7 +20,7 @@
 
 ## Giai đoạn 2: Tái cấu trúc Module Khách hàng (Customer & Partner Module)
 
-- [ ] **Task 2.1:** Xây dựng `CustomerValidator` (kiểm tra định dạng SĐT VN, email, mã KH-xxxx/NCC-xxxx theo BR-09..11, BR-52) và viết Unit Test cho validator.
+- [x] **Task 2.1:** Xây dựng `CustomerValidator` (kiểm tra định dạng SĐT VN, email, mã KH-xxxx/NCC-xxxx theo BR-09..11, BR-52) và viết Unit Test cho validator.
 - [ ] **Task 2.2:** Xây dựng `CustomerService` và `CustomerEvaluationService`, chuyển toàn bộ logic nghiệp vụ đánh giá vòng đời, lọc địa bàn và xuất Excel từ Controller về Service.
 - [ ] **Task 2.3:** Tách nhỏ `CustomerDAO` thành `CustomerDAO` (nghiệp vụ chính) và `CustomerLifecycleDAO` (đánh giá & sự kiện vòng đời).
 - [ ] **Task 2.4:** Refactor `CustomerController` thành các Controller chuyên biệt: `CustomerListController`, `CustomerDetailController`, `CustomerActionController` (Thêm/Sửa/Xóa), `CustomerExportController`.

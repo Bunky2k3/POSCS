@@ -48,6 +48,16 @@ public final class ServiceResult<T> {
         return new ServiceResult<>(false, null, message, fieldErrors);
     }
 
+    public static <T> ServiceResult<T> fail(poscs.validator.ValidationResult vr) {
+        if (vr == null) {
+            return fail((String) null, null);
+        }
+        String globalMsg = vr.getGlobalError();
+        Map<String, String> fields = new LinkedHashMap<>(vr.getErrors());
+        fields.remove(poscs.validator.ValidationResult.GLOBAL_KEY);
+        return fail(globalMsg, fields.isEmpty() ? null : fields);
+    }
+
     public boolean isSuccess() {
         return success;
     }

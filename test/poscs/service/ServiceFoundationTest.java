@@ -105,4 +105,20 @@ public class ServiceFoundationTest {
         assertEquals("done", good.getData());
         assertEquals("ok", good.getMessage());
     }
+
+    @Test
+    public void failFromValidationResultExtractsGlobalAndFieldErrors() {
+        ValidationResult vr = new ValidationResult();
+        vr.addGlobalError("global_issue");
+        vr.addError("username", "required");
+        vr.addError("password", "weak");
+
+        ServiceResult<Void> sr = ServiceResult.fail(vr);
+        assertFalse(sr.isSuccess());
+        assertEquals("global_issue", sr.getMessage());
+        assertEquals(2, sr.getFieldErrors().size());
+        assertEquals("required", sr.getFieldErrors().get("username"));
+        assertEquals("weak", sr.getFieldErrors().get("password"));
+        assertFalse(sr.getFieldErrors().containsKey(ValidationResult.GLOBAL_KEY));
+    }
 }

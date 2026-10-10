@@ -32,7 +32,7 @@ public abstract class BaseService {
 
     /** Chuyển kết quả validate thất bại thành ServiceResult thất bại. */
     protected <T> ServiceResult<T> failure(ValidationResult validation) {
-        return ServiceResult.fail(validation.getErrors());
+        return ServiceResult.fail(validation);
     }
 
     /** Ghi log lỗi và trả về kết quả thất bại với thông điệp thân thiện. */
