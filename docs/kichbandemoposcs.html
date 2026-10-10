@@ -1,0 +1,964 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root { color-scheme: light dark; }
+  html, body { margin: 0; padding: 0; }
+  img { max-width: 100%; }
+  [hidden] { display: none !important; }
+</style>
+<title>Kịch bản demo POSCS</title>
+
+<style>
+:root {
+  --ground: #EEF1F0;
+  --surface: #FFFFFF;
+  --surface-2: #F6F8F7;
+  --ink: #16232B;
+  --ink-2: #3C4F58;
+  --muted: #6B7F87;
+  --line: #D6DDDB;
+  --line-soft: #E4E9E7;
+  --accent: #1C5F7A;
+  --accent-soft: #E2EDF1;
+  --ok: #2A6B4F;
+  --ok-soft: #E3F0E9;
+  --warn: #A85B1E;
+  --warn-soft: #F7EADF;
+  --admin: #5B3E8C;
+  --sales: #1C5F7A;
+  --tech: #2A6B4F;
+  --cs: #A85B1E;
+
+  --f-display: Cambria, Constantia, "Palatino Linotype", Georgia, serif;
+  --f-body: "Segoe UI", "Segoe UI Variable Text", system-ui, "Helvetica Neue", Arial, sans-serif;
+  --f-mono: "Cascadia Mono", Consolas, "Courier New", monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ground: #0F1619;
+    --surface: #161F23;
+    --surface-2: #1C262B;
+    --ink: #E7EDEB;
+    --ink-2: #B9C6C9;
+    --muted: #8A9BA1;
+    --line: #2C393E;
+    --line-soft: #242F34;
+    --accent: #6FB6D1;
+    --accent-soft: #17313C;
+    --ok: #6FC298;
+    --ok-soft: #172E24;
+    --warn: #E0975B;
+    --warn-soft: #332314;
+    --admin: #B294DC;
+    --sales: #6FB6D1;
+    --tech: #6FC298;
+    --cs: #E0975B;
+  }
+}
+
+:root[data-theme="dark"] {
+  --ground: #0F1619;
+  --surface: #161F23;
+  --surface-2: #1C262B;
+  --ink: #E7EDEB;
+  --ink-2: #B9C6C9;
+  --muted: #8A9BA1;
+  --line: #2C393E;
+  --line-soft: #242F34;
+  --accent: #6FB6D1;
+  --accent-soft: #17313C;
+  --ok: #6FC298;
+  --ok-soft: #172E24;
+  --warn: #E0975B;
+  --warn-soft: #332314;
+  --admin: #B294DC;
+  --sales: #6FB6D1;
+  --tech: #6FC298;
+  --cs: #E0975B;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--f-body);
+  font-size: 15px;
+  line-height: 1.62;
+  -webkit-font-smoothing: antialiased;
+}
+
+.wrap {
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 40px 24px 96px;
+  display: flex;
+  flex-direction: column;
+  gap: 44px;
+}
+
+/* ---------- Header ---------- */
+
+.masthead {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  border-bottom: 2px solid var(--ink);
+  padding-bottom: 22px;
+}
+
+.eyebrow {
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+h1 {
+  font-family: var(--f-display);
+  font-weight: 700;
+  font-size: clamp(34px, 5.4vw, 50px);
+  line-height: 1.08;
+  letter-spacing: -0.015em;
+  margin: 0;
+  text-wrap: balance;
+}
+
+.standfirst {
+  font-size: 16.5px;
+  color: var(--ink-2);
+  max-width: 62ch;
+  margin: 0;
+}
+
+.meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 28px;
+  font-family: var(--f-mono);
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.meta-row b {
+  color: var(--ink);
+  font-weight: 500;
+}
+
+/* ---------- Sections ---------- */
+
+section { display: flex; flex-direction: column; gap: 18px; }
+
+.sec-head { display: flex; flex-direction: column; gap: 6px; }
+
+.sec-head .kicker {
+  font-family: var(--f-mono);
+  font-size: 11.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+h2 {
+  font-family: var(--f-display);
+  font-weight: 600;
+  font-size: 26px;
+  line-height: 1.2;
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+.sec-head p { margin: 4px 0 0; color: var(--ink-2); max-width: 66ch; }
+
+/* ---------- Prep checklist ---------- */
+
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 22px 24px;
+}
+
+.panel-title {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 0 0 14px;
+}
+
+.check-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+
+.check-list li { border-bottom: 1px solid var(--line-soft); }
+.check-list li:last-child { border-bottom: none; }
+
+.check-list label {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 12px;
+  align-items: start;
+  padding: 9px 2px;
+  cursor: pointer;
+}
+
+.check-list input[type="checkbox"] {
+  margin: 5px 0 0;
+  width: 15px;
+  height: 15px;
+  accent-color: var(--accent);
+  flex: none;
+}
+
+.check-list input:checked + span { color: var(--muted); text-decoration: line-through; text-decoration-thickness: 1px; }
+
+.check-list span small { display: block; color: var(--muted); font-size: 13px; text-decoration: none; }
+
+/* ---------- Tables ---------- */
+
+.table-scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: 4px; background: var(--surface); }
+
+table { border-collapse: collapse; width: 100%; font-size: 14px; min-width: 560px; }
+
+th {
+  text-align: left;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 11px 16px;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+
+td { padding: 11px 16px; border-bottom: 1px solid var(--line-soft); vertical-align: top; }
+tr:last-child td { border-bottom: none; }
+
+td.mono, th.mono { font-family: var(--f-mono); font-size: 13px; }
+
+/* ---------- Role chips ---------- */
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--f-mono);
+  font-size: 11.5px;
+  font-weight: 500;
+  padding: 3px 9px;
+  border-radius: 2px;
+  border: 1px solid currentColor;
+  white-space: nowrap;
+}
+
+.chip .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+.role-admin { color: var(--admin); }
+.role-sales { color: var(--sales); }
+.role-tech  { color: var(--tech); }
+.role-cs    { color: var(--cs); }
+
+.tag-cut {
+  display: inline-block;
+  font-family: var(--f-mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--warn);
+  background: var(--warn-soft);
+  padding: 2px 8px;
+  border-radius: 2px;
+}
+
+/* ---------- Run sheet ---------- */
+
+.runsheet { display: flex; flex-direction: column; gap: 0; }
+
+.cue {
+  display: grid;
+  grid-template-columns: 108px 1fr;
+  gap: 0 26px;
+  padding: 26px 0;
+  border-top: 1px solid var(--line);
+}
+
+.cue:last-child { border-bottom: 1px solid var(--line); }
+
+.cue-rail { display: flex; flex-direction: column; gap: 9px; align-items: flex-start; }
+
+.cue-num {
+  font-family: var(--f-mono);
+  font-size: 12px;
+  color: var(--muted);
+  letter-spacing: 0.08em;
+}
+
+.cue-time {
+  font-family: var(--f-display);
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.cue-time em { font-style: normal; font-size: 13px; font-weight: 600; color: var(--muted); margin-left: 3px; }
+
+.cue-body { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+
+.cue-body h3 {
+  font-family: var(--f-display);
+  font-size: 21px;
+  font-weight: 600;
+  margin: 0;
+  line-height: 1.25;
+  text-wrap: balance;
+}
+
+.goal { margin: 0; color: var(--ink-2); max-width: 64ch; }
+
+.steps { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; }
+.steps li { padding-left: 3px; }
+.steps li::marker { color: var(--muted); font-family: var(--f-mono); font-size: 12.5px; }
+
+code {
+  font-family: var(--f-mono);
+  font-size: 12.8px;
+  background: var(--surface-2);
+  border: 1px solid var(--line-soft);
+  border-radius: 2px;
+  padding: 1px 5px;
+  word-break: break-word;
+}
+
+.note {
+  border-left: 3px solid var(--ok);
+  background: var(--ok-soft);
+  padding: 11px 16px;
+  border-radius: 0 3px 3px 0;
+  font-size: 14px;
+}
+
+.note.trap { border-left-color: var(--warn); background: var(--warn-soft); }
+.note.say  { border-left-color: var(--accent); background: var(--accent-soft); font-family: var(--f-display); font-size: 16px; font-style: italic; }
+
+.note b {
+  display: block;
+  font-family: var(--f-body);
+  font-style: normal;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  margin-bottom: 3px;
+  opacity: 0.75;
+}
+
+.note p { margin: 0; }
+
+/* ---------- Arc strip ---------- */
+
+.arc {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 8px;
+  font-size: 13.5px;
+}
+
+.arc-step {
+  flex: 1 1 150px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-top: 3px solid var(--accent);
+  border-radius: 0 0 3px 3px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.arc-step .who {
+  font-family: var(--f-mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.arc-step .what { font-weight: 500; }
+
+/* ---------- Q&A ---------- */
+
+.qa { display: flex; flex-direction: column; gap: 0; }
+
+.qa-item { border-top: 1px solid var(--line); padding: 18px 0; display: flex; flex-direction: column; gap: 7px; }
+.qa-item:last-child { border-bottom: 1px solid var(--line); }
+
+.qa-q { font-family: var(--f-display); font-size: 18px; font-weight: 600; margin: 0; }
+.qa-a { margin: 0; color: var(--ink-2); max-width: 68ch; }
+
+/* ---------- Out of scope ---------- */
+
+.scope-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+
+.scope-list li {
+  display: grid;
+  grid-template-columns: 18px 1fr;
+  gap: 12px;
+  align-items: start;
+}
+
+.scope-list .mark { color: var(--warn); font-family: var(--f-mono); font-weight: 500; }
+
+footer {
+  border-top: 1px solid var(--line);
+  padding-top: 18px;
+  font-size: 13px;
+  color: var(--muted);
+  max-width: 70ch;
+}
+
+a { color: var(--accent); text-underline-offset: 2px; }
+
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
+}
+
+@media (max-width: 640px) {
+  .cue { grid-template-columns: 1fr; gap: 14px; }
+  .cue-rail { flex-direction: row; align-items: center; gap: 14px; }
+  .cue-time { font-size: 22px; }
+}
+
+/* ---------- In ra giấy / xuất PDF ---------- */
+
+@media print {
+  :root {
+    --ground: #FFFFFF;
+    --surface: #FFFFFF;
+    --surface-2: #F4F6F5;
+    --line: #C3CCC9;
+    --line-soft: #DFE5E3;
+  }
+  html, body { background: #FFFFFF; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+  body { font-size: 10.5pt; line-height: 1.5; }
+  .wrap { max-width: none; padding: 0; gap: 26px; }
+  h1 { font-size: 30pt; }
+  h2 { font-size: 17pt; break-after: avoid; }
+  .cue-body h3 { font-size: 14pt; }
+  .cue-time { font-size: 20pt; }
+  .cue, .qa-item, .panel, .note, table, .arc-step, footer { break-inside: avoid; }
+  .sec-head { break-after: avoid; }
+  section { break-inside: auto; }
+  .table-scroll { overflow: visible; border-radius: 0; }
+  table { min-width: 0; font-size: 9.5pt; }
+  .check-list input[type="checkbox"] { -webkit-appearance: none; appearance: none; border: 1px solid var(--ink); border-radius: 2px; }
+  a { color: inherit; text-decoration: none; }
+  .masthead { border-bottom-width: 1.5pt; }
+}
+
+@page { margin: 16mm 14mm; }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <header class="masthead">
+    <div class="eyebrow">Buổi review với khách hàng · POSTEF Chi nhánh Miền Bắc</div>
+    <h1>Kịch bản demo POSCS</h1>
+    <p class="standfirst">Một mạch kể duy nhất — khách hàng mới ký hợp đồng, thiết bị gặp sự cố, đội kỹ thuật xử lý, rồi quan hệ khách hàng được đánh giá lại — chạy qua đủ 4 vai trong hệ thống.</p>
+    <div class="meta-row">
+      <span>Thời lượng <b>40–45 phút</b></span>
+      <span>Số phân cảnh <b>13</b></span>
+      <span>Vai đăng nhập <b>4</b></span>
+      <span>Có thể cắt còn <b>~25 phút</b></span>
+    </div>
+  </header>
+
+  <section>
+    <div class="sec-head">
+      <div class="kicker">Mạch kể</div>
+      <h2>Câu chuyện xuyên suốt buổi demo</h2>
+      <p>Không demo theo menu. Mỗi màn hình xuất hiện vì câu chuyện cần đến nó — khách hàng sẽ thấy quy trình của chính họ, không phải một danh sách tính năng.</p>
+    </div>
+    <div class="arc">
+      <div class="arc-step"><span class="who">Sales</span><span class="what">Tiếp nhận khách hàng mới</span></div>
+      <div class="arc-step"><span class="who">Sales</span><span class="what">Ký hợp đồng cung cấp thiết bị</span></div>
+      <div class="arc-step"><span class="who">CSKH</span><span class="what">Nhận báo hỏng, mở phiếu</span></div>
+      <div class="arc-step"><span class="who">Kỹ thuật</span><span class="what">Xử lý phiếu được giao</span></div>
+      <div class="arc-step"><span class="who">Sales</span><span class="what">Đánh giá lại quan hệ</span></div>
+      <div class="arc-step"><span class="who">Admin</span><span class="what">Quản trị &amp; bảo mật</span></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <div class="kicker">Trước giờ G</div>
+      <h2>Chuẩn bị</h2>
+      <p>Làm xong toàn bộ danh sách này <b>ít nhất 15 phút trước</b> khi khách vào phòng. Trình duyệt để sẵn 4 tab, mỗi tab đăng nhập một vai — chuyển vai bằng cách đổi tab, không đăng xuất giữa buổi.</p>
+    </div>
+
+    <div class="panel">
+      <p class="panel-title">Danh sách kiểm tra</p>
+      <ul class="check-list" id="prep">
+        <li><label><input type="checkbox"><span>MySQL đang chạy, biến môi trường <code>DB_URL</code> / <code>DB_USER</code> / <code>DB_PASSWORD</code> trỏ đúng CSDL demo<small>Không trỏ vào CSDL đang có dữ liệu thật — chạy lại <code>db/schema.sql</code> sẽ xoá sạch mọi bảng.</small></span></label></li>
+        <li><label><input type="checkbox"><span>Tomcat khởi động <b>trước ít nhất 5 phút</b><small>Bộ nhắc hạn tự động (<code>NotificationScheduler</code>) chỉ chạy lần đầu sau khi server lên 1 phút, rồi lặp mỗi 60 phút. Chưa chạy thì chuông thông báo trống trơn ở phân cảnh 11.</small></span></label></li>
+        <li><label><input type="checkbox"><span>Có ít nhất 1 hợp đồng sắp hết hạn trong 30 ngày tới<small>Nếu không, bảng “Hợp đồng sắp hết hạn” trên dashboard sẽ rỗng. Kiểm tra bằng câu SQL bên dưới, thiếu thì sửa <code>end_date</code> của một hợp đồng thành ~20 ngày nữa.</small></span></label></li>
+        <li><label><input type="checkbox"><span>Có ít nhất 1 phiếu hỗ trợ chưa đóng, <code>sla_deadline</code> trong vòng 24 giờ tới<small>Đây là điều kiện để ô “Sắp/đã trễ hạn” trên dashboard khác 0 và để thông báo SLA được sinh ra.</small></span></label></li>
+        <li><label><input type="checkbox"><span>Chuẩn bị sẵn file để tải lên: 1 ảnh sản phẩm, 1 file catalogue PDF, 1 file mẫu hợp đồng PDF đã điền<small>Tải file mẫu tại <code>/contract?action=downloadImportTemplate</code>, điền trước bằng Adobe Acrobat Reader và lưu lại — đừng điền trực tiếp trên trình duyệt.</small></span></label></li>
+        <li><label><input type="checkbox"><span>Mở sẵn cửa sổ log Tomcat ở màn hình thứ hai<small>Chưa cấu hình SMTP thì email chạy ở chế độ DEV: mã OTP và mật khẩu tạm chỉ in ra console, không có thư thật.</small></span></label></li>
+        <li><label><input type="checkbox"><span>Đăng nhập sẵn 4 tab: Admin · Sales · Kỹ thuật · CSKH<small>Đặt tên tab hoặc dùng 4 cửa sổ riêng để không nhầm vai giữa buổi.</small></span></label></li>
+        <li><label><input type="checkbox"><span>Thu phóng trình duyệt 110–125%, tắt thông báo hệ thống và tiện ích mở rộng<small>Bảng dữ liệu nhiều cột — ở 100% khách ngồi xa sẽ không đọc được mã hợp đồng.</small></span></label></li>
+      </ul>
+    </div>
+
+    <div class="panel">
+      <p class="panel-title">Câu SQL kiểm tra dữ liệu trước buổi demo</p>
+      <div class="table-scroll" style="border:none">
+<pre style="margin:0;font-family:var(--f-mono);font-size:12.5px;line-height:1.7;overflow-x:auto"><code style="background:none;border:none;padding:0">-- Hợp đồng sẽ hiện ở mục "Sắp hết hạn" (ngưỡng 30 ngày)
+SELECT contract_code, end_date, DATEDIFF(end_date, CURDATE()) AS con_lai
+FROM contracts
+WHERE is_deleted = 0
+  AND CURDATE() BETWEEN effective_date AND end_date
+  AND DATEDIFF(end_date, CURDATE()) &lt;= 30
+ORDER BY end_date;
+
+-- Phiếu hỗ trợ sắp/đã trễ SLA (ngưỡng 24 giờ)
+SELECT ticket_code, status, sla_deadline
+FROM technicalrequests
+WHERE is_deleted = 0
+  AND status &lt;&gt; 'Đã đóng'
+  AND sla_deadline IS NOT NULL
+  AND sla_deadline &lt;= DATE_ADD(NOW(), INTERVAL 24 HOUR);</code></pre>
+      </div>
+    </div>
+
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Vai</th>
+            <th class="mono">Tài khoản</th>
+            <th class="mono">Mật khẩu</th>
+            <th>Nhìn thấy gì</th>
+            <th>Dùng ở phân cảnh</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="chip role-admin"><span class="dot"></span>Admin</span></td>
+            <td class="mono">admin</td>
+            <td class="mono">Admin@123</td>
+            <td>Toàn quyền, kể cả quản lý nhân viên</td>
+            <td class="mono">1, 2, 13</td>
+          </tr>
+          <tr>
+            <td><span class="chip role-sales"><span class="dot"></span>Sales</span></td>
+            <td class="mono">sales1</td>
+            <td class="mono">Poscs@123</td>
+            <td>Toàn quyền khách hàng &amp; hợp đồng; sản phẩm và phiếu hỗ trợ chỉ xem</td>
+            <td class="mono">3–7, 12</td>
+          </tr>
+          <tr>
+            <td><span class="chip role-tech"><span class="dot"></span>Kỹ thuật</span></td>
+            <td class="mono">kythuat1</td>
+            <td class="mono">Poscs@123</td>
+            <td>Toàn quyền sản phẩm; phiếu được giao chỉ sửa được trạng thái &amp; kết quả xử lý</td>
+            <td class="mono">8, 10, 11</td>
+          </tr>
+          <tr>
+            <td><span class="chip role-cs"><span class="dot"></span>CSKH</span></td>
+            <td class="mono">cskh1</td>
+            <td class="mono">Poscs@123</td>
+            <td>Toàn quyền phiếu hỗ trợ; khách hàng &amp; hợp đồng chỉ xem</td>
+            <td class="mono">9</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="note trap"><b>Về bộ tài khoản</b><p>Đây là tài khoản dev trên máy chạy demo, không phải tài khoản thật của khách hàng. Ba vai Sales, Kỹ thuật và CSKH dùng chung mật khẩu <code>Poscs@123</code>; riêng <code>admin</code> có mật khẩu riêng. Ngoài bốn tài khoản chạy kịch bản, cơ sở dữ liệu còn <code>sales2</code>–<code>sales5</code>, <code>kythuat2</code>–<code>kythuat5</code>, <code>cskh2</code>–<code>cskh4</code> (cùng mật khẩu <code>Poscs@123</code>) để danh sách nhân viên đủ hai trang và ô “người phụ trách” có nhiều lựa chọn thật. Riêng <code>sales6</code> để sẵn trạng thái Inactive.</p></div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <div class="kicker">Kịch bản</div>
+      <h2>13 phân cảnh</h2>
+      <p>Cột trái là thời lượng dự kiến và vai cần đăng nhập. Những phân cảnh gắn nhãn <span class="tag-cut">có thể cắt</span> là phần bỏ được đầu tiên nếu buổi họp bị rút ngắn.</p>
+    </div>
+
+    <div class="runsheet">
+
+      <article class="cue">
+        <div class="cue-rail">
+          <span class="cue-num">01</span>
+          <span class="cue-time">2<em>phút</em></span>
+          <span class="chip role-admin"><span class="dot"></span>Admin</span>
+        </div>
+        <div class="cue-body">
+          <h3>Đăng nhập và bức tranh phân quyền</h3>
+          <p class="goal">Mở đầu bằng câu hỏi “ai được làm gì” — đây là thứ khách hàng doanh nghiệp quan tâm trước cả tính năng.</p>
+          <ol class="steps">
+            <li>Mở <code>/login</code>, đăng nhập bằng tài khoản <code>admin</code>.</li>
+            <li>Chỉ vào thanh điều hướng bên trái: Khách hàng · Hợp đồng · Sản phẩm · Phiếu hỗ trợ · Nhân viên.</li>
+            <li>Nói trước rằng menu này sẽ <b>khác đi</b> ở từng vai, và lát nữa sẽ chứng minh bằng chính hệ thống chứ không chỉ bằng lời.</li>
+          </ol>
+          <div class="note say"><b>Câu mở</b><p>“Bốn vai trong hệ thống ứng đúng bốn bộ phận của mình: kinh doanh, kỹ thuật, chăm sóc khách hàng và quản trị. Cả buổi hôm nay em sẽ đi theo đúng một hợp đồng, qua tay cả bốn bộ phận đó.”</p></div>
+        </div>
+      </article>
+
+      <article class="cue">
+        <div class="cue-rail">
+          <span class="cue-num">02</span>
+          <span class="cue-time">3<em>phút</em></span>
+          <span class="chip role-admin"><span class="dot"></span>Admin</span>
+        </div>
+        <div class="cue-body">
+          <h3>Dashboard — việc gì cần làm hôm nay</h3>
+          <p class="goal">Cho thấy hệ thống không chỉ lưu trữ mà còn chủ động đẩy việc cần xử lý lên trước mắt người dùng.</p>
+          <ol class="steps">
+            <li>Vào <code>/dashboard</code>. Đọc lướt hàng chỉ số: tổng khách hàng, khách mới trong tháng, hợp đồng theo trạng thái, doanh thu tháng và mức tăng/giảm so với tháng trước.</li>
+            <li>Dừng lại ở ô <b>phiếu sắp/đã trễ hạn</b> — giải thích đây là số phiếu chưa đóng mà hạn SLA còn dưới 24 giờ.</li>
+            <li>Kéo xuống bảng <b>Hợp đồng sắp hết hạn</b>: 5 hợp đồng gần hạn nhất kèm số ngày còn lại. Nhấn mạnh trạng thái hợp đồng được <b>tính lại theo ngày hiện tại</b>, không phải gõ tay.</li>
+            <li>Bảng <b>Phiếu cần xử lý</b> bên dưới xếp theo mức ưu tiên Khẩn cấp → Cao → Bình thường → Thấp.</li>
+          </ol>
+          <div class="note"><b>Kết quả mong đợi</b><p>Các con số khớp với dữ liệu thật trong CSDL; bảng hợp đồng sắp hết hạn có ít nhất 1 dòng.</p></div>
+          <div class="note trap"><b>Bẫy</b><p>Mốc “sắp hết hạn” là 30 ngày và tính từ ngày hệ thống. Nếu máy demo lệch ngày hoặc dữ liệu mẫu đã cũ, hai bảng này sẽ trống — đã kiểm tra ở phần chuẩn bị.</p></div>
+        </div>
+      </article>
+
+      <article class="cue">
+        <div class="cue-rail">
+          <span class="cue-num">03</span>
+          <span class="cue-time">3<em>phút</em></span>
+          <span class="chip role-sales"><span class="dot"></span>Sales</span>
+        </div>
+        <div class="cue-body">
+          <h3>Danh sách khách hàng: tìm, lọc, xuất Excel</h3>
+          <p class="goal">Chuyển sang tab Sales. Đây là màn hình nhân viên kinh doanh mở nhiều nhất trong ngày.</p>
+          <ol class="steps">
+            <li>Vào <code>/customer</code>. Chỉ ra phân trang và cột <b>Xếp hạng quan hệ</b> ở mỗi dòng.</li>
+            <li>Gõ một từ khoá vào ô tìm kiếm (tên doanh nghiệp, mã số thuế hoặc email) — kết quả lọc ngay.</li>
+            <li>Lọc theo <b>loại khách hàng</b>: Nhà mạng viễn thông / Nhà thầu thi công / Đại lý phân phối; rồi lọc thêm theo <b>người phụ trách</b>.</li>
+            <li>Bấm <b>Xuất Excel</b> — mở file vừa tải để khách thấy đúng những dòng đang hiển thị, kể cả khi đang lọc.</li>
+          </ol>
+          <div class="note"><b>Điểm nhấn</b><p>File xuất ra chứa đúng phạm vi dữ liệu người đó được phép xem — không phải toàn bộ CSDL.</p></div>
+          <div class="note trap"><b>Bẫy</b><p>File xuất là định dạng <code>.xls</code> cũ. Excel có thể hiện cảnh báo “định dạng không khớp phần mở rộng” — bấm Yes là mở bình thường. Nên mở thử một lần trước buổi họp.</p></div>
+        </div>
+      </article>
+
+      <article class="cue">
+        <div class="cue-rail">
+          <span class="cue-num">04</span>
+          <span class="cue-time">3<em>phút</em></span>
+          <span class="chip role-sales"><span class="dot"></span>Sales</span>
+        </div>
+        <div class="cue-body">
+          <h3>Thêm khách hàng mới</h3>
+          <p class="goal">Khởi động câu chuyện: một nhà thầu thi công vừa đồng ý hợp tác.</p>
+          <ol class="steps">
+            <li>Bấm <b>Thêm khách hàng</b>. Điền tên doanh nghiệp, mã số thuế, email, điện thoại, người đại diện pháp luật.</li>
+            <li>Chọn <b>Tỉnh/Thành phố</b> rồi chọn <b>Phường/Xã</b> — danh sách phường tự nạp theo tỉnh vừa chọn, dùng dữ liệu đơn vị hành chính 2025.</li>
+            <li>Chọn loại khách hàng <b>Nhà thầu thi công</b>, nhóm <b>Tiềm năng</b>, và người phụ trách.</li>
+            <li>Cố tình bỏ trống email hoặc gõ số điện thoại sai định dạng rồi bấm lưu — cho khách thấy thông báo lỗi.</li>
+            <li>Sửa lại cho đúng và lưu. Ghi nhớ <b>mã khách hàng</b> vừa sinh ra, sẽ dùng ở phân cảnh 6.</li>
+          </ol>
+          <div class="note"><b>Kết quả mong đợi</b><p>Khách hàng mới xuất hiện ở đầu danh sách; hệ thống chấp nhận cả số di động lẫn số máy bàn Việt Nam.</p></div>
+        </div>
+      </article>
+
+      <article class="cue">
+        <div class="cue-rail">
+          <span class="cue-num">05</span>
+          <span class="cue-time">2<em>phút</em></span>
+          <span class="chip role-sales"><span class="dot"></span>Sales</span>
+        </div>
+        <div class="cue-body">
+          <h3>Hồ sơ khách hàng 360°</h3>
+          <p class="goal">Mở một khách hàng <b>lâu năm</b> (không phải khách vừa tạo) để hồ sơ có đủ dữ liệu.</p>
+          <ol class="steps">
+            <li>Từ danh sách, mở chi tiết một khách hàng nhóm VIP.</li>
+            <li>Đi qua từng khối: thông tin doanh nghiệp và địa chỉ, danh sách người liên hệ, hợp đồng đã ký, phiếu hỗ trợ đã mở, lịch sử quan hệ.</li>
+            <li>Nhấn mạnh: mọi thứ về một khách hàng nằm trên <b>một trang</b> — không phải mở ba phần mềm khác nhau.</li>
+          </ol>
+          <div class="note say"><b>Câu gợi ý</b><p>“Khi anh chị gọi cho khách này, tất cả những gì cần biết đều nằm ở đây: đã ký gì, đang vướng gì, lần gần nhất mình đánh giá họ ra sao.”</p></div>
+        </div>
+      </article>
+
+      <article class="cue">
+        <div class="cue-rail">
+          <span class="cue-num">06</span>
+          <span class="cue-time">5<em>phút</em></span>
+          <span class="chip role-sales"><span class="dot"></span>Sales</span>
+        </div>
+        <div class="cue-body">
+          <h3>Lập hợp đồng và thêm dòng thiết bị</h3>
+          <p class="goal">Phân cảnh quan trọng nhất của buổi demo — dành đủ thời gian, đừng thao tác nhanh.</p>
+          <ol class="steps">
+            <li>Vào <code>/contract</code>, bấm <b>Thêm hợp đồng</b>.</li>
+            <li>Chọn khách hàng vừa tạo ở phân cảnh 4. Nhập tiêu đề, chọn loại <b>Cung cấp thiết bị</b>, chọn người phụ trách.</li>
+            <li>Nhập ngày ký <b>sau</b> ngày hiệu lực rồi bấm lưu — hệ thống chặn lại. Giải thích quy tắc: Ngày ký ≤ Hiệu lực từ ≤ Đến ngày.</li>
+            <li>Sửa lại ngày cho đúng, đặt ngày kết thúc khoảng 20 ngày nữa, rồi lưu.</li>
+            <li>Trong màn chi tiết hợp đồng, bấm <b>Thêm sản phẩm</b>: chọn thiết bị từ danh mục POSTEF, nhập số lượng và đơn vị. Thêm 2–3 dòng.</li>
+            <li>Quay lại danh sách hợp đồng, lọc trạng thái <b>Sắp hết hạn</b> — hợp đồng vừa tạo nằm trong đó, dù không ai gõ trạng thái này vào.</li>
+          </ol>
+          <div class="note"><b>Điểm nhấn</b><p>Trạng thái hợp đồng là kết quả tính từ ngày tháng, nên không bao giờ có chuyện dữ liệu nói “đang hiệu lực” trong khi hợp đồng đã hết hạn từ tháng trước.</p></div>
+          <div class="note trap"><b>Bẫy</b><p>Chỉ hợp đồng ở trạng thái <b>Chưa hiệu lực</b> mới xoá được. Nếu định demo nút xoá, hãy tạo riêng một hợp đồng có ngày hiệu lực ở tương lai — đừng thử xoá hợp đồng vừa lập ở trên.</p></div>
+        </div>
+      </article>
+
+      <article class="cue">
+        <div class="cue-rail">
+          <span class="cue-num">07</span>
+          <span class="cue-time">4<em>phút</em></span>
+          <span class="chip role-sales"><span class="dot"></span>Sales</span>
+          <span class="tag-cut">có thể cắt</span>
+        </div>
+        <div class="cue-body">
+          <h3>Hợp đồng ra giấy và vào máy</h3>
+          <p class="goal">Hai chiều của cùng một việc: xuất hợp đồng ra file, và nhập hợp đồng từ file vào hệ thống.</p>
+          <ol class="steps">
+            <li>Ở chi tiết hợp đồng, bấm <b>Xuất PDF</b> — mở file, chỉ ra bảng thiết bị đi kèm đúng những dòng vừa nhập.</li>
+            <li>Quay lại danh sách, bấm <b>Xuất Excel</b> để có bảng theo dõi toàn bộ hợp đồng.</li>
+            <li>Bấm <b>Nhập PDF</b> → <b>Tải file mẫu</b>, cho khách thấy đây là biểu mẫu có sẵn các ô điền.</li>
+            <li>Tải lên file mẫu đã điền sẵn từ trước. Hệ thống đọc ra hợp đồng, thông tin bên mua và các dòng thiết bị.</li>
+            <li>Trước đó, tải thử một file <b>điền sai</b> (sai định dạng ngày hoặc sai loại hợp đồng) — hệ thống liệt kê toàn bộ lỗi và <b>không ghi gì</b> vào CSDL.</li>
+          </ol>
+          <div class="note"><b>Điểm nhấn</b><p>File sai chỉ có hai kết cục: nhập trọn vẹn hoặc không nhập gì. Không có trường hợp tạo ra nửa hợp đồng rồi dừng giữa chừng.</p></div>
+          <div class="note trap"><b>Bẫy</b><p>File mẫu phải được điền bằng phần mềm đọc PDF trên máy (Acrobat Reader) và lưu lại. Điền trên trình duyệt thường không ghi giá trị vào ô biểu mẫu, hệ thống sẽ báo file trống.</p></div>
+        </div>
+      </article>
+
+      <article class="cue">
+        <div class="cue-rail">
+          <span class="cue-num">08</span>
+          <span class="cue-time">3<em>phút</em></span>
+          <span class="chip role-tech"><span class="dot"></span>Kỹ thuật</span>
+          <span class="tag-cut">có thể cắt</span>
+        </div>
+        <div class="cue-body">
+          <h3>Danh mục sản phẩm POSTEF</h3>
+          <p class="goal">Chuyển sang tab Kỹ thuật. Đây là nguồn dữ liệu cho cả hợp đồng lẫn phiếu hỗ trợ.</p>
+          <ol class="steps">
+            <li>Vào <code>/product</code>. Danh mục đang chứa dòng sản phẩm thật của POSTEF, chia theo nhóm.</li>
+            <li>Mở chi tiết một sản phẩm: thông số kỹ thuật, bộ ảnh, và tệp catalogue PDF tải về được.</li>
+            <li>Bấm <b>Sửa</b>, tải thêm một ảnh và một catalogue, lưu lại rồi xem kết quả.</li>
+            <li>Chuyển nhanh sang tab Sales, mở lại <code>/product</code>: nút Thêm/Sửa/Xoá <b>không còn</b>.</li>
+          </ol>
+          <div class="note"><b>Kết quả mong đợi</b><p>Ảnh và catalogue mới hiện ngay trong trang chi tiết; vai Sales vẫn xem được sản phẩm nhưng không sửa được.</p></div>
+        </div>
+      </article>
+
+      <article class="cue">
+        <div class="cue-rail">
+          <span class="cue-num">09</span>
+          <span class="cue-time">4<em>phút</em></span>
+          <span class="chip role-cs"><span class="dot"></span>CSKH</span>
+        </div>
+        <div class="cue-body">
+          <h3>Khách báo hỏng — mở phiếu hỗ trợ</h3>
+          <p class="goal">Chuyển sang tab CSKH. Câu chuyện bước sang giai đoạn sau bán hàng.</p>
+          <ol class="steps">
+            <li>Vào <code>/ticket</code>, bấm <b>Thêm phiếu</b>.</li>
+            <li>Chọn khách hàng và <b>gắn phiếu vào hợp đồng</b> vừa ký ở phân cảnh 6 — đây là chỗ hai nghiệp vụ nối vào nhau.</li>
+            <li>Chọn kênh tiếp nhận, loại yêu cầu, mức ưu tiên <b>Khẩn cấp</b>, đánh dấu còn bảo hành.</li>
+            <li>Khai báo thiết bị gặp sự cố kèm số serial và mô tả lỗi.</li>
+            <li>Đặt <b>hạn SLA</b> trong vòng 24 giờ tới và <b>giao cho kỹ thuật viên</b> đang dùng ở tab Kỹ thuật.</li>
+            <li>Lưu. Quay về danh sách, lọc theo mức ưu tiên Khẩn cấp để thấy phiếu vừa tạo.</li>
+          </ol>
+          <div class="note"><b>Kết quả mong đợi</b><p>Phiếu ở trạng thái <b>Mới tiếp nhận</b>, hiện trong danh sách với nhãn ưu tiên màu đỏ.</p></div>
+        </div>
+      </article>
+
+      <article class="cue">
+        <div class="cue-rail">
+          <span class="cue-num">10</span>
+          <span class="cue-time">4<em>phút</em></span>
+          <span class="chip role-tech"><span class="dot"></span>Kỹ thuật</span>
+        </div>
+        <div class="cue-body">
+          <h3>Kỹ thuật viên xử lý — và giới hạn quyền được chứng minh</h3>
+          <p class="goal">Phân cảnh thuyết phục nhất về mặt kiểm soát nội bộ. Nên diễn chậm.</p>
+          <ol class="steps">
+            <li>Sang tab Kỹ thuật, mở đúng phiếu vừa được giao.</li>
+            <li>Đổi trạng thái sang <b>Đang xử lý</b>, ghi ghi chú nội bộ, lưu.</li>
+            <li>Chỉ ra rằng các ô khác — khách hàng, hợp đồng, mức ưu tiên, người được giao — <b>không sửa được</b>: kỹ thuật viên chỉ cập nhật tiến độ, không được đổi việc của mình sang người khác.</li>
+            <li>Cập nhật <b>kết quả xử lý</b> và chuyển trạng thái sang <b>Đã đóng</b>.</li>
+            <li>Mở tab lịch sử của phiếu: từng lần đổi trạng thái được ghi lại kèm ai đổi và đổi lúc nào.</li>
+            <li>Vẫn ở vai Kỹ thuật, mở một phiếu <b>không phải của mình</b> và thử bấm sửa — hệ thống trả về trang 403.</li>
+            <li>Gõ thẳng <code>/ticket?action=new</code> lên thanh địa chỉ — vẫn 403, dù nút đã bị ẩn.</li>
+          </ol>
+          <div class="note"><b>Điểm nhấn</b><p>Ẩn nút chỉ để đỡ bấm nhầm. Quyền được kiểm tra ở phía máy chủ, nên gõ tay URL cũng không đi vòng được.</p></div>
+          <div class="note say"><b>Câu gợi ý</b><p>“Phần nhiều hệ thống chỉ giấu nút đi. Ở đây em gõ thẳng địa chỉ vào trình duyệt — và hệ thống vẫn chặn.”</p></div>
+        </div>
+      </article>
+
+      <article class="cue">
+        <div class="cue-rail">
+          <span class="cue-num">11</span>
+          <span class="cue-time">2<em>phút</em></span>
+          <span class="chip role-tech"><span class="dot"></span>Kỹ thuật</span>
+        </div>
+        <div class="cue-body">
+          <h3>Nhắc hạn tự động</h3>
+          <p class="goal">Cho thấy hệ thống tự gõ cửa người phụ trách, không chờ ai nhớ ra.</p>
+          <ol class="steps">
+            <li>Bấm chuông thông báo trên thanh trên cùng, hoặc vào <code>/notifications</code>.</li>
+            <li>Chỉ ra hai loại nhắc: <b>hợp đồng sắp hết hạn</b> gửi cho người phụ trách hợp đồng, và <b>phiếu sắp/đã trễ SLA</b> gửi cho kỹ thuật viên được giao.</li>
+            <li>Bấm <b>Đánh dấu đã đọc tất cả</b> để thấy huy hiệu số đếm về 0.</li>
+          </ol>
+          <div class="note"><b>Điểm nhấn</b><p>Bộ nhắc hạn chạy lại mỗi giờ nhưng <b>không tạo thông báo trùng</b> cho cùng một hợp đồng hay cùng một phiếu.</p></div>
+          <div class="note trap"><b>Bẫy</b><p>Thông báo chỉ xuất hiện sau khi bộ lập lịch chạy lần đầu — 1 phút sau khi Tomcat khởi động. Khởi động server sát giờ demo là đủ để phân cảnh này trắng trơn.</p></div>
+        </div>
+      </article>
+
+      <article class="cue">
+        <div class="cue-rail">
+          <span class="cue-num">12</span>
+          <span class="cue-time">3<em>phút</em></span>
+          <span class="chip role-sales"><span class="dot"></span>Sales</span>
+        </div>
+        <div class="cue-body">
+          <h3>Đóng vòng: đánh giá lại quan hệ khách hàng</h3>
+          <p class="goal">Khép lại câu chuyện đúng chỗ nó bắt đầu — hồ sơ khách hàng.</p>
+          <ol class="steps">
+            <li>Về tab Sales, mở lại hồ sơ khách hàng của câu chuyện.</li>
+            <li>Ở khối đánh giá, chọn xếp hạng — <b>Tốt</b>, <b>Cần theo dõi</b>, <b>Xấu</b> hoặc <b>Có nguy cơ rời bỏ</b> — ghi lý do, rồi lưu.</li>
+            <li>Xếp hạng mới hiện ngay trên hồ sơ, đồng thời một dòng mới được ghi vào <b>lịch sử quan hệ</b> kèm người đánh giá và ngày đánh giá.</li>
+            <li>Quay ra danh sách khách hàng: cột xếp hạng đã đổi theo.</li>
+          </ol>
+          <div class="note"><b>Điểm nhấn</b><p>Đánh giá là <b>do người phụ trách quyết định</b>, hệ thống không tự chấm điểm hộ — nhưng mọi lần đánh giá đều để lại dấu vết ai làm, khi nào, vì sao.</p></div>
+        </div>
+      </article>
+
+      <article class="cue">
+        <div class="cue-rail">
+          <span class="cue-num">13</span>
+          <span class="cue-time">4<em>phút</em></span>
+          <span class="chip role-admin"><span class="dot"></span>Admin</span>
+        </div>
+        <div class="cue-body">
+          <h3>Quản trị tài khoản và bảo mật</h3>
+          <p class="goal">Kết bài bằng phần dành cho người quản lý — và những thứ chạy ngầm mà khách không nhìn thấy.</p>
+          <ol class="steps">
+            <li>Về tab Admin, vào <code>/employee</code>. Đây là màn hình <b>chỉ Admin</b> mở được — ba vai kia thậm chí không thấy mục này trên menu.</li>
+            <li>Tạo một nhân viên mới: chọn phòng ban và vai trò, nhập ngày sinh, giới tính, CCCD, điện thoại. Email công ty được cấp tự động dạng <code>&lt;tên đăng nhập&gt;@postef.com.vn</code>.</li>
+            <li>Mở chi tiết nhân viên vừa tạo, bấm <b>Khoá tài khoản</b> rồi <b>Mở khoá</b> — giải thích nghỉ việc hay tạm đình chỉ thì khoá chứ không xoá, để dữ liệu cũ không mất người phụ trách. Muốn cho khách thấy một tài khoản đang bị khoá sẵn thì lọc trạng thái <b>Inactive</b> ở danh sách — <code>sales6</code> nằm ở đó.</li>
+            <li>Thử khoá chính tài khoản Admin đang đăng nhập — hệ thống từ chối.</li>
+            <li>Nói (không cần thao tác): mật khẩu lưu dạng băm; mọi thao tác ghi dữ liệu đều có mã chống giả mạo yêu cầu; luồng quên mật khẩu khoá mã OTP sau 5 lần nhập sai và bắt chờ 30 giây giữa hai lần gửi lại.</li>
+          </ol>
+          <div class="note trap"><b>Bẫy nghiêm trọng</b><p>Nút <b>Gửi tài khoản</b> sẽ <b>cấp lại mật khẩu mới</b> cho nhân viên đó và gửi qua email cá nhân. Tuyệt đối không bấm lên bốn tài khoản đang dùng để demo — sẽ mất quyền đăng nhập ngay giữa buổi. Nếu muốn demo, chỉ bấm trên nhân viên vừa tạo ở bước 2, và nhớ rằng chưa cấu hình SMTP thì thư chỉ in ra log Tomcat.</p></div>
+        </div>
+      </article>
+
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <div class="kicker">Phương án B</div>
+      <h2>Khi có sự cố giữa buổi</h2>
+    </div>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr><th>Tình huống</th><th>Xử lý tại chỗ</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Trang trắng hoặc lỗi 500</td><td>Chuyển sang tab vai khác đã mở sẵn và tiếp tục mạch kể; ghi lại URL để xem log <b>sau</b> buổi họp. Không mở log trước mặt khách.</td></tr>
+          <tr><td>Mất kết nối CSDL</td><td>Chuyển sang phần nói: quyền hạn, quy trình, phạm vi. Khởi động lại Tomcat trong lúc đó; nhớ là thông báo cần thêm 1 phút mới sinh lại.</td></tr>
+          <tr><td>Nhập PDF thất bại</td><td>Bỏ qua, chuyển thẳng sang xuất PDF — đây là phân cảnh đã gắn nhãn “có thể cắt”.</td></tr>
+          <tr><td>Quên mật khẩu một vai</td><td>Đăng nhập bằng Admin, vào chi tiết nhân viên đó và cấp lại tài khoản. Chỉ làm khi buộc phải, vì thư mật khẩu tạm chỉ in ra log.</td></tr>
+          <tr><td>Bảng dữ liệu trống</td><td>Nói thẳng là dữ liệu demo chưa có trường hợp đó, rồi chuyển sang bản ghi khác. Đừng sửa dữ liệu trực tiếp trước mặt khách.</td></tr>
+          <tr><td>Chậm hơn dự kiến 10 phút</td><td>Cắt phân cảnh 7 và 8, gộp 11 vào 10 (chỉ bấm chuông thông báo một lần), giữ nguyên 12 và 13.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <div class="kicker">Hỏi đáp</div>
+      <h2>Câu khách hay hỏi</h2>
+    </div>
+    <div class="qa">
+      <div class="qa-item">
+        <p class="qa-q">Sửa được phân quyền theo phòng ban của bên em không?</p>
+        <p class="qa-a">Được. Bảng vai trò nằm trong CSDL và mỗi màn hình đều kiểm tra quyền ở phía máy chủ, nên thêm vai hoặc đổi phạm vi là sửa cấu hình chứ không phải viết lại chức năng. Bốn vai hiện tại là bốn vai chuẩn, không phải giới hạn cứng.</p>
+      </div>
+      <div class="qa-item">
+        <p class="qa-q">Có quản lý tồn kho thiết bị không?</p>
+        <p class="qa-a">Không — đây là ranh giới cố ý của phạm vi dự án. Hệ thống quản lý <b>quan hệ khách hàng</b>: khách hàng, hợp đồng, danh mục sản phẩm và hỗ trợ kỹ thuật. Tồn kho, xuất nhập kho và kế toán thuộc hệ thống khác.</p>
+      </div>
+      <div class="qa-item">
+        <p class="qa-q">Xuất hoá đơn, thu tiền được không?</p>
+        <p class="qa-a">Không. Hệ thống ghi nhận giá trị hợp đồng để theo dõi doanh thu trên dashboard, nhưng không phát hành hoá đơn, không nối cổng thanh toán và không làm kế toán.</p>
+      </div>
+      <div class="qa-item">
+        <p class="qa-q">Ai đã sửa dữ liệu thì có truy được không?</p>
+        <p class="qa-a">Với phiếu hỗ trợ thì có đầy đủ: mỗi lần đổi trạng thái đều ghi lại trạng thái trước, trạng thái sau, người đổi, thời điểm và ghi chú. Với đánh giá quan hệ khách hàng cũng vậy. Các bản ghi khác hiện lưu người tạo, người phụ trách và thời điểm cập nhật gần nhất.</p>
+      </div>
+      <div class="qa-item">
+        <p class="qa-q">Nhân viên nghỉ việc thì dữ liệu của họ ra sao?</p>
+        <p class="qa-a">Tài khoản bị khoá chứ không xoá, nên các hợp đồng và phiếu cũ vẫn giữ nguyên tên người phụ trách. Việc chuyển giao là thao tác gán lại người phụ trách trên từng hồ sơ.</p>
+      </div>
+      <div class="qa-item">
+        <p class="qa-q">Hệ thống có tự chấm điểm khách hàng không?</p>
+        <p class="qa-a">Hiện tại xếp hạng do người phụ trách chọn, hệ thống chỉ lưu lại kèm lý do và dấu vết người đánh giá. Chấm điểm tự động theo bộ tiêu chí là hướng phát triển tiếp, không phải phần đang chạy hôm nay.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <div class="kicker">Giới hạn</div>
+      <h2>Đừng hứa những điều này</h2>
+      <p>Trả lời dứt khoát và ngắn gọn khi khách hỏi tới. Đây là phạm vi đã chốt của dự án, không phải phần còn thiếu.</p>
+    </div>
+    <ul class="scope-list">
+      <li><span class="mark">×</span><span><b>Quản lý kho, tồn kho, logistics</b> — không có và sẽ không thêm vào phạm vi này.</span></li>
+      <li><span class="mark">×</span><span><b>Hoá đơn, cổng thanh toán, kế toán, lương và chấm công</b> — thuộc hệ thống tài chính riêng.</span></li>
+      <li><span class="mark">×</span><span><b>Gửi email thật cho khách hàng</b> — chức năng email hiện phục vụ nội bộ (cấp tài khoản, mã OTP) và cần cấu hình máy chủ thư trước khi chạy thật.</span></li>
+      <li><span class="mark">×</span><span><b>Ứng dụng di động</b> — hiện là ứng dụng web, xem được trên trình duyệt điện thoại nhưng không có bản cài đặt riêng.</span></li>
+    </ul>
+  </section>
+
+  <footer>
+    Kịch bản này bám theo đúng chức năng đang có trong mã nguồn tại thời điểm biên soạn. Trước buổi họp, chạy thử trọn vẹn một lượt trên chính máy sẽ dùng để trình chiếu — nhất là ba phân cảnh phụ thuộc dữ liệu và thời gian: 02, 07 và 11.
+  </footer>
+
+</div>
+
+<script>
+(function () {
+  var list = document.getElementById('prep');
+  if (!list) return;
+  var boxes = list.querySelectorAll('input[type="checkbox"]');
+  var KEY = 'poscs-demo-prep';
+  var saved = [];
+  try {
+    saved = JSON.parse(localStorage.getItem(KEY) || '[]');
+  } catch (e) {
+    saved = [];
+  }
+  boxes.forEach(function (box, i) {
+    if (saved[i]) box.checked = true;
+    box.addEventListener('change', function () {
+      var state = [];
+      boxes.forEach(function (b) { state.push(b.checked); });
+      try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {}
+    });
+  });
+})();
+</script>
+</body>
+</html>

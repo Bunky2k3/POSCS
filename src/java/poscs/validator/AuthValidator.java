@@ -21,6 +21,9 @@ public class AuthValidator extends BaseValidator {
     public static final String ERR_WEAK_PASSWORD = "weak_password";
     public static final String ERR_MISMATCH = "mismatch";
 
+    /** Độ dài tối đa của username. */
+    public static final int MAX_USERNAME_LENGTH = 50;
+
     /** Trim; chuỗi rỗng sau khi trim coi như null (chưa nhập). */
     public static String trimToNull(String value) {
         if (value == null) {
@@ -33,7 +36,8 @@ public class AuthValidator extends BaseValidator {
     /** Đăng nhập: bắt buộc có username (đã trim) và mật khẩu không rỗng. */
     public ValidationResult validateLogin(String identifier, String password) {
         ValidationResult result = new ValidationResult();
-        if (trimToNull(identifier) == null || password == null || password.isEmpty()) {
+        String id = trimToNull(identifier);
+        if (id == null || id.length() > MAX_USERNAME_LENGTH || password == null || password.isEmpty()) {
             result.addError("credentials", ERR_MISSING_FIELDS);
         }
         return result;
@@ -42,7 +46,7 @@ public class AuthValidator extends BaseValidator {
     /** Mật khẩu mới: 8..72 byte UTF-8 (BCrypt chỉ dùng 72 byte đầu) và khớp ô xác nhận. */
     public ValidationResult validateNewPassword(String newPassword, String confirmPassword) {
         ValidationResult result = new ValidationResult();
-        if (newPassword == null || newPassword.length() < MIN_PASSWORD_LENGTH
+        if (newPassword == null || newPassword.isBlank() || newPassword.length() < MIN_PASSWORD_LENGTH
                 || isPasswordTooLong(newPassword)) {
             result.addError("newPassword", ERR_WEAK_PASSWORD);
         } else if (!newPassword.equals(confirmPassword)) {
@@ -60,7 +64,8 @@ public class AuthValidator extends BaseValidator {
     /** Quên mật khẩu bước 1: bắt buộc nhập username. */
     public ValidationResult validateForgotPassword(String username) {
         ValidationResult result = new ValidationResult();
-        if (trimToNull(username) == null) {
+        String id = trimToNull(username);
+        if (id == null || id.length() > MAX_USERNAME_LENGTH) {
             result.addError("username", ERR_MISSING_USERNAME);
         }
         return result;

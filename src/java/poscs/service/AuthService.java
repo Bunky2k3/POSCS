@@ -72,6 +72,7 @@ public class AuthService extends BaseService {
     public static final String SESSION_RESET_OTP_ATTEMPTS = "resetOtpAttempts";
     public static final String SESSION_RESET_OTP_LAST_SENT = "resetOtpLastSent";
     public static final String SESSION_OTP_VERIFIED = "otpVerified";
+    public static final String SESSION_OTP_VERIFIED_EXPIRY = "otpVerifiedExpiry";
     // TRUE khi mã trong session là mã "mồi" -- xem issueOtp.
     public static final String SESSION_RESET_DECOY = "resetOtpDecoy";
 
@@ -232,7 +233,11 @@ public class AuthService extends BaseService {
      * Thành công thì controller huỷ session và bắt đăng nhập lại.
      */
     public ServiceResult<Void> changePassword(User currentUser, String oldPassword,
-            String newPassword, String confirmPassword) {
+            String newPassword, String confirmPassword, String clientIp, long now) {
+        String ip = normalizeIp(clientIp);
+        if (isLockedOut(ip, now)) {
+            return failure(ERR_TOO_MANY_ATTEMPTS);
+        }
         if (currentUser == null || currentUser.getUsername() == null) {
             return failure(ERR_SESSION_INVALID);
         }
@@ -242,8 +247,10 @@ public class AuthService extends BaseService {
             return failure(ERR_SESSION_INVALID);
         }
         if (AuthValidator.isPasswordTooLong(oldPassword) || !safeCheck(oldPassword, freshUser.getPasswordHash())) {
+            recordFailedLoginAttempt(ip, now);
             return failure(ERR_WRONG_OLD_PASSWORD);
         }
+        LOGIN_ATTEMPTS_BY_IP.remove(ip);
         ValidationResult validation = validator.validateNewPassword(newPassword, confirmPassword);
         if (!validation.isValid()) {
             return failure(validation.getError("newPassword"));
@@ -345,6 +352,7 @@ public class AuthService extends BaseService {
         }
         // Đúng OTP: đánh dấu đã xác thực, xoá mã để không dùng lại.
         session.set(SESSION_OTP_VERIFIED, Boolean.TRUE);
+        session.set(SESSION_OTP_VERIFIED_EXPIRY, now + 10 * 60 * 1000L); // 10 phút
         session.remove(SESSION_RESET_OTP);
         session.remove(SESSION_RESET_OTP_ATTEMPTS);
         return success(null);
@@ -360,10 +368,12 @@ public class AuthService extends BaseService {
      * {@code same_as_old} (giữ trạng thái OTP để nhập lại), {@code update_failed}
      * (đã dọn sạch trạng thái reset).
      */
-    public ServiceResult<Void> resetPassword(String newPassword, String confirmPassword, AttributeStore session) {
+    public ServiceResult<Void> resetPassword(String newPassword, String confirmPassword, long now, AttributeStore session) {
         String username = getString(session, SESSION_RESET_USERNAME);
+        Long expiry = getLong(session, SESSION_OTP_VERIFIED_EXPIRY);
         // Chặn truy cập thẳng bước 3 khi chưa qua bước 2.
-        if (username == null || !getBool(session, SESSION_OTP_VERIFIED)) {
+        if (username == null || !getBool(session, SESSION_OTP_VERIFIED) || expiry == null || now > expiry) {
+            clearResetState(session);
             return failure(ERR_UNAUTHORIZED);
         }
         ValidationResult validation = validator.validateNewPassword(newPassword, confirmPassword);
@@ -386,7 +396,8 @@ public class AuthService extends BaseService {
         clearResetState(session);
 
         if (!ok) {
-            log.warning("Dat lai mat khau that bai o buoc ghi CSDL (username=" + username + ")");
+            String safeUsername = username.replace('\n', '_').replace('\r', '_');
+            log.warning("Dat lai mat khau that bai o buoc ghi CSDL (username=" + safeUsername + ")");
             return failure(ERR_UPDATE_FAILED);
         }
         return success(null);
@@ -469,6 +480,7 @@ public class AuthService extends BaseService {
         session.remove(SESSION_RESET_OTP_ATTEMPTS);
         session.remove(SESSION_RESET_OTP_LAST_SENT);
         session.remove(SESSION_OTP_VERIFIED);
+        session.remove(SESSION_OTP_VERIFIED_EXPIRY);
         session.remove(SESSION_RESET_DECOY);
     }
 

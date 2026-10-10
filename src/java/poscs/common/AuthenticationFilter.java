@@ -48,6 +48,7 @@ public class AuthenticationFilter implements Filter {
             "/verifyOtp.jsp",
             "/resetPassword.jsp",
             "/login",
+            "/logout",
             "/ForgotPasswordServlet",
             "/VerifyOtpServlet",
             "/ResetPasswordServlet",

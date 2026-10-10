@@ -70,7 +70,12 @@
                 <li><a class="dropdown-item" href="${pageContext.request.contextPath}/viewProfile"><i class="fa-regular fa-id-card me-2"></i>Thông tin cá nhân</a></li>
                 <li><a class="dropdown-item" href="${pageContext.request.contextPath}/changePassword.jsp"><i class="fa-solid fa-key me-2"></i>Đổi mật khẩu</a></li>
                 <li><hr class="dropdown-divider"></li>
-                <li><a class="dropdown-item text-danger" href="${pageContext.request.contextPath}/login?action=logout"><i class="fa-solid fa-arrow-right-from-bracket me-2"></i>Đăng xuất</a></li>
+                <li>
+                    <form action="${pageContext.request.contextPath}/logout" method="post" class="m-0 p-0">
+                        <input type="hidden" name="csrfToken" value="${csrfToken}">
+                        <button type="submit" class="dropdown-item text-danger border-0 bg-transparent text-start w-100"><i class="fa-solid fa-arrow-right-from-bracket me-2"></i>Đăng xuất</button>
+                    </form>
+                </li>
             </ul>
         </div>
     </div>
