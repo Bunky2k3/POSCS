@@ -11,6 +11,12 @@ import java.util.regex.Pattern;
  */
 public abstract class BaseValidator {
 
+    /** Độ dài tối đa của email theo RFC 5321. */
+    public static final int MAX_EMAIL_LENGTH = 254;
+
+    // LƯU Ý (BR-09/10): matches/phoneVn/email kiểm tra trên giá trị đã trim;
+    // caller PHẢI lưu giá trị đã trim (xem AuthValidator.trimToNull).
+
     /** BR-09: SĐT VN 10 chữ số, đầu số hợp lệ (03x, 05x, 07x, 08x, 09x). */
     public static final Pattern PHONE_VN = Pattern.compile("^0[35789]\\d{8}$");
 
@@ -52,7 +58,7 @@ public abstract class BaseValidator {
     /** Độ dài trong khoảng [min, max] (bỏ qua giá trị rỗng). */
     protected boolean lengthBetween(ValidationResult result, String field, String value, int min, int max,
             String message) {
-        if (!isBlank(value) && (value.trim().length() < min || value.length() > max)) {
+        if (!isBlank(value) && (value.trim().length() < min || value.trim().length() > max)) {
             result.addError(field, message);
             return false;
         }
@@ -84,18 +90,35 @@ public abstract class BaseValidator {
         return matches(result, field, value, PHONE_VN, message);
     }
 
-    /** BR-10: Email. */
+    /** BR-10: Email (tối đa 254 ký tự theo RFC 5321). */
     protected boolean email(ValidationResult result, String field, String value, String message) {
+        if (!isBlank(value) && value.trim().length() > MAX_EMAIL_LENGTH) {
+            result.addError(field, message);
+            return false;
+        }
         return matches(result, field, value, EMAIL, message);
     }
 
-    /** Số không được âm (bỏ qua null). */
+    /** Số không được âm; NaN/Infinity bị từ chối (bỏ qua null). */
     protected boolean nonNegative(ValidationResult result, String field, Number value, String message) {
-        if (value != null && toBigDecimal(value).signum() < 0) {
+        if (value == null) {
+            return true;
+        }
+        if (isNotFinite(value) || toBigDecimal(value).signum() < 0) {
             result.addError(field, message);
             return false;
         }
         return true;
+    }
+
+    private static boolean isNotFinite(Number n) {
+        if (n instanceof Double) {
+            return ((Double) n).isNaN() || ((Double) n).isInfinite();
+        }
+        if (n instanceof Float) {
+            return ((Float) n).isNaN() || ((Float) n).isInfinite();
+        }
+        return false;
     }
 
     private static BigDecimal toBigDecimal(Number n) {

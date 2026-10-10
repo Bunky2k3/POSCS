@@ -11,8 +11,10 @@
 ## Giai đoạn 1: Chuẩn bị Kiến trúc & Khởi tạo Tầng Dịch vụ (Service & Validator Foundation)
 
 - [x] **Task 1.1:** Khởi tạo kiến trúc tầng Service (`poscs.service`) và Validator (`poscs.validator`) cơ bản kèm Base Service & Result/Response wrapper pattern.
-- [ ] **Task 1.2:** Tách `AuthValidator` và `AuthService` từ `AuthenticationController`, chuyển giao toàn bộ logic kiểm tra đăng nhập, đổi mật khẩu, OTP email sang Service; viết Unit Test trong `test/poscs/service/AuthServiceTest.java`.
+- [x] **Task 1.2:** Tách `AuthValidator` và `AuthService` từ `AuthenticationController`, chuyển giao toàn bộ logic kiểm tra đăng nhập, đổi mật khẩu, OTP email sang Service; viết Unit Test trong `test/poscs/service/AuthServiceTest.java`.
 - [ ] **Task 1.3:** Tách `AuthenticationController` thành các controller đơn nhiệm: `LoginController`, `LogoutController`, `PasswordResetController`, `ProfileController`.
+  - Kèm theo (từ QA Task 1.2): nối controller với `AuthService` và **xoá logic trùng** trong `AuthenticationController` (`LOGIN_ATTEMPTS_BY_IP`, `OTP_REQUESTS_BY_IP`, OTP/đổi mật khẩu), chuyển `AuthenticationControllerTest`/`PasswordResetFlowTest` sang service.
+  - Cần quyết định: IP sau reverse proxy (`getRemoteAddr()` vs `X-Forwarded-For` có cấu hình) — SPEC chưa nêu.
 
 ---
 
