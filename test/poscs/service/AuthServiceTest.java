@@ -135,22 +135,22 @@ public class AuthServiceTest {
     public void changePassword_sessionInvalid_whenUserMissingOrDeleted() {
         User current = user("bob", "oldpass123");
         when(dao.findByUsername("bob")).thenReturn(null);
-        assertEquals("session_invalid", service.changePassword(current, "oldpass123", "newpass123", "newpass123").getMessage());
+        assertEquals("session_invalid", service.changePassword(current, "oldpass123", "newpass123", "newpass123", IP, NOW).getMessage());
         User deleted = user("bob", "oldpass123");
         deleted.setDeleted(true);
         when(dao.findByUsername("bob")).thenReturn(deleted);
-        assertEquals("session_invalid", service.changePassword(current, "oldpass123", "newpass123", "newpass123").getMessage());
+        assertEquals("session_invalid", service.changePassword(current, "oldpass123", "newpass123", "newpass123", IP, NOW).getMessage());
     }
 
     @Test
     public void changePassword_rulesInOriginalOrder() {
         User current = user("bob", "oldpass123");
         when(dao.findByUsername("bob")).thenReturn(user("bob", "oldpass123"));
-        assertEquals("wrong_old_password", service.changePassword(current, "nope", "newpass123", "newpass123").getMessage());
-        assertEquals("wrong_old_password", service.changePassword(current, null, "newpass123", "newpass123").getMessage());
-        assertEquals("weak_password", service.changePassword(current, "oldpass123", "short", "short").getMessage());
-        assertEquals("mismatch", service.changePassword(current, "oldpass123", "newpass123", "other1234").getMessage());
-        assertEquals("same_as_old", service.changePassword(current, "oldpass123", "oldpass123", "oldpass123").getMessage());
+        assertEquals("wrong_old_password", service.changePassword(current, "nope", "newpass123", "newpass123", IP, NOW).getMessage());
+        assertEquals("wrong_old_password", service.changePassword(current, null, "newpass123", "newpass123", IP, NOW).getMessage());
+        assertEquals("weak_password", service.changePassword(current, "oldpass123", "short", "short", IP, NOW).getMessage());
+        assertEquals("mismatch", service.changePassword(current, "oldpass123", "newpass123", "other1234", IP, NOW).getMessage());
+        assertEquals("same_as_old", service.changePassword(current, "oldpass123", "oldpass123", "oldpass123", IP, NOW).getMessage());
         verify(dao, never()).updatePasswordByUsername(anyString(), anyString());
     }
 
@@ -159,10 +159,10 @@ public class AuthServiceTest {
         User current = user("bob", "oldpass123");
         when(dao.findByUsername("bob")).thenReturn(user("bob", "oldpass123"));
         when(dao.updatePasswordByUsername(eq("bob"), anyString())).thenReturn(true);
-        assertTrue(service.changePassword(current, "oldpass123", "newpass123", "newpass123").isSuccess());
+        assertTrue(service.changePassword(current, "oldpass123", "newpass123", "newpass123", IP, NOW).isSuccess());
 
         when(dao.updatePasswordByUsername(eq("bob"), anyString())).thenReturn(false);
-        assertEquals("update_failed", service.changePassword(current, "oldpass123", "newpass123", "newpass123").getMessage());
+        assertEquals("update_failed", service.changePassword(current, "oldpass123", "newpass123", "newpass123", IP, NOW).getMessage());
     }
 
     // ---------------- OTP ----------------
@@ -278,7 +278,8 @@ public class AuthServiceTest {
         map.clear();
         map.put(AuthService.SESSION_RESET_USERNAME, "bob");
         map.put(AuthService.SESSION_OTP_VERIFIED, "true");       // không phải Boolean
-        assertEquals("unauthorized", service.resetPassword("newpass123", "newpass123", session).getMessage());
+        map.put(AuthService.SESSION_OTP_VERIFIED_EXPIRY, NOW + 10000L);
+        assertEquals("unauthorized", service.resetPassword("newpass123", "newpass123", NOW, session).getMessage());
 
         map.clear();
         when(dao.findByUsername("bob")).thenReturn(user("bob", "x"));
@@ -302,13 +303,14 @@ public class AuthServiceTest {
         when(dao.findByUsername("bob")).thenReturn(garbage);
         assertEquals("invalid_credentials", service.login("bob", "secret123", IP, NOW).getMessage());
         assertEquals("wrong_old_password",
-                service.changePassword(garbage, "oldpass123", "newpass123", "newpass123").getMessage());
+                service.changePassword(garbage, "oldpass123", "newpass123", "newpass123", IP, NOW).getMessage());
 
         // resetPassword: hash rác -> không coi là "trùng mật khẩu cũ", vẫn đặt lại được.
         map.put(AuthService.SESSION_RESET_USERNAME, "bob");
         map.put(AuthService.SESSION_OTP_VERIFIED, Boolean.TRUE);
+        map.put(AuthService.SESSION_OTP_VERIFIED_EXPIRY, NOW + 10000L);
         when(dao.updatePasswordByUsername(eq("bob"), anyString())).thenReturn(true);
-        assertTrue(service.resetPassword("newpass123", "newpass123", session).isSuccess());
+        assertTrue(service.resetPassword("newpass123", "newpass123", NOW, session).isSuccess());
     }
 
     @Test
@@ -349,14 +351,14 @@ public class AuthServiceTest {
         // Đổi mật khẩu: mật khẩu cũ / mới quá dài.
         User current = user("bob", "oldpass123");
         when(dao.findByUsername("bob")).thenReturn(user("bob", "oldpass123"));
-        assertEquals("wrong_old_password", service.changePassword(current, longPw, "newpass123", "newpass123").getMessage());
-        assertEquals("weak_password", service.changePassword(current, "oldpass123", longPw, longPw).getMessage());
+        assertEquals("wrong_old_password", service.changePassword(current, longPw, "newpass123", "newpass123", IP, NOW).getMessage());
+        assertEquals("weak_password", service.changePassword(current, "oldpass123", longPw, longPw, IP, NOW).getMessage());
     }
 
     @Test
     public void changePassword_nullCurrentUser_isSessionInvalid() {
-        assertEquals("session_invalid", service.changePassword(null, "a", "b", "b").getMessage());
-        assertEquals("session_invalid", service.changePassword(new User(), "a", "b", "b").getMessage());
+        assertEquals("session_invalid", service.changePassword(null, "a", "b", "b", IP, NOW).getMessage());
+        assertEquals("session_invalid", service.changePassword(new User(), "a", "b", "b", IP, NOW).getMessage());
     }
 
     @Test
@@ -365,8 +367,9 @@ public class AuthServiceTest {
             map.clear();
             map.put(AuthService.SESSION_RESET_USERNAME, "bob");
             map.put(AuthService.SESSION_OTP_VERIFIED, Boolean.TRUE);
+            map.put(AuthService.SESSION_OTP_VERIFIED_EXPIRY, NOW + 10000L);
             when(dao.findByUsername("bob")).thenReturn(account);
-            assertEquals("unauthorized", service.resetPassword("newpass123", "newpass123", session).getMessage());
+            assertEquals("unauthorized", service.resetPassword("newpass123", "newpass123", NOW, session).getMessage());
             assertTrue(map.isEmpty());
         }
         verify(dao, never()).updatePasswordByUsername(anyString(), anyString());
@@ -382,23 +385,24 @@ public class AuthServiceTest {
 
     @Test
     public void resetPassword_unauthorizedWithoutVerifiedOtp() {
-        assertEquals("unauthorized", service.resetPassword("newpass123", "newpass123", session).getMessage());
+        assertEquals("unauthorized", service.resetPassword("newpass123", "newpass123", NOW, session).getMessage());
         map.put(AuthService.SESSION_RESET_USERNAME, "bob");
-        assertEquals("unauthorized", service.resetPassword("newpass123", "newpass123", session).getMessage());
+        assertEquals("unauthorized", service.resetPassword("newpass123", "newpass123", NOW, session).getMessage());
     }
 
     private void verifiedSession() {
         map.put(AuthService.SESSION_RESET_USERNAME, "bob");
         map.put(AuthService.SESSION_OTP_VERIFIED, Boolean.TRUE);
+        map.put(AuthService.SESSION_OTP_VERIFIED_EXPIRY, NOW + 10000L);
     }
 
     @Test
     public void resetPassword_validationErrors_keepOtpState() {
         verifiedSession();
         when(dao.findByUsername("bob")).thenReturn(user("bob", "oldpass123"));
-        assertEquals("weak_password", service.resetPassword("short", "short", session).getMessage());
-        assertEquals("mismatch", service.resetPassword("newpass123", "x", session).getMessage());
-        assertEquals("same_as_old", service.resetPassword("oldpass123", "oldpass123", session).getMessage());
+        assertEquals("weak_password", service.resetPassword("short", "short", NOW, session).getMessage());
+        assertEquals("mismatch", service.resetPassword("newpass123", "x", NOW, session).getMessage());
+        assertEquals("same_as_old", service.resetPassword("oldpass123", "oldpass123", NOW, session).getMessage());
         assertEquals(Boolean.TRUE, map.get(AuthService.SESSION_OTP_VERIFIED));
     }
 
@@ -407,7 +411,7 @@ public class AuthServiceTest {
         verifiedSession();
         when(dao.findByUsername("bob")).thenReturn(user("bob", "oldpass123"));
         when(dao.updatePasswordByUsername(eq("bob"), anyString())).thenReturn(true);
-        assertTrue(service.resetPassword("newpass123", "newpass123", session).isSuccess());
+        assertTrue(service.resetPassword("newpass123", "newpass123", NOW, session).isSuccess());
         assertTrue(map.isEmpty());
     }
 
@@ -416,7 +420,7 @@ public class AuthServiceTest {
         verifiedSession();
         when(dao.findByUsername("bob")).thenReturn(user("bob", "oldpass123"));
         when(dao.updatePasswordByUsername(eq("bob"), anyString())).thenReturn(false);
-        assertEquals("update_failed", service.resetPassword("newpass123", "newpass123", session).getMessage());
+        assertEquals("update_failed", service.resetPassword("newpass123", "newpass123", NOW, session).getMessage());
         assertTrue(map.isEmpty());
     }
 }
