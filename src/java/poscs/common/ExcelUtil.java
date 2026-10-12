@@ -50,6 +50,24 @@ public final class ExcelUtil {
     }
 
     /**
+     * Tạo 1 workbook và ghi thẳng vào OutputStream mà không phụ thuộc Servlet API.
+     */
+    public static void writeWorkbook(OutputStream outputStream, String[] headers, List<Object[]> rows)
+            throws IOException {
+        if (rows.size() > MAX_DATA_ROWS) {
+            throw new IOException("Không xuất được: " + rows.size() + " dòng vượt quá giới hạn "
+                    + MAX_DATA_ROWS + " dòng của định dạng .xls. Hãy lọc hẹp lại rồi xuất từng phần.");
+        }
+        try (Workbook workbook = new HSSFWorkbook()) {
+            Sheet sheet = workbook.createSheet("Data");
+            writeHeaderRow(workbook, sheet, headers);
+            writeDataRows(workbook, sheet, headers.length, rows);
+            setDefaultColumnWidths(sheet, headers.length);
+            workbook.write(outputStream);
+        }
+    }
+
+    /**
      * Tạo 1 workbook có đúng 1 sheet ("Data"), dòng đầu là header (in đậm,
      * nền xám nhạt), các dòng sau là dữ liệu, rồi stream thẳng ra response
      * dưới dạng file tải về. Không forward tới JSP nào sau khi gọi hàm này.
@@ -162,14 +180,21 @@ public final class ExcelUtil {
         }
     }
 
-    private static void streamAsAttachment(HttpServletResponse response, Workbook workbook, String fileNamePrefix)
-            throws IOException {
+    /**
+     * Thiết lập header cho HttpServletResponse để tải về file Excel đính kèm.
+     */
+    public static void prepareAttachmentHeaders(HttpServletResponse response, String fileNamePrefix) {
         String fileName = fileNamePrefix + "_" + new SimpleDateFormat("yyyyMMdd_HHmmss").format(new java.util.Date()) + FILE_EXTENSION;
         String encodedFileName = URLEncoder.encode(fileName, StandardCharsets.UTF_8).replace("+", "%20");
 
         response.setContentType(CONTENT_TYPE);
         response.setHeader("Content-Disposition",
                 "attachment; filename=\"" + fileName + "\"; filename*=UTF-8''" + encodedFileName);
+    }
+
+    private static void streamAsAttachment(HttpServletResponse response, Workbook workbook, String fileNamePrefix)
+            throws IOException {
+        prepareAttachmentHeaders(response, fileNamePrefix);
         try (OutputStream out = response.getOutputStream()) {
             workbook.write(out);
         }

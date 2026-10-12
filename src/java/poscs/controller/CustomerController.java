@@ -1,6 +1,7 @@
 package poscs.controller;
 
 import java.io.IOException;
+import java.io.OutputStream;
 import java.sql.Date;
 import java.text.Collator;
 import java.time.LocalDate;
@@ -38,6 +39,10 @@ import poscs.model.Enterprise;
 import poscs.model.Province;
 import poscs.model.RelationshipRating;
 import poscs.model.User;
+import poscs.service.CustomerEvaluationService;
+import poscs.service.CustomerService;
+import poscs.service.ServiceResult;
+import poscs.validator.CustomerValidator;
 
 /**
  * Controller cho toàn bộ chức năng khách hàng (enterprises). Điều hướng
@@ -87,7 +92,7 @@ public class CustomerController extends HttpServlet {
             "Nhà sản xuất", "Nhà nhập khẩu", "Nhà phân phối", "Đơn vị dịch vụ");
 
     private static List<String> customerTypesFor(String role) {
-        return ROLE_SUPPLIER.equals(role) ? SUPPLIER_TYPES : BUYER_TYPES;
+        return CustomerService.customerTypesFor(role);
     }
 
     private static final String LIST_VIEW = "/jsp/sale/listcustomer.jsp";
@@ -100,6 +105,32 @@ public class CustomerController extends HttpServlet {
     private final AddressDAO addressDAO = new AddressDAO();
     private final ContractDAO contractDAO = new ContractDAO();
     private final TechnicalSupportTicketDAO ticketDAO = new TechnicalSupportTicketDAO();
+    private final CustomerValidator customerValidator = new CustomerValidator();
+
+    private CustomerService customerService;
+    private CustomerEvaluationService customerEvaluationService;
+
+    CustomerService getCustomerService() {
+        if (customerService != null) {
+            return customerService;
+        }
+        return new CustomerService(customerDAO, employeeDAO, addressDAO, customerValidator);
+    }
+
+    void setCustomerService(CustomerService customerService) {
+        this.customerService = customerService;
+    }
+
+    CustomerEvaluationService getCustomerEvaluationService() {
+        if (customerEvaluationService != null) {
+            return customerEvaluationService;
+        }
+        return new CustomerEvaluationService(customerDAO, getCustomerService());
+    }
+
+    void setCustomerEvaluationService(CustomerEvaluationService customerEvaluationService) {
+        this.customerEvaluationService = customerEvaluationService;
+    }
 
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
@@ -203,9 +234,9 @@ public class CustomerController extends HttpServlet {
                 AccessControl.VIEW_MINE.equals(AccessControl.defaultView(request))
                         ? AccessControl.VIEW_ALL : AccessControl.VIEW_MINE));
 
-        List<Enterprise> customerList = customerDAO.findAll(page, PAGE_SIZE, keyword, typeFilter, assigneeFilter,
+        List<Enterprise> customerList = getCustomerService().findAll(page, PAGE_SIZE, keyword, typeFilter, assigneeFilter,
                 provinceFilters, false, roleFilter, scope);
-        int totalCount = customerDAO.countAll(keyword, typeFilter, assigneeFilter, provinceFilters, roleFilter, scope);
+        int totalCount = getCustomerService().countAll(keyword, typeFilter, assigneeFilter, provinceFilters, roleFilter, scope);
         int totalPages = Math.max(1, (int) Math.ceil(totalCount / (double) PAGE_SIZE));
 
         request.setAttribute("customerList", customerList);
@@ -247,7 +278,7 @@ public class CustomerController extends HttpServlet {
     private void showDetail(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
         Integer id = parseIntOrNull(request.getParameter("id"));
-        Enterprise customer = id != null ? customerDAO.findById(id) : null;
+        Enterprise customer = id != null ? getCustomerService().findById(id) : null;
         if (customer == null) {
             // MSG-021: khách hàng không tồn tại
             response.sendRedirect(notFoundUrl(request));
@@ -258,8 +289,8 @@ public class CustomerController extends HttpServlet {
         request.setAttribute("contactList", customerDAO.findContactsByEnterpriseId(id));
         request.setAttribute("contractList", contractDAO.findByEnterpriseId(id));
         request.setAttribute("ticketList", ticketDAO.findByEnterpriseId(id));
-        request.setAttribute("lifecycleEventList", customerDAO.findLifecycleEventsByEnterpriseId(id));
-        List<String> roles = customerDAO.findRolesOf(id);
+        request.setAttribute("lifecycleEventList", getCustomerEvaluationService().getLifecycleEvents(id));
+        List<String> roles = getCustomerService().findRolesOf(id);
         request.setAttribute("customerRoles", roles);
         // Ba nút ghi (Sửa, Xoá, Đánh giá) tính theo TỪNG khách chứ không chỉ theo
         // vai: Sales xem được khách của người khác nhưng không ghi được. Kèm cờ
@@ -520,12 +551,12 @@ public class CustomerController extends HttpServlet {
             return;
         }
         Integer id = parseIntOrNull(request.getParameter("id"));
-        Enterprise customer = id != null ? customerDAO.findById(id) : null;
+        Enterprise customer = id != null ? getCustomerService().findById(id) : null;
         if (customer == null) {
             response.sendRedirect(notFoundUrl(request));
             return;
         }
-        List<String> roles = customerDAO.findRolesOf(id);
+        List<String> roles = getCustomerService().findRolesOf(id);
         if (outsideSalesScope(request, customer, roles)) {
             response.sendRedirect(request.getContextPath()
                     + "/customer?action=view&id=" + id + "&error=not_your_customer");
@@ -591,63 +622,20 @@ public class CustomerController extends HttpServlet {
         String typeFilter = request.getParameter("type");
         Integer assigneeFilter = parseIntOrNull(request.getParameter("assigneeId"));
         List<Integer> provinceFilters = ContractController.provinceFiltersOf(request);
-
-        // Sắp theo tỉnh (sortByProvince=true): quản lý khách hàng chia theo địa bàn
-        // nên file xuất ra phải gom các dòng cùng tỉnh lại với nhau, không phải
-        // mới-nhất-trước như danh sách trên màn hình.
-        // Xuất đúng danh sách đang xem: đứng ở "Nhà cung cấp" mà bấm Xuất
-        // Excel lại ra khách mua thì người dùng không cách nào biết file sai.
         String roleFilter = roleFromKind(request.getParameter("kind"));
-        // ĐỊA BÀN KHÔNG ÁP CHO NHÀ CUNG CẤP. Tỉnh ở đây là địa bàn BÁN HÀNG --
-        // nó quyết định ai cầm khách nào (user_provinces). Bên bán hàng cho
-        // mình thì không được chia theo địa bàn, nên lọc theo tỉnh ở màn đó vừa
-        // vô nghĩa vừa cắt mất kết quả.
-        //
-        // Bỏ ở đây chứ không chỉ ẩn ô chọn: ẩn thôi thì một provinceId còn sót
-        // trên URL vẫn âm thầm thu hẹp danh sách.
         if (ROLE_SUPPLIER.equals(roleFilter)) {
             provinceFilters = List.of();
         }
-        // Xuất ĐÚNG thứ đang nhìn thấy: cùng phạm vi mặc định với danh sách trên
-        // màn hình. Thiếu dòng này thì bấm "Xuất Excel" ở màn hình 4 dòng lại ra file
-        // 12 dòng, mà người xuất không cách nào biết file sai.
         ListScope scope = AccessControl.listScope(request,
                 () -> employeeDAO.findTeamUserIds(AccessControl.currentUser(request).getUserId()),
                 () -> employeeDAO.findProvincesOf(AccessControl.currentUser(request).getUserId())
                         .stream().map(Province::getProvinceId).collect(Collectors.toList()));
-        List<Enterprise> all = customerDAO.findAll(1, Integer.MAX_VALUE, keyword, typeFilter, assigneeFilter,
-                provinceFilters, true, roleFilter, scope);
-        // File Excel vẫn giữ cột "Mã KH" dù danh sách trên màn hình đã bỏ: STT chỉ
-        // là số thứ tự dòng trong chính file này, hai người mở hai file xuất ở hai
-        // thời điểm sẽ có STT khác nhau cho cùng một khách -- cần một cột để đối
-        // chiếu ngược lại hệ thống thì mã là thứ duy nhất không đổi.
-        String[] headers = {"STT", "Mã KH", "Tên doanh nghiệp", "Loại KH", "Nhóm KH", "MST", "Email", "SĐT",
-            "Website", "Tỉnh/Thành phố", "Địa chỉ", "Người phụ trách chính", "Người hỗ trợ",
-            "Ngày tham gia", "Xếp hạng quan hệ"};
-        List<Object[]> rows = new ArrayList<>();
-        int stt = 1;
-        for (Enterprise e : all) {
-            rows.add(new Object[]{
-                stt++,
-                e.getEnterpriseCode(),
-                e.getEnterpriseName(),
-                e.getCustomerType(),
-                e.getCustomerGroup(),
-                e.getTaxCode(),
-                e.getEmail(),
-                e.getPhone(),
-                e.getWebsite(),
-                provinceNameOf(e),
-                e.getAddress() != null ? e.getAddress().getFullAddress() : "",
-                e.getAccountOwner() != null ? e.getAccountOwner().getFullName() : "",
-                e.getSupportOwner() != null ? e.getSupportOwner().getFullName() : "",
-                e.getJoinDate() != null ? e.getJoinDate().toString() : "",
-                e.getCurrentRelationshipRating() != null ? e.getCurrentRelationshipRating().toString() : ""
-            });
+
+        String prefix = getCustomerService().getExportFileNamePrefix(roleFilter);
+        ExcelUtil.prepareAttachmentHeaders(response, prefix);
+        try (OutputStream out = response.getOutputStream()) {
+            getCustomerService().exportCustomersToExcel(out, keyword, typeFilter, assigneeFilter, provinceFilters, roleFilter, scope);
         }
-        ExcelUtil.writeWorkbook(response,
-                ROLE_SUPPLIER.equals(roleFilter) ? "nha_cung_cap" : "khach_hang_mua",
-                headers, rows);
     }
 
     // ------------------------------------------------------------------
@@ -679,79 +667,31 @@ public class CustomerController extends HttpServlet {
         e.setStatus("Active");
         e.setJoinDate(parseDateOrNull(request.getParameter("joinDate")));
 
-        // Người phụ trách chính -- chỗ khoá thật; JSP chỉ khoá hình. Bỏ qua ô
-        // accountOwnerId gửi lên ở mọi nhánh có khoá, như một request nặn tay.
         User me = AccessControl.currentUser(request);
-        Integer accountOwnerId;
-        if (supplier) {
-            // Nhà cung cấp không chia theo địa bàn: Sales tạo thì đứng tên chính
-            // mình, Admin chọn tay. Không tra bảng phân công -- người cầm tỉnh
-            // nơi nhà cung cấp đặt văn phòng chẳng liên quan gì tới họ.
-            accountOwnerId = AccessControl.isSales(request)
-                    ? Integer.valueOf(me.getUserId())
-                    : parseIntOrNull(request.getParameter("accountOwnerId"));
-        } else if (!territoryOf(request).isEmpty()) {
-            // Sales đã được giao tỉnh: chỉ tạo khách trong tỉnh mình cầm, khách
-            // đứng tên mình. Kiểm theo XÃ/PHƯỜNG như resolveAccountOwnerId, không
-            // theo ô tỉnh rời. Mỗi tỉnh chỉ một người cầm (UNIQUE ở
-            // user_provinces), nên "xã này thuộc tỉnh của tôi" chính là "người
-            // cầm xã này là tôi".
-            Integer wardId = parseIntOrNull(request.getParameter("districtId"));
-            if (wardId != null && !Integer.valueOf(me.getUserId()).equals(employeeDAO.findAssigneeOfWard(wardId))) {
-                response.sendRedirect(formUrl + "&error=province_not_allowed");
-                return;
-            }
-            accountOwnerId = me.getUserId();
-        } else {
-            accountOwnerId = resolveAccountOwnerId(request);
-        }
-        if (accountOwnerId != null) {
-            e.setAccountOwnerId(accountOwnerId);
-        }
-        e.setSupportOwnerId(parseIntOrNull(request.getParameter("supportOwnerId")));
+        boolean isSales = AccessControl.isSales(request);
+        Integer wardId = parseIntOrNull(request.getParameter("districtId"));
+        String addressDetail = emptyToNull(request.getParameter("addressDetail"));
+        Integer inputOwnerId = parseIntOrNull(request.getParameter("accountOwnerId"));
+        Integer inputSupportOwnerId = parseIntOrNull(request.getParameter("supportOwnerId"));
 
-        setAddressFromRequest(e, request, null);
-
-        // Địa chỉ giờ là bắt buộc: khách hàng được giao việc và báo cáo theo
-        // địa bàn tỉnh, mà tỉnh chỉ suy ra được qua xã/phường của địa chỉ --
-        // khách không có địa chỉ sẽ rơi khỏi mọi bộ lọc/thống kê theo tỉnh.
-        // Chỉ chặn ở tầng ứng dụng, cột address_id vẫn để NULL được cho dữ
-        // liệu cũ tạo trước thay đổi này.
-        if (!isValidCommonFields(e) || isBlank(e.getTaxCode()) || e.getAddress() == null) {
-            response.sendRedirect(formUrl + "&error=invalid");
-            return;
-        }
-        if (supportIsOwnersManager(e)) {
-            response.sendRedirect(formUrl + "&error=support_is_superior");
-            return;
-        }
-        String duplicate = findDuplicateField(e, null);
-        if (duplicate != null) {
-            response.sendRedirect(formUrl + "&error=" + duplicate);
+        ServiceResult<Enterprise> valResult = getCustomerService().prepareAndValidateCreate(
+                e, role, me, isSales, wardId, addressDetail, inputOwnerId, inputSupportOwnerId);
+        if (!valResult.isSuccess()) {
+            response.sendRedirect(formUrl + "&error=" + valResult.getMessage());
             return;
         }
 
-        // Lưu logo SAU khi đã qua hết các bước kiểm: FileStorage.save ghi thẳng
-        // file xuống đĩa, nên gọi nó trước validate là mỗi lần người dùng gõ
-        // sai một ô lại để lại một file không bản ghi nào trỏ tới, và không có
-        // đường nào dọn.
         e.setLogoUrl(FileStorage.save(request.getPart("logo"), LOGO_SUBFOLDER, FileStorage.IMAGE_EXTENSIONS));
 
-        e.setEnterpriseCode(supplier
-                ? customerDAO.generateNextSupplierCode()
-                : customerDAO.generateNextEnterpriseCode());
-        int newId = customerDAO.insert(e);
-        if (newId <= 0) {
+        ServiceResult<Integer> result = getCustomerService().insertCustomer(e, role);
+        if (!result.isSuccess()) {
             LOG.warn("Tao khach hang that bai (actor={}, enterpriseCode={})", Logs.actor(request), e.getEnterpriseCode());
-            response.sendRedirect(formUrl + "&error=create_failed");
+            response.sendRedirect(formUrl + "&error=" + result.getMessage());
             return;
         }
-        // Vai nằm ở bảng riêng nên phải ghi tách khỏi hồ sơ khách hàng. Hỏng thì
-        // khách đã lưu mà không nằm trong danh sách nào (bộ lọc theo vai) --
-        // phải báo, và đưa về trang chi tiết để người dùng mở Sửa tick lại vai.
-        // KHÔNG xoá mềm bản vừa tạo để "làm lại": các cột mã số thuế / email /
-        // số điện thoại UNIQUE cả trên bản ghi đã xoá mềm, tạo lại sẽ bị báo trùng.
-        if (!customerDAO.replaceRolesOf(newId, List.of(role))) {
+
+        int newId = result.getData();
+        if ("roles_not_saved".equals(result.getMessage())) {
             LOG.warn("Ghi vai khach hang moi that bai (actor={}, enterpriseId={})", Logs.actor(request), newId);
             response.sendRedirect(request.getContextPath() + "/customer?action=view&id=" + newId + "&error=roles_not_saved");
             return;
@@ -765,22 +705,16 @@ public class CustomerController extends HttpServlet {
             return;
         }
         Integer id = parseIntOrNull(request.getParameter("customerId"));
-        Enterprise existing = id != null ? customerDAO.findById(id) : null;
-        if (existing == null) {
+        if (id == null) {
             response.sendRedirect(notFoundUrl(request));
             return;
         }
-        // Lỗi thì quay về đúng trang vừa gửi (Sửa khách hàng / Sửa nhà cung
-        // cấp), xong thì về chi tiết vẫn sáng đúng danh sách -- như trang Thêm.
+
         String pageRole = roleFromKind(request.getParameter("kind"));
         String kindQuery = ROLE_SUPPLIER.equals(pageRole) ? "&kind=supplier" : "";
         String formUrl = request.getContextPath() + "/customer?action=edit&id=" + id + kindQuery;
         String detailUrl = request.getContextPath() + "/customer?action=view&id=" + id + kindQuery;
-        // Trang form đã chặn, nhưng POST thẳng thì không đi qua trang form.
-        if (outsideSalesScope(request, existing, customerDAO.findRolesOf(id))) {
-            response.sendRedirect(detailUrl + "&error=not_your_customer");
-            return;
-        }
+
         if (!logoIsAcceptable(request, response, formUrl)) {
             return;
         }
@@ -795,57 +729,40 @@ public class CustomerController extends HttpServlet {
         e.setWebsite(emptyToNull(request.getParameter("website")));
         e.setJoinDate(parseDateOrNull(request.getParameter("joinDate")));
 
-        // Luật tỉnh và người phụ trách đi theo vai SẼ LƯU, không phải vai cũ:
-        // tick thêm "Khách mua" cho một nhà cung cấp là từ đó nó theo địa bàn.
-        List<String> roles = rolesForUpdate(request, pageRole);
-        if (!isSupplierOnly(roles) && !provinceAllowedForSales(request, existing)) {
-            response.sendRedirect(formUrl + "&error=province_not_allowed");
-            return;
-        }
-        Integer accountOwnerId = ownerForUpdate(request, existing, roles);
-        if (accountOwnerId != null) {
-            e.setAccountOwnerId(accountOwnerId);
-        }
-        e.setSupportOwnerId(parseIntOrNull(request.getParameter("supportOwnerId")));
+        User me = AccessControl.currentUser(request);
+        boolean isSales = AccessControl.isSales(request);
+        String[] submittedRoles = request.getParameterValues("roles");
+        Integer wardId = parseIntOrNull(request.getParameter("districtId"));
+        String addressDetail = emptyToNull(request.getParameter("addressDetail"));
+        Integer inputOwnerId = parseIntOrNull(request.getParameter("accountOwnerId"));
+        Integer inputSupportOwnerId = parseIntOrNull(request.getParameter("supportOwnerId"));
 
-        setAddressFromRequest(e, request, existing.getAddressId());
-
-        // Như handleCreate: phải có địa bàn. Ở đây chấp nhận cả trường hợp
-        // request không gửi lên địa chỉ mới nhưng khách đã có sẵn address_id
-        // (DAO giữ nguyên địa chỉ cũ) -- sửa tên/SĐT của khách cũ không vì thế
-        // mà bị chặn.
-        if (!isValidCommonFields(e) || (e.getAddress() == null && existing.getAddressId() == null)) {
-            response.sendRedirect(formUrl + "&error=invalid");
-            return;
-        }
-        if (supportIsOwnersManager(e)) {
-            response.sendRedirect(formUrl + "&error=support_is_superior");
-            return;
-        }
-        // Loại chính khách đang sửa ra khỏi phép kiểm, nếu không thì mở form
-        // lên bấm Lưu mà không đổi gì cũng báo trùng với chính nó.
-        String duplicate = findDuplicateField(e, id);
-        if (duplicate != null) {
-            response.sendRedirect(formUrl + "&error=" + duplicate);
+        ServiceResult<CustomerService.UpdatePreparedState> prepResult = getCustomerService().prepareAndValidateUpdate(
+                e, submittedRoles, pageRole, me, isSales, wardId, addressDetail, inputOwnerId, inputSupportOwnerId);
+        if (!prepResult.isSuccess()) {
+            String error = prepResult.getMessage();
+            if ("notfound".equals(error)) {
+                response.sendRedirect(notFoundUrl(request));
+            } else if ("not_your_customer".equals(error)) {
+                response.sendRedirect(detailUrl + "&error=not_your_customer");
+            } else {
+                response.sendRedirect(formUrl + "&error=" + error);
+            }
             return;
         }
 
-        // Ghi file sau validate, cùng lý do như handleCreate. Chỉ ghi đè logo
-        // khi người dùng thực sự chọn ảnh mới -- input file để trống vẫn gửi
-        // lên 1 Part rỗng (size=0), FileStorage.save trả về null trong trường
-        // hợp đó, nên giữ nguyên logo cũ thay vì xoá mất.
+        CustomerService.UpdatePreparedState state = prepResult.getData();
         String newLogoUrl = FileStorage.save(request.getPart("logo"), LOGO_SUBFOLDER, FileStorage.IMAGE_EXTENSIONS);
-        e.setLogoUrl(newLogoUrl != null ? newLogoUrl : existing.getLogoUrl());
+        e.setLogoUrl(newLogoUrl != null ? newLogoUrl : state.getExisting().getLogoUrl());
 
-        boolean ok = customerDAO.update(e);
-        if (!ok) {
+        ServiceResult<Enterprise> commitResult = getCustomerService().commitUpdate(e, state.getRoles());
+        if (!commitResult.isSuccess()) {
             LOG.warn("Cap nhat khach hang that bai (actor={}, enterpriseId={})", Logs.actor(request), id);
-            response.sendRedirect(formUrl + "&error=update_failed");
+            response.sendRedirect(formUrl + "&error=" + commitResult.getMessage());
             return;
         }
-        // replaceRolesOf tự bọc transaction: hỏng thì vai cũ còn nguyên, chỉ phần
-        // vai vừa tick chưa được ghi. Hồ sơ thì đã lưu -- về trang chi tiết báo rõ.
-        if (!customerDAO.replaceRolesOf(id, roles)) {
+
+        if ("roles_not_saved".equals(commitResult.getMessage())) {
             LOG.warn("Ghi vai khach hang that bai (actor={}, enterpriseId={})", Logs.actor(request), id);
             response.sendRedirect(detailUrl + "&error=roles_not_saved");
             return;
@@ -858,106 +775,65 @@ public class CustomerController extends HttpServlet {
             return;
         }
         Integer id = parseIntOrNull(request.getParameter("id"));
-        // Phải kiểm bản ghi có tồn tại TRƯỚC các ràng buộc nghiệp vụ: id rác chạy
-        // thẳng xuống softDelete thì UPDATE không chạm dòng nào và người dùng bị
-        // đẩy về danh sách không kèm thông báo gì, tưởng đã xoá xong.
-        Enterprise existing = id != null ? customerDAO.findById(id) : null;
-        if (existing == null) {
+        if (id == null) {
             response.sendRedirect(notFoundUrl(request));
             return;
         }
-        if (outsideSalesScope(request, existing, customerDAO.findRolesOf(id))) {
-            response.sendRedirect(request.getContextPath()
-                    + "/customer?action=view&id=" + id + "&error=not_your_customer");
-            return;
-        }
-
-        // BR-34: không cho xoá khách hàng còn hợp đồng đang hiệu lực
-        if (customerDAO.hasActiveContracts(id)) {
-            response.sendRedirect(request.getContextPath() + "/customer?action=view&id=" + id + "&error=has_active_contracts");
-            return;
-        }
-
-        // Quay về đúng danh sách người dùng vừa đứng: form xoá ở viewcustomerdetail.jsp
-        // gửi kèm kind, vì sau softDelete thì không đọc lại được vai của bản ghi nữa.
-        // Thiếu tham số này thì xoá một nhà cung cấp xong bị đẩy sang danh sách khách mua.
+        User me = AccessControl.currentUser(request);
+        boolean isSales = AccessControl.isSales(request);
         String kind = ROLE_SUPPLIER.equals(roleFromKind(request.getParameter("kind"))) ? "supplier" : "buyer";
-        if (!customerDAO.softDelete(id)) {
-            LOG.warn("Xoa khach hang that bai (actor={}, enterpriseId={})", Logs.actor(request), id);
-            // Khách vẫn còn nguyên: về trang chi tiết của nó chứ không về danh sách
-            // như đã xoá xong. kind chỉ đi kèm khi request có gửi -- không có thì
-            // trang chi tiết tự suy từ vai của khách, đúng hơn là ép về "buyer"
-            // (một nhà cung cấp sẽ hiện như đang ở danh sách khách mua).
-            String kindQuery = request.getParameter("kind") != null ? "&kind=" + kind : "";
-            response.sendRedirect(request.getContextPath()
-                    + "/customer?action=view&id=" + id + kindQuery + "&error=delete_failed");
-            return;
+        String kindQuery = request.getParameter("kind") != null ? "&kind=" + kind : "";
+
+        ServiceResult<Void> result = getCustomerService().deleteCustomer(id, me, isSales);
+        if (result.isSuccess()) {
+            response.sendRedirect(request.getContextPath() + "/customer?kind=" + kind);
+        } else {
+            String error = result.getMessage();
+            if ("notfound".equals(error)) {
+                response.sendRedirect(notFoundUrl(request));
+            } else if ("not_your_customer".equals(error)) {
+                response.sendRedirect(request.getContextPath() + "/customer?action=view&id=" + id + "&error=not_your_customer");
+            } else if ("has_active_contracts".equals(error)) {
+                response.sendRedirect(request.getContextPath() + "/customer?action=view&id=" + id + "&error=has_active_contracts");
+            } else {
+                LOG.warn("Xoa khach hang that bai (actor={}, enterpriseId={})", Logs.actor(request), id);
+                response.sendRedirect(request.getContextPath() + "/customer?action=view&id=" + id + kindQuery + "&error=" + error);
+            }
         }
-        response.sendRedirect(request.getContextPath() + "/customer?kind=" + kind);
     }
 
-    /**
-     * Ghi 1 lần đánh giá xếp hạng THỦ CÔNG do người dùng chọn trong box ở
-     * viewcustomerdetail.jsp (không có engine tự động tính điểm nào cả --
-     * customer_evaluation_rules/contract_payments vẫn nằm trong schema
-     * nhưng không có chỗ nào đụng tới) -- ghi kết quả vào
-     * enterprises.current_relationship_rating và thêm 1 dòng
-     * customer_lifecycle_events (is_auto_generated=0). Cùng quyền Full
-     * access với create/update/delete vì đây cũng là 1 thao tác ghi dữ
-     * liệu khách hàng.
-     */
     private void handleEvaluate(HttpServletRequest request, HttpServletResponse response) throws IOException {
         if (!AccessControl.requireFullAccess(request, response, AccessControl.Resource.CUSTOMER)) {
             return;
         }
         Integer id = parseIntOrNull(request.getParameter("id"));
-        Enterprise existing = id != null ? customerDAO.findById(id) : null;
-        if (existing == null) {
+        if (id == null) {
             response.sendRedirect(notFoundUrl(request));
-            return;
-        }
-        if (outsideSalesScope(request, existing, customerDAO.findRolesOf(id))) {
-            response.sendRedirect(request.getContextPath()
-                    + "/customer?action=view&id=" + id + "&error=not_your_customer");
-            return;
-        }
-
-        RelationshipRating rating = parseRatingOrNull(request.getParameter("rating"));
-        if (rating == null) {
-            response.sendRedirect(request.getContextPath() + "/customer?action=view&id=" + id + "&error=invalid_rating");
             return;
         }
 
         User currentUser = AccessControl.currentUser(request);
-        CustomerLifecycleEvent event = new CustomerLifecycleEvent();
-        event.setEnterpriseId(id);
-        event.setEventType("Đánh giá xếp hạng");
-        event.setRelationshipRating(rating);
-        event.setAutoGenerated(false);
-        event.setDescription(emptyToNull(request.getParameter("description")));
-        event.setEventDate(Date.valueOf(LocalDate.now()));
-        event.setRecordedBy(currentUser.getUserId());
-        // Xếp hạng + dòng lịch sử ghi trong một transaction (xem recordEvaluation):
-        // hỏng thì không ghi gì, và trang KHÔNG được báo "Đã đánh giá lại".
-        if (!customerDAO.recordEvaluation(event)) {
-            LOG.warn("Danh gia khach hang that bai (actor={}, enterpriseId={})", Logs.actor(request), id);
-            response.sendRedirect(request.getContextPath() + "/customer?action=view&id=" + id + "&error=evaluate_failed");
-            return;
-        }
+        boolean isSales = AccessControl.isSales(request);
+        ServiceResult<CustomerLifecycleEvent> result = getCustomerEvaluationService().evaluateCustomer(
+                id, request.getParameter("rating"), emptyToNull(request.getParameter("description")), currentUser, isSales);
 
-        response.sendRedirect(request.getContextPath() + "/customer?action=view&id=" + id + "&evaluated=1");
+        if (result.isSuccess()) {
+            response.sendRedirect(request.getContextPath() + "/customer?action=view&id=" + id + "&evaluated=1");
+        } else {
+            String error = result.getMessage();
+            if ("notfound".equals(error)) {
+                response.sendRedirect(notFoundUrl(request));
+            } else {
+                if ("evaluate_failed".equals(error)) {
+                    LOG.warn("Danh gia khach hang that bai (actor={}, enterpriseId={})", Logs.actor(request), id);
+                }
+                response.sendRedirect(request.getContextPath() + "/customer?action=view&id=" + id + "&error=" + error);
+            }
+        }
     }
 
-    /** Chỉ chấp nhận đúng 1 trong 4 tên hằng số của RelationshipRating (khớp value của các <option> trong box chọn). */
     private RelationshipRating parseRatingOrNull(String value) {
-        if (isBlank(value)) {
-            return null;
-        }
-        try {
-            return RelationshipRating.valueOf(value.trim());
-        } catch (IllegalArgumentException ex) {
-            return null;
-        }
+        return getCustomerEvaluationService().parseRatingOrNull(value);
     }
 
     // ------------------------------------------------------------------
