@@ -18,10 +18,13 @@
 ## Quyết định đã chốt
 
 1. Cách lấy IP cho BR-01 (Task 1.3): **không cần thay đổi**, giữ cách hiện tại.
-2. Thông báo SLA phiếu: **báo trước 24 giờ**. Thông báo hợp đồng: tạm dùng **30 ngày** (BR-17).
+2. Thông báo SLA phiếu: **báo trước 24 giờ**. Thông báo hợp đồng: chốt **30 ngày** (BR-17).
 3. Bảng phân công địa bàn **đã có trong DB** (`user_provinces`; tên chính xác theo `db/schema.sql`).
 4. Hai gói `poscs.service` và `poscs.validator` đã được xác nhận và đã tồn tại.
 5. Integration test: 3 lớp trong `test/poscs/integration/`, **mặc định bị bỏ qua (skipped)**; chỉ chạy khi trỏ vào CSDL dùng-một-lần có tên kết thúc bằng `_it` (xem Task 7.2).
+6. UC-50, UC-51 (Change Request): `ChangeRequestDAO` và `ChangeRequestController` đã tồn tại độc lập kèm test, giữ nguyên không tách lại (Task 4.8 bỏ).
+7. UC-54 (Chữa sai sót HĐ đã ký): tích hợp vào `ContractService` (Task 4.10) và `ContractActionController` (Task 4.12); không tạo controller riêng.
+8. Luồng chi tiết UC-36 → UC-54: lấy hành vi code và JSP hiện có làm chuẩn (khóa bằng test ở Task 4.2), chỉ tách nhỏ theo rules §3 mà không thêm tính năng.
 
 ## Quyết định còn chờ người dùng
 
@@ -35,8 +38,8 @@ Không còn mục nào.
 - [x] **Task 1.2:** Tách `AuthValidator` và `AuthService` từ `AuthenticationController`; chuyển logic kiểm tra đăng nhập, đổi mật khẩu, OTP email sang Service; Unit Test tại `test/poscs/service/AuthServiceTest.java`.
 - [x] **Task 1.3:** Tách `AuthenticationController` thành `LoginController`, `LogoutController`, `PasswordResetController`, `ProfileController`; nối với `AuthService` và xóa logic trùng trong `AuthenticationController`.
   - *IP sau reverse proxy: đã chốt không cần xử lý thêm (xem "Quyết định đã chốt").*
-- [ ] **Task 1.4:** `[SPEC mục 3]` `[UC-30..35, UC-44, UC-46..51, UC-54]` `[NFR-10]` Xây dựng `PermissionService` gom logic phân quyền về một chỗ: ma trận 3 vai trò (Admin / Sales / Kỹ thuật), phân biệt **Sales quản lý vùng** (không có cấp trên) với **Sales có cấp trên** (chỉ xem, gửi yêu cầu thay đổi), phạm vi dữ liệu "Của tôi" theo người phụ trách/cấp dưới/tỉnh được giao. Cấp trên đọc từ DB.
-  - *Xong khi:* có unit test phủ ma trận 3 vai trò × các thao tác `(*)` trong SPEC mục 3.3; vi phạm quyền trả `MSG-022`. Không tạo vai trò CS.
+- [x] **Task 1.4:** `[SPEC mục 3]` `[UC-30..35, UC-44, UC-46..51, UC-54]` `[NFR-10]` Xây dựng `PermissionService` gom logic phân quyền về một chỗ: ma trận 3 vai trò (Admin / Sales / Kỹ thuật), phân biệt **Sales quản lý vùng** (không có cấp trên) với **Sales có cấp trên** (chỉ xem, gửi yêu cầu thay đổi), phạm vi dữ liệu "Của tôi" theo người phụ trách/cấp dưới/tỉnh được giao. Cấp trên đọc từ DB.
+  - *Đã hoàn thành:* Xây dựng `poscs.service.PermissionService` gom toàn bộ ma trận RBAC 3 vai trò, xác thực DB theo thời gian thực (fail-closed), ListScope bảo mật và kiểm tra quyền dòng; Unit Test tại `test/poscs/service/PermissionServiceTest.java` (29 test cases pass 100%).
 
 ---
 
@@ -75,18 +78,18 @@ Không còn mục nào.
 - [ ] **Task 4.5:** `[UC-52]` Tách `ContractDocumentDAO` (tài liệu đính kèm là **đường dẫn**, hủy mềm kèm lý do bắt buộc).
 - [ ] **Task 4.6:** `[UC-47]` Tách `ContractLinkDAO` (liên kết Bán ↔ Mua, gỡ liên kết).
 - [ ] **Task 4.7:** `[UC-48, UC-49]` Tách `ContractHandoverDAO` (chặng bàn giao phòng ban).
-- [ ] **Task 4.8:** `[UC-50, UC-51]` Tách phần yêu cầu thay đổi thành `ChangeRequestDAO` (nếu đã có trong code; không thêm tính năng).
+- [-] **Task 4.8:** `[UC-50, UC-51]` Bỏ - theo quyết định ngày 15/10 (`ChangeRequestDAO` và `ChangeRequestController` đã tồn tại độc lập tại `poscs.dao.ChangeRequestDAO` và `poscs.controller.ChangeRequestController`, không cần tách từ `ContractDAO`).
 - [ ] **Task 4.9:** `[UC-10, UC-11, UC-33, UC-34, UC-35, UC-39, UC-41, UC-44, UC-46]` `[BR-12, BR-16, BR-17, BR-18, BR-35..37]` Thu gọn `ContractDAO` còn CRUD hợp đồng gốc, hàng hóa, phụ lục và lọc/tìm kiếm.
-- [ ] **Task 4.10:** `[UC-33, UC-34, UC-35, UC-39, UC-44, UC-46]` `[BR-17, BR-35, BR-36, BR-37]` Xây dựng `ContractService`: transaction (NFR-19), Ký (Nháp → Đã ký, tự đóng dấu ngày ký, kiểm quyền qua `PermissionService`), huỷ bản ghi (lý do bắt buộc; Nháp: Admin/quản lý vùng; đã ký: **chỉ Admin**; chặn nếu có phụ lục), sửa theo tiến độ (Nháp sửa mọi ô; đã ký chỉ đổi Người phụ trách; thanh lý/chấm dứt không sửa).
+- [ ] **Task 4.10:** `[UC-33, UC-34, UC-35, UC-39, UC-44, UC-46, UC-54]` `[BR-17, BR-35, BR-36, BR-37]` Xây dựng `ContractService`: transaction (NFR-19), Ký (Nháp → Đã ký, tự đóng dấu ngày ký, kiểm quyền qua `PermissionService`), huỷ bản ghi (lý do bắt buộc; Nháp: Admin/quản lý vùng; đã ký: **chỉ Admin**; chặn nếu có phụ lục), sửa theo tiến độ (Nháp sửa mọi ô; đã ký chỉ đổi Người phụ trách; thanh lý/chấm dứt không sửa), tích hợp method chữa sai sót HĐ đã ký (UC-54) từ `ContractDAO`.
 - [ ] **Task 4.11:** `[UC-48, UC-49, UC-53]` Xây dựng `ContractHandoverService` và `ContractPaymentService`.
-- [ ] **Task 4.12:** `[UC-33, UC-34, UC-35, UC-44, UC-46]` `ContractActionController` (Tạo, Sửa, Ký, Huỷ bản ghi, Phụ lục).
+- [ ] **Task 4.12:** `[UC-33, UC-34, UC-35, UC-44, UC-46, UC-54]` `ContractActionController` (Tạo, Sửa, Ký, Huỷ bản ghi, Phụ lục, Chữa sai sót UC-54 gọi về `ContractService`).
 - [ ] **Task 4.13:** `[UC-10, UC-11, UC-45]` `[BR-12, BR-14, BR-16, BR-18]` `ContractListController` và `ContractDetailController`.
 - [ ] **Task 4.14:** `[UC-48, UC-49]` `ContractHandoverController`.
 - [ ] **Task 4.15:** `[UC-53]` `ContractPaymentController`.
 - [ ] **Task 4.16:** `[UC-52]` `ContractDocumentController`.
 - [ ] **Task 4.17:** `[UC-41]` `ContractExportController` (Excel, cùng bộ lọc, không phân trang, sắp theo tỉnh/thành).
-- [ ] **Task 4.18:** `[UC-47, UC-50, UC-51]` Controller cho liên kết Bán ↔ Mua và yêu cầu thay đổi (nếu đã có trong `ContractController` cũ).
-- [ ] **Task 4.19:** `[UC-54]` Module **chữa sai sót hợp đồng đã ký** (chỉ Admin): chưa thanh lý/chấm dứt, **bắt buộc lý do**, ghi nhật ký loại sự kiện riêng, **ngày ký không sửa được**.
+- [ ] **Task 4.18:** `[UC-47]` Xây dựng `ContractLinkController` cho liên kết hợp đồng Bán ↔ Mua (và gỡ liên kết). Phần ChangeRequest (UC-50, UC-51) giữ nguyên `ChangeRequestController` đã có.
+- [ ] **Task 4.19:** `[UC-54]` Kiểm thử luồng chữa sai sót hợp đồng đã ký (chỉ Admin, bắt buộc lý do, ghi nhật ký sự kiện riêng `EVENT_CORRECTED`, khóa ngày ký) trên `ContractService` (Task 4.10) và `ContractActionController` (Task 4.12); không tạo controller riêng.
 
 ---
 
