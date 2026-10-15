@@ -59,7 +59,8 @@ Không còn mục nào.
 
 ## Giai đoạn 3: Module Sản phẩm
 
-- [ ] **Task 3.1:** `[UC-18, UC-19]` `[BR-54]` Xây dựng `ProductValidator` (bắt buộc Tên sản phẩm và Danh mục; danh mục phải còn dùng được; ảnh chỉ JPG/PNG/GIF/WEBP) và Unit Test.
+- [x] **Task 3.1:** `[UC-18, UC-19]` `[BR-54]` Xây dựng `ProductValidator` (bắt buộc Tên sản phẩm và Danh mục; danh mục phải còn dùng được; ảnh chỉ JPG/PNG/GIF/WEBP) và Unit Test.
+  - *Đã hoàn thành:* Xây dựng `poscs.validator.ProductValidator` kế thừa `BaseValidator` kiểm tra ràng buộc BR-54 (Tên sản phẩm bắt buộc, tối đa 150 ký tự; Danh mục bắt buộc > 0), danh mục phải còn dùng được (không xóa mềm, không phải danh mục cha, hỗ trợ keepCategoryId cho form sửa), BR-48 (ảnh chỉ nhận JPG/PNG/GIF/WEBP, catalogue chỉ nhận PDF, hỗ trợ Part và tên file). Unit test tại `test/poscs/validator/ProductValidatorTest.java` (28/28 test cases pass 100%).
   - *Lưu ý:* validator **không** kiểm trùng mã sản phẩm (BR-55).
 - [ ] **Task 3.2:** `[UC-12, UC-13, UC-18, UC-19, UC-20]` `[BR-19, BR-48, BR-49, BR-54, BR-55]` Xây dựng `ProductService`: danh mục phân cấp, upload ảnh/catalogue, **sinh mã tự động dựa UNIQUE ở DB, trùng thì thử lại tối đa 5 lần không báo lỗi (BR-55, MSG-056)**, mã không đổi sau khi tạo, xóa mềm và chặn khi SP nằm trong hợp đồng còn hiệu lực.
 - [ ] **Task 3.3:** `[UC-12, UC-13, UC-18, UC-19, UC-20]` `[BR-12, BR-14, BR-19, BR-49, BR-53]` Tinh gọn `ProductController` chỉ còn lớp Presentation, gọi qua `ProductService`.
