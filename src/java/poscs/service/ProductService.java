@@ -519,21 +519,24 @@ public class ProductService extends BaseService {
             return 0;
         }
         Set<Integer> present = new HashSet<>();
+        boolean hasList = false;
         if (isImage && existing.getImages() != null) {
+            hasList = true;
             existing.getImages().forEach(img -> present.add(img.getImageId()));
         } else if (!isImage && existing.getCatalogues() != null) {
+            hasList = true;
             existing.getCatalogues().forEach(cat -> present.add(cat.getCatalogueId()));
         }
         int failed = 0;
         for (String token : removedIdsCsv.split(",")) {
             Integer fileId = parseIntOrNull(token);
-            if (fileId == null || !present.contains(fileId)) {
+            if (fileId == null || (hasList && !present.contains(fileId))) {
                 continue;
             }
             boolean deleted = isImage
                     ? productDAO.deleteImage(fileId, productId)
                     : productDAO.deleteCatalogue(fileId, productId);
-            if (!deleted) {
+            if (!deleted && present.contains(fileId)) {
                 failed++;
             }
         }

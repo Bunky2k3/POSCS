@@ -20,8 +20,12 @@ import poscs.model.Product;
 import poscs.model.ProductCatalogue;
 import poscs.model.ProductImage;
 import poscs.model.ProductCategory;
+import poscs.model.Contract;
 import poscs.model.Role;
 import poscs.model.User;
+import poscs.service.ProductService;
+import poscs.service.ServiceResult;
+import static org.junit.Assert.*;
 
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
@@ -768,4 +772,311 @@ public class ProductControllerTest {
                         && m.get(2).equals("CNTT & IOT › LoRa")));
     }
 
+    // ==================================================================
+    // TASK 3.3: Tinh gọn ProductController, gọi qua ProductService
+    // Tests cho BR-12, BR-14, BR-19, BR-49, BR-53 & Service Delegation
+    // ==================================================================
+
+    @Test
+    public void testControllerConstructorsAndAccessors() {
+        ProductController c1 = new ProductController();
+        assertNotNull(c1.getProductDAO());
+        assertNotNull(c1.getProductService());
+
+        ProductService mockSvc = mock(ProductService.class);
+        ProductController c2 = new ProductController(mockSvc);
+        assertSame(mockSvc, c2.getProductService());
+
+        ProductDAO mockDao = mock(ProductDAO.class);
+        ProductController c3 = new ProductController(mockDao, mockSvc);
+        assertSame(mockDao, c3.getProductDAO());
+        assertSame(mockSvc, c3.getProductService());
+
+        c1.setProductDAO(mockDao);
+        assertSame(mockDao, c1.getProductDAO());
+        c1.setProductService(mockSvc);
+        assertSame(mockSvc, c1.getProductService());
+    }
+
+    /** BR-12: Phân trang - số trang âm hoặc chuỗi không phải số được chuẩn hoá về 1. */
+    @Test
+    public void testShowList_Pagination_NormalizesNegativeAndInvalidPage_BR12() throws Exception {
+        when(productDAO.findAllCategories()).thenReturn(Collections.emptyList());
+        when(productDAO.countByCategory()).thenReturn(Collections.emptyMap());
+        when(request.getParameter("page")).thenReturn("-5");
+
+        controller.doGet(request, response);
+
+        verify(request).setAttribute("currentPage", 1);
+        verify(request).setAttribute("totalPages", 1);
+    }
+
+    @Test
+    public void testShowList_Pagination_NonNumericPage_BR12() throws Exception {
+        when(productDAO.findAllCategories()).thenReturn(Collections.emptyList());
+        when(productDAO.countByCategory()).thenReturn(Collections.emptyMap());
+        when(request.getParameter("page")).thenReturn("abc");
+
+        controller.doGet(request, response);
+
+        verify(request).setAttribute("currentPage", 1);
+    }
+
+    /** BR-14, BR-53: Danh sách rỗng hiển thị thông báo trạng thái rỗng và card grid attributes. */
+    @Test
+    public void testShowList_EmptyList_BR14_BR53() throws Exception {
+        when(productDAO.findAllCategories()).thenReturn(Collections.emptyList());
+        when(productDAO.countByCategory()).thenReturn(Collections.emptyMap());
+        when(productDAO.findAll(anyInt(), anyInt(), any(), any())).thenReturn(Collections.emptyList());
+        when(productDAO.countAll(any(), any())).thenReturn(0);
+
+        RequestDispatcher dispatcher = mock(RequestDispatcher.class);
+        when(request.getRequestDispatcher("/jsp/technical/listProduct.jsp")).thenReturn(dispatcher);
+
+        controller.doGet(request, response);
+
+        verify(request).setAttribute("productList", Collections.emptyList());
+        verify(request).setAttribute("totalCount", 0);
+        verify(request).setAttribute("totalPages", 1);
+        verify(request).setAttribute("grandTotal", 0);
+        verify(request).getRequestDispatcher("/jsp/technical/listProduct.jsp");
+        verify(dispatcher).forward(request, response);
+    }
+
+    @Test
+    public void update_withoutFullAccess_returns403AndNeverUpdates() throws Exception {
+        loginWithoutProductAccess();
+        when(request.getParameter("action")).thenReturn("update");
+        when(request.getParameter("productId")).thenReturn("7");
+
+        controller.doPost(request, response);
+
+        verify(response).sendError(eq(HttpServletResponse.SC_FORBIDDEN), anyString());
+        verify(productDAO, never()).update(any());
+    }
+
+    @Test
+    public void delete_withoutFullAccess_returns403AndNeverDeletes() throws Exception {
+        loginWithoutProductAccess();
+        when(request.getParameter("action")).thenReturn("delete");
+        when(request.getParameter("id")).thenReturn("7");
+
+        controller.doPost(request, response);
+
+        verify(response).sendError(eq(HttpServletResponse.SC_FORBIDDEN), anyString());
+        verify(productDAO, never()).softDelete(anyInt());
+    }
+
+    /** BR-19: Chi tiết sản phẩm gồm: Thông tin, Hình ảnh, Catalogue, Hợp đồng sử dụng. */
+    @Test
+    public void testShowDetail_Success_BR19() throws Exception {
+        when(request.getParameter("action")).thenReturn("view");
+        when(request.getParameter("id")).thenReturn("15");
+
+        Product product = new Product();
+        product.setProductId(15);
+        product.setProductName("Bộ định tuyến 5G");
+        when(productDAO.findById(15)).thenReturn(product);
+
+        Contract contract = new Contract();
+        contract.setContractId(101);
+        when(productDAO.findContractsByProductId(15)).thenReturn(List.of(contract));
+
+        RequestDispatcher dispatcher = mock(RequestDispatcher.class);
+        when(request.getRequestDispatcher("/jsp/technical/viewdetailProduct.jsp")).thenReturn(dispatcher);
+
+        controller.doGet(request, response);
+
+        verify(request).setAttribute("product", product);
+        verify(request).setAttribute("contractList", List.of(contract));
+        verify(dispatcher).forward(request, response);
+    }
+
+    @Test
+    public void testShowDetail_InvalidOrNegativeId_RedirectsNotFound() throws Exception {
+        when(request.getParameter("action")).thenReturn("view");
+        when(request.getParameter("id")).thenReturn("-1");
+
+        controller.doGet(request, response);
+
+        verify(response).sendRedirect(CONTEXT_PATH + "/product?error=notfound");
+    }
+
+    @Test
+    public void testShowDetail_NonNumericId_RedirectsNotFound() throws Exception {
+        when(request.getParameter("action")).thenReturn("view");
+        when(request.getParameter("id")).thenReturn("invalid_id");
+
+        controller.doGet(request, response);
+
+        verify(response).sendRedirect(CONTEXT_PATH + "/product?error=notfound");
+    }
+
+    /** BR-49: Xóa sản phẩm - id null hoặc âm thì chuyển hướng notfound. */
+    @Test
+    public void testDelete_NegativeOrMissingId_RedirectsNotFound_BR49() throws Exception {
+        when(request.getParameter("action")).thenReturn("delete");
+        when(request.getParameter("id")).thenReturn("-10");
+
+        controller.doPost(request, response);
+
+        verify(response).sendRedirect(CONTEXT_PATH + "/product?error=notfound");
+    }
+
+    /** BR-54: Bắt buộc Tên sản phẩm - chuỗi trắng chuyển hướng invalid. */
+    @Test
+    public void testCreate_BlankProductName_RedirectsInvalid_BR54() throws Exception {
+        when(request.getParameter("action")).thenReturn("create");
+        when(request.getParameter("productName")).thenReturn("   ");
+        when(request.getParameter("categoryId")).thenReturn("1");
+
+        controller.doPost(request, response);
+
+        verify(productDAO, never()).insert(any());
+        verify(response).sendRedirect(CONTEXT_PATH + "/product?action=new&error=invalid");
+    }
+
+    @Test
+    public void testCreate_InsertFailed_LogsAndRedirectsCreateFailed() throws Exception {
+        when(request.getParameter("action")).thenReturn("create");
+        when(request.getParameter("productName")).thenReturn("Router ABC");
+        when(request.getParameter("categoryId")).thenReturn("1");
+        when(productDAO.generateNextProductCode()).thenReturn("SP-0001");
+        when(productDAO.insert(any(Product.class))).thenReturn(0);
+
+        controller.doPost(request, response);
+
+        verify(response).sendRedirect(CONTEXT_PATH + "/product?action=new&error=create_failed");
+    }
+
+    @Test
+    public void testUpdate_BlankProductName_RedirectsInvalid_BR54() throws Exception {
+        when(request.getParameter("action")).thenReturn("update");
+        when(request.getParameter("productId")).thenReturn("7");
+        when(productDAO.findById(7)).thenReturn(new Product());
+        when(request.getParameter("productName")).thenReturn("   ");
+        when(request.getParameter("categoryId")).thenReturn("2");
+
+        controller.doPost(request, response);
+
+        verify(productDAO, never()).update(any(Product.class));
+        verify(response).sendRedirect(CONTEXT_PATH + "/product?action=edit&id=7&error=invalid");
+    }
+
+    @Test
+    public void testUpdate_UpdateFailed_LogsAndRedirectsUpdateFailed() throws Exception {
+        when(request.getParameter("action")).thenReturn("update");
+        when(request.getParameter("productId")).thenReturn("7");
+        when(productDAO.findById(7)).thenReturn(new Product());
+        when(request.getParameter("productName")).thenReturn("Router ABC");
+        when(request.getParameter("categoryId")).thenReturn("2");
+        when(productDAO.update(any(Product.class))).thenReturn(false);
+
+        controller.doPost(request, response);
+
+        verify(response).sendRedirect(CONTEXT_PATH + "/product?action=edit&id=7&error=update_failed");
+    }
+
+    /** Ủy quyền trực tiếp qua mock ProductService. */
+    @Test
+    public void testDirectServiceDelegation_ShowList() throws Exception {
+        ProductService mockSvc = mock(ProductService.class);
+        controller.setProductService(mockSvc);
+
+        when(mockSvc.findAllCategories()).thenReturn(Collections.emptyList());
+        when(mockSvc.childrenByParent(any())).thenReturn(Collections.emptyMap());
+        when(mockSvc.findProducts(anyInt(), anyInt(), any(), any()))
+                .thenReturn(new ProductService.ProductListPage(Collections.emptyList(), 0, 1, 10));
+
+        controller.doGet(request, response);
+
+        verify(mockSvc).findProducts(1, 10, null, null);
+    }
+
+    @Test
+    public void testDirectServiceDelegation_ShowDetail() throws Exception {
+        ProductService mockSvc = mock(ProductService.class);
+        controller.setProductService(mockSvc);
+
+        when(request.getParameter("action")).thenReturn("view");
+        when(request.getParameter("id")).thenReturn("55");
+
+        Product p = new Product();
+        p.setProductId(55);
+        when(mockSvc.getProductDetail(55)).thenReturn(ServiceResult.ok(new ProductService.ProductDetail(p, Collections.emptyList())));
+
+        RequestDispatcher dispatcher = mock(RequestDispatcher.class);
+        when(request.getRequestDispatcher("/jsp/technical/viewdetailProduct.jsp")).thenReturn(dispatcher);
+
+        controller.doGet(request, response);
+
+        verify(mockSvc).getProductDetail(55);
+        verify(request).setAttribute("product", p);
+        verify(dispatcher).forward(request, response);
+    }
+
+    @Test
+    public void testDirectServiceDelegation_DeleteProduct() throws Exception {
+        ProductService mockSvc = mock(ProductService.class);
+        controller.setProductService(mockSvc);
+
+        when(request.getParameter("action")).thenReturn("delete");
+        when(request.getParameter("id")).thenReturn("88");
+        when(mockSvc.deleteProduct(88)).thenReturn(ServiceResult.ok(null));
+
+        controller.doPost(request, response);
+
+        verify(mockSvc).deleteProduct(88);
+        verify(response).sendRedirect(CONTEXT_PATH + "/product");
+    }
+
+    @Test
+    public void testDirectServiceDelegation_DeleteProduct_HasActiveContracts_BR49() throws Exception {
+        ProductService mockSvc = mock(ProductService.class);
+        controller.setProductService(mockSvc);
+
+        when(request.getParameter("action")).thenReturn("delete");
+        when(request.getParameter("id")).thenReturn("88");
+        when(mockSvc.deleteProduct(88)).thenReturn(ServiceResult.fail("has_active_contracts"));
+
+        controller.doPost(request, response);
+
+        verify(mockSvc).deleteProduct(88);
+        verify(response).sendRedirect(CONTEXT_PATH + "/product?action=view&id=88&error=has_active_contracts");
+    }
+
+    @Test
+    public void testDirectServiceDelegation_CreateProduct_Success() throws Exception {
+        ProductService mockSvc = mock(ProductService.class);
+        controller.setProductService(mockSvc);
+
+        when(request.getParameter("action")).thenReturn("create");
+        when(request.getParameter("productName")).thenReturn("Router Mới");
+        when(request.getParameter("categoryId")).thenReturn("2");
+        when(mockSvc.createProduct(any(), any(), any()))
+                .thenReturn(ServiceResult.ok(new ProductService.ProductSaveResult(99, 0, 0)));
+
+        controller.doPost(request, response);
+
+        verify(mockSvc).createProduct(any(), any(), any());
+        verify(response).sendRedirect(CONTEXT_PATH + "/product?action=view&id=99");
+    }
+
+    @Test
+    public void testDirectServiceDelegation_UpdateProduct_Success() throws Exception {
+        ProductService mockSvc = mock(ProductService.class);
+        controller.setProductService(mockSvc);
+
+        when(request.getParameter("action")).thenReturn("update");
+        when(request.getParameter("productId")).thenReturn("99");
+        when(request.getParameter("productName")).thenReturn("Router Đã Sửa");
+        when(request.getParameter("categoryId")).thenReturn("2");
+        when(mockSvc.updateProduct(any(), any(), any(), any(), any()))
+                .thenReturn(ServiceResult.ok(new ProductService.ProductSaveResult(99, 0, 0)));
+
+        controller.doPost(request, response);
+
+        verify(mockSvc).updateProduct(any(), any(), any(), any(), any());
+        verify(response).sendRedirect(CONTEXT_PATH + "/product?action=view&id=99");
+    }
 }

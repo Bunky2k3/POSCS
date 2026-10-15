@@ -64,7 +64,8 @@ Không còn mục nào.
   - *Lưu ý:* validator **không** kiểm trùng mã sản phẩm (BR-55).
 - [x] **Task 3.2:** `[UC-12, UC-13, UC-18, UC-19, UC-20]` `[BR-19, BR-48, BR-49, BR-54, BR-55]` Xây dựng `ProductService`: danh mục phân cấp, upload ảnh/catalogue, **sinh mã tự động dựa UNIQUE ở DB, trùng thì thử lại tối đa 5 lần không báo lỗi (BR-55, MSG-056)**, mã không đổi sau khi tạo, xóa mềm và chặn khi SP nằm trong hợp đồng còn hiệu lực.
   - *Đã hoàn thành:* Xây dựng `poscs.service.ProductService` kế thừa `BaseService`, đáp ứng đầy đủ xử lý cây danh mục 3 cấp (cộng dồn số lượng đệ quy, lọc mở rộng subtree, accordion), chi tiết sản phẩm đầy đủ (ảnh, catalogue, hợp đồng sử dụng theo BR-19), ép buộc sinh mã hệ thống `SP-xxxx` và cơ chế thử lại tối đa 5 lần khi đụng UNIQUE DB (BR-55, MSG-056), mã không đổi sau khi tạo, xóa mềm và chặn khi còn hợp đồng (`has_active_contracts`). Unit tests tại `test/poscs/service/ProductServiceTest.java` (42/42 tests pass 100%). QA report tại `docs/qa/Task-3.2.md`.
-- [ ] **Task 3.3:** `[UC-12, UC-13, UC-18, UC-19, UC-20]` `[BR-12, BR-14, BR-19, BR-49, BR-53]` Tinh gọn `ProductController` chỉ còn lớp Presentation, gọi qua `ProductService`.
+- [x] **Task 3.3:** `[UC-12, UC-13, UC-18, UC-19, UC-20]` `[BR-12, BR-14, BR-19, BR-49, BR-53]` Tinh gọn `ProductController` chỉ còn lớp Presentation, gọi qua `ProductService`.
+  - *Đã hoàn thành:* Tinh gọn `poscs.controller.ProductController` về lớp Presentation thuần túy (giảm từ 638 dòng xuống 258 dòng, mọi phương thức <= 30 dòng), loại bỏ toàn bộ truy cập DAO và nghiệp vụ trùng lặp, ủy quyền đầy đủ qua `ProductService`. Hỗ trợ DI linh hoạt. Tinh chỉnh nhẹ `ProductService.removeMarkedFiles` tương thích ngược. Bổ sung test kiểm tra phân quyền RBAC và forward routing. Unit tests tại `test/poscs/controller/ProductControllerTest.java` (54/54 tests pass 100%). QA report tại `docs/qa/Task-3.3.md`.
 
 ---
 
