@@ -36,6 +36,20 @@ public class CustomerDAO {
 
     private static final Logger LOG = LoggerFactory.getLogger(CustomerDAO.class);
 
+    private final CustomerLifecycleDAO lifecycleDAO;
+
+    public CustomerDAO() {
+        this(new CustomerLifecycleDAO());
+    }
+
+    public CustomerDAO(CustomerLifecycleDAO lifecycleDAO) {
+        this.lifecycleDAO = lifecycleDAO != null ? lifecycleDAO : new CustomerLifecycleDAO();
+    }
+
+    public CustomerLifecycleDAO getLifecycleDAO() {
+        return lifecycleDAO;
+    }
+
     private static final String SELECT_ENTERPRISE_BASE =
         "SELECT e.enterprise_id, e.enterprise_code, e.enterprise_name, e.customer_type, e.customer_group, " +
         "       e.tax_code, e.email AS ent_email, e.phone AS ent_phone, e.website, e.address_id, " +
@@ -143,8 +157,10 @@ public class CustomerDAO {
                 ? " ORDER BY p.province_name IS NULL, " + AddressDAO.PROVINCE_SHORT_NAME_ORDER
                         + ", e.enterprise_id DESC LIMIT ? OFFSET ?"
                 : " ORDER BY e.enterprise_id DESC LIMIT ? OFFSET ?");
-        params.add(pageSize);
-        params.add(Math.max(0, (page - 1) * pageSize));
+        int safePageSize = pageSize > 0 ? pageSize : 10;
+        int safePage = page > 0 ? page : 1;
+        params.add(safePageSize);
+        params.add((safePage - 1) * safePageSize);
 
         try (Connection conn = DBContext.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql.toString())) {
@@ -412,6 +428,9 @@ public class CustomerDAO {
      * dòng addresses trước rồi mới gán address_id. Trả về enterprise_id vừa tạo, hoặc -1 nếu lỗi.
      */
     public int insert(Enterprise enterprise) {
+        if (enterprise == null) {
+            return -1;
+        }
         String sql = "INSERT INTO enterprises " +
                 "(enterprise_code, enterprise_name, customer_type, customer_group, tax_code, email, phone, " +
                 " website, address_id, account_owner_id, support_owner_id, legal_representative, logo_url, " +
@@ -495,6 +514,9 @@ public class CustomerDAO {
 
     /** Cập nhật thông tin khách hàng đang có. Trả về true nếu cập nhật thành công. */
     public boolean update(Enterprise enterprise) {
+        if (enterprise == null || enterprise.getEnterpriseId() <= 0) {
+            return false;
+        }
         String sql = "UPDATE enterprises SET " +
                 "enterprise_name = ?, customer_type = ?, customer_group = ?, email = ?, phone = ?, " +
                 "website = ?, address_id = ?, account_owner_id = ?, support_owner_id = ?, join_date = ?, logo_url = ? " +
@@ -591,14 +613,14 @@ public class CustomerDAO {
      * hàm này sinh ra để tránh.
      */
     private boolean existsByColumn(String column, String value, Integer excludeEnterpriseId) {
-        if (value == null) {
+        if (value == null || value.trim().isEmpty()) {
             return false;
         }
         String sql = "SELECT 1 FROM enterprises WHERE " + column + " = ?" +
                      (excludeEnterpriseId != null ? " AND enterprise_id <> ?" : "") + " LIMIT 1";
         try (Connection conn = DBContext.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, value);
+            ps.setString(1, value.trim());
             if (excludeEnterpriseId != null) {
                 ps.setInt(2, excludeEnterpriseId);
             }
@@ -614,9 +636,12 @@ public class CustomerDAO {
         }
     }
 
-    /** Xoá mềm khách hàng (is_deleted = 1). Gọi hasActiveContracts() trước để áp BR-34. */
+    /** Xoá mềm khách hàng (is_deleted = 1, status = 'Inactive'). Gọi hasActiveContracts() trước để áp BR-34. */
     public boolean softDelete(int enterpriseId) {
-        String sql = "UPDATE enterprises SET is_deleted = 1 WHERE enterprise_id = ?";
+        if (enterpriseId <= 0) {
+            return false;
+        }
+        String sql = "UPDATE enterprises SET is_deleted = 1, status = 'Inactive' WHERE enterprise_id = ?";
         try (Connection conn = DBContext.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, enterpriseId);
@@ -629,16 +654,17 @@ public class CustomerDAO {
 
     /**
      * BR-34: kiểm tra khách hàng còn hợp đồng đang hiệu lực hay không trước khi
-     * cho xoá. Tính trực tiếp theo effective_date/end_date (BR-17) thay vì đọc
-     * cột contracts.status đã lưu -- cột đó chỉ được ghi lúc insert/update
-     * (xem ContractDAO), nên 1 hợp đồng "Chưa hiệu lực" đã tự chuyển sang hiệu
-     * lực (hoặc 1 hợp đồng đã hết hạn) mà chưa có UPDATE nào khác từ lúc đó sẽ
-     * làm hàm này trả về sai nếu đọc thẳng status. "Sắp hết hạn" cũng tính là
-     * còn hiệu lực vì vẫn nằm trong khoảng effective_date..end_date.
+     * cho xoá. Chỉ xét các hợp đồng đã ký (progress_status = 'Đã ký') và nằm trong khoảng
+     * thời gian hiệu lực (CURDATE() BETWEEN effective_date AND end_date). Hợp đồng Nháp,
+     * Đã thanh lý, hoặc Chấm dứt sớm không chặn xóa khách hàng.
      */
     public boolean hasActiveContracts(int enterpriseId) {
+        if (enterpriseId <= 0) {
+            return false;
+        }
         String sql = "SELECT COUNT(*) FROM contracts " +
                      "WHERE enterprise_id = ? AND is_deleted = 0 " +
+                     "AND progress_status = 'Đã ký' " +
                      "AND CURDATE() BETWEEN effective_date AND end_date";
         try (Connection conn = DBContext.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -961,132 +987,30 @@ public class CustomerDAO {
     // Lịch sử xếp hạng quan hệ (bảng customer_lifecycle_events)
     // ==================================================================
     //
-    // Các lần đánh giá/thay đổi xếp hạng quan hệ của khách hàng, do người
-    // dùng chọn THỦ CÔNG ở viewcustomerdetail.jsp (xem
-    // CustomerController#handleEvaluate) -- không có engine tự tính điểm nào.
-    //
-    // Nằm trong CustomerDAO chứ không phải một DAO riêng: bảng này khoá theo
-    // enterprise_id và chỉ có nghĩa kèm theo khách hàng.
+    // Nghiệp vụ đánh giá & sự kiện vòng đời đã được tách sang CustomerLifecycleDAO
+    // (Task 2.3). Các phương thức dưới đây ủy quyền (delegate) sang CustomerLifecycleDAO
+    // để đảm bảo tương thích ngược 100% cho mọi module và test hiện có.
 
-    /** Ghi 1 sự kiện mới. Trả về event_id vừa tạo, hoặc -1 nếu thất bại. */
+    /**
+     * Ghi 1 sự kiện mới. Ủy quyền sang {@link CustomerLifecycleDAO#insertLifecycleEvent(CustomerLifecycleEvent)}.
+     */
     public int insertLifecycleEvent(CustomerLifecycleEvent event) {
-        try (Connection conn = DBContext.getConnection()) {
-            return insertLifecycleEvent(conn, event);
-        } catch (SQLException ex) {
-            LOG.error("Loi ghi lich su danh gia khach hang (enterpriseId={})", event.getEnterpriseId(), ex);
-            return -1;
-        }
+        return lifecycleDAO.insertLifecycleEvent(event);
     }
 
     /**
-     * Một lần đánh giá xếp hạng THỦ CÔNG: đổi
-     * {@code enterprises.current_relationship_rating} VÀ ghi dòng lịch sử, trong
-     * CÙNG một transaction.
-     *
-     * <p>Trước đây là hai lời gọi rời, không bên nào được kiểm: câu UPDATE hỏng
-     * thì trang vẫn báo "Đã đánh giá lại", còn UPDATE xong mà dòng lịch sử hỏng
-     * thì xếp hạng đổi mà không ai biết ai đổi, lúc nào. Gộp lại để hai thứ
-     * luôn khớp nhau: được cả hoặc không gì cả.
-     *
-     * <p>Khách đã xoá mềm (ở tab khác) thì UPDATE không chạm dòng nào -- tính
-     * là thất bại, không ghi lịch sử cho một khách đã biến khỏi danh sách.
-     *
-     * @return true nếu đã ghi cả hai.
+     * Một lần đánh giá xếp hạng THỦ CÔNG: cập nhật xếp hạng hiện tại và ghi lịch sử
+     * trong cùng một transaction. Ủy quyền sang {@link CustomerLifecycleDAO#recordEvaluation(CustomerLifecycleEvent)}.
      */
     public boolean recordEvaluation(CustomerLifecycleEvent event) {
-        try (Connection conn = DBContext.getConnection()) {
-            conn.setAutoCommit(false);
-            boolean committed = false;
-            try {
-                try (PreparedStatement ps = conn.prepareStatement(
-                        "UPDATE enterprises SET current_relationship_rating = ? "
-                        + "WHERE enterprise_id = ? AND is_deleted = 0")) {
-                    ps.setString(1, event.getRelationshipRating().getDbValue());
-                    ps.setInt(2, event.getEnterpriseId());
-                    if (ps.executeUpdate() == 0) {
-                        return false;
-                    }
-                }
-                if (insertLifecycleEvent(conn, event) <= 0) {
-                    return false;
-                }
-                conn.commit();
-                committed = true;
-                return true;
-            } finally {
-                if (!committed) {
-                    conn.rollback();
-                }
-                conn.setAutoCommit(true);
-            }
-        } catch (SQLException ex) {
-            LOG.error("Loi ghi danh gia xep hang khach hang (enterpriseId={})", event.getEnterpriseId(), ex);
-            return false;
-        }
+        return lifecycleDAO.recordEvaluation(event);
     }
 
-    private int insertLifecycleEvent(Connection conn, CustomerLifecycleEvent event) throws SQLException {
-        String sql = "INSERT INTO customer_lifecycle_events " +
-                "(enterprise_id, event_type, relationship_rating, is_auto_generated, description, event_date, recorded_by) " +
-                "VALUES (?, ?, ?, ?, ?, ?, ?)";
-        try (PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
-            ps.setInt(1, event.getEnterpriseId());
-            ps.setString(2, event.getEventType());
-            ps.setString(3, event.getRelationshipRating().getDbValue());
-            ps.setBoolean(4, event.isAutoGenerated());
-            ps.setString(5, event.getDescription());
-            ps.setDate(6, event.getEventDate());
-            ps.setInt(7, event.getRecordedBy());
-
-            int affected = ps.executeUpdate();
-            if (affected == 0) {
-                return -1;
-            }
-            try (ResultSet keys = ps.getGeneratedKeys()) {
-                return keys.next() ? keys.getInt(1) : -1;
-            }
-        }
-    }
-
-    /** Lịch sử đánh giá của 1 khách hàng, mới nhất trước, kèm tên người ghi nhận. */
+    /**
+     * Lịch sử đánh giá của 1 khách hàng, mới nhất trước, kèm tên người ghi nhận.
+     * Ủy quyền sang {@link CustomerLifecycleDAO#findLifecycleEventsByEnterpriseId(int)}.
+     */
     public List<CustomerLifecycleEvent> findLifecycleEventsByEnterpriseId(int enterpriseId) {
-        List<CustomerLifecycleEvent> result = new ArrayList<>();
-        String sql = "SELECT ev.event_id, ev.enterprise_id, ev.event_type, ev.relationship_rating, " +
-                "       ev.is_auto_generated, ev.description, ev.event_date, ev.recorded_by, ev.created_at, " +
-                "       u.last_name AS recorder_last_name, u.middle_name AS recorder_middle_name, " +
-                "       u.first_name AS recorder_first_name " +
-                "FROM customer_lifecycle_events ev " +
-                "JOIN users u ON u.user_id = ev.recorded_by " +
-                "WHERE ev.enterprise_id = ? " +
-                "ORDER BY ev.event_date DESC, ev.event_id DESC";
-        try (Connection conn = DBContext.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, enterpriseId);
-            try (ResultSet rs = ps.executeQuery()) {
-                while (rs.next()) {
-                    CustomerLifecycleEvent ev = new CustomerLifecycleEvent();
-                    ev.setEventId(rs.getInt("event_id"));
-                    ev.setEnterpriseId(rs.getInt("enterprise_id"));
-                    ev.setEventType(rs.getString("event_type"));
-                    ev.setRelationshipRating(RelationshipRating.fromDbValue(rs.getString("relationship_rating")));
-                    ev.setAutoGenerated(rs.getBoolean("is_auto_generated"));
-                    ev.setDescription(rs.getString("description"));
-                    ev.setEventDate(rs.getDate("event_date"));
-                    ev.setRecordedBy(rs.getInt("recorded_by"));
-                    ev.setCreatedAt(rs.getTimestamp("created_at"));
-
-                    User recorder = new User();
-                    recorder.setLastName(rs.getString("recorder_last_name"));
-                    recorder.setMiddleName(rs.getString("recorder_middle_name"));
-                    recorder.setFirstName(rs.getString("recorder_first_name"));
-                    ev.setRecordedByUser(recorder);
-
-                    result.add(ev);
-                }
-            }
-        } catch (SQLException ex) {
-            LOG.error("Loi doc lich su danh gia khach hang (enterpriseId={})", enterpriseId, ex);
-        }
-        return result;
+        return lifecycleDAO.findLifecycleEventsByEnterpriseId(enterpriseId);
     }
 }

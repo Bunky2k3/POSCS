@@ -14,7 +14,7 @@ import static org.junit.Assert.*;
  * - BR-09: Định dạng SĐT Việt Nam (di động, cố định, tiền tố +84, khoảng trắng/chấm/gạch ngang).
  * - BR-10: Định dạng email (hợp lệ, max 254 ký tự, không chứa khoảng trắng).
  * - BR-11: Ràng buộc trường bắt buộc (tên, loại, nhóm, MST, địa chỉ, người phụ trách chính).
- * - BR-52: Định dạng mã KH-xxxx và NCC-xxxx.
+ * - BR-52: Định dạng mã KH-xxxx (4 chữ số) và NCC-xxx (3 chữ số).
  * - Tương thích logic gốc của isValidCommonFields.
  */
 public class CustomerValidatorTest {
@@ -97,17 +97,22 @@ public class CustomerValidatorTest {
     }
 
     // -------------------------------------------------------------
-    // BR-52: Enterprise Code tests (KH-xxxx, NCC-xxxx)
+    // BR-52: Enterprise Code tests (KH-xxxx, NCC-xxx)
     // -------------------------------------------------------------
     @Test
     public void testValidCustomerCode() {
         assertTrue(validator.isValidCustomerCode("KH-0001"));
         assertTrue(validator.isValidCustomerCode("KH-1234"));
-        assertTrue(validator.isValidCustomerCode("KH-1"));
-        assertTrue(validator.isValidCustomerCode("KH-99999"));
+        assertTrue(validator.isValidCustomerCode("KH-9999"));
 
+        // Sai định dạng: không đúng 4 chữ số hoặc sai tiền tố
+        assertFalse(validator.isValidCustomerCode("KH-1")); // thiếu số
+        assertFalse(validator.isValidCustomerCode("KH-01")); // thiếu số
+        assertFalse(validator.isValidCustomerCode("KH-001")); // 3 chữ số
+        assertFalse(validator.isValidCustomerCode("KH-99999")); // thừa số (5 chữ số)
         assertFalse(validator.isValidCustomerCode(null));
         assertFalse(validator.isValidCustomerCode(""));
+        assertFalse(validator.isValidCustomerCode("NCC-001"));
         assertFalse(validator.isValidCustomerCode("NCC-0001"));
         assertFalse(validator.isValidCustomerCode("KH-ABCD"));
         assertFalse(validator.isValidCustomerCode("KH_0001"));
@@ -117,9 +122,14 @@ public class CustomerValidatorTest {
     @Test
     public void testValidSupplierCode() {
         assertTrue(validator.isValidSupplierCode("NCC-001"));
-        assertTrue(validator.isValidSupplierCode("NCC-0001"));
-        assertTrue(validator.isValidSupplierCode("NCC-99"));
+        assertTrue(validator.isValidSupplierCode("NCC-005"));
+        assertTrue(validator.isValidSupplierCode("NCC-999"));
 
+        // Sai định dạng: không đúng 3 chữ số hoặc sai tiền tố
+        assertFalse(validator.isValidSupplierCode("NCC-0001")); // 4 chữ số (SPEC v2 từ chối)
+        assertFalse(validator.isValidSupplierCode("NCC-99")); // thiếu số (2 chữ số)
+        assertFalse(validator.isValidSupplierCode("NCC-1")); // thiếu số (1 chữ số)
+        assertFalse(validator.isValidSupplierCode("NCC-1000")); // thừa số (4 chữ số)
         assertFalse(validator.isValidSupplierCode(null));
         assertFalse(validator.isValidSupplierCode(""));
         assertFalse(validator.isValidSupplierCode("KH-0001"));
@@ -130,10 +140,13 @@ public class CustomerValidatorTest {
     @Test
     public void testValidEnterpriseCode() {
         assertTrue(validator.isValidEnterpriseCode("KH-0001"));
+        assertTrue(validator.isValidEnterpriseCode("KH-9999"));
         assertTrue(validator.isValidEnterpriseCode("NCC-001"));
-        assertTrue(validator.isValidEnterpriseCode("KH-100"));
-        assertTrue(validator.isValidEnterpriseCode("NCC-1000"));
+        assertTrue(validator.isValidEnterpriseCode("NCC-999"));
 
+        assertFalse(validator.isValidEnterpriseCode("KH-100")); // KH không đúng 4 chữ số
+        assertFalse(validator.isValidEnterpriseCode("NCC-1000")); // NCC không đúng 3 chữ số
+        assertFalse(validator.isValidEnterpriseCode("NCC-0001")); // NCC không đúng 3 chữ số
         assertFalse(validator.isValidEnterpriseCode(null));
         assertFalse(validator.isValidEnterpriseCode(""));
         assertFalse(validator.isValidEnterpriseCode("HD-0001"));

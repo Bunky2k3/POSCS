@@ -15,6 +15,7 @@ import org.mockito.MockedStatic;
 import poscs.model.Address;
 import poscs.model.CustomerLifecycleEvent;
 import poscs.model.Enterprise;
+import poscs.model.EnterpriseContact;
 import poscs.model.RelationshipRating;
 
 import static org.junit.Assert.*;
@@ -853,6 +854,398 @@ public class CustomerDAOTest {
             // viewcustomerdetail.jsp lặp thẳng trên danh sách này.
             assertNotNull(found);
             assertTrue(found.isEmpty());
+        }
+    }
+
+    @Test
+    public void customerDao_delegatesToInjectedLifecycleDao() {
+        CustomerLifecycleDAO mockLifecycle = mock(CustomerLifecycleDAO.class);
+        CustomerDAO customDao = new CustomerDAO(mockLifecycle);
+
+        assertSame(mockLifecycle, customDao.getLifecycleDAO());
+
+        CustomerLifecycleEvent e = event();
+        when(mockLifecycle.insertLifecycleEvent(e)).thenReturn(99);
+        when(mockLifecycle.recordEvaluation(e)).thenReturn(true);
+        when(mockLifecycle.findLifecycleEventsByEnterpriseId(3)).thenReturn(List.of(e));
+
+        assertEquals(99, customDao.insertLifecycleEvent(e));
+        assertTrue(customDao.recordEvaluation(e));
+        assertEquals(1, customDao.findLifecycleEventsByEnterpriseId(3).size());
+
+        verify(mockLifecycle).insertLifecycleEvent(e);
+        verify(mockLifecycle).recordEvaluation(e);
+        verify(mockLifecycle).findLifecycleEventsByEnterpriseId(3);
+    }
+
+    // ------------------------------------------------------------------
+    // Null safety & boundary tests (insert, update, findAll)
+    // ------------------------------------------------------------------
+
+    @Test
+    public void insert_nullEnterprise_returnsMinusOne() {
+        assertEquals(-1, dao.insert(null));
+    }
+
+    @Test
+    public void update_nullEnterprise_returnsFalse() {
+        assertFalse(dao.update(null));
+        Enterprise invalidId = new Enterprise();
+        invalidId.setEnterpriseId(0);
+        assertFalse(dao.update(invalidId));
+        invalidId.setEnterpriseId(-5);
+        assertFalse(dao.update(invalidId));
+    }
+
+    @Test
+    public void findAll_nonPositivePageAndPageSize_usesSafeDefaults() throws Exception {
+        PreparedStatement ps = statementReturning(emptyResultSet());
+        Connection conn = connectionReturning(ps);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            List<Enterprise> list = dao.findAll(-1, 0, null, null, null, null, false, null);
+            assertNotNull(list);
+            // safePageSize = 10, safePage = 1 -> offset = 0
+            verify(ps).setObject(1, 10);
+            verify(ps).setObject(2, 0);
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // BR-34 & SPEC 5.4: hasActiveContracts
+    // ------------------------------------------------------------------
+
+    @Test
+    public void hasActiveContracts_invalidId_returnsFalse() {
+        assertFalse(dao.hasActiveContracts(0));
+        assertFalse(dao.hasActiveContracts(-1));
+    }
+
+    @Test
+    public void hasActiveContracts_hasSignedContractInDateRange_returnsTrue() throws Exception {
+        ResultSet rs = singleRow(row("count", 1));
+        PreparedStatement ps = statementReturning(rs);
+        Connection conn = connectionReturning(ps);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            assertTrue(dao.hasActiveContracts(5));
+            verify(ps).setInt(1, 5);
+        }
+    }
+
+    @Test
+    public void hasActiveContracts_contractExpiredOrLiquidated_returnsFalse() throws Exception {
+        ResultSet rs = singleRow(row("count", 0));
+        PreparedStatement ps = statementReturning(rs);
+        Connection conn = connectionReturning(ps);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            assertFalse(dao.hasActiveContracts(5));
+            verify(ps).setInt(1, 5);
+        }
+    }
+
+    @Test
+    public void hasActiveContracts_sqlError_failsSafeReturnsTrue() throws Exception {
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenThrow(new SQLException("Lỗi kết nối CSDL"));
+
+            // An toàn: lỗi DB coi như có HĐ hiệu lực để chặn xóa nhầm
+            assertTrue(dao.hasActiveContracts(5));
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // BR-34: softDelete (is_deleted = 1, status = 'Inactive')
+    // ------------------------------------------------------------------
+
+    @Test
+    public void softDelete_invalidId_returnsFalse() {
+        assertFalse(dao.softDelete(0));
+        assertFalse(dao.softDelete(-3));
+    }
+
+    @Test
+    public void softDelete_success_setsDeletedAndInactive() throws Exception {
+        PreparedStatement ps = mock(PreparedStatement.class);
+        when(ps.executeUpdate()).thenReturn(1);
+        Connection conn = connectionReturning(ps);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            assertTrue(dao.softDelete(7));
+            verify(ps).setInt(1, 7);
+        }
+    }
+
+    @Test
+    public void softDelete_notFoundOrZeroRows_returnsFalse() throws Exception {
+        PreparedStatement ps = mock(PreparedStatement.class);
+        when(ps.executeUpdate()).thenReturn(0);
+        Connection conn = connectionReturning(ps);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            assertFalse(dao.softDelete(999));
+        }
+    }
+
+    @Test
+    public void softDelete_sqlError_returnsFalse() throws Exception {
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenThrow(new SQLException("Lỗi kết nối"));
+
+            assertFalse(dao.softDelete(7));
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // BR-27: existsByEmail, existsByPhone, existsByTaxCode
+    // ------------------------------------------------------------------
+
+    @Test
+    public void existsByEmail_nullOrBlank_returnsFalse() {
+        assertFalse(dao.existsByEmail(null, null));
+        assertFalse(dao.existsByEmail("", null));
+        assertFalse(dao.existsByEmail("   ", null));
+    }
+
+    @Test
+    public void existsByEmail_foundDuplicate_returnsTrue() throws Exception {
+        ResultSet rs = singleRow(row("1", 1));
+        PreparedStatement ps = statementReturning(rs);
+        Connection conn = connectionReturning(ps);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            assertTrue(dao.existsByEmail("  lienhe@company.vn  ", null));
+            verify(ps).setString(1, "lienhe@company.vn");
+        }
+    }
+
+    @Test
+    public void existsByEmail_sameCustomer_returnsFalse() throws Exception {
+        PreparedStatement ps = statementReturning(emptyResultSet());
+        Connection conn = connectionReturning(ps);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            assertFalse(dao.existsByEmail("lienhe@company.vn", 12));
+            verify(ps).setString(1, "lienhe@company.vn");
+            verify(ps).setInt(2, 12);
+        }
+    }
+
+    @Test
+    public void existsByPhone_sqlError_failsSafeReturnsTrue() throws Exception {
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenThrow(new SQLException("DB lỗi"));
+
+            // An toàn: lỗi DB coi như trùng để chặn lại
+            assertTrue(dao.existsByPhone("0901234567", null));
+        }
+    }
+
+    @Test
+    public void existsByTaxCode_uniqueAndDuplicateCheck() throws Exception {
+        assertFalse(dao.existsByTaxCode(null, null));
+        assertFalse(dao.existsByTaxCode("   ", null));
+
+        ResultSet rs = singleRow(row("1", 1));
+        PreparedStatement ps = statementReturning(rs);
+        Connection conn = connectionReturning(ps);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            assertTrue(dao.existsByTaxCode("0101234567", 5));
+            verify(ps).setString(1, "0101234567");
+            verify(ps).setInt(2, 5);
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // BR-52: generateNextEnterpriseCode & generateNextSupplierCode
+    // ------------------------------------------------------------------
+
+    @Test
+    public void generateNextEnterpriseCode_initialAndNextSequence() throws Exception {
+        // Trường hợp chưa có bản ghi nào: trả về KH-0001
+        PreparedStatement emptyPs = statementReturning(emptyResultSet());
+        Connection emptyConn = connectionReturning(emptyPs);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(emptyConn);
+
+            assertEquals("KH-0001", dao.generateNextEnterpriseCode());
+        }
+
+        // Trường hợp đã có mã lớn nhất KH-0009: trả về KH-0010
+        ResultSet nextRs = singleRow(row("enterprise_code", "KH-0009"));
+        PreparedStatement nextPs = statementReturning(nextRs);
+        Connection nextConn = connectionReturning(nextPs);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(nextConn);
+
+            assertEquals("KH-0010", dao.generateNextEnterpriseCode());
+        }
+    }
+
+    @Test
+    public void generateNextSupplierCode_seriesNccThreeDigits() throws Exception {
+        // Chưa có NCC: trả về NCC-001
+        PreparedStatement emptyPs = statementReturning(emptyResultSet());
+        Connection emptyConn = connectionReturning(emptyPs);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(emptyConn);
+
+            assertEquals("NCC-001", dao.generateNextSupplierCode());
+        }
+
+        // Đã có NCC-004: trả về NCC-005
+        ResultSet nextRs = singleRow(row("enterprise_code", "NCC-004"));
+        PreparedStatement nextPs = statementReturning(nextRs);
+        Connection nextConn = connectionReturning(nextPs);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(nextConn);
+
+            assertEquals("NCC-005", dao.generateNextSupplierCode());
+        }
+    }
+
+    @Test
+    public void generateNextCode_sqlError_returnsNull() throws Exception {
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenThrow(new SQLException("Lỗi truy vấn"));
+
+            assertNull(dao.generateNextEnterpriseCode());
+            assertNull(dao.generateNextSupplierCode());
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // UC-09: findById & findContactsByEnterpriseId
+    // ------------------------------------------------------------------
+
+    @Test
+    public void findById_activeCustomer_returnsMappedEnterprise() throws Exception {
+        List<Map<String, Object>> rows = new ArrayList<>();
+        rows.add(row(
+                "enterprise_id", 10,
+                "enterprise_code", "KH-0010",
+                "enterprise_name", "Công ty Cổ phần Alpha",
+                "customer_type", "Doanh nghiệp",
+                "customer_group", "Khách hàng lớn",
+                "tax_code", "0109998888",
+                "ent_email", "alpha@corp.vn",
+                "ent_phone", "02438889999",
+                "website", "https://alpha.vn",
+                "address_id", null,
+                "account_owner_id", 1,
+                "support_owner_id", null,
+                "legal_representative", "Trần Văn A",
+                "logo_url", null,
+                "business_license_url", null,
+                "status", "Active",
+                "join_date", Date.valueOf("2025-01-15"),
+                "current_relationship_rating", "Tốt",
+                "created_at", null,
+                "updated_at", null,
+                "is_deleted", 0,
+                "street_and_local_name", null,
+                "owner_last_name", null,
+                "support_last_name", null
+        ));
+        PreparedStatement ps = statementReturning(resultSetOf(rows));
+        Connection conn = connectionReturning(ps);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            Enterprise found = dao.findById(10);
+            assertNotNull(found);
+            assertEquals(10, found.getEnterpriseId());
+            assertEquals("KH-0010", found.getEnterpriseCode());
+            assertEquals("Công ty Cổ phần Alpha", found.getEnterpriseName());
+            assertEquals(RelationshipRating.GOOD, found.getCurrentRelationshipRating());
+            verify(ps).setInt(1, 10);
+        }
+    }
+
+    @Test
+    public void findById_softDeletedCustomer_returnsNull() throws Exception {
+        PreparedStatement ps = statementReturning(emptyResultSet());
+        Connection conn = connectionReturning(ps);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            assertNull(dao.findById(999));
+            verify(ps).setInt(1, 999);
+        }
+    }
+
+    @Test
+    public void findById_sqlError_returnsNull() throws Exception {
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenThrow(new SQLException("Lỗi kết nối"));
+
+            assertNull(dao.findById(10));
+        }
+    }
+
+    @Test
+    public void findContactsByEnterpriseId_mapsContactsCorrectly() throws Exception {
+        List<Map<String, Object>> rows = new ArrayList<>();
+        rows.add(row(
+                "contact_id", 1,
+                "enterprise_id", 10,
+                "contact_last_name", "Nguyễn",
+                "contact_middle_name", "Văn",
+                "contact_first_name", "Bình",
+                "contact_phone", "0987654321",
+                "contact_email", "binh.nv@alpha.vn",
+                "position", "Giám đốc kỹ thuật"
+        ));
+        PreparedStatement ps = statementReturning(resultSetOf(rows));
+        Connection conn = connectionReturning(ps);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            List<EnterpriseContact> contacts = dao.findContactsByEnterpriseId(10);
+            assertEquals(1, contacts.size());
+            EnterpriseContact c = contacts.get(0);
+            assertEquals(1, c.getContactId());
+            assertEquals(10, c.getEnterpriseId());
+            assertEquals("Nguyễn", c.getContactLastName());
+            assertEquals("Bình", c.getContactFirstName());
+            assertEquals("Giám đốc kỹ thuật", c.getPosition());
+            verify(ps).setInt(1, 10);
+        }
+    }
+
+    @Test
+    public void findContactsByEnterpriseId_sqlError_returnsEmptyListNotNull() throws Exception {
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenThrow(new SQLException("Lỗi DB"));
+
+            List<EnterpriseContact> contacts = dao.findContactsByEnterpriseId(10);
+            assertNotNull(contacts);
+            assertTrue(contacts.isEmpty());
         }
     }
 }

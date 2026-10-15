@@ -4,6 +4,7 @@ import java.util.List;
 import org.junit.Before;
 import org.junit.Test;
 import poscs.dao.CustomerDAO;
+import poscs.dao.CustomerLifecycleDAO;
 import poscs.model.CustomerLifecycleEvent;
 import poscs.model.Enterprise;
 import poscs.model.RelationshipRating;
@@ -176,5 +177,61 @@ public class CustomerEvaluationServiceTest {
         List<CustomerLifecycleEvent> events = service.getLifecycleEvents(1);
         assertEquals(1, events.size());
         assertEquals(101, events.get(0).getEventId());
+    }
+
+    @Test
+    public void testEvaluateCustomer_WithInjectedCustomerLifecycleDAO_Success() {
+        CustomerLifecycleDAO lifecycleDAO = mock(CustomerLifecycleDAO.class);
+        CustomerEvaluationService customService = new CustomerEvaluationService(customerDAO, lifecycleDAO, customerService);
+
+        Enterprise customer = new Enterprise();
+        customer.setEnterpriseId(1);
+        when(customerDAO.findById(1)).thenReturn(customer);
+        when(customerDAO.findRolesOf(1)).thenReturn(List.of("Khách mua"));
+        when(customerService.isOutsideSalesScope(customer, List.of("Khách mua"), salesUser, true)).thenReturn(false);
+        when(lifecycleDAO.recordEvaluation(any(CustomerLifecycleEvent.class))).thenReturn(true);
+
+        ServiceResult<CustomerLifecycleEvent> result = customService.evaluateCustomer(1, "GOOD", "Khách VIP", salesUser, true);
+
+        assertTrue(result.isSuccess());
+        assertEquals("evaluated", result.getMessage());
+        verify(lifecycleDAO).recordEvaluation(any(CustomerLifecycleEvent.class));
+        verify(customerDAO, never()).recordEvaluation(any());
+        assertSame(lifecycleDAO, customService.getCustomerLifecycleDAO());
+    }
+
+    @Test
+    public void testEvaluateCustomer_WithInjectedCustomerLifecycleDAO_RecordFailed() {
+        CustomerLifecycleDAO lifecycleDAO = mock(CustomerLifecycleDAO.class);
+        CustomerEvaluationService customService = new CustomerEvaluationService(customerDAO, lifecycleDAO, customerService);
+
+        Enterprise customer = new Enterprise();
+        customer.setEnterpriseId(1);
+        when(customerDAO.findById(1)).thenReturn(customer);
+        when(customerDAO.findRolesOf(1)).thenReturn(List.of("Khách mua"));
+        when(customerService.isOutsideSalesScope(customer, List.of("Khách mua"), salesUser, true)).thenReturn(false);
+        when(lifecycleDAO.recordEvaluation(any(CustomerLifecycleEvent.class))).thenReturn(false);
+
+        ServiceResult<CustomerLifecycleEvent> result = customService.evaluateCustomer(1, RelationshipRating.AT_RISK, "Nguy co", salesUser, true);
+
+        assertFalse(result.isSuccess());
+        assertEquals("evaluate_failed", result.getMessage());
+        verify(lifecycleDAO).recordEvaluation(any(CustomerLifecycleEvent.class));
+    }
+
+    @Test
+    public void testGetLifecycleEvents_WithInjectedCustomerLifecycleDAO() {
+        CustomerLifecycleDAO lifecycleDAO = mock(CustomerLifecycleDAO.class);
+        CustomerEvaluationService customService = new CustomerEvaluationService(customerDAO, lifecycleDAO, customerService);
+
+        CustomerLifecycleEvent ev = new CustomerLifecycleEvent();
+        ev.setEventId(202);
+        when(lifecycleDAO.findLifecycleEventsByEnterpriseId(5)).thenReturn(List.of(ev));
+
+        List<CustomerLifecycleEvent> events = customService.getLifecycleEvents(5);
+        assertEquals(1, events.size());
+        assertEquals(202, events.get(0).getEventId());
+        verify(lifecycleDAO).findLifecycleEventsByEnterpriseId(5);
+        verify(customerDAO, never()).findLifecycleEventsByEnterpriseId(anyInt());
     }
 }

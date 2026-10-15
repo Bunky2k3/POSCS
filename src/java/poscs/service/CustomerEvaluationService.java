@@ -6,6 +6,7 @@ import java.util.Collections;
 import java.util.List;
 import poscs.dao.AddressDAO;
 import poscs.dao.CustomerDAO;
+import poscs.dao.CustomerLifecycleDAO;
 import poscs.dao.EmployeeDAO;
 import poscs.model.CustomerLifecycleEvent;
 import poscs.model.Enterprise;
@@ -28,19 +29,38 @@ import poscs.model.User;
 public class CustomerEvaluationService extends BaseService {
 
     private final CustomerDAO customerDAO;
+    private final CustomerLifecycleDAO customerLifecycleDAO;
     private final CustomerService customerService;
 
     public CustomerEvaluationService() {
-        this(new CustomerDAO(), new CustomerService());
+        this(new CustomerDAO(), new CustomerLifecycleDAO(), new CustomerService());
     }
 
     public CustomerEvaluationService(CustomerDAO customerDAO, CustomerService customerService) {
+        this(customerDAO, null, customerService);
+    }
+
+    public CustomerEvaluationService(CustomerDAO customerDAO, CustomerLifecycleDAO customerLifecycleDAO,
+            CustomerService customerService) {
         this.customerDAO = customerDAO;
+        this.customerLifecycleDAO = customerLifecycleDAO;
         this.customerService = customerService;
     }
 
     public CustomerEvaluationService(CustomerDAO customerDAO, EmployeeDAO employeeDAO, AddressDAO addressDAO) {
-        this(customerDAO, new CustomerService(customerDAO, employeeDAO, addressDAO));
+        this(customerDAO, null, new CustomerService(customerDAO, employeeDAO, addressDAO));
+    }
+
+    public CustomerEvaluationService(CustomerDAO customerDAO, CustomerLifecycleDAO customerLifecycleDAO,
+            EmployeeDAO employeeDAO, AddressDAO addressDAO) {
+        this(customerDAO, customerLifecycleDAO, new CustomerService(customerDAO, employeeDAO, addressDAO));
+    }
+
+    public CustomerLifecycleDAO getCustomerLifecycleDAO() {
+        if (customerLifecycleDAO != null) {
+            return customerLifecycleDAO;
+        }
+        return customerDAO != null ? customerDAO.getLifecycleDAO() : null;
     }
 
     /**
@@ -110,7 +130,10 @@ public class CustomerEvaluationService extends BaseService {
         event.setEventDate(Date.valueOf(LocalDate.now()));
         event.setRecordedBy(actor.getUserId());
 
-        if (!customerDAO.recordEvaluation(event)) {
+        boolean recorded = customerLifecycleDAO != null
+                ? customerLifecycleDAO.recordEvaluation(event)
+                : (customerDAO != null && customerDAO.recordEvaluation(event));
+        if (!recorded) {
             log.warning("Danh gia khach hang that bai (actor=" + actor.getUserId() + ", enterpriseId=" + customerId + ")");
             return failure("evaluate_failed");
         }
@@ -125,6 +148,9 @@ public class CustomerEvaluationService extends BaseService {
         if (customerId <= 0) {
             return Collections.emptyList();
         }
-        return customerDAO.findLifecycleEventsByEnterpriseId(customerId);
+        if (customerLifecycleDAO != null) {
+            return customerLifecycleDAO.findLifecycleEventsByEnterpriseId(customerId);
+        }
+        return customerDAO != null ? customerDAO.findLifecycleEventsByEnterpriseId(customerId) : Collections.emptyList();
     }
 }

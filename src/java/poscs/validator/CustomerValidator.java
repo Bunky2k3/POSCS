@@ -15,19 +15,19 @@ import poscs.model.Enterprise;
  *       (9-10 chữ số sau 0 hoặc +84, cho phép khoảng trắng/chấm/gạch ngang).</li>
  *   <li>BR-10: Email hợp lệ (theo chuẩn RFC, không chứa khoảng trắng, tối đa 254 ký tự).</li>
  *   <li>BR-11: Các trường bắt buộc không được để trống (tên khách hàng, loại, nhóm, MST khi tạo mới, địa chỉ, người phụ trách chính).</li>
- *   <li>BR-52: Mã khách hàng tự sinh dạng {@code KH-xxxx} (ví dụ {@code KH-0001}), nhà cung cấp dạng {@code NCC-xxxx} hoặc {@code NCC-xxx} (ví dụ {@code NCC-001}).</li>
+ *   <li>BR-52: Mã khách hàng tự sinh dạng {@code KH-xxxx} (4 chữ số, ví dụ {@code KH-0001}), nhà cung cấp dạng {@code NCC-xxx} (3 chữ số, ví dụ {@code NCC-001}).</li>
  * </ul>
  */
 public class CustomerValidator extends BaseValidator {
 
-    /** BR-52: Mã khách hàng dạng KH-xxxx (tối thiểu 1 chữ số, thông thường 4 chữ số: KH-0001). */
-    public static final Pattern CUSTOMER_CODE_PATTERN = Pattern.compile("^KH-\\d+$");
+    /** BR-52: Mã khách hàng dạng KH-xxxx (đúng 4 chữ số: KH-0001, KH-0002, ...). */
+    public static final Pattern CUSTOMER_CODE_PATTERN = Pattern.compile("^KH-\\d{4}$");
 
-    /** BR-52: Mã nhà cung cấp dạng NCC-xxxx hoặc NCC-xxx (tối thiểu 1 chữ số, thông thường 3-4 chữ số: NCC-001). */
-    public static final Pattern SUPPLIER_CODE_PATTERN = Pattern.compile("^NCC-\\d+$");
+    /** BR-52: Mã nhà cung cấp dạng NCC-xxx (đúng 3 chữ số: NCC-001, NCC-002, ...). */
+    public static final Pattern SUPPLIER_CODE_PATTERN = Pattern.compile("^NCC-\\d{3}$");
 
-    /** Regex kiểm tra mã đối tác chung (KH- hoặc NCC-). */
-    public static final Pattern ENTERPRISE_CODE_PATTERN = Pattern.compile("^(KH|NCC)-\\d+$");
+    /** Regex kiểm tra mã đối tác chung (KH-xxxx hoặc NCC-xxx). */
+    public static final Pattern ENTERPRISE_CODE_PATTERN = Pattern.compile("^(KH-\\d{4}|NCC-\\d{3})$");
 
     /** BR-09: Regex kiểm tra SĐT Việt Nam khớp logic gốc của CustomerController (chấp nhận di động & cố định). */
     public static final Pattern CUSTOMER_PHONE_PATTERN = Pattern.compile("^(0|\\+84)[0-9]{9,10}$");
@@ -90,7 +90,7 @@ public class CustomerValidator extends BaseValidator {
     }
 
     /**
-     * BR-52: Kiểm tra định dạng mã khách hàng (KH-xxxx) hoặc nhà cung cấp (NCC-xxxx).
+     * BR-52: Kiểm tra định dạng mã đối tác (KH-xxxx đúng 4 chữ số hoặc NCC-xxx đúng 3 chữ số).
      */
     public boolean isValidEnterpriseCode(String code) {
         if (isBlank(code)) {
@@ -100,7 +100,7 @@ public class CustomerValidator extends BaseValidator {
     }
 
     /**
-     * BR-52: Kiểm tra định dạng mã khách hàng (bắt đầu bằng KH- theo sau bởi các chữ số).
+     * BR-52: Kiểm tra định dạng mã khách hàng (bắt đầu bằng KH- theo sau bởi đúng 4 chữ số).
      */
     public boolean isValidCustomerCode(String code) {
         if (isBlank(code)) {
@@ -110,7 +110,7 @@ public class CustomerValidator extends BaseValidator {
     }
 
     /**
-     * BR-52: Kiểm tra định dạng mã nhà cung cấp (bắt đầu bằng NCC- theo sau bởi các chữ số).
+     * BR-52: Kiểm tra định dạng mã nhà cung cấp (bắt đầu bằng NCC- theo sau bởi đúng 3 chữ số).
      */
     public boolean isValidSupplierCode(String code) {
         if (isBlank(code)) {
