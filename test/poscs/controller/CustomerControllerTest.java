@@ -87,6 +87,14 @@ public class CustomerControllerTest {
         // EmployeeDAO.findTeamUserIds thật luôn có chính người hỏi, kể cả khi
         // họ chưa có cấp dưới nào.
         when(employeeDAO.findTeamUserIds(99)).thenReturn(List.of(99));
+        when(employeeDAO.findById(anyInt())).thenAnswer(inv -> {
+            Integer id = inv.getArgument(0);
+            User u = (User) session.getAttribute("currentUser");
+            if (u != null && id != null && id.equals(u.getUserId())) {
+                return u;
+            }
+            return null;
+        });
         // Đường thành công mặc định: ghi vai được. Test nào nói về ghi vai hỏng
         // thì tự stub lại false.
         when(customerDAO.replaceRolesOf(anyInt(), any())).thenReturn(true);
@@ -97,6 +105,7 @@ public class CustomerControllerTest {
         user.setUserId(99);
         user.setRole(new Role(1, roleName));
         when(session.getAttribute("currentUser")).thenReturn(user);
+        when(employeeDAO.findById(99)).thenReturn(user);
     }
 
     private static void setField(Object target, String fieldName, Object value) throws Exception {
@@ -996,6 +1005,7 @@ public class CustomerControllerTest {
         customer.setSupportOwnerId(42);
         when(customerDAO.findById(5)).thenReturn(customer);
 
+        when(employeeDAO.findTeamUserIds(99)).thenReturn(List.of(99, 41, 42));
         controller.doGet(request, response);
 
         verify(employeeDAO).findActiveByRole("Sales", 41, 42);
@@ -1559,6 +1569,7 @@ public class CustomerControllerTest {
         holdsProvinces();
         khach5(42, 2);
         postUpdate5(2);
+        when(employeeDAO.findTeamUserIds(99)).thenReturn(List.of(99, 42));
         when(employeeDAO.findAssigneeOfWard(10)).thenReturn(77);
 
         controller.doPost(request, response);
@@ -1585,6 +1596,7 @@ public class CustomerControllerTest {
         holdsProvinces();
         khach5(42, 2);
         openEditForm5();
+        when(employeeDAO.findTeamUserIds(99)).thenReturn(List.of(99, 42));
 
         controller.doGet(request, response);
 

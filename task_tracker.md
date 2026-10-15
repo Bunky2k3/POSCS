@@ -52,8 +52,8 @@ Không còn mục nào.
   - *Đã hoàn thành:* Chuẩn hóa `SUPPLIER_CODE_PATTERN` thành `^NCC-\\d{3}$`, `CUSTOMER_CODE_PATTERN` thành `^KH-\\d{4}$` trong `CustomerValidator.java`; bộ sinh mã `CustomerDAO.generateNextSupplierCode()` sinh đúng 3 chữ số; bổ sung test case từ chối `NCC-0001`, chấp nhận `NCC-001` trong `CustomerValidatorTest.java`. Toàn bộ `ant test` pass.
 - [x] **Task 2.3:** `[UC-08, UC-09, UC-30..32, UC-38]` `[BR-12, BR-27, BR-34, BR-52]` Tách `CustomerDAO` thành `CustomerDAO` (nghiệp vụ chính) và `CustomerLifecycleDAO` (đánh giá & sự kiện vòng đời).
   - *(Người dùng xác nhận đã làm và QA xong.)* Không đổi hành vi; xóa KH vẫn là **xóa mềm** và vẫn chặn khi còn hợp đồng hiệu lực (BR-34, MSG-040).
-- [ ] **Task 2.4:** `[UC-08, UC-09, UC-30..32, UC-37]` `[BR-12, BR-13, BR-14, BR-34]` Refactor `CustomerController` thành `CustomerListController`, `CustomerDetailController`, `CustomerActionController` (Thêm/Sửa/Xóa), `CustomerExportController` (Excel, UC-37).
-  - *Xong khi:* quyền ghi lấy từ `PermissionService` (Task 1.4); bộ lọc & từ khóa giữ nguyên khi phân trang và khi xuất Excel.
+- [x] **Task 2.4:** `[UC-08, UC-09, UC-30..32, UC-37]` `[BR-12, BR-13, BR-14, BR-34]` Refactor `CustomerController` thành `CustomerListController`, `CustomerDetailController`, `CustomerActionController` (Thêm/Sửa/Xóa), `CustomerExportController` (Excel, UC-37).
+  - *Đã hoàn thành:* Tách `CustomerController` thành 4 controller chuyên biệt (`CustomerListController`, `CustomerDetailController`, `CustomerActionController`, `CustomerExportController`) và `CustomerControllerHelper`. Quyền ghi và phạm vi kiểm soát chặt chẽ qua `PermissionService` (fail-closed, MSG-022, RBAC). Bộ lọc & phân trang (BR-12, BR-13, BR-14) và xuất Excel (UC-37) hoạt động đồng bộ. Unit tests đạt 100% pass (bổ sung test ngoại lệ trong `CustomerActionControllerTest`, `CustomerListControllerTest`, `CustomerDetailControllerTest`, `CustomerExportControllerTest` và `CustomerControllerTest`).
 
 ---
 
