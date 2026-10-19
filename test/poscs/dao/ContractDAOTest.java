@@ -19,6 +19,8 @@ import poscs.model.Contract;
 import poscs.model.ContractDocument;
 import poscs.model.ContractHandover;
 import poscs.model.ContractHistory;
+import poscs.model.ContractLink;
+import poscs.model.ContractPayment;
 import poscs.model.ContractProduct;
 
 import static org.junit.Assert.*;
@@ -2408,4 +2410,356 @@ public class ContractDAOTest {
         assertSame(h, list.get(0));
         verify(mockHandoverDAO).findPendingHandovers(List.of(ACTOR));
     }
+
+    // ==================================================================
+    // Task 4.9 -- CRUD hợp đồng gốc, hàng hóa, phụ lục, kiểm tra đầu vào
+    // và ủy quyền sang ContractHistoryDAO / ContractPaymentDAO / ContractLinkDAO
+    // ==================================================================
+
+    @Test
+    public void nullGuards_insertUpdateCorrectInsertProducts_doNotTouchDatabase() {
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            assertEquals(-1, dao.insert(null, ACTOR));
+            assertFalse(dao.update(null, ACTOR));
+            assertFalse(dao.correct(null, ACTOR, "Lý do hợp lệ"));
+            assertTrue(dao.insertProducts(10, null, ACTOR));
+            assertFalse(dao.contractCodeExists(null, 0));
+            assertFalse(dao.contractCodeExists("   ", 0));
+
+            db.verifyNoInteractions();
+        }
+    }
+
+    @Test
+    public void findById_whenNotFound_returnsNull() throws Exception {
+        ResultSet rs = emptyResultSet();
+        PreparedStatement ps = statementReturning(rs);
+        Connection conn = connectionReturning(ps);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            assertNull(dao.findById(999));
+            verify(ps).setInt(1, 999);
+        }
+    }
+
+    @Test
+    public void findById_onSqlException_returnsNull() throws Exception {
+        Connection conn = mock(Connection.class);
+        when(conn.prepareStatement(anyString())).thenThrow(new SQLException("boom"));
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            assertNull(dao.findById(10));
+        }
+    }
+
+    @Test
+    public void findByEnterpriseId_mapsContractFieldsAndStatus() throws Exception {
+        ResultSet rs = singleRow(row(
+                "contract_id", 15,
+                "contract_code", "HD-ENT-15",
+                "title", "Hợp đồng bảo trì",
+                "contract_type", "Bảo trì",
+                "direction", ContractDAO.DIRECTION_SELL,
+                "signing_date", Date.valueOf("2026-01-10"),
+                "effective_date", Date.valueOf(LocalDate.now().minusDays(10)),
+                "end_date", Date.valueOf(LocalDate.now().plusDays(90)),
+                "enterprise_id", 7,
+                "owner_id", 3));
+        PreparedStatement ps = statementReturning(rs);
+        Connection conn = connectionReturning(ps);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            List<Contract> list = dao.findByEnterpriseId(7);
+
+            assertEquals(1, list.size());
+            Contract c = list.get(0);
+            assertEquals(15, c.getContractId());
+            assertEquals("HD-ENT-15", c.getContractCode());
+            assertEquals(ContractDAO.DIRECTION_SELL, c.getDirection());
+            assertEquals(ContractDAO.STATUS_ACTIVE, c.getStatus());
+            verify(ps).setInt(1, 7);
+        }
+    }
+
+    @Test
+    public void findByEnterpriseId_onSqlException_returnsEmptyList() throws Exception {
+        Connection conn = mock(Connection.class);
+        when(conn.prepareStatement(anyString())).thenThrow(new SQLException("boom"));
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            assertTrue(dao.findByEnterpriseId(7).isEmpty());
+        }
+    }
+
+    @Test
+    public void findProductsByContractId_mapsProductRowsAndHandlesException() throws Exception {
+        ResultSet rs = singleRow(row(
+                "contract_product_id", 101,
+                "contract_id", 10,
+                "product_id", 5,
+                "product_code", "SP-05",
+                "product_name", "Thiết bị định vị",
+                "quantity", 12,
+                "unit", "bộ",
+                "notes", "Bảo hành 24 tháng"));
+        PreparedStatement ps = statementReturning(rs);
+        Connection conn = connectionReturning(ps);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            List<ContractProduct> items = dao.findProductsByContractId(10);
+
+            assertEquals(1, items.size());
+            ContractProduct cp = items.get(0);
+            assertEquals(101, cp.getContractProductId());
+            assertEquals(10, cp.getContractId());
+            assertEquals(5, cp.getProductId());
+            assertEquals("SP-05", cp.getProductCode());
+            assertEquals("Thiết bị định vị", cp.getProductName());
+            assertEquals(12, cp.getQuantity());
+            assertEquals("bộ", cp.getUnit());
+            assertEquals("Bảo hành 24 tháng", cp.getNotes());
+        }
+
+        Connection badConn = mock(Connection.class);
+        when(badConn.prepareStatement(anyString())).thenThrow(new SQLException("boom"));
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(badConn);
+            assertTrue(dao.findProductsByContractId(10).isEmpty());
+        }
+    }
+
+    @Test
+    public void findAmendmentsByParentId_mapsRowsAndHandlesException() throws Exception {
+        ResultSet rs = singleRow(row(
+                "contract_id", 21,
+                "contract_code", "HD-01-PL01",
+                "title", "Phụ lục gia hạn",
+                "contract_type", "Phụ lục",
+                "direction", ContractDAO.DIRECTION_SELL,
+                "parent_contract_id", 10,
+                "parent_contract_code", "HD-01",
+                "progress_status", ContractDAO.PROGRESS_SIGNED));
+        PreparedStatement ps = statementReturning(rs);
+        Connection conn = connectionReturning(ps);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            List<Contract> list = dao.findAmendmentsByParentId(10);
+
+            assertEquals(1, list.size());
+            assertEquals(21, list.get(0).getContractId());
+            assertEquals(Integer.valueOf(10), list.get(0).getParentContractId());
+            verify(ps).setInt(1, 10);
+        }
+
+        Connection badConn = mock(Connection.class);
+        when(badConn.prepareStatement(anyString())).thenThrow(new SQLException("boom"));
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(badConn);
+            assertTrue(dao.findAmendmentsByParentId(10).isEmpty());
+        }
+    }
+
+    @Test
+    public void contractDAO_historyPaymentAndLinkDelegation_forwardsAllCalls() {
+        ContractHistoryDAO mockHistoryDAO = mock(ContractHistoryDAO.class);
+        ContractPaymentDAO mockPaymentDAO = mock(ContractPaymentDAO.class);
+        ContractDocumentDAO mockDocDAO = mock(ContractDocumentDAO.class);
+        ContractLinkDAO mockLinkDAO = mock(ContractLinkDAO.class);
+        ContractHandoverDAO mockHandoverDAO = mock(ContractHandoverDAO.class);
+
+        ContractDAO fullDao = new ContractDAO(
+                mockHistoryDAO, mockPaymentDAO, mockDocDAO, mockLinkDAO, mockHandoverDAO);
+
+        assertSame(mockHistoryDAO, fullDao.getHistoryDAO());
+        assertSame(mockPaymentDAO, fullDao.getPaymentDAO());
+        assertSame(mockDocDAO, fullDao.getDocumentDAO());
+        assertSame(mockLinkDAO, fullDao.getLinkDAO());
+        assertSame(mockHandoverDAO, fullDao.getHandoverDAO());
+
+        ContractHistory history = new ContractHistory();
+        when(mockHistoryDAO.findHistoryByContractId(10)).thenReturn(List.of(history));
+        assertEquals(1, fullDao.findHistoryByContractId(10).size());
+        verify(mockHistoryDAO).findHistoryByContractId(10);
+
+        ContractPayment payment = new ContractPayment();
+        Date paidDate = Date.valueOf("2026-04-15");
+        Period period = mock(Period.class);
+        when(mockPaymentDAO.findPaymentsByContractId(10)).thenReturn(List.of(payment));
+        when(mockPaymentDAO.insertPayment(10, payment, ACTOR)).thenReturn(true);
+        when(mockPaymentDAO.markPaymentPaid(1, 10, paidDate, ACTOR)).thenReturn(true);
+        when(mockPaymentDAO.deletePayment(1, 10, ACTOR)).thenReturn(true);
+        when(mockPaymentDAO.sumInvoiceAmountInPeriod(period, 1)).thenReturn(BigDecimal.TEN);
+        when(mockPaymentDAO.sumInvoiceAmountInPeriod(period, List.of(1), List.of(ACTOR))).thenReturn(BigDecimal.ONE);
+        when(mockPaymentDAO.sumInvoiceAmountByMonth(2026, 4)).thenReturn(BigDecimal.TEN);
+        when(mockPaymentDAO.sumInvoiceAmountByMonth(2026, 4, 1)).thenReturn(BigDecimal.TEN);
+        when(mockPaymentDAO.sumInvoiceAmountByMonth(2026, 4, List.of(1), List.of(ACTOR))).thenReturn(BigDecimal.ONE);
+        when(mockPaymentDAO.sumScheduledPaymentsForCluster(10)).thenReturn(new BigDecimal("500"));
+
+        assertEquals(1, fullDao.findPaymentsByContractId(10).size());
+        assertTrue(fullDao.insertPayment(10, payment, ACTOR));
+        assertTrue(fullDao.markPaymentPaid(1, 10, paidDate, ACTOR));
+        assertTrue(fullDao.deletePayment(1, 10, ACTOR));
+        assertEquals(BigDecimal.TEN, fullDao.sumInvoiceAmountInPeriod(period, 1));
+        assertEquals(BigDecimal.ONE, fullDao.sumInvoiceAmountInPeriod(period, List.of(1), List.of(ACTOR)));
+        assertEquals(BigDecimal.TEN, fullDao.sumInvoiceAmountByMonth(2026, 4));
+        assertEquals(BigDecimal.TEN, fullDao.sumInvoiceAmountByMonth(2026, 4, 1));
+        assertEquals(BigDecimal.ONE, fullDao.sumInvoiceAmountByMonth(2026, 4, List.of(1), List.of(ACTOR)));
+        assertEquals(new BigDecimal("500"), fullDao.sumScheduledPaymentsForCluster(10));
+
+        ContractLink link = new ContractLink();
+        when(mockLinkDAO.linkContracts(10, 20, "note", ACTOR)).thenReturn(ContractDAO.LINK_OK);
+        when(mockLinkDAO.unlinkContracts(5, ACTOR)).thenReturn(true);
+        when(mockLinkDAO.findLinksOf(10)).thenReturn(List.of(link));
+        when(mockLinkDAO.sumLinkedBuyValue(10)).thenReturn(new BigDecimal("300"));
+
+        assertEquals(ContractDAO.LINK_OK, fullDao.linkContracts(10, 20, "note", ACTOR));
+        assertTrue(fullDao.unlinkContracts(5, ACTOR));
+        assertEquals(1, fullDao.findLinksOf(10).size());
+        assertEquals(new BigDecimal("300"), fullDao.sumLinkedBuyValue(10));
+    }
+
+    @Test
+    public void insertProducts_listWithNullElement_returnsFalseWithoutTouchingDatabase() {
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            assertFalse(dao.insertProducts(10, Arrays.asList(item(1, 2), null), ACTOR));
+            db.verifyNoInteractions();
+        }
+    }
+
+    @Test
+    public void findAll_pageSizeZeroOrNegative_usesDefaultPageSize() throws Exception {
+        PreparedStatement psZero = statementReturning(emptyResultSet());
+        Connection connZero = connectionReturning(psZero);
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(connZero);
+            dao.findAll(2, 0, null, null, null);
+            verify(psZero).setObject(1, 10);
+            verify(psZero).setObject(2, 10);
+        }
+
+        PreparedStatement psNegative = statementReturning(emptyResultSet());
+        Connection connNegative = connectionReturning(psNegative);
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(connNegative);
+            dao.findAll(3, -5, null, null, null);
+            verify(psNegative).setObject(1, 10);
+            verify(psNegative).setObject(2, 20);
+        }
+    }
+
+    @Test
+    public void findAll_pageBelowOne_startsAtOffsetZero() throws Exception {
+        PreparedStatement ps = statementReturning(emptyResultSet());
+        Connection conn = connectionReturning(ps);
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+            dao.findAll(0, 15, null, null, null);
+            verify(ps).setObject(1, 15);
+            verify(ps).setObject(2, 0);
+        }
+    }
+
+    @Test
+    public void mapRow_withNullEnterpriseNullProvinceNullOwner_handlesNullableBranches() throws Exception {
+        ResultSet rsAllNull = singleRow(row(
+                "contract_id", 30,
+                "contract_code", "HD-30",
+                "enterprise_id", 5,
+                "owner_id", 8));
+        ResultSet rsEnterpriseWithoutProvince = singleRow(row(
+                "contract_id", 31,
+                "contract_code", "HD-31",
+                "enterprise_id", 5,
+                "enterprise_name", "Công ty A",
+                "owner_id", 8,
+                "owner_last_name", "Nguyễn",
+                "owner_middle_name", "Văn",
+                "owner_first_name", "B"));
+        ResultSet rsEnterpriseWithProvince = singleRow(row(
+                "contract_id", 32,
+                "contract_code", "HD-32",
+                "enterprise_id", 5,
+                "enterprise_name", "Công ty A",
+                "province_id", 1,
+                "province_name", "Hà Nội",
+                "owner_id", 8));
+
+        PreparedStatement ps = mock(PreparedStatement.class);
+        when(ps.executeQuery()).thenReturn(rsAllNull, rsEnterpriseWithoutProvince, rsEnterpriseWithProvince);
+        Connection conn = connectionReturning(ps);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            Contract c1 = dao.findById(30);
+            assertNotNull(c1);
+            assertNull(c1.getEnterprise());
+            assertNull(c1.getOwner());
+
+            Contract c2 = dao.findById(31);
+            assertNotNull(c2);
+            assertNotNull(c2.getEnterprise());
+            assertEquals("Công ty A", c2.getEnterprise().getEnterpriseName());
+            assertNull(c2.getEnterprise().getAddress());
+            assertNotNull(c2.getOwner());
+            assertEquals("Nguyễn", c2.getOwner().getLastName());
+
+            Contract c3 = dao.findById(32);
+            assertNotNull(c3);
+            assertNotNull(c3.getEnterprise());
+            assertNotNull(c3.getEnterprise().getAddress());
+            assertEquals("Hà Nội", c3.getEnterprise().getAddress().getDistrict().getProvince().getProvinceName());
+            assertNull(c3.getOwner());
+        }
+    }
+
+    @Test
+    public void countStatusSummary_waitingHandoverClause_handlesAnyAndSpecificDepartment() throws Exception {
+        ResultSet rsAny = singleRow(row("draft_count", 1, "expired_count", 2, "soon_count", 3, "active_count", 4));
+        PreparedStatement psAny = statementReturning(rsAny);
+        Connection connAny = mock(Connection.class);
+        ArgumentCaptor<String> sqlAny = ArgumentCaptor.forClass(String.class);
+        when(connAny.prepareStatement(sqlAny.capture())).thenReturn(psAny);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(connAny);
+
+            java.util.Map<String, Integer> summary = dao.countStatusSummary(
+                    (Integer) null, null, null, false, null, ListScope.all(), ContractDAO.WAITING_ANY_DEPARTMENT);
+
+            assertEquals(Integer.valueOf(4), summary.get(ContractDAO.STATUS_ACTIVE));
+            assertTrue(sqlAny.getValue().contains("wh.done_at IS NULL)"));
+            assertFalse(sqlAny.getValue().contains("wh.department_id = ?"));
+            verify(psAny, never()).setInt(anyInt(), anyInt());
+        }
+
+        ResultSet rsDept = singleRow(row("draft_count", 0, "expired_count", 0, "soon_count", 1, "active_count", 2));
+        PreparedStatement psDept = statementReturning(rsDept);
+        Connection connDept = mock(Connection.class);
+        ArgumentCaptor<String> sqlDept = ArgumentCaptor.forClass(String.class);
+        when(connDept.prepareStatement(sqlDept.capture())).thenReturn(psDept);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(connDept);
+
+            dao.countStatusSummary((Integer) null, null, null, false, null, ListScope.all(), 3);
+
+            assertTrue(sqlDept.getValue().contains("wh.department_id = ?"));
+            verify(psDept).setInt(1, 3);
+        }
+    }
 }
+
+
