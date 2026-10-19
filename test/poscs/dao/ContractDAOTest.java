@@ -16,6 +16,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.mockito.MockedStatic;
 import poscs.model.Contract;
+import poscs.model.ContractDocument;
 import poscs.model.ContractHistory;
 import poscs.model.ContractProduct;
 
@@ -2284,5 +2285,59 @@ public class ContractDAOTest {
             verify(historyPs, never()).setString(2, ContractHistory.EVENT_VALUE_ADJUSTED);
             verify(conn).commit();
         }
+    }
+
+    // ==================================================================
+    // Tài liệu hợp đồng -- ủy quyền sang ContractDocumentDAO (Task 4.5, UC-52)
+    // ==================================================================
+
+    @Test
+    public void contractDAO_documentDelegation_constructorsAndGetters() {
+        ContractDAO defaultDao = new ContractDAO();
+        assertNotNull(defaultDao.getDocumentDAO());
+
+        ContractDocumentDAO docDao = new ContractDocumentDAO();
+        ContractDAO customDao = new ContractDAO(docDao);
+        assertSame(docDao, customDao.getDocumentDAO());
+    }
+
+    @Test
+    public void contractDAO_addDocument_delegatesToContractDocumentDAO() {
+        ContractDocumentDAO mockDocDAO = mock(ContractDocumentDAO.class);
+        ContractDAO daoWithMock = new ContractDAO(mockDocDAO);
+
+        ContractDocument doc = new ContractDocument();
+        doc.setContractId(10);
+        when(mockDocDAO.addDocument(doc, ACTOR)).thenReturn(ContractDocumentDAO.DOC_OK);
+
+        int result = daoWithMock.addDocument(doc, ACTOR);
+        assertEquals(ContractDocumentDAO.DOC_OK, result);
+        verify(mockDocDAO).addDocument(doc, ACTOR);
+    }
+
+    @Test
+    public void contractDAO_voidDocument_delegatesToContractDocumentDAO() {
+        ContractDocumentDAO mockDocDAO = mock(ContractDocumentDAO.class);
+        ContractDAO daoWithMock = new ContractDAO(mockDocDAO);
+
+        when(mockDocDAO.voidDocument(50, ACTOR, "Lý do huỷ")).thenReturn(true);
+
+        assertTrue(daoWithMock.voidDocument(50, ACTOR, "Lý do huỷ"));
+        verify(mockDocDAO).voidDocument(50, ACTOR, "Lý do huỷ");
+    }
+
+    @Test
+    public void contractDAO_findDocumentsOf_delegatesToContractDocumentDAO() {
+        ContractDocumentDAO mockDocDAO = mock(ContractDocumentDAO.class);
+        ContractDAO daoWithMock = new ContractDAO(mockDocDAO);
+
+        ContractDocument d = new ContractDocument();
+        d.setDocumentId(1);
+        when(mockDocDAO.findDocumentsOf(10)).thenReturn(List.of(d));
+
+        List<ContractDocument> list = daoWithMock.findDocumentsOf(10);
+        assertEquals(1, list.size());
+        assertSame(d, list.get(0));
+        verify(mockDocDAO).findDocumentsOf(10);
     }
 }
