@@ -93,8 +93,19 @@ public class ContractDAO {
 
     private static final int SOON_THRESHOLD_DAYS = 30;
 
-    /** Khớp varchar(500) của contract_history.detail -- xem {@link #truncate}. */
-    private static final int DETAIL_MAX_LENGTH = 500;
+    private final ContractHistoryDAO historyDAO;
+
+    public ContractDAO() {
+        this(new ContractHistoryDAO());
+    }
+
+    public ContractDAO(ContractHistoryDAO historyDAO) {
+        this.historyDAO = historyDAO != null ? historyDAO : new ContractHistoryDAO();
+    }
+
+    public ContractHistoryDAO getHistoryDAO() {
+        return historyDAO;
+    }
 
     /** Ngày trong câu nhật ký viết như người Việt đọc, không phải như CSDL lưu. */
     private static final DateTimeFormatter DETAIL_DATE_FORMAT = DateTimeFormatter.ofPattern("dd/MM/yyyy");
@@ -2163,32 +2174,11 @@ public class ContractDAO {
      * Dòng nhật ký của một bước chuyển tiến độ -- khác dòng sửa đổi ở chỗ có
      * from_status/to_status, nên dựng lại được cả dòng thời gian vòng đời chứ
      * không chỉ danh sách thay đổi.
+     * Ủy quyền sang {@link ContractHistoryDAO#insertStatusChange(Connection, int, String, String, int, String)}.
      */
     private void insertStatusChange(Connection conn, int contractId, String fromStatus, String toStatus,
             int changedBy, String note) throws SQLException {
-        String sql = "INSERT INTO contract_history " +
-                "(contract_id, event_type, detail, from_status, to_status, changed_by, note) " +
-                "VALUES (?, ?, ?, ?, ?, ?, ?)";
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, contractId);
-            ps.setString(2, eventTypeOf(toStatus));
-            ps.setString(3, truncate(fromStatus + " → " + toStatus, DETAIL_MAX_LENGTH));
-            ps.setString(4, fromStatus);
-            ps.setString(5, toStatus);
-            ps.setInt(6, changedBy);
-            ps.setString(7, note);
-            ps.executeUpdate();
-        }
-    }
-
-    private static String eventTypeOf(String toStatus) {
-        if (PROGRESS_SIGNED.equals(toStatus)) {
-            return ContractHistory.EVENT_SIGNED;
-        }
-        if (PROGRESS_LIQUIDATED.equals(toStatus)) {
-            return ContractHistory.EVENT_LIQUIDATED;
-        }
-        return ContractHistory.EVENT_TERMINATED;
+        historyDAO.insertStatusChange(conn, contractId, fromStatus, toStatus, changedBy, note);
     }
 
     // ------------------------------------------------------------------
@@ -2203,19 +2193,11 @@ public class ContractDAO {
      * Hai connection rời nhau thì sẽ có lúc hàng hoá đã gỡ xong mà dòng nhật ký
      * ghi hụt, và không ai phát hiện ra -- đúng cái lỗ mà bảng này sinh ra để
      * bịt. Ném SQLException ra ngoài để transaction của bên gọi rollback.
+     * Ủy quyền sang {@link ContractHistoryDAO#insertHistory(Connection, int, String, String, int, String)}.
      */
     private void insertHistory(Connection conn, int contractId, String eventType, String detail,
             int changedBy, String note) throws SQLException {
-        String sql = "INSERT INTO contract_history " +
-                "(contract_id, event_type, detail, changed_by, note) VALUES (?, ?, ?, ?, ?)";
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, contractId);
-            ps.setString(2, eventType);
-            ps.setString(3, truncate(detail, DETAIL_MAX_LENGTH));
-            ps.setInt(4, changedBy);
-            ps.setString(5, note);
-            ps.executeUpdate();
-        }
+        historyDAO.insertHistory(conn, contractId, eventType, detail, changedBy, note);
     }
 
     /**
@@ -2244,46 +2226,12 @@ public class ContractDAO {
         }
     }
 
-    /** Nhật ký của 1 hợp đồng, mới nhất trước, kèm tên người thực hiện. */
+    /**
+     * Nhật ký của 1 hợp đồng, mới nhất trước, kèm tên người thực hiện.
+     * [UC-45] Ủy quyền sang {@link ContractHistoryDAO#findHistoryByContractId(int)}.
+     */
     public List<ContractHistory> findHistoryByContractId(int contractId) {
-        List<ContractHistory> result = new ArrayList<>();
-        String sql = "SELECT h.history_id, h.contract_id, h.event_type, h.detail, h.from_status, h.to_status, " +
-                "       h.changed_by, h.changed_at, h.note, " +
-                "       u.last_name AS changer_last_name, u.middle_name AS changer_middle_name, " +
-                "       u.first_name AS changer_first_name " +
-                "FROM contract_history h " +
-                "JOIN users u ON u.user_id = h.changed_by " +
-                "WHERE h.contract_id = ? " +
-                "ORDER BY h.changed_at DESC, h.history_id DESC";
-        try (Connection conn = DBContext.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, contractId);
-            try (ResultSet rs = ps.executeQuery()) {
-                while (rs.next()) {
-                    ContractHistory h = new ContractHistory();
-                    h.setHistoryId(rs.getInt("history_id"));
-                    h.setContractId(rs.getInt("contract_id"));
-                    h.setEventType(rs.getString("event_type"));
-                    h.setDetail(rs.getString("detail"));
-                    h.setFromStatus(rs.getString("from_status"));
-                    h.setToStatus(rs.getString("to_status"));
-                    h.setChangedBy(rs.getInt("changed_by"));
-                    h.setChangedAt(rs.getTimestamp("changed_at"));
-                    h.setNote(rs.getString("note"));
-
-                    User changer = new User();
-                    changer.setLastName(rs.getString("changer_last_name"));
-                    changer.setMiddleName(rs.getString("changer_middle_name"));
-                    changer.setFirstName(rs.getString("changer_first_name"));
-                    h.setChangedByUser(changer);
-
-                    result.add(h);
-                }
-            }
-        } catch (SQLException ex) {
-            LOG.error("Loi truy van nhat ky hop dong (contractId={})", contractId, ex);
-        }
-        return result;
+        return historyDAO.findHistoryByContractId(contractId);
     }
 
     // ------------------------------------------------------------------
@@ -2650,10 +2598,7 @@ public class ContractDAO {
 
     /** Cắt cho vừa cột detail thay vì để MySQL từ chối cả câu INSERT và mất luôn dòng nhật ký. */
     private static String truncate(String text, int max) {
-        if (text == null) {
-            return "";
-        }
-        return text.length() <= max ? text : text.substring(0, max - 1) + "…";
+        return ContractHistoryDAO.truncate(text, max);
     }
 
     private void appendFilters(StringBuilder sql, List<Object> params, String keyword, String statusFilter,
