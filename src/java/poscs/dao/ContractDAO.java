@@ -97,40 +97,50 @@ public class ContractDAO {
     private final ContractPaymentDAO paymentDAO;
     private final ContractDocumentDAO documentDAO;
     private final ContractLinkDAO linkDAO;
+    private final ContractHandoverDAO handoverDAO;
 
     public ContractDAO() {
         this(new ContractHistoryDAO());
     }
 
     public ContractDAO(ContractHistoryDAO historyDAO) {
-        this(historyDAO, null, null, null);
+        this(historyDAO, null, null, null, null);
     }
 
     public ContractDAO(ContractPaymentDAO paymentDAO) {
-        this(paymentDAO != null ? paymentDAO.getHistoryDAO() : new ContractHistoryDAO(), paymentDAO, null, null);
+        this(paymentDAO != null ? paymentDAO.getHistoryDAO() : new ContractHistoryDAO(), paymentDAO, null, null, null);
     }
 
     public ContractDAO(ContractDocumentDAO documentDAO) {
-        this(documentDAO != null ? documentDAO.getHistoryDAO() : new ContractHistoryDAO(), null, documentDAO, null);
+        this(documentDAO != null ? documentDAO.getHistoryDAO() : new ContractHistoryDAO(), null, documentDAO, null, null);
     }
 
     public ContractDAO(ContractLinkDAO linkDAO) {
-        this(linkDAO != null ? linkDAO.getHistoryDAO() : new ContractHistoryDAO(), null, null, linkDAO);
+        this(linkDAO != null ? linkDAO.getHistoryDAO() : new ContractHistoryDAO(), null, null, linkDAO, null);
+    }
+
+    public ContractDAO(ContractHandoverDAO handoverDAO) {
+        this(handoverDAO != null ? handoverDAO.getHistoryDAO() : new ContractHistoryDAO(), null, null, null, handoverDAO);
     }
 
     public ContractDAO(ContractHistoryDAO historyDAO, ContractPaymentDAO paymentDAO) {
-        this(historyDAO, paymentDAO, null, null);
+        this(historyDAO, paymentDAO, null, null, null);
     }
 
     public ContractDAO(ContractHistoryDAO historyDAO, ContractPaymentDAO paymentDAO, ContractDocumentDAO documentDAO) {
-        this(historyDAO, paymentDAO, documentDAO, null);
+        this(historyDAO, paymentDAO, documentDAO, null, null);
     }
 
     public ContractDAO(ContractHistoryDAO historyDAO, ContractPaymentDAO paymentDAO, ContractDocumentDAO documentDAO, ContractLinkDAO linkDAO) {
+        this(historyDAO, paymentDAO, documentDAO, linkDAO, null);
+    }
+
+    public ContractDAO(ContractHistoryDAO historyDAO, ContractPaymentDAO paymentDAO, ContractDocumentDAO documentDAO, ContractLinkDAO linkDAO, ContractHandoverDAO handoverDAO) {
         this.historyDAO = historyDAO != null ? historyDAO : new ContractHistoryDAO();
         this.paymentDAO = paymentDAO != null ? paymentDAO : new ContractPaymentDAO(this.historyDAO);
         this.documentDAO = documentDAO != null ? documentDAO : new ContractDocumentDAO(this.historyDAO);
         this.linkDAO = linkDAO != null ? linkDAO : new ContractLinkDAO(this.historyDAO);
+        this.handoverDAO = handoverDAO != null ? handoverDAO : new ContractHandoverDAO(this.historyDAO);
     }
 
     public ContractHistoryDAO getHistoryDAO() {
@@ -147,6 +157,10 @@ public class ContractDAO {
 
     public ContractLinkDAO getLinkDAO() {
         return linkDAO;
+    }
+
+    public ContractHandoverDAO getHandoverDAO() {
+        return handoverDAO;
     }
 
     private static final String SQL_ENTERPRISE_LABEL =
@@ -1291,251 +1305,52 @@ public class ContractDAO {
     // phòng tự báo xong. Thứ khách hàng (giám đốc) hỏi là "đang nằm ở đâu, bao
     // lâu rồi", nên mỗi lượt giao là một dòng có mốc thời gian -- xem V32.
 
-    /** Phòng đó đang còn giữ hợp đồng, không giao lại lượt mới được. */
-    public static final int HANDOVER_ALREADY_PENDING = -1;
+    /** Phòng đó đang còn giữ hợp đồng, không giao lại lượt mới được. [UC-48] */
+    public static final int HANDOVER_ALREADY_PENDING = ContractHandoverDAO.HANDOVER_ALREADY_PENDING;
 
     /**
      * Truyền vào chỗ {@code waitingDepartmentId} để lọc "đang chờ ở BẤT KỲ phòng
      * nào" thay vì một phòng cụ thể.
-     *
-     * <p>Dùng giá trị canh thay vì thêm tham số thứ mười bốn cho findAll: câu hỏi
-     * là CÙNG một câu ("hợp đồng nào đang nằm chờ"), chỉ khác ở chỗ có nêu tên
-     * phòng hay không. {@code departments.department_id} là AUTO_INCREMENT nên
-     * số âm không bao giờ đụng một id thật.
      */
-    public static final int WAITING_ANY_DEPARTMENT = -1;
+    public static final int WAITING_ANY_DEPARTMENT = ContractHandoverDAO.WAITING_ANY_DEPARTMENT;
 
-    /** Hợp đồng đã thanh lý / chấm dứt sớm -- không mở lượt bàn giao mới nữa. */
-    public static final int HANDOVER_FROZEN = -3;
+    /** Hợp đồng đã thanh lý / chấm dứt sớm -- không mở lượt bàn giao mới nữa. [UC-48] */
+    public static final int HANDOVER_FROZEN = ContractHandoverDAO.HANDOVER_FROZEN;
 
-    private static final String HANDOVER_SELECT =
-        "SELECT h.handover_id, h.contract_id, h.department_id, h.handed_at, h.handed_by, "
-        + "       h.done_at, h.done_by, h.handover_note, h.done_note, "
-        + "       d.department_name, c.contract_code, c.title AS contract_title, "
-        + "       hb.last_name AS hb_last, hb.middle_name AS hb_mid, hb.first_name AS hb_first, "
-        + "       db.last_name AS db_last, db.middle_name AS db_mid, db.first_name AS db_first, "
-        + "       ow.last_name AS ow_last, ow.middle_name AS ow_mid, ow.first_name AS ow_first "
-        + "FROM contract_handovers h "
-        + "JOIN departments d ON d.department_id = h.department_id "
-        + "JOIN contracts c ON c.contract_id = h.contract_id "
-        + "LEFT JOIN users hb ON hb.user_id = h.handed_by "
-        + "LEFT JOIN users db ON db.user_id = h.done_by "
-        + "LEFT JOIN users ow ON ow.user_id = c.owner_id ";
+    /** Thao tác bàn giao thất bại / Hợp đồng không tồn tại. */
+    public static final int HANDOVER_FAILED = ContractHandoverDAO.HANDOVER_FAILED;
 
     /**
      * Bàn giao một hợp đồng cho nhiều phòng CÙNG LÚC (Kế toán + Dự án là mặc
-     * định của luồng). Một transaction cho cả lô: giao được nửa rồi hỏng thì
-     * hợp đồng nằm ở trạng thái không ai mô tả nổi.
-     *
-     * <p>CHẶN khi hợp đồng đã đóng băng. Chặn ở ĐÂY chứ không chỉ ẩn nút, cùng lẽ
-     * với {@code update} / {@code insertProducts} / {@code deleteProductLine}: ẩn
-     * nút chỉ là tầng hiển thị, một request gửi thẳng vẫn đi qua.
-     *
-     * <p>Chỉ chặn MỞ lượt MỚI. ĐÓNG một chặng đang treo thì VẪN được
-     * ({@code completeHandover}) -- khoá cả hai thì chặng nào lệch nhịp với lúc thanh
-     * lý sẽ treo vĩnh viễn, và hàng đợi bàn giao đếm ngày chờ tăng mãi không ai
-     * dọn được.
-     *
-     * @return số chặng mở ra, {@link #HANDOVER_ALREADY_PENDING} nếu MỘT trong các
-     *         phòng đó đang còn giữ hợp đồng này, hoặc {@link #HANDOVER_FROZEN}
-     *         khi hợp đồng đã thanh lý / chấm dứt sớm
+     * định của luồng).
+     * [UC-48] Ủy quyền sang {@link ContractHandoverDAO#handOverToDepartments(int, List, String, int)}.
      */
     public int handOverToDepartments(int contractId, List<Integer> departmentIds, String note, int actorId) {
-        if (departmentIds == null || departmentIds.isEmpty()) {
-            return 0;
-        }
-        try (Connection conn = DBContext.getConnection()) {
-            conn.setAutoCommit(false);
-            boolean committed = false;
-            try {
-                Contract contract = lockForUpdate(conn, contractId);
-                if (contract == null) {
-                    return -2;
-                }
-                // Đã thanh lý thì không còn việc để giao: hợp đồng đóng lại rồi, phát
-                // sinh sau thời điểm đó phải lập hợp đồng mới chứ không nối tiếp vào
-                // cái cũ. Dùng chính bản đã khoá ở trên, không hỏi lại CSDL lần nữa.
-                if (contract.isFrozen()) {
-                    return HANDOVER_FROZEN;
-                }
-                // Giao lại khi phòng đó CHƯA báo xong là đẻ ra hai chặng mở của
-                // cùng một phòng -- "đang chờ bao lâu" lúc đó không có câu trả
-                // lời. Bị trả về sửa rồi giao lại thì được, vì lượt cũ đã đóng.
-                for (Integer departmentId : departmentIds) {
-                    if (hasPendingHandover(conn, contractId, departmentId)) {
-                        return HANDOVER_ALREADY_PENDING;
-                    }
-                }
-
-                String trimmed = note == null || note.trim().isEmpty() ? null : note.trim();
-                for (Integer departmentId : departmentIds) {
-                    try (PreparedStatement ps = conn.prepareStatement(
-                            "INSERT INTO contract_handovers (contract_id, department_id, handed_by, handover_note) "
-                            + "VALUES (?, ?, ?, ?)")) {
-                        ps.setInt(1, contractId);
-                        ps.setInt(2, departmentId);
-                        ps.setInt(3, actorId);
-                        ps.setString(4, trimmed);
-                        ps.executeUpdate();
-                    }
-                    insertHistory(conn, contractId, ContractHistory.EVENT_HANDOVER,
-                            "Bàn giao cho phòng " + departmentName(conn, departmentId), actorId, trimmed);
-                }
-
-                conn.commit();
-                committed = true;
-                return departmentIds.size();
-            } finally {
-                finishTransaction(conn, committed, "ban giao hop dong", contractId);
-            }
-        } catch (SQLException ex) {
-            LOG.error("Loi ban giao hop dong (contractId={})", contractId, ex);
-            return -2;
-        }
+        return handoverDAO.handOverToDepartments(contractId, departmentIds, note, actorId);
     }
 
     /**
-     * Phòng nhận báo đã xử lý xong. Ghi chú BẮT BUỘC: một chặng đóng lại mà
-     * không ai nói đã làm gì thì về sau không phân biệt được với việc bấm cho
-     * xong -- đúng lý do thanh lý hợp đồng cũng bắt nhập lý do.
+     * Phòng nhận báo đã xử lý xong.
+     * [UC-49] Ủy quyền sang {@link ContractHandoverDAO#completeHandover(int, int, String)}.
      */
     public boolean completeHandover(int handoverId, int actorId, String doneNote) {
-        if (doneNote == null || doneNote.trim().isEmpty()) {
-            return false;
-        }
-        try (Connection conn = DBContext.getConnection()) {
-            conn.setAutoCommit(false);
-            boolean committed = false;
-            try {
-                int contractId;
-                int departmentId;
-                try (PreparedStatement ps = conn.prepareStatement(
-                        "SELECT contract_id, department_id FROM contract_handovers "
-                        + "WHERE handover_id = ? AND done_at IS NULL FOR UPDATE")) {
-                    ps.setInt(1, handoverId);
-                    try (ResultSet rs = ps.executeQuery()) {
-                        if (!rs.next()) {
-                            // Không tồn tại, hoặc người khác vừa xác nhận xong.
-                            return false;
-                        }
-                        contractId = rs.getInt("contract_id");
-                        departmentId = rs.getInt("department_id");
-                    }
-                }
-
-                try (PreparedStatement ps = conn.prepareStatement(
-                        "UPDATE contract_handovers SET done_at = NOW(), done_by = ?, done_note = ? "
-                        + "WHERE handover_id = ? AND done_at IS NULL")) {
-                    ps.setInt(1, actorId);
-                    ps.setString(2, doneNote.trim());
-                    ps.setInt(3, handoverId);
-                    if (ps.executeUpdate() == 0) {
-                        return false;
-                    }
-                }
-
-                insertHistory(conn, contractId, ContractHistory.EVENT_HANDOVER,
-                        "Phòng " + departmentName(conn, departmentId) + " báo đã xử lý xong",
-                        actorId, doneNote.trim());
-
-                conn.commit();
-                committed = true;
-            } finally {
-                finishTransaction(conn, committed, "xac nhan xong chang ban giao", handoverId);
-            }
-            return committed;
-        } catch (SQLException ex) {
-            LOG.error("Loi xac nhan xong chang ban giao (handoverId={})", handoverId, ex);
-            return false;
-        }
-    }
-
-    /** Các chặng của một hợp đồng, lượt mới nhất đứng trước. */
-    public List<ContractHandover> findHandoversOf(int contractId) {
-        List<ContractHandover> result = new ArrayList<>();
-        String sql = HANDOVER_SELECT + "WHERE h.contract_id = ? ORDER BY h.handed_at DESC, h.handover_id DESC";
-        try (Connection conn = DBContext.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, contractId);
-            try (ResultSet rs = ps.executeQuery()) {
-                while (rs.next()) {
-                    result.add(mapHandoverRow(rs));
-                }
-            }
-        } catch (SQLException ex) {
-            LOG.error("Loi truy van chang ban giao (contractId={})", contractId, ex);
-        }
-        return result;
+        return handoverDAO.completeHandover(handoverId, actorId, doneNote);
     }
 
     /**
-     * Mọi chặng CHƯA XONG của toàn hệ thống, phòng nào để lâu nhất đứng trước
-     * -- màn hình theo dõi của giám đốc.
-     *
-     * @param ownerIds giới hạn theo người phụ trách hợp đồng (rỗng/null = tất cả)
+     * Các chặng của một hợp đồng, lượt mới nhất đứng trước.
+     * [UC-48, UC-49] Ủy quyền sang {@link ContractHandoverDAO#findHandoversOf(int)}.
+     */
+    public List<ContractHandover> findHandoversOf(int contractId) {
+        return handoverDAO.findHandoversOf(contractId);
+    }
+
+    /**
+     * Mọi chặng CHƯA XONG của toàn hệ thống, phòng nào để lâu nhất đứng trước.
+     * [UC-48, UC-49] Ủy quyền sang {@link ContractHandoverDAO#findPendingHandovers(List)}.
      */
     public List<ContractHandover> findPendingHandovers(List<Integer> ownerIds) {
-        List<ContractHandover> result = new ArrayList<>();
-        String sql = HANDOVER_SELECT
-                + "WHERE h.done_at IS NULL AND c.is_deleted = 0"
-                + SqlFilters.inClause("c.owner_id", ownerIds)
-                + " ORDER BY h.handed_at ASC";
-        try (Connection conn = DBContext.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            SqlFilters.bind(ps, 1, ownerIds);
-            try (ResultSet rs = ps.executeQuery()) {
-                while (rs.next()) {
-                    result.add(mapHandoverRow(rs));
-                }
-            }
-        } catch (SQLException ex) {
-            LOG.error("Loi truy van chang ban giao dang cho", ex);
-        }
-        return result;
-    }
-
-    private boolean hasPendingHandover(Connection conn, int contractId, int departmentId) throws SQLException {
-        try (PreparedStatement ps = conn.prepareStatement(
-                "SELECT 1 FROM contract_handovers "
-                + "WHERE contract_id = ? AND department_id = ? AND done_at IS NULL")) {
-            ps.setInt(1, contractId);
-            ps.setInt(2, departmentId);
-            try (ResultSet rs = ps.executeQuery()) {
-                return rs.next();
-            }
-        }
-    }
-
-    /** Tên phòng, để câu nhật ký đọc được thay vì "phòng #5". */
-    private String departmentName(Connection conn, int departmentId) throws SQLException {
-        try (PreparedStatement ps = conn.prepareStatement(
-                "SELECT department_name FROM departments WHERE department_id = ?")) {
-            ps.setInt(1, departmentId);
-            try (ResultSet rs = ps.executeQuery()) {
-                return rs.next() ? rs.getString(1) : "#" + departmentId;
-            }
-        }
-    }
-
-    private ContractHandover mapHandoverRow(ResultSet rs) throws SQLException {
-        ContractHandover h = new ContractHandover();
-        h.setHandoverId(rs.getInt("handover_id"));
-        h.setContractId(rs.getInt("contract_id"));
-        h.setDepartmentId(rs.getInt("department_id"));
-        h.setDepartmentName(rs.getString("department_name"));
-        h.setHandedAt(rs.getTimestamp("handed_at"));
-        h.setHandedBy(rs.getInt("handed_by"));
-        h.setDoneAt(rs.getTimestamp("done_at"));
-        int doneBy = rs.getInt("done_by");
-        h.setDoneBy(rs.wasNull() ? null : doneBy);
-        h.setHandoverNote(rs.getString("handover_note"));
-        h.setDoneNote(rs.getString("done_note"));
-        h.setContractCode(rs.getString("contract_code"));
-        h.setContractTitle(rs.getString("contract_title"));
-        h.setHandedByName(fullName(rs, "hb_last", "hb_mid", "hb_first"));
-        h.setDoneByName(fullName(rs, "db_last", "db_mid", "db_first"));
-        h.setOwnerName(fullName(rs, "ow_last", "ow_mid", "ow_first"));
-        return h;
+        return handoverDAO.findPendingHandovers(ownerIds);
     }
 
     /** Chuỗi rỗng hoặc toàn khoảng trắng coi như KHÔNG có giá trị -- ghi NULL chứ không ghi "". */

@@ -17,6 +17,7 @@ import org.mockito.InOrder;
 import org.mockito.MockedStatic;
 import poscs.model.Contract;
 import poscs.model.ContractDocument;
+import poscs.model.ContractHandover;
 import poscs.model.ContractHistory;
 import poscs.model.ContractProduct;
 
@@ -2339,5 +2340,72 @@ public class ContractDAOTest {
         assertEquals(1, list.size());
         assertSame(d, list.get(0));
         verify(mockDocDAO).findDocumentsOf(10);
+    }
+
+    // ==================================================================
+    // Bàn giao phòng ban -- ủy quyền sang ContractHandoverDAO (Task 4.7, UC-48, UC-49)
+    // ==================================================================
+
+    @Test
+    public void contractDAO_handoverDelegation_constructorsAndGetters() {
+        ContractDAO defaultDao = new ContractDAO();
+        assertNotNull(defaultDao.getHandoverDAO());
+
+        ContractHandoverDAO handoverDao = new ContractHandoverDAO();
+        ContractDAO customDao = new ContractDAO(handoverDao);
+        assertSame(handoverDao, customDao.getHandoverDAO());
+    }
+
+    @Test
+    public void contractDAO_handOverToDepartments_delegatesToContractHandoverDAO() {
+        ContractHandoverDAO mockHandoverDAO = mock(ContractHandoverDAO.class);
+        ContractDAO daoWithMock = new ContractDAO(mockHandoverDAO);
+
+        when(mockHandoverDAO.handOverToDepartments(10, List.of(1, 2), "ghi chú", ACTOR)).thenReturn(2);
+
+        int result = daoWithMock.handOverToDepartments(10, List.of(1, 2), "ghi chú", ACTOR);
+        assertEquals(2, result);
+        verify(mockHandoverDAO).handOverToDepartments(10, List.of(1, 2), "ghi chú", ACTOR);
+    }
+
+    @Test
+    public void contractDAO_completeHandover_delegatesToContractHandoverDAO() {
+        ContractHandoverDAO mockHandoverDAO = mock(ContractHandoverDAO.class);
+        ContractDAO daoWithMock = new ContractDAO(mockHandoverDAO);
+
+        when(mockHandoverDAO.completeHandover(50, ACTOR, "xong việc")).thenReturn(true);
+
+        assertTrue(daoWithMock.completeHandover(50, ACTOR, "xong việc"));
+        verify(mockHandoverDAO).completeHandover(50, ACTOR, "xong việc");
+    }
+
+    @Test
+    public void contractDAO_findHandoversOf_delegatesToContractHandoverDAO() {
+        ContractHandoverDAO mockHandoverDAO = mock(ContractHandoverDAO.class);
+        ContractDAO daoWithMock = new ContractDAO(mockHandoverDAO);
+
+        ContractHandover h = new ContractHandover();
+        h.setHandoverId(1);
+        when(mockHandoverDAO.findHandoversOf(10)).thenReturn(List.of(h));
+
+        List<ContractHandover> list = daoWithMock.findHandoversOf(10);
+        assertEquals(1, list.size());
+        assertSame(h, list.get(0));
+        verify(mockHandoverDAO).findHandoversOf(10);
+    }
+
+    @Test
+    public void contractDAO_findPendingHandovers_delegatesToContractHandoverDAO() {
+        ContractHandoverDAO mockHandoverDAO = mock(ContractHandoverDAO.class);
+        ContractDAO daoWithMock = new ContractDAO(mockHandoverDAO);
+
+        ContractHandover h = new ContractHandover();
+        h.setHandoverId(2);
+        when(mockHandoverDAO.findPendingHandovers(List.of(ACTOR))).thenReturn(List.of(h));
+
+        List<ContractHandover> list = daoWithMock.findPendingHandovers(List.of(ACTOR));
+        assertEquals(1, list.size());
+        assertSame(h, list.get(0));
+        verify(mockHandoverDAO).findPendingHandovers(List.of(ACTOR));
     }
 }
