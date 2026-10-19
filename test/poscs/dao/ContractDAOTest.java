@@ -768,7 +768,9 @@ public class ContractDAOTest {
      * khi bỏ cột attachment_url (V34).
      * Tách ra hằng số để lần sau chỉ sửa một chỗ thay vì năm chỗ.
      */
+    private static final int SIGNING_DATE_PARAM_INDEX = 5;
     private static final int STATUS_PARAM_INDEX = 10;
+    private static final int PROGRESS_PARAM_INDEX = STATUS_PARAM_INDEX + 1;
 
     /** Chạy insert() với cặp ngày cho trước rồi trả về statement để soi tham số đã bind. */
     private PreparedStatement captureStatusFor(Date effectiveDate, Date endDate) throws Exception {
@@ -1542,5 +1544,745 @@ public class ContractDAOTest {
                 "enterprise_id", 3,
                 "owner_id", 5,
                 "progress_status", "Đã ký");
+    }
+
+    // ==================================================================
+    // Task 4.2: Khóa hành vi ContractDAO trước khi tách
+    // [UC-10, UC-11, UC-33, UC-34, UC-35, UC-44] [BR-16, BR-17, BR-35, BR-37]
+    // ==================================================================
+
+    // ------------------------------------------------------------------
+    // 1. Bộ lọc mặc định: "Của tôi" & "Còn hiệu lực trong tháng" (UC-10, BR-16)
+    // ------------------------------------------------------------------
+
+    @Test
+    public void findAll_withMyScopeOwnerAndProvinces_buildsOrClauseAndBindsOwnerThenProvince() throws Exception {
+        PreparedStatement ps = statementReturning(emptyResultSet());
+        Connection conn = connectionReturning(ps);
+        ListScope myScope = ListScope.of(List.of(5, 8), List.of(3, 17));
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            dao.findAll(1, 10, null, null, null, null, false,
+                    null, null, null, false, null, myScope);
+
+            String sql = capturedSql(conn);
+            assertTrue(sql.contains("c.is_deleted = 0"));
+            assertTrue(sql.contains("(c.owner_id IN (?,?) OR d.province_id IN (?,?))"));
+            verify(ps).setObject(1, 5);
+            verify(ps).setObject(2, 8);
+            verify(ps).setObject(3, 3);
+            verify(ps).setObject(4, 17);
+            verify(ps).setObject(5, 10);
+            verify(ps).setObject(6, 0);
+        }
+    }
+
+    @Test
+    public void findAll_withMyScopeWithoutProvinces_filtersByOwnerOnly() throws Exception {
+        PreparedStatement ps = statementReturning(emptyResultSet());
+        Connection conn = connectionReturning(ps);
+        ListScope myScope = ListScope.of(List.of(5), List.of());
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            dao.findAll(1, 10, null, null, null, null, false,
+                    null, null, null, false, null, myScope);
+
+            String sql = capturedSql(conn);
+            assertTrue(sql.contains("(c.owner_id IN (?))"));
+            assertFalse(sql.contains("OR d.province_id"));
+            verify(ps).setObject(1, 5);
+        }
+    }
+
+    @Test
+    public void findAll_withActiveWindowInScope_filtersByEffectiveAndEndDateAllowingNulls() throws Exception {
+        PreparedStatement ps = statementReturning(emptyResultSet());
+        Connection conn = connectionReturning(ps);
+        Period monthWindow = Period.parse("2026", "m10");
+        ListScope scope = ListScope.activeIn(monthWindow);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            dao.findAll(1, 10, null, null, null, null, false,
+                    null, null, null, false, null, scope);
+
+            String sql = capturedSql(conn);
+            assertTrue(sql.contains("((c.effective_date IS NULL OR c.effective_date <= ?)"
+                    + " AND (c.end_date IS NULL OR c.end_date >= ?))"));
+            verify(ps).setObject(1, monthWindow.getTo());
+            verify(ps).setObject(2, monthWindow.getFrom());
+        }
+    }
+
+    @Test
+    public void findAll_withCombinedDefaultScopeAndUserFilters_bindsAllParamsInOrder() throws Exception {
+        PreparedStatement ps = statementReturning(emptyResultSet());
+        Connection conn = connectionReturning(ps);
+        Period monthWindow = Period.parse("2026", "m10");
+        Period signingPeriod = Period.parse("2026", "q4");
+        ListScope scope = ListScope.of(List.of(5), List.of(3)).withActiveWindow(monthWindow);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            dao.findAll(2, 10, "POSTEF", ContractDAO.STATUS_ACTIVE, "Cung cấp thiết bị",
+                    List.of(3), false, signingPeriod, ContractDAO.DIRECTION_SELL,
+                    ContractDAO.PROGRESS_SIGNED, true, 4, scope);
+
+            String sql = capturedSql(conn);
+            assertTrue(sql.contains("(c.owner_id IN (?) OR d.province_id IN (?))"));
+            assertTrue(sql.contains("((c.effective_date IS NULL OR c.effective_date <= ?)"
+                    + " AND (c.end_date IS NULL OR c.end_date >= ?))"));
+            assertTrue(sql.contains("c.parent_contract_id IS NULL"));
+            assertTrue(sql.contains("AND wh.department_id = ?"));
+            assertTrue(sql.contains("(c.contract_code LIKE ? OR c.title LIKE ? OR e.enterprise_name LIKE ?)"));
+            assertTrue(sql.contains("c.contract_type = ?"));
+            assertTrue(sql.contains("d.province_id IN (?)"));
+            assertTrue(sql.contains("c.signing_date BETWEEN ? AND ?"));
+            assertTrue(sql.contains("c.progress_status = ?"));
+            assertTrue(sql.contains("c.direction = ?"));
+
+            verify(ps).setObject(1, 5);
+            verify(ps).setObject(2, 3);
+            verify(ps).setObject(3, monthWindow.getTo());
+            verify(ps).setObject(4, monthWindow.getFrom());
+            verify(ps).setObject(5, 4);
+            verify(ps).setObject(6, "%POSTEF%");
+            verify(ps).setObject(7, "%POSTEF%");
+            verify(ps).setObject(8, "%POSTEF%");
+            verify(ps).setObject(9, "Cung cấp thiết bị");
+            verify(ps).setObject(10, ContractDAO.STATUS_ACTIVE);
+            verify(ps).setObject(11, 3);
+            verify(ps).setObject(12, signingPeriod.getFrom());
+            verify(ps).setObject(13, signingPeriod.getTo());
+            verify(ps).setObject(14, ContractDAO.PROGRESS_SIGNED);
+            verify(ps).setObject(15, ContractDAO.DIRECTION_SELL);
+            verify(ps).setObject(16, 10);
+            verify(ps).setObject(17, 10);
+        }
+    }
+
+    @Test
+    public void countAll_withDefaultScope_appliesSameOwnerProvinceAndActiveWindowAsFindAll() throws Exception {
+        PreparedStatement ps = statementReturning(singleRow(row("total", 4)));
+        Connection conn = connectionReturning(ps);
+        Period monthWindow = Period.parse("2026", "m10");
+        ListScope scope = ListScope.of(List.of(5, 9), List.of(3)).withActiveWindow(monthWindow);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            assertEquals(4, dao.countAll(null, null, null, null, null, null, null, false, null, scope));
+
+            String sql = capturedSql(conn);
+            assertTrue(sql.contains("(c.owner_id IN (?,?) OR d.province_id IN (?))"));
+            assertTrue(sql.contains("((c.effective_date IS NULL OR c.effective_date <= ?)"
+                    + " AND (c.end_date IS NULL OR c.end_date >= ?))"));
+            verify(ps).setObject(1, 5);
+            verify(ps).setObject(2, 9);
+            verify(ps).setObject(3, 3);
+            verify(ps).setObject(4, monthWindow.getTo());
+            verify(ps).setObject(5, monthWindow.getFrom());
+        }
+    }
+
+    @Test
+    public void countStatusSummary_withDefaultScope_appliesOwnerProvinceAndActiveWindow() throws Exception {
+        ResultSet rs = singleRow(row("draft_count", 2, "expired_count", 1, "soon_count", 3, "active_count", 6));
+        PreparedStatement ps = statementReturning(rs);
+        Connection conn = connectionReturning(ps);
+        Period monthWindow = Period.parse("2026", "m10");
+        ListScope scope = ListScope.of(List.of(5), List.of(3)).withActiveWindow(monthWindow);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            java.util.Map<String, Integer> summary = dao.countStatusSummary(
+                    List.of(), null, ContractDAO.DIRECTION_SELL, false, null, scope,
+                    ContractDAO.WAITING_ANY_DEPARTMENT);
+
+            String sql = capturedSql(conn);
+            assertTrue(sql.contains("(c.owner_id IN (?) OR d.province_id IN (?))"));
+            assertTrue(sql.contains("((c.effective_date IS NULL OR c.effective_date <= ?)"
+                    + " AND (c.end_date IS NULL OR c.end_date >= ?))"));
+            assertTrue(sql.contains("EXISTS (SELECT 1 FROM contract_handovers wh"
+                    + " WHERE wh.contract_id = c.contract_id AND wh.done_at IS NULL)"));
+            assertEquals(Integer.valueOf(2), summary.get(ContractDAO.STATUS_DRAFT));
+            assertEquals(Integer.valueOf(1), summary.get(ContractDAO.STATUS_EXPIRED));
+            assertEquals(Integer.valueOf(3), summary.get(ContractDAO.STATUS_SOON));
+            assertEquals(Integer.valueOf(6), summary.get(ContractDAO.STATUS_ACTIVE));
+        }
+    }
+
+    @Test
+    public void findActiveInPeriod_withWindowAndScope_filtersRootsAndAllowsNullDates() throws Exception {
+        PreparedStatement ps = statementReturning(emptyResultSet());
+        Connection conn = connectionReturning(ps);
+        Period window = Period.parse("2026", "m10");
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            dao.findActiveInPeriod(5, List.of(3), List.of(7), window);
+
+            String sql = capturedSql(conn);
+            assertTrue(sql.contains("c.is_deleted = 0 AND c.parent_contract_id IS NULL"));
+            assertTrue(sql.contains("(c.effective_date IS NULL OR c.effective_date <= ?)"));
+            assertTrue(sql.contains("(c.end_date IS NULL OR c.end_date >= ?)"));
+            verify(ps).setDate(1, window.getTo());
+            verify(ps).setDate(2, window.getFrom());
+        }
+    }
+
+    @Test
+    public void findAll_withAllScope_hasNoOwnerNorActiveWindowClause() throws Exception {
+        PreparedStatement ps = statementReturning(emptyResultSet());
+        Connection conn = connectionReturning(ps);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            // UC-10: chuyển sang "Toàn chi nhánh" + "Mọi thời điểm" (ListScope.all())
+            dao.findAll(1, 10, null, null, null, null, false,
+                    null, null, null, false, null, ListScope.all());
+
+            String sql = capturedSql(conn);
+            assertTrue(sql.contains("c.is_deleted = 0"));
+            assertFalse(sql.contains("c.effective_date IS NULL OR c.effective_date <="));
+            assertFalse(sql.contains("c.end_date IS NULL OR c.end_date >="));
+            assertFalse(sql.contains("c.owner_id IN"));
+            verify(ps).setObject(1, 10);
+            verify(ps).setObject(2, 0);
+        }
+    }
+
+    @Test
+    public void findAll_withCurrentMonthDefaultActiveWindow_bindsCurrentMonthBounds() throws Exception {
+        PreparedStatement ps = statementReturning(emptyResultSet());
+        Connection conn = connectionReturning(ps);
+        // UC-10: cửa sổ mặc định của danh sách là tháng hiện tại (xem ContractController.currentMonth)
+        LocalDate today = LocalDate.now();
+        Period currentMonth = Period.parse(String.valueOf(today.getYear()), "m" + today.getMonthValue());
+        ListScope defaultScope = ListScope.of(List.of(5), List.of(3)).withActiveWindow(currentMonth);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            dao.findAll(1, 10, null, null, null, null, false,
+                    null, null, null, false, null, defaultScope);
+
+            String sql = capturedSql(conn);
+            assertTrue(sql.contains("((c.effective_date IS NULL OR c.effective_date <= ?)"
+                    + " AND (c.end_date IS NULL OR c.end_date >= ?))"));
+            verify(ps).setObject(1, 5);
+            verify(ps).setObject(2, 3);
+            verify(ps).setObject(3, Date.valueOf(today.withDayOfMonth(today.lengthOfMonth())));
+            verify(ps).setObject(4, Date.valueOf(today.withDayOfMonth(1)));
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // 2. Trạng thái tự tính (BR-17, UC-10, UC-11)
+    // ------------------------------------------------------------------
+
+    /**
+     * BR-17: các test biên dưới đây cùng gọi {@code LocalDate.now()} như
+     * {@code ContractDAO.computeStatus}. Lưu ý: nếu chạy đúng vào khoảnh khắc
+     * chuyển ngày lúc 00:00:00 giữa bước dựng tham số và bước DAO tính toán thì
+     * mốc ngày có thể lệch 1 ngày.
+     */
+    @Test
+    public void insert_boundaryExactly30DaysRemaining_storesExpiringSoonStatus() throws Exception {
+        PreparedStatement ps = captureStatusFor(
+                Date.valueOf(LocalDate.now().minusMonths(1)),
+                Date.valueOf(LocalDate.now().plusDays(30)));
+
+        verify(ps).setString(STATUS_PARAM_INDEX, ContractDAO.STATUS_SOON);
+    }
+
+    @Test
+    public void insert_endingToday_storesExpiringSoonStatus() throws Exception {
+        PreparedStatement ps = captureStatusFor(
+                Date.valueOf(LocalDate.now().minusMonths(1)),
+                Date.valueOf(LocalDate.now()));
+
+        verify(ps).setString(STATUS_PARAM_INDEX, ContractDAO.STATUS_SOON);
+    }
+
+    @Test
+    public void insert_effectiveTodayAndEndingBeyond30Days_storesActiveStatus() throws Exception {
+        PreparedStatement ps = captureStatusFor(
+                Date.valueOf(LocalDate.now()),
+                Date.valueOf(LocalDate.now().plusDays(31)));
+
+        verify(ps).setString(STATUS_PARAM_INDEX, ContractDAO.STATUS_ACTIVE);
+    }
+
+    @Test
+    public void insert_onlyOneDatePresent_fallsBackToDraftStatus() throws Exception {
+        PreparedStatement psMissingEnd = captureStatusFor(
+                Date.valueOf(LocalDate.now()), null);
+        verify(psMissingEnd).setString(STATUS_PARAM_INDEX, ContractDAO.STATUS_DRAFT);
+
+        PreparedStatement psMissingEffective = captureStatusFor(
+                null, Date.valueOf(LocalDate.now().plusDays(60)));
+        verify(psMissingEffective).setString(STATUS_PARAM_INDEX, ContractDAO.STATUS_DRAFT);
+    }
+
+    @Test
+    public void findById_recomputesStatusFromDatesIgnoringStaleDatabaseStatusAndMapsAllBR16Fields() throws Exception {
+        java.util.Map<String, Object> dbRow = row(
+                "contract_id", 15,
+                "contract_code", "15/2026/HĐKT-POSTEF",
+                "title", "Cung cấp thiết bị nguồn",
+                "contract_type", "Cung cấp thiết bị",
+                "direction", ContractDAO.DIRECTION_SELL,
+                "signing_date", Date.valueOf(LocalDate.now().minusDays(200)),
+                "effective_date", Date.valueOf(LocalDate.now().minusDays(190)),
+                "end_date", Date.valueOf(LocalDate.now().minusDays(2)),
+                "enterprise_id", 4,
+                "owner_id", 6,
+                "status", ContractDAO.STATUS_ACTIVE, // Cột status trong DB bị cũ
+                "progress_status", ContractDAO.PROGRESS_SIGNED,
+                "contract_value", new BigDecimal("1000000000"),
+                "amendment_count", 1,
+                "amendment_value_signed", new BigDecimal("200000000"),
+                "amendment_value_pending", BigDecimal.ZERO,
+                "enterprise_name", "Công ty Viễn thông A",
+                "province_id", 3,
+                "province_name", "Thành phố Hà Nội",
+                "owner_last_name", "Nguyễn",
+                "owner_middle_name", "Văn",
+                "owner_first_name", "An");
+        PreparedStatement ps = statementReturning(singleRow(dbRow));
+        Connection conn = connectionReturning(ps);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            Contract found = dao.findById(15);
+
+            assertNotNull(found);
+            // BR-17: trạng thái phải tính lại từ ngày hiệu lực/kết thúc, không đọc cột status cũ
+            assertEquals(ContractDAO.STATUS_EXPIRED, found.getStatus());
+            assertEquals(ContractDAO.PROGRESS_SIGNED, found.getProgressStatus());
+            assertEquals(new BigDecimal("1200000000"), found.getCurrentValue());
+            assertNotNull(found.getEnterprise());
+            assertEquals("Công ty Viễn thông A", found.getEnterprise().getEnterpriseName());
+            assertEquals("Thành phố Hà Nội",
+                    found.getEnterprise().getAddress().getDistrict().getProvince().getProvinceName());
+            assertNotNull(found.getOwner());
+            assertEquals("Nguyễn Văn An", found.getOwner().getFullName());
+        }
+    }
+
+    @Test
+    public void findByEnterpriseId_recomputesStatusForEachContract() throws Exception {
+        java.util.Map<String, Object> activeRow = row(
+                "contract_id", 1,
+                "contract_code", "01/2026/HĐKT",
+                "title", "HĐ 1",
+                "contract_type", "Cung cấp thiết bị",
+                "direction", "Bán",
+                "effective_date", Date.valueOf(LocalDate.now().minusDays(10)),
+                "end_date", Date.valueOf(LocalDate.now().plusDays(20)),
+                "enterprise_id", 4,
+                "owner_id", 6);
+        PreparedStatement ps = statementReturning(singleRow(activeRow));
+        Connection conn = connectionReturning(ps);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            List<Contract> list = dao.findByEnterpriseId(4);
+
+            assertEquals(1, list.size());
+            assertEquals(ContractDAO.STATUS_SOON, list.get(0).getStatus());
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // 3. Tạo ở Nháp (UC-33, BR-35)
+    // ------------------------------------------------------------------
+
+    @Test
+    public void insert_alwaysForcesDraftProgressStatusAndLogsCreatedHistory() throws Exception {
+        ResultSet keys = singleRow(row("GENERATED_KEY", 99));
+        PreparedStatement historyPs = mock(PreparedStatement.class);
+        PreparedStatement contractPs = mock(PreparedStatement.class);
+        when(contractPs.executeUpdate()).thenReturn(1);
+        when(contractPs.getGeneratedKeys()).thenReturn(keys);
+        Connection conn = connectionRoutingOn("contract_history", historyPs, contractPs);
+
+        Contract c = contract("99/2026/HĐKT-POSTEF");
+        c.setDirection(ContractDAO.DIRECTION_SELL);
+        // BR-35: form tạo hợp đồng (ContractController.buildContractFromRequest) không đọc
+        // signing_date từ request nên c.getSigningDate() = null; khóa việc insert() bind null
+        // vào cột signing_date và luôn ép progress_status = Nháp dù bên gọi truyền giá trị khác.
+        c.setSigningDate(null);
+        c.setProgressStatus(ContractDAO.PROGRESS_SIGNED);
+        c.setEffectiveDate(null);
+        c.setEndDate(null);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            assertEquals(99, dao.insert(c, ACTOR));
+
+            verify(contractPs).setDate(SIGNING_DATE_PARAM_INDEX, null);
+            verify(contractPs).setString(PROGRESS_PARAM_INDEX, ContractDAO.PROGRESS_DRAFT);
+            verify(historyPs).setInt(1, 99);
+            verify(historyPs).setString(2, ContractHistory.EVENT_CREATED);
+            ArgumentCaptor<String> detail = ArgumentCaptor.forClass(String.class);
+            verify(historyPs).setString(eq(3), detail.capture());
+            assertTrue(detail.getValue().contains("Tạo bản nháp 99/2026/HĐKT-POSTEF"));
+            assertTrue(detail.getValue().contains("chưa chốt thời hạn"));
+            verify(conn).commit();
+        }
+    }
+
+    @Test
+    public void contractCodeExists_blankOrNull_returnsFalseWithoutTouchingDatabase() throws Exception {
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            assertFalse(dao.contractCodeExists(null, 0));
+            assertFalse(dao.contractCodeExists("   ", 0));
+            db.verify(DBContext::getConnection, never());
+        }
+    }
+
+    @Test
+    public void contractCodeExists_trimsCodeAndExcludesGivenContractId() throws Exception {
+        PreparedStatement ps = statementReturning(singleRow(row("one", 1)));
+        Connection conn = connectionReturning(ps);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            assertTrue(dao.contractCodeExists("  01/2026/HĐKT-POSTEF  ", 12));
+
+            verify(ps).setString(1, "01/2026/HĐKT-POSTEF");
+            verify(ps).setInt(2, 12);
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // 4. Ký hợp đồng & Cập nhật theo tiến độ (UC-44, UC-35, BR-35)
+    // ------------------------------------------------------------------
+
+    @Test
+    public void changeProgressStatus_signingWithOnlyOneDatePresent_isRefused() throws Exception {
+        ResultSet missingEnd = singleRow(row(
+                "progress_status", ContractDAO.PROGRESS_DRAFT,
+                "effective_date", Date.valueOf(LocalDate.now()),
+                "end_date", null));
+        ResultSet missingEffective = singleRow(row(
+                "progress_status", ContractDAO.PROGRESS_DRAFT,
+                "effective_date", null,
+                "end_date", Date.valueOf(LocalDate.now().plusYears(1))));
+        PreparedStatement ps = mock(PreparedStatement.class);
+        when(ps.executeQuery()).thenReturn(missingEnd, missingEffective);
+        Connection conn = connectionReturning(ps);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            assertFalse(dao.changeProgressStatus(5, ContractDAO.PROGRESS_SIGNED, ACTOR, null));
+            assertFalse(dao.changeProgressStatus(5, ContractDAO.PROGRESS_SIGNED, ACTOR, null));
+            verify(ps, never()).executeUpdate();
+            verify(conn, times(2)).rollback();
+        }
+    }
+
+    @Test
+    public void changeProgressStatus_alreadySigned_cannotSignAgainOrRevertToDraft() throws Exception {
+        ResultSet signed1 = singleRow(contractRow(ContractDAO.PROGRESS_SIGNED));
+        ResultSet signed2 = singleRow(contractRow(ContractDAO.PROGRESS_SIGNED));
+        PreparedStatement ps = mock(PreparedStatement.class);
+        when(ps.executeQuery()).thenReturn(signed1, signed2);
+        Connection conn = connectionReturning(ps);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            assertFalse(dao.changeProgressStatus(5, ContractDAO.PROGRESS_SIGNED, ACTOR, null));
+            assertFalse(dao.changeProgressStatus(5, ContractDAO.PROGRESS_DRAFT, ACTOR, null));
+            verify(ps, never()).executeUpdate();
+            verify(conn, times(2)).rollback();
+        }
+    }
+
+    @Test
+    public void changeProgressStatus_draftCannotJumpDirectlyToLiquidatedOrTerminated() throws Exception {
+        ResultSet draft1 = singleRow(contractRow(ContractDAO.PROGRESS_DRAFT));
+        ResultSet draft2 = singleRow(contractRow(ContractDAO.PROGRESS_DRAFT));
+        PreparedStatement ps = mock(PreparedStatement.class);
+        when(ps.executeQuery()).thenReturn(draft1, draft2);
+        Connection conn = connectionReturning(ps);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            assertFalse(dao.changeProgressStatus(5, ContractDAO.PROGRESS_LIQUIDATED, ACTOR, "Thanh lý"));
+            assertFalse(dao.changeProgressStatus(5, ContractDAO.PROGRESS_TERMINATED, ACTOR, "Chấm dứt"));
+            verify(ps, never()).executeUpdate();
+            verify(conn, times(2)).rollback();
+        }
+    }
+
+    @Test
+    public void update_frozenContract_refusesBothLiquidatedAndTerminated() throws Exception {
+        ResultSet liquidated = singleRow(parentRow(ContractDAO.PROGRESS_LIQUIDATED, null));
+        ResultSet terminated = singleRow(parentRow(ContractDAO.PROGRESS_TERMINATED, null));
+        PreparedStatement ps = mock(PreparedStatement.class);
+        when(ps.executeQuery()).thenReturn(liquidated, terminated);
+        Connection conn = connectionReturning(ps);
+
+        Contract submitted = contract("01/2026/HĐMB-POSTEF");
+        submitted.setContractId(3);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            assertFalse(dao.update(submitted, ACTOR));
+            assertFalse(dao.update(submitted, ACTOR));
+            verify(ps, never()).executeUpdate();
+            verify(conn, times(2)).rollback();
+        }
+    }
+
+    @Test
+    public void update_signedContract_ignoresLockedFieldChangesInHistoryWhenOwnerUnchanged() throws Exception {
+        ResultSet current = singleRow(parentRow(ContractDAO.PROGRESS_SIGNED, null));
+        PreparedStatement historyPs = mock(PreparedStatement.class);
+        PreparedStatement contractPs = mock(PreparedStatement.class);
+        when(contractPs.executeQuery()).thenReturn(current);
+        when(contractPs.executeUpdate()).thenReturn(1);
+        Connection conn = connectionRoutingOn("contract_history", historyPs, contractPs);
+
+        Contract submitted = new Contract();
+        submitted.setContractId(3);
+        submitted.setOwnerId(5); // Giữ nguyên owner_id = 5 như trong parentRow
+        submitted.setTitle("Tiêu đề bị sửa nhưng đã khóa");
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            assertTrue(dao.update(submitted, ACTOR));
+
+            // BR-35 / UC-35: câu UPDATE của HĐ đã ký chỉ được chứa owner_id, không chứa title
+            ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+            verify(conn, atLeastOnce()).prepareStatement(sql.capture());
+            assertTrue(sql.getAllValues().stream()
+                    .filter(q -> q.startsWith("UPDATE contracts"))
+                    .allMatch(q -> q.contains("owner_id = ?") && !q.contains("title")));
+            verify(historyPs, never()).executeUpdate();
+            verify(conn).commit();
+        }
+    }
+
+    @Test
+    public void update_signedContract_whenOwnerChanged_logsOnlyOwnerChangeAndIgnoresLockedFields() throws Exception {
+        ResultSet current = singleRow(parentRow(ContractDAO.PROGRESS_SIGNED, null));
+        ResultSet oldOwnerLabel = singleRow(row("label", "Nguyễn Văn Cũ"));
+        ResultSet newOwnerLabel = singleRow(row("label", "Trần Thị Mới"));
+        PreparedStatement historyPs = mock(PreparedStatement.class);
+        PreparedStatement contractPs = mock(PreparedStatement.class);
+        when(contractPs.executeQuery()).thenReturn(current, oldOwnerLabel, newOwnerLabel);
+        when(contractPs.executeUpdate()).thenReturn(1);
+        Connection conn = connectionRoutingOn("contract_history", historyPs, contractPs);
+
+        Contract submitted = new Contract();
+        submitted.setContractId(3);
+        submitted.setOwnerId(88); // Đổi từ 5 sang 88
+        submitted.setTitle("Tiêu đề gửi kèm nhưng đã khóa");
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            assertTrue(dao.update(submitted, ACTOR));
+
+            ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+            verify(conn, atLeastOnce()).prepareStatement(sql.capture());
+            assertTrue(sql.getAllValues().stream()
+                    .filter(q -> q.startsWith("UPDATE contracts"))
+                    .allMatch(q -> q.contains("owner_id = ?") && !q.contains("title")));
+            // setInt(1, 88) được gọi 2 lần trên contractPs: 1 lần cho UPDATE owner_id và 1 lần cho lookupLabel(88)
+            verify(contractPs, times(2)).setInt(1, 88);
+            verify(contractPs).setInt(2, 3);
+            verify(historyPs).setInt(1, 3);
+            verify(historyPs).setString(2, ContractHistory.EVENT_UPDATED);
+            ArgumentCaptor<String> detail = ArgumentCaptor.forClass(String.class);
+            verify(historyPs).setString(eq(3), detail.capture());
+            assertTrue(detail.getValue().contains("Người phụ trách: Nguyễn Văn Cũ → Trần Thị Mới"));
+            assertFalse(detail.getValue().contains("Tiêu đề"));
+            verify(conn).commit();
+        }
+    }
+
+    @Test
+    public void update_draftAmendmentReducingBelowZero_refusesAndRollsBack() throws Exception {
+        java.util.Map<String, Object> draftAmendment = parentRow(ContractDAO.PROGRESS_DRAFT, 3);
+        draftAmendment.put("contract_id", 77);
+        ResultSet amendmentRs = singleRow(draftAmendment);
+        ResultSet parentValueRs = singleRow(row("contract_value", new BigDecimal("500000000")));
+        ResultSet signedAmendmentsRs = singleRow(row("total", BigDecimal.ZERO));
+
+        PreparedStatement ps = mock(PreparedStatement.class);
+        when(ps.executeQuery()).thenReturn(amendmentRs, parentValueRs, signedAmendmentsRs);
+        Connection conn = connectionReturning(ps);
+
+        Contract submitted = amendmentOf(3);
+        submitted.setContractId(77);
+        submitted.setContractValue(new BigDecimal("-600000000"));
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            assertFalse(dao.update(submitted, ACTOR));
+            verify(ps, never()).executeUpdate();
+            verify(conn).rollback();
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // 5. Huỷ bản ghi (UC-34, BR-37)
+    // ------------------------------------------------------------------
+
+    @Test
+    public void voidRecord_softDeletesAndWritesHistoryBeforeCommit() throws Exception {
+        ResultSet noChildAmendments = singleRow(row("count", 0));
+        ResultSet voidedRs = singleRow(parentRow(ContractDAO.PROGRESS_SIGNED, null));
+        PreparedStatement historyPs = mock(PreparedStatement.class);
+        PreparedStatement contractPs = mock(PreparedStatement.class);
+        when(contractPs.executeQuery()).thenReturn(noChildAmendments, voidedRs);
+        when(contractPs.executeUpdate()).thenReturn(1);
+        Connection conn = connectionRoutingOn("contract_history", historyPs, contractPs);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            assertTrue(dao.voidRecord(3, ACTOR, "Nhập nhầm số hợp đồng"));
+
+            // BR-37 & rules §4: xóa mềm (is_deleted = 1), không DELETE cứng, ghi lịch sử trước commit
+            ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+            verify(conn, atLeastOnce()).prepareStatement(sql.capture());
+            assertTrue(sql.getAllValues().stream()
+                    .anyMatch(q -> q.contains("UPDATE contracts SET is_deleted = 1")));
+            assertTrue(sql.getAllValues().stream()
+                    .noneMatch(q -> q.startsWith("DELETE FROM contracts")));
+
+            InOrder inOrder = inOrder(conn, contractPs, historyPs);
+            inOrder.verify(conn).setAutoCommit(false);
+            inOrder.verify(contractPs).executeUpdate();
+            inOrder.verify(historyPs).executeUpdate();
+            inOrder.verify(conn).commit();
+        }
+    }
+
+    @Test
+    public void voidRecord_historyFails_rollsBackAndReturnsFalse() throws Exception {
+        ResultSet noChildAmendments = singleRow(row("count", 0));
+        ResultSet voidedRs = singleRow(parentRow(ContractDAO.PROGRESS_SIGNED, null));
+        PreparedStatement historyPs = mock(PreparedStatement.class);
+        PreparedStatement contractPs = mock(PreparedStatement.class);
+        when(contractPs.executeQuery()).thenReturn(noChildAmendments, voidedRs);
+        when(contractPs.executeUpdate()).thenReturn(1);
+        when(historyPs.executeUpdate()).thenThrow(new SQLException("history table down"));
+        Connection conn = connectionRoutingOn("contract_history", historyPs, contractPs);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            assertFalse(dao.voidRecord(3, ACTOR, "Nhập nhầm số hợp đồng"));
+
+            verify(conn).rollback();
+            verify(conn, never()).commit();
+        }
+    }
+
+    @Test
+    public void voidRecord_nonExistentOrAlreadyDeletedContract_returnsFalseAndWritesNoHistory() throws Exception {
+        ResultSet noAmendments = singleRow(row("count", 0));
+        ResultSet notFound = emptyResultSet();
+        PreparedStatement historyPs = mock(PreparedStatement.class);
+        PreparedStatement contractPs = mock(PreparedStatement.class);
+        when(contractPs.executeQuery()).thenReturn(noAmendments, notFound);
+        when(contractPs.executeUpdate()).thenReturn(0);
+        Connection conn = connectionRoutingOn("contract_history", historyPs, contractPs);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            assertFalse(dao.voidRecord(999, ACTOR, "Nhập nhầm"));
+
+            verify(historyPs, never()).executeUpdate();
+            verify(conn).rollback();
+            verify(conn, never()).commit();
+        }
+    }
+
+    @Test
+    public void voidRecord_signedAmendmentWithValue_logsNegatedValueAdjustmentOnParent() throws Exception {
+        ResultSet noChildAmendments = singleRow(row("count", 0));
+        java.util.Map<String, Object> signedAmendment = parentRow(ContractDAO.PROGRESS_SIGNED, 3);
+        signedAmendment.put("contract_id", 77);
+        signedAmendment.put("contract_code", "01/2026/HĐMB-POSTEF/PL01");
+        signedAmendment.put("contract_value", new BigDecimal("250000000"));
+        ResultSet voidedRs = singleRow(signedAmendment);
+        ResultSet parentBaseValue = singleRow(row("contract_value", new BigDecimal("1500000000")));
+        ResultSet remainingSignedTotal = singleRow(row("total", BigDecimal.ZERO));
+
+        PreparedStatement historyPs = mock(PreparedStatement.class);
+        PreparedStatement contractPs = mock(PreparedStatement.class);
+        when(contractPs.executeQuery()).thenReturn(
+                noChildAmendments, voidedRs, parentBaseValue, remainingSignedTotal);
+        when(contractPs.executeUpdate()).thenReturn(1);
+        Connection conn = connectionRoutingOn("contract_history", historyPs, contractPs);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            assertTrue(dao.voidRecord(77, ACTOR, "Nhập nhầm phụ lục"));
+
+            verify(historyPs).setInt(1, 77);
+            verify(historyPs).setString(2, ContractHistory.EVENT_VOIDED);
+            verify(historyPs).setInt(1, 3);
+            verify(historyPs).setString(2, ContractHistory.EVENT_VALUE_ADJUSTED);
+            ArgumentCaptor<String> detail = ArgumentCaptor.forClass(String.class);
+            verify(historyPs, times(2)).setString(eq(3), detail.capture());
+            assertTrue(detail.getAllValues().get(1).contains("-250.000.000 đ"));
+            verify(conn).commit();
+        }
+    }
+
+    @Test
+    public void voidRecord_draftAmendmentWithValue_doesNotLogValueAdjustmentOnParent() throws Exception {
+        ResultSet noChildAmendments = singleRow(row("count", 0));
+        java.util.Map<String, Object> draftAmendment = parentRow(ContractDAO.PROGRESS_DRAFT, 3);
+        draftAmendment.put("contract_id", 77);
+        draftAmendment.put("contract_value", new BigDecimal("250000000"));
+        ResultSet voidedRs = singleRow(draftAmendment);
+
+        PreparedStatement historyPs = mock(PreparedStatement.class);
+        PreparedStatement contractPs = mock(PreparedStatement.class);
+        when(contractPs.executeQuery()).thenReturn(noChildAmendments, voidedRs);
+        when(contractPs.executeUpdate()).thenReturn(1);
+        Connection conn = connectionRoutingOn("contract_history", historyPs, contractPs);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            assertTrue(dao.voidRecord(77, ACTOR, "Huỷ phụ lục nháp"));
+
+            verify(historyPs, times(1)).executeUpdate();
+            verify(historyPs).setString(2, ContractHistory.EVENT_VOIDED);
+            verify(historyPs, never()).setString(2, ContractHistory.EVENT_VALUE_ADJUSTED);
+            verify(conn).commit();
+        }
     }
 }
