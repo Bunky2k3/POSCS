@@ -73,7 +73,8 @@ Không còn mục nào.
 
 > Phụ thuộc: cần xong **Task 1.4** trước. Mỗi DAO/controller là **một task riêng**. Chỉ **tách**, không thêm tính năng.
 
-- [ ] **Task 4.1:** `[UC-33, UC-35, UC-44]` `[BR-17, BR-35, BR-36]` Xây dựng `ContractValidator`: trường bắt buộc (Mã HĐ, Tiêu đề, KH/NCC đúng vai, Loại, Người phụ trách), `Ngày ký ≤ hiệu lực ≤ kết thúc` (MSG-045), tính trạng thái tự động (BR-17), khoản giảm trừ phụ lục không vượt giá trị còn lại của HĐ gốc.
+- [x] **Task 4.1:** `[UC-33, UC-35, UC-44]` `[BR-17, BR-35, BR-36]` Xây dựng `ContractValidator`: trường bắt buộc (Mã HĐ, Tiêu đề, KH/NCC đúng vai, Loại, Người phụ trách), `Ngày ký ≤ hiệu lực ≤ kết thúc` (MSG-045), tính trạng thái tự động (BR-17), khoản giảm trừ phụ lục không vượt giá trị còn lại của HĐ gốc.
+  - *Đã hoàn thành:* Xây dựng `poscs.validator.ContractValidator` kế thừa `BaseValidator` kiểm tra ràng buộc BR-35 (Mã HĐ, Tiêu đề, Loại HĐ, Người phụ trách, KH/NCC đúng vai theo chiều Bán↔Khách mua / Mua↔Nhà cung cấp; ngày ký do hệ thống đóng dấu, không nhập tay; chiều Bán/Mua không đổi được; HĐ đã ký chỉ đổi Người phụ trách; HĐ đã thanh lý/chấm dứt sớm không sửa); BR-36 & MSG-045 (thứ tự Ngày ký ≤ Hiệu lực ≤ Kết thúc); BR-17 (tính trạng thái tự động Chưa hiệu lực / Đang hiệu lực / Sắp hết hạn ≤ 30 ngày / Đã hết hạn); UC-35 (khoản giảm trừ phụ lục không vượt giá trị còn lại HĐ gốc). Unit test tại `test/poscs/validator/ContractValidatorTest.java` (55/55 test cases pass 100%).
   - *Lưu ý:* **ngày ký không phải trường nhập** (hệ thống đóng dấu khi Ký); chiều Bán/Mua không đổi được.
 - [ ] **Task 4.2:** `[UC-10, UC-11, UC-33, UC-34, UC-35, UC-44]` `[BR-16, BR-17, BR-35, BR-37]` Viết **test khóa hành vi hiện tại** của `ContractDAO` trước khi tách: bộ lọc mặc định (còn hiệu lực trong tháng, "Của tôi"), trạng thái tự tính, tạo ở Nháp, ký, huỷ bản ghi.
 - [ ] **Task 4.3:** `[UC-45]` Tách `ContractHistoryDAO` (nhật ký trạng thái/sự kiện hợp đồng).
