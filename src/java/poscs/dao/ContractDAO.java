@@ -94,21 +94,32 @@ public class ContractDAO {
     private static final int SOON_THRESHOLD_DAYS = 30;
 
     private final ContractHistoryDAO historyDAO;
+    private final ContractPaymentDAO paymentDAO;
 
     public ContractDAO() {
         this(new ContractHistoryDAO());
     }
 
     public ContractDAO(ContractHistoryDAO historyDAO) {
+        this(historyDAO, new ContractPaymentDAO(historyDAO));
+    }
+
+    public ContractDAO(ContractPaymentDAO paymentDAO) {
+        this(paymentDAO != null ? paymentDAO.getHistoryDAO() : new ContractHistoryDAO(), paymentDAO);
+    }
+
+    public ContractDAO(ContractHistoryDAO historyDAO, ContractPaymentDAO paymentDAO) {
         this.historyDAO = historyDAO != null ? historyDAO : new ContractHistoryDAO();
+        this.paymentDAO = paymentDAO != null ? paymentDAO : new ContractPaymentDAO(this.historyDAO);
     }
 
     public ContractHistoryDAO getHistoryDAO() {
         return historyDAO;
     }
 
-    /** Ngày trong câu nhật ký viết như người Việt đọc, không phải như CSDL lưu. */
-    private static final DateTimeFormatter DETAIL_DATE_FORMAT = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+    public ContractPaymentDAO getPaymentDAO() {
+        return paymentDAO;
+    }
 
     private static final String SQL_ENTERPRISE_LABEL =
         "SELECT enterprise_name FROM enterprises WHERE enterprise_id = ?";
@@ -2593,7 +2604,7 @@ public class ContractDAO {
     }
 
     private static String formatDate(Date date) {
-        return date == null ? "" : date.toLocalDate().format(DETAIL_DATE_FORMAT);
+        return ContractPaymentDAO.formatDate(date);
     }
 
     /** Cắt cho vừa cột detail thay vì để MySQL từ chối cả câu INSERT và mất luôn dòng nhật ký. */
@@ -2804,198 +2815,39 @@ public class ContractDAO {
     // ==================================================================
     /**
      * Các kỳ thanh toán của một hợp đồng, kỳ đến hạn sớm nhất trước.
-     *
-     * <p>Bảng contract_payments đã tồn tại từ lâu và ĐANG ĐƯỢC ĐỌC (ba hàm
-     * sumInvoiceAmount* bên dưới nuôi dải KPI doanh thu của dashboard), nhưng
-     * cho tới trước phần này thì KHÔNG màn hình nào ghi vào đó -- nghĩa là con
-     * số doanh thu trên dashboard đóng băng ở dữ liệu gieo mẫu.
+     * [UC-53] [BR-18] Ủy quyền sang {@link ContractPaymentDAO#findPaymentsByContractId(int)}.
      */
     public List<ContractPayment> findPaymentsByContractId(int contractId) {
-        List<ContractPayment> result = new ArrayList<>();
-        String sql = "SELECT payment_id, contract_id, invoice_amount, due_date, paid_date, created_at " +
-                "FROM contract_payments WHERE contract_id = ? ORDER BY due_date, payment_id";
-        try (Connection conn = DBContext.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, contractId);
-            try (ResultSet rs = ps.executeQuery()) {
-                while (rs.next()) {
-                    ContractPayment p = new ContractPayment();
-                    p.setPaymentId(rs.getInt("payment_id"));
-                    p.setContractId(rs.getInt("contract_id"));
-                    p.setInvoiceAmount(rs.getBigDecimal("invoice_amount"));
-                    p.setDueDate(rs.getDate("due_date"));
-                    p.setPaidDate(rs.getDate("paid_date"));
-                    p.setCreatedAt(rs.getTimestamp("created_at"));
-                    result.add(p);
-                }
-            }
-        } catch (SQLException ex) {
-            LOG.error("Loi truy van ky thanh toan (contractId={})", contractId, ex);
-        }
-        return result;
+        return paymentDAO.findPaymentsByContractId(contractId);
     }
 
     /**
      * Lập một kỳ thanh toán, kèm dòng nhật ký -- trong cùng transaction.
-     *
-     * <p>CHẶN khi hợp đồng đã đóng băng, nhưng KHÔNG chặn khi đã ký. Khác hàng
-     * hoá ở chỗ đó, và có lý do: hàng hoá là nội dung hợp đồng (ký xong là
-     * chứng cứ), còn lịch thu tiền là thứ mình theo dõi trong lúc thực hiện --
-     * hợp đồng ký tháng trước mà giờ mới nhập kỳ thu là chuyện bình thường.
+     * [UC-53] [BR-18] Ủy quyền sang {@link ContractPaymentDAO#insertPayment(int, ContractPayment, int)}.
      */
     public boolean insertPayment(int contractId, ContractPayment payment, int actorId) {
-        if (payment.getInvoiceAmount() == null || payment.getInvoiceAmount().signum() <= 0
-                || payment.getDueDate() == null) {
-            return false;
-        }
-        String sql = "INSERT INTO contract_payments (contract_id, invoice_amount, due_date, paid_date) " +
-                "VALUES (?, ?, ?, ?)";
-        try (Connection conn = DBContext.getConnection()) {
-            conn.setAutoCommit(false);
-            boolean committed = false;
-            try {
-                if (isFrozen(conn, contractId)) {
-                    return false;
-                }
-                try (PreparedStatement ps = conn.prepareStatement(sql)) {
-                    ps.setInt(1, contractId);
-                    ps.setBigDecimal(2, payment.getInvoiceAmount());
-                    ps.setDate(3, payment.getDueDate());
-                    ps.setDate(4, payment.getPaidDate());
-                    if (ps.executeUpdate() == 0) {
-                        return false;
-                    }
-                }
-                insertHistory(conn, contractId, ContractHistory.EVENT_PAYMENT_ADDED,
-                        "Lập kỳ thanh toán " + formatMoney(payment.getInvoiceAmount())
-                                + ", đến hạn " + formatDate(payment.getDueDate())
-                                + (payment.getPaidDate() == null ? ""
-                                        : " (đã thu " + formatDate(payment.getPaidDate()) + ")"),
-                        actorId, null);
-                conn.commit();
-                committed = true;
-            } finally {
-                finishTransaction(conn, committed, "lap ky thanh toan", contractId);
-            }
-            return committed;
-        } catch (SQLException ex) {
-            LOG.error("Loi lap ky thanh toan (contractId={})", contractId, ex);
-            return false;
-        }
+        return paymentDAO.insertPayment(contractId, payment, actorId);
     }
 
     /**
      * Ghi nhận tiền của một kỳ đã về.
-     *
-     * <p>KHÔNG chặn kể cả khi hợp đồng đã thanh lý: tiền bảo hành giữ lại
-     * thường chỉ về sau thanh lý cả năm. Đóng băng nói về NỘI DUNG hợp đồng,
-     * không nói về việc tiền có thật sự vào tài khoản hay chưa.
+     * [UC-53] [BR-18] Ủy quyền sang {@link ContractPaymentDAO#markPaymentPaid(int, int, Date, int)}.
      */
     public boolean markPaymentPaid(int paymentId, int contractId, Date paidDate, int actorId) {
-        if (paidDate == null) {
-            return false;
-        }
-        try (Connection conn = DBContext.getConnection()) {
-            conn.setAutoCommit(false);
-            boolean committed = false;
-            try {
-                ContractPayment before = lockPayment(conn, paymentId, contractId);
-                if (before == null || before.getPaidDate() != null) {
-                    // Đã ghi nhận rồi thì thôi -- ghi đè lần nữa chỉ sinh thêm
-                    // một dòng nhật ký nói về việc chẳng thay đổi gì.
-                    return false;
-                }
-                try (PreparedStatement ps = conn.prepareStatement(
-                        "UPDATE contract_payments SET paid_date = ? WHERE payment_id = ? AND contract_id = ?")) {
-                    ps.setDate(1, paidDate);
-                    ps.setInt(2, paymentId);
-                    ps.setInt(3, contractId);
-                    if (ps.executeUpdate() == 0) {
-                        return false;
-                    }
-                }
-                insertHistory(conn, contractId, ContractHistory.EVENT_PAYMENT_PAID,
-                        "Đã thu " + formatMoney(before.getInvoiceAmount())
-                                + " (kỳ đến hạn " + formatDate(before.getDueDate()) + ")"
-                                + " ngày " + formatDate(paidDate),
-                        actorId, null);
-                conn.commit();
-                committed = true;
-            } finally {
-                finishTransaction(conn, committed, "ghi nhan da thu", contractId);
-            }
-            return committed;
-        } catch (SQLException ex) {
-            LOG.error("Loi ghi nhan da thu (paymentId={}, contractId={})", paymentId, contractId, ex);
-            return false;
-        }
+        return paymentDAO.markPaymentPaid(paymentId, contractId, paidDate, actorId);
     }
 
-    /** Xoá một kỳ lập nhầm. Đọc TRƯỚC khi xoá để nhật ký nói được đã xoá cái gì. */
+    /**
+     * Xoá một kỳ lập nhầm.
+     * [UC-53] [BR-18] Ủy quyền sang {@link ContractPaymentDAO#deletePayment(int, int, int)}.
+     */
     public boolean deletePayment(int paymentId, int contractId, int actorId) {
-        try (Connection conn = DBContext.getConnection()) {
-            conn.setAutoCommit(false);
-            boolean committed = false;
-            try {
-                if (isFrozen(conn, contractId)) {
-                    return false;
-                }
-                ContractPayment before = lockPayment(conn, paymentId, contractId);
-                if (before == null) {
-                    return false;
-                }
-                try (PreparedStatement ps = conn.prepareStatement(
-                        "DELETE FROM contract_payments WHERE payment_id = ? AND contract_id = ?")) {
-                    ps.setInt(1, paymentId);
-                    ps.setInt(2, contractId);
-                    if (ps.executeUpdate() == 0) {
-                        return false;
-                    }
-                }
-                insertHistory(conn, contractId, ContractHistory.EVENT_PAYMENT_REMOVED,
-                        "Xoá kỳ " + formatMoney(before.getInvoiceAmount())
-                                + " đến hạn " + formatDate(before.getDueDate()),
-                        actorId, null);
-                conn.commit();
-                committed = true;
-            } finally {
-                finishTransaction(conn, committed, "xoa ky thanh toan", contractId);
-            }
-            return committed;
-        } catch (SQLException ex) {
-            LOG.error("Loi xoa ky thanh toan (paymentId={}, contractId={})", paymentId, contractId, ex);
-            return false;
-        }
-    }
-
-    /** Đọc và khoá một kỳ thanh toán trong transaction; null nếu không thuộc hợp đồng này. */
-    private ContractPayment lockPayment(Connection conn, int paymentId, int contractId) throws SQLException {
-        String sql = "SELECT payment_id, invoice_amount, due_date, paid_date FROM contract_payments " +
-                "WHERE payment_id = ? AND contract_id = ? FOR UPDATE";
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, paymentId);
-            ps.setInt(2, contractId);
-            try (ResultSet rs = ps.executeQuery()) {
-                if (!rs.next()) {
-                    return null;
-                }
-                ContractPayment p = new ContractPayment();
-                p.setPaymentId(rs.getInt("payment_id"));
-                p.setContractId(contractId);
-                p.setInvoiceAmount(rs.getBigDecimal("invoice_amount"));
-                p.setDueDate(rs.getDate("due_date"));
-                p.setPaidDate(rs.getDate("paid_date"));
-                return p;
-            }
-        }
+        return paymentDAO.deletePayment(paymentId, contractId, actorId);
     }
 
     /** Tiền trong câu nhật ký viết như người Việt đọc: "1.500.000.000 đ". */
     private static String formatMoney(BigDecimal amount) {
-        if (amount == null) {
-            return "";
-        }
-        return String.format("%,.0f", amount).replace(',', '.') + " đ";
+        return ContractPaymentDAO.formatMoney(amount);
     }
 
     /**
@@ -3010,154 +2862,58 @@ public class ContractDAO {
         return (amount.signum() > 0 ? "+" : "") + formatMoney(amount);
     }
 
-    // Kỳ thanh toán của hợp đồng (bảng contract_payments)
     // ==================================================================
-    //
-    // Doanh thu tính theo paid_date -- tiền ĐÃ THỰC THU, không phải due_date
-    // (tiền đáng lẽ phải thu). Hai cột đó lệch nhau chính là chuyện trả chậm,
-    // mà lấy nhầm due_date là báo cáo doanh thu tự cộng cả khoản chưa về.
-    //
-    // Nằm trong ContractDAO chứ không phải một DAO riêng: kỳ thanh toán không
-    // đứng một mình được, mọi câu ở đây đều JOIN về contracts.
-
-    /**
-     * Loại tiền của hợp đồng ĐÃ HUỶ BẢN GHI ra khỏi các phép cộng doanh thu.
-     *
-     * <p>{@code voidRecord} xoá MỀM: dòng contracts vẫn nằm đó với
-     * {@code is_deleted = 1}, và các kỳ thanh toán treo vào nó không bị đụng
-     * tới (cố ý -- huỷ một bản ghi nhập nhầm không được phép xoá dấu vết tiền
-     * đã ghi nhận). Nhưng hai câu cộng bên dưới JOIN thẳng sang contracts, nên
-     * thiếu điều kiện này thì tiền của một hợp đồng đã biến mất khỏi mọi danh
-     * sách vẫn nằm mãi trong KPI doanh thu -- sai âm thầm, và không có màn hình
-     * nào chỉ ra được nó đến từ đâu.
-     *
-     * <p>Tách thành hằng số vì cả hai câu phải giống nhau từng chữ: lệch một
-     * chỗ là KPI theo kỳ và KPI theo tháng ra hai con số khác nhau cho cùng một
-     * quãng thời gian.
-     */
-    private static final String REVENUE_LIVE_CONTRACT_SQL = "AND c.is_deleted = 0 ";
+    // Kỳ thanh toán của hợp đồng (bảng contract_payments - [UC-53] [BR-18])
+    // ==================================================================
 
     /**
      * Tổng tiền đã thu trong một kỳ (theo ngày thanh toán), lọc thêm theo tỉnh
-     * của khách hàng đứng tên hợp đồng. period null = trả về 0 phần tiền chưa
-     * xác định kỳ -- bên gọi tự quyết định dùng hàm theo tháng bên dưới.
+     * của khách hàng đứng tên hợp đồng.
+     * [UC-36] [BR-18] Ủy quyền sang {@link ContractPaymentDAO#sumInvoiceAmountInPeriod(Period, Integer)}.
      */
     public BigDecimal sumInvoiceAmountInPeriod(Period period, Integer provinceId) {
-        return sumInvoiceAmountInPeriod(period, SqlFilters.one(provinceId), null);
-    }
-
-    /** Như trên nhưng thu hẹp theo nhiều tỉnh và theo người phụ trách -- bộ lọc Dashboard. */
-    public BigDecimal sumInvoiceAmountInPeriod(Period period, List<Integer> provinceIds, List<Integer> ownerIds) {
-        if (period == null) {
-            return BigDecimal.ZERO;
-        }
-        String sql = "SELECT COALESCE(SUM(p.invoice_amount), 0) FROM contract_payments p " +
-                     "LEFT JOIN contracts c ON p.contract_id = c.contract_id " +
-                     "LEFT JOIN enterprises e ON c.enterprise_id = e.enterprise_id " +
-                     "LEFT JOIN addresses a ON e.address_id = a.address_id " +
-                     "LEFT JOIN districts d ON a.districts_id = d.districts_id " +
-                     "WHERE p.paid_date IS NOT NULL AND p.paid_date BETWEEN ? AND ? " +
-                     // CHỈ hợp đồng BÁN RA. Doanh thu là tiền về, không phải
-                     // mọi khoản đi qua contract_payments -- thiếu điều kiện này
-                     // thì hợp đồng MUA đầu tiên nhập vào là KPI tự cộng cả tiền
-                     // mình đi trả, sai âm thầm cho tới lúc đối chiếu sổ sách.
-                     "AND c.direction = 'Bán' " +
-                     REVENUE_LIVE_CONTRACT_SQL +
-                     SqlFilters.scopeClause(DASHBOARD_OWNER_COLUMNS, ownerIds, "d.province_id", provinceIds);
-        try (Connection conn = DBContext.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setDate(1, period.getFrom());
-            ps.setDate(2, period.getTo());
-            int param = 3;
-            SqlFilters.bindScope(ps, param, DASHBOARD_OWNER_COLUMNS, ownerIds, provinceIds);
-            try (ResultSet rs = ps.executeQuery()) {
-                if (rs.next()) {
-                    return rs.getBigDecimal(1);
-                }
-            }
-        } catch (SQLException ex) {
-            LOG.error("Loi tinh doanh thu theo ky", ex);
-        }
-        return BigDecimal.ZERO;
-    }
-
-    /** Tổng tiền đã thu trong 1 tháng cụ thể. Trả về 0 nếu không có khoản thu nào. */
-    public BigDecimal sumInvoiceAmountByMonth(int year, int month) {
-        return sumInvoiceAmountByMonth(year, month, null);
+        return paymentDAO.sumInvoiceAmountInPeriod(period, provinceId);
     }
 
     /**
-     * Như {@link #sumInvoiceAmountByMonth(int, int)} nhưng chỉ tính các khoản
-     * thu của hợp đồng thuộc 1 tỉnh (null = toàn quốc). Khoản thu không mang
-     * địa bàn riêng -- nó thừa hưởng tỉnh của khách hàng đứng tên hợp đồng, nên
-     * phải đi qua contracts -> enterprises -> addresses -> districts.
+     * Như trên nhưng thu hẹp theo nhiều tỉnh và theo người phụ trách -- bộ lọc Dashboard.
+     * [UC-36] [BR-18] Ủy quyền sang {@link ContractPaymentDAO#sumInvoiceAmountInPeriod(Period, List, List)}.
+     */
+    public BigDecimal sumInvoiceAmountInPeriod(Period period, List<Integer> provinceIds, List<Integer> ownerIds) {
+        return paymentDAO.sumInvoiceAmountInPeriod(period, provinceIds, ownerIds);
+    }
+
+    /**
+     * Tổng tiền đã thu trong 1 tháng cụ thể.
+     * [UC-36] [BR-18] Ủy quyền sang {@link ContractPaymentDAO#sumInvoiceAmountByMonth(int, int)}.
+     */
+    public BigDecimal sumInvoiceAmountByMonth(int year, int month) {
+        return paymentDAO.sumInvoiceAmountByMonth(year, month);
+    }
+
+    /**
+     * Như {@link #sumInvoiceAmountByMonth(int, int)} nhưng chỉ tính các khoản thu của hợp đồng thuộc 1 tỉnh.
+     * [UC-36] [BR-18] Ủy quyền sang {@link ContractPaymentDAO#sumInvoiceAmountByMonth(int, int, Integer)}.
      */
     public BigDecimal sumInvoiceAmountByMonth(int year, int month, Integer provinceId) {
-        return sumInvoiceAmountByMonth(year, month, SqlFilters.one(provinceId), null);
-    }
-
-    /** Như trên nhưng thu hẹp theo nhiều tỉnh và theo người phụ trách -- bộ lọc Dashboard. */
-    public BigDecimal sumInvoiceAmountByMonth(int year, int month, List<Integer> provinceIds,
-            List<Integer> ownerIds) {
-        String sql = "SELECT COALESCE(SUM(p.invoice_amount), 0) FROM contract_payments p " +
-                     "LEFT JOIN contracts c ON p.contract_id = c.contract_id " +
-                     "LEFT JOIN enterprises e ON c.enterprise_id = e.enterprise_id " +
-                     "LEFT JOIN addresses a ON e.address_id = a.address_id " +
-                     "LEFT JOIN districts d ON a.districts_id = d.districts_id " +
-                     "WHERE p.paid_date IS NOT NULL AND YEAR(p.paid_date) = ? AND MONTH(p.paid_date) = ? " +
-                     // CHỈ hợp đồng BÁN RA. Doanh thu là tiền về, không phải
-                     // mọi khoản đi qua contract_payments -- thiếu điều kiện này
-                     // thì hợp đồng MUA đầu tiên nhập vào là KPI tự cộng cả tiền
-                     // mình đi trả, sai âm thầm cho tới lúc đối chiếu sổ sách.
-                     "AND c.direction = 'Bán' " +
-                     REVENUE_LIVE_CONTRACT_SQL +
-                     SqlFilters.scopeClause(DASHBOARD_OWNER_COLUMNS, ownerIds, "d.province_id", provinceIds);
-        try (Connection conn = DBContext.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, year);
-            ps.setInt(2, month);
-            int param = 3;
-            SqlFilters.bindScope(ps, param, DASHBOARD_OWNER_COLUMNS, ownerIds, provinceIds);
-            try (ResultSet rs = ps.executeQuery()) {
-                if (rs.next()) {
-                    return rs.getBigDecimal(1);
-                }
-            }
-        } catch (SQLException ex) {
-            LOG.error("Loi tinh doanh thu theo thang", ex);
-        }
-        return BigDecimal.ZERO;
+        return paymentDAO.sumInvoiceAmountByMonth(year, month, provinceId);
     }
 
     /**
-     * Tổng tiền đã lập kỳ của CẢ CỤM hợp đồng: bản gốc cộng mọi phụ lục còn
-     * sống của nó.
-     *
-     * <p>Đây là con số duy nhất đối chiếu được với giá trị hiện hành. Kỳ thanh
-     * toán treo vào đúng bản ghi lập ra nó -- phần bổ sung theo phụ lục thường
-     * được lập kỳ ngay trên phụ lục -- nên so tổng kỳ của riêng hợp đồng gốc
-     * với giá trị đã cộng phụ lục thì cảnh báo "không khớp" nổ ở mọi hợp đồng
-     * có phụ lục, tức là nó hết nói được điều gì.
-     *
-     * @param rootContractId id hợp đồng GỐC (không phải phụ lục)
+     * Như trên nhưng thu hẹp theo nhiều tỉnh và theo người phụ trách -- bộ lọc Dashboard.
+     * [UC-36] [BR-18] Ủy quyền sang {@link ContractPaymentDAO#sumInvoiceAmountByMonth(int, int, List, List)}.
+     */
+    public BigDecimal sumInvoiceAmountByMonth(int year, int month, List<Integer> provinceIds,
+            List<Integer> ownerIds) {
+        return paymentDAO.sumInvoiceAmountByMonth(year, month, provinceIds, ownerIds);
+    }
+
+    /**
+     * Tổng tiền đã lập kỳ của CẢ CỤM hợp đồng: bản gốc cộng mọi phụ lục còn sống của nó.
+     * [UC-53] [BR-18] Ủy quyền sang {@link ContractPaymentDAO#sumScheduledPaymentsForCluster(int)}.
      */
     public BigDecimal sumScheduledPaymentsForCluster(int rootContractId) {
-        String sql = "SELECT COALESCE(SUM(p.invoice_amount), 0) FROM contract_payments p " +
-                     "JOIN contracts c ON p.contract_id = c.contract_id " +
-                     "WHERE c.is_deleted = 0 AND (c.contract_id = ? OR c.parent_contract_id = ?)";
-        try (Connection conn = DBContext.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, rootContractId);
-            ps.setInt(2, rootContractId);
-            try (ResultSet rs = ps.executeQuery()) {
-                if (rs.next()) {
-                    return rs.getBigDecimal(1);
-                }
-            }
-        } catch (SQLException ex) {
-            LOG.error("Loi tinh tong ky thanh toan ca cum (rootContractId={})", rootContractId, ex);
-        }
-        return BigDecimal.ZERO;
+        return paymentDAO.sumScheduledPaymentsForCluster(rootContractId);
     }
 
 }
