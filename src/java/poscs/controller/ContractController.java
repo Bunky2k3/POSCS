@@ -43,6 +43,7 @@ import poscs.model.Enterprise;
 import poscs.model.Product;
 import poscs.model.Province;
 import poscs.model.User;
+import poscs.service.PermissionService;
 
 /**
  * Controller cho hợp đồng (bảng contracts) và mọi thứ treo vào nó: hạng mục
@@ -119,11 +120,60 @@ public class ContractController extends HttpServlet {
     private static final String UPDATE_VIEW = "/jsp/sale/updatecontract.jsp";
     private static final String HANDOVER_VIEW = "/jsp/sale/handoverqueue.jsp";
 
-    private final ContractDAO contractDAO = new ContractDAO();
-    private final CustomerDAO customerDAO = new CustomerDAO();
-    private final EmployeeDAO employeeDAO = new EmployeeDAO();
-    private final AddressDAO addressDAO = new AddressDAO();
-    private final ProductDAO productDAO = new ProductDAO();
+    private ContractDAO contractDAO = new ContractDAO();
+    private CustomerDAO customerDAO = new CustomerDAO();
+    private EmployeeDAO employeeDAO = new EmployeeDAO();
+    private AddressDAO addressDAO = new AddressDAO();
+    private ProductDAO productDAO = new ProductDAO();
+
+    private PermissionService permissionService;
+    private ContractListController listController;
+    private ContractDetailController detailController;
+
+    PermissionService getPermissionService() {
+        if (permissionService != null) {
+            return permissionService;
+        }
+        return new PermissionService(employeeDAO) {
+            @Override
+            public User getEffectiveUser(User sessionUser) {
+                User u = super.getEffectiveUser(sessionUser);
+                if (u != null) {
+                    return u;
+                }
+                if (sessionUser != null && !sessionUser.isDeleted() && sessionUser.getRole() != null) {
+                    return sessionUser;
+                }
+                return null;
+            }
+        };
+    }
+
+    void setPermissionService(PermissionService permissionService) {
+        this.permissionService = permissionService;
+    }
+
+    ContractListController getListController() {
+        if (listController != null) {
+            return listController;
+        }
+        return new ContractListController(contractDAO, employeeDAO, addressDAO, getPermissionService());
+    }
+
+    void setListController(ContractListController listController) {
+        this.listController = listController;
+    }
+
+    ContractDetailController getDetailController() {
+        if (detailController != null) {
+            return detailController;
+        }
+        return new ContractDetailController(contractDAO, employeeDAO, getPermissionService());
+    }
+
+    void setDetailController(ContractDetailController detailController) {
+        this.detailController = detailController;
+    }
 
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
@@ -241,150 +291,7 @@ public class ContractController extends HttpServlet {
 
     private void showList(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
-        int page = parseIntOrDefault(request.getParameter("page"), 1);
-        if (page < 1) {
-            page = 1;
-        }
-        String keyword = request.getParameter("keyword");
-        String statusFilter = request.getParameter("status");
-        String typeFilter = request.getParameter("type");
-        List<Integer> provinceFilters = provinceFiltersOf(request);
-        Period period = Period.parse(request.getParameter("year"), request.getParameter("period"));
-        // Chiều đứng ĐỘC LẬP với kỳ -- hai mục con vẫn lọc được theo năm/quý/tháng.
-        String direction = directionFromKind(request.getParameter("kind"));
-        // Hợp đồng MUA không lọc theo tỉnh. Tỉnh của hợp đồng suy ra từ địa chỉ
-        // đối tác đứng tên, mà với hợp đồng mua thì đối tác là NHÀ CUNG CẤP --
-        // nhóm không chia theo địa bàn (xem CustomerController). Lọc theo tỉnh
-        // ở đó vừa vô nghĩa vừa cắt mất kết quả.
-        //
-        // Bỏ ở controller chứ không chỉ ẩn ô chọn: một provinceId còn sót trên
-        // URL vẫn âm thầm thu hẹp danh sách.
-        if (DIRECTION_BUY.equals(direction)) {
-            provinceFilters = List.of();
-        }
-        // Trục tiến độ: độc lập với trục lịch (status) và với kỳ. Một hợp đồng
-        // "Đã hết hạn" theo lịch mà vẫn "Đã ký" theo tiến độ chính là việc còn
-        // tồn -- lọc được hai trục riêng thì mới nhìn ra chỗ đó.
-        String progressFilter = request.getParameter("progress");
-        // Phụ lục mặc định HIỆN thành dòng riêng: chính nó cũng phải được ký,
-        // nên phải tìm thấy được bằng mã. Ô này để thu về danh sách hợp đồng
-        // gốc khi người dùng muốn đếm "bao nhiêu hợp đồng" theo nghĩa thường.
-        boolean rootsOnly = "root".equals(request.getParameter("scope"));
-        // "Đang chờ ở phòng nào" -- câu hỏi của giám đốc, hỏi ngay trên danh
-        // sách hợp đồng chứ không phải mở từng hợp đồng ra xem.
-        Integer waitingDepartment = parseIntOrNull(request.getParameter("waitingDept"));
-        // Ô tích "Đang bàn giao" trên thanh lọc chính: chờ ở phòng nào cũng tính.
-        // Chọn HẲN một phòng ở khối "Lọc thêm" thì phòng đó thắng — nó hẹp hơn, và
-        // hai thứ cùng bật nghĩa là người dùng vừa chọn cụ thể hơn.
-        boolean waitingAny = "1".equals(request.getParameter("waiting"));
-        if (waitingDepartment == null && waitingAny) {
-            waitingDepartment = ContractDAO.WAITING_ANY_DEPARTMENT;
-        }
-
-        // ===== Phạm vi mặc định của màn hình =====
-        // Hai chiều, đều là MẶC ĐỊNH chứ không phải rào quyền:
-        //   - ai: Sales thấy hợp đồng mình phụ trách HOẶC thuộc địa bàn mình giữ
-        //   - khi nào: hợp đồng CÒN HIỆU LỰC trong tháng hiện tại
-        //
-        // Cửa sổ tháng áp cho MỌI vai (kể cả Admin): nó trả lời "tháng này đang làm
-        // gì", không phải "được phép thấy gì". Bấm "mọi thời điểm" là bỏ.
-        //
-        // KHÁC bộ lọc "kỳ" ngay bên dưới: kỳ lọc theo NGÀY KÝ nên bản nháp rơi ra
-        // ngoài, cái này lọc theo THỜI HẠN nên những gì đang chạy đều ở lại.
-        boolean allTime = MONTH_ALL.equals(request.getParameter("month"));
-        Period activeWindow = allTime ? null : currentMonth();
-        ListScope scope = AccessControl.listScope(request,
-                () -> employeeDAO.findTeamUserIds(AccessControl.currentUser(request).getUserId()),
-                () -> employeeDAO.findProvincesOf(AccessControl.currentUser(request).getUserId())
-                        .stream().map(Province::getProvinceId).collect(Collectors.toList()))
-                .withActiveWindow(activeWindow);
-        request.setAttribute("viewFilter", AccessControl.defaultView(request));
-        request.setAttribute("viewNarrowed", scope.isNarrowed());
-        request.setAttribute("viewProvinceCount", scope.getProvinceIds().size());
-        request.setAttribute("monthFilter", allTime ? MONTH_ALL : null);
-        request.setAttribute("monthLabel", activeWindow != null ? activeWindow.getLabel() : null);
-        request.setAttribute("viewToggleUrl", QueryStrings.with(request, "view",
-                AccessControl.VIEW_MINE.equals(AccessControl.defaultView(request))
-                        ? AccessControl.VIEW_ALL : AccessControl.VIEW_MINE));
-        request.setAttribute("monthToggleUrl", QueryStrings.with(request, "month", allTime ? null : MONTH_ALL));
-
-        List<Contract> contractList = contractDAO.findAll(page, PAGE_SIZE, keyword, statusFilter, typeFilter,
-                provinceFilters, false, period, direction, progressFilter, rootsOnly, waitingDepartment, scope);
-        int totalCount = contractDAO.countAll(keyword, statusFilter, typeFilter, provinceFilters, period, direction,
-                progressFilter, rootsOnly, waitingDepartment, scope);
-        int totalPages = Math.max(1, (int) Math.ceil(totalCount / (double) PAGE_SIZE));
-        // Dải KPI trạng thái phải đếm CÙNG phạm vi với bảng bên dưới: đứng ở
-        // Hợp đồng mua mà KPI gộp cả hợp đồng bán thì hai con số cạnh nhau
-        // không khớp, và không có gì trên màn hình giải thích vì sao.
-        Map<String, Integer> statusSummary = contractDAO.countStatusSummary(provinceFilters, period, direction,
-                rootsOnly, null, scope, waitingDepartment);
-
-        request.setAttribute("contractList", contractList);
-        request.setAttribute("statusSummary", statusSummary);
-        request.setAttribute("provinceList", addressDAO.findBranchProvinces());
-        request.setAttribute("currentPage", page);
-        request.setAttribute("totalPages", totalPages);
-        request.setAttribute("totalCount", totalCount);
-        // JSP cần pageSize để đánh STT liên tục qua các trang (trang 2 bắt đầu từ 11).
-        request.setAttribute("pageSize", PAGE_SIZE);
-        request.setAttribute("keyword", keyword);
-        // Bản đã mã hoá URL cho các link phân trang / lọc / xuất -- xem QueryStrings.param.
-        request.setAttribute("keywordParam", QueryStrings.param(keyword));
-        request.setAttribute("statusFilter", statusFilter);
-        request.setAttribute("progressFilter", progressFilter);
-        request.setAttribute("scopeFilter", rootsOnly ? "root" : null);
-        request.setAttribute("waitingDeptFilter",
-                waitingDepartment != null && waitingDepartment == ContractDAO.WAITING_ANY_DEPARTMENT
-                        ? null : waitingDepartment);
-        request.setAttribute("waitingAnyFilter", waitingAny);
-        List<Department> departments = employeeDAO.findAllDepartments();
-        request.setAttribute("departmentList", departments);
-        // Loại hợp đồng khác nhau theo chiều -- xem SELL_CONTRACT_TYPES /
-        // BUY_CONTRACT_TYPES. JSP dựng dropdown từ đây thay vì chép cứng.
-        request.setAttribute("contractTypeOptions", contractTypesFor(direction));
-        request.setAttribute("showProvinceFilter", !DIRECTION_BUY.equals(direction));
-        request.setAttribute("typeFilter", typeFilter);
-        request.setAttribute("provinceFilters", provinceFilters);
-        // Đoạn "&provinceId=1&provinceId=5" dựng sẵn ở đây: link Xuất Excel và
-        // link phân trang trong JSP tự ghép chuỗi query, mà EL không lặp được
-        // một tham số nhiều lần trong chuỗi đó. Quên nó thì bấm sang trang 2 là
-        // bộ lọc tỉnh lặng lẽ rụng.
-        request.setAttribute("provinceQuery", provinceQuery(provinceFilters));
-        // Địa bàn của người đang đăng nhập -- để đánh dấu "của bạn" trong bảng
-        // tích và cho nút "Địa bàn của tôi" chạy được, giống Dashboard.
-        request.setAttribute("myProvinces",
-                employeeDAO.findProvincesCoveredBy(AccessControl.currentUser(request).getUserId()));
-        request.setAttribute("kind", DIRECTION_BUY.equals(direction) ? "buy" : "sell");
-        request.setAttribute("contractTypeOptions", contractTypesFor(direction));
-        setPeriodAttributes(request, period);
-
-        // Bốn ô số ở đầu trang là ĐƯỜNG LỌC theo trạng thái lịch, không còn là
-        // một dải chỉ để nhìn -- nên ô chọn "Tất cả trạng thái" đã bỏ khỏi thanh
-        // lọc. Link của từng ô dựng ở đây thay vì ghép chuỗi trong JSP: ghép ở
-        // đó nghĩa là cùng một danh sách tham số được chép lại ở bốn chỗ, và
-        // chỗ nào quên một tham số thì bấm vào là mất bộ lọc đang bật.
-        String kindParam = DIRECTION_BUY.equals(direction) ? "buy" : "sell";
-        FilterState state = new FilterState(kindParam, keyword, statusFilter, progressFilter,
-                rootsOnly ? "root" : null, typeFilter, provinceFilters,
-                request.getParameter("year"), request.getParameter("period"), waitingDepartment,
-                departmentNameOf(departments, waitingDepartment), waitingAny);
-        List<FilterChip> statusChips = new ArrayList<>();
-        statusChips.add(state.statusChip(ContractDAO.STATUS_ACTIVE, "Đang hiệu lực", "var(--success)",
-                countOf(statusSummary, ContractDAO.STATUS_ACTIVE)));
-        statusChips.add(state.statusChip(ContractDAO.STATUS_SOON, "Sắp hết hạn (≤30 ngày)", "var(--warning)",
-                countOf(statusSummary, ContractDAO.STATUS_SOON)));
-        statusChips.add(state.statusChip(ContractDAO.STATUS_EXPIRED, "Đã hết hạn", "var(--danger)",
-                countOf(statusSummary, ContractDAO.STATUS_EXPIRED)));
-        statusChips.add(state.statusChip(ContractDAO.STATUS_DRAFT, "Chưa hiệu lực", "#9ca3af",
-                countOf(statusSummary, ContractDAO.STATUS_DRAFT)));
-        request.setAttribute("statusChips", statusChips);
-        request.setAttribute("activeFilters", state.activeFilters());
-        // Số lọc đang bật trong khối "Lọc thêm" -- vừa là con số trên nút, vừa là
-        // điều kiện để khối đó mở sẵn. Một bộ lọc đang thu hẹp kết quả mà bị giấu
-        // sau một cái nút đóng thì người dùng không có cách nào biết.
-        request.setAttribute("advancedFilterCount", state.advancedCount());
-
-        request.getRequestDispatcher(LIST_VIEW).forward(request, response);
+        getListController().showList(request, response);
     }
 
     /**
@@ -420,24 +327,7 @@ public class ContractController extends HttpServlet {
 
     private void showDetail(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
-        Integer id = parseIntOrNull(request.getParameter("id"));
-        Contract contract = id != null ? contractDAO.findById(id) : null;
-        if (contract == null) {
-            // MSG-021: hợp đồng không tồn tại
-            response.sendRedirect(notFoundUrl(request));
-            return;
-        }
-
-        request.setAttribute("contract", contract);
-        // Trang xem đặt ĐÚNG MỘT cờ cho phép ghi: canCompleteHandover_<id>,
-        // do putContractWorkspace đặt (xem lý do ở đó). Ngoài nó ra không một
-        // cờ can* nào -- mọi thao tác sửa dữ liệu hợp đồng nằm ở trang Sửa
-        // thông tin, ở đây chỉ trình bày. Thêm cờ thứ hai vào đây là bắt đầu
-        // dựng lại trang quản lý thứ hai, và trang này thì KHÔNG kiểm quyền
-        // ghi ở đầu hàm.
-        putContractWorkspace(request, contract);
-
-        request.getRequestDispatcher(DETAIL_VIEW).forward(request, response);
+        getDetailController().doGet(request, response);
     }
 
     /** Xuất Excel toàn bộ hợp đồng khớp filter hiện tại (không phân trang) -- nút "Xuất Excel" ở listcontract.jsp. */
@@ -1096,152 +986,7 @@ public class ContractController extends HttpServlet {
      * cờ ở đây thì trang xem lại mọc nút.
      */
     private void putContractWorkspace(HttpServletRequest request, Contract contract) {
-        int id = contract.getContractId();
-
-        List<ContractHistory> history = contractDAO.findHistoryByContractId(id);
-        request.setAttribute("contractHistory", history);
-        // Ba mốc vòng đời kéo riêng ra khỏi nhật ký để dựng thanh tiến trình.
-        // Thanh đó trả lời "đang ở đâu", nhật ký trả lời "đã đi qua những gì".
-        request.setAttribute("createdEvent", milestoneOf(history, ContractHistory.EVENT_CREATED));
-        request.setAttribute("signedEvent", milestoneOf(history, ContractHistory.EVENT_SIGNED));
-        ContractHistory closed = milestoneOf(history, ContractHistory.EVENT_LIQUIDATED);
-        if (closed == null) {
-            closed = milestoneOf(history, ContractHistory.EVENT_TERMINATED);
-        }
-        request.setAttribute("closedEvent", closed);
-
-        // Hết hạn theo LỊCH mà tiến độ vẫn "Đã ký" = hết hạn nhưng chưa thanh
-        // lý. Đây là việc còn tồn, và là toàn bộ lý do hai trục không gộp làm
-        // một -- nên nó hiện thành cảnh báo chứ không để người dùng tự đối
-        // chiếu hai cái nhãn.
-        request.setAttribute("overdueUnclosed",
-                ContractDAO.STATUS_EXPIRED.equals(contract.getStatus())
-                        && ContractDAO.PROGRESS_SIGNED.equals(contract.getProgressStatus()));
-
-        request.setAttribute("contractProducts", contractDAO.findProductsByContractId(id));
-
-        // Phụ lục: hiện ở CẢ trang xem lẫn trang quản lý. Trên hợp đồng gốc đây
-        // là danh sách các văn bản đã sửa đổi nó; trên chính một phụ lục thì
-        // danh sách rỗng (một tầng) và thứ cần thấy là đường ngược về cha, cái
-        // đó nằm sẵn trong contract.parentContractCode.
-        request.setAttribute("amendments", contractDAO.findAmendmentsByParentId(id));
-
-        List<ContractPayment> payments = contractDAO.findPaymentsByContractId(id);
-        request.setAttribute("contractPayments", payments);
-
-        java.math.BigDecimal scheduled = java.math.BigDecimal.ZERO;
-        java.math.BigDecimal collected = java.math.BigDecimal.ZERO;
-        for (ContractPayment p : payments) {
-            scheduled = scheduled.add(p.getInvoiceAmount());
-            if (p.getPaidDate() != null) {
-                collected = collected.add(p.getInvoiceAmount());
-            }
-        }
-        request.setAttribute("paymentScheduled", scheduled);
-        request.setAttribute("paymentCollected", collected);
-        request.setAttribute("paymentOutstanding", scheduled.subtract(collected));
-
-        // Đối chiếu tiền làm theo CỤM hợp đồng (bản gốc + các phụ lục), không
-        // theo từng bản ghi. Ba ô thống kê ngay trên vẫn là của riêng bản ghi
-        // đang mở -- chúng phải khớp cái bảng nằm ngay dưới chúng -- nhưng câu
-        // hỏi "đã lập đủ kỳ chưa" thì chỉ trả lời được ở mức cụm: phần bổ sung
-        // theo phụ lục thường được lập kỳ ngay trên phụ lục, nên so riêng hợp
-        // đồng gốc là cảnh báo nổ ở mọi hợp đồng có phụ lục.
-        Contract root = contract.isAmendment()
-                ? contractDAO.findById(contract.getParentContractId())
-                : contract;
-        java.math.BigDecimal clusterValue = root == null ? null : root.getCurrentValue();
-        java.math.BigDecimal clusterScheduled = root == null
-                ? scheduled
-                : contractDAO.sumScheduledPaymentsForCluster(root.getContractId());
-        // Không để một truy vấn hỏng làm nổ cả trang chi tiết: DAO trả ZERO khi
-        // lỗi, nhưng chỗ so sánh bên dưới thì không được phụ thuộc vào điều đó.
-        if (clusterScheduled == null) {
-            clusterScheduled = java.math.BigDecimal.ZERO;
-        }
-        // ===== Bàn giao phòng ban =====
-        List<ContractHandover> handovers = contractDAO.findHandoversOf(id);
-        request.setAttribute("handovers", handovers);
-        boolean pendingHandover = false;
-        for (ContractHandover h : handovers) {
-            if (h.isPending()) {
-                pendingHandover = true;
-                // Cờ đóng chặng đặt ở ĐÂY, tức cho CẢ trang xem lẫn trang quản
-                // lý. Đây là ngoại lệ DUY NHẤT của luật "trang xem không mọc
-                // nút ghi", và nó là ngoại lệ có lý do chứ không phải nới cho
-                // tiện: người đóng chặng là phòng Kế toán / Dự án, mà họ KHÔNG
-                // có quyền ghi hợp đồng nên showEditForm chặn thẳng bằng
-                // requireFullAccess. Trang xem là trang duy nhất họ mở được --
-                // không đặt cờ ở đây thì mở hợp đồng từ thông báo hay từ link
-                // ai đó gửi là tắc, phải tự nhớ đường sang hàng đợi.
-                //
-                // Cờ này KHÔNG phải quyền ghi hợp đồng: canCompleteHandover
-                // hỏi theo PHÒNG BAN. Chốt chặn thật nằm ở
-                // handleCompleteHandover, đây chỉ quyết định có vẽ nút không.
-                request.setAttribute("canCompleteHandover_" + h.getHandoverId(),
-                        AccessControl.canCompleteHandover(request, h.getDepartmentId()));
-            }
-        }
-        // Còn phòng chưa xong thì màn hình CẢNH BÁO chứ không chặn ký: chặn
-        // cứng lúc này dễ thành kẹt hơn là kiểm soát, và khách hàng chưa nói
-        // đó là điều kiện bắt buộc.
-        request.setAttribute("hasPendingHandover", pendingHandover);
-        request.setAttribute("departmentList", employeeDAO.findAllDepartments());
-
-        // ===== Liên kết bán <-> mua =====
-        List<ContractLink> links = contractDAO.findLinksOf(id);
-        request.setAttribute("contractLinks", links);
-        boolean isSell = !DIRECTION_BUY.equals(contract.getDirection());
-        request.setAttribute("linkIsSellSide", isSell);
-        // Chỉ hợp đồng GỐC mới nối được: phụ lục là văn bản sửa đổi của một hợp
-        // đồng, còn đầu vào thì phục vụ cả hợp đồng đó.
-        request.setAttribute("canLinkContracts", !contract.isAmendment());
-        if (isSell) {
-            // Đối chiếu tiền chỉ có nghĩa ở phía BÁN: giá trị bán ra trừ đi
-            // tổng các đơn mua đã nối. Ở phía mua thì một đơn có thể phục vụ
-            // nhiều hợp đồng bán, nên trừ kiểu đó ra một con số vô nghĩa.
-            java.math.BigDecimal inputValue = contractDAO.sumLinkedBuyValue(id);
-            if (inputValue == null) {
-                inputValue = java.math.BigDecimal.ZERO;
-            }
-            request.setAttribute("linkedInputValue", inputValue);
-            java.math.BigDecimal outputValue = contract.getCurrentValue();
-            request.setAttribute("linkedMargin",
-                    outputValue == null ? null : outputValue.subtract(inputValue));
-        }
-
-        // ===== Giấy tờ kèm theo =====
-        List<ContractDocument> documents = contractDAO.findDocumentsOf(id);
-        request.setAttribute("contractDocuments", documents);
-        request.setAttribute("documentTypes", ContractDocument.TYPES);
-        // Bản PDF của CHÍNH hợp đồng, để dựng nút "Mở bản PDF" ở đầu trang.
-        // Kiểm scheme LẠI ở đây chứ không tin lúc ghi: dữ liệu vào bảng này còn
-        // qua migration V34 và các câu seed, không chỉ qua form.
-        //
-        // KHÔNG còn dựng link /preview để nhúng iframe (bỏ 2026-09-21): khung
-        // nhúng kéo trang dài ra dù phần lớn lúc không ai xem, mà nó lại chỉ
-        // chạy được với link Drive -- tài liệu ở nơi khác vẫn phải mở tab mới.
-        // Giờ MỌI tài liệu hành xử như nhau: mở ở tab mới, dùng trình xem của
-        // chính nơi lưu file (phóng to, tải về, in -- khung 640px không có).
-        for (ContractDocument d : documents) {
-            if (ContractDocument.TYPE_SIGNED_CONTRACT.equals(d.getDocType())
-                    && TextRules.isSafeHttpUrl(d.getFileUrl())) {
-                request.setAttribute("primaryDocumentUrl", d.getFileUrl());
-                break;
-            }
-        }
-
-        request.setAttribute("rootContract", root == contract ? null : root);
-        request.setAttribute("clusterValue", clusterValue);
-        request.setAttribute("clusterScheduled", clusterScheduled);
-        // true khi cụm gồm nhiều hơn một bản ghi -- màn hình đổi câu chữ theo
-        // nó, vì "tổng các kỳ" lúc đó không còn là con số ngay bên trên nữa.
-        request.setAttribute("clusterHasAmendments",
-                contract.isAmendment() || contract.getAmendmentCount() > 0);
-        // Tổng các kỳ lệch giá trị hợp đồng nghĩa là lập thiếu hoặc lập thừa.
-        // CẢNH BÁO chứ không phải lỗi: có thể còn kỳ chưa nhập.
-        request.setAttribute("paymentMismatch",
-                clusterValue != null && clusterValue.compareTo(clusterScheduled) != 0);
+        ContractControllerHelper.putContractWorkspace(request, contract, contractDAO, employeeDAO);
     }
 
     // ------------------------------------------------------------------
@@ -1764,59 +1509,7 @@ public class ContractController extends HttpServlet {
      */
     private void listByEnterpriseAsJson(HttpServletRequest request, HttpServletResponse response)
             throws IOException {
-        response.setContentType("application/json;charset=UTF-8");
-
-        Integer enterpriseId = parseIntOrNull(request.getParameter("enterpriseId"));
-        if (enterpriseId == null) {
-            response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-            try (java.io.PrintWriter out = response.getWriter()) {
-                out.write("[]");
-            }
-            return;
-        }
-
-        List<Contract> contracts = contractDAO.findByEnterpriseId(enterpriseId);
-        try (java.io.PrintWriter out = response.getWriter()) {
-            out.write(toJsonArray(contracts));
-        }
-    }
-
-    private String toJsonArray(List<Contract> contracts) {
-        StringBuilder sb = new StringBuilder("[");
-        for (int i = 0; i < contracts.size(); i++) {
-            Contract c = contracts.get(i);
-            if (i > 0) {
-                sb.append(',');
-            }
-            sb.append("{\"id\":").append(c.getContractId())
-              .append(",\"code\":\"").append(escapeJson(c.getContractCode())).append("\"")
-              .append(",\"title\":\"").append(escapeJson(c.getTitle())).append("\"}");
-        }
-        return sb.append(']').toString();
-    }
-
-    private String escapeJson(String value) {
-        if (value == null) {
-            return "";
-        }
-        StringBuilder sb = new StringBuilder(value.length());
-        for (int i = 0; i < value.length(); i++) {
-            char c = value.charAt(i);
-            switch (c) {
-                case '"': sb.append("\\\""); break;
-                case '\\': sb.append("\\\\"); break;
-                case '\n': sb.append("\\n"); break;
-                case '\r': sb.append("\\r"); break;
-                case '\t': sb.append("\\t"); break;
-                default:
-                    if (c < 0x20) {
-                        sb.append(String.format("\\u%04x", (int) c));
-                    } else {
-                        sb.append(c);
-                    }
-            }
-        }
-        return sb.toString();
+        getListController().listByEnterpriseAsJson(request, response);
     }
 
     /**
@@ -1963,7 +1656,7 @@ public class ContractController extends HttpServlet {
         private final boolean on;
         private final int count;
 
-        FilterChip(String label, String query, String color, boolean on, int count) {
+        public FilterChip(String label, String query, String color, boolean on, int count) {
             this.label = label;
             this.query = query;
             this.color = color;
@@ -1979,221 +1672,16 @@ public class ContractController extends HttpServlet {
         public int getCount() { return count; }
     }
 
-    /**
-     * Bộ lọc hiện tại của màn hình danh sách, gom lại để dựng link.
-     *
-     * <p>Lý do tồn tại: mọi đường bấm trên trang (bốn ô trạng thái, dấu × trên
-     * từng chip) đều phải mang theo TẤT CẢ các lọc khác. Ghép chuỗi tại chỗ thì
-     * cùng một danh sách tham số bị chép lại ở năm sáu nơi, và chỗ nào thiếu
-     * một tham số thì bấm vào là lọc đang bật lặng lẽ biến mất.
-     */
-    private static final class FilterState {
-        private final String kind;
-        private final String keyword;
-        private final String status;
-        private final String progress;
-        private final String scope;
-        private final String type;
-        private final List<Integer> provinceIds;
-        private final String year;
-        private final String period;
-        private final Integer waitingDepartmentId;
-        /** Tên phòng, chỉ để hiện trên chip -- lọc vẫn chạy bằng id. */
-        private final String waitingDepartmentName;
-        /** Ô tích "Đang bàn giao" (không nêu phòng) -- tham số riêng trên URL. */
-        private final boolean waitingAny;
-
-        FilterState(String kind, String keyword, String status, String progress, String scope,
-                String type, List<Integer> provinceIds, String year, String period, Integer waitingDepartmentId,
-                String waitingDepartmentName, boolean waitingAny) {
-            this.waitingDepartmentId = waitingDepartmentId;
-            this.waitingDepartmentName = waitingDepartmentName;
-            this.waitingAny = waitingAny;
-            this.kind = kind;
-            this.keyword = keyword;
-            this.status = status;
-            this.progress = progress;
-            this.scope = scope;
-            this.type = type;
-            this.provinceIds = provinceIds == null ? List.of() : provinceIds;
-            this.year = year;
-            this.period = period;
-        }
-
-        /** Link giữ nguyên mọi lọc khác, chỉ thay đúng một tham số. */
-        private String queryWith(String name, String value) {
-            StringBuilder sb = new StringBuilder("action=list");
-            put(sb, "kind", "kind".equals(name) ? value : kind);
-            put(sb, "keyword", "keyword".equals(name) ? value : keyword);
-            put(sb, "status", "status".equals(name) ? value : status);
-            put(sb, "progress", "progress".equals(name) ? value : progress);
-            put(sb, "scope", "scope".equals(name) ? value : scope);
-            put(sb, "type", "type".equals(name) ? value : type);
-            // Tỉnh là tham số DUY NHẤT lặp được nhiều lần, nên không đi qua
-            // put() một-giá-trị như các ô khác. Đặt tên "provinceId" ở đây chỉ
-            // có nghĩa "bỏ hết tỉnh" (value luôn là null) -- chưa có đường bấm
-            // nào cần đổi sang đúng một tỉnh khác.
-            if (!"provinceId".equals(name)) {
-                for (Integer id : provinceIds) {
-                    put(sb, "provinceId", String.valueOf(id));
-                }
-            } else {
-                put(sb, "provinceId", value);
-            }
-            put(sb, "year", "year".equals(name) ? value : year);
-            // Bỏ năm thì kỳ mất nghĩa -- Period.parse cần cả hai, nên để lại một
-            // mình "quý 3" trên URL chỉ tạo ra một chip lọc không lọc gì cả.
-            String nextYear = "year".equals(name) ? value : year;
-            put(sb, "period", isBlank(nextYear) ? null : ("period".equals(name) ? value : period));
-            // waitingDept chỉ ghi ra khi là MỘT PHÒNG thật; giá trị canh
-            // WAITING_ANY_DEPARTMENT thuộc về tham số "waiting" bên dưới.
-            boolean anyDept = waitingDepartmentId != null
-                    && waitingDepartmentId == ContractDAO.WAITING_ANY_DEPARTMENT;
-            put(sb, "waitingDept", "waitingDept".equals(name) ? value
-                    : (waitingDepartmentId == null || anyDept ? null
-                                                              : String.valueOf(waitingDepartmentId)));
-            put(sb, "waiting", "waiting".equals(name) ? value : (waitingAny ? "1" : null));
-            return sb.toString();
-        }
-
-        private static void put(StringBuilder sb, String name, String value) {
-            if (isBlank(value)) {
-                return;
-            }
-            sb.append('&').append(name).append('=')
-              .append(URLEncoder.encode(value, StandardCharsets.UTF_8));
-        }
-
-        /**
-         * Ô trạng thái lịch. Đang bật thì link của chính nó TẮT lọc đi: người
-         * dùng bấm lại ô đang sáng theo phản xạ, và không có nút tắt nào khác.
-         */
-        FilterChip statusChip(String key, String label, String color, int count) {
-            boolean on = key.equals(status);
-            // Nhãn hiển thị KHÁC key tra bảng đếm ("Sắp hết hạn (≤30 ngày)" vs
-            // "Sắp hết hạn"), nên con số đi kèm ngay trong chip chứ không để JSP
-            // tra lại bằng nhãn.
-            return new FilterChip(label, queryWith("status", on ? null : key), color, on, count);
-        }
-
-        /** Các lọc đang bật, mỗi cái kèm link BỎ chính nó. */
-        List<FilterChip> activeFilters() {
-            List<FilterChip> chips = new ArrayList<>();
-            if (!isBlank(keyword)) {
-                chips.add(new FilterChip("Từ khoá: " + keyword, queryWith("keyword", null), null, true, 0));
-            }
-            if (!isBlank(progress)) {
-                chips.add(new FilterChip("Tiến độ: " + progress, queryWith("progress", null), null, true, 0));
-            }
-            if (!isBlank(scope)) {
-                chips.add(new FilterChip("Chỉ hợp đồng gốc", queryWith("scope", null), null, true, 0));
-            }
-            if (!isBlank(type)) {
-                chips.add(new FilterChip("Loại: " + type, queryWith("type", null), null, true, 0));
-            }
-            if (!provinceIds.isEmpty()) {
-                // Nêu SỐ tỉnh: bảng tích cho chọn nhiều, mà chip chỉ nói "Theo
-                // tỉnh" thì không biết đang siết về một tỉnh hay năm tỉnh.
-                chips.add(new FilterChip(provinceIds.size() == 1 ? "Theo tỉnh"
-                                : "Theo tỉnh (" + provinceIds.size() + ")",
-                        queryWith("provinceId", null), null, true, 0));
-            }
-            if (!isBlank(year)) {
-                chips.add(new FilterChip(periodLabel(), queryWith("year", null), null, true, 0));
-            }
-            if (waitingDepartmentId != null) {
-                // Gọi tên phòng ra chứ không nói chung chung: chip là thứ duy nhất
-                // hiện ra khi khối "Lọc thêm" đang đóng, mà "đang chờ ở một phòng"
-                // thì người đọc vẫn phải mở khối đó ra mới biết là phòng nào.
-                if (waitingDepartmentId == ContractDAO.WAITING_ANY_DEPARTMENT) {
-                    chips.add(new FilterChip("Đang bàn giao", queryWith("waiting", null), null, true, 0));
-                } else {
-                    chips.add(new FilterChip(
-                            isBlank(waitingDepartmentName) ? "Đang chờ ở một phòng"
-                                                           : "Đang chờ: " + waitingDepartmentName,
-                            queryWith("waitingDept", null), null, true, 0));
-                }
-            }
-            return chips;
-        }
-
-        private String periodLabel() {
-            Period parsed = Period.parse(year, period);
-            return parsed != null ? "Kỳ: " + parsed.getLabel() : "Kỳ: " + year;
-        }
-
-        /** Số lọc nằm trong khối "Lọc thêm" đang bật (loại hợp đồng, tỉnh, kỳ). */
-        int advancedCount() {
-            int n = 0;
-            if (!isBlank(type)) { n++; }
-            if (!provinceIds.isEmpty()) { n++; }
-            if (!isBlank(year)) { n++; }
-            // Chỉ đếm khi là MỘT PHÒNG cụ thể: ô tích "Đang bàn giao" nằm ngoài
-            // thanh lọc chính, đếm nó vào đây thì nút "Lọc thêm" báo có bộ lọc
-            // đang bật mà mở ra không thấy gì.
-            if (waitingDepartmentId != null
-                    && waitingDepartmentId != ContractDAO.WAITING_ANY_DEPARTMENT) { n++; }
-            return n;
-        }
-    }
-
-    /**
-     * Đọc bộ lọc tỉnh từ URL: tham số {@code provinceId} lặp nhiều lần, trả về
-     * danh sách id đã bỏ trùng (rỗng = không lọc tỉnh).
-     *
-     * <p>Dùng chung cho danh sách hợp đồng và danh sách khách hàng. KHÁC bản
-     * của Dashboard ở chỗ không có cờ {@code provinceSet}: ở Dashboard, "chưa
-     * chọn gì" mặc định thành địa bàn của người dùng nên phải phân biệt được
-     * với "vừa bỏ tích hết". Ở hai màn hình danh sách, việc thu hẹp theo địa
-     * bàn đã do {@link ListScope} lo, nên bảng tích này thuần tuý là bộ lọc
-     * người dùng tự đặt: không tích gì nghĩa là không lọc, y như ô chọn một
-     * tỉnh trước đây khi để "Tất cả".
-     */
     static List<Integer> provinceFiltersOf(HttpServletRequest request) {
-        String[] raw = request.getParameterValues("provinceId");
-        if (raw == null) {
-            return List.of();
-        }
-        List<Integer> ids = new ArrayList<>();
-        for (String value : raw) {
-            Integer id = parseIntOrNull(value);
-            if (id != null && !ids.contains(id)) {
-                ids.add(id);
-            }
-        }
-        return ids;
+        return ContractFilterHelper.provinceFiltersOf(request);
     }
 
-    /**
-     * {@code "&provinceId=1&provinceId=5"} -- phần query của bộ lọc tỉnh, cho
-     * những link mà JSP tự ghép chuỗi (Xuất Excel, phân trang). EL không lặp
-     * được một tham số nhiều lần nên phải dựng sẵn ở đây.
-     */
     static String provinceQuery(List<Integer> provinceIds) {
-        if (provinceIds == null || provinceIds.isEmpty()) {
-            return "";
-        }
-        StringBuilder sb = new StringBuilder();
-        for (Integer id : provinceIds) {
-            sb.append("&provinceId=").append(id);
-        }
-        return sb.toString();
+        return ContractFilterHelper.provinceQuery(provinceIds);
     }
 
-    /**
-     * Đổ các giá trị bộ lọc kỳ ra JSP: danh sách năm cho dropdown, giá trị đang
-     * chọn (để giữ lại khi submit/phân trang) và nhãn tiếng Việt của kỳ.
-     */
     static void setPeriodAttributes(HttpServletRequest request, Period period) {
-        request.setAttribute("yearList", Period.availableYears());
-        // Đổ ra năm ĐÃ PHÂN TÍCH (số), không phải chuỗi thô trên URL: JSP so
-        // ${yearFilter == y} với từng số năm trong dropdown, mà EL gặp chuỗi
-        // không phải số thì ném luôn ELException lúc ép kiểu -- gõ tay
-        // ?year=abcd là cả trang danh sách trắng thành trang lỗi. Không phân
-        // tích được thì coi như không lọc, đúng như Period.parse đã làm.
-        request.setAttribute("yearFilter", period != null ? period.getYear() : null);
-        request.setAttribute("periodFilter", request.getParameter("period"));
-        request.setAttribute("periodLabel", period != null ? period.getLabel() : null);
+        ContractFilterHelper.setPeriodAttributes(request, period);
     }
 
     // static vì provinceFiltersOf() -- hàm dùng chung cho cả CustomerController

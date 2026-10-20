@@ -57,7 +57,10 @@ public final class ContractControllerHelper {
         try { return Date.valueOf(v.trim()); } catch (IllegalArgumentException ex) { return null; }
     }
 
-    public static String notFoundUrl(HttpServletRequest req) { return req.getContextPath() + "/contract?error=notfound"; }
+    public static String notFoundUrl(HttpServletRequest req) {
+        return req.getContextPath() + "/contract?error=notfound"
+                + ("buy".equals(req.getParameter("kind")) ? "&kind=buy" : "");
+    }
 
     public static java.math.BigDecimal parseContractValue(HttpServletRequest req) {
         java.math.BigDecimal amount = MoneyVnd.parseOrNull(req.getParameter("contractValue"));
