@@ -29,6 +29,8 @@ public final class ContractActionResultHelper {
             resp.sendError(HttpServletResponse.SC_FORBIDDEN, PermissionService.MSG_022);
         } else if (ContractService.ERR_DUPLICATE_CODE.equals(res.getMessage())) {
             resp.sendRedirect(req.getContextPath() + back + "&error=duplicate_code");
+        } else if (ContractService.ERR_VALUE_NEGATIVE.equals(res.getMessage())) {
+            resp.sendRedirect(req.getContextPath() + back + "&error=value_negative");
         } else if (ContractService.ERR_INVALID.equals(res.getMessage())) {
             resp.sendRedirect(req.getContextPath() + back + "&error=invalid");
         } else {
@@ -91,6 +93,8 @@ public final class ContractActionResultHelper {
             resp.sendRedirect(req.getContextPath() + back + "&error=missing_reason");
         } else if (ContractService.ERR_DUPLICATE_CODE.equals(res.getMessage())) {
             resp.sendRedirect(req.getContextPath() + back + "&error=duplicate_code");
+        } else if (ContractService.ERR_VALUE_NEGATIVE.equals(res.getMessage())) {
+            resp.sendRedirect(req.getContextPath() + back + "&error=value_negative");
         } else if (ContractService.ERR_INVALID.equals(res.getMessage())) {
             resp.sendRedirect(req.getContextPath() + back + "&error=invalid");
         } else {

@@ -500,7 +500,17 @@ public class ContractService extends BaseService {
     }
 
     private ServiceResult<Void> checkSignedAmendmentValue(Contract contract, Contract existing) {
-        if (!existing.isAmendment() || contract.getContractValue() == null || contract.getContractValue().signum() >= 0) {
+        if (!existing.isAmendment()) {
+            if (contract.getContractValue() != null && existing.getAmendmentValueSigned() != null) {
+                BigDecimal current = contract.getContractValue().add(existing.getAmendmentValueSigned());
+                if (current.signum() < 0) {
+                    return failField(ERR_VALUE_NEGATIVE, ContractValidator.FIELD_CONTRACT_VALUE,
+                            ContractValidator.MSG_EXCEEDS_REMAINING_VALUE);
+                }
+            }
+            return success(null);
+        }
+        if (contract.getContractValue() == null || contract.getContractValue().signum() >= 0) {
             return success(null);
         }
         Contract parent = contractDAO.findById(existing.getParentContractId());

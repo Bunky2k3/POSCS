@@ -126,7 +126,8 @@ Không còn mục nào.
   - Tinh gọn `ContractController` ủy quyền `handleLinkContract` và `handleUnlinkContract` sang `ContractLinkController`.
   - Bổ sung `ContractLinkControllerTest` (24 unit tests), `ContractLinkServiceTest` (37 unit tests) và cập nhật `ContractControllerTest` (105 tests pass 100%).
   - Hoàn thiện và cập nhật `docs/qa/Task-4.18.md`.
-- [ ] **Task 4.19:** `[UC-54]` Kiểm thử luồng chữa sai sót hợp đồng đã ký (chỉ Admin, bắt buộc lý do, ghi nhật ký sự kiện riêng `EVENT_CORRECTED`, khóa ngày ký) trên `ContractService` (Task 4.10) và `ContractActionController` (Task 4.12); không tạo controller riêng.
+- [x] **Task 4.19:** `[UC-54]` Kiểm thử luồng chữa sai sót hợp đồng đã ký (chỉ Admin, bắt buộc lý do, ghi nhật ký sự kiện riêng `EVENT_CORRECTED`, khóa ngày ký) trên `ContractService` (Task 4.10) và `ContractActionController` (Task 4.12); không tạo controller riêng.
+  - *Đã hoàn thành:* Kiểm thử và chuẩn hóa trọn vẹn luồng chữa sai sót hợp đồng đã ký (UC-54, bảng `contracts`, `contract_history`): chỉ Admin được phép thực hiện, bắt buộc lý do chữa sai sót, ghi nhận nhật ký kiểm toán với loại sự kiện riêng `EVENT_CORRECTED`, khóa cố định ngày ký, kiểm soát trần giá trị hợp đồng khi có phụ lục giảm trừ đã ký; phân quyền tầng Controller sử dụng `PermissionService.canCorrectSignedContract(actor)`. File chỉnh sửa: `src/java/poscs/service/ContractService.java`, `src/java/poscs/controller/ContractActionController.java`, `src/java/poscs/controller/ContractActionResultHelper.java`, `src/java/poscs/controller/ContractControllerHelper.java`. Unit tests bổ sung/cập nhật: `test/poscs/service/ContractServiceTest.java` (41 tests pass), `test/poscs/controller/ContractActionControllerTest.java` (62 tests pass). QA report tại `docs/qa/Task-4.19.md`.
 
 ---
 

@@ -425,6 +425,29 @@ public class ContractActionControllerTest {
     }
 
     // ------------------------------------------------------------------
+    @Test
+    public void handleUpdate_draftAmendment_preservesParentContractId_andRedirectsValueNegative() throws Exception {
+        User u = loginAs(PermissionService.ROLE_SALES, null);
+        when(permissionService.canUpdateContract(u)).thenReturn(true);
+        when(request.getParameter("action")).thenReturn("update");
+        when(request.getParameter("contractId")).thenReturn("5");
+
+        Contract draftAmend = draftContract(5);
+        draftAmend.setParentContractId(1);
+        when(contractService.findById(5)).thenReturn(draftAmend);
+
+        when(contractService.updateContract(any(), eq(u)))
+                .thenReturn(ServiceResult.fail(ContractService.ERR_VALUE_NEGATIVE));
+
+        controller.doPost(request, response);
+
+        org.mockito.ArgumentCaptor<Contract> captor = org.mockito.ArgumentCaptor.forClass(Contract.class);
+        verify(contractService).updateContract(captor.capture(), eq(u));
+        assertEquals(Integer.valueOf(1), captor.getValue().getParentContractId());
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=edit&id=5&error=value_negative");
+    }
+
+    // ------------------------------------------------------------------
     // handleCreateAmendment (UC-46)
     // ------------------------------------------------------------------
 
@@ -548,7 +571,7 @@ public class ContractActionControllerTest {
     @Test
     public void handleCorrect_nonAdmin_returns403() throws Exception {
         User u = loginAs(PermissionService.ROLE_SALES, null);
-        when(permissionService.isAdmin(u)).thenReturn(false);
+        when(permissionService.canCorrectSignedContract(u)).thenReturn(false);
         when(request.getParameter("action")).thenReturn("correct");
 
         controller.doPost(request, response);
@@ -560,7 +583,7 @@ public class ContractActionControllerTest {
     @Test
     public void handleCorrect_contractNotFound_redirectsToNotFound() throws Exception {
         User u = loginAs(PermissionService.ROLE_ADMIN, null);
-        when(permissionService.isAdmin(u)).thenReturn(true);
+        when(permissionService.canCorrectSignedContract(u)).thenReturn(true);
         when(request.getParameter("action")).thenReturn("correct");
         when(request.getParameter("contractId")).thenReturn("999");
         when(contractService.findById(999)).thenReturn(null);
@@ -573,7 +596,7 @@ public class ContractActionControllerTest {
     @Test
     public void handleCorrect_missingReason_redirectsWithMissingReasonError() throws Exception {
         User u = loginAs(PermissionService.ROLE_ADMIN, null);
-        when(permissionService.isAdmin(u)).thenReturn(true);
+        when(permissionService.canCorrectSignedContract(u)).thenReturn(true);
         when(request.getParameter("action")).thenReturn("correct");
         when(request.getParameter("contractId")).thenReturn("5");
         when(contractService.findById(5)).thenReturn(signedContract(5));
@@ -588,7 +611,7 @@ public class ContractActionControllerTest {
     @Test
     public void handleCorrect_valid_redirectsToDetail() throws Exception {
         User u = loginAs(PermissionService.ROLE_ADMIN, null);
-        when(permissionService.isAdmin(u)).thenReturn(true);
+        when(permissionService.canCorrectSignedContract(u)).thenReturn(true);
         when(request.getParameter("action")).thenReturn("correct");
         when(request.getParameter("contractId")).thenReturn("5");
         when(contractService.findById(5)).thenReturn(signedContract(5));
@@ -604,7 +627,7 @@ public class ContractActionControllerTest {
     @Test
     public void handleCorrect_updateFailed_redirectsWithUpdateFailedError() throws Exception {
         User u = loginAs(PermissionService.ROLE_ADMIN, null);
-        when(permissionService.isAdmin(u)).thenReturn(true);
+        when(permissionService.canCorrectSignedContract(u)).thenReturn(true);
         when(request.getParameter("action")).thenReturn("correct");
         when(request.getParameter("contractId")).thenReturn("5");
         when(contractService.findById(5)).thenReturn(signedContract(5));
@@ -615,6 +638,188 @@ public class ContractActionControllerTest {
         controller.doPost(request, response);
 
         verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=edit&id=5&error=update_failed");
+    }
+
+    // ------------------------------------------------------------------
+    @Test
+    public void handleCorrect_salesRoleWithoutSupervisor_returns403() throws Exception {
+        User u = loginAs(PermissionService.ROLE_SALES, null); // Sales manager without supervisor
+        when(permissionService.canCorrectSignedContract(u)).thenReturn(false);
+        when(request.getParameter("action")).thenReturn("correct");
+
+        controller.doPost(request, response);
+
+        verify(response).sendError(HttpServletResponse.SC_FORBIDDEN, PermissionService.MSG_022);
+        verify(contractService, never()).correctSignedContract(any(), any(), any());
+    }
+
+    @Test
+    public void handleCorrect_techRole_returns403() throws Exception {
+        User u = loginAs(PermissionService.ROLE_TECHNICAL, null);
+        when(permissionService.canCorrectSignedContract(u)).thenReturn(false);
+        when(request.getParameter("action")).thenReturn("correct");
+
+        controller.doPost(request, response);
+
+        verify(response).sendError(HttpServletResponse.SC_FORBIDDEN, PermissionService.MSG_022);
+        verify(contractService, never()).correctSignedContract(any(), any(), any());
+    }
+
+    @Test
+    public void handleCorrect_nullOrInvalidContractIdParam_redirectsToNotFound() throws Exception {
+        User u = loginAs(PermissionService.ROLE_ADMIN, null);
+        when(permissionService.canCorrectSignedContract(u)).thenReturn(true);
+        when(request.getParameter("action")).thenReturn("correct");
+        when(request.getParameter("contractId")).thenReturn("invalid_id");
+
+        controller.doPost(request, response);
+
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?error=notfound");
+        verify(contractService, never()).correctSignedContract(any(), any(), any());
+    }
+
+    @Test
+    public void handleCorrect_nullReason_redirectsWithMissingReasonError() throws Exception {
+        User u = loginAs(PermissionService.ROLE_ADMIN, null);
+        when(permissionService.canCorrectSignedContract(u)).thenReturn(true);
+        when(request.getParameter("action")).thenReturn("correct");
+        when(request.getParameter("contractId")).thenReturn("5");
+        when(contractService.findById(5)).thenReturn(signedContract(5));
+        when(request.getParameter("correctionReason")).thenReturn(null);
+
+        controller.doPost(request, response);
+
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=edit&id=5&error=missing_reason");
+        verify(contractService, never()).correctSignedContract(any(), any(), any());
+    }
+
+    @Test
+    public void handleCorrect_serviceReturnsDuplicateCode_redirectsWithDuplicateCodeError() throws Exception {
+        User u = loginAs(PermissionService.ROLE_ADMIN, null);
+        when(permissionService.canCorrectSignedContract(u)).thenReturn(true);
+        when(request.getParameter("action")).thenReturn("correct");
+        when(request.getParameter("contractId")).thenReturn("5");
+        when(contractService.findById(5)).thenReturn(signedContract(5));
+        when(request.getParameter("correctionReason")).thenReturn("Sửa mã");
+        when(contractService.correctSignedContract(any(), eq(u), anyString()))
+                .thenReturn(ServiceResult.fail(ContractService.ERR_DUPLICATE_CODE));
+
+        controller.doPost(request, response);
+
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=edit&id=5&error=duplicate_code");
+    }
+
+    @Test
+    public void handleCorrect_serviceReturnsValueNegative_redirectsWithValueNegativeError() throws Exception {
+        User u = loginAs(PermissionService.ROLE_ADMIN, null);
+        when(permissionService.canCorrectSignedContract(u)).thenReturn(true);
+        when(request.getParameter("action")).thenReturn("correct");
+        when(request.getParameter("contractId")).thenReturn("5");
+        when(contractService.findById(5)).thenReturn(signedContract(5));
+        when(request.getParameter("correctionReason")).thenReturn("Giảm trừ phụ lục");
+        when(contractService.correctSignedContract(any(), eq(u), anyString()))
+                .thenReturn(ServiceResult.fail(ContractService.ERR_VALUE_NEGATIVE));
+
+        controller.doPost(request, response);
+
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=edit&id=5&error=value_negative");
+    }
+
+    @Test
+    public void handleCorrect_serviceReturnsInvalid_redirectsWithInvalidError() throws Exception {
+        User u = loginAs(PermissionService.ROLE_ADMIN, null);
+        when(permissionService.canCorrectSignedContract(u)).thenReturn(true);
+        when(request.getParameter("action")).thenReturn("correct");
+        when(request.getParameter("contractId")).thenReturn("5");
+        when(contractService.findById(5)).thenReturn(signedContract(5));
+        when(request.getParameter("correctionReason")).thenReturn("Sửa");
+        when(contractService.correctSignedContract(any(), eq(u), anyString()))
+                .thenReturn(ServiceResult.fail(ContractService.ERR_INVALID));
+
+        controller.doPost(request, response);
+
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=edit&id=5&error=invalid");
+    }
+
+    @Test
+    public void handleCorrect_serviceReturnsForbidden_sends403() throws Exception {
+        User u = loginAs(PermissionService.ROLE_ADMIN, null);
+        when(permissionService.canCorrectSignedContract(u)).thenReturn(true);
+        when(request.getParameter("action")).thenReturn("correct");
+        when(request.getParameter("contractId")).thenReturn("5");
+        when(contractService.findById(5)).thenReturn(signedContract(5));
+        when(request.getParameter("correctionReason")).thenReturn("Lý do");
+        when(contractService.correctSignedContract(any(), eq(u), anyString()))
+                .thenReturn(ServiceResult.fail(ContractService.ERR_FORBIDDEN));
+
+        controller.doPost(request, response);
+
+        verify(response).sendError(HttpServletResponse.SC_FORBIDDEN, PermissionService.MSG_022);
+    }
+
+    @Test
+    public void handleCorrect_serviceReturnsNotFound_redirectsToNotFound() throws Exception {
+        User u = loginAs(PermissionService.ROLE_ADMIN, null);
+        when(permissionService.canCorrectSignedContract(u)).thenReturn(true);
+        when(request.getParameter("action")).thenReturn("correct");
+        when(request.getParameter("contractId")).thenReturn("5");
+        when(contractService.findById(5)).thenReturn(signedContract(5));
+        when(request.getParameter("correctionReason")).thenReturn("Lý do");
+        when(contractService.correctSignedContract(any(), eq(u), anyString()))
+                .thenReturn(ServiceResult.fail(ContractService.ERR_NOT_FOUND));
+
+        controller.doPost(request, response);
+
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?error=notfound");
+    }
+
+    @Test
+    public void handleCorrect_serviceReturnsMissingReason_redirectsWithMissingReasonError() throws Exception {
+        User u = loginAs(PermissionService.ROLE_ADMIN, null);
+        when(permissionService.canCorrectSignedContract(u)).thenReturn(true);
+        when(request.getParameter("action")).thenReturn("correct");
+        when(request.getParameter("contractId")).thenReturn("5");
+        when(contractService.findById(5)).thenReturn(signedContract(5));
+        when(request.getParameter("correctionReason")).thenReturn("Lý do");
+        when(contractService.correctSignedContract(any(), eq(u), anyString()))
+                .thenReturn(ServiceResult.fail(ContractService.ERR_MISSING_REASON));
+
+        controller.doPost(request, response);
+
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=edit&id=5&error=missing_reason");
+    }
+
+    @Test
+    public void handleCorrect_locksSigningDateAndDirectionFromExistingContract() throws Exception {
+        User u = loginAs(PermissionService.ROLE_ADMIN, null);
+        when(permissionService.canCorrectSignedContract(u)).thenReturn(true);
+        when(request.getParameter("action")).thenReturn("correct");
+        when(request.getParameter("contractId")).thenReturn("5");
+
+        Contract existing = signedContract(5);
+        existing.setDirection(ContractService.DIRECTION_SELL);
+        existing.setSigningDate(Date.valueOf("2026-02-15"));
+        when(contractService.findById(5)).thenReturn(existing);
+
+        when(request.getParameter("contractCode")).thenReturn("HD-NEW-CODE");
+        when(request.getParameter("title")).thenReturn("Tiêu đề mới");
+        when(request.getParameter("correctionReason")).thenReturn("Sửa tiêu đề");
+        when(request.getParameter("direction")).thenReturn("Mua");
+        when(request.getParameter("kind")).thenReturn("buy");
+
+        when(contractService.correctSignedContract(any(), eq(u), eq("Sửa tiêu đề")))
+                .thenReturn(ServiceResult.ok(null));
+
+        controller.doPost(request, response);
+
+        org.mockito.ArgumentCaptor<Contract> captor = org.mockito.ArgumentCaptor.forClass(Contract.class);
+        verify(contractService).correctSignedContract(captor.capture(), eq(u), eq("Sửa tiêu đề"));
+        Contract submitted = captor.getValue();
+        assertEquals(5, submitted.getContractId());
+        assertEquals("HD-NEW-CODE", submitted.getContractCode());
+        assertEquals("Tiêu đề mới", submitted.getTitle());
+        assertEquals(Date.valueOf("2026-02-15"), submitted.getSigningDate());
+        assertEquals(ContractService.DIRECTION_SELL, submitted.getDirection());
     }
 
     // ------------------------------------------------------------------

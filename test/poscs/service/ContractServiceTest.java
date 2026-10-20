@@ -782,6 +782,9 @@ public class ContractServiceTest {
         ServiceResult<Void> mgrRes = service.correctSignedContract(edited, salesManager, "Sửa lỗi gõ máy");
         assertFalse(mgrRes.isSuccess());
         assertEquals(PermissionService.MSG_022, mgrRes.getMessage());
+        assertEquals("HD-CORR-60", contractDAO.findById(60).getContractCode());
+        assertTrue(service.findHistoryByContractId(60).stream()
+                .noneMatch(h -> ContractHistory.EVENT_CORRECTED.equals(h.getEventType())));
 
         // contract null hoặc contractId <= 0 -> ERR_INVALID
         assertEquals(ContractService.ERR_INVALID,
@@ -838,6 +841,11 @@ public class ContractServiceTest {
         ServiceResult<Void> liqRes = service.correctSignedContract(liquidated, adminUser, "Sửa HĐ đã thanh lý");
         assertFalse(liqRes.isSuccess());
         assertEquals(ContractService.ERR_CORRECT_FAILED, liqRes.getMessage());
+
+        assertTrue(service.findHistoryByContractId(61).stream()
+                .noneMatch(h -> ContractHistory.EVENT_CORRECTED.equals(h.getEventType())));
+        assertTrue(service.findHistoryByContractId(62).stream()
+                .noneMatch(h -> ContractHistory.EVENT_CORRECTED.equals(h.getEventType())));
     }
 
     @Test
@@ -852,6 +860,9 @@ public class ContractServiceTest {
         ServiceResult<Void> dupRes = service.correctSignedContract(dupEdit, adminUser, "Đổi mã");
         assertFalse(dupRes.isSuccess());
         assertEquals(ContractService.ERR_DUPLICATE_CODE, dupRes.getMessage());
+        assertEquals("HD-CORR-63", contractDAO.findById(63).getContractCode());
+        assertTrue(service.findHistoryByContractId(63).stream()
+                .noneMatch(h -> ContractHistory.EVENT_CORRECTED.equals(h.getEventType())));
 
         // Ngày hiệu lực trước ngày ký gốc -> vi phạm BR-36
         Contract badDateEdit = signedParentContract(63, "HD-CORR-63", new BigDecimal("100000000"));
@@ -886,6 +897,308 @@ public class ContractServiceTest {
         assertFalse(overRes.isSuccess());
         assertEquals(ContractService.ERR_VALUE_NEGATIVE, overRes.getMessage());
         assertTrue(overRes.getFieldErrors().containsKey(ContractValidator.FIELD_CONTRACT_VALUE));
+    }
+
+    @Test
+    public void correctSignedContract_allRolesMatrix_onlyAdminAllowed() {
+        Contract signed = signedParentContract(66, "HD-CORR-66", new BigDecimal("100000000"));
+        contractDAO.putContract(signed);
+
+        Contract edited = signedParentContract(66, "HD-CORR-66", new BigDecimal("100000000"));
+        edited.setTitle("Tiêu đề đính chính 66");
+
+        // Sales quản lý vùng (không có cấp trên): bị chặn MSG-022
+        ServiceResult<Void> mgrRes = service.correctSignedContract(edited, salesManager, "Lý do");
+        assertFalse(mgrRes.isSuccess());
+        assertEquals(PermissionService.MSG_022, mgrRes.getMessage());
+
+        // Sales có cấp trên: bị chặn MSG-022
+        ServiceResult<Void> subRes = service.correctSignedContract(edited, salesSubordinate, "Lý do");
+        assertFalse(subRes.isSuccess());
+        assertEquals(PermissionService.MSG_022, subRes.getMessage());
+
+        // Kỹ thuật: bị chặn MSG-022
+        ServiceResult<Void> techRes = service.correctSignedContract(edited, techUser, "Lý do");
+        assertFalse(techRes.isSuccess());
+        assertEquals(PermissionService.MSG_022, techRes.getMessage());
+
+        // User bị xóa mềm / không hoạt động: bị chặn
+        ServiceResult<Void> delRes = service.correctSignedContract(edited, deletedUser, "Lý do");
+        assertFalse(delRes.isSuccess());
+        assertEquals(PermissionService.MSG_022, delRes.getMessage());
+
+        // User null: bị chặn
+        ServiceResult<Void> nullUserRes = service.correctSignedContract(edited, null, "Lý do");
+        assertFalse(nullUserRes.isSuccess());
+        assertEquals(PermissionService.MSG_022, nullUserRes.getMessage());
+
+        // Admin: thành công
+        ServiceResult<Void> adminRes = service.correctSignedContract(edited, adminUser, "Admin chữa sai sót");
+        assertTrue(adminRes.isSuccess());
+    }
+
+    @Test
+    public void correctSignedContract_allProgressStatuses_onlySignedAllowed() {
+        // Nháp -> thất bại
+        Contract draft = validDraftSellContract("HD-STATUS-DRAFT");
+        draft.setContractId(67);
+        draft.setProgressStatus(ContractService.PROGRESS_DRAFT);
+        contractDAO.putContract(draft);
+        ServiceResult<Void> resDraft = service.correctSignedContract(draft, adminUser, "Chữa nháp");
+        assertFalse(resDraft.isSuccess());
+        assertEquals(ContractService.ERR_CORRECT_FAILED, resDraft.getMessage());
+
+        // Đã thanh lý -> thất bại
+        Contract liq = signedParentContract(68, "HD-STATUS-LIQ", new BigDecimal("50000000"));
+        liq.setProgressStatus(ContractService.PROGRESS_LIQUIDATED);
+        contractDAO.putContract(liq);
+        ServiceResult<Void> resLiq = service.correctSignedContract(liq, adminUser, "Chữa thanh lý");
+        assertFalse(resLiq.isSuccess());
+        assertEquals(ContractService.ERR_CORRECT_FAILED, resLiq.getMessage());
+
+        // Chấm dứt sớm -> thất bại
+        Contract term = signedParentContract(69, "HD-STATUS-TERM", new BigDecimal("50000000"));
+        term.setProgressStatus(ContractService.PROGRESS_TERMINATED);
+        contractDAO.putContract(term);
+        ServiceResult<Void> resTerm = service.correctSignedContract(term, adminUser, "Chữa chấm dứt sớm");
+        assertFalse(resTerm.isSuccess());
+        assertEquals(ContractService.ERR_CORRECT_FAILED, resTerm.getMessage());
+
+        // Đã ký -> thành công
+        Contract signed = signedParentContract(70, "HD-STATUS-SIGNED", new BigDecimal("50000000"));
+        contractDAO.putContract(signed);
+        ServiceResult<Void> resSigned = service.correctSignedContract(signed, adminUser, "Chữa đã ký");
+        assertTrue(resSigned.isSuccess());
+    }
+
+    @Test
+    public void correctSignedContract_reasonVariationsAndMaxBoundaries() {
+        Contract signed = signedParentContract(71, "HD-REASON-71", new BigDecimal("80000000"));
+        contractDAO.putContract(signed);
+
+        Contract edited = signedParentContract(71, "HD-REASON-71", new BigDecimal("80000000"));
+
+        // null reason
+        assertEquals(ContractService.ERR_MISSING_REASON,
+                service.correctSignedContract(edited, adminUser, null).getMessage());
+
+        // empty string
+        assertEquals(ContractService.ERR_MISSING_REASON,
+                service.correctSignedContract(edited, adminUser, "").getMessage());
+
+        // tabs / spaces only
+        assertEquals(ContractService.ERR_MISSING_REASON,
+                service.correctSignedContract(edited, adminUser, "  \t \n  ").getMessage());
+
+        // 1001 ký tự -> ERR_INVALID + FIELD_REASON
+        String over1000 = "R".repeat(1001);
+        ServiceResult<Void> overRes = service.correctSignedContract(edited, adminUser, over1000);
+        assertFalse(overRes.isSuccess());
+        assertEquals(ContractService.ERR_INVALID, overRes.getMessage());
+        assertTrue(overRes.getFieldErrors().containsKey(ContractService.FIELD_REASON));
+
+        // đúng 1000 ký tự -> thành công
+        String exact1000 = "R".repeat(1000);
+        ServiceResult<Void> exactRes = service.correctSignedContract(edited, adminUser, exact1000);
+        assertTrue(exactRes.isSuccess());
+        assertEquals(1000, contractDAO.lastCorrectionReason.length());
+    }
+
+    @Test
+    public void correctSignedContract_strictlyLocksSigningDateDirectionAndParentContractId() {
+        Contract signed = signedParentContract(72, "HD-LOCK-72", new BigDecimal("50000000"));
+        Date originalSigningDate = signed.getSigningDate();
+        String originalDirection = signed.getDirection();
+        contractDAO.putContract(signed);
+
+        Contract tamper = signedParentContract(72, "HD-LOCK-72-Tampered", new BigDecimal("55000000"));
+        // Cố tình thay đổi ngày ký sang tương lai
+        tamper.setSigningDate(Date.valueOf("2099-12-31"));
+        // Cố tình thay đổi chiều từ Bán sang Mua
+        tamper.setDirection(ContractService.DIRECTION_BUY);
+        // Cố tình gán parentContractId cho hợp đồng gốc
+        tamper.setParentContractId(999);
+
+        ServiceResult<Void> res = service.correctSignedContract(tamper, adminUser, "Kiểm tra khóa trường cố định");
+        assertTrue(res.isSuccess());
+
+        Contract stored = contractDAO.findById(72);
+        assertNotNull(stored);
+        assertEquals(originalSigningDate, stored.getSigningDate());
+        assertEquals(originalDirection, stored.getDirection());
+        assertNull(stored.getParentContractId());
+        assertEquals("HD-LOCK-72-Tampered", stored.getContractCode());
+    }
+
+    @Test
+    public void correctSignedContract_requiredFieldsAndBR35_BR36_ValidationErrors() {
+        Contract signed = signedParentContract(73, "HD-VAL-73", new BigDecimal("60000000"));
+        contractDAO.putContract(signed);
+
+        // Mã HĐ null / rỗng / quá 50 ký tự
+        Contract badCode = signedParentContract(73, "   ", new BigDecimal("60000000"));
+        ServiceResult<Void> r1 = service.correctSignedContract(badCode, adminUser, "Lý do");
+        assertFalse(r1.isSuccess());
+        assertTrue(r1.getFieldErrors().containsKey(ContractValidator.FIELD_CONTRACT_CODE));
+
+        Contract longCode = signedParentContract(73, "C".repeat(51), new BigDecimal("60000000"));
+        ServiceResult<Void> r2 = service.correctSignedContract(longCode, adminUser, "Lý do");
+        assertFalse(r2.isSuccess());
+        assertTrue(r2.getFieldErrors().containsKey(ContractValidator.FIELD_CONTRACT_CODE));
+
+        // Tiêu đề null / rỗng / quá 255 ký tự
+        Contract badTitle = signedParentContract(73, "HD-VAL-73", new BigDecimal("60000000"));
+        badTitle.setTitle("   ");
+        ServiceResult<Void> r3 = service.correctSignedContract(badTitle, adminUser, "Lý do");
+        assertFalse(r3.isSuccess());
+        assertTrue(r3.getFieldErrors().containsKey(ContractValidator.FIELD_TITLE));
+
+        Contract longTitle = signedParentContract(73, "HD-VAL-73", new BigDecimal("60000000"));
+        longTitle.setTitle("T".repeat(256));
+        ServiceResult<Void> r4 = service.correctSignedContract(longTitle, adminUser, "Lý do");
+        assertFalse(r4.isSuccess());
+        assertTrue(r4.getFieldErrors().containsKey(ContractValidator.FIELD_TITLE));
+
+        // Loại hợp đồng null / rỗng
+        Contract badType = signedParentContract(73, "HD-VAL-73", new BigDecimal("60000000"));
+        badType.setContractType("   ");
+        ServiceResult<Void> r5 = service.correctSignedContract(badType, adminUser, "Lý do");
+        assertFalse(r5.isSuccess());
+        assertTrue(r5.getFieldErrors().containsKey(ContractValidator.FIELD_CONTRACT_TYPE));
+
+        // Người phụ trách không tồn tại hoặc bị xóa mềm
+        Contract badOwner = signedParentContract(73, "HD-VAL-73", new BigDecimal("60000000"));
+        badOwner.setOwnerId(9999);
+        ServiceResult<Void> r6 = service.correctSignedContract(badOwner, adminUser, "Lý do");
+        assertFalse(r6.isSuccess());
+        assertTrue(r6.getFieldErrors().containsKey(ContractValidator.FIELD_OWNER_ID));
+
+        Contract delOwner = signedParentContract(73, "HD-VAL-73", new BigDecimal("60000000"));
+        delOwner.setOwnerId(deletedUser.getUserId());
+        ServiceResult<Void> r7 = service.correctSignedContract(delOwner, adminUser, "Lý do");
+        assertFalse(r7.isSuccess());
+        assertTrue(r7.getFieldErrors().containsKey(ContractValidator.FIELD_OWNER_ID));
+
+        // Ngày hiệu lực null hoặc ngày kết thúc null -> MSG-045
+        Contract nullEff = signedParentContract(73, "HD-VAL-73", new BigDecimal("60000000"));
+        nullEff.setEffectiveDate(null);
+        ServiceResult<Void> r8 = service.correctSignedContract(nullEff, adminUser, "Lý do");
+        assertFalse(r8.isSuccess());
+        assertTrue(r8.getFieldErrors().containsKey(ContractValidator.FIELD_EFFECTIVE_DATE));
+
+        Contract nullEnd = signedParentContract(73, "HD-VAL-73", new BigDecimal("60000000"));
+        nullEnd.setEndDate(null);
+        ServiceResult<Void> r9 = service.correctSignedContract(nullEnd, adminUser, "Lý do");
+        assertFalse(r9.isSuccess());
+        assertTrue(r9.getFieldErrors().containsKey(ContractValidator.FIELD_EFFECTIVE_DATE));
+
+        // Ngày hiệu lực > ngày kết thúc -> MSG-045
+        Contract effAfterEnd = signedParentContract(73, "HD-VAL-73", new BigDecimal("60000000"));
+        effAfterEnd.setEffectiveDate(Date.valueOf("2026-12-31"));
+        effAfterEnd.setEndDate(Date.valueOf("2026-06-01"));
+        ServiceResult<Void> r10 = service.correctSignedContract(effAfterEnd, adminUser, "Lý do");
+        assertFalse(r10.isSuccess());
+        assertTrue(r10.getFieldErrors().containsKey(ContractValidator.FIELD_EFFECTIVE_DATE));
+    }
+
+    @Test
+    public void correctSignedContract_amendmentBoundaryAndParentLookup() {
+        // HĐ gốc 100tr
+        Contract root = signedParentContract(74, "HD-ROOT-74", new BigDecimal("100000000"));
+        root.setAmendmentValueSigned(BigDecimal.ZERO);
+        contractDAO.putContract(root);
+
+        // Phụ lục đã ký -30tr
+        Contract amend = signedParentContract(75, "PL-75", new BigDecimal("-30000000"));
+        amend.setParentContractId(74);
+        contractDAO.putContract(amend);
+
+        // 1. Chữa sai sót phụ lục nhưng phụ lục trỏ cha không tồn tại -> ERR_CORRECT_FAILED
+        Contract orphanAmend = signedParentContract(76, "PL-ORPHAN-76", new BigDecimal("-10000000"));
+        orphanAmend.setParentContractId(99999);
+        contractDAO.putContract(orphanAmend);
+        ServiceResult<Void> orphanRes = service.correctSignedContract(orphanAmend, adminUser, "Chữa phụ lục mồ côi");
+        assertFalse(orphanRes.isSuccess());
+        assertEquals(ContractService.ERR_CORRECT_FAILED, orphanRes.getMessage());
+
+        // 2. Chữa sai sót phụ lục với giá trị dương -> thành công
+        Contract posAmend = signedParentContract(75, "PL-75", new BigDecimal("20000000"));
+        posAmend.setParentContractId(74);
+        ServiceResult<Void> posRes = service.correctSignedContract(posAmend, adminUser, "Tăng giá trị phụ lục");
+        assertTrue(posRes.isSuccess());
+
+        // 3. Phụ lục giảm trừ chính xác bằng giá trị còn lại:
+        // HĐ gốc 78 có giá trị 100tr, phụ lục 79 đang là -30tr, amendmentValueSigned của root = -30tr (hiện hành = 70tr)
+        // Khi đó baseRemaining = 70tr - (-30tr) = 100tr. Giảm trừ đúng -100tr -> thành công.
+        Contract root2 = signedParentContract(78, "HD-ROOT-78", new BigDecimal("100000000"));
+        root2.setAmendmentValueSigned(new BigDecimal("-30000000"));
+        contractDAO.putContract(root2);
+
+        Contract amend2 = signedParentContract(79, "PL-79", new BigDecimal("-30000000"));
+        amend2.setParentContractId(78);
+        contractDAO.putContract(amend2);
+
+        Contract exactAmend = signedParentContract(79, "PL-79", new BigDecimal("-100000000"));
+        exactAmend.setParentContractId(78);
+        ServiceResult<Void> exactRes = service.correctSignedContract(exactAmend, adminUser, "Giảm trừ chạm trần");
+        assertTrue(exactRes.isSuccess());
+
+        // 4. Chữa phụ lục giảm trừ vượt quá giá trị còn lại (-100tr01) -> ERR_VALUE_NEGATIVE
+        Contract root3 = signedParentContract(80, "HD-ROOT-80", new BigDecimal("100000000"));
+        root3.setAmendmentValueSigned(new BigDecimal("-30000000"));
+        contractDAO.putContract(root3);
+
+        Contract amend3 = signedParentContract(81, "PL-81", new BigDecimal("-30000000"));
+        amend3.setParentContractId(80);
+        contractDAO.putContract(amend3);
+
+        Contract overAmend = signedParentContract(81, "PL-81", new BigDecimal("-100000001"));
+        overAmend.setParentContractId(80);
+        ServiceResult<Void> overRes = service.correctSignedContract(overAmend, adminUser, "Giảm trừ quá trần");
+        assertFalse(overRes.isSuccess());
+        assertEquals(ContractService.ERR_VALUE_NEGATIVE, overRes.getMessage());
+    }
+
+    @Test
+    public void correctSignedContract_recordsAuditHistoryWithEventCorrectedAndReason() {
+        Contract signed = signedParentContract(77, "HD-AUDIT-77", new BigDecimal("200000000"));
+        contractDAO.putContract(signed);
+
+        Contract edited = signedParentContract(77, "HD-AUDIT-77-FIXED", new BigDecimal("200000000"));
+        edited.setTitle("Đã đính chính số hiệu");
+
+        ServiceResult<Void> res = service.correctSignedContract(edited, adminUser, "   Đối chiếu lại hợp đồng gốc số 77/2026   ");
+        assertTrue(res.isSuccess());
+
+        List<ContractHistory> history = service.findHistoryByContractId(77);
+        assertFalse(history.isEmpty());
+        ContractHistory last = history.get(history.size() - 1);
+        assertEquals(ContractHistory.EVENT_CORRECTED, last.getEventType());
+        assertEquals("Đối chiếu lại hợp đồng gốc số 77/2026", last.getNote());
+        assertEquals(adminUser.getUserId(), last.getChangedBy());
+
+        assertEquals(adminUser.getUserId(), contractDAO.lastCorrectionActorId);
+        assertEquals("Đối chiếu lại hợp đồng gốc số 77/2026", contractDAO.lastCorrectionReason);
+        // Lưu ý: Tầng DAO thực tế (ghi CSDL & EVENT_CORRECTED) được kiểm thử khóa giao dịch tại ContractDAOTest.correct_storesReasonAndItsOwnEventType
+    }
+
+    @Test
+    public void correctSignedContract_rootContractValueReducedBelowSignedAmendments_failsWithValueNegative() {
+        // HĐ gốc 100tr, có phụ lục giảm trừ đã ký -30tr (amendmentValueSigned = -30tr)
+        Contract root = signedParentContract(82, "HD-ROOT-82", new BigDecimal("100000000"));
+        root.setAmendmentValueSigned(new BigDecimal("-30000000"));
+        contractDAO.putContract(root);
+
+        // Chữa giá trị HĐ gốc xuống 20tr -> 20tr + (-30tr) = -10tr (< 0) -> vi phạm
+        Contract badRoot = signedParentContract(82, "HD-ROOT-82", new BigDecimal("20000000"));
+        ServiceResult<Void> res = service.correctSignedContract(badRoot, adminUser, "Hạ giá gốc quá mức");
+        assertFalse(res.isSuccess());
+        assertEquals(ContractService.ERR_VALUE_NEGATIVE, res.getMessage());
+
+        // Dữ liệu hợp đồng gốc trong CSDL không bị thay đổi và không phát sinh nhật ký EVENT_CORRECTED
+        assertEquals(new BigDecimal("100000000"), contractDAO.findById(82).getContractValue());
+        assertTrue(service.findHistoryByContractId(82).stream()
+                .noneMatch(h -> ContractHistory.EVENT_CORRECTED.equals(h.getEventType())));
     }
 
     // ==================================================================
@@ -1208,6 +1521,7 @@ public class ContractServiceTest {
         private final Map<Integer, List<ContractHistory>> historyByContract = new HashMap<>();
         private int seq = 1;
         private int prodSeq = 1;
+        int lastCorrectionActorId;
         String lastCorrectionReason;
 
         void putContract(Contract c) {
@@ -1278,8 +1592,10 @@ public class ContractServiceTest {
             }
             contract.setSigningDate(existing.getSigningDate());
             contract.setDirection(existing.getDirection());
+            contract.setParentContractId(existing.getParentContractId());
             contract.setProgressStatus(existing.getProgressStatus());
             store.put(contract.getContractId(), contract);
+            this.lastCorrectionActorId = actorId;
             this.lastCorrectionReason = reason.trim();
             recordHistory(contract.getContractId(), ContractHistory.EVENT_CORRECTED,
                     "Đính chính hợp đồng đã ký", null, null, this.lastCorrectionReason, actorId);

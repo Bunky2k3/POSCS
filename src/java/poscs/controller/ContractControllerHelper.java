@@ -101,6 +101,7 @@ public final class ContractControllerHelper {
         c.setContractId(existing.getContractId());
         c.setDirection(existing.getDirection());
         c.setSigningDate(existing.getSigningDate());
+        c.setParentContractId(existing.getParentContractId());
         return c;
     }
 

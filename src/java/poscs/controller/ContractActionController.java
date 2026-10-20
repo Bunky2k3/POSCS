@@ -173,7 +173,7 @@ public class ContractActionController extends HttpServlet {
 
     public void handleCorrect(HttpServletRequest req, HttpServletResponse resp) throws IOException {
         User u = AccessControl.currentUser(req);
-        if (!getPermissionService().isAdmin(u)) { resp.sendError(HttpServletResponse.SC_FORBIDDEN, PermissionService.MSG_022); return; }
+        if (!getPermissionService().canCorrectSignedContract(u)) { resp.sendError(HttpServletResponse.SC_FORBIDDEN, PermissionService.MSG_022); return; }
         Integer id = ContractControllerHelper.parseIntOrNull(req.getParameter("contractId"));
         Contract existing = id != null ? getContractService().findById(id) : null;
         if (existing == null) { resp.sendRedirect(ContractControllerHelper.notFoundUrl(req)); return; }
