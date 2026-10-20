@@ -31,7 +31,6 @@ import poscs.dao.EmployeeDAO;
 import poscs.dao.ProductDAO;
 import poscs.model.Address;
 import poscs.model.Contract;
-import poscs.model.ContractDocument;
 import poscs.model.Department;
 import poscs.model.ContractHandover;
 import poscs.model.ContractHistory;
@@ -130,6 +129,7 @@ public class ContractController extends HttpServlet {
     private ContractListController listController;
     private ContractDetailController detailController;
     private ContractPaymentController paymentController;
+    private ContractDocumentController documentController;
 
     PermissionService getPermissionService() {
         if (permissionService != null) {
@@ -181,6 +181,17 @@ public class ContractController extends HttpServlet {
 
     void setPaymentController(ContractPaymentController paymentController) {
         this.paymentController = paymentController;
+    }
+
+    ContractDocumentController getDocumentController() {
+        if (documentController == null) {
+            this.documentController = new ContractDocumentController(contractDAO, employeeDAO, null, getPermissionService());
+        }
+        return documentController;
+    }
+
+    void setDocumentController(ContractDocumentController documentController) {
+        this.documentController = documentController;
     }
 
     void setDetailController(ContractDetailController detailController) {
@@ -1221,69 +1232,16 @@ public class ContractController extends HttpServlet {
      * biên bản thanh lý là ví dụ.
      */
     private void handleAddDocument(HttpServletRequest request, HttpServletResponse response) throws IOException {
-        if (!AccessControl.requireFullAccess(request, response, AccessControl.Resource.CONTRACT)) {
-            return;
-        }
-        Integer contractId = parseIntOrNull(request.getParameter("contractId"));
-        if (contractId == null) {
-            response.sendRedirect(notFoundUrl(request));
-            return;
-        }
-        String back = "/contract?action=edit&id=" + contractId;
-        String url = emptyToNull(request.getParameter("fileUrl"));
-        String docType = emptyToNull(request.getParameter("docType"));
-        if (url == null || !TextRules.isSafeHttpUrl(url)
-                || docType == null || !ContractDocument.TYPES.contains(docType)) {
-            response.sendRedirect(request.getContextPath() + back + "&error=document_invalid");
-            return;
-        }
-
-        ContractDocument doc = new ContractDocument();
-        doc.setContractId(contractId);
-        doc.setDocType(docType);
-        doc.setTitle(emptyToNull(request.getParameter("docTitle")));
-        doc.setFileUrl(url);
-        doc.setNote(emptyToNull(request.getParameter("docNote")));
-
-        int result = contractDAO.addDocument(doc, actorId(request));
-        if (result != ContractDAO.DOC_OK) {
-            LOG.warn("Them tai lieu that bai (actor={}, contractId={}, result={})",
-                    Logs.actor(request), contractId, result);
-            response.sendRedirect(request.getContextPath() + back + "&error=document_failed");
-            return;
-        }
-        response.sendRedirect(request.getContextPath() + back);
+        getDocumentController().handleAddDocument(request, response);
     }
 
     /**
      * Huỷ một giấy tờ -- xoá MỀM, bắt buộc có lý do.
      *
-     * <p>Lý do kiểm ở CẢ hai tầng: ở đây để báo lỗi tử tế, và trong
-     * {@code ContractDAO.voidDocument} để một POST nặn tay cũng không gỡ được
-     * giấy tờ mà không để lại lời giải thích.
+     * <p>Uỷ quyền xử lý sang {@link ContractDocumentController#handleVoidDocument}.
      */
     private void handleVoidDocument(HttpServletRequest request, HttpServletResponse response) throws IOException {
-        if (!AccessControl.requireFullAccess(request, response, AccessControl.Resource.CONTRACT)) {
-            return;
-        }
-        Integer contractId = parseIntOrNull(request.getParameter("contractId"));
-        Integer documentId = parseIntOrNull(request.getParameter("documentId"));
-        if (contractId == null || documentId == null) {
-            response.sendRedirect(notFoundUrl(request));
-            return;
-        }
-        String back = "/contract?action=edit&id=" + contractId;
-        String reason = emptyToNull(request.getParameter("reason"));
-        if (reason == null) {
-            response.sendRedirect(request.getContextPath() + back + "&error=document_reason_required");
-            return;
-        }
-        if (!contractDAO.voidDocument(documentId, actorId(request), reason)) {
-            LOG.warn("Huy tai lieu that bai (actor={}, documentId={})", Logs.actor(request), documentId);
-            response.sendRedirect(request.getContextPath() + back + "&error=document_failed");
-            return;
-        }
-        response.sendRedirect(request.getContextPath() + back);
+        getDocumentController().handleVoidDocument(request, response);
     }
 
     // ------------------------------------------------------------------

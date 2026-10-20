@@ -1957,4 +1957,42 @@ public class ContractControllerTest {
         assertSame(customPc, ctrl.getPaymentController());
     }
 
+    // ------------------------------------------------------------------
+    // Delegation to ContractDocumentController (Task 4.16)
+    // ------------------------------------------------------------------
+
+    @Test
+    public void doPost_addDocument_delegatesToDocumentController() throws Exception {
+        ContractDocumentController mockDocCtrl = mock(ContractDocumentController.class);
+        controller.setDocumentController(mockDocCtrl);
+
+        when(request.getParameter("action")).thenReturn("addDocument");
+        controller.doPost(request, response);
+
+        verify(mockDocCtrl).handleAddDocument(request, response);
+    }
+
+    @Test
+    public void doPost_voidDocument_delegatesToDocumentController() throws Exception {
+        ContractDocumentController mockDocCtrl = mock(ContractDocumentController.class);
+        controller.setDocumentController(mockDocCtrl);
+
+        when(request.getParameter("action")).thenReturn("voidDocument");
+        controller.doPost(request, response);
+
+        verify(mockDocCtrl).handleVoidDocument(request, response);
+    }
+
+    @Test
+    public void getDocumentController_lazyInitAndSetDocumentController() {
+        ContractController ctrl = new ContractController();
+        ContractDocumentController dc1 = ctrl.getDocumentController();
+        assertNotNull(dc1);
+        assertSame(dc1, ctrl.getDocumentController());
+
+        ContractDocumentController customDc = mock(ContractDocumentController.class);
+        ctrl.setDocumentController(customDc);
+        assertSame(customDc, ctrl.getDocumentController());
+    }
+
 }

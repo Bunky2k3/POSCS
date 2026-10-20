@@ -111,7 +111,11 @@ Không còn mục nào.
   - Tinh gọn `ContractController` ủy quyền các handler thanh toán sang `ContractPaymentController`.
   - Bổ sung `ContractPaymentControllerTest` (36 unit tests) và cập nhật `ContractControllerTest` (96 tests pass 100%).
   - Hoàn thiện và cập nhật `docs/qa/Task-4.15.md`.
-- [ ] **Task 4.16:** `[UC-52]` `ContractDocumentController`.
+- [x] **Task 4.16:** `[UC-52]` `ContractDocumentController`.
+  - Xây dựng `ContractDocumentController` và `ContractDocumentService` xử lý gắn đường dẫn tài liệu và huỷ mềm có lý do bắt buộc (UC-52), phân quyền RBAC (Admin, Sales quản lý vùng), phòng chống IDOR tài liệu giữa các hợp đồng.
+  - Tinh gọn `ContractController` ủy quyền các handler tài liệu sang `ContractDocumentController`.
+  - Bổ sung `ContractDocumentControllerTest` (27 unit tests), `ContractDocumentServiceTest` (37 unit tests) và cập nhật `ContractControllerTest` (99 tests pass 100%).
+  - Hoàn thiện và cập nhật `docs/qa/Task-4.16.md`.
 - [ ] **Task 4.17:** `[UC-41]` `ContractExportController` (Excel, cùng bộ lọc, không phân trang, sắp theo tỉnh/thành).
 - [ ] **Task 4.18:** `[UC-47]` Xây dựng `ContractLinkController` cho liên kết hợp đồng Bán ↔ Mua (và gỡ liên kết). Phần ChangeRequest (UC-50, UC-51) giữ nguyên `ChangeRequestController` đã có.
 - [ ] **Task 4.19:** `[UC-54]` Kiểm thử luồng chữa sai sót hợp đồng đã ký (chỉ Admin, bắt buộc lý do, ghi nhật ký sự kiện riêng `EVENT_CORRECTED`, khóa ngày ký) trên `ContractService` (Task 4.10) và `ContractActionController` (Task 4.12); không tạo controller riêng.
