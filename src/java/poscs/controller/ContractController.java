@@ -129,6 +129,7 @@ public class ContractController extends HttpServlet {
     private PermissionService permissionService;
     private ContractListController listController;
     private ContractDetailController detailController;
+    private ContractPaymentController paymentController;
 
     PermissionService getPermissionService() {
         if (permissionService != null) {
@@ -169,6 +170,17 @@ public class ContractController extends HttpServlet {
             return detailController;
         }
         return new ContractDetailController(contractDAO, employeeDAO, getPermissionService());
+    }
+
+    ContractPaymentController getPaymentController() {
+        if (paymentController != null) {
+            return paymentController;
+        }
+        return new ContractPaymentController(contractDAO, employeeDAO, null, getPermissionService());
+    }
+
+    void setPaymentController(ContractPaymentController paymentController) {
+        this.paymentController = paymentController;
     }
 
     void setDetailController(ContractDetailController detailController) {
@@ -1342,75 +1354,15 @@ public class ContractController extends HttpServlet {
     }
 
     private void handleAddPayment(HttpServletRequest request, HttpServletResponse response) throws IOException {
-        if (!AccessControl.requireFullAccess(request, response, AccessControl.Resource.CONTRACT)) {
-            return;
-        }
-        Integer contractId = parseIntOrNull(request.getParameter("contractId"));
-        if (contractId == null || contractDAO.findById(contractId) == null) {
-            response.sendRedirect(notFoundUrl(request));
-            return;
-        }
-
-        ContractPayment payment = new ContractPayment();
-        payment.setInvoiceAmount(MoneyVnd.parseOrNull(request.getParameter("invoiceAmount")));
-        payment.setDueDate(parseDateOrNull(request.getParameter("dueDate")));
-        payment.setPaidDate(parseDateOrNull(request.getParameter("paidDate")));
-
-        if (!contractDAO.insertPayment(contractId, payment, actorId(request))) {
-            LOG.warn("Lap ky thanh toan that bai (actor={}, contractId={})", Logs.actor(request), contractId);
-            response.sendRedirect(request.getContextPath()
-                    + "/contract?action=edit&id=" + contractId + "&error=payment_failed");
-            return;
-        }
-        response.sendRedirect(request.getContextPath() + "/contract?action=edit&id=" + contractId);
+        getPaymentController().handleAddPayment(request, response);
     }
 
     private void handleMarkPaid(HttpServletRequest request, HttpServletResponse response) throws IOException {
-        if (!AccessControl.requireFullAccess(request, response, AccessControl.Resource.CONTRACT)) {
-            return;
-        }
-        Integer contractId = parseIntOrNull(request.getParameter("contractId"));
-        Integer paymentId = parseIntOrNull(request.getParameter("paymentId"));
-        if (contractId == null || paymentId == null) {
-            response.sendRedirect(notFoundUrl(request));
-            return;
-        }
-        // Ngày thu mặc định là hôm nay -- phần lớn thao tác là ghi nhận ngay
-        // lúc tiền về; ai cần lùi ngày thì điền ô riêng.
-        Date paidDate = parseDateOrNull(request.getParameter("paidDate"));
-        if (paidDate == null) {
-            paidDate = Date.valueOf(java.time.LocalDate.now());
-        }
-
-        if (!contractDAO.markPaymentPaid(paymentId, contractId, paidDate, actorId(request))) {
-            LOG.warn("Ghi nhan da thu that bai (actor={}, contractId={}, paymentId={})",
-                    Logs.actor(request), contractId, paymentId);
-            response.sendRedirect(request.getContextPath()
-                    + "/contract?action=edit&id=" + contractId + "&error=payment_failed");
-            return;
-        }
-        response.sendRedirect(request.getContextPath() + "/contract?action=edit&id=" + contractId);
+        getPaymentController().handleMarkPaid(request, response);
     }
 
     private void handleRemovePayment(HttpServletRequest request, HttpServletResponse response) throws IOException {
-        if (!AccessControl.requireFullAccess(request, response, AccessControl.Resource.CONTRACT)) {
-            return;
-        }
-        Integer contractId = parseIntOrNull(request.getParameter("contractId"));
-        Integer paymentId = parseIntOrNull(request.getParameter("paymentId"));
-        if (contractId == null || paymentId == null) {
-            response.sendRedirect(notFoundUrl(request));
-            return;
-        }
-
-        if (!contractDAO.deletePayment(paymentId, contractId, actorId(request))) {
-            LOG.warn("Xoa ky thanh toan that bai (actor={}, contractId={}, paymentId={})",
-                    Logs.actor(request), contractId, paymentId);
-            response.sendRedirect(request.getContextPath()
-                    + "/contract?action=edit&id=" + contractId + "&error=payment_failed");
-            return;
-        }
-        response.sendRedirect(request.getContextPath() + "/contract?action=edit&id=" + contractId);
+        getPaymentController().handleRemovePayment(request, response);
     }
 
     /** Dòng nhật ký gần nhất của một loại mốc vòng đời, hoặc null nếu chưa xảy ra. */

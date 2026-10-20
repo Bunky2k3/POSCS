@@ -106,7 +106,11 @@ Không còn mục nào.
   - Xây dựng `ContractHandoverController` và `ContractHandoverHelper` xử lý hàng đợi bàn giao (UC-48) và hoàn tất chặng (UC-49) qua `ContractHandoverService`.
   - Bổ sung `ContractHandoverControllerTest` (25 unit tests bao phủ các nhánh và phân quyền RBAC).
   - Hoàn thiện và cập nhật `docs/qa/Task-4.14.md`.
-- [ ] **Task 4.15:** `[UC-53]` `ContractPaymentController`.
+- [x] **Task 4.15:** `[UC-53]` `ContractPaymentController`.
+  - Xây dựng `ContractPaymentController` xử lý lập kỳ thanh toán, ghi nhận đã thu, xoá kỳ (UC-53, BR-18) qua `ContractPaymentService`.
+  - Tinh gọn `ContractController` ủy quyền các handler thanh toán sang `ContractPaymentController`.
+  - Bổ sung `ContractPaymentControllerTest` (36 unit tests) và cập nhật `ContractControllerTest` (96 tests pass 100%).
+  - Hoàn thiện và cập nhật `docs/qa/Task-4.15.md`.
 - [ ] **Task 4.16:** `[UC-52]` `ContractDocumentController`.
 - [ ] **Task 4.17:** `[UC-41]` `ContractExportController` (Excel, cùng bộ lọc, không phân trang, sắp theo tỉnh/thành).
 - [ ] **Task 4.18:** `[UC-47]` Xây dựng `ContractLinkController` cho liên kết hợp đồng Bán ↔ Mua (và gỡ liên kết). Phần ChangeRequest (UC-50, UC-51) giữ nguyên `ChangeRequestController` đã có.

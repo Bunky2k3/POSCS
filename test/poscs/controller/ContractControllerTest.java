@@ -1909,4 +1909,52 @@ public class ContractControllerTest {
         verify(request).setAttribute("periodLabel", "Quý 2/2026");
     }
 
+    // ------------------------------------------------------------------
+    // Delegation to ContractPaymentController (Task 4.15)
+    // ------------------------------------------------------------------
+
+    @Test
+    public void doPost_addPayment_delegatesToPaymentController() throws Exception {
+        ContractPaymentController mockPaymentCtrl = mock(ContractPaymentController.class);
+        controller.setPaymentController(mockPaymentCtrl);
+
+        when(request.getParameter("action")).thenReturn("addPayment");
+        controller.doPost(request, response);
+
+        verify(mockPaymentCtrl).handleAddPayment(request, response);
+    }
+
+    @Test
+    public void doPost_markPaid_delegatesToPaymentController() throws Exception {
+        ContractPaymentController mockPaymentCtrl = mock(ContractPaymentController.class);
+        controller.setPaymentController(mockPaymentCtrl);
+
+        when(request.getParameter("action")).thenReturn("markPaid");
+        controller.doPost(request, response);
+
+        verify(mockPaymentCtrl).handleMarkPaid(request, response);
+    }
+
+    @Test
+    public void doPost_removePayment_delegatesToPaymentController() throws Exception {
+        ContractPaymentController mockPaymentCtrl = mock(ContractPaymentController.class);
+        controller.setPaymentController(mockPaymentCtrl);
+
+        when(request.getParameter("action")).thenReturn("removePayment");
+        controller.doPost(request, response);
+
+        verify(mockPaymentCtrl).handleRemovePayment(request, response);
+    }
+
+    @Test
+    public void getPaymentController_lazyInitAndSetPaymentController() {
+        ContractController ctrl = new ContractController();
+        ContractPaymentController pc1 = ctrl.getPaymentController();
+        assertNotNull(pc1);
+
+        ContractPaymentController customPc = mock(ContractPaymentController.class);
+        ctrl.setPaymentController(customPc);
+        assertSame(customPc, ctrl.getPaymentController());
+    }
+
 }
