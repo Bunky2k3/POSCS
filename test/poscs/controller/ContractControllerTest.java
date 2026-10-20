@@ -25,6 +25,7 @@ import poscs.model.Enterprise;
 import poscs.model.Product;
 import poscs.model.Role;
 import poscs.model.User;
+import poscs.service.PermissionService;
 
 import static org.junit.Assert.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -2020,5 +2021,102 @@ public class ContractControllerTest {
         ContractExportController customEc = mock(ContractExportController.class);
         ctrl.setExportController(customEc);
         assertSame(customEc, ctrl.getExportController());
+    }
+
+    // ==================================================================
+    // Delegation to ContractLinkController (Task 4.18 - [UC-47])
+    // ==================================================================
+
+    @Test
+    public void doPost_linkContract_delegatesToLinkController() throws Exception {
+        ContractLinkController mockLinkCtrl = mock(ContractLinkController.class);
+        controller.setLinkController(mockLinkCtrl);
+
+        when(request.getParameter("action")).thenReturn("linkContract");
+        controller.doPost(request, response);
+
+        verify(mockLinkCtrl).handleLinkContract(request, response);
+    }
+
+    @Test
+    public void doPost_unlinkContract_delegatesToLinkController() throws Exception {
+        ContractLinkController mockLinkCtrl = mock(ContractLinkController.class);
+        controller.setLinkController(mockLinkCtrl);
+
+        when(request.getParameter("action")).thenReturn("unlinkContract");
+        controller.doPost(request, response);
+
+        verify(mockLinkCtrl).handleUnlinkContract(request, response);
+    }
+
+    @Test
+    public void getLinkController_lazyInitAndSetLinkController() {
+        ContractController ctrl = new ContractController();
+        ContractLinkController lc1 = ctrl.getLinkController();
+        assertNotNull(lc1);
+        assertSame(lc1, ctrl.getLinkController());
+
+        ContractLinkController customLc = mock(ContractLinkController.class);
+        ctrl.setLinkController(customLc);
+        assertSame(customLc, ctrl.getLinkController());
+    }
+
+    // ==================================================================
+    // ContractController anonymous PermissionService branch tests
+    // ==================================================================
+
+    @Test
+    public void getPermissionService_isSubordinate_branches() throws Exception {
+        ContractController ctrl = new ContractController();
+        EmployeeDAO mockEmpDao = mock(EmployeeDAO.class);
+        setField(ctrl, "employeeDAO", mockEmpDao);
+
+        PermissionService ps = ctrl.getPermissionService();
+
+        // 1. user == null -> false
+        assertFalse(ps.isSubordinate(null));
+
+        // 2. isAdmin -> false
+        User admin = new User();
+        admin.setUserId(10);
+        admin.setRole(new Role(1, PermissionService.ROLE_ADMIN));
+        admin.setManagerId(99);
+        assertFalse(ps.isSubordinate(admin));
+
+        // 3. Sales with dbUser having managerId != null -> true
+        User salesWithDbMgr = new User();
+        salesWithDbMgr.setUserId(20);
+        salesWithDbMgr.setRole(new Role(2, PermissionService.ROLE_SALES));
+        User dbUser1 = new User();
+        dbUser1.setUserId(20);
+        dbUser1.setManagerId(5);
+        when(mockEmpDao.findById(20)).thenReturn(dbUser1);
+        assertTrue(ps.isSubordinate(salesWithDbMgr));
+
+        // 4. Sales with dbUser having managerId == null -> false
+        User salesNoDbMgr = new User();
+        salesNoDbMgr.setUserId(21);
+        salesNoDbMgr.setRole(new Role(2, PermissionService.ROLE_SALES));
+        User dbUser2 = new User();
+        dbUser2.setUserId(21);
+        dbUser2.setManagerId(null);
+        when(mockEmpDao.findById(21)).thenReturn(dbUser2);
+        assertFalse(ps.isSubordinate(salesNoDbMgr));
+
+        // 5. Sales not found in DB (null), fallback to sessionUser managerId != null -> true
+        User salesMissingDbWithMgr = new User();
+        salesMissingDbWithMgr.setUserId(22);
+        salesMissingDbWithMgr.setRole(new Role(2, PermissionService.ROLE_SALES));
+        salesMissingDbWithMgr.setManagerId(8);
+        when(mockEmpDao.findById(22)).thenReturn(null);
+        assertTrue(ps.isSubordinate(salesMissingDbWithMgr));
+
+        // 6. Sales not found in DB (null), fallback to sessionUser managerId == null -> false
+        User salesMissingDbNoMgr = new User();
+        salesMissingDbNoMgr.setUserId(23);
+        salesMissingDbNoMgr.setRole(new Role(2, PermissionService.ROLE_SALES));
+        salesMissingDbNoMgr.setManagerId(null);
+        when(mockEmpDao.findById(23)).thenReturn(null);
+        assertFalse(ps.isSubordinate(salesMissingDbNoMgr));
     }
 }

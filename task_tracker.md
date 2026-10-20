@@ -121,7 +121,11 @@ Không còn mục nào.
   - Tinh gọn `ContractController` ủy quyền `exportExcel` sang `ContractExportController`.
   - Bổ sung `ContractExportControllerTest` (12 unit tests), `ContractExportServiceTest` (14 unit tests) và cập nhật `ContractControllerTest` (101 tests pass 100%).
   - Hoàn thiện và cập nhật `docs/qa/Task-4.17.md`.
-- [ ] **Task 4.18:** `[UC-47]` Xây dựng `ContractLinkController` cho liên kết hợp đồng Bán ↔ Mua (và gỡ liên kết). Phần ChangeRequest (UC-50, UC-51) giữ nguyên `ChangeRequestController` đã có.
+- [x] **Task 4.18:** `[UC-47]` Xây dựng `ContractLinkController` cho liên kết hợp đồng Bán ↔ Mua (và gỡ liên kết). Phần ChangeRequest (UC-50, UC-51) giữ nguyên `ChangeRequestController` đã có.
+  - Xây dựng `ContractLinkController` và `ContractLinkService` xử lý liên kết Bán ↔ Mua và gỡ liên kết (UC-47), phân quyền RBAC (Admin, Sales quản lý vùng), tự động phân định chiều, chặn HĐ phụ lục/cùng chiều/tự nối, phòng chống IDOR khi gỡ liên kết.
+  - Tinh gọn `ContractController` ủy quyền `handleLinkContract` và `handleUnlinkContract` sang `ContractLinkController`.
+  - Bổ sung `ContractLinkControllerTest` (24 unit tests), `ContractLinkServiceTest` (37 unit tests) và cập nhật `ContractControllerTest` (105 tests pass 100%).
+  - Hoàn thiện và cập nhật `docs/qa/Task-4.18.md`.
 - [ ] **Task 4.19:** `[UC-54]` Kiểm thử luồng chữa sai sót hợp đồng đã ký (chỉ Admin, bắt buộc lý do, ghi nhật ký sự kiện riêng `EVENT_CORRECTED`, khóa ngày ký) trên `ContractService` (Task 4.10) và `ContractActionController` (Task 4.12); không tạo controller riêng.
 
 ---

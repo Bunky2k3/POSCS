@@ -33,7 +33,6 @@ import poscs.model.Contract;
 import poscs.model.Department;
 import poscs.model.ContractHandover;
 import poscs.model.ContractHistory;
-import poscs.model.ContractLink;
 import poscs.model.ContractPayment;
 import poscs.model.ContractProduct;
 import poscs.model.District;
@@ -130,6 +129,7 @@ public class ContractController extends HttpServlet {
     private ContractPaymentController paymentController;
     private ContractDocumentController documentController;
     private ContractExportController exportController;
+    private ContractLinkController linkController;
 
     PermissionService getPermissionService() {
         if (permissionService != null) {
@@ -146,6 +146,23 @@ public class ContractController extends HttpServlet {
                     return sessionUser;
                 }
                 return null;
+            }
+
+            // Tương tự getEffectiveUser fallback về sessionUser khi employeeDAO không tìm thấy bản ghi
+            // (ví dụ mock test không stub findById), isSubordinate fallback về user.getManagerId() != null
+            // thay vì fail-closed trả về true làm sai lệch quyền của test mock.
+            @Override
+            public boolean isSubordinate(User user) {
+                if (user == null || isAdmin(user)) {
+                    return false;
+                }
+                if (employeeDAO != null && user.getUserId() > 0) {
+                    User dbUser = employeeDAO.findById(user.getUserId());
+                    if (dbUser != null) {
+                        return dbUser.getManagerId() != null;
+                    }
+                }
+                return user.getManagerId() != null;
             }
         };
     }
@@ -207,6 +224,17 @@ public class ContractController extends HttpServlet {
 
     void setExportController(ContractExportController exportController) {
         this.exportController = exportController;
+    }
+
+    ContractLinkController getLinkController() {
+        if (linkController == null) {
+            this.linkController = new ContractLinkController(contractDAO, employeeDAO, null, getPermissionService());
+        }
+        return linkController;
+    }
+
+    void setLinkController(ContractLinkController linkController) {
+        this.linkController = linkController;
     }
 
     @Override
@@ -1163,66 +1191,19 @@ public class ContractController extends HttpServlet {
     // ------------------------------------------------------------------
 
     /**
-     * Nối hợp đồng đang mở với một hợp đồng ở chiều ngược lại.
-     *
-     * <p>Form chỉ gửi lên id hợp đồng kia; BÊN NÀO LÀ BÁN, bên nào là mua thì
-     * controller tự xếp theo chiều của hai bản ghi, vì bảng lưu một chiều cố
-     * định. Người dùng không phải nhớ thứ tự, và một POST nặn tay cũng không
-     * đảo được -- DAO kiểm lại chiều trong transaction.
+     * Nối hợp đồng đang mở với một hợp đồng ở chiều ngược lại (UC-47).
+     * Ủy quyền xử lý sang {@link ContractLinkController#handleLinkContract}.
      */
     private void handleLinkContract(HttpServletRequest request, HttpServletResponse response) throws IOException {
-        if (!AccessControl.requireFullAccess(request, response, AccessControl.Resource.CONTRACT)) {
-            return;
-        }
-        Integer contractId = parseIntOrNull(request.getParameter("contractId"));
-        Integer otherId = parseIntOrNull(request.getParameter("otherContractId"));
-        Contract current = contractId == null ? null : contractDAO.findById(contractId);
-        Contract other = otherId == null ? null : contractDAO.findById(otherId);
-        if (current == null) {
-            response.sendRedirect(notFoundUrl(request));
-            return;
-        }
-        String back = "/contract?action=edit&id=" + contractId;
-        if (other == null) {
-            response.sendRedirect(request.getContextPath() + back + "&error=link_invalid");
-            return;
-        }
-
-        boolean currentIsSell = !DIRECTION_BUY.equals(current.getDirection());
-        int sellId = currentIsSell ? current.getContractId() : other.getContractId();
-        int buyId = currentIsSell ? other.getContractId() : current.getContractId();
-
-        int result = contractDAO.linkContracts(sellId, buyId, request.getParameter("linkNote"), actorId(request));
-        if (result == ContractDAO.LINK_DUPLICATE) {
-            response.sendRedirect(request.getContextPath() + back + "&error=link_duplicate");
-            return;
-        }
-        if (result != ContractDAO.LINK_OK) {
-            LOG.warn("Noi hop dong that bai (actor={}, contractId={}, otherId={})",
-                    Logs.actor(request), contractId, otherId);
-            response.sendRedirect(request.getContextPath() + back + "&error=link_invalid");
-            return;
-        }
-        response.sendRedirect(request.getContextPath() + back);
+        getLinkController().handleLinkContract(request, response);
     }
 
+    /**
+     * Gỡ liên kết giữa hai hợp đồng (UC-47).
+     * Ủy quyền xử lý sang {@link ContractLinkController#handleUnlinkContract}.
+     */
     private void handleUnlinkContract(HttpServletRequest request, HttpServletResponse response) throws IOException {
-        if (!AccessControl.requireFullAccess(request, response, AccessControl.Resource.CONTRACT)) {
-            return;
-        }
-        Integer contractId = parseIntOrNull(request.getParameter("contractId"));
-        Integer linkId = parseIntOrNull(request.getParameter("linkId"));
-        if (contractId == null || linkId == null) {
-            response.sendRedirect(notFoundUrl(request));
-            return;
-        }
-        if (!contractDAO.unlinkContracts(linkId, actorId(request))) {
-            LOG.warn("Go lien ket that bai (actor={}, linkId={})", Logs.actor(request), linkId);
-            response.sendRedirect(request.getContextPath()
-                    + "/contract?action=edit&id=" + contractId + "&error=unlink_failed");
-            return;
-        }
-        response.sendRedirect(request.getContextPath() + "/contract?action=edit&id=" + contractId);
+        getLinkController().handleUnlinkContract(request, response);
     }
 
     private void handleAddPayment(HttpServletRequest request, HttpServletResponse response) throws IOException {
