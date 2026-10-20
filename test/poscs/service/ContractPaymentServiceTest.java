@@ -87,7 +87,12 @@ public class ContractPaymentServiceTest {
     }
 
     private ContractPayment samplePayment(BigDecimal amount, Date dueDate, Date paidDate) {
+        return samplePayment(0, amount, dueDate, paidDate);
+    }
+
+    private ContractPayment samplePayment(int paymentId, BigDecimal amount, Date dueDate, Date paidDate) {
         ContractPayment p = new ContractPayment();
+        p.setPaymentId(paymentId);
         p.setInvoiceAmount(amount);
         p.setDueDate(dueDate);
         p.setPaidDate(paidDate);
@@ -355,6 +360,10 @@ public class ContractPaymentServiceTest {
         Contract contract = sampleContract(10, PROGRESS_SIGNED);
         when(contractDAO.findById(10)).thenReturn(contract);
 
+        ContractPayment p1 = samplePayment(1, new BigDecimal("10000000"), Date.valueOf("2026-11-01"), null);
+        ContractPayment p2 = samplePayment(2, new BigDecimal("20000000"), Date.valueOf("2026-12-01"), null);
+        when(paymentDAO.findPaymentsByContractId(10)).thenReturn(List.of(p1, p2));
+
         // DAO returns false
         when(paymentDAO.deletePayment(1, 10, adminUser.getUserId())).thenReturn(false);
         ServiceResult<Void> r1 = service.deletePayment(10, 1, adminUser);
@@ -366,6 +375,36 @@ public class ContractPaymentServiceTest {
         ServiceResult<Void> r2 = service.deletePayment(10, 2, adminUser);
         assertTrue(r2.isSuccess());
         verify(paymentDAO).deletePayment(2, 10, adminUser.getUserId());
+    }
+
+    @Test
+    public void testDeletePayment_QAFeedback_PaymentAlreadyPaid_Fails() {
+        Contract contract = sampleContract(10, PROGRESS_SIGNED);
+        when(contractDAO.findById(10)).thenReturn(contract);
+
+        // Kỳ thanh toán đã được ghi nhận thu tiền (paid_date != null)
+        ContractPayment paidPayment = samplePayment(1, new BigDecimal("50000000"),
+                Date.valueOf("2026-10-01"), Date.valueOf("2026-10-15"));
+        when(paymentDAO.findPaymentsByContractId(10)).thenReturn(List.of(paidPayment));
+
+        ServiceResult<Void> r = service.deletePayment(10, 1, adminUser);
+        assertFalse(r.isSuccess());
+        assertEquals(ContractPaymentService.ERR_PAYMENT_ALREADY_PAID, r.getMessage());
+        verify(paymentDAO, never()).deletePayment(anyInt(), anyInt(), anyInt());
+    }
+
+    @Test
+    public void testDeletePayment_QAFeedback_PaymentNotFoundInContract_FailsNotFound() {
+        Contract contract = sampleContract(10, PROGRESS_SIGNED);
+        when(contractDAO.findById(10)).thenReturn(contract);
+
+        // Hợp đồng 10 chỉ có kỳ thanh toán 1, caller đòi xóa kỳ 999
+        ContractPayment p1 = samplePayment(1, new BigDecimal("10000000"), Date.valueOf("2026-11-01"), null);
+        when(paymentDAO.findPaymentsByContractId(10)).thenReturn(List.of(p1));
+
+        ServiceResult<Void> r = service.deletePayment(10, 999, adminUser);
+        assertFalse(r.isSuccess());
+        assertEquals(ContractPaymentService.ERR_NOT_FOUND, r.getMessage());
     }
 
     // ==================================================================

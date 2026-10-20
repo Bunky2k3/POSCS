@@ -129,11 +129,22 @@ public class ContractHandoverService extends BaseService {
      */
     public ServiceResult<Void> completeHandover(int contractId, int handoverId, int departmentId,
                                                 String doneNote, User actor) {
-        if (!permissionService.canConfirmHandover(actor, departmentId)) {
-            return ServiceResult.fail(ERR_FORBIDDEN);
-        }
         if (handoverId <= 0 || departmentId <= 0 || contractId < 0) {
             return ServiceResult.fail(ERR_INVALID);
+        }
+        ContractHandover targetHandover = findHandoverTarget(contractId, handoverId);
+        if (targetHandover == null) {
+            return ServiceResult.fail(ERR_NOT_FOUND);
+        }
+        int actualDeptId = targetHandover.getDepartmentId();
+        if (departmentId != actualDeptId) {
+            return ServiceResult.fail(ERR_INVALID);
+        }
+        if (!permissionService.canConfirmHandover(actor, actualDeptId)) {
+            return ServiceResult.fail(ERR_FORBIDDEN);
+        }
+        if (targetHandover.getDoneAt() != null) {
+            return ServiceResult.fail(ERR_COMPLETE_FAILED);
         }
         if (contractId > 0) {
             Contract contract = contractDAO.findById(contractId);
@@ -150,6 +161,29 @@ public class ContractHandoverService extends BaseService {
             return ServiceResult.fail(ERR_COMPLETE_FAILED);
         }
         return ServiceResult.ok(null, "Xác nhận xử lý bàn giao thành công.");
+    }
+
+    private ContractHandover findHandoverTarget(int contractId, int handoverId) {
+        if (contractId > 0) {
+            List<ContractHandover> list = handoverDAO.findHandoversOf(contractId);
+            if (list != null) {
+                for (ContractHandover h : list) {
+                    if (h.getHandoverId() == handoverId) {
+                        return h;
+                    }
+                }
+            }
+            return null;
+        }
+        List<ContractHandover> pending = handoverDAO.findPendingHandovers(null);
+        if (pending != null) {
+            for (ContractHandover h : pending) {
+                if (h.getHandoverId() == handoverId) {
+                    return h;
+                }
+            }
+        }
+        return null;
     }
 
     private ServiceResult<Void> validateDoneNote(String doneNote) {

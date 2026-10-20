@@ -91,6 +91,14 @@ public class ContractHandoverServiceTest {
         return c;
     }
 
+    private ContractHandover sampleHandover(int handoverId, int contractId, int deptId) {
+        ContractHandover h = new ContractHandover();
+        h.setHandoverId(handoverId);
+        h.setContractId(contractId);
+        h.setDepartmentId(deptId);
+        return h;
+    }
+
     // ==================================================================
     // UC-48: initiateHandover - Phân quyền
     // ==================================================================
@@ -264,6 +272,10 @@ public class ContractHandoverServiceTest {
 
     @Test
     public void testCompleteHandover_Permissions() {
+        ContractHandover h100 = sampleHandover(100, 10, 2);
+        ContractHandover h101 = sampleHandover(101, 10, 1);
+        when(handoverDAO.findPendingHandovers(null)).thenReturn(List.of(h100, h101));
+
         // Admin confirms for any department -> permitted
         when(handoverDAO.completeHandover(100, adminUser.getUserId(), "Đã xong"))
                 .thenReturn(true);
@@ -282,7 +294,7 @@ public class ContractHandoverServiceTest {
         assertEquals(ContractHandoverService.ERR_FORBIDDEN, r3.getMessage());
 
         // Deleted user -> Forbidden
-        ServiceResult<Void> r4 = service.completeHandover(101, 2, "Duyệt", deletedUser);
+        ServiceResult<Void> r4 = service.completeHandover(100, 2, "Duyệt", deletedUser);
         assertFalse(r4.isSuccess());
         assertEquals(ContractHandoverService.ERR_FORBIDDEN, r4.getMessage());
     }
@@ -305,6 +317,8 @@ public class ContractHandoverServiceTest {
         assertEquals(ContractHandoverService.ERR_INVALID, r3.getMessage());
 
         // contractId > 0 but contract not found
+        ContractHandover h10 = sampleHandover(10, 999, 1);
+        when(handoverDAO.findHandoversOf(999)).thenReturn(List.of(h10));
         when(contractDAO.findById(999)).thenReturn(null);
         ServiceResult<Void> r4 = service.completeHandover(999, 10, 1, "Done", adminUser);
         assertFalse(r4.isSuccess());
@@ -313,6 +327,9 @@ public class ContractHandoverServiceTest {
 
     @Test
     public void testCompleteHandover_DoneNoteValidation() {
+        ContractHandover h10 = sampleHandover(10, 10, 1);
+        when(handoverDAO.findPendingHandovers(null)).thenReturn(List.of(h10));
+
         // Null doneNote
         ServiceResult<Void> r1 = service.completeHandover(10, 1, null, adminUser);
         assertFalse(r1.isSuccess());
@@ -339,6 +356,10 @@ public class ContractHandoverServiceTest {
 
     @Test
     public void testCompleteHandover_DaoFailsAndSucceeds() {
+        ContractHandover h10 = sampleHandover(10, 10, 1);
+        ContractHandover h11 = sampleHandover(11, 10, 1);
+        when(handoverDAO.findPendingHandovers(null)).thenReturn(List.of(h10, h11));
+
         // DAO returns false
         when(handoverDAO.completeHandover(10, adminUser.getUserId(), "Đã xử lý"))
                 .thenReturn(false);
@@ -352,6 +373,49 @@ public class ContractHandoverServiceTest {
         ServiceResult<Void> r2 = service.completeHandover(11, 1, "   Đã xử lý   ", adminUser);
         assertTrue(r2.isSuccess());
         verify(handoverDAO).completeHandover(11, adminUser.getUserId(), "Đã xử lý");
+    }
+
+    @Test
+    public void testCompleteHandover_QAFeedback_DepartmentMismatchAndSpoofing_Fails() {
+        // Handover 101 thực tế thuộc Phòng 1 (Kỹ thuật)
+        ContractHandover h101 = sampleHandover(101, 10, 1);
+        when(handoverDAO.findPendingHandovers(null)).thenReturn(List.of(h101));
+
+        // Nhân viên Phòng 2 gửi departmentId = 2 nhưng truyền handoverId = 101 của Phòng 1
+        ServiceResult<Void> r1 = service.completeHandover(101, 2, "Xong việc", employeeDept2);
+        assertFalse(r1.isSuccess());
+        assertEquals(ContractHandoverService.ERR_INVALID, r1.getMessage());
+
+        // Nếu gửi departmentId = 1 nhưng actor lại thuộc Phòng 2 -> Bị chặn MSG-022 Forbidden
+        ServiceResult<Void> r2 = service.completeHandover(101, 1, "Xong việc", employeeDept2);
+        assertFalse(r2.isSuccess());
+        assertEquals(ContractHandoverService.ERR_FORBIDDEN, r2.getMessage());
+    }
+
+    @Test
+    public void testCompleteHandover_QAFeedback_HandoverNotBelongingToContract_FailsNotFound() {
+        Contract contract = sampleContract(10, PROGRESS_SIGNED);
+        when(contractDAO.findById(10)).thenReturn(contract);
+
+        // Hợp đồng 10 chỉ có chặng bàn giao 101
+        ContractHandover h101 = sampleHandover(101, 10, 1);
+        when(handoverDAO.findHandoversOf(10)).thenReturn(List.of(h101));
+
+        // Truyền handoverId = 999 không thuộc HĐ 10
+        ServiceResult<Void> r = service.completeHandover(10, 999, 1, "Đã nghiệm thu", adminUser);
+        assertFalse(r.isSuccess());
+        assertEquals(ContractHandoverService.ERR_NOT_FOUND, r.getMessage());
+    }
+
+    @Test
+    public void testCompleteHandover_QAFeedback_AlreadyCompleted_Fails() {
+        ContractHandover h10 = sampleHandover(10, 10, 1);
+        h10.setDoneAt(Timestamp.from(Instant.now())); // Đã hoàn tất trước đó
+        when(handoverDAO.findPendingHandovers(null)).thenReturn(List.of(h10));
+
+        ServiceResult<Void> r = service.completeHandover(10, 1, "Nghiệm thu lại", adminUser);
+        assertFalse(r.isSuccess());
+        assertEquals(ContractHandoverService.ERR_COMPLETE_FAILED, r.getMessage());
     }
 
     // ==================================================================

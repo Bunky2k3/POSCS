@@ -24,6 +24,7 @@ public class ContractPaymentService extends BaseService {
     public static final String ERR_INVALID = "invalid";
     public static final String ERR_PAYMENT_FROZEN = "payment_frozen";
     public static final String ERR_PAYMENT_FAILED = "payment_failed";
+    public static final String ERR_PAYMENT_ALREADY_PAID = "payment_already_paid";
     public static final String ERR_INVALID_AMOUNT = "invalid_amount";
     public static final String ERR_MISSING_DUE_DATE = "missing_due_date";
 
@@ -142,11 +143,30 @@ public class ContractPaymentService extends BaseService {
         if (contract.isFrozen()) {
             return ServiceResult.fail(ERR_PAYMENT_FROZEN);
         }
+        ContractPayment targetPayment = findPaymentInContract(contractId, paymentId);
+        if (targetPayment == null) {
+            return ServiceResult.fail(ERR_NOT_FOUND);
+        }
+        if (targetPayment.getPaidDate() != null) {
+            return ServiceResult.fail(ERR_PAYMENT_ALREADY_PAID);
+        }
         boolean ok = paymentDAO.deletePayment(paymentId, contractId, actor.getUserId());
         if (!ok) {
             return ServiceResult.fail(ERR_PAYMENT_FAILED);
         }
         return ServiceResult.ok(null, "Xoá kỳ thanh toán thành công.");
+    }
+
+    private ContractPayment findPaymentInContract(int contractId, int paymentId) {
+        List<ContractPayment> list = paymentDAO.findPaymentsByContractId(contractId);
+        if (list != null) {
+            for (ContractPayment p : list) {
+                if (p.getPaymentId() == paymentId) {
+                    return p;
+                }
+            }
+        }
+        return null;
     }
 
     /**
