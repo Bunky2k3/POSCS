@@ -18,7 +18,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import poscs.common.AccessControl;
 import poscs.common.ListScope;
-import poscs.common.ExcelUtil;
 import poscs.common.Logs;
 import poscs.common.MoneyVnd;
 import poscs.common.Period;
@@ -130,6 +129,7 @@ public class ContractController extends HttpServlet {
     private ContractDetailController detailController;
     private ContractPaymentController paymentController;
     private ContractDocumentController documentController;
+    private ContractExportController exportController;
 
     PermissionService getPermissionService() {
         if (permissionService != null) {
@@ -196,6 +196,17 @@ public class ContractController extends HttpServlet {
 
     void setDetailController(ContractDetailController detailController) {
         this.detailController = detailController;
+    }
+
+    ContractExportController getExportController() {
+        if (exportController == null) {
+            this.exportController = new ContractExportController(contractDAO, employeeDAO, null, getPermissionService());
+        }
+        return exportController;
+    }
+
+    void setExportController(ContractExportController exportController) {
+        this.exportController = exportController;
     }
 
     @Override
@@ -317,112 +328,15 @@ public class ContractController extends HttpServlet {
         getListController().showList(request, response);
     }
 
-    /**
-     * Cùng phép đọc bộ lọc bàn giao với showList -- file Excel phải ra đúng thứ
-     * đang nhìn thấy, kể cả khi lọc bằng ô tích chứ không bằng dropdown.
-     */
-    private Integer waitingDepartmentForExport(HttpServletRequest request) {
-        Integer dept = parseIntOrNull(request.getParameter("waitingDept"));
-        if (dept == null && "1".equals(request.getParameter("waiting"))) {
-            return ContractDAO.WAITING_ANY_DEPARTMENT;
-        }
-        return dept;
-    }
-
-    /**
-     * Tên phòng ứng với id, tra trong danh sách ĐÃ nạp sẵn cho dropdown.
-     *
-     * <p>Không gọi thêm câu truy vấn nào: danh sách phòng vốn đã phải lấy để dựng
-     * ô lọc, dùng lại chính nó. Không tìm thấy thì trả null và chip rơi về câu
-     * chữ chung -- id rác trên URL không đáng làm vỡ cả trang danh sách.
-     */
-    private static String departmentNameOf(List<Department> departments, Integer id) {
-        if (id == null || departments == null) {
-            return null;
-        }
-        for (Department d : departments) {
-            if (d.getDepartmentId() == id) {
-                return d.getDepartmentName();
-            }
-        }
-        return null;
-    }
-
     private void showDetail(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
         getDetailController().doGet(request, response);
     }
 
-    /** Xuất Excel toàn bộ hợp đồng khớp filter hiện tại (không phân trang) -- nút "Xuất Excel" ở listcontract.jsp. */
-    private void exportExcel(HttpServletRequest request, HttpServletResponse response) throws IOException {
-        String keyword = request.getParameter("keyword");
-        String statusFilter = request.getParameter("status");
-        String typeFilter = request.getParameter("type");
-        List<Integer> provinceFilters = provinceFiltersOf(request);
-        Period period = Period.parse(request.getParameter("year"), request.getParameter("period"));
-
-        // Sắp theo tỉnh: hợp đồng được giao việc theo địa bàn nên file xuất ra
-        // phải gom các hợp đồng cùng tỉnh lại với nhau.
-        // Xuất đúng danh sách đang xem, giữ nguyên cả kỳ lẫn chiều.
-        String direction = directionFromKind(request.getParameter("kind"));
-        // Hợp đồng MUA không lọc theo tỉnh. Tỉnh của hợp đồng suy ra từ địa chỉ
-        // đối tác đứng tên, mà với hợp đồng mua thì đối tác là NHÀ CUNG CẤP --
-        // nhóm không chia theo địa bàn (xem CustomerController). Lọc theo tỉnh
-        // ở đó vừa vô nghĩa vừa cắt mất kết quả.
-        //
-        // Bỏ ở controller chứ không chỉ ẩn ô chọn: một provinceId còn sót trên
-        // URL vẫn âm thầm thu hẹp danh sách.
-        if (DIRECTION_BUY.equals(direction)) {
-            provinceFilters = List.of();
-        }
-        // Ô "Cả phụ lục / Chỉ hợp đồng gốc" phải đi theo sang file: xuất ra một
-        // danh sách khác thứ đang nhìn thấy là cách chắc chắn nhất để hai con số
-        // trong cùng một cuộc họp không khớp nhau.
-        // Xuất ĐÚNG thứ đang nhìn thấy: cùng phạm vi mặc định với danh sách trên
-        // màn hình. Thiếu dòng này thì bấm "Xuất Excel" ở màn hình 4 dòng lại ra file
-        // 12 dòng, mà người xuất không cách nào biết file sai.
-        ListScope scope = AccessControl.listScope(request,
-                () -> employeeDAO.findTeamUserIds(AccessControl.currentUser(request).getUserId()),
-                () -> employeeDAO.findProvincesOf(AccessControl.currentUser(request).getUserId())
-                        .stream().map(Province::getProvinceId).collect(Collectors.toList()))
-                .withActiveWindow(MONTH_ALL.equals(request.getParameter("month")) ? null : currentMonth());
-        List<Contract> all = contractDAO.findAll(1, Integer.MAX_VALUE, keyword, statusFilter, typeFilter,
-                provinceFilters, true, period, direction, request.getParameter("progress"),
-                "root".equals(request.getParameter("scope")),
-                waitingDepartmentForExport(request), scope);
-        // Giữ cột "Mã HĐ" trong file dù danh sách trên màn hình đã bỏ -- xem lý do
-        // ở CustomerController.exportExcel: STT chỉ đúng trong phạm vi một file.
-        //
-        // MỘT cột mã, không hai. V25 từng xuất kèm cột "Số hợp đồng" riêng, hồi
-        // mã là định danh máy sinh còn số là thứ in trên giấy; V28 chốt lại rằng
-        // hai thứ đó là một và bỏ cột contract_number, nên cột thứ hai ở đây
-        // không còn gì để đọc.
-        String[] headers = {"STT", "Mã HĐ", "Phụ lục của", "Tiêu đề", "Loại HĐ", "Tỉnh/Thành phố", "Khách hàng",
-            "Người phụ trách", "Ngày ký", "Ngày hiệu lực", "Ngày kết thúc", "Trạng thái", "Tiến độ"};
-        List<Object[]> rows = new ArrayList<>();
-        int stt = 1;
-        for (Contract c : all) {
-            rows.add(new Object[]{
-                stt++,
-                c.getContractCode(),
-                // Rỗng ở hợp đồng gốc. Có cột này thì đọc file cũng phân biệt
-                // được phụ lục với hợp đồng, y như nhãn trên màn hình.
-                c.getParentContractCode() != null ? c.getParentContractCode() : "",
-                c.getTitle(),
-                c.getContractType(),
-                provinceNameOf(c),
-                c.getEnterprise() != null ? c.getEnterprise().getEnterpriseName() : "",
-                c.getOwner() != null ? c.getOwner().getFullName() : "",
-                c.getSigningDate() != null ? c.getSigningDate().toString() : "",
-                c.getEffectiveDate() != null ? c.getEffectiveDate().toString() : "",
-                c.getEndDate() != null ? c.getEndDate().toString() : "",
-                c.getStatus(),
-                c.getProgressStatus()
-            });
-        }
-        ExcelUtil.writeWorkbook(response,
-                DIRECTION_BUY.equals(direction) ? "hop_dong_mua" : "hop_dong_ban",
-                headers, rows);
+    /** Xuất Excel toàn bộ hợp đồng khớp filter hiện tại (không phân trang) -- nút "Xuất Excel" ở listcontract.jsp (UC-41). */
+    private void exportExcel(HttpServletRequest request, HttpServletResponse response)
+            throws ServletException, IOException {
+        getExportController().doGet(request, response);
     }
 
     // static: FilterState (lớp lồng static) cũng dùng chung phép kiểm này.
@@ -1527,20 +1441,6 @@ public class ContractController extends HttpServlet {
         // Có cả hai thì vẫn giữ BR-36; thiếu một trong hai thì chưa có gì để so.
         return c.getEffectiveDate() == null || c.getEndDate() == null
                 || !c.getEffectiveDate().after(c.getEndDate());
-    }
-
-    /**
-     * Tỉnh/thành của hợp đồng = tỉnh của khách hàng đứng tên (ContractDAO đã
-     * gắn sẵn khi map). Bỏ tiền tố "Tỉnh "/"Thành phố " cho khớp thứ tự đã sắp
-     * ở DAO; hợp đồng của khách chưa có địa chỉ ghi "Chưa xác định" thay vì để
-     * trống, để người đọc file phân biệt được thiếu dữ liệu với lỗi xuất.
-     */
-    private static String provinceNameOf(Contract contract) {
-        Enterprise enterprise = contract.getEnterprise();
-        Address address = enterprise != null ? enterprise.getAddress() : null;
-        District district = address != null ? address.getDistrict() : null;
-        Province province = district != null ? district.getProvince() : null;
-        return province != null ? province.getShortName() : "Chưa xác định";
     }
 
     /**

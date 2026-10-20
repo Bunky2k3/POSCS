@@ -1995,4 +1995,30 @@ public class ContractControllerTest {
         assertSame(customDc, ctrl.getDocumentController());
     }
 
+    // ------------------------------------------------------------------
+    // Delegation to ContractExportController (Task 4.17)
+    // ------------------------------------------------------------------
+
+    @Test
+    public void doGet_exportExcel_delegatesToExportController() throws Exception {
+        ContractExportController mockExportCtrl = mock(ContractExportController.class);
+        controller.setExportController(mockExportCtrl);
+
+        when(request.getParameter("action")).thenReturn("exportExcel");
+        controller.doGet(request, response);
+
+        verify(mockExportCtrl).doGet(request, response);
+    }
+
+    @Test
+    public void getExportController_lazyInitAndSetExportController() {
+        ContractController ctrl = new ContractController();
+        ContractExportController ec1 = ctrl.getExportController();
+        assertNotNull(ec1);
+        assertSame(ec1, ctrl.getExportController());
+
+        ContractExportController customEc = mock(ContractExportController.class);
+        ctrl.setExportController(customEc);
+        assertSame(customEc, ctrl.getExportController());
+    }
 }
