@@ -102,7 +102,10 @@ Không còn mục nào.
   - Tách `ContractFilterHelper` xử lý lọc, chu kỳ thời gian và dải chip trạng thái.
   - Tinh gọn `ContractController` và `ContractControllerHelper`.
   - Bổ sung unit tests cho `ContractListControllerTest` và `ContractDetailControllerTest`.
-- [ ] **Task 4.14:** `[UC-48, UC-49]` `ContractHandoverController`.
+- [x] **Task 4.14:** `[UC-48, UC-49]` `ContractHandoverController`.
+  - Xây dựng `ContractHandoverController` và `ContractHandoverHelper` xử lý hàng đợi bàn giao (UC-48) và hoàn tất chặng (UC-49) qua `ContractHandoverService`.
+  - Bổ sung `ContractHandoverControllerTest` (25 unit tests bao phủ các nhánh và phân quyền RBAC).
+  - Hoàn thiện và cập nhật `docs/qa/Task-4.14.md`.
 - [ ] **Task 4.15:** `[UC-53]` `ContractPaymentController`.
 - [ ] **Task 4.16:** `[UC-52]` `ContractDocumentController`.
 - [ ] **Task 4.17:** `[UC-41]` `ContractExportController` (Excel, cùng bộ lọc, không phân trang, sắp theo tỉnh/thành).
