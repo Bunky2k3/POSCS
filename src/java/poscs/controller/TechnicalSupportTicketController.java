@@ -34,6 +34,9 @@ import poscs.dao.TechnicalSupportTicketDAO;
 import poscs.model.Contract;
 import poscs.model.TechnicalRequest;
 import poscs.model.User;
+import poscs.service.PermissionService;
+import poscs.service.TicketService;
+import poscs.validator.TicketValidator;
 
 /**
  * Controller CRUD cho phiếu hỗ trợ kỹ thuật (bảng technicalrequests). Điều
@@ -76,11 +79,75 @@ public class TechnicalSupportTicketController extends HttpServlet {
     /** Lề (điểm) của trang PDF xuất phiếu -- dùng cho cả 4 phía. */
     private static final float PDF_MARGIN = 56f;
 
-    private final TechnicalSupportTicketDAO ticketDAO = new TechnicalSupportTicketDAO();
-    private final CustomerDAO customerDAO = new CustomerDAO();
+    private TechnicalSupportTicketDAO ticketDAO = new TechnicalSupportTicketDAO();
+    private CustomerDAO customerDAO = new CustomerDAO();
     // Dùng để kiểm hợp đồng được chọn có đúng của khách hàng trên phiếu không.
-    private final ContractDAO contractDAO = new ContractDAO();
-    private final EmployeeDAO employeeDAO = new EmployeeDAO();
+    private ContractDAO contractDAO = new ContractDAO();
+    private EmployeeDAO employeeDAO = new EmployeeDAO();
+
+    private PermissionService permissionService;
+    private TicketService ticketService;
+    private TicketListController listController;
+    private TicketDetailController detailController;
+
+    PermissionService getPermissionService() {
+        if (permissionService != null) {
+            return permissionService;
+        }
+        return new PermissionService(employeeDAO) {
+            @Override
+            public User getEffectiveUser(User sessionUser) {
+                User u = super.getEffectiveUser(sessionUser);
+                if (u != null) {
+                    return u;
+                }
+                if (sessionUser != null && !sessionUser.isDeleted() && sessionUser.getRole() != null) {
+                    return sessionUser;
+                }
+                return null;
+            }
+        };
+    }
+
+    void setPermissionService(PermissionService permissionService) {
+        this.permissionService = permissionService;
+    }
+
+    TicketService getTicketService() {
+        if (ticketService != null) {
+            return ticketService;
+        }
+        return new TicketService(ticketDAO, customerDAO, contractDAO, employeeDAO,
+                getPermissionService(), new TicketValidator());
+    }
+
+    void setTicketService(TicketService ticketService) {
+        this.ticketService = ticketService;
+    }
+
+    TicketListController getListController() {
+        if (listController != null) {
+            return listController;
+        }
+        return new TicketListController(ticketDAO, customerDAO, contractDAO, employeeDAO,
+                getTicketService(), getPermissionService());
+    }
+
+    void setListController(TicketListController listController) {
+        this.listController = listController;
+    }
+
+    TicketDetailController getDetailController() {
+        if (detailController != null) {
+            return detailController;
+        }
+        return new TicketDetailController(ticketDAO, customerDAO, contractDAO, employeeDAO,
+                getTicketService(), getPermissionService());
+    }
+
+    void setDetailController(TicketDetailController detailController) {
+        this.detailController = detailController;
+    }
 
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
@@ -147,43 +214,7 @@ public class TechnicalSupportTicketController extends HttpServlet {
 
     private void showList(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
-        int page = parseIntOrDefault(request.getParameter("page"), 1);
-        if (page < 1) {
-            page = 1;
-        }
-        String keyword = request.getParameter("keyword");
-        String statusFilter = request.getParameter("status");
-        String priorityFilter = request.getParameter("priority");
-        Period period = Period.parse(request.getParameter("year"), request.getParameter("period"));
-        String assigneeFilter = assigneeFilterOf(request);
-        Integer assigneeId = assigneeIdOf(assigneeFilter, request);
-
-        List<TechnicalRequest> ticketList = ticketDAO.findAll(page, PAGE_SIZE, keyword, statusFilter,
-                priorityFilter, period, assigneeId);
-        int totalCount = ticketDAO.countAll(keyword, statusFilter, priorityFilter, period, assigneeId);
-        int totalPages = Math.max(1, (int) Math.ceil(totalCount / (double) PAGE_SIZE));
-
-        request.setAttribute("ticketList", ticketList);
-        // Dải KPI ở đầu trang cũng thu theo kỳ VÀ theo người xử lý, nếu không
-        // thì con số tổng nằm ngay trên một bảng đã lọc -- hai phạm vi khác
-        // nhau trên cùng màn hình.
-        request.setAttribute("statusSummary", ticketDAO.countListSummary(period, assigneeId));
-        request.setAttribute("currentPage", page);
-        request.setAttribute("totalPages", totalPages);
-        request.setAttribute("totalCount", totalCount);
-        request.setAttribute("keyword", keyword);
-        // Bản đã mã hoá URL cho các link phân trang / lọc / xuất -- xem QueryStrings.param.
-        request.setAttribute("keywordParam", QueryStrings.param(keyword));
-        request.setAttribute("statusFilter", statusFilter);
-        request.setAttribute("priorityFilter", priorityFilter);
-        request.setAttribute("assigneeFilter", assigneeFilter);
-        request.setAttribute("isTechnician", isTechnician(request));
-        // Giữ người đang lọc trong ô chọn dù họ đã đổi vai / nghỉ, như ô chọn ở form.
-        request.setAttribute("technicianList", employeeDAO.findActiveByRole(TECHNICIAN_ROLE,
-                ASSIGNEE_MINE.equals(assigneeFilter) ? null : assigneeId));
-        ContractController.setPeriodAttributes(request, period);
-
-        request.getRequestDispatcher(LIST_VIEW).forward(request, response);
+        getListController().showList(request, response);
     }
 
     /** Giá trị của ô lọc "Người xử lý" (tham số assignee), ngoài user_id. */
@@ -200,52 +231,18 @@ public class TechnicalSupportTicketController extends HttpServlet {
      * sang trang. Giá trị lạ -> "all".
      */
     private String assigneeFilterOf(HttpServletRequest request) {
-        String raw = request.getParameter("assignee");
-        if (raw == null || raw.trim().isEmpty()) {
-            return isTechnician(request) ? ASSIGNEE_MINE : ASSIGNEE_ALL;
-        }
-        raw = raw.trim();
-        if (ASSIGNEE_MINE.equals(raw)) {
-            return ASSIGNEE_MINE;
-        }
-        Integer id = parseIntOrNull(raw);
-        return id != null && id > 0 ? String.valueOf(id) : ASSIGNEE_ALL;
+        return getTicketService().resolveAssigneeFilter(
+                request.getParameter("assignee"), AccessControl.currentUser(request));
     }
 
     /** user_id cần lọc theo ô "Người xử lý", null = mọi người. */
     private Integer assigneeIdOf(String assigneeFilter, HttpServletRequest request) {
-        if (ASSIGNEE_MINE.equals(assigneeFilter)) {
-            User me = AccessControl.currentUser(request);
-            return me != null ? me.getUserId() : null;
-        }
-        return ASSIGNEE_ALL.equals(assigneeFilter) ? null : parseIntOrNull(assigneeFilter);
-    }
-
-    private boolean isTechnician(HttpServletRequest request) {
-        User me = AccessControl.currentUser(request);
-        return me != null && me.getRole() != null && TECHNICIAN_ROLE.equals(me.getRole().getRoleName());
+        return getTicketService().resolveAssigneeId(assigneeFilter, AccessControl.currentUser(request));
     }
 
     private void showDetail(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
-        Integer id = parseIntOrNull(request.getParameter("id"));
-        TechnicalRequest ticket = id != null ? ticketDAO.findById(id) : null;
-        if (ticket == null) {
-            response.sendRedirect(request.getContextPath() + "/ticket?error=notfound");
-            return;
-        }
-
-        request.setAttribute("ticket", ticket);
-        request.setAttribute("canDelete", ticketDAO.canDelete(id));
-        request.setAttribute("ticketHistory", ticketDAO.findHistoryByTicketId(id));
-        // Nút "Sửa" phải hiện cho cả kỹ thuật viên ĐANG ĐƯỢC GIAO phiếu này --
-        // họ không có quyền Full trên Ticket, nhưng vẫn được cập nhật trạng
-        // thái/ghi chú xử lý của đúng phiếu của mình (xem PERMISSIONS.md).
-        request.setAttribute("canEdit",
-                AccessControl.hasFullAccess(request, AccessControl.Resource.TICKET)
-                        || AccessControl.canUpdateAssignedTicket(request, ticket));
-
-        request.getRequestDispatcher(DETAIL_VIEW).forward(request, response);
+        getDetailController().showDetail(request, response);
     }
 
     /**
