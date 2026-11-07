@@ -693,4 +693,54 @@ public class EmployeeDAOTest {
             assertTrue(dao.findAllProvincesWithHolder().isEmpty());
         }
     }
+
+    @Test
+    public void findById_mapsProfileRoleDepartmentManagerAndAddress() throws Exception {
+        ResultSet rs = singleRow(row(
+                "user_id", 15, "username", "annd", "last_name", "Nguyễn", "middle_name", "Văn",
+                "first_name", "An", "citizen_id", "001201012345", "gender", "Nam",
+                "personal_email", "an@example.com", "phone", "0912345678",
+                "role_id", 2, "role_name", "Sales", "department_id", 3, "department_name", "Kinh doanh",
+                "manager_id", 7,
+                "address_id", 100, "street_and_local_name", "Số 1 Hoàng Quốc Việt",
+                "districts_id", 10, "districts_name", "Phường Nghĩa Đô",
+                "province_id", 1, "province_name", "Thành phố Hà Nội", "is_deleted", false));
+        Connection conn = connectionReturning(statementReturning(rs));
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            User u = dao.findById(15);
+
+            assertNotNull(u);
+            assertEquals(15, u.getUserId());
+            assertEquals("Sales", u.getRole().getRoleName());
+            assertEquals("Kinh doanh", u.getDepartment().getDepartmentName());
+            assertEquals(Integer.valueOf(7), u.getManagerId());
+            assertNotNull(u.getAddress());
+            assertEquals(100, u.getAddress().getAddressId());
+            assertEquals("Phường Nghĩa Đô", u.getAddress().getDistrict().getDistrictName());
+            assertEquals("Thành phố Hà Nội", u.getAddress().getDistrict().getProvince().getProvinceName());
+        }
+    }
+
+    @Test
+    public void findProfileById_withoutAddressOrManager_leavesAddressAndManagerNull() throws Exception {
+        ResultSet rs = singleRow(row(
+                "user_id", 15, "username", "annd", "last_name", "Nguyễn",
+                "first_name", "An", "role_id", 2, "role_name", "Sales",
+                "department_id", 3, "department_name", "Kinh doanh", "is_deleted", false));
+        Connection conn = connectionReturning(statementReturning(rs));
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            User u = dao.findProfileById(15);
+
+            assertNotNull(u);
+            assertNull(u.getManagerId());
+            assertNull(u.getManager());
+            assertNull(u.getAddress());
+        }
+    }
 }

@@ -54,46 +54,37 @@ public class EmployeeDAO {
             ps.setString(1, username);
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
-                    // Map từng cột trong ResultSet sang object User.
-                    User u = new User();
-                    u.setUserId(rs.getInt("user_id"));
-                    u.setUsername(rs.getString("username"));
-                    u.setPasswordHash(rs.getString("password_hash")); // hash BCrypt, controller sẽ so khớp bằng BCrypt.checkpw
-                    u.setMustChangePassword(rs.getBoolean("must_change_password"));
-                    u.setRoleId(rs.getInt("role_id"));
-                    u.setLastName(rs.getString("last_name"));
-                    u.setMiddleName(rs.getString("middle_name"));
-                    u.setFirstName(rs.getString("first_name"));
-                    u.setGender(rs.getString("gender"));
-                    u.setDateOfBirth(rs.getDate("date_of_birth"));
-                    u.setCitizenId(rs.getString("citizen_id"));
-                    u.setPhone(rs.getString("phone"));
-                    // Quên map cột này thì getPersonalEmail() luôn null, và
-                    // quên mật khẩu im lặng không gửi OTP cho ai cả -- đúng
-                    // như đã xảy ra từ V36 tới khi có test tích hợp chặn lại.
-                    u.setPersonalEmail(rs.getString("personal_email"));
-                    u.setDepartmentId(rs.getInt("department_id"));
-                    // Vị trí trong cây tổ chức PHẢI đi cùng User vào session:
-                    // AccessControl đọc thẳng từ đó để biết người này là cấp
-                    // trên hay cấp dưới. Quên map ở đây thì managerId luôn null,
-                    // ai cũng thành cấp trên, và toàn bộ phần siết quyền im
-                    // lặng không chạy -- không lỗi, không log, chỉ là không có
-                    // tác dụng gì.
-                    int managerId = rs.getInt("manager_id");
-                    u.setManagerId(rs.wasNull() ? null : managerId);
-                    u.setAvatarUrl(rs.getString("avatar_url")); // topbar doc anh dai dien tu session
-                    u.setDeleted(rs.getBoolean("is_deleted"));
-                    u.setRole(new Role(rs.getInt("role_id"), rs.getString("role_name")));
-                    return u;
+                    return mapAuthUser(rs);
                 }
-                // Không tìm thấy hàng nào khớp -> trả về null, để caller tự quyết định
-                // thông báo lỗi (KHÔNG throw exception vì "không tìm thấy" là kết quả
-                // hợp lệ, không phải lỗi hệ thống).
             }
         } catch (SQLException ex) {
             LOG.error("Loi truy van dang nhap (username={})", username, ex);
         }
         return null;
+    }
+
+    private User mapAuthUser(ResultSet rs) throws SQLException {
+        User u = new User();
+        u.setUserId(rs.getInt("user_id"));
+        u.setUsername(rs.getString("username"));
+        u.setPasswordHash(rs.getString("password_hash"));
+        u.setMustChangePassword(rs.getBoolean("must_change_password"));
+        u.setRoleId(rs.getInt("role_id"));
+        u.setLastName(rs.getString("last_name"));
+        u.setMiddleName(rs.getString("middle_name"));
+        u.setFirstName(rs.getString("first_name"));
+        u.setGender(rs.getString("gender"));
+        u.setDateOfBirth(rs.getDate("date_of_birth"));
+        u.setCitizenId(rs.getString("citizen_id"));
+        u.setPhone(rs.getString("phone"));
+        u.setPersonalEmail(rs.getString("personal_email"));
+        u.setDepartmentId(rs.getInt("department_id"));
+        int managerId = rs.getInt("manager_id");
+        u.setManagerId(rs.wasNull() ? null : managerId);
+        u.setAvatarUrl(rs.getString("avatar_url"));
+        u.setDeleted(rs.getBoolean("is_deleted"));
+        u.setRole(new Role(rs.getInt("role_id"), rs.getString("role_name")));
+        return u;
     }
 
     /**
@@ -120,50 +111,57 @@ public class EmployeeDAO {
             ps.setInt(1, userId);
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
-                    User u = new User();
-                    u.setUserId(rs.getInt("user_id"));
-                    u.setUsername(rs.getString("username"));
-                    u.setRoleId(rs.getInt("role_id"));
-                    u.setRole(new Role(rs.getInt("role_id"), rs.getString("role_name")));
-                    u.setLastName(rs.getString("last_name"));
-                    u.setMiddleName(rs.getString("middle_name"));
-                    u.setFirstName(rs.getString("first_name"));
-                    u.setGender(rs.getString("gender"));
-                    u.setDateOfBirth(rs.getDate("date_of_birth"));
-                    u.setCitizenId(rs.getString("citizen_id"));
-                    u.setPhone(rs.getString("phone"));
-                    u.setPersonalEmail(rs.getString("personal_email"));
-                    u.setAvatarUrl(rs.getString("avatar_url"));
-                    u.setDepartmentId(rs.getInt("department_id"));
-                    u.setDepartment(new Department(rs.getInt("department_id"), rs.getString("department_name")));
-                    u.setHireDate(rs.getDate("hire_date"));
-
-                    // address_id có thể NULL -- getInt() sẽ trả 0 khi NULL, nên
-                    // phải kiểm tra wasNull() để phân biệt "0" thật với NULL.
-                    int addressId = rs.getInt("address_id");
-                    if (!rs.wasNull()) {
-                        Address address = new Address();
-                        address.setAddressId(addressId);
-                        address.setStreetAndLocalName(rs.getString("street_and_local_name"));
-                        address.setDistrictId(rs.getInt("districts_id"));
-
-                        District district = new District();
-                        district.setDistrictId(rs.getInt("districts_id"));
-                        district.setDistrictName(rs.getString("districts_name"));
-                        district.setProvinceId(rs.getInt("province_id"));
-                        district.setProvince(new Province(rs.getInt("province_id"), rs.getString("province_name")));
-
-                        address.setDistrict(district);
-                        u.setAddress(address);
-                    }
-
-                    return u;
+                    return mapProfileUser(rs);
                 }
             }
         } catch (SQLException ex) {
             LOG.error("Loi truy van ho so ca nhan (userId={})", userId, ex);
         }
         return null;
+    }
+
+    private User mapProfileUser(ResultSet rs) throws SQLException {
+        User u = new User();
+        u.setUserId(rs.getInt("user_id"));
+        u.setUsername(rs.getString("username"));
+        u.setRoleId(rs.getInt("role_id"));
+        u.setRole(new Role(rs.getInt("role_id"), rs.getString("role_name")));
+        u.setLastName(rs.getString("last_name"));
+        u.setMiddleName(rs.getString("middle_name"));
+        u.setFirstName(rs.getString("first_name"));
+        u.setGender(rs.getString("gender"));
+        u.setDateOfBirth(rs.getDate("date_of_birth"));
+        u.setCitizenId(rs.getString("citizen_id"));
+        u.setPhone(rs.getString("phone"));
+        u.setPersonalEmail(rs.getString("personal_email"));
+        u.setAvatarUrl(rs.getString("avatar_url"));
+        u.setDepartmentId(rs.getInt("department_id"));
+        u.setDepartment(new Department(rs.getInt("department_id"), rs.getString("department_name")));
+        u.setHireDate(rs.getDate("hire_date"));
+        u.setAddress(readAddress(rs));
+        return u;
+    }
+
+    private Address readAddress(ResultSet rs) throws SQLException {
+        // address_id có thể NULL -- getInt() sẽ trả 0 khi NULL, nên
+        // phải kiểm tra wasNull() để phân biệt "0" thật với NULL.
+        int addressId = rs.getInt("address_id");
+        if (rs.wasNull()) {
+            return null;
+        }
+        Address address = new Address();
+        address.setAddressId(addressId);
+        address.setStreetAndLocalName(rs.getString("street_and_local_name"));
+        address.setDistrictId(rs.getInt("districts_id"));
+
+        District district = new District();
+        district.setDistrictId(rs.getInt("districts_id"));
+        district.setDistrictName(rs.getString("districts_name"));
+        district.setProvinceId(rs.getInt("province_id"));
+        district.setProvince(new Province(rs.getInt("province_id"), rs.getString("province_name")));
+
+        address.setDistrict(district);
+        return address;
     }
 
     /**
@@ -181,28 +179,12 @@ public class EmployeeDAO {
         try (Connection conn = DBContext.getConnection()) {
             // resolveAddressId() (insert/update dòng addresses) và UPDATE users
             // phải cùng thành công hoặc cùng rollback -- tắt autocommit để gộp
-            // thành 1 transaction, tránh để địa chỉ đã đổi mà các trường khác
-            // của hồ sơ lại không được lưu (hoặc ngược lại) khi 1 trong 2 bước lỗi.
+            // thành 1 transaction (NFR-19).
             conn.setAutoCommit(false);
             try {
                 Integer addressId = resolveAddressId(conn, user.getAddress());
-
                 try (PreparedStatement ps = conn.prepareStatement(sql)) {
-                    ps.setString(1, user.getLastName());
-                    ps.setString(2, user.getMiddleName());
-                    ps.setString(3, user.getFirstName());
-                    ps.setString(4, user.getGender());
-                    ps.setDate(5, user.getDateOfBirth());
-                    ps.setString(6, user.getCitizenId());
-                    ps.setString(7, user.getPhone());
-                    ps.setString(8, user.getPersonalEmail());
-                    if (addressId != null) {
-                        ps.setInt(9, addressId);
-                    } else {
-                        ps.setNull(9, Types.INTEGER);
-                    }
-                    ps.setString(10, user.getAvatarUrl());
-                    ps.setInt(11, user.getUserId());
+                    bindUpdateProfile(ps, user, addressId);
                     boolean ok = ps.executeUpdate() > 0;
                     if (ok) {
                         conn.commit();
@@ -221,6 +203,20 @@ public class EmployeeDAO {
             LOG.error("Loi cap nhat ho so ca nhan (userId={}, username={})", user.getUserId(), user.getUsername(), ex);
             return false;
         }
+    }
+
+    private void bindUpdateProfile(PreparedStatement ps, User user, Integer addressId) throws SQLException {
+        ps.setString(1, user.getLastName());
+        ps.setString(2, user.getMiddleName());
+        ps.setString(3, user.getFirstName());
+        ps.setString(4, user.getGender());
+        ps.setDate(5, user.getDateOfBirth());
+        ps.setString(6, user.getCitizenId());
+        ps.setString(7, user.getPhone());
+        ps.setString(8, user.getPersonalEmail());
+        setNullableInt(ps, 9, addressId);
+        ps.setString(10, user.getAvatarUrl());
+        ps.setInt(11, user.getUserId());
     }
 
     /**
@@ -300,6 +296,27 @@ public class EmployeeDAO {
      *        Bỏ qua phần tử null, nên truyền thẳng cột nullable vào được.
      */
     public List<User> findActiveByRole(String roleName, Integer... alsoInclude) {
+        List<Integer> keep = collectKeepIds(alsoInclude);
+        String sql = buildFindActiveByRoleSql(keep.size());
+        List<User> result = new ArrayList<>();
+        try (Connection conn = DBContext.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, roleName);
+            for (int i = 0; i < keep.size(); i++) {
+                ps.setInt(i + 2, keep.get(i));
+            }
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    result.add(mapActiveUserSummary(rs));
+                }
+            }
+        } catch (SQLException ex) {
+            LOG.error("Loi truy van nhan vien theo vai (roleName={})", roleName, ex);
+        }
+        return result;
+    }
+
+    private List<Integer> collectKeepIds(Integer... alsoInclude) {
         List<Integer> keep = new ArrayList<>();
         if (alsoInclude != null) {
             for (Integer id : alsoInclude) {
@@ -308,41 +325,33 @@ public class EmployeeDAO {
                 }
             }
         }
+        return keep;
+    }
+
+    private String buildFindActiveByRoleSql(int keepCount) {
         StringBuilder sql = new StringBuilder(
                 "SELECT u.user_id, u.username, u.last_name, u.middle_name, u.first_name, u.department_id " +
                 "FROM users u JOIN roles r ON r.role_id = u.role_id " +
                 "WHERE u.is_deleted = 0 AND (r.role_name = ?");
-        for (int i = 0; i < keep.size(); i++) {
+        for (int i = 0; i < keepCount; i++) {
             sql.append(i == 0 ? " OR u.user_id IN (?" : ",?");
         }
-        if (!keep.isEmpty()) {
+        if (keepCount > 0) {
             sql.append(")");
         }
         sql.append(") ORDER BY u.last_name, u.first_name");
+        return sql.toString();
+    }
 
-        List<User> result = new ArrayList<>();
-        try (Connection conn = DBContext.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql.toString())) {
-            ps.setString(1, roleName);
-            for (int i = 0; i < keep.size(); i++) {
-                ps.setInt(i + 2, keep.get(i));
-            }
-            try (ResultSet rs = ps.executeQuery()) {
-                while (rs.next()) {
-                    User u = new User();
-                    u.setUserId(rs.getInt("user_id"));
-                    u.setUsername(rs.getString("username"));
-                    u.setLastName(rs.getString("last_name"));
-                    u.setMiddleName(rs.getString("middle_name"));
-                    u.setFirstName(rs.getString("first_name"));
-                    u.setDepartmentId(rs.getInt("department_id"));
-                    result.add(u);
-                }
-            }
-        } catch (SQLException ex) {
-            LOG.error("Loi truy van nhan vien theo vai (roleName={})", roleName, ex);
-        }
-        return result;
+    private User mapActiveUserSummary(ResultSet rs) throws SQLException {
+        User u = new User();
+        u.setUserId(rs.getInt("user_id"));
+        u.setUsername(rs.getString("username"));
+        u.setLastName(rs.getString("last_name"));
+        u.setMiddleName(rs.getString("middle_name"));
+        u.setFirstName(rs.getString("first_name"));
+        u.setDepartmentId(rs.getInt("department_id"));
+        return u;
     }
 
     /**
@@ -361,14 +370,7 @@ public class EmployeeDAO {
              PreparedStatement ps = conn.prepareStatement(sql);
              ResultSet rs = ps.executeQuery()) {
             while (rs.next()) {
-                User u = new User();
-                u.setUserId(rs.getInt("user_id"));
-                u.setUsername(rs.getString("username"));
-                u.setLastName(rs.getString("last_name"));
-                u.setMiddleName(rs.getString("middle_name"));
-                u.setFirstName(rs.getString("first_name"));
-                u.setDepartmentId(rs.getInt("department_id"));
-                result.add(u);
+                result.add(mapActiveUserSummary(rs));
             }
         } catch (SQLException ex) {
             LOG.error("Loi truy van danh sach nhan vien", ex);
@@ -520,22 +522,7 @@ public class EmployeeDAO {
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
                     User u = mapRow(rs);
-                    int addressId = rs.getInt("address_id");
-                    if (!rs.wasNull()) {
-                        Address address = new Address();
-                        address.setAddressId(addressId);
-                        address.setStreetAndLocalName(rs.getString("street_and_local_name"));
-                        address.setDistrictId(rs.getInt("districts_id"));
-
-                        District district = new District();
-                        district.setDistrictId(rs.getInt("districts_id"));
-                        district.setDistrictName(rs.getString("districts_name"));
-                        district.setProvinceId(rs.getInt("province_id"));
-                        district.setProvince(new Province(rs.getInt("province_id"), rs.getString("province_name")));
-
-                        address.setDistrict(district);
-                        u.setAddress(address);
-                    }
+                    u.setAddress(readAddress(rs));
                     return u;
                 }
             }
@@ -666,13 +653,13 @@ public class EmployeeDAO {
 
     /**
      * Tạo nhân viên mới (UC-26) kèm mật khẩu (đã hash BCrypt bởi
-     * EmployeeController, hàm này chỉ lưu). Nếu user.getAddress() có dữ
+     * EmployeeService/EmployeeController, hàm này chỉ lưu). Nếu user.getAddress() có dữ
      * liệu thì tạo luôn dòng addresses tương ứng, cùng transaction với
      * INSERT users -- tái dùng resolveAddressId() có sẵn.
      *
      * <p>{@code must_change_password} luôn ghi '1': mật khẩu vừa tạo là mật
-     * khẩu tạm (EmployeeController sinh ngẫu nhiên), nhân viên chưa hề biết
-     * tới nó cho tới khi Admin bấm "Gửi thông tin tài khoản" -- xem V35.
+     * khẩu tạm, nhân viên chưa hề biết tới nó cho tới khi Admin bấm
+     * "Gửi thông tin tài khoản" -- xem V35.
      * gender/date_of_birth/citizen_id/phone từ V35 được phép NULL: không còn
      * ép Admin điền hết lúc tạo, nhân viên tự bổ sung ở lần đăng nhập đầu.
      */
@@ -685,27 +672,8 @@ public class EmployeeDAO {
             try {
                 Integer addressId = resolveAddressId(conn, user.getAddress());
                 try (PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
-                    ps.setString(1, user.getUsername());
-                    ps.setString(2, user.getPasswordHash());
-                    ps.setInt(3, user.getRoleId());
-                    ps.setString(4, user.getLastName());
-                    ps.setString(5, user.getMiddleName());
-                    ps.setString(6, user.getFirstName());
-                    ps.setString(7, user.getGender());
-                    ps.setDate(8, user.getDateOfBirth());
-                    ps.setString(9, user.getCitizenId());
-                    ps.setString(10, user.getPhone());
-                    ps.setString(11, user.getPersonalEmail());
-                    if (addressId != null) {
-                        ps.setInt(12, addressId);
-                    } else {
-                        ps.setNull(12, Types.INTEGER);
-                    }
-                    ps.setInt(13, user.getDepartmentId());
-                    ps.setDate(14, user.getHireDate());
-                    setNullableInt(ps, 15, user.getManagerId());
-                    int affected = ps.executeUpdate();
-                    if (affected == 0) {
+                    bindInsertUser(ps, user, addressId);
+                    if (ps.executeUpdate() == 0) {
                         conn.rollback();
                         return -1;
                     }
@@ -727,6 +695,24 @@ public class EmployeeDAO {
         }
     }
 
+    private void bindInsertUser(PreparedStatement ps, User user, Integer addressId) throws SQLException {
+        ps.setString(1, user.getUsername());
+        ps.setString(2, user.getPasswordHash());
+        ps.setInt(3, user.getRoleId());
+        ps.setString(4, user.getLastName());
+        ps.setString(5, user.getMiddleName());
+        ps.setString(6, user.getFirstName());
+        ps.setString(7, user.getGender());
+        ps.setDate(8, user.getDateOfBirth());
+        ps.setString(9, user.getCitizenId());
+        ps.setString(10, user.getPhone());
+        ps.setString(11, user.getPersonalEmail());
+        setNullableInt(ps, 12, addressId);
+        ps.setInt(13, user.getDepartmentId());
+        ps.setDate(14, user.getHireDate());
+        setNullableInt(ps, 15, user.getManagerId());
+    }
+
     /**
      * Cập nhật thông tin nhân viên do Admin sửa (UC-27/UC-28: gồm cả phòng
      * ban + vai trò, khác updateProfile() ở trên vốn chỉ cho tự sửa thông
@@ -743,24 +729,7 @@ public class EmployeeDAO {
             try {
                 Integer addressId = resolveAddressId(conn, user.getAddress());
                 try (PreparedStatement ps = conn.prepareStatement(sql)) {
-                    ps.setInt(1, user.getRoleId());
-                    ps.setString(2, user.getLastName());
-                    ps.setString(3, user.getMiddleName());
-                    ps.setString(4, user.getFirstName());
-                    ps.setString(5, user.getGender());
-                    ps.setDate(6, user.getDateOfBirth());
-                    ps.setString(7, user.getCitizenId());
-                    ps.setString(8, user.getPhone());
-                    ps.setString(9, user.getPersonalEmail());
-                    if (addressId != null) {
-                        ps.setInt(10, addressId);
-                    } else {
-                        ps.setNull(10, Types.INTEGER);
-                    }
-                    ps.setInt(11, user.getDepartmentId());
-                    ps.setDate(12, user.getHireDate());
-                    setNullableInt(ps, 13, user.getManagerId());
-                    ps.setInt(14, user.getUserId());
+                    bindUpdateUser(ps, user, addressId);
                     boolean ok = ps.executeUpdate() > 0;
                     if (ok) {
                         conn.commit();
@@ -779,6 +748,23 @@ public class EmployeeDAO {
             LOG.error("Loi cap nhat nhan vien (userId={}, username={})", user.getUserId(), user.getUsername(), ex);
             return false;
         }
+    }
+
+    private void bindUpdateUser(PreparedStatement ps, User user, Integer addressId) throws SQLException {
+        ps.setInt(1, user.getRoleId());
+        ps.setString(2, user.getLastName());
+        ps.setString(3, user.getMiddleName());
+        ps.setString(4, user.getFirstName());
+        ps.setString(5, user.getGender());
+        ps.setDate(6, user.getDateOfBirth());
+        ps.setString(7, user.getCitizenId());
+        ps.setString(8, user.getPhone());
+        ps.setString(9, user.getPersonalEmail());
+        setNullableInt(ps, 10, addressId);
+        ps.setInt(11, user.getDepartmentId());
+        ps.setDate(12, user.getHireDate());
+        setNullableInt(ps, 13, user.getManagerId());
+        ps.setInt(14, user.getUserId());
     }
 
     /**
@@ -1017,42 +1003,54 @@ public class EmployeeDAO {
             conn.setAutoCommit(false);
             boolean committed = false;
             try {
-                try (PreparedStatement del = conn.prepareStatement(
-                        "DELETE FROM user_provinces WHERE user_id = ?")) {
-                    del.setInt(1, userId);
-                    del.executeUpdate();
-                }
-                if (provinceIds != null && !provinceIds.isEmpty()) {
-                    try (PreparedStatement ins = conn.prepareStatement(
-                            "INSERT INTO user_provinces (province_id, user_id) VALUES (?, ?)")) {
-                        for (Integer provinceId : provinceIds) {
-                            ins.setInt(1, provinceId);
-                            ins.setInt(2, userId);
-                            ins.addBatch();
-                        }
-                        ins.executeBatch();
-                    }
-                }
+                deleteProvincesOf(conn, userId);
+                insertProvincesOf(conn, userId, provinceIds);
                 conn.commit();
                 committed = true;
                 return true;
             } finally {
-                if (!committed) {
-                    try {
-                        conn.rollback();
-                    } catch (SQLException rollbackEx) {
-                        LOG.error("Loi rollback khi phan cong dia ban (userId={})", userId, rollbackEx);
-                    }
-                }
-                try {
-                    conn.setAutoCommit(true);
-                } catch (SQLException autoCommitEx) {
-                    LOG.error("Loi reset autocommit sau phan cong dia ban (userId={})", userId, autoCommitEx);
-                }
+                finalizeProvinceTx(conn, committed, userId);
             }
         } catch (SQLException ex) {
             LOG.error("Loi phan cong dia ban (userId={})", userId, ex);
             return false;
+        }
+    }
+
+    private void deleteProvincesOf(Connection conn, int userId) throws SQLException {
+        try (PreparedStatement del = conn.prepareStatement("DELETE FROM user_provinces WHERE user_id = ?")) {
+            del.setInt(1, userId);
+            del.executeUpdate();
+        }
+    }
+
+    private void insertProvincesOf(Connection conn, int userId, List<Integer> provinceIds) throws SQLException {
+        if (provinceIds == null || provinceIds.isEmpty()) {
+            return;
+        }
+        try (PreparedStatement ins = conn.prepareStatement(
+                "INSERT INTO user_provinces (province_id, user_id) VALUES (?, ?)")) {
+            for (Integer provinceId : provinceIds) {
+                ins.setInt(1, provinceId);
+                ins.setInt(2, userId);
+                ins.addBatch();
+            }
+            ins.executeBatch();
+        }
+    }
+
+    private void finalizeProvinceTx(Connection conn, boolean committed, int userId) {
+        if (!committed) {
+            try {
+                conn.rollback();
+            } catch (SQLException rollbackEx) {
+                LOG.error("Loi rollback khi phan cong dia ban (userId={})", userId, rollbackEx);
+            }
+        }
+        try {
+            conn.setAutoCommit(true);
+        } catch (SQLException autoCommitEx) {
+            LOG.error("Loi reset autocommit sau phan cong dia ban (userId={})", userId, autoCommitEx);
         }
     }
 
@@ -1081,26 +1079,28 @@ public class EmployeeDAO {
              PreparedStatement ps = conn.prepareStatement(sql);
              ResultSet rs = ps.executeQuery()) {
             while (rs.next()) {
-                int holderIdRaw = rs.getInt("holder_id");
-                Integer holderId = rs.wasNull() ? null : holderIdRaw;
-                String holderName = null;
-                if (holderId != null) {
-                    // Tái dùng đúng luật ghép họ tên của User.getFullName()
-                    // thay vì chép lại CONCAT trong SQL, để hai nơi không lệch
-                    // nhau khi luật đó đổi (vd. thêm học vị/chức danh).
-                    User holder = new User();
-                    holder.setLastName(rs.getString("last_name"));
-                    holder.setMiddleName(rs.getString("middle_name"));
-                    holder.setFirstName(rs.getString("first_name"));
-                    holderName = holder.getFullName();
-                }
-                result.add(new ProvinceAssignment(rs.getInt("province_id"), rs.getString("province_name"),
-                        holderId, holderName));
+                result.add(mapProvinceAssignment(rs));
             }
         } catch (SQLException ex) {
             LOG.error("Loi tra danh sach tinh kem nguoi cam", ex);
         }
         return result;
+    }
+
+    private ProvinceAssignment mapProvinceAssignment(ResultSet rs) throws SQLException {
+        int holderIdRaw = rs.getInt("holder_id");
+        Integer holderId = rs.wasNull() ? null : holderIdRaw;
+        String holderName = null;
+        if (holderId != null) {
+            // Tái dùng đúng luật ghép họ tên của User.getFullName()
+            User holder = new User();
+            holder.setLastName(rs.getString("last_name"));
+            holder.setMiddleName(rs.getString("middle_name"));
+            holder.setFirstName(rs.getString("first_name"));
+            holderName = holder.getFullName();
+        }
+        return new ProvinceAssignment(rs.getInt("province_id"), rs.getString("province_name"),
+                holderId, holderName);
     }
 
     private List<Province> queryProvinces(String sql, int param) {

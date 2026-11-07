@@ -17,6 +17,7 @@ import poscs.model.Province;
 import poscs.model.ProvinceAssignment;
 import poscs.model.Role;
 import poscs.model.User;
+import poscs.service.PermissionService;
 
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
@@ -68,6 +69,7 @@ public class EmployeeControllerTest {
         user.setUserId(userId);
         user.setRole(new Role(1, roleName));
         when(session.getAttribute("currentUser")).thenReturn(user);
+        when(employeeDAO.findById(userId)).thenReturn(user);
     }
 
     private static void setField(Object target, String fieldName, Object value) throws Exception {
@@ -387,6 +389,7 @@ public class EmployeeControllerTest {
         when(request.getParameter("id")).thenReturn("99");
         User self = new User();
         self.setUserId(99);
+        self.setRole(new Role(1, "Admin"));
         when(employeeDAO.findById(99)).thenReturn(self);
 
         controller.doPost(request, response);
@@ -719,5 +722,204 @@ public class EmployeeControllerTest {
 
         verify(employeeDAO).update(argThat((User u) -> u.getUserId() == 15));
         verify(response).sendRedirect(CONTEXT_PATH + "/employee?action=view&id=15");
+    }
+
+    // ------------------------------------------------------------------
+    // Bổ sung Task 6.2: UC-24..29, BR-12, BR-14, BR-22..24, BR-26, BR-29
+    // ------------------------------------------------------------------
+
+    @Test
+    public void doGet_unauthenticatedUser_returns403AndNeverTouchesDao() throws Exception {
+        when(session.getAttribute("currentUser")).thenReturn(null);
+        when(request.getParameter("action")).thenReturn("list");
+
+        controller.doGet(request, response);
+
+        verify(response).sendError(eq(HttpServletResponse.SC_FORBIDDEN), anyString());
+        verify(employeeDAO, never()).findAll(anyInt(), anyInt(), any(), any(), any());
+    }
+
+    @Test
+    public void doGet_adminLockedInDatabase_returns403WithMsg022() throws Exception {
+        User lockedDbAdmin = new User();
+        lockedDbAdmin.setUserId(99);
+        lockedDbAdmin.setRole(ADMIN_ROLE);
+        lockedDbAdmin.setDeleted(true);
+        when(employeeDAO.findById(99)).thenReturn(lockedDbAdmin);
+        when(request.getParameter("action")).thenReturn("list");
+
+        controller.doGet(request, response);
+
+        verify(response).sendError(HttpServletResponse.SC_FORBIDDEN, PermissionService.MSG_022);
+        verify(employeeDAO, never()).findAll(anyInt(), anyInt(), any(), any(), any());
+    }
+
+    @Test
+    public void showList_withFiltersAndPagination_setsAttributesAndForwards() throws Exception {
+        RequestDispatcher dispatcher = mock(RequestDispatcher.class);
+        when(request.getRequestDispatcher("/jsp/admin/listEmployee.jsp")).thenReturn(dispatcher);
+        when(request.getParameter("action")).thenReturn("list");
+        when(request.getParameter("page")).thenReturn("2");
+        when(request.getParameter("keyword")).thenReturn("an");
+        when(request.getParameter("status")).thenReturn("Active");
+        when(request.getParameter("roleId")).thenReturn("2");
+
+        User emp = new User();
+        emp.setUserId(15);
+        when(employeeDAO.findAll(2, 10, "an", "Active", 2)).thenReturn(List.of(emp));
+        when(employeeDAO.countAll("an", "Active", 2)).thenReturn(23);
+        when(employeeDAO.findAllRoles()).thenReturn(List.of(ADMIN_ROLE, SALES_ROLE));
+
+        controller.doGet(request, response);
+
+        verify(request).setAttribute("employeeList", List.of(emp));
+        verify(request).setAttribute("currentPage", 2);
+        verify(request).setAttribute("totalPages", 3);
+        verify(request).setAttribute("totalCount", 23);
+        verify(request).setAttribute("keyword", "an");
+        verify(request).setAttribute("statusFilter", "Active");
+        verify(request).setAttribute("roleFilter", 2);
+        verify(dispatcher).forward(request, response);
+    }
+
+    @Test
+    public void showList_negativePageAndEmptyResult_normalizesPageAndTotalPagesToOne() throws Exception {
+        RequestDispatcher dispatcher = mock(RequestDispatcher.class);
+        when(request.getRequestDispatcher("/jsp/admin/listEmployee.jsp")).thenReturn(dispatcher);
+        when(request.getParameter("page")).thenReturn("-5");
+        when(employeeDAO.findAll(1, 10, null, null, null)).thenReturn(List.of());
+        when(employeeDAO.countAll(null, null, null)).thenReturn(0);
+
+        controller.doGet(request, response);
+
+        verify(request).setAttribute("employeeList", List.of());
+        verify(request).setAttribute("currentPage", 1);
+        verify(request).setAttribute("totalPages", 1);
+        verify(request).setAttribute("totalCount", 0);
+        verify(dispatcher).forward(request, response);
+    }
+
+    @Test
+    public void showDetail_existingEmployee_formatsDatesDdMmYyyyAndLoadsProvinces() throws Exception {
+        RequestDispatcher dispatcher = mock(RequestDispatcher.class);
+        when(request.getRequestDispatcher("/jsp/admin/viewdetailEmployee.jsp")).thenReturn(dispatcher);
+        when(request.getParameter("action")).thenReturn("view");
+        when(request.getParameter("id")).thenReturn("15");
+
+        User emp = new User();
+        emp.setUserId(15);
+        emp.setDateOfBirth(Date.valueOf(LocalDate.of(1995, 5, 20)));
+        emp.setHireDate(Date.valueOf(LocalDate.of(2023, 10, 1)));
+        when(employeeDAO.findById(15)).thenReturn(emp);
+
+        List<Province> assigned = List.of(new Province(1, "Thành phố Hà Nội"));
+        List<Province> managed = List.of(new Province(2, "Tỉnh Bắc Ninh"));
+        when(employeeDAO.findProvincesOf(15)).thenReturn(assigned);
+        when(employeeDAO.findProvincesManagedBy(15)).thenReturn(managed);
+
+        controller.doGet(request, response);
+
+        verify(request).setAttribute("employee", emp);
+        verify(request).setAttribute("dateOfBirthText", "20/05/1995");
+        verify(request).setAttribute("hireDateText", "01/10/2023");
+        verify(request).setAttribute("assignedProvinces", assigned);
+        verify(request).setAttribute("managedProvinces", managed);
+        verify(dispatcher).forward(request, response);
+    }
+
+    @Test
+    public void showDetail_employeeNotFound_redirectsWithNotFoundError() throws Exception {
+        when(request.getParameter("action")).thenReturn("view");
+        when(request.getParameter("id")).thenReturn("999");
+        when(employeeDAO.findById(999)).thenReturn(null);
+
+        controller.doGet(request, response);
+
+        verify(response).sendRedirect(CONTEXT_PATH + "/employee?error=notfound");
+    }
+
+    @Test
+    public void showEditForm_employeeNotFound_redirectsWithNotFoundError() throws Exception {
+        when(request.getParameter("action")).thenReturn("edit");
+        when(request.getParameter("id")).thenReturn("999");
+        when(employeeDAO.findById(999)).thenReturn(null);
+
+        controller.doGet(request, response);
+
+        verify(response).sendRedirect(CONTEXT_PATH + "/employee?error=notfound");
+    }
+
+    @Test
+    public void create_validDdMmYyyyDates_parsesStrictlyAndSucceeds() throws Exception {
+        when(request.getParameter("action")).thenReturn("create");
+        stubValidCreateFields();
+        when(request.getParameter("dateOfBirth")).thenReturn("15/08/1998");
+        when(request.getParameter("hireDate")).thenReturn("01/03/2024");
+        when(employeeDAO.generateUniqueUsername("Nguyễn", null, "An")).thenReturn("annd");
+        when(employeeDAO.insert(any(User.class))).thenReturn(15);
+
+        controller.doPost(request, response);
+
+        verify(employeeDAO).insert(argThat((User u) ->
+                Date.valueOf(LocalDate.of(1998, 8, 15)).equals(u.getDateOfBirth())
+                        && Date.valueOf(LocalDate.of(2024, 3, 1)).equals(u.getHireDate())));
+        verify(response).sendRedirect(CONTEXT_PATH + "/employee?action=view&id=15");
+    }
+
+    @Test
+    public void create_invalidNonBlankBirthDate_violatesBr29_redirectsWithInvalidError() throws Exception {
+        when(request.getParameter("action")).thenReturn("create");
+        stubValidCreateFields();
+        when(request.getParameter("dateOfBirth")).thenReturn("31/02/2000");
+
+        controller.doPost(request, response);
+
+        verify(employeeDAO, never()).insert(any());
+        verify(response).sendRedirect(CONTEXT_PATH + "/employee?action=new&error=invalid");
+    }
+
+    @Test
+    public void create_daoInsertFails_redirectsWithCreateFailedError() throws Exception {
+        when(request.getParameter("action")).thenReturn("create");
+        stubValidCreateFields();
+        when(employeeDAO.generateUniqueUsername("Nguyễn", null, "An")).thenReturn("annd");
+        when(employeeDAO.insert(any(User.class))).thenReturn(-1);
+
+        controller.doPost(request, response);
+
+        verify(response).sendRedirect(CONTEXT_PATH + "/employee?action=new&error=create_failed");
+    }
+
+    @Test
+    public void update_daoUpdateFails_redirectsWithUpdateFailedError() throws Exception {
+        when(request.getParameter("action")).thenReturn("update");
+        when(request.getParameter("userId")).thenReturn("15");
+        when(employeeDAO.findById(15)).thenReturn(new User());
+        stubValidCreateFields();
+        when(employeeDAO.update(any(User.class))).thenReturn(false);
+
+        controller.doPost(request, response);
+
+        verify(response).sendRedirect(CONTEXT_PATH + "/employee?action=edit&id=15&error=update_failed");
+    }
+
+    @Test
+    public void doPost_unknownAction_redirectsToEmployeeList() throws Exception {
+        when(request.getParameter("action")).thenReturn("unknown");
+
+        controller.doPost(request, response);
+
+        verify(response).sendRedirect(CONTEXT_PATH + "/employee");
+    }
+
+    @Test
+    public void showDetail_missingIdParam_redirectsWithNotFoundError() throws Exception {
+        when(request.getParameter("action")).thenReturn("view");
+        when(request.getParameter("id")).thenReturn("   ");
+
+        controller.doGet(request, response);
+
+        verify(response).sendRedirect(CONTEXT_PATH + "/employee?error=notfound");
+        verify(request, never()).setAttribute(eq("employee"), any());
     }
 }
