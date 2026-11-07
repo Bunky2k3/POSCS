@@ -5,27 +5,17 @@ import java.sql.Date;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeParseException;
-import java.util.ArrayList;
-import java.util.List;
+import jakarta.servlet.ServletConfig;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
-import java.text.SimpleDateFormat;
-import org.apache.pdfbox.pdmodel.PDDocument;
-import org.apache.pdfbox.pdmodel.PDPage;
-import org.apache.pdfbox.pdmodel.PDPageContentStream;
-import org.apache.pdfbox.pdmodel.common.PDRectangle;
-import org.apache.pdfbox.pdmodel.font.PDFont;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import poscs.common.QueryStrings;
 import poscs.common.AccessControl;
-import poscs.common.ExcelUtil;
 import poscs.common.Logs;
-import poscs.common.PdfUtil;
 import poscs.common.Period;
 import poscs.dao.ContractDAO;
 import poscs.dao.CustomerDAO;
@@ -48,9 +38,6 @@ import poscs.validator.TicketValidator;
  * Riêng handleUpdate có thêm ngoại lệ: Kỹ thuật được tự đổi trạng thái/ghi
  * chú xử lý của đúng phiếu đang giao cho mình, xem
  * AccessControl.canUpdateAssignedTicket.
- *
- * technicalrequestdevices (thiết bị lỗi) và technicalrequesthistory (lịch
- * sử đổi trạng thái) chưa được xử lý -- thuộc phạm vi khác.
  */
 @WebServlet(name = "TechnicalSupportTicketController", urlPatterns = {"/ticket"})
 public class TechnicalSupportTicketController extends HttpServlet {
@@ -76,8 +63,6 @@ public class TechnicalSupportTicketController extends HttpServlet {
     private static final String DETAIL_VIEW = "/jsp/customersupport/viewdetailTicket.jsp";
     private static final String CREATE_VIEW = "/jsp/customersupport/addnewTicket.jsp";
     private static final String UPDATE_VIEW = "/jsp/customersupport/updateTicket.jsp";
-    /** Lề (điểm) của trang PDF xuất phiếu -- dùng cho cả 4 phía. */
-    private static final float PDF_MARGIN = 56f;
 
     private TechnicalSupportTicketDAO ticketDAO = new TechnicalSupportTicketDAO();
     private CustomerDAO customerDAO = new CustomerDAO();
@@ -89,6 +74,7 @@ public class TechnicalSupportTicketController extends HttpServlet {
     private TicketService ticketService;
     private TicketListController listController;
     private TicketDetailController detailController;
+    private TicketExportController exportController;
 
     PermissionService getPermissionService() {
         if (permissionService != null) {
@@ -147,6 +133,40 @@ public class TechnicalSupportTicketController extends HttpServlet {
 
     void setDetailController(TicketDetailController detailController) {
         this.detailController = detailController;
+    }
+
+    TicketExportController getExportController() {
+        if (exportController == null) {
+            this.exportController = new TicketExportController(ticketDAO, employeeDAO, null,
+                    getTicketService(), getPermissionService());
+            try {
+                this.exportController.setServletContext(getServletContext());
+            } catch (Exception ignored) {
+            }
+        } else {
+            if (exportController.getTicketDAO() != ticketDAO) {
+                exportController.setTicketDAO(ticketDAO);
+            }
+            if (exportController.getEmployeeDAO() != employeeDAO) {
+                exportController.setEmployeeDAO(employeeDAO);
+            }
+        }
+        return exportController;
+    }
+
+    void setExportController(TicketExportController exportController) {
+        this.exportController = exportController;
+    }
+
+    @Override
+    public void init(ServletConfig config) throws ServletException {
+        super.init(config);
+        if (this.exportController != null) {
+            try {
+                this.exportController.setServletContext(config.getServletContext());
+            } catch (Exception ignored) {
+            }
+        }
     }
 
     @Override
@@ -217,25 +237,14 @@ public class TechnicalSupportTicketController extends HttpServlet {
         getListController().showList(request, response);
     }
 
-    /** Giá trị của ô lọc "Người xử lý" (tham số assignee), ngoài user_id. */
     static final String ASSIGNEE_ALL = "all";
     static final String ASSIGNEE_MINE = "mine";
 
-    /**
-     * Ô lọc "Người xử lý" đã chuẩn hoá: "all", "mine", hoặc user_id dạng chuỗi.
-     *
-     * <p>Vắng tham số thì kỹ thuật viên mặc định "mine" -- việc của họ là phiếu
-     * được giao cho mình, cùng lẽ Sales mặc định phạm vi "Của tôi" ở danh
-     * sách khách hàng / hợp đồng; vai khác mặc định "all". Chọn "Tất cả" thì
-     * gửi assignee=all tường minh, nên mặc định không đè lên lựa chọn đó khi
-     * sang trang. Giá trị lạ -> "all".
-     */
     private String assigneeFilterOf(HttpServletRequest request) {
         return getTicketService().resolveAssigneeFilter(
                 request.getParameter("assignee"), AccessControl.currentUser(request));
     }
 
-    /** user_id cần lọc theo ô "Người xử lý", null = mọi người. */
     private Integer assigneeIdOf(String assigneeFilter, HttpServletRequest request) {
         return getTicketService().resolveAssigneeId(assigneeFilter, AccessControl.currentUser(request));
     }
@@ -245,238 +254,25 @@ public class TechnicalSupportTicketController extends HttpServlet {
         getDetailController().showDetail(request, response);
     }
 
-    /**
-     * Xuất danh sách phiếu hỗ trợ ra Excel -- nút "Xuất Excel" ở listTicket.jsp.
-     *
-     * Xuất theo ĐÚNG bộ lọc đang áp trên màn hình (từ khoá/trạng thái/độ ưu
-     * tiên/kỳ) nhưng bỏ phân trang: người dùng lọc ra cái họ cần rồi muốn cả
-     * tập đó, không phải đúng 10 dòng của trang đang mở. Cùng cách làm với
-     * xuất Excel của khách hàng và hợp đồng.
-     *
-     * Kỳ (năm + quý/tháng) trước đây bị bỏ qua dù link "Xuất Excel" có gửi
-     * kèm: lọc Tháng 8 thì màn hình còn 5 phiếu mà file vẫn ra cả 16, người
-     * nhận file không có cách nào biết mình đang đọc một tập khác.
-     *
-     * Nhiều cột hơn bảng trên màn hình (thêm kênh tiếp nhận, hạn SLA, thời
-     * điểm đóng, bảo hành, mô tả, kết quả xử lý) -- file Excel là để đem đi
-     * lọc/thống kê ngoại tuyến, không bị giới hạn bề ngang như bảng HTML.
-     */
-    private void exportExcel(HttpServletRequest request, HttpServletResponse response) throws IOException {
-        String keyword = request.getParameter("keyword");
-        String statusFilter = request.getParameter("status");
-        String priorityFilter = request.getParameter("priority");
-        Period period = Period.parse(request.getParameter("year"), request.getParameter("period"));
-        // Cùng cách đọc ô "Người xử lý" với danh sách -- file là đúng thứ đang nhìn thấy.
-        Integer assigneeId = assigneeIdOf(assigneeFilterOf(request), request);
-
-        List<TechnicalRequest> all = ticketDAO.findAll(1, Integer.MAX_VALUE, keyword, statusFilter, priorityFilter,
-                period, assigneeId);
-        String[] headers = {"Mã phiếu", "Loại phiếu", "Khách hàng", "Hợp đồng liên quan",
-            "Mức ưu tiên", "Kênh tiếp nhận", "Trạng thái", "Người xử lý", "Người tạo",
-            "Ngày tạo", "Hạn xử lý (SLA)", "Thời điểm đóng", "Bảo hành",
-            "Mô tả sự cố", "Nguyên nhân sự cố", "Nhóm nguyên nhân", "Phương hướng xử lý", "Kết quả xử lý"};
-        List<Object[]> rows = new ArrayList<>();
-        for (TechnicalRequest t : all) {
-            rows.add(new Object[]{
-                t.getTicketCode(),
-                t.getTicketType(),
-                t.getEnterprise() != null ? t.getEnterprise().getEnterpriseName() : "",
-                t.getContract() != null ? t.getContract().getContractCode() : "",
-                t.getPriority(),
-                t.getReceptionChannel(),
-                t.getStatus(),
-                t.getAssignedTechnician() != null ? t.getAssignedTechnician().getFullName() : "",
-                t.getCreatedByUser() != null ? t.getCreatedByUser().getFullName() : "",
-                formatDate(t.getCreatedDate()),
-                formatDateTime(t.getSlaDeadline()),
-                formatDateTime(t.getResolvedAt()),
-                t.isWarranty() ? "Có" : "Không",
-                t.getDescription(),
-                t.getRootCause(),
-                t.getCauseCategory(),
-                t.getHandlingPlan(),
-                t.getResolutionSummary()
-            });
-        }
-        ExcelUtil.writeWorkbook(response, "phieu_ho_tro", headers, rows);
+    private void exportExcel(HttpServletRequest request, HttpServletResponse response)
+            throws ServletException, IOException {
+        getExportController().doGet(request, response);
     }
 
-    /**
-     * Xuất 1 phiếu hỗ trợ ra PDF để in/gửi khách.
-     *
-     * Vẽ thẳng bằng PDFBox thay vì điền vào file mẫu như hợp đồng: phiếu hỗ trợ
-     * không có mẫu in sẵn nào, và nội dung ở đây chỉ là các cặp nhãn/giá trị
-     * cộng 2 đoạn văn -- dựng một AcroForm chỉ để điền vào là công vô ích.
-     * Font tiếng Việt lấy từ PdfUtil.loadVietnameseFont (font mặc định của
-     * PDFBox không có glyph tiếng Việt, xuất ra sẽ mất dấu hết).
-     *
-     * Dựng TOÀN BỘ nội dung thành danh sách dòng trước, rồi mới đổ ra trang
-     * (xem {@link #renderPaginated}), thay vì vừa tính vừa vẽ. Lý do: "Mô tả
-     * sự cố" và "Kết quả xử lý" là cột TEXT, người dùng gõ bao nhiêu cũng
-     * được. Cách cũ chỉ tạo đúng 1 trang A4 và cứ trừ dần toạ độ y, nên phần
-     * vượt quá chiều cao trang được vẽ ra NGOÀI vùng giấy: PDFBox không báo
-     * lỗi gì, file mở lên vẫn bình thường, chỉ là mất hẳn phần cuối mà không
-     * ai biết. Tách 2 bước thì việc "hết chỗ -> sang trang mới" chỉ là một
-     * phép so sánh, không còn chỗ nào vẽ lố ra ngoài được nữa.
-     */
-    private void exportPdf(HttpServletRequest request, HttpServletResponse response) throws IOException {
-        Integer id = parseIntOrNull(request.getParameter("id"));
-        TechnicalRequest t = id != null ? ticketDAO.findById(id) : null;
-        if (t == null) {
-            response.sendRedirect(request.getContextPath() + "/ticket?error=notfound");
-            return;
-        }
-
-        try (PDDocument document = new PDDocument()) {
-            PDFont font = PdfUtil.loadVietnameseFont(document, getServletContext());
-            float contentWidth = PDRectangle.A4.getWidth() - PDF_MARGIN * 2;
-
-            List<PdfLine> lines = new ArrayList<>();
-            lines.add(new PdfLine(17, "PHIẾU HỖ TRỢ KỸ THUẬT", 22));
-            lines.add(new PdfLine(11, "Mã phiếu: " + nz(t.getTicketCode()), 26));
-
-            addPair(lines, "Khách hàng",
-                    t.getEnterprise() != null ? t.getEnterprise().getEnterpriseName() : "—");
-            addPair(lines, "Hợp đồng liên quan",
-                    t.getContract() != null ? t.getContract().getContractCode() : "—");
-            addPair(lines, "Loại phiếu", t.getTicketType());
-            addPair(lines, "Mức ưu tiên", t.getPriority());
-            addPair(lines, "Kênh tiếp nhận", t.getReceptionChannel());
-            addPair(lines, "Trạng thái", t.getStatus());
-            addPair(lines, "Ngày tạo", formatDate(t.getCreatedDate()));
-            addPair(lines, "Hạn xử lý (SLA)", formatDateTime(t.getSlaDeadline()));
-            addPair(lines, "Kỹ thuật viên phụ trách",
-                    t.getAssignedTechnician() != null ? t.getAssignedTechnician().getFullName() : "—");
-            addPair(lines, "Thời điểm đóng", formatDateTime(t.getResolvedAt()));
-
-            addParagraph(lines, font, contentWidth, "Mô tả sự cố", t.getDescription());
-            // Mạch phiếu in ra phải đúng thứ tự hiện tượng -> nguyên nhân ->
-            // phương hướng -> kết quả như khách yêu cầu; thiếu mục nào thì bản
-            // in mâu thuẫn với trang chi tiết trên màn hình.
-            addParagraph(lines, font, contentWidth, "Nguyên nhân sự cố", causeForPrint(t));
-            addParagraph(lines, font, contentWidth, "Phương hướng xử lý", t.getHandlingPlan());
-            addParagraph(lines, font, contentWidth, "Kết quả xử lý", t.getResolutionSummary());
-
-            renderPaginated(document, font, lines);
-
-            response.setContentType("application/pdf");
-            String fileName = "phieu_" + nz(t.getTicketCode()).replace("/", "-") + ".pdf";
-            response.setHeader("Content-Disposition", "attachment; filename=\"" + fileName + "\"");
-            document.save(response.getOutputStream());
-        }
-    }
-
-    /** 1 dòng chữ đã biết cỡ chữ và khoảng cách xuống dòng kế tiếp, chưa gắn với trang nào. */
-    private static final class PdfLine {
-
-        private final float fontSize;
-        private final String text;
-        private final float leading;
-
-        private PdfLine(float fontSize, String text, float leading) {
-            this.fontSize = fontSize;
-            this.text = text;
-            this.leading = leading;
-        }
-    }
-
-    /** Thêm 1 dòng "Nhãn: giá trị". */
-    private void addPair(List<PdfLine> lines, String label, String value) {
-        lines.add(new PdfLine(10, label + ": " + nz(value), 17));
-    }
-
-    /** Thêm 1 đoạn văn có tiêu đề, tự bẻ dòng theo bề rộng trang. */
-    private void addParagraph(List<PdfLine> lines, PDFont font, float width, String title, String body)
-            throws IOException {
-        lines.add(new PdfLine(11, title, 16));
-        List<String> wrapped = PdfUtil.wrapLines(font, 10, width, nz(body));
-        for (int i = 0; i < wrapped.size(); i++) {
-            // Dòng cuối của đoạn chừa thêm khoảng trống trước tiêu đề đoạn sau.
-            lines.add(new PdfLine(10, wrapped.get(i), i == wrapped.size() - 1 ? 22 : 14));
-        }
-    }
-
-    /**
-     * Đổ danh sách dòng ra tài liệu, tự mở trang mới mỗi khi dòng kế tiếp
-     * không còn nằm trọn phía trên lề dưới. Luôn tạo ít nhất 1 trang (phiếu
-     * nào cũng có mã phiếu nên danh sách không bao giờ rỗng).
-     */
-    private void renderPaginated(PDDocument document, PDFont font, List<PdfLine> lines) throws IOException {
-        float top = PDRectangle.A4.getHeight() - PDF_MARGIN;
-        int index = 0;
-        while (index < lines.size()) {
-            PDPage page = new PDPage(PDRectangle.A4);
-            document.addPage(page);
-            float y = top;
-            try (PDPageContentStream cs = new PDPageContentStream(document, page)) {
-                while (index < lines.size()) {
-                    PdfLine line = lines.get(index);
-                    // Cỡ chữ trừ đi vì y là toạ độ CHÂN chữ: chữ còn ăn lên
-                    // trên, nên chỉ cần chân chữ nằm trên lề dưới là đủ.
-                    if (y - line.fontSize < PDF_MARGIN && y < top) {
-                        break; // Hết chỗ -> sang trang mới.
-                    }
-                    PdfUtil.drawText(cs, font, line.fontSize, PDF_MARGIN, y, line.text);
-                    y -= line.leading;
-                    index++;
-                }
-            }
-        }
-    }
-
-    /**
-     * Phần "Nguyên nhân sự cố" cho bản in: ghép nhóm nguyên nhân vào trước
-     * diễn giải, vì trên giấy không có cách nào khác để thấy cả hai.
-     *
-     * Nhóm đứng riêng một đoạn thì người đọc phải tự nối hai chỗ lại; gộp
-     * thành "[Do vận chuyển] Gãy chân cắm nguồn..." là đọc một mạch. Chưa
-     * đánh giá gì thì trả null để nz() in dấu gạch như các trường trống khác.
-     */
-    private String causeForPrint(TechnicalRequest t) {
-        String category = t.getCauseCategory();
-        String detail = t.getRootCause();
-        if (category == null || category.trim().isEmpty()) {
-            return detail;
-        }
-        if (detail == null || detail.trim().isEmpty()) {
-            return "[" + category + "]";
-        }
-        return "[" + category + "] " + detail;
-    }
-
-    /** Giá trị trống hiện dấu gạch thay vì để trắng, cho người đọc biết là "chưa có" chứ không phải lỗi in. */
-    private String nz(String value) {
-        return value == null || value.trim().isEmpty() ? "—" : value;
-    }
-
-    private String formatDate(Date date) {
-        return date == null ? "—" : new SimpleDateFormat("dd/MM/yyyy").format(date);
-    }
-
-    /**
-     * Đọc giá trị của &lt;input type="datetime-local"&gt; ("yyyy-MM-ddTHH:mm")
-     * thành Timestamp. Trả null khi để trống hoặc sai định dạng -- hạn SLA
-     * không bắt buộc, và handleUpdate sẽ giữ lại giá trị cũ khi nhận null.
-     */
-    private Timestamp parseDateTimeOrNull(String value) {
-        if (value == null || value.trim().isEmpty()) {
-            return null;
-        }
+    private void exportPdf(HttpServletRequest request, HttpServletResponse response)
+            throws ServletException, IOException {
+        TicketExportController ec = getExportController();
         try {
-            return Timestamp.valueOf(LocalDateTime.parse(value.trim()));
-        } catch (DateTimeParseException ex) {
-            return null;
+            if (ec.getCustomServletContext() == null && getServletContext() != null) {
+                ec.setServletContext(getServletContext());
+            }
+        } catch (Exception ignored) {
         }
-    }
-
-    private String formatDateTime(Timestamp ts) {
-        return ts == null ? "—" : new SimpleDateFormat("dd/MM/yyyy HH:mm").format(ts);
+        ec.doGet(request, response);
     }
 
     private void showCreateForm(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
-        // Trang form cũng là thao tác quản trị: vai trò chỉ-xem không được
-        // vào đây, dù nút bấm đã ẩn ở danh sách (xem PERMISSIONS.md).
         if (!AccessControl.requireFullAccess(request, response, AccessControl.Resource.TICKET)) {
             return;
         }
@@ -493,9 +289,6 @@ public class TechnicalSupportTicketController extends HttpServlet {
             return;
         }
 
-        // Cùng điều kiện với handleUpdate: ngoài vai trò có quyền Full, kỹ
-        // thuật viên ĐANG ĐƯỢC GIAO đúng phiếu này cũng được mở form (họ được
-        // cập nhật trạng thái/kết quả xử lý của phiếu mình -- PERMISSIONS.md).
         if (!AccessControl.hasFullAccess(request, AccessControl.Resource.TICKET)
                 && !AccessControl.canUpdateAssignedTicket(request, ticket)) {
             response.sendError(HttpServletResponse.SC_FORBIDDEN, "Bạn không có quyền thực hiện thao tác này.");
@@ -550,11 +343,6 @@ public class TechnicalSupportTicketController extends HttpServlet {
             return;
         }
 
-        // Cần đọc lại phiếu hiện có trong DB để: (1) giữ nguyên contractId khi form
-        // không gửi lên (dropdown "Hợp đồng" ở updateTicket.jsp mặc định disabled,
-        // chỉ enable sau khi AJAX loadContracts() chạy xong -- nếu chậm/lỗi/JS tắt
-        // thì trường này không được submit); và (2) không ghi đè lại resolved_at
-        // nếu phiếu đã đóng từ trước, xem bên dưới.
         TechnicalRequest existing = ticketDAO.findById(id);
         if (existing == null) {
             response.sendRedirect(request.getContextPath() + "/ticket?error=notfound");
@@ -568,71 +356,28 @@ public class TechnicalSupportTicketController extends HttpServlet {
             return;
         }
 
-        // Kỹ thuật viên được giao chỉ được đổi trạng thái/nguyên nhân/ghi chú xử
-        // lý của đúng phiếu của mình -- không được sửa khách hàng/hợp đồng/độ ưu
-        // tiên/người xử lý, nên bỏ qua toàn bộ các trường khác dù form có gửi
-        // lên hay không.
         TechnicalRequest t = fullAccess ? buildTicketFromRequest(request, new TechnicalRequest()) : existing;
         t.setTicketId(id);
-        // contractId trống có HAI nghĩa khác hẳn nhau, phải phân biệt:
-        //
-        //  - Ô chọn hợp đồng mặc định bị khoá, chỉ mở sau khi AJAX loadContracts()
-        //    chạy xong. Form gửi đi trước lúc đó (mạng chậm, lỗi, hoặc tắt JS)
-        //    thì trường này không có giá trị -- phải GIỮ hợp đồng cũ.
-        //  - Người dùng đổi sang khách hàng khác: JS chủ động xoá trắng ô này.
-        //    Lúc đó giữ hợp đồng cũ là SAI, vì hợp đồng đó thuộc khách hàng cũ.
-        //
-        // JS đặt contractLoaded=1 ngay khi danh sách hợp đồng đã tải xong, nên
-        // có marker nghĩa là người dùng thật sự nhìn thấy ô chọn và để trống.
+
         boolean contractPickerWasUsable = "1".equals(request.getParameter("contractLoaded"));
         if (t.getContractId() == null && !contractPickerWasUsable) {
             t.setContractId(existing.getContractId());
         }
-        // Hạn SLA không đọc ra ngày thì có BA nghĩa khác hẳn nhau, và chỉ một
-        // trong ba là "xoá đi":
-        //
-        //  - KHÔNG có tham số: request không đi từ form sửa (POST tự dựng, hay
-        //    một form rút gọn thêm sau này) -- GIỮ hạn cũ.
-        //  - Có tham số nhưng RÁC ("hom qua", định dạng của trình duyệt cũ):
-        //    coi như không nhập -- GIỮ hạn cũ.
-        //  - Có tham số và RỖNG: người dùng nhìn thấy ô rồi chủ động xoá trắng
-        //    -- XOÁ thật. Trước đây nhánh này cũng rơi về "giữ hạn cũ", nên gỡ
-        //    hạn xử lý là việc không làm được: bấm Lưu xong giá trị cũ lặng lẽ
-        //    quay lại, không báo gì.
-        //
-        // Hai nhánh đầu phải giữ vì ghi đè thành NULL là phiếu lặng lẽ biến mất
-        // khỏi ô "sắp/đã quá hạn" trên dashboard VÀ khỏi lịch nhắc của
-        // NotificationScheduler -- cả hai đều lọc "sla_deadline IS NOT NULL".
-        //
-        // Nhánh kỹ thuật viên không bị ảnh hưởng: ở đó t chính LÀ existing, nên
-        // hạn cũ vốn đã nằm sẵn trong t.
+
         String slaParam = request.getParameter("slaDeadline");
         boolean slaClearedOnPurpose = slaParam != null && slaParam.trim().isEmpty();
         if (t.getSlaDeadline() == null && !slaClearedOnPurpose) {
             t.setSlaDeadline(existing.getSlaDeadline());
         }
-        // Chụp lại status/resolvedAt GỐC trước khi set field mới -- ở nhánh
-        // không Full access, t chính LÀ existing (cùng reference), nên nếu đọc
-        // existing.getStatus() sau khi đã t.setStatus() thì sẽ đọc lại đúng giá
-        // trị vừa mới set, luôn thấy "đã đóng từ trước" ngay lần đóng đầu tiên
-        // và không bao giờ stamp được resolved_at cho case kỹ thuật viên tự đóng.
+
         String previousStatus = existing.getStatus();
         Timestamp previousResolvedAt = existing.getResolvedAt();
         t.setStatus(emptyToNull(request.getParameter("status")));
         t.setResolutionSummary(emptyToNull(request.getParameter("resolutionSummary")));
-        // Nguyên nhân và phương hướng xử lý nằm cùng nhóm với kết quả: set ở ĐÂY, ngoài
-        // nhánh fullAccess, nên kỹ thuật viên được giao phiếu cũng ghi được --
-        // đúng yêu cầu nghiệp vụ "nguyên nhân do nhân viên kỹ thuật đánh giá"
-        // (xem phần ngoại lệ của role Kỹ thuật trong PERMISSIONS.md). Đây là
-        // ba cột DUY NHẤT được nới thêm; mọi trường khác vẫn chỉ Full access
-        // mới đụng tới được, vì ở nhánh kia t chính là bản ghi đọc từ DB.
         t.setRootCause(emptyToNull(request.getParameter("rootCause")));
         t.setCauseCategory(emptyToNull(request.getParameter("causeCategory")));
         t.setHandlingPlan(emptyToNull(request.getParameter("handlingPlan")));
         if (TechnicalSupportTicketDAO.STATUS_CLOSED.equals(t.getStatus())) {
-            // Chỉ stamp resolved_at = bây giờ ở lần đầu tiên chuyển sang "Đã đóng"
-            // -- nếu phiếu đã đóng từ trước (sửa lại resolutionSummary chẳng hạn),
-            // giữ nguyên thời điểm đóng gốc thay vì ghi đè lại mỗi lần lưu.
             t.setResolvedAt(TechnicalSupportTicketDAO.STATUS_CLOSED.equals(previousStatus)
                     ? previousResolvedAt
                     : new Timestamp(System.currentTimeMillis()));
@@ -640,10 +385,6 @@ public class TechnicalSupportTicketController extends HttpServlet {
             t.setResolvedAt(null);
         }
 
-        // Trạng thái cũng kiểm theo danh sách cho phép (BR-40), cùng lẽ với mức
-        // ưu tiên trong isValid: một trạng thái thứ tư ghi được vào CSDL sẽ làm
-        // phiếu tàng hình -- không rơi vào ô đếm nào của countStatusSummary,
-        // nhưng vẫn bị các câu SLA (status <> 'Đã đóng') tính là đang mở.
         if (!isValid(t) || !TechnicalSupportTicketDAO.isAllowedStatus(t.getStatus())) {
             response.sendRedirect(request.getContextPath() + "/ticket?action=edit&id=" + id + "&error=invalid");
             return;
@@ -657,11 +398,6 @@ public class TechnicalSupportTicketController extends HttpServlet {
             return;
         }
 
-        // Ghi chú nội bộ chỉ đi kèm DÒNG LỊCH SỬ của lần đổi trạng thái này,
-        // không lưu vào phiếu: nó trả lời "vì sao lúc đó đổi", nên gắn vào
-        // đúng thời điểm đó mới có nghĩa. DAO tự bỏ qua nếu trạng thái không
-        // đổi. Người thực hiện lấy từ session, không nhận từ form -- form thì
-        // ai cũng sửa được, mà đây là cột dùng để quy trách nhiệm.
         int changedBy = resolveCurrentUserId(request, existing.getAssignedTechnicianId());
         boolean ok = ticketDAO.update(t, changedBy, emptyToNull(request.getParameter("internalNote")));
         if (!ok) {
@@ -807,6 +543,17 @@ public class TechnicalSupportTicketController extends HttpServlet {
                 && t.getReceptionChannel() != null
                 && t.getAssignedTechnicianId() > 0
                 && t.getDescription() != null;
+    }
+
+    private Timestamp parseDateTimeOrNull(String value) {
+        if (value == null || value.trim().isEmpty()) {
+            return null;
+        }
+        try {
+            return Timestamp.valueOf(LocalDateTime.parse(value.trim()));
+        } catch (DateTimeParseException ex) {
+            return null;
+        }
     }
 
     private Integer parseIntOrNull(String value) {
