@@ -188,4 +188,52 @@ public class LogFilesTest {
 
         assertEquals("3 B", file.getSizeText());
     }
+
+    // ------------------------------------------------------------------
+    // NFR-17: Giới hạn 512 KB cuối tệp
+    // ------------------------------------------------------------------
+
+    @Test
+    public void maxTailBytes_matchesNfr17() {
+        assertEquals("NFR-17 quy định giới hạn đọc tối đa 512 KB cuối tệp",
+                512 * 1024L, LogFiles.MAX_TAIL_BYTES);
+    }
+
+    @Test
+    public void tail_hugeFile_doesNotReadLinesBeyond512KbLimit_NFR17() throws Exception {
+        StringBuilder big = new StringBuilder();
+        // ~1.08 MB (vượt trần 512 KB)
+        for (int i = 1; i <= 60_000; i++) {
+            big.append("dong log so ").append(i).append('\n');
+        }
+        Path file = write("poscs.log", big.toString());
+
+        // Yêu cầu lấy toàn bộ 100,000 dòng
+        List<String> lines = LogFiles.tail(file, 100_000);
+
+        // Số dòng đọc được chỉ nằm trong phạm vi 512 KB cuối (~30,000 dòng), không bao giờ đạt 60,000 dòng
+        assertTrue("Không được đọc toàn bộ file vượt 512 KB", lines.size() < 60_000);
+        assertFalse("Các dòng đầu tệp nằm ngoài 512 KB cuối không được xuất hiện",
+                lines.contains("dong log so 1"));
+        assertEquals("Dòng cuối cùng phải khớp với dòng kết thúc file",
+                "dong log so 60000", lines.get(lines.size() - 1));
+    }
+
+    @Test
+    public void tail_zeroOrNegativeMaxLines_returnsEmptyList() throws Exception {
+        Path file = write("poscs.log", "dong 1\ndong 2\n");
+
+        assertTrue(LogFiles.tail(file, 0).isEmpty());
+        assertTrue(LogFiles.tail(file, -5).isEmpty());
+    }
+
+    @Test
+    public void resolve_nullOrBlankOrInvalidNames_returnsNull() throws Exception {
+        write("poscs.log", "nội dung");
+
+        assertNull(LogFiles.resolve(null));
+        assertNull(LogFiles.resolve(""));
+        assertNull(LogFiles.resolve("   "));
+        assertNull(LogFiles.resolve("a".repeat(121) + ".log")); // Vượt quá SAFE_NAME length
+    }
 }

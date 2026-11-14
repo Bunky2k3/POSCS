@@ -46,11 +46,11 @@ public final class LogFiles {
     private static final Pattern SAFE_NAME = Pattern.compile("[A-Za-z0-9._-]{1,120}");
 
     /**
-     * Trần số byte đọc khi xem đuôi file. catalina.out chạy lâu ngày có thể
-     * lên hàng trăm MB; đọc cả file vào RAM để hiện 200 dòng cuối là cách
-     * nhanh nhất để hạ máy chủ bằng chính màn hình xem log.
+     * Trần số byte đọc khi xem đuôi file theo NFR-17 (tối đa 512 KB cuối tệp mỗi lần).
+     * catalina.out chạy lâu ngày có thể lên hàng trăm MB; đọc cả file vào RAM để hiện
+     * 200 dòng cuối là cách nhanh nhất để hạ máy chủ bằng chính màn hình xem log.
      */
-    private static final long MAX_TAIL_BYTES = 512 * 1024;
+    static final long MAX_TAIL_BYTES = 512 * 1024;
 
     private LogFiles() {
     }

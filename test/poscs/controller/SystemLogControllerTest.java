@@ -264,6 +264,141 @@ public class SystemLogControllerTest {
         verify(response, never()).getOutputStream();
     }
 
+    @Test
+    public void download_technicalRole_gets403AndNoFileContent() throws Exception {
+        loginAs("Kỹ thuật");
+        when(request.getParameter("action")).thenReturn("download");
+        when(request.getParameter("file")).thenReturn("poscs.log");
+
+        controller.doGet(request, response);
+
+        verify(response).sendError(eq(HttpServletResponse.SC_FORBIDDEN), anyString());
+        verify(response, never()).getOutputStream();
+    }
+
+    @Test
+    public void download_sessionExpired_gets403() throws Exception {
+        when(request.getSession(false)).thenReturn(null);
+        when(request.getParameter("action")).thenReturn("download");
+        when(request.getParameter("file")).thenReturn("poscs.log");
+
+        controller.doGet(request, response);
+
+        verify(response).sendError(eq(HttpServletResponse.SC_FORBIDDEN), anyString());
+        verify(response, never()).getOutputStream();
+    }
+
+    @Test
+    public void view_userWithoutRole_gets403() throws Exception {
+        User user = new User();
+        user.setUserId(99);
+        user.setUsername("norole");
+        user.setRole(null);
+        when(session.getAttribute("currentUser")).thenReturn(user);
+
+        controller.doGet(request, response);
+
+        verify(response).sendError(eq(HttpServletResponse.SC_FORBIDDEN), anyString());
+        verify(request, never()).getRequestDispatcher(VIEW);
+    }
+
+    @Test
+    public void download_userWithoutRole_gets403() throws Exception {
+        User user = new User();
+        user.setUserId(99);
+        user.setUsername("norole");
+        user.setRole(null);
+        when(session.getAttribute("currentUser")).thenReturn(user);
+        when(request.getParameter("action")).thenReturn("download");
+        when(request.getParameter("file")).thenReturn("poscs.log");
+
+        controller.doGet(request, response);
+
+        verify(response).sendError(eq(HttpServletResponse.SC_FORBIDDEN), anyString());
+        verify(response, never()).getOutputStream();
+    }
+
+    @Test
+    public void view_emptyLogDirectory_forwardsWithEmptyLists() throws Exception {
+        stubDispatcher();
+        // Xóa file log để thư mục trống
+        Files.deleteIfExists(folder.getRoot().toPath().resolve("poscs.log"));
+
+        controller.doGet(request, response);
+
+        assertNull(attribute("selectedFile"));
+        assertTrue(((List<?>) attribute("logFiles")).isEmpty());
+        assertTrue(((List<?>) attribute("logContent")).isEmpty());
+    }
+
+    @Test
+    public void view_explicitFileSelection_readsSpecifiedFile() throws Exception {
+        stubDispatcher();
+        Files.write(folder.getRoot().toPath().resolve("other.log"),
+                "dong rieng cua other log\n".getBytes(StandardCharsets.UTF_8));
+        when(request.getParameter("file")).thenReturn("other.log");
+
+        controller.doGet(request, response);
+
+        assertEquals("other.log", attribute("selectedFile"));
+        List<?> content = (List<?>) attribute("logContent");
+        assertEquals(1, content.size());
+        assertEquals("dong rieng cua other log", content.get(0));
+    }
+
+    @Test
+    public void view_blankKeyword_doesNotFilter() throws Exception {
+        stubDispatcher();
+        when(request.getParameter("keyword")).thenReturn("   ");
+
+        controller.doGet(request, response);
+
+        assertNull("Keyword khoảng trắng phải được trim về null", attribute("keyword"));
+        assertEquals(3, ((List<?>) attribute("logContent")).size());
+    }
+
+    @Test
+    public void view_keywordMatchesNothing_returnsEmptyList() throws Exception {
+        stubDispatcher();
+        when(request.getParameter("keyword")).thenReturn("KHONG_CO_TRONG_FILE");
+
+        controller.doGet(request, response);
+
+        assertTrue(((List<?>) attribute("logContent")).isEmpty());
+    }
+
+    @Test
+    public void view_blankFileName_redirectsWithNotFound() throws Exception {
+        when(request.getParameter("file")).thenReturn("   ");
+
+        controller.doGet(request, response);
+
+        verify(response).sendRedirect(CONTEXT_PATH + "/systemLog?error=notfound");
+        verify(request, never()).getRequestDispatcher(anyString());
+    }
+
+    @Test
+    public void download_noFileParameter_redirectsInsteadOfStreaming() throws Exception {
+        when(request.getParameter("action")).thenReturn("download");
+        when(request.getParameter("file")).thenReturn(null);
+
+        controller.doGet(request, response);
+
+        verify(response).sendRedirect(CONTEXT_PATH + "/systemLog?error=notfound");
+        verify(response, never()).getOutputStream();
+    }
+
+    @Test
+    public void download_blankFileName_redirectsInsteadOfStreaming() throws Exception {
+        when(request.getParameter("action")).thenReturn("download");
+        when(request.getParameter("file")).thenReturn("   ");
+
+        controller.doGet(request, response);
+
+        verify(response).sendRedirect(CONTEXT_PATH + "/systemLog?error=notfound");
+        verify(response, never()).getOutputStream();
+    }
+
     private Object attribute(String name) {
         ArgumentCaptor<Object> captor = ArgumentCaptor.forClass(Object.class);
         verify(request, atLeastOnce()).setAttribute(eq(name), captor.capture());
