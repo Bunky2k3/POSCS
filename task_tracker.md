@@ -173,5 +173,7 @@ Không còn mục nào.
   - Lệnh: `ant -Dtest-sys-prop.DB_URL=jdbc:mysql://localhost:3306/poscs_it -Dtest-sys-prop.DB_USER=root -Dtest-sys-prop.DB_PASSWORD=<do người dùng nhập> test` (dùng đường dẫn đầy đủ tới `ant.bat`).
   - **Mỗi lượt chạy xóa sạch dữ liệu của `poscs_it`.** Code chặn nếu tên DB không kết thúc bằng `_it`.
   - **Agent không tự tạo DB, không tự điền hay lưu mật khẩu, không trỏ vào DB khác.** Nếu `poscs_it` chưa có hoặc chưa có mật khẩu: dừng và báo người dùng. Cách tạo DB xem `README.md`.
+- [x] **Task 7.2a:** Loại bỏ mật khẩu DB mặc định hardcode (`"1234"`) theo kết quả QA `docs/qa/Task-7.2.md`: đổi mặc định `DB_PASSWORD` trong `src/java/poscs/dao/DBContext.java` thành chuỗi rỗng `""` (giữ `setInitializationFailTimeout(-1)`, mặc định `DB_URL`/`DB_USER`, không log/in mật khẩu); cập nhật placeholder mật khẩu trong Javadoc `test/poscs/integration/IntegrationDb.java` và `README.md`.
+  - *Đã hoàn thành:* Đổi mặc định `DB_PASSWORD` trong `src/java/poscs/dao/DBContext.java` thành `""`, cập nhật comment và tài liệu hướng dẫn trong `test/poscs/integration/IntegrationDb.java`, `README.md`. Toàn bộ `ant test` đạt 100% pass (3 suite tích hợp skipped mặc định). QA report tại `docs/qa/Task-7.2a.md`.
 - [ ] **Task 7.3:** Cập nhật **`docs/ARCHITECTURE.md`** (không sửa `docs/SPEC.md`) mô tả cấu trúc mới: `service`, `validator`, các DAO/controller đã tách.
 - [ ] **Task 7.4:** Đối chiếu `docs/SPEC.md` với code, `db/schema.sql`, `PERMISSIONS.md`; **chỉ liệt kê sai lệch cho người dùng**, không tự sửa SPEC.

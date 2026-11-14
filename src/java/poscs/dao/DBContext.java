@@ -7,9 +7,10 @@ import java.sql.SQLException;
 
 public class DBContext {
 
-    // Cấu hình lấy từ system property, rồi tới biến môi trường; các giá trị
-    // mặc định chỉ dùng cho môi trường dev cục bộ, KHÔNG chứa bất kỳ
-    // credential thật nào.
+    // Cấu hình lấy từ system property, rồi tới biến môi trường; DB_URL và
+    // DB_USER có giá trị mặc định cho môi trường dev cục bộ, còn DB_PASSWORD
+    // không có credential mặc định (rỗng nếu chưa cấu hình; mật khẩu lấy từ
+    // system property hoặc biến môi trường DB_PASSWORD).
     //
     // System property được ưu tiên vì biến môi trường không đặt được từ bên
     // trong JVM: test tích hợp cần trỏ DAO sang CSDL dùng-một-lần
@@ -18,7 +19,7 @@ public class DBContext {
     // truyền -D nên vẫn rơi về đúng biến môi trường như trước.
     private static final String DB_URL = config("DB_URL", "jdbc:mysql://localhost:3306/poscs_db");
     private static final String DB_USER_NAME = config("DB_USER", "root");
-    private static final String DB_PASSWORD = config("DB_PASSWORD", "1234");
+    private static final String DB_PASSWORD = config("DB_PASSWORD", "");
 
     private static String config(String key, String defaultValue) {
         String fromProperty = System.getProperty(key);

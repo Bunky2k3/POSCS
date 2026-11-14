@@ -31,7 +31,7 @@ import poscs.dao.DBContext;
  *
  * <pre>
  * ant -Dtest-sys-prop.DB_URL=jdbc:mysql://localhost:3306/poscs_it \
- *     -Dtest-sys-prop.DB_USER=root -Dtest-sys-prop.DB_PASSWORD=1234 test
+ *     -Dtest-sys-prop.DB_USER=root -Dtest-sys-prop.DB_PASSWORD=<mật khẩu> test
  * </pre>
  *
  * <h3>Không có MySQL thì sao</h3>

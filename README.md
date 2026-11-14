@@ -134,9 +134,11 @@ This project is set up as a NetBeans Ant-based web application:
    values, see [DEPLOY.md](DEPLOY.md) §2.
 2. Set up the database (see **Database Setup** above).
 3. Configure connection settings via the `DB_URL` / `DB_USER` /
-   `DB_PASSWORD` environment variables, read by `poscs.dao.DBContext`
-   (falls back to `jdbc:mysql://localhost:3306/poscs_db` / `root` / `1234`
-   if unset).
+   `DB_PASSWORD` environment variables (or `-D` system properties), read by
+   `poscs.dao.DBContext`. `DB_URL` and `DB_USER` fall back to
+   `jdbc:mysql://localhost:3306/poscs_db` and `root` if unset; `DB_PASSWORD`
+   has no default and must be provided explicitly (e.g.
+   `DB_PASSWORD=<your_password>` or `-DDB_PASSWORD=<your_password>`).
 4. Deploy the resulting WAR to a Jakarta EE 11–compatible servlet
    container (e.g. Apache Tomcat).
 
