@@ -18,11 +18,26 @@ NetBeans Ant project, backed by a MySQL database.
 
 ```
 src/java/poscs/
-  controller/   Servlets handling HTTP requests
-  dao/          Data access objects for database operations
-  model/        Domain entities (User, Role, Address, ...)
-  common/       Shared utilities, plus the servlet filter and the
-                scheduled-notification listener
+  controller/   Servlets & helpers handling HTTP requests (38 files:
+                LoginController, LogoutController, PasswordResetController,
+                ProfileController, Customer*Controller, Contract*Controller,
+                ChangeRequestController, Ticket*Controller, ProductController,
+                EmployeeController, DashboardController, NotificationController,
+                AddressController, GuideController, UploadFileController,
+                SystemLogController, ...)
+  service/      Business logic, transactions & RBAC (21 files: BaseService,
+                ServiceResult, AttributeStore, PermissionService, AuthService,
+                ProfileService, CustomerService, CustomerEvaluationService,
+                ProductService, Contract*Service, Ticket*Service,
+                EmployeeService, DashboardService, NotificationService, ...)
+  validator/    Input validation by Business Rules (9 files: BaseValidator,
+                ValidationResult, AuthValidator, ProfileValidator,
+                CustomerValidator, ProductValidator, ContractValidator,
+                TicketValidator, EmployeeValidator)
+  dao/          Data access objects for database operations (15 files)
+  model/        Domain entities / POJOs (27 files: User, Role, Address, ...)
+  common/       Shared utilities, plus the servlet filter, access control, and
+                the scheduled-notification listener (18 files)
 web/            JSP pages and static web resources
 nbproject/      NetBeans/Ant project configuration
 build.xml       Ant build script
@@ -193,9 +208,12 @@ only.
 
 See [PERMISSIONS.md](PERMISSIONS.md) for the role-based access matrix
 (who can do what per feature). Login/session enforcement is wired up
-in `AuthenticationController`/`AuthenticationFilter`, and the matrix
-is enforced server-side for Customer/Contract/Product/Ticket/Employee
-via `poscs.common.AccessControl`.
+in `LoginController`, `LogoutController`, `PasswordResetController`,
+`ProfileController` (`AuthService` / `ProfileService`) and `AuthenticationFilter`,
+and the matrix is enforced server-side for Customer/Contract/Product/Ticket/Employee
+via `poscs.service.PermissionService` and `poscs.common.AccessControl`
+(across `CustomerActionController`, `ContractActionController`, `TicketActionController`,
+`ProductController`, `EmployeeController`, and their companion list/detail/export controllers).
 
 ## System log screen (Admin only)
 
@@ -224,20 +242,20 @@ the person with shell access to the server.
   `poscs.common.CsrfUtil`.
 - **Session fixation:** login regenerates the session instead of
   reusing whatever session ID the request arrived with (see
-  `AuthenticationController#handleLogin`).
+  `LoginController` / `AuthService`).
 - **Login does not reveal which usernames exist:** an unknown username
   gets the same `invalid_credentials` error as a wrong password, and
   still runs one BCrypt check against a dummy hash of the same cost, so
-  the response time matches too (`AuthenticationController#handleLogin`).
+  the response time matches too (`LoginController` / `AuthService#login`).
 - **OTP rate limiting:** the forgot-password flow locks out a code
   after 5 failed verification attempts, and enforces a 30-second
   server-side cooldown between resend requests
-  (`AuthenticationController`).
+  (`PasswordResetController` / `AuthService`).
 - **Forgot password does not reveal which usernames exist:** an unknown
   username (or an account with no personal email) still gets a decoy
   code in the session, so the OTP page, resend, cooldown and
   wrong-code counter all respond exactly as for a real account. The
   decoy is never mailed and can never be verified, and the real OTP
   email is sent on a background thread so response time does not give
-  it away either (`AuthenticationController#issueOtp`).
+  it away either (`PasswordResetController` / `AuthService#requestPasswordReset`).
 - **Role-based access control:** see [PERMISSIONS.md](PERMISSIONS.md).

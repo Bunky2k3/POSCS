@@ -647,6 +647,16 @@ public class PermissionService extends BaseService {
         return ListScope.of(team, provinceIds).includes(customer.getAccountOwnerId(), provId);
     }
 
+    /**
+     * Kiểm tra hợp đồng có nằm trong phạm vi "Của tôi" (do mình/cấp dưới phụ trách
+     * hoặc thuộc tỉnh được giao) của người dùng hay không.
+     *
+     * <p>Theo thiết kế phân quyền hiện tại ở {@code PERMISSIONS.md} (Phương án A),
+     * hệ thống chỉ khóa ghi theo phạm vi dòng (row-level write lock) đối với Khách hàng
+     * ({@link #isCustomerInScope}), còn Hợp đồng khóa ghi theo trạng thái tiến độ
+     * ({@code Nháp} / {@code Đã ký}). Hàm này dùng cho kiểm tra phạm vi hợp đồng
+     * khi cần mở rộng row-level write lock.
+     */
     public boolean isContractInScope(User user, int contractOwnerId, Integer contractProvinceId) {
         if (!isActiveUser(user)) {
             return false;

@@ -101,6 +101,9 @@ public final class AccessControl {
         return user.isSubordinate();
     }
 
+    /** MSG-022: Thông báo chuẩn khi từ chối truy cập (HTTP 403). */
+    public static final String MSG_022 = "Bạn không có quyền truy cập nội dung này.";
+
     /**
      * Chặn action tạo/sửa/xoá nếu role hiện tại chỉ được View only (hoặc No
      * access) trên resource này -- trả về 403 và false. Gọi ở đầu mỗi
@@ -112,8 +115,7 @@ public final class AccessControl {
         if (hasFullAccess(request, resource)) {
             return true;
         }
-        response.sendError(HttpServletResponse.SC_FORBIDDEN,
-                "Bạn không có quyền thực hiện thao tác này.");
+        response.sendError(HttpServletResponse.SC_FORBIDDEN, MSG_022);
         return false;
     }
 
@@ -191,8 +193,7 @@ public final class AccessControl {
         if (isAdmin(request)) {
             return true;
         }
-        response.sendError(HttpServletResponse.SC_FORBIDDEN,
-                "Chức năng này chỉ dành cho quản trị viên.");
+        response.sendError(HttpServletResponse.SC_FORBIDDEN, MSG_022);
         return false;
     }
 

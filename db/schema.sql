@@ -4723,7 +4723,7 @@ CREATE TABLE `change_requests` (
   `request_id` int NOT NULL AUTO_INCREMENT,
   -- 'Khách hàng' | 'Hợp đồng' -- đúng hai tài nguyên mà cây tổ chức siết.
   `resource_type` varchar(30) COLLATE utf8mb4_unicode_ci NOT NULL,
-  -- 'Tạo mới' | 'Sửa' | 'Xoá'
+  -- 'Tạo mới' | 'Sửa' | 'Xoá' | 'Lập phụ lục'
   `intent` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
   -- NULL khi intent = 'Tạo mới': chưa có dòng nào để trỏ tới.
   -- Không đặt khoá ngoại vì cột này trỏ sang HAI bảng khác nhau tuỳ

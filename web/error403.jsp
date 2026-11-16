@@ -71,7 +71,7 @@
         <div class="error-icon"><i class="fa-solid fa-lock"></i></div>
         <div class="error-code">Lỗi 403</div>
         <h3 class="fw-bold mt-2 mb-2" style="color:#111827;">Không có quyền truy cập</h3>
-        <p class="text-muted mb-0">Tài khoản của bạn không có quyền thực hiện thao tác hoặc xem trang này.</p>
+        <p class="text-muted mb-0">Bạn không có quyền truy cập nội dung này.</p>
         <a href="${pageContext.request.contextPath}/dashboard" class="btn-back">
             <i class="fa-solid fa-house me-1"></i> Về trang chủ
         </a>

@@ -2,7 +2,7 @@
 
 > **Single Source of Truth của dự án POSCS.**
 > Chắt lọc từ `docs/Project_Report_v8.docx` (Phần I, III, IV). Số hiệu **UC / BR / MSG / NFR / FE** giữ nguyên theo báo cáo để tra cứu ngược.
-> Các file `PERMISSIONS.md`, `README.md`, `db/schema.sql` **chưa được đối chiếu** trong bản này.
+> Các file `PERMISSIONS.md`, `README.md`, `db/schema.sql`, `docs/ARCHITECTURE.md` đã được đối chiếu và đồng bộ toàn diện (Task 7.4).
 
 ## 0. Quy ước dành cho agent
 
@@ -37,20 +37,18 @@
 - **Nền tảng:** Java 21 (javac source/target = 21), Jakarta EE (Servlet, JSP, JSTL), Tomcat 11.0, MySQL 9.3, build bằng Apache Ant 1.10 (NetBeans IDE tùy chọn).
 - **Truy cập dữ liệu:** JDBC + commons-dbutils, bồn kết nối **HikariCP** (do `DBContext` quản lý).
 - **Email:** gửi qua máy chủ SMTP ngoài (`EmailUtil`). Nếu chưa cấu hình SMTP: chạy chế độ phát triển, **không gửi thật**, ghi thông tin ra nhật ký máy chủ.
-- **Bảo mật:** mật khẩu băm **BCrypt**; chống **CSRF** (`CsrfUtil`); `AuthenticationFilter`, `AccessControl` kiểm soát theo vai trò.
-- **Phân tầng (bắt buộc giữ):**
+- **Bảo mật:** mật khẩu băm **BCrypt**; chống **CSRF** (`CsrfUtil`); `AuthenticationFilter`, `AccessControl` và `PermissionService` kiểm soát theo vai trò.
+- **Phân tầng (bắt buộc giữ, chi tiết tại `docs/ARCHITECTURE.md`):**
 
 | Gói | Vai trò |
 |---|---|
 | `view` | Trang JSP + CSS/JS/ảnh trong `web/`. Chỉ hiển thị, **không chứa logic nghiệp vụ**. |
-| `controller` | 11 servlet: Authentication, Customer, Contract, Product, TechnicalSupportTicket, Employee, Dashboard, Notification, Address, UploadFile, SystemLog. Kiểm quyền, validate đầu vào, gọi xuống dao. |
-| `dao` | 10 lớp DAO. Mọi thao tác ghi nhiều bảng chạy **trong một giao dịch**. |
-| `model` | 21 lớp POJO ánh xạ bảng DB. |
-| `service` (`poscs.service`) | Tầng nghiệp vụ và giao dịch, tách khỏi controller; có Base Service và Result/Response wrapper. Đã có `AuthService`, `CustomerService`, `CustomerEvaluationService`. |
-| `validator` (`poscs.validator`) | Kiểm tra đầu vào theo BR. Đã có `AuthValidator`, `CustomerValidator`. |
-
-> Danh sách 11 servlet ở trên theo báo cáo v8; các controller đang được tách dần (ví dụ `AuthenticationController` đã tách thành `LoginController`, `LogoutController`, `PasswordResetController`, `ProfileController`).
-| `common` | `AuthenticationFilter`, `AccessControl`, `CsrfUtil`, `EmailUtil`, `ExcelUtil`, `PdfUtil`, `FileStorage`, `LogFiles`, `Logs`, `TextRules`, bộ hẹn giờ sinh thông báo (`NotificationScheduler`). |
+| `controller` | **38 file** trong `poscs.controller` (Servlet tách theo module & tác vụ: `LoginController`, `LogoutController`, `PasswordResetController`, `ProfileController`, nhóm `Customer*Controller`, `Contract*Controller`, `ChangeRequestController`, `Ticket*Controller`, `ProductController`, `EmployeeController`, `DashboardController`, `NotificationController`, `AddressController`, `GuideController`, `UploadFileController`, `SystemLogController` cùng các helper). Kiểm quyền, nhận và kiểm đầu vào, gọi `service`; **không chứa nghiệp vụ**. |
+| `service` (`poscs.service`) | **21 file** (`BaseService`, `ServiceResult`, `AttributeStore`, `PermissionService`, `AuthService`, `ProfileService`, `CustomerService`, `CustomerEvaluationService`, `ProductService`, nhóm `Contract*Service`, `Ticket*Service`, `EmployeeService`, `DashboardService`, `DashboardSummary`, `NotificationService`). Nghiệp vụ và giao dịch. |
+| `validator` (`poscs.validator`) | **9 file** (`BaseValidator`, `ValidationResult`, `AuthValidator`, `ProfileValidator`, `CustomerValidator`, `ProductValidator`, `ContractValidator`, `TicketValidator`, `EmployeeValidator`). Kiểm tra đầu vào theo BR. |
+| `dao` | **15 file** (`DBContext` + 14 lớp DAO). Mọi thao tác ghi nhiều bảng chạy **trong một giao dịch**. |
+| `model` | **27 file** POJO ánh xạ bảng DB và thực thể nghiệp vụ. |
+| `common` | **18 file** (`AuthenticationFilter`, `AccessControl`, `CsrfUtil`, `ClientIp`, `DataSourceLifecycle`, `NotificationScheduler`, `ListScope`, `Period`, `MoneyVnd`, `TextRules`, `QueryStrings`, `SqlFilters`, `ExcelUtil`, `PdfUtil`, `FileStorage`, `EmailUtil`, `Logs`, `LogFiles`). |
 
 ---
 
@@ -162,7 +160,7 @@
 | UC-17 | Xem chi tiết phiếu | Admin, Sales, Kỹ thuật |
 | UC-21 | Tạo phiếu | Admin, Sales |
 | UC-22 | Cập nhật phiếu | Admin, Sales, Kỹ thuật (Kỹ thuật: chỉ phiếu được giao) |
-| UC-23 | Xóa phiếu (xóa mềm, ghi lý do, lưu vết) | Admin, Sales |
+| UC-23 | Xóa phiếu (xóa mềm) | Admin, Sales |
 | UC-42 | Xuất phiếu ra Excel hoặc PDF | Admin, Kỹ thuật, Sales |
 
 ### 4.6 Thông báo, tổng quan, nhật ký
@@ -241,11 +239,14 @@
 
 ### 5.7 Thông báo
 - Chỉ xem thông báo của chính mình; sắp xếp mới nhất lên đầu, hiển thị số chưa đọc (BR-20).
-- **Thông báo không do người dùng tạo tay.** `NotificationScheduler` chạy nền, **chu kỳ 60 phút**, tự sinh thông báo cho đúng hai trường hợp:
-  1. **Hợp đồng sắp hết hạn** → gửi cho **người phụ trách hợp đồng**. "Sắp hết hạn" theo BR-17 (còn ≤ 30 ngày tới ngày kết thúc).
-  2. **Phiếu hỗ trợ sắp / đã quá hạn SLA** → gửi cho **kỹ thuật viên được phân công**. "Sắp quá hạn" = còn ≤ **24 giờ** tới hạn SLA (người dùng chốt; báo cáo không nêu).
-  - Mỗi cặp (đối tượng, người nhận) chỉ sinh **một** thông báo; chạy lại nhiều lần **không tạo bản ghi trùng**.
-  - Không có thông báo nhắc hạn thanh toán. Báo cáo chỉ nêu hai trường hợp trên.
+- **Thông báo không do người dùng tạo tay.** Hệ thống tự sinh thông báo từ hai nguồn:
+  - **Định kỳ qua `NotificationScheduler`** (chạy nền, **chu kỳ 60 phút**) cho đúng hai trường hợp:
+    1. **Hợp đồng sắp hết hạn** (`ref_type = "CONTRACT"`) → gửi cho **người phụ trách hợp đồng**. "Sắp hết hạn" theo BR-17 (còn ≤ 30 ngày tới ngày kết thúc).
+    2. **Phiếu hỗ trợ sắp / đã quá hạn SLA** (`ref_type = "TICKET"`) → gửi cho **kỹ thuật viên được phân công**. "Sắp quá hạn" = còn ≤ **24 giờ** tới hạn SLA.
+    - Mỗi cặp (đối tượng, người nhận) chỉ sinh **một** thông báo; chạy lại nhiều lần **không tạo bản ghi trùng**.
+  - **Theo sự kiện yêu cầu thay đổi (`UC-50`, `UC-51`, `ref_type = "CHANGE_REQUEST"`)**:
+    3. Khi nhân viên có cấp trên gửi yêu cầu thay đổi (`UC-50`) → gửi thông báo cho **người quản lý trực tiếp** (`manager_id`). Khi người quản lý (hoặc Admin) duyệt / từ chối yêu cầu (`UC-51`) → gửi thông báo kết quả cho **người gửi yêu cầu** (`requested_by`).
+  - Không có thông báo nhắc hạn thanh toán.
 - Mở danh sách **KHÔNG** tự đánh dấu đã đọc; phải bấm từng thông báo hoặc "Đánh dấu tất cả đã đọc" (BR-21). Mã thông báo không thuộc người dùng → bỏ qua, không đổi dữ liệu.
 
 ---
@@ -312,18 +313,18 @@
 
 ---
 
-## 7. Mô hình dữ liệu (22 bảng)
+## 7. Mô hình dữ liệu (29 bảng)
 
-Nguồn chính thức là `db/schema.sql`; bảng dưới chỉ để định hướng.
+Nguồn chính thức là `db/schema.sql`; bảng dưới tổng hợp đầy đủ 29 bảng trong hệ thống:
 
 | Nhóm | Bảng |
 |---|---|
-| Tài khoản & tổ chức | `users`, `roles`, `departments`, `provinces`, `districts`, `addresses`, `user_provinces` (phân công địa bàn; có trong DB, chưa có trong báo cáo, tên chính xác theo `schema.sql`) |
-| Khách hàng | `enterprises`, `enterprisecontacts`, `customer_lifecycle_events` (có `relationship_rating`), `customer_evaluation_rules` |
-| Sản phẩm | `productcategories` (cây đa tầng), `products`, `productimages`, `productcatalogues` |
-| Hợp đồng | `contracts`, `contractproducts`, `contract_payments` (nguồn duy nhất tính doanh thu dashboard & đánh giá KH) |
-| Phiếu hỗ trợ | `technicalrequests`, `technicalrequestdevices` (có bảng nhưng **không dùng**, theo quyết định bỏ BR-44), `technicalrequesthistory` |
-| Khác | `notifications`, `schema_migrations` (mỗi file trong `db/migrations/` khi áp dụng ghi một dòng) |
+| Tài khoản & tổ chức (7) | `users`, `roles`, `departments`, `provinces`, `districts`, `addresses`, `user_provinces` (phân công địa bàn) |
+| Khách hàng / Đối tác (5) | `enterprises`, `enterprise_roles` (vai đối tác: Khách mua / Nhà cung cấp), `enterprisecontacts`, `customer_lifecycle_events` (có `relationship_rating`), `customer_evaluation_rules` |
+| Sản phẩm (4) | `productcategories` (cây đa tầng), `products`, `productimages`, `productcatalogues` |
+| Hợp đồng (7) | `contracts`, `contractproducts`, `contract_payments` (nguồn duy nhất tính doanh thu dashboard & đánh giá KH), `contract_history` (nhật ký hợp đồng, UC-45/UC-54), `contract_handovers` (bàn giao liên phòng, UC-48/UC-49), `contract_documents` (tài liệu đính kèm, UC-52), `contract_links` (liên kết HĐ Bán ↔ Mua, UC-47) |
+| Phiếu hỗ trợ (3) | `technicalrequests`, `technicalrequestdevices` (có bảng nhưng **không dùng**, theo quyết định bỏ BR-44), `technicalrequesthistory` |
+| Khác (3) | `change_requests` (yêu cầu thay đổi của cấp dưới, UC-50/UC-51), `notifications`, `schema_migrations` (mỗi file trong `db/migrations/` khi áp dụng ghi một dòng) |
 
 Lưu ý: dùng **xóa mềm** (`is_deleted`) cho KH, sản phẩm, hợp đồng, phiếu, tài liệu hợp đồng, danh mục.
 
@@ -441,19 +442,17 @@ Loại: **Nội tuyến** (inline), **Toast**, **Hộp thoại**. "(chuyển tra
 
 ---
 
-## 11. Quyết định đã chốt & điểm còn mở
+## 11. Quyết định đã chốt
 
-### Đã chốt
-1. **Không có vai trò CS.** Chỉ Admin, Sales, Kỹ thuật.
+### Đã chốt (theo `rules.md` §1)
+1. **Không có vai trò CS.** Chỉ 3 vai trò: Admin, Sales, Kỹ thuật.
 2. **BR-44 không làm.** Phiếu gắn với hợp đồng; lỗi/thiết bị ghi ở Mô tả/ghi chú. Bỏ qua phần thiết bị trong mô tả UC-17/21/22.
-3. **Mã NCC là `NCC-xxx`** (3 chữ số), mã KH là `KH-xxxx`.
-4. Trạng thái phiếu dùng **Đã đóng** (theo BR-40), không dùng "Đã giải quyết" như mô tả UC-16.
-5. Trạng thái và ngày tạo của phiếu do **hệ thống gán** (theo BR-39), không phải trường nhập như mô tả UC-21.
-6. `NotificationScheduler` chu kỳ 60 phút, 2 loại thông báo tự sinh (xem 5.7). **Phiếu: báo trước 24 giờ** so với hạn SLA.
-7. Cách lấy IP cho BR-01: không cần thay đổi, giữ cách hiện tại.
-8. Hai gói `poscs.service` và `poscs.validator` đã được xác nhận và đã tồn tại trong code (mục 2).
-
-### Còn mở `[CẦN XÁC NHẬN]`
-1. **Ngưỡng thông báo "hợp đồng sắp hết hạn":** báo cáo không nói riêng; tạm dùng BR-17 (≤ 30 ngày). Đổi nếu người dùng chỉ định khác.
-2. **Luồng chi tiết** UC-36 → UC-54: báo cáo chỉ có mô tả ngắn.
-3. Đối chiếu `PERMISSIONS.md`, `README.md`, `db/schema.sql` với tài liệu này.
+3. **Không làm BR-50, BR-51**, và không làm nhập/xuất PDF từng hợp đồng (UC-40 đã gỡ).
+4. **Mã NCC là `NCC-xxx`** (3 chữ số), mã KH là `KH-xxxx`.
+5. Trạng thái phiếu dùng **Đã đóng** (theo BR-40), không dùng "Đã giải quyết" như mô tả UC-16.
+6. Trạng thái và ngày tạo của phiếu do **hệ thống gán** (theo BR-39), không phải trường nhập như mô tả UC-21.
+7. **Ngưỡng thông báo:** hợp đồng sắp hết hạn là **30 ngày** (BR-17); phiếu hỗ trợ là **24 giờ** trước hạn SLA (`NotificationScheduler` chu kỳ 60 phút, cộng thêm thông báo sự kiện `CHANGE_REQUEST` cho UC-50/UC-51, xem 5.7).
+8. Cách lấy IP cho BR-01: giữ nguyên qua `ClientIp`.
+9. Hai gói `poscs.service` và `poscs.validator` đã hoàn thiện đầy đủ cho toàn bộ module (mục 2 & `docs/ARCHITECTURE.md`).
+10. **Luồng chi tiết UC-36 → UC-54:** đã chốt theo hành vi code và JSP hiện tại (`ChangeRequestDAO` & `ChangeRequestController` cho UC-50/UC-51; `ContractService` & `ContractActionController` cho UC-54).
+11. Đã đối chiếu và đồng bộ toàn diện giữa `docs/SPEC.md`, `PERMISSIONS.md`, `README.md` và `db/schema.sql` (Task 7.4).

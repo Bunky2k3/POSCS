@@ -13,10 +13,14 @@ rejects it. See
 
 The `roles` table is seeded (see
 [`db/migrations/V2__seed_default_roles__ndat2003.sql`](db/migrations/V2__seed_default_roles__ndat2003.sql)),
-login/session is implemented in `AuthenticationController`, and
-`CustomerController`/`ContractController`/`ProductController`/
-`TechnicalSupportTicketController`/`EmployeeController` enforce this
-matrix server-side via `poscs.common.AccessControl.requireFullAccess(...)`.
+login/session is implemented in `LoginController`, `LogoutController`,
+`PasswordResetController`, and `ProfileController` (backed by `AuthService` and `ProfileService`), and
+the specialized controllers (`CustomerController`, `CustomerListController`, `CustomerDetailController`, `CustomerActionController`, `CustomerExportController`,
+`ContractController`, `ContractListController`, `ContractDetailController`, `ContractActionController`, `ContractPaymentController`, `ContractDocumentController`, `ContractHandoverController`, `ContractLinkController`, `ContractExportController`,
+`ProductController`,
+`TechnicalSupportTicketController`, `TicketListController`, `TicketDetailController`, `TicketActionController`, `TicketExportController`,
+`EmployeeController`) enforce this
+matrix server-side via `poscs.service.PermissionService` and `poscs.common.AccessControl.requireFullAccess(...)`.
 `EmployeeController` gates once at the top of `doGet`/`doPost` instead of
 per-handler like the others, since Employee has no "View only" tier for
 any role — every single action (including list/view) requires Admin.
@@ -196,8 +200,8 @@ also feeds the `canManage` flag the JSPs use to hide buttons.
 | | |
 |---|---|
 | `users.manager_id` + two-tier org chart | **done** (V16) |
-| Subordinate read-only on Customer/Contract | **done** (`AccessControl.hasFullAccess`) |
-| Admin picks a manager on the employee form | **done** |
+| Subordinate read-only on Customer/Contract | **done** (`PermissionService` / `AccessControl.hasFullAccess`) |
+| Direct manager (`users.manager_id`) assigned in DB (`Cấp trên` dropdown removed from employee form; see below & `docs/SPEC.md` §3.2) | **done** |
 | Subordinate submits a change request, manager approves | **done** (V17, `/changerequest`) |
 
 What is still pending is **data, not code**: the real org chart (who manages
