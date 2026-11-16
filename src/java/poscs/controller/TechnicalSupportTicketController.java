@@ -291,7 +291,7 @@ public class TechnicalSupportTicketController extends HttpServlet {
 
         if (!AccessControl.hasFullAccess(request, AccessControl.Resource.TICKET)
                 && !AccessControl.canUpdateAssignedTicket(request, ticket)) {
-            response.sendError(HttpServletResponse.SC_FORBIDDEN, "Bạn không có quyền thực hiện thao tác này.");
+            response.sendError(HttpServletResponse.SC_FORBIDDEN, AccessControl.MSG_022);
             return;
         }
 
@@ -352,7 +352,7 @@ public class TechnicalSupportTicketController extends HttpServlet {
         boolean fullAccess = AccessControl.hasFullAccess(request, AccessControl.Resource.TICKET);
         boolean assignedTechnicianUpdate = !fullAccess && AccessControl.canUpdateAssignedTicket(request, existing);
         if (!fullAccess && !assignedTechnicianUpdate) {
-            response.sendError(HttpServletResponse.SC_FORBIDDEN, "Bạn không có quyền thực hiện thao tác này.");
+            response.sendError(HttpServletResponse.SC_FORBIDDEN, AccessControl.MSG_022);
             return;
         }
 
