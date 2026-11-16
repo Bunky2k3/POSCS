@@ -15,6 +15,20 @@
 4. Hàm > 40 dòng hoặc file > 250 dòng: xem xét tách module phụ trợ.
 5. Đánh `[x]` kèm ghi chú ngắn các file đã sửa. Mỗi task ghi thêm "Xong khi" nếu có tiêu chí riêng.
 
+## Cách ghi một task mới
+
+Dòng task viết như các task bên dưới (`**Task X.X:** <Tên task>`), kèm các dòng con sau. Các dòng con này là chỗ lấy nội dung điền vào bộ prompt 4 bước (Code, QA, Fix, Commit):
+
+- **UC:** `UC-xx` (ghi "không có" nếu task không gắn UC).
+- **BR / MSG / NFR:** các mã trong `docs/SPEC.md` mà task phải đáp ứng.
+- **File sửa:** đường dẫn từng file, kèm việc cần làm ở file đó.
+- **File test:** file test và các test cần thêm.
+- **Không đụng:** file hoặc phần nằm ngoài phạm vi task.
+- **Lưu ý:** bối cảnh, lệnh đặc biệt, điều kiện phải dừng lại hỏi.
+- **Xong khi:** tiêu chí riêng, ngoài "Tiêu chí hoàn thành chung" ở trên.
+- **Nhánh:** `<type>/task-X.X-<tên-ngắn>` (không làm trên `main`).
+- **Commit:** `<type>(<module>): <mô tả ngắn> (Task X.X)`.
+
 ## Quyết định đã chốt
 
 1. Cách lấy IP cho BR-01 (Task 1.3): **không cần thay đổi**, giữ cách hiện tại.
@@ -180,3 +194,14 @@ Không còn mục nào.
   - *Đã hoàn thành:* Tạo mới `docs/ARCHITECTURE.md` với sơ đồ Mermaid và mô tả chi tiết các tầng Presentation (`poscs.controller`), `poscs.service`, `poscs.validator`, `poscs.dao`, `poscs.model`, `poscs.common` theo `.gemini/rules.md` §4. QA report tại `docs/qa/Task-7.3.md`.
 - [x] **Task 7.4:** Đối chiếu `docs/SPEC.md` với code, `db/schema.sql`, `PERMISSIONS.md`; **chỉ liệt kê sai lệch cho người dùng**, không tự sửa SPEC.
   - *Đã hoàn thành:* Kiểm toán toàn diện hệ thống và giải quyết dứt điểm 12 điểm sai lệch (`D-01` → `D-12`) theo chỉ định của người dùng: bổ sung `<session-timeout>30</session-timeout>` trong `web/WEB-INF/web.xml` (NFR-20); chuẩn hóa thông điệp HTTP 403 (`MSG-022`) trong `src/java/poscs/common/AccessControl.java` và `web/error403.jsp`; bổ sung Javadoc trên `PermissionService.isContractInScope`; đồng bộ tài liệu `docs/SPEC.md` (§2, §4.5, §5.7, §7 đủ 29 bảng, §11), `PERMISSIONS.md`, `README.md` và comment `db/schema.sql`. QA report tại `docs/qa/Task-7.4.md`.
+- [x] **Task 7.4a:** Đồng bộ câu báo lỗi 403 về MSG-022 theo QA D-10 (`docs/qa/Task-7.4.md`).
+  - UC: không có (áp cho mọi trang báo vượt thẩm quyền).
+  - BR / MSG / NFR: `MSG-022` = "Bạn không có quyền truy cập nội dung này." (SPEC §9; §3 ghi chú cuối bảng quyền; §5.6), `NFR-10`.
+  - File sửa: `src/java/poscs/controller/TechnicalSupportTicketController.java` (2 chỗ `sendError` 403 dùng hằng có sẵn `AccessControl.MSG_022`, không đổi điều kiện); `web/jsp/guide/employee.jsp`, `web/jsp/guide/ticket.jsp` (bảng "Thông báo lỗi thường gặp": đổi ô câu cũ thành câu MSG-022, giữ cột nguyên nhân và thẻ HTML); `tools/guide/word/export_word.py` (thêm 1 dòng cuối `CHANGES`); `docs/Report6_HuongDanSuDung.docx` (xuất lại).
+  - File test: `test/poscs/controller/TechnicalSupportTicketControllerTest.java`: thêm test mới cho 2 nhánh (mở form sửa và cập nhật phiếu không được giao), khẳng định `sendError(SC_FORBIDDEN, AccessControl.MSG_022)`; không sửa test cũ.
+  - Không đụng: `docs/SPEC.md`, `PERMISSIONS.md`, `README.md`, `web/error403.jsp`, `AccessControl.java`, `PermissionService.java`; các câu 403 riêng ở `ChangeRequestController`, `ContractActionController`, `AuthenticationFilter` (CSRF). Không gộp hai hằng `MSG_022`.
+  - Lưu ý: `web/error403.jsp` không hiện message của `sendError`, người dùng luôn thấy câu viết cứng trong JSP, nên hướng dẫn phải ghi đúng câu đó. Trước khi xuất lại docx: `lastModifiedBy` trong `docProps/core.xml` phải là `tools/guide/word/export_word.py`, khác thì dừng hỏi. Lệnh: `python tools/guide/word/export_word.py --template "C:\Users\Admin\Documents\Backup\Prj\Ref\Report6_Software User Guides.docx" --out "docs\Report6_HuongDanSuDung.docx"`. Thiếu Python/thư viện thì dừng, không tự cài.
+  - Xong khi: không còn câu "Bạn không có quyền thực hiện thao tác này." trong `src/` và `web/`; docx có câu MSG-022 ở 2 bảng lỗi và dòng Task 7.4a trong Lịch sử thay đổi; `ant compile-jsps` và `ant test` pass.
+  - Nhánh: `fix/task-7.4a-msg-022`.
+  - Commit: `fix(guide): đồng bộ thông báo 403 về MSG-022 ở phiếu hỗ trợ và hướng dẫn sử dụng (Task 7.4a)`
+  - *Đã hoàn thành:* 2 chỗ `sendError` 403 trong `src/java/poscs/controller/TechnicalSupportTicketController.java` dùng `AccessControl.MSG_022`; bảng "Thông báo lỗi thường gặp" ở `web/jsp/guide/employee.jsp`, `web/jsp/guide/ticket.jsp` ghi đúng câu MSG-022; thêm dòng Task 7.4a vào `CHANGES` của `tools/guide/word/export_word.py` và xuất lại `docs/Report6_HuongDanSuDung.docx`. Unit tests: thêm 2 test vào `test/poscs/controller/TechnicalSupportTicketControllerTest.java` (67/67 pass). `ant test` 1.964 pass / 0 fail / 3 skipped, `ant compile-jsps` pass. QA report tại `docs/qa/Task-7.4a.md`.

@@ -757,6 +757,7 @@ CHANGES = [
     ('01/10/2026', 'S', 'Khách hàng: tách trang Sửa khách hàng / Sửa nhà cung cấp; ô "Đồng thời là ..." thay hai ô tick '
                         'vai (PR #172).'),
     ('01/10/2026', 'S', 'Khách hàng: Sales không đổi được người phụ trách chính ở trang Sửa (PR #173).'),
+    ('16/11/2026', 'S', 'Nhân viên, Phiếu hỗ trợ: thông báo không có quyền ghi đúng câu MSG-022 (Task 7.4a).'),
 ]
 
 

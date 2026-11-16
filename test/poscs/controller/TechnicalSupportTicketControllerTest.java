@@ -19,6 +19,7 @@ import jakarta.servlet.http.HttpSession;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.ArgumentCaptor;
+import poscs.common.AccessControl;
 import poscs.common.Period;
 import poscs.dao.ContractDAO;
 import poscs.dao.CustomerDAO;
@@ -234,6 +235,20 @@ public class TechnicalSupportTicketControllerTest {
         controller.doPost(request, response);
 
         verify(response).sendError(eq(HttpServletResponse.SC_FORBIDDEN), anyString());
+        verify(ticketDAO, never()).update(any(), anyInt(), any());
+    }
+
+    /** Vi phạm quyền trả đúng câu MSG-022 (SPEC §9), không phải câu riêng của controller. */
+    @Test
+    public void update_technicianNotAssignedToTicket_returns403WithMsg022() throws Exception {
+        loginAs("Kỹ thuật", 1); // phiếu được giao cho kỹ thuật viên 50
+        when(request.getParameter("action")).thenReturn("update");
+        when(request.getParameter("ticketId")).thenReturn("3");
+        when(ticketDAO.findById(3)).thenReturn(fullyValidExistingTicket());
+
+        controller.doPost(request, response);
+
+        verify(response).sendError(HttpServletResponse.SC_FORBIDDEN, AccessControl.MSG_022);
         verify(ticketDAO, never()).update(any(), anyInt(), any());
     }
 
@@ -1238,6 +1253,20 @@ public class TechnicalSupportTicketControllerTest {
         controller.doGet(request, response);
 
         verify(response).sendError(eq(HttpServletResponse.SC_FORBIDDEN), anyString());
+        verify(request, never()).getRequestDispatcher("/jsp/customersupport/updateTicket.jsp");
+    }
+
+    /** Vi phạm quyền trả đúng câu MSG-022 (SPEC §9), không phải câu riêng của controller. */
+    @Test
+    public void editForm_technicianNotAssignedToThisTicket_returns403WithMsg022() throws Exception {
+        loginAs("Kỹ thuật", 51); // phiếu được giao cho kỹ thuật viên 50
+        when(request.getParameter("action")).thenReturn("edit");
+        when(request.getParameter("id")).thenReturn("3");
+        when(ticketDAO.findById(3)).thenReturn(fullyValidExistingTicket());
+
+        controller.doGet(request, response);
+
+        verify(response).sendError(HttpServletResponse.SC_FORBIDDEN, AccessControl.MSG_022);
         verify(request, never()).getRequestDispatcher("/jsp/customersupport/updateTicket.jsp");
     }
 

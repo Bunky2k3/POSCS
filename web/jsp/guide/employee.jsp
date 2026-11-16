@@ -225,7 +225,7 @@
 <h2 id="loi-thuong-gap">9. Thông báo lỗi thường gặp</h2>
 <table class="guide-table">
     <tr><th>Thông báo</th><th>Nguyên nhân và cách xử lý</th></tr>
-    <tr><td>Bạn không có quyền thực hiện thao tác này.</td><td>Người không phải Admin mở trang nhân viên.</td></tr>
+    <tr><td>Bạn không có quyền truy cập nội dung này.</td><td>Người không phải Admin mở trang nhân viên.</td></tr>
     <tr><td>Không tìm thấy nhân viên này…</td><td>Link cũ, hoặc mã nhân viên trên đường dẫn không đúng.</td></tr>
     <tr><td>Vui lòng nhập đầy đủ và đúng định dạng các trường bắt buộc.</td><td>Còn ô có dấu * để trống, hoặc số điện thoại, email, ngày sinh sai định dạng.</td></tr>
     <tr><td>Số điện thoại / Số CCCD/CMND này đã được sử dụng bởi tài khoản khác.</td><td>Trùng với một nhân viên khác. Kiểm lại số.</td></tr>

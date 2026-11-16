@@ -247,7 +247,7 @@
     <tr><td>Không xoá được phiếu hỗ trợ. Vui lòng thử lại.</td><td>Lỗi hệ thống lúc xoá: phiếu chưa bị xoá, trang chi tiết của phiếu mở lại. Xoá lại; vẫn lỗi thì báo quản trị viên.</td></tr>
     <tr><td>Không tìm thấy phiếu hỗ trợ này. Có thể phiếu đã bị xoá.</td><td>Mở một link cũ tới phiếu đã bị xoá, hoặc mã trên đường dẫn không đúng.</td></tr>
     <tr><td>Không tải được danh sách hợp đồng (trong ô Hợp đồng liên quan)</td><td>Mất kết nối lúc nạp danh sách hợp đồng. Chọn lại khách hàng, hoặc tải lại trang.</td></tr>
-    <tr><td>Bạn không có quyền thực hiện thao tác này.</td><td>Kỹ thuật viên mở trang tạo phiếu, hoặc trang sửa của một phiếu không giao cho mình.</td></tr>
+    <tr><td>Bạn không có quyền truy cập nội dung này.</td><td>Kỹ thuật viên mở trang tạo phiếu, hoặc trang sửa của một phiếu không giao cho mình.</td></tr>
 </table>
 
 <%@ include file="/jsp/guide/_bottom.jspf" %>
