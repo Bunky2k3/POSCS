@@ -241,7 +241,7 @@ Không còn mục nào.
   - Nhánh: `docs/task-8.1-spec-thong-tin-chi-nhanh`.
   - Commit: `docs(spec): đặc tả thông tin chi nhánh và người ký bên mình (Task 8.1)`
   - *Đã hoàn thành:* `docs/SPEC.md` thêm UC-55 (§3.3, §4 tiêu đề "UC-01 → UC-55", mục 4.8), §5.4 sửa đoạn "Tạo (UC-33)", "Cập nhật (UC-35)" và thêm gạch đầu dòng "Người ký bên mình (BR-56)", mục 5.8 "Thông tin chi nhánh (Admin)", BR-56 và BR-57 (§6 "BR-01 → BR-57"), §7 "30 bảng" thêm `branch_info`, MSG-057 → MSG-060 (§9), §11 quyết định 12. Theo QA đã chốt thêm: SĐT/fax tối đa 20 ký tự (quyết định 12), "chưa khai" = họ tên GĐCN còn trống (quyết định 10). Không có test mới; `ant test` 1.964 test, 0 fail, 3 skipped. QA report tại `docs/qa/Task-8.1.md`.
-- [ ] **Task 8.2:** Tạo bảng `branch_info`, thêm `signer_phone`/`signer_fax` vào `contracts`, kèm model và DAO.
+- [x] **Task 8.2:** Tạo bảng `branch_info`, thêm `signer_phone`/`signer_fax` vào `contracts`, kèm model và DAO.
   - UC: `UC-55` (dữ liệu); `UC-33`, `UC-35` (hai cột mới của hợp đồng).
   - BR / MSG / NFR: `BR-56`, `BR-57`.
   - File sửa:
@@ -256,6 +256,7 @@ Không còn mục nào.
   - Xong khi: V39 và `schema.sql` khớp nhau từng cột; `BranchInfoDAOTest` pass.
   - Nhánh: `feat/task-8.2-branch-info-schema`.
   - Commit: `feat(db): thêm bảng branch_info và SĐT, fax người ký bên mình (Task 8.2)`
+  - *Đã hoàn thành:* `db/migrations/V39__add_branch_info_and_contract_signer_contact__ndat2003.sql` (mới: bảng `branch_info` một dòng id = 1 gieo sẵn chức vụ, `contracts.signer_phone`/`signer_fax` sau `signer_position`); `db/schema.sql` mirror V39 (bảng mới ngay sau `users`, khớp từng cột); `src/java/poscs/model/BranchInfo.java` (mới); `src/java/poscs/model/Contract.java` thêm `signerPhone`, `signerFax`; `src/java/poscs/dao/BranchInfoDAO.java` (mới: `get()`, `update(info, actorId)`). Test: `test/poscs/dao/BranchInfoDAOTest.java` 14 test; `ant test` 1.978 test, 0 fail, 3 skipped. **Chưa chạy V39 lên `poscs_db`**: phải chạy trước khi kéo code Task 8.4 về checkout chính. QA report tại `docs/qa/Task-8.2.md`.
 - [ ] **Task 8.3:** Trang "Thông tin chi nhánh" cho Admin (xem và sửa thông tin GĐCN).
   - UC: `UC-55`.
   - BR / MSG / NFR: `BR-57`, `MSG-057`, `MSG-058`, `MSG-059`, `MSG-015`, `MSG-022`.
