@@ -10,6 +10,7 @@ import poscs.dao.ContractDAO;
 import poscs.dao.CustomerDAO;
 import poscs.dao.EmployeeDAO;
 import poscs.dao.ProductDAO;
+import poscs.model.BranchInfo;
 import poscs.model.Contract;
 import poscs.model.ContractDocument;
 import poscs.model.ContractHandover;
@@ -80,8 +81,7 @@ public final class ContractControllerHelper {
         if (entId != null) c.setEnterpriseId(entId);
         Integer ownerId = parseIntOrNull(req.getParameter("ownerId"));
         if (ownerId != null) c.setOwnerId(ownerId);
-        c.setSignerName(emptyToNull(req.getParameter("signerName")));
-        c.setSignerPosition(emptyToNull(req.getParameter("signerPosition")));
+        // BR-56: người ký bên mình KHÔNG đọc từ request -- ContractService chép từ Thông tin chi nhánh.
         c.setCounterpartySignerName(emptyToNull(req.getParameter("counterpartySignerName")));
         c.setCounterpartySignerPosition(emptyToNull(req.getParameter("counterpartySignerPosition")));
         c.setAuthorizationRef(emptyToNull(req.getParameter("authorizationRef")));
@@ -127,6 +127,15 @@ public final class ContractControllerHelper {
         req.setAttribute("direction", parent.getDirection());
         req.setAttribute("kind", ContractService.DIRECTION_BUY.equals(parent.getDirection()) ? ContractService.KIND_BUY : ContractService.KIND_SELL);
         req.setAttribute("contractTypeOptions", ContractService.contractTypesFor(parent.getDirection()));
+    }
+
+    /**
+     * BR-56: thông tin GĐCN cho mục "Thông tin ký kết" của form tạo/sửa, và cờ
+     * {@code branchSignerMissing} để form hiện MSG-060 khi chưa khai.
+     */
+    public static void putBranchSigner(HttpServletRequest req, BranchInfo branchInfo) {
+        req.setAttribute("branchInfo", branchInfo);
+        req.setAttribute("branchSignerMissing", !ContractService.isBranchSignerDeclared(branchInfo));
     }
 
     public static void setDropdownAttributes(HttpServletRequest req, CustomerDAO custDAO, EmployeeDAO empDAO,

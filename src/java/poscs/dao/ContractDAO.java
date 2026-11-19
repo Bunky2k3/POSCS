@@ -251,7 +251,8 @@ public class ContractDAO {
     private static final String SELECT_BASE =
         "SELECT c.contract_id, c.contract_code, c.title, c.contract_type, c.direction, c.signing_date, " +
         "       c.effective_date, c.end_date, c.enterprise_id, c.owner_id, " +
-        "       c.signer_name, c.signer_position, c.counterparty_signer_name, c.counterparty_signer_position, c.authorization_ref, c.signing_place, c.contract_value, " +
+        "       c.signer_name, c.signer_position, c.signer_phone, c.signer_fax, " +
+        "       c.counterparty_signer_name, c.counterparty_signer_position, c.authorization_ref, c.signing_place, c.contract_value, " +
         "       c.progress_status, c.created_at, c.updated_at, c.is_deleted, " +
         "       c.parent_contract_id, pc.contract_code AS parent_contract_code, " +
         "       " + AMENDMENT_COUNT_SQL + " AS amendment_count, " +
@@ -879,9 +880,10 @@ public class ContractDAO {
     private static final String SQL_INSERT = "INSERT INTO contracts " +
             "(contract_code, title, contract_type, direction, signing_date, effective_date, end_date, " +
             " enterprise_id, owner_id, status, progress_status, " +
-            " signer_name, signer_position, counterparty_signer_name, counterparty_signer_position, " +
+            " signer_name, signer_position, signer_phone, signer_fax, " +
+            " counterparty_signer_name, counterparty_signer_position, " +
             " authorization_ref, signing_place, contract_value, parent_contract_id) " +
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
     /**
      * Thêm hợp đồng mới kèm dòng nhật ký "Khởi tạo". Trả về contract_id vừa
@@ -984,7 +986,7 @@ public class ContractDAO {
             bindSigningParties(ps, 12, contract);
             // setObject, không setInt: phụ lục của hợp đồng gốc là
             // NULL, và setInt(0) sẽ đâm vào khoá ngoại.
-            ps.setObject(19, parentId, java.sql.Types.INTEGER);
+            ps.setObject(12 + SIGNING_PARTY_COLUMNS, parentId, java.sql.Types.INTEGER);
 
             if (ps.executeUpdate() == 0) {
                 return -1;
@@ -1084,7 +1086,8 @@ public class ContractDAO {
     private static final String SQL_UPDATE_ALL = "UPDATE contracts SET " +
             "contract_code = ?, title = ?, contract_type = ?, signing_date = ?, effective_date = ?, end_date = ?, " +
             "enterprise_id = ?, owner_id = ?, status = ?, " +
-            "signer_name = ?, signer_position = ?, counterparty_signer_name = ?, counterparty_signer_position = ?, " +
+            "signer_name = ?, signer_position = ?, signer_phone = ?, signer_fax = ?, " +
+            "counterparty_signer_name = ?, counterparty_signer_position = ?, " +
             "authorization_ref = ?, signing_place = ?, contract_value = ? " +
             "WHERE contract_id = ? AND is_deleted = 0";
 
@@ -1128,6 +1131,8 @@ public class ContractDAO {
         merged.setEnterpriseId(before.getEnterpriseId());
         merged.setSignerName(before.getSignerName());
         merged.setSignerPosition(before.getSignerPosition());
+        merged.setSignerPhone(before.getSignerPhone());
+        merged.setSignerFax(before.getSignerFax());
         merged.setCounterpartySignerName(before.getCounterpartySignerName());
         merged.setCounterpartySignerPosition(before.getCounterpartySignerPosition());
         merged.setAuthorizationRef(before.getAuthorizationRef());
@@ -1246,7 +1251,7 @@ public class ContractDAO {
         ps.setInt(8, written.getOwnerId());
         ps.setString(9, computeStatus(written.getEffectiveDate(), written.getEndDate()));
         bindSigningParties(ps, 10, written);
-        ps.setInt(17, contractId);
+        ps.setInt(10 + SIGNING_PARTY_COLUMNS, contractId);
     }
 
     /**
@@ -1311,6 +1316,9 @@ public class ContractDAO {
         if (before == null || before.isFrozen() || before.isDraft()) {
             return false;
         }
+        // BR-56: chữa sai sót KHÔNG đổi bốn ô người ký bên mình. Lấy từ bản ghi
+        // đang khoá, giống ngày ký bên dưới, bất kể bên gọi truyền gì xuống.
+        keepBranchSignerFrom(before, contract);
 
         try (PreparedStatement ps = conn.prepareStatement(SQL_UPDATE_ALL)) {
             // Ngày ký KHÔNG sửa được kể cả ở đây: nó là dấu của một hành
@@ -1952,7 +1960,8 @@ public class ContractDAO {
     private Contract lockForUpdate(Connection conn, int contractId) throws SQLException {
         String sql = "SELECT contract_id, contract_code, title, contract_type, direction, signing_date, " +
                 "       effective_date, end_date, enterprise_id, owner_id, progress_status, " +
-                "       signer_name, signer_position, counterparty_signer_name, counterparty_signer_position, " +
+                "       signer_name, signer_position, signer_phone, signer_fax, " +
+                "       counterparty_signer_name, counterparty_signer_position, " +
                 "       authorization_ref, signing_place, contract_value, parent_contract_id " +
                 "FROM contracts WHERE contract_id = ? AND is_deleted = 0 FOR UPDATE";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -1975,6 +1984,8 @@ public class ContractDAO {
                 c.setProgressStatus(rs.getString("progress_status"));
                 c.setSignerName(rs.getString("signer_name"));
                 c.setSignerPosition(rs.getString("signer_position"));
+                c.setSignerPhone(rs.getString("signer_phone"));
+                c.setSignerFax(rs.getString("signer_fax"));
                 c.setCounterpartySignerName(rs.getString("counterparty_signer_name"));
                 c.setCounterpartySignerPosition(rs.getString("counterparty_signer_position"));
                 c.setAuthorizationRef(rs.getString("authorization_ref"));
@@ -2002,6 +2013,8 @@ public class ContractDAO {
         addChange(parts, "Ngày hết hạn", formatDate(before.getEndDate()), formatDate(after.getEndDate()));
         addChange(parts, "Người ký bên mình", before.getSignerName(), after.getSignerName());
         addChange(parts, "Chức vụ người ký bên mình", before.getSignerPosition(), after.getSignerPosition());
+        addChange(parts, "Điện thoại người ký bên mình", before.getSignerPhone(), after.getSignerPhone());
+        addChange(parts, "Fax người ký bên mình", before.getSignerFax(), after.getSignerFax());
         addChange(parts, "Người ký bên đối tác", before.getCounterpartySignerName(), after.getCounterpartySignerName());
         addChange(parts, "Chức vụ người ký bên đối tác",
                 before.getCounterpartySignerPosition(), after.getCounterpartySignerPosition());
@@ -2090,21 +2103,36 @@ public class ContractDAO {
         return "#" + id;
     }
 
+    /** Số cột {@link #bindSigningParties} bind: bảy cột của V27 cộng SĐT, fax người ký bên mình (V39). */
+    private static final int SIGNING_PARTY_COLUMNS = 9;
+
     /**
-     * Bind bảy cột của V27 vào statement, bắt đầu từ {@code first}.
+     * Bind {@value #SIGNING_PARTY_COLUMNS} cột ký kết và giá trị vào statement,
+     * bắt đầu từ {@code first}.
      *
      * <p>Gom lại một chỗ vì cùng bộ cột đó xuất hiện ở cả INSERT lẫn UPDATE:
      * tách ra hai đoạn giống nhau là chỗ đầu tiên hai bên lệch nhau khi có ai
-     * thêm cột thứ tám.
+     * thêm cột. Tham số đứng sau bộ cột này tính từ
+     * {@code first + SIGNING_PARTY_COLUMNS}, nên thêm cột chỉ sửa một hằng.
      */
     private void bindSigningParties(PreparedStatement ps, int first, Contract c) throws SQLException {
         ps.setString(first, c.getSignerName());
         ps.setString(first + 1, c.getSignerPosition());
-        ps.setString(first + 2, c.getCounterpartySignerName());
-        ps.setString(first + 3, c.getCounterpartySignerPosition());
-        ps.setString(first + 4, c.getAuthorizationRef());
-        ps.setString(first + 5, c.getSigningPlace());
-        ps.setBigDecimal(first + 6, c.getContractValue());
+        ps.setString(first + 2, c.getSignerPhone());
+        ps.setString(first + 3, c.getSignerFax());
+        ps.setString(first + 4, c.getCounterpartySignerName());
+        ps.setString(first + 5, c.getCounterpartySignerPosition());
+        ps.setString(first + 6, c.getAuthorizationRef());
+        ps.setString(first + 7, c.getSigningPlace());
+        ps.setBigDecimal(first + 8, c.getContractValue());
+    }
+
+    /** BR-56: chép bốn ô người ký bên mình từ {@code source} sang {@code target}. */
+    private static void keepBranchSignerFrom(Contract source, Contract target) {
+        target.setSignerName(source.getSignerName());
+        target.setSignerPosition(source.getSignerPosition());
+        target.setSignerPhone(source.getSignerPhone());
+        target.setSignerFax(source.getSignerFax());
     }
 
     private static String formatDate(Date date) {
@@ -2239,6 +2267,8 @@ public class ContractDAO {
         c.setOwnerId(rs.getInt("owner_id"));
         c.setSignerName(rs.getString("signer_name"));
         c.setSignerPosition(rs.getString("signer_position"));
+        c.setSignerPhone(rs.getString("signer_phone"));
+        c.setSignerFax(rs.getString("signer_fax"));
         c.setCounterpartySignerName(rs.getString("counterparty_signer_name"));
         c.setCounterpartySignerPosition(rs.getString("counterparty_signer_position"));
         c.setAuthorizationRef(rs.getString("authorization_ref"));

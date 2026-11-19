@@ -13,6 +13,7 @@ import poscs.dao.ContractDAO;
 import poscs.dao.CustomerDAO;
 import poscs.dao.EmployeeDAO;
 import poscs.dao.ProductDAO;
+import poscs.model.BranchInfo;
 import poscs.model.Contract;
 import poscs.model.Role;
 import poscs.model.User;
@@ -1201,5 +1202,151 @@ public class ContractActionControllerTest {
 
         // Null user
         assertFalse(controller.canSign(null));
+    }
+
+    // ------------------------------------------------------------------
+    // Task 8.4 - BR-56: người ký bên mình lấy từ Thông tin chi nhánh
+    // ------------------------------------------------------------------
+
+    private static BranchInfo director(String name) {
+        BranchInfo b = new BranchInfo();
+        b.setDirectorName(name);
+        b.setDirectorPosition("Giám đốc chi nhánh");
+        b.setPhone("0233 3852 123");
+        b.setFax("0233 3852 124");
+        return b;
+    }
+
+    private void stubTypedSigner() {
+        when(request.getParameter("signerName")).thenReturn("Tên tự gõ");
+        when(request.getParameter("signerPosition")).thenReturn("Chức vụ tự gõ");
+        when(request.getParameter("signerPhone")).thenReturn("0999 999 999");
+        when(request.getParameter("signerFax")).thenReturn("0999 999 998");
+    }
+
+    private static boolean hasNoSigner(Contract c) {
+        return c.getSignerName() == null && c.getSignerPosition() == null
+                && c.getSignerPhone() == null && c.getSignerFax() == null;
+    }
+
+    @Test
+    public void doGet_actionNew_setsBranchInfoFromService() throws Exception {
+        User u = loginAs(PermissionService.ROLE_SALES, null);
+        when(permissionService.canCreateContract(u)).thenReturn(true);
+        when(request.getParameter("action")).thenReturn("new");
+        BranchInfo info = director("Nguyễn Văn An");
+        when(contractService.findBranchInfo()).thenReturn(info);
+
+        controller.doGet(request, response);
+
+        verify(request).setAttribute("branchInfo", info);
+        verify(request).setAttribute("branchSignerMissing", false);
+        verify(createDispatcher).forward(request, response);
+    }
+
+    @Test
+    public void doGet_actionNew_directorNotDeclared_flagsMissing() throws Exception {
+        User u = loginAs(PermissionService.ROLE_SALES, null);
+        when(permissionService.canCreateContract(u)).thenReturn(true);
+        when(request.getParameter("action")).thenReturn("new");
+        BranchInfo seeded = director(null);
+        when(contractService.findBranchInfo()).thenReturn(seeded);
+
+        controller.doGet(request, response);
+
+        verify(request).setAttribute("branchInfo", seeded);
+        verify(request).setAttribute("branchSignerMissing", true);
+    }
+
+    @Test
+    public void doGet_actionNewAmendment_setsBranchInfo() throws Exception {
+        User u = loginAs(PermissionService.ROLE_SALES, null);
+        when(permissionService.canCreateAmendment(u)).thenReturn(true);
+        when(request.getParameter("action")).thenReturn("newAmendment");
+        when(request.getParameter("parentId")).thenReturn("1");
+        when(contractService.findById(1)).thenReturn(signedContract(1));
+        BranchInfo info = director("Nguyễn Văn An");
+        when(contractService.findBranchInfo()).thenReturn(info);
+
+        controller.doGet(request, response);
+
+        verify(request).setAttribute("branchInfo", info);
+        verify(request).setAttribute("branchSignerMissing", false);
+    }
+
+    @Test
+    public void doGet_actionEdit_setsBranchInfo_andNullMeansMissing() throws Exception {
+        User u = loginAs(PermissionService.ROLE_SALES, null);
+        when(permissionService.canUpdateContract(u)).thenReturn(true);
+        when(request.getParameter("action")).thenReturn("edit");
+        when(request.getParameter("id")).thenReturn("5");
+        when(contractService.findById(5)).thenReturn(draftContract(5));
+        when(contractService.findBranchInfo()).thenReturn(null);
+
+        controller.doGet(request, response);
+
+        verify(request).setAttribute("branchInfo", null);
+        verify(request).setAttribute("branchSignerMissing", true);
+        verify(updateDispatcher).forward(request, response);
+    }
+
+    @Test
+    public void handleCreate_typedSignerIsIgnored() throws Exception {
+        User u = loginAs(PermissionService.ROLE_SALES, null);
+        when(permissionService.canCreateContract(u)).thenReturn(true);
+        when(request.getParameter("action")).thenReturn("create");
+        stubTypedSigner();
+        when(contractService.createContract(any(), eq(u))).thenReturn(ServiceResult.ok(105));
+
+        controller.doPost(request, response);
+
+        verify(contractService).createContract(argThat(ContractActionControllerTest::hasNoSigner), eq(u));
+    }
+
+    @Test
+    public void handleCreateAmendment_typedSignerIsIgnored() throws Exception {
+        User u = loginAs(PermissionService.ROLE_SALES, null);
+        when(permissionService.canCreateAmendment(u)).thenReturn(true);
+        when(request.getParameter("action")).thenReturn("createAmendment");
+        when(request.getParameter("parentId")).thenReturn("1");
+        when(contractService.findById(1)).thenReturn(signedContract(1));
+        stubTypedSigner();
+        when(contractService.createAmendment(eq(1), any(), eq(u))).thenReturn(ServiceResult.ok(201));
+
+        controller.doPost(request, response);
+
+        verify(contractService).createAmendment(eq(1), argThat(ContractActionControllerTest::hasNoSigner), eq(u));
+    }
+
+    @Test
+    public void handleUpdate_draft_typedSignerIsIgnored() throws Exception {
+        User u = loginAs(PermissionService.ROLE_SALES, null);
+        when(permissionService.canUpdateContract(u)).thenReturn(true);
+        when(request.getParameter("action")).thenReturn("update");
+        when(request.getParameter("contractId")).thenReturn("5");
+        when(contractService.findById(5)).thenReturn(draftContract(5));
+        stubTypedSigner();
+        when(contractService.updateContract(any(), eq(u))).thenReturn(ServiceResult.ok(null));
+
+        controller.doPost(request, response);
+
+        verify(contractService).updateContract(argThat(ContractActionControllerTest::hasNoSigner), eq(u));
+    }
+
+    @Test
+    public void handleCorrect_typedSignerIsIgnored() throws Exception {
+        User u = loginAs(PermissionService.ROLE_ADMIN, null);
+        when(permissionService.canCorrectSignedContract(u)).thenReturn(true);
+        when(request.getParameter("action")).thenReturn("correct");
+        when(request.getParameter("contractId")).thenReturn("5");
+        when(contractService.findById(5)).thenReturn(signedContract(5));
+        when(request.getParameter("correctionReason")).thenReturn("Sửa mã hợp đồng gõ nhầm");
+        stubTypedSigner();
+        when(contractService.correctSignedContract(any(), eq(u), anyString())).thenReturn(ServiceResult.ok(null));
+
+        controller.doPost(request, response);
+
+        verify(contractService).correctSignedContract(
+                argThat(ContractActionControllerTest::hasNoSigner), eq(u), eq("Sửa mã hợp đồng gõ nhầm"));
     }
 }

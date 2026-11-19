@@ -564,6 +564,9 @@
                         <c:choose>
                             <c:when test="${not empty contract.signerName}">
                                 ${fn:escapeXml(contract.signerName)}<c:if test="${not empty contract.signerPosition}"><span style="color:#6b7280;">&nbsp;&middot;&nbsp;${fn:escapeXml(contract.signerPosition)}</span></c:if>
+                                <%-- BR-56: SĐT, fax GĐCN chép vào hợp đồng (V39); chỉ hiện dòng nào có. --%>
+                                <c:if test="${not empty contract.signerPhone}"><div style="color:#6b7280; font-size:0.85rem;">Điện thoại: ${fn:escapeXml(contract.signerPhone)}</div></c:if>
+                                <c:if test="${not empty contract.signerFax}"><div style="color:#6b7280; font-size:0.85rem;">Fax: ${fn:escapeXml(contract.signerFax)}</div></c:if>
                             </c:when>
                             <c:otherwise><span style="color:#9ca3af;">chưa điền</span></c:otherwise>
                         </c:choose>

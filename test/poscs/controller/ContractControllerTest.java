@@ -17,6 +17,7 @@ import poscs.dao.ContractDAO;
 import poscs.dao.CustomerDAO;
 import poscs.dao.EmployeeDAO;
 import poscs.dao.ProductDAO;
+import poscs.model.BranchInfo;
 import poscs.model.Contract;
 import poscs.model.ContractDocument;
 import poscs.model.ContractHandover;
@@ -25,6 +26,7 @@ import poscs.model.Enterprise;
 import poscs.model.Product;
 import poscs.model.Role;
 import poscs.model.User;
+import poscs.service.BranchInfoService;
 import poscs.service.PermissionService;
 
 import static org.junit.Assert.*;
@@ -51,6 +53,8 @@ public class ContractControllerTest {
     private EmployeeDAO employeeDAO;
     private AddressDAO addressDAO;
     private ProductDAO productDAO;
+    /** Nguồn người ký bên mình (BR-56, Task 8.4); mock để không chạm CSDL thật. */
+    private BranchInfoService branchInfoService;
 
     private HttpServletRequest request;
     private HttpServletResponse response;
@@ -71,6 +75,9 @@ public class ContractControllerTest {
         setField(controller, "employeeDAO", employeeDAO);
         setField(controller, "addressDAO", addressDAO);
         setField(controller, "productDAO", productDAO);
+        // Task 8.4: mặc định get() trả null (= chưa khai GĐCN), test cũ chạy y như trước.
+        branchInfoService = mock(BranchInfoService.class);
+        setField(controller, "branchInfoService", branchInfoService);
 
         request = mock(HttpServletRequest.class);
         response = mock(HttpServletResponse.class);
@@ -2118,5 +2125,214 @@ public class ContractControllerTest {
         salesMissingDbNoMgr.setManagerId(null);
         when(mockEmpDao.findById(23)).thenReturn(null);
         assertFalse(ps.isSubordinate(salesMissingDbNoMgr));
+    }
+
+    // ------------------------------------------------------------------
+    // Task 8.4 - BR-56: người ký bên mình lấy từ Thông tin chi nhánh
+    // ------------------------------------------------------------------
+
+    private static BranchInfo director(String name) {
+        BranchInfo b = new BranchInfo();
+        b.setDirectorName(name);
+        b.setDirectorPosition("Giám đốc chi nhánh");
+        b.setPhone("0233 3852 123");
+        b.setFax("0233 3852 124");
+        return b;
+    }
+
+    /** Một POST nặn tay gửi kèm bốn ô người ký bên mình -- phải bị bỏ qua. */
+    private void stubTypedSigner() {
+        when(request.getParameter("signerName")).thenReturn("Tên tự gõ");
+        when(request.getParameter("signerPosition")).thenReturn("Chức vụ tự gõ");
+        when(request.getParameter("signerPhone")).thenReturn("0999 999 999");
+        when(request.getParameter("signerFax")).thenReturn("0999 999 998");
+    }
+
+    private static boolean signerIs(Contract c, String name, String position, String phone, String fax) {
+        return java.util.Objects.equals(name, c.getSignerName())
+                && java.util.Objects.equals(position, c.getSignerPosition())
+                && java.util.Objects.equals(phone, c.getSignerPhone())
+                && java.util.Objects.equals(fax, c.getSignerFax());
+    }
+
+    private static Contract withStoredSigner(Contract c) {
+        c.setSignerName("GĐCN cũ");
+        c.setSignerPosition("Giám đốc chi nhánh");
+        c.setSignerPhone("0233 000 000");
+        c.setSignerFax("0233 000 001");
+        return c;
+    }
+
+    @Test
+    public void create_typedSignerIgnored_takesCurrentDirector() throws Exception {
+        when(request.getParameter("action")).thenReturn("create");
+        stubValidContractFields();
+        stubTypedSigner();
+        when(branchInfoService.get()).thenReturn(director("Nguyễn Văn An"));
+        when(contractDAO.insert(any(Contract.class), anyInt())).thenReturn(77);
+
+        controller.doPost(request, response);
+
+        verify(contractDAO).insert(argThat((Contract c) -> signerIs(c,
+                "Nguyễn Văn An", "Giám đốc chi nhánh", "0233 3852 123", "0233 3852 124")), anyInt());
+    }
+
+    @Test
+    public void create_directorNotDeclared_leavesAllFourBlank() throws Exception {
+        when(request.getParameter("action")).thenReturn("create");
+        stubValidContractFields();
+        stubTypedSigner();
+        // Dòng gieo sẵn của V39: chỉ có chức vụ -> không chép riêng chức vụ.
+        when(branchInfoService.get()).thenReturn(director(null));
+        when(contractDAO.insert(any(Contract.class), anyInt())).thenReturn(77);
+
+        controller.doPost(request, response);
+
+        verify(contractDAO).insert(argThat((Contract c) -> signerIs(c, null, null, null, null)), anyInt());
+    }
+
+    @Test
+    public void createAmendment_takesCurrentDirectorNotParentSigner() throws Exception {
+        Contract parent = withStoredSigner(signedContract());
+        parent.setContractId(3);
+        when(request.getParameter("action")).thenReturn("createAmendment");
+        when(request.getParameter("parentId")).thenReturn("3");
+        when(contractDAO.findById(3)).thenReturn(parent);
+        stubValidContractFields();
+        stubTypedSigner();
+        when(branchInfoService.get()).thenReturn(director("Nguyễn Văn An"));
+        when(contractDAO.insert(any(Contract.class), anyInt())).thenReturn(90);
+
+        controller.doPost(request, response);
+
+        verify(contractDAO).insert(argThat((Contract c) -> signerIs(c,
+                "Nguyễn Văn An", "Giám đốc chi nhánh", "0233 3852 123", "0233 3852 124")), anyInt());
+    }
+
+    @Test
+    public void update_draft_typedSignerIgnored_takesCurrentDirector() throws Exception {
+        when(request.getParameter("action")).thenReturn("update");
+        when(request.getParameter("contractId")).thenReturn("5");
+        when(contractDAO.findById(5)).thenReturn(withStoredSigner(draftContract()));
+        stubValidContractFields();
+        stubTypedSigner();
+        when(branchInfoService.get()).thenReturn(director("Nguyễn Văn An"));
+        when(contractDAO.update(any(Contract.class), anyInt())).thenReturn(true);
+
+        controller.doPost(request, response);
+
+        verify(contractDAO).update(argThat((Contract c) -> signerIs(c,
+                "Nguyễn Văn An", "Giám đốc chi nhánh", "0233 3852 123", "0233 3852 124")), anyInt());
+    }
+
+    @Test
+    public void update_draft_directorNotDeclared_keepsStoredSigner() throws Exception {
+        when(request.getParameter("action")).thenReturn("update");
+        when(request.getParameter("contractId")).thenReturn("5");
+        when(contractDAO.findById(5)).thenReturn(withStoredSigner(draftContract()));
+        stubValidContractFields();
+        stubTypedSigner();
+        when(branchInfoService.get()).thenReturn(director("   "));
+        when(contractDAO.update(any(Contract.class), anyInt())).thenReturn(true);
+
+        controller.doPost(request, response);
+
+        verify(contractDAO).update(argThat((Contract c) -> signerIs(c,
+                "GĐCN cũ", "Giám đốc chi nhánh", "0233 000 000", "0233 000 001")), anyInt());
+    }
+
+    @Test
+    public void update_signed_keepsStoredSignerAndDoesNotReadBranchInfo() throws Exception {
+        when(request.getParameter("action")).thenReturn("update");
+        when(request.getParameter("contractId")).thenReturn("5");
+        when(contractDAO.findById(5)).thenReturn(withStoredSigner(signedContract()));
+        stubValidContractFields();
+        stubTypedSigner();
+        when(request.getParameter("ownerId")).thenReturn("88");
+        when(branchInfoService.get()).thenReturn(director("Nguyễn Văn An"));
+        when(contractDAO.update(any(Contract.class), anyInt())).thenReturn(true);
+
+        controller.doPost(request, response);
+
+        verify(contractDAO).update(argThat((Contract c) -> c.getOwnerId() == 88 && signerIs(c,
+                "GĐCN cũ", "Giám đốc chi nhánh", "0233 000 000", "0233 000 001")), anyInt());
+        verify(branchInfoService, never()).get();
+    }
+
+    @Test
+    public void correct_keepsStoredSignerAndDoesNotReadBranchInfo() throws Exception {
+        loginAs("Admin");
+        when(request.getParameter("action")).thenReturn("correct");
+        when(request.getParameter("contractId")).thenReturn("5");
+        when(contractDAO.findById(5)).thenReturn(withStoredSigner(signedContract()));
+        when(request.getParameter("correctionReason")).thenReturn("Gõ nhầm mã");
+        stubValidContractFields();
+        stubTypedSigner();
+        when(branchInfoService.get()).thenReturn(director("Nguyễn Văn An"));
+        when(contractDAO.correct(any(Contract.class), anyInt(), anyString())).thenReturn(true);
+
+        controller.doPost(request, response);
+
+        verify(contractDAO).correct(argThat((Contract c) -> signerIs(c,
+                "GĐCN cũ", "Giám đốc chi nhánh", "0233 000 000", "0233 000 001")), anyInt(), eq("Gõ nhầm mã"));
+        verify(branchInfoService, never()).get();
+    }
+
+    @Test
+    public void createForm_setsBranchInfoAttributes() throws Exception {
+        when(request.getRequestDispatcher("/jsp/sale/addnewcontract.jsp")).thenReturn(mock(RequestDispatcher.class));
+        when(request.getParameter("action")).thenReturn("new");
+        BranchInfo info = director("Nguyễn Văn An");
+        when(branchInfoService.get()).thenReturn(info);
+
+        controller.doGet(request, response);
+
+        verify(request).setAttribute("branchInfo", info);
+        verify(request).setAttribute("branchSignerMissing", false);
+    }
+
+    @Test
+    public void createForm_directorNotDeclared_flagsMissing() throws Exception {
+        when(request.getRequestDispatcher("/jsp/sale/addnewcontract.jsp")).thenReturn(mock(RequestDispatcher.class));
+        when(request.getParameter("action")).thenReturn("new");
+        BranchInfo seeded = director(null);
+        when(branchInfoService.get()).thenReturn(seeded);
+
+        controller.doGet(request, response);
+
+        verify(request).setAttribute("branchInfo", seeded);
+        verify(request).setAttribute("branchSignerMissing", true);
+    }
+
+    @Test
+    public void amendmentForm_setsBranchInfoAttributes() throws Exception {
+        Contract parent = signedContract();
+        parent.setContractId(3);
+        when(request.getRequestDispatcher("/jsp/sale/addnewcontract.jsp")).thenReturn(mock(RequestDispatcher.class));
+        when(request.getParameter("action")).thenReturn("newAmendment");
+        when(request.getParameter("parentId")).thenReturn("3");
+        when(contractDAO.findById(3)).thenReturn(parent);
+        BranchInfo info = director("Nguyễn Văn An");
+        when(branchInfoService.get()).thenReturn(info);
+
+        controller.doGet(request, response);
+
+        verify(request).setAttribute("branchInfo", info);
+        verify(request).setAttribute("branchSignerMissing", false);
+    }
+
+    @Test
+    public void editForm_setsBranchInfoAttributes() throws Exception {
+        loginAs("Admin");
+        when(request.getRequestDispatcher(anyString())).thenReturn(mock(RequestDispatcher.class));
+        when(request.getParameter("action")).thenReturn("edit");
+        when(request.getParameter("id")).thenReturn("5");
+        when(contractDAO.findById(5)).thenReturn(withStoredSigner(draftContract()));
+        when(branchInfoService.get()).thenReturn(null);
+
+        controller.doGet(request, response);
+
+        verify(request).setAttribute("branchInfo", null);
+        verify(request).setAttribute("branchSignerMissing", true);
     }
 }
