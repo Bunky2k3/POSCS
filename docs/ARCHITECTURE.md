@@ -116,6 +116,7 @@ flowchart LR
     subgraph Core ["Product, Employee, Dashboard & System"]
         ProductController["ProductController (/product)"]
         EmployeeController["EmployeeController (/employee)"]
+        BranchInfoController["BranchInfoController (/branch)"]
         DashboardController["DashboardController (/dashboard)"]
         SystemLogController["SystemLogController (/systemLog)"]
         NotificationController["NotificationController (/notifications)"]
@@ -131,6 +132,7 @@ flowchart LR
 - **Contract**: `ContractController`, `ContractListController`, `ContractDetailController`, `ContractActionController` (gồm tạo, sửa, phụ lục, ký & tiến độ, hủy, chữa sai sót UC-54, hàng hóa), cùng các controller chuyên biệt: `ContractPaymentController`, `ContractDocumentController`, `ContractHandoverController`, `ContractLinkController`, `ContractExportController`, `ChangeRequestController` (UC-50, UC-51) và các helper (`ContractControllerHelper`, `ContractFilterHelper`, `ContractActionResultHelper`, `ContractHandoverHelper`).
 - **Ticket**: `TechnicalSupportTicketController` (Facade `/ticket`) cùng các controller tách riêng: `TicketListController`, `TicketDetailController`, `TicketActionController`, `TicketExportController` và `TicketActionHelper`.
 - **Employee**: `EmployeeController`.
+- **Thông tin chi nhánh** (UC-55, chỉ Admin): `BranchInfoController`.
 - **Dashboard, Log & Tiện ích hệ thống**: `DashboardController`, `SystemLogController`, `NotificationController`, `AddressController`, `GuideController`, `UploadFileController`.
 
 ---
@@ -154,6 +156,7 @@ Tầng Service kế thừa `BaseService` và giao tiếp với Controller thông
 | Contract | `ContractService`, `ContractPaymentService`, `ContractDocumentService`, `ContractHandoverService`, `ContractLinkService`, `ContractExportService` | Nghiệp vụ hợp đồng, phụ lục, chữa sai sót (UC-54), kỳ thanh toán, tài liệu đính kèm, bàn giao liên phòng, liên kết bán-mua, xuất dữ liệu. |
 | Ticket | `TicketService`, `TicketExportService` | Tạo, cập nhật, phân công xử lý, xóa mềm phiếu hỗ trợ kỹ thuật và xuất dữ liệu. |
 | Employee | `EmployeeService` | Quản lý tài khoản nhân viên, vai trò, phòng ban, cây cấp trên và phân vùng tỉnh. |
+| Thông tin chi nhánh | `BranchInfoService` | Xem và sửa thông tin Giám đốc chi nhánh (UC-55, BR-57), nguồn người ký bên mình trên hợp đồng (BR-56). |
 | Dashboard & Thông báo | `DashboardService` (kèm `DashboardSummary`), `NotificationService` | Tổng hợp số liệu dashboard theo vai trò/phạm vi và quản lý thông báo (hợp đồng sắp hết hạn 30 ngày, phiếu sắp quá hạn SLA 24 giờ). |
 
 ---
@@ -173,6 +176,7 @@ Tầng Validator tách riêng quy tắc kiểm tra đầu vào theo Business Rul
 - `ContractValidator`
 - `TicketValidator`
 - `EmployeeValidator`
+- `BranchInfoValidator`
 
 ---
 
@@ -200,6 +204,7 @@ flowchart TB
         ProductDAO["ProductDAO"]
         TicketDAO["TechnicalSupportTicketDAO"]
         EmployeeDAO["EmployeeDAO"]
+        BranchInfoDAO["BranchInfoDAO"]
         NotificationDAO["NotificationDAO"]
         AddressDAO["AddressDAO"]
     end
@@ -214,13 +219,14 @@ flowchart TB
 - **Product**: `ProductDAO`.
 - **Ticket**: `TechnicalSupportTicketDAO`.
 - **Employee**: `EmployeeDAO`.
+- **Thông tin chi nhánh**: `BranchInfoDAO` (một dòng duy nhất của `branch_info`, chỉ đọc và sửa).
 - **Notification & Address**: `NotificationDAO`, `AddressDAO`.
 
 ---
 
 ### 2.5. Tầng Model (`poscs.model`) & Common (`poscs.common`)
 
-- **`poscs.model`** (27 POJO): `User`, `Role`, `Department`, `Province`, `District`, `Address`, `ProvinceAssignment`, `Enterprise`, `EnterpriseContact`, `RelationshipRating`, `CustomerEvaluationRule`, `CustomerLifecycleEvent`, `Product`, `ProductCategory`, `ProductImage`, `ProductCatalogue`, `Contract`, `ContractProduct`, `ContractPayment`, `ContractDocument`, `ContractHandover`, `ContractLink`, `ContractHistory`, `ChangeRequest`, `TechnicalRequest`, `TechnicalRequestHistory`, `Notification`.
+- **`poscs.model`** (28 POJO): `User`, `BranchInfo`, `Role`, `Department`, `Province`, `District`, `Address`, `ProvinceAssignment`, `Enterprise`, `EnterpriseContact`, `RelationshipRating`, `CustomerEvaluationRule`, `CustomerLifecycleEvent`, `Product`, `ProductCategory`, `ProductImage`, `ProductCatalogue`, `Contract`, `ContractProduct`, `ContractPayment`, `ContractDocument`, `ContractHandover`, `ContractLink`, `ContractHistory`, `ChangeRequest`, `TechnicalRequest`, `TechnicalRequestHistory`, `Notification`.
 - **`poscs.common`** (18 lớp hạ tầng & tiện ích):
   - **Bảo mật & Phân quyền**: `AuthenticationFilter`, `AccessControl`, `CsrfUtil`, `ClientIp`.
   - **Vòng đời & Tác vụ nền**: `DataSourceLifecycle`, `NotificationScheduler`.
