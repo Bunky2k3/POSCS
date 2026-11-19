@@ -39,6 +39,10 @@ Dòng task viết như các task bên dưới (`**Task X.X:** <Tên task>`), kè
 6. UC-50, UC-51 (Change Request): `ChangeRequestDAO` và `ChangeRequestController` đã tồn tại độc lập kèm test, giữ nguyên không tách lại (Task 4.8 bỏ).
 7. UC-54 (Chữa sai sót HĐ đã ký): tích hợp vào `ContractService` (Task 4.10) và `ContractActionController` (Task 4.12); không tạo controller riêng.
 8. Luồng chi tiết UC-36 → UC-54: lấy hành vi code và JSP hiện có làm chuẩn (khóa bằng test ở Task 4.2), chỉ tách nhỏ theo rules §3 mà không thêm tính năng.
+9. **Người ký bên mình (Giai đoạn 8, chốt 19/11/2026):** luôn là **Giám đốc chi nhánh (GĐCN)**. Admin khai họ tên, chức vụ, SĐT, fax một lần ở trang **"Thông tin chi nhánh"** (bảng một dòng `branch_info`). Trên form hợp đồng các ô này **chỉ hiển thị, không sửa tay**. SĐT và fax **lưu vào từng hợp đồng** (`contracts.signer_phone`, `contracts.signer_fax`) giống họ tên, chức vụ, để sau này đổi GĐCN thì hợp đồng cũ vẫn giữ đúng thông tin lúc ký. Phần người ký **bên đối tác giữ nguyên nhập tay**.
+10. **Thời điểm chép thông tin GĐCN vào hợp đồng** (đề xuất lúc lập kế hoạch 19/11/2026): lúc tạo hợp đồng/phụ lục, và mỗi lần lưu khi hợp đồng còn **Nháp**, lấy GĐCN **hiện tại**. Từ **Đã ký** trở đi giữ nguyên; UC-54 (chữa sai sót) không đổi bốn ô này. Chưa khai GĐCN (**họ tên GĐCN còn trống**, kể cả dòng gieo sẵn chỉ có chức vụ; chốt thêm theo QA Task 8.1): tạo mới thì để trống **cả bốn ô**, bản Nháp đang có thì giữ giá trị cũ. Hợp đồng cũ trong CSDL **không chạy lại dữ liệu**.
+11. **Người phụ trách hợp đồng (chốt 19/11/2026):** lấy theo **người tạo**, không chọn tay nữa. Sales (quản lý vùng) tạo → là chính mình; **Admin tạo → vẫn chọn một Sales**; **phụ lục → theo người phụ trách hợp đồng gốc**. Sau khi tạo **khoá luôn**, kể cả khi đã ký (bỏ việc đổi người phụ trách ở trang Sửa). Người phụ trách khác người ký bên mình (GĐCN, mục 9).
+12. **SĐT, fax của GĐCN tối đa 20 ký tự** (chốt 19/11/2026 theo QA Task 8.1): khớp cột `varchar(20)` của Task 8.2 (`branch_info.phone`, `branch_info.fax`, `contracts.signer_phone`, `contracts.signer_fax`); đã ghi vào BR-57. Vượt thì báo MSG-015 (SĐT) / MSG-059 (fax).
 
 ## Quyết định còn chờ người dùng
 
@@ -205,3 +209,125 @@ Không còn mục nào.
   - Nhánh: `fix/task-7.4a-msg-022`.
   - Commit: `fix(guide): đồng bộ thông báo 403 về MSG-022 ở phiếu hỗ trợ và hướng dẫn sử dụng (Task 7.4a)`
   - *Đã hoàn thành:* 2 chỗ `sendError` 403 trong `src/java/poscs/controller/TechnicalSupportTicketController.java` dùng `AccessControl.MSG_022`; bảng "Thông báo lỗi thường gặp" ở `web/jsp/guide/employee.jsp`, `web/jsp/guide/ticket.jsp` ghi đúng câu MSG-022; thêm dòng Task 7.4a vào `CHANGES` của `tools/guide/word/export_word.py` và xuất lại `docs/Report6_HuongDanSuDung.docx`. Unit tests: thêm 2 test vào `test/poscs/controller/TechnicalSupportTicketControllerTest.java` (67/67 pass). `ant test` 1.964 pass / 0 fail / 3 skipped, `ant compile-jsps` pass. QA report tại `docs/qa/Task-7.4a.md`.
+
+---
+
+## Giai đoạn 8: Người ký bên mình lấy từ Thông tin chi nhánh
+
+> Yêu cầu người dùng 19/11/2026: mục "Thông tin ký kết" của form hợp đồng thôi bắt gõ người ký bên mình, mà lấy sẵn thông tin Giám đốc chi nhánh (họ tên, chức vụ, SĐT, fax). Bổ sung cùng ngày: người phụ trách hợp đồng lấy theo người tạo (Task 8.5). Các điểm đã chốt: mục 9, 10, 11 ở "Quyết định đã chốt". Làm **theo thứ tự 8.1 → 8.6**: task sau dùng mã UC/BR/MSG và bảng/cột do task trước tạo.
+
+- [x] **Task 8.1:** Bổ sung đặc tả "Thông tin chi nhánh" và người ký bên mình vào `docs/SPEC.md`.
+  - UC: thêm mới `UC-55` (Cập nhật thông tin chi nhánh, chỉ Admin); sửa mô tả liên quan ở `UC-33`, `UC-35`, `UC-46`, `UC-54`.
+  - BR / MSG / NFR: thêm `BR-56`, `BR-57`, `MSG-057` → `MSG-060`, ghi **đúng nội dung dưới đây**, không tự đặt câu khác:
+    - `BR-56`: Người ký bên mình (họ tên, chức vụ, SĐT, fax) luôn lấy từ Thông tin chi nhánh, không sửa tay trên form hợp đồng. Hệ thống chép vào hợp đồng khi tạo (UC-33, UC-46) và mỗi lần lưu khi hợp đồng còn Nháp (UC-35). Từ Đã ký trở đi giữ nguyên; UC-54 không đổi bốn ô này. Chưa khai thông tin chi nhánh (họ tên GĐCN còn trống): tạo mới thì để trống cả bốn ô, bản Nháp giữ giá trị đang có.
+    - `BR-57`: Thông tin chi nhánh: họ tên và chức vụ GĐCN bắt buộc, tối đa 100 ký tự. SĐT và fax không bắt buộc; nếu nhập thì tối đa 20 ký tự, phải có 8–15 chữ số, ngoài chữ số chỉ cho phép dấu `+` ở đầu, khoảng trắng, dấu chấm, gạch ngang, ngoặc đơn (nhận cả số máy bàn, nên không áp BR-09).
+    - `MSG-057` (Toast) Lưu thông tin chi nhánh thành công: "Đã lưu thông tin chi nhánh."
+    - `MSG-058` (Nội tuyến) Thiếu họ tên hoặc chức vụ GĐCN: "Vui lòng nhập họ tên và chức vụ Giám đốc chi nhánh."
+    - `MSG-059` (Nội tuyến) Fax sai định dạng: "Số fax không hợp lệ." (SĐT sai định dạng dùng lại `MSG-015`.)
+    - `MSG-060` (Nội tuyến, trên form tạo/sửa hợp đồng) Chưa khai thông tin chi nhánh: "Chưa có thông tin Giám đốc chi nhánh. Admin khai tại trang Thông tin chi nhánh."
+  - File sửa: `docs/SPEC.md`:
+    - §3.3: thêm dòng "Cập nhật thông tin chi nhánh (UC-55)", chỉ Admin.
+    - §4: tiêu đề thành "UC-01 → UC-55"; thêm mục 4.8 "Thông tin chi nhánh (chỉ Admin)" gồm UC-55.
+    - §5.4, đoạn "Tạo (UC-33)": đổi "người ký & chức vụ hai bên" thành "người ký bên mình do hệ thống tự điền (BR-56); người ký & chức vụ bên đối tác tuỳ chọn".
+    - Thêm §5.8 "Thông tin chi nhánh (Admin)": một bản ghi duy nhất, chỉ xem và sửa, không tạo/xoá; ràng buộc BR-57; thông báo MSG-057, MSG-058, MSG-059, MSG-015; vai khác vào thì MSG-022.
+    - §6: tiêu đề thành "BR-01 → BR-57", thêm hai dòng BR.
+    - §7: thành "30 bảng"; nhóm "Tài khoản & tổ chức (8)" thêm `branch_info`.
+    - §9: thêm bốn dòng MSG.
+    - §11: thêm quyết định 12, tóm tắt mục 9 và 10 "Quyết định đã chốt" của file này.
+  - File test: không có (chỉ sửa tài liệu). Vẫn chạy `ant test` theo tiêu chí chung.
+  - Không đụng: code, `db/`, `README.md`, `PERMISSIONS.md` (sửa ở Task 8.3 cùng lúc với code chặn quyền, để file đó không ghi một quyền chưa có code).
+  - Lưu ý: trước khi ghi, `grep` cả repo để chắc `UC-55`, `BR-56`, `BR-57`, `MSG-057` → `MSG-060` chưa ai dùng; trùng thì dừng hỏi.
+  - Xong khi: SPEC có đủ các mục trên; mọi số đếm trong tiêu đề (số UC, số BR, số bảng) khớp nội dung.
+  - Nhánh: `docs/task-8.1-spec-thong-tin-chi-nhanh`.
+  - Commit: `docs(spec): đặc tả thông tin chi nhánh và người ký bên mình (Task 8.1)`
+  - *Đã hoàn thành:* `docs/SPEC.md` thêm UC-55 (§3.3, §4 tiêu đề "UC-01 → UC-55", mục 4.8), §5.4 sửa đoạn "Tạo (UC-33)", "Cập nhật (UC-35)" và thêm gạch đầu dòng "Người ký bên mình (BR-56)", mục 5.8 "Thông tin chi nhánh (Admin)", BR-56 và BR-57 (§6 "BR-01 → BR-57"), §7 "30 bảng" thêm `branch_info`, MSG-057 → MSG-060 (§9), §11 quyết định 12. Theo QA đã chốt thêm: SĐT/fax tối đa 20 ký tự (quyết định 12), "chưa khai" = họ tên GĐCN còn trống (quyết định 10). Không có test mới; `ant test` 1.964 test, 0 fail, 3 skipped. QA report tại `docs/qa/Task-8.1.md`.
+- [ ] **Task 8.2:** Tạo bảng `branch_info`, thêm `signer_phone`/`signer_fax` vào `contracts`, kèm model và DAO.
+  - UC: `UC-55` (dữ liệu); `UC-33`, `UC-35` (hai cột mới của hợp đồng).
+  - BR / MSG / NFR: `BR-56`, `BR-57`.
+  - File sửa:
+    - `db/migrations/V39__add_branch_info_and_contract_signer_contact__ndat2003.sql` (mới): ghi dòng `schema_migrations` như các file V trước. Tạo `branch_info`: `branch_info_id` tinyint PK (một dòng duy nhất, id = 1), `director_name` varchar(100) NULL, `director_position` varchar(100) NULL, `phone` varchar(20) NULL, `fax` varchar(20) NULL, `updated_by` int NULL FK → `users.user_id`, `updated_at` timestamp tự cập nhật. Gieo sẵn dòng id = 1 với `director_position` = 'Giám đốc chi nhánh', các cột khác NULL. `ALTER TABLE contracts` thêm `signer_phone` varchar(20) NULL và `signer_fax` varchar(20) NULL ngay sau `signer_position`. Comment đầu file giải thích lý do, theo kiểu V27.
+    - `db/schema.sql`: mirror đúng V39 (bảng mới đặt cạnh nhóm bảng tổ chức, hai cột mới trong `CREATE TABLE contracts`, dòng gieo `branch_info`).
+    - `src/java/poscs/model/BranchInfo.java` (mới): 4 trường thông tin, cộng `updatedBy`, `updatedAt`.
+    - `src/java/poscs/model/Contract.java`: thêm `signerPhone`, `signerFax` kèm getter/setter, đặt cạnh `signerName`/`signerPosition`.
+    - `src/java/poscs/dao/BranchInfoDAO.java` (mới): `BranchInfo get()` (lỗi hoặc không có dòng thì trả `null`, ghi log như các DAO khác) và `boolean update(BranchInfo info, int actorId)` (UPDATE dòng id = 1, ghi `updated_by`). Được có DAO riêng vì miền này có mục menu, controller và model riêng (Task 8.3).
+  - File test: `test/poscs/dao/BranchInfoDAOTest.java` (mới, dùng `JdbcStub` như các DAO test khác): đọc đủ cột; không có dòng → `null`; `SQLException` → `null` / `false`; `update` bind đúng thứ tự tham số và `actorId`.
+  - Không đụng: `ContractDAO` và mọi chỗ đọc/ghi hợp đồng (Task 8.4); controller, JSP (Task 8.3, 8.4). Không đổi hai cột `signer_name`, `signer_position`.
+  - Lưu ý: **agent không chạy V39 lên CSDL nào** (rules §3). Ghi vào report cho người dùng: trước khi kéo code Task 8.4 về checkout chính phải chạy V39 lên `poscs_db` (code mới + CSDL cũ thì lưu hợp đồng hỏng). `ant test` nạp `db/schema.sql` cho test tích hợp, nên bản mirror phải chạy được từ đầu.
+  - Xong khi: V39 và `schema.sql` khớp nhau từng cột; `BranchInfoDAOTest` pass.
+  - Nhánh: `feat/task-8.2-branch-info-schema`.
+  - Commit: `feat(db): thêm bảng branch_info và SĐT, fax người ký bên mình (Task 8.2)`
+- [ ] **Task 8.3:** Trang "Thông tin chi nhánh" cho Admin (xem và sửa thông tin GĐCN).
+  - UC: `UC-55`.
+  - BR / MSG / NFR: `BR-57`, `MSG-057`, `MSG-058`, `MSG-059`, `MSG-015`, `MSG-022`.
+  - File sửa:
+    - `src/java/poscs/validator/BranchInfoValidator.java` (mới, kế thừa `BaseValidator`): kiểm theo BR-57, trim trước khi kiểm, trả lỗi theo từng ô.
+    - `src/java/poscs/service/BranchInfoService.java` (mới, kế thừa `BaseService`): `get()`; `update(BranchInfo, User actor)` chạy validator rồi gọi `BranchInfoDAO.update`, trả `ServiceResult`.
+    - `src/java/poscs/controller/BranchInfoController.java` (mới, `@WebServlet` `/branch`): GET hiện form, POST lưu. Chặn quyền một lần ở đầu `doGet`/`doPost` bằng `AccessControl.requireAdmin`, giống `EmployeeController`. Lưu xong chuyển về GET kèm MSG-057; lỗi kiểm tra thì hiện lại form, giữ dữ liệu vừa nhập.
+    - `web/jsp/admin/branchInfo.jsp` (mới): 4 ô Họ tên GĐCN, Chức vụ, Điện thoại, Fax; dòng "Cập nhật lần cuối bởi … lúc …"; ô ẩn `csrfToken` như các form khác (AuthenticationFilter kiểm); khung trang/CSS như `web/jsp/admin/updateEmployee.jsp`; set `activeNav = 'branch'`.
+    - `web/jsp/common/sidebar.jsp`: thêm mục "Thông tin chi nhánh" ngay dưới "Nhân viên", chỉ hiện với Admin, sáng khi `activeNav == 'branch'`; thêm `branch` vào danh sách giá trị hợp lệ của `activeNav` trong comment đầu file.
+    - `PERMISSIONS.md`: thêm dòng UC-55 chỉ Admin, thêm `BranchInfoController` vào danh sách controller.
+    - `docs/ARCHITECTURE.md`: thêm `BranchInfoController`, `BranchInfoService`, `BranchInfoValidator`, `BranchInfoDAO`, `BranchInfo` vào các tầng tương ứng.
+  - File test: `test/poscs/validator/BranchInfoValidatorTest.java` (thiếu họ tên/chức vụ; quá 100 ký tự; SĐT/fax đúng: số di động, số máy bàn có khoảng trắng/ngoặc/dấu chấm, có `+84`; SĐT/fax sai: có chữ cái, dưới 8 hoặc trên 15 chữ số, đủ 8–15 chữ số nhưng tổng quá 20 ký tự như `(024) 3852 1234 - 1105`); `test/poscs/service/BranchInfoServiceTest.java` (dữ liệu sai thì không gọi DAO; DAO trả `false` thì báo lỗi); `test/poscs/controller/BranchInfoControllerTest.java` (Admin xem và lưu được; Sales, Kỹ thuật → 403 MSG-022; chưa đăng nhập bị chặn; lưu xong có MSG-057; lỗi kiểm tra giữ dữ liệu đã nhập).
+  - Không đụng: form và luồng hợp đồng (Task 8.4); `EmployeeController`, `EmployeeDAO`.
+  - Lưu ý: chỉ sửa, không có nút tạo/xoá (một bản ghi duy nhất). Không dùng `BaseValidator.PHONE_VN` cho SĐT/fax: nó chỉ nhận số di động. Cần hộp xác nhận thì dùng modal trong trang, không dùng `alert`/`confirm` của trình duyệt.
+  - Xong khi: đăng nhập `admin` thấy mục menu, sửa và lưu được; đăng nhập Sales gõ thẳng `/POSCS/branch` nhận 403.
+  - Nhánh: `feat/task-8.3-branch-info-page`.
+  - Commit: `feat(branch): trang Thông tin chi nhánh cho Admin (Task 8.3)`
+- [ ] **Task 8.4:** Form hợp đồng lấy người ký bên mình từ Thông tin chi nhánh (khoá ô, thêm SĐT và fax).
+  - UC: `UC-33`, `UC-35`, `UC-46`, `UC-54`, `UC-11`.
+  - BR / MSG / NFR: `BR-56`, `MSG-060`.
+  - File sửa:
+    - `src/java/poscs/dao/ContractDAO.java`: thêm `signer_phone`, `signer_fax` vào `SQL_INSERT`, `SQL_UPDATE_ALL`, câu SELECT và hai chỗ map `ResultSet` (quanh dòng 1976 và 2240). `bindSigningParties` bind thêm hai cột: **dịch lại chỉ số** của các tham số `?` đứng sau trong INSERT/UPDATE. `withTermsFrom` giữ thêm hai trường. Nhật ký thay đổi (quanh dòng 2003) thêm "Điện thoại người ký bên mình", "Fax người ký bên mình".
+    - `src/java/poscs/service/ContractService.java`: thêm hàm tĩnh `applyBranchSigner(Contract c, BranchInfo b)` chép 4 ô theo BR-56. Gọi trong `createContract`, `createAmendment`, và trong `updateContract` khi hợp đồng chưa khoá điều khoản (`!existing.isTermsLocked()`). `correctSignedContract` chép 4 ô từ bản ghi đang có.
+    - `src/java/poscs/controller/ContractController.java` (lối `/contract`: hai form hợp đồng post vào đây và lối này gọi thẳng `contractDAO`): `buildContractFromRequest` (quanh dòng 1327) thôi đọc `signerName`/`signerPosition` từ request. `handleCreate`, `handleCreateAmendment`, và `handleUpdate` khi chưa khoá điều khoản gọi `ContractService.applyBranchSigner`; `handleCorrect` chép 4 ô từ bản ghi đang có. Khi mở form tạo/sửa thì set thuộc tính `branchInfo` cho JSP. Lấy thông tin qua `BranchInfoService`, tiêm phụ thuộc đúng cách controller đang tiêm `contractDAO` để test mock được.
+    - `src/java/poscs/controller/ContractControllerHelper.java` (lối `/contract/action`): `buildContractFromRequest` (quanh dòng 73) thôi đọc hai ô người ký bên mình; chỗ set `canEditTerms` (quanh dòng 154) set thêm `branchInfo`.
+    - `src/java/poscs/validator/ContractValidator.java`: giới hạn 20 ký tự cho `signerPhone`, `signerFax`; `hasRestrictedFieldsChanged` so thêm hai trường này.
+    - `web/jsp/sale/addnewcontract.jsp`, `web/jsp/sale/updatecontract.jsp`, mục "Thông tin ký kết": thay hai ô nhập người ký bên mình bằng 4 ô **chỉ đọc** (Người ký bên mình, Chức vụ, Điện thoại, Fax). Form tạo và bản Nháp hiện `branchInfo`; hợp đồng đã khoá điều khoản hiện giá trị đang lưu trên hợp đồng. Chưa khai GĐCN thì hiện MSG-060 (Admin thấy thêm link sang `/branch`). Sửa dòng chú thích đầu mục cho đúng cách làm mới; bỏ placeholder "VD: Giám đốc chi nhánh".
+    - `web/jsp/sale/viewcontractdetail.jsp` (quanh dòng 562): hiện thêm Điện thoại, Fax dưới người ký bên mình khi có.
+  - File test: `test/poscs/dao/ContractDAOTest.java` (insert/update bind hai cột mới đúng vị trí; `withTermsFrom` giữ 4 ô khi đã ký; nhật ký ghi thay đổi SĐT/fax); `test/poscs/validator/ContractValidatorTest.java` (độ dài, `hasRestrictedFieldsChanged`); `test/poscs/service/ContractServiceTest.java` (`applyBranchSigner`; tạo, phụ lục, sửa bản Nháp lấy GĐCN hiện tại; chưa khai thì bản Nháp giữ giá trị cũ; chưa khai (chỉ có chức vụ gieo sẵn, họ tên trống) thì tạo mới để trống cả bốn ô; chữa sai sót giữ nguyên); `test/poscs/controller/ContractControllerTest.java` và `test/poscs/controller/ContractActionControllerTest.java` (POST kèm `signerName` tự gõ bị bỏ qua; form có thuộc tính `branchInfo`). Không sửa assertion của test cũ; nếu có test đang khẳng định `signerName` lấy từ request thì dừng, báo trong report rằng hành vi đó đổi theo BR-56.
+  - Không đụng: người ký bên đối tác, căn cứ uỷ quyền, nơi ký (vẫn nhập tay); `ContractExportService` (Excel chưa có cột người ký); dữ liệu hợp đồng cũ trong CSDL.
+  - Lưu ý: ô `disabled` không được gửi lên khi submit, nên server **không bao giờ** lấy 4 ô này từ request, kể cả ở lối chữa sai sót (UC-54). "Chưa khai GĐCN" = họ tên GĐCN trống sau khi trim, kể cả dòng gieo sẵn của V39 chỉ có chức vụ; khi đó tạo mới để trống cả bốn ô, **không** chép chức vụ gieo sẵn, và form hiện MSG-060 (BR-56). CSDL đang chạy phải có V39 (Task 8.2) trước khi build vào checkout chính: Tomcat 8080 của người dùng chạy thẳng `build/web`, và NetBeans tự dịch class ngay khi kéo code.
+  - Xong khi: tạo hợp đồng mới thấy 4 ô đã điền sẵn GĐCN, không gõ được; lưu xong trang chi tiết hiện đủ 4 thông tin; Admin đổi GĐCN thì bản Nháp lưu lại sẽ đổi theo, hợp đồng đã ký giữ nguyên.
+  - Nhánh: `feat/task-8.4-contract-branch-signer`.
+  - Commit: `feat(contract): người ký bên mình lấy từ thông tin chi nhánh (Task 8.4)`
+- [ ] **Task 8.5:** Người phụ trách hợp đồng lấy theo người tạo, không đổi được sau khi tạo.
+  - UC: `UC-33`, `UC-35`, `UC-46`, `UC-54`.
+  - BR / MSG / NFR: sửa `BR-35`; dùng lại `MSG_OWNER_REQUIRED`, `MSG_CANNOT_EDIT_LOCKED` đã có trong `ContractValidator`; không thêm MSG mới.
+  - File sửa:
+    - `docs/SPEC.md` (Task 8.1 phải merge trước, vì cùng sửa §5.4):
+      - `BR-35` thêm câu: "Người phụ trách: Sales tạo → chính người tạo, không chọn; Admin tạo → chọn một Sales đang hoạt động; phụ lục → người phụ trách của hợp đồng gốc. Không đổi được sau khi tạo."
+      - §5.4 đoạn "Tạo (UC-33)": trỏ tới BR-35 cho người phụ trách.
+      - §5.4 đoạn "Cập nhật (UC-35)": đổi "**đã ký** chỉ đổi được **Người phụ trách**" thành "Người phụ trách không đổi được ở mọi tiến độ; **đã ký** thì form Sửa không còn ô nào sửa được (thay đổi đi qua phụ lục, sai sót nhập liệu đi qua UC-54)".
+      - §11: thêm quyết định 13, tóm tắt mục 11 "Quyết định đã chốt" của file này.
+    - `src/java/poscs/service/ContractService.java`:
+      - `createContract`: actor là Sales thì `ownerId` = chính actor, bỏ qua giá trị gửi lên; actor là Admin thì giữ lựa chọn và vẫn kiểm `isActiveOwner`.
+      - `createAmendment`: `ownerId` = người phụ trách hợp đồng gốc.
+      - `updateContract`, `correctSignedContract`: `ownerId` luôn chép từ bản ghi đang có. Hợp đồng đã khoá điều khoản mà gửi form Sửa (không phải chữa sai sót) thì từ chối bằng `MSG_CANNOT_EDIT_LOCKED`.
+      - Gỡ `updateContractOwner`: không còn đường đổi người phụ trách.
+      - Phần chọn người phụ trách lúc tạo đặt trong một hàm tĩnh dùng chung, để `ContractController` gọi lại chứ không viết hai lần.
+    - `src/java/poscs/controller/ContractActionController.java` (lối `/contract/action`): `updateByTermsLock` bỏ nhánh gọi `updateContractOwner`.
+    - `src/java/poscs/controller/ContractController.java` (lối `/contract`, gọi thẳng `contractDAO`): áp đúng các luật trên ở `handleCreate`, `handleCreateAmendment`, `handleUpdate` (cả nhánh đã ký đang đọc `ownerId` từ request, quanh dòng 585) và `handleCorrect`. `buildContractFromRequest` vẫn đọc `ownerId` (Admin tạo cần), các handler ghi đè theo luật.
+    - `src/java/poscs/dao/ContractDAO.java`: `update` luôn ghi `owner_id` của bản ghi cũ (`before`), kể cả trong `withTermsFrom`. Gỡ `SQL_UPDATE_ADMIN_FIELDS` nếu không còn chỗ dùng. Nhật ký thay đổi không còn sinh dòng đổi người phụ trách.
+    - `web/jsp/sale/addnewcontract.jsp`: ô Người phụ trách: Sales thấy tên chính mình dạng chỉ đọc; Admin thấy ô chọn Sales như cũ; phụ lục thấy tên người phụ trách hợp đồng gốc dạng chỉ đọc (bỏ comment "VẪN cho đổi"). Bỏ `'owner'` khỏi danh sách kiểm JS (quanh dòng 377) khi không có ô chọn.
+    - `web/jsp/sale/updatecontract.jsp`: ô Người phụ trách (quanh dòng 313) thành chỉ đọc. Khung báo "Hợp đồng đã ký" (quanh dòng 261) bỏ câu "Chỉ còn người phụ trách sửa được". Khi đã khoá điều khoản thì ẩn nút "Lưu thay đổi", chỉ hiện lúc Admin bật "Chữa sai sót nhập liệu". Bỏ `'owner'` khỏi danh sách kiểm JS (quanh dòng 1392).
+  - File test: `test/poscs/service/ContractServiceTest.java` (Sales tạo kèm `ownerId` người khác → vẫn là chính mình; Admin tạo → theo lựa chọn, chọn người không phải Sales đang hoạt động → lỗi; phụ lục → người phụ trách gốc; sửa bản Nháp kèm `ownerId` khác → giữ nguyên; sửa hợp đồng đã ký → bị từ chối; chữa sai sót → giữ nguyên); `test/poscs/controller/ContractControllerTest.java` và `test/poscs/controller/ContractActionControllerTest.java` (các luật trên ở cả hai lối, kể cả POST tự gõ `ownerId`); `test/poscs/dao/ContractDAOTest.java` (`update` giữ `owner_id` cũ). Được xoá các assertion đang gọi `updateContractOwner` (`ContractServiceTest` quanh dòng 488–533, `ContractActionControllerTest` quanh dòng 361–365) vì hành vi đó bị bỏ theo quyết định người dùng; ghi rõ trong report đã xoá những test nào.
+  - Không đụng: `owner_id` của hợp đồng cũ trong CSDL; luồng yêu cầu thay đổi (`ChangeRequest*`); phạm vi "Của tôi / Toàn chi nhánh", thông báo, dashboard; người ký bên mình (Task 8.4).
+  - Lưu ý: làm **sau Task 8.4** (cùng sửa `ContractController`, `ContractService`, `ContractDAO` và hai JSP form). Người dùng đã chọn "khoá luôn" và biết hệ quả: quản lý vùng không giao hợp đồng cho cấp dưới được nữa; nhân viên nghỉ việc thì hợp đồng vẫn đứng tên họ, thông báo sắp hết hạn gửi tới tài khoản đã khoá. Không tự thêm ngoại lệ; cần thì dừng hỏi.
+  - Xong khi: Sales quản lý vùng tạo hợp đồng không chọn được người phụ trách, lưu xong là chính mình; Admin tạo vẫn chọn Sales; phụ lục mang người phụ trách của hợp đồng gốc; trang Sửa không đổi được người phụ trách ở mọi tiến độ.
+  - Nhánh: `feat/task-8.5-contract-owner-creator`.
+  - Commit: `feat(contract): người phụ trách lấy theo người tạo, không đổi sau khi tạo (Task 8.5)`
+- [ ] **Task 8.6:** Cập nhật hướng dẫn sử dụng (trang trong app và bản Word) cho Thông tin chi nhánh, người ký bên mình và người phụ trách.
+  - UC: `UC-55`, `UC-33`, `UC-35`.
+  - BR / MSG / NFR: `BR-35`, `BR-56`, `BR-57`, `MSG-060`.
+  - File sửa:
+    - `web/jsp/guide/contract.jsp`: dòng "Người phụ trách" (quanh dòng 152) theo BR-35 mới; dòng "Thông tin ký kết" (quanh dòng 154): người ký bên mình hệ thống tự lấy từ Thông tin chi nhánh, chỉ nhập người ký bên đối tác; bảng tiến độ (quanh dòng 44), đoạn quanh dòng 211 và dòng 274 đang nói người phụ trách "còn đổi được" thì sửa cho đúng.
+    - `web/jsp/guide/employee.jsp`: thêm mục ngắn "Thông tin chi nhánh" cho Admin (mở từ menu, 4 ô, ràng buộc BR-57).
+    - `tools/guide/shots/contract.mjs`: mục 'Thông tin ký kết' đang `n: 6`, chỉnh nếu số ô đổi; xem lại ảnh có ô Người phụ trách.
+    - `tools/guide/word/export_word.py`: thêm 1 dòng cuối `CHANGES`.
+    - `docs/Report6_HuongDanSuDung.docx`: xuất lại.
+  - File test: không có test Java mới; chạy `ant test`.
+  - Không đụng: code Java, `docs/SPEC.md`.
+  - Lưu ý: đọc code của Task 8.3, 8.4, 8.5 đã merge trước khi viết, ghi đúng chữ trên giao diện. Xuất docx như Task 7.4a: `lastModifiedBy` trong `docProps/core.xml` phải là `tools/guide/word/export_word.py`, khác thì dừng hỏi. Lệnh: `python tools/guide/word/export_word.py --template "C:\Users\Admin\Documents\Backup\Prj\Ref\Report6_Software User Guides.docx" --out "docs\Report6_HuongDanSuDung.docx"`. Thiếu Python/thư viện thì dừng, không tự cài.
+  - Xong khi: hai trang hướng dẫn và docx mô tả đúng cách làm mới; docx có dòng Task 8.6 trong Lịch sử thay đổi.
+  - Nhánh: `docs/task-8.6-guide-branch-signer-owner`.
+  - Commit: `docs(guide): hướng dẫn thông tin chi nhánh, người ký bên mình và người phụ trách (Task 8.6)`

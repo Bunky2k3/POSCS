@@ -87,6 +87,7 @@
 | **Cập nhật** Phiếu hỗ trợ | X | X (chỉ phiếu được giao) | X |
 | **Xóa** Phiếu hỗ trợ | X | - | X |
 | Quản lý nhân viên (xem DS, chi tiết, tạo, sửa, khóa/mở khóa, gửi TK, đổi vai trò) | X | - | - |
+| Cập nhật thông tin chi nhánh (UC-55) | X | - | - |
 | Xem DS thông báo; Đánh dấu đã đọc | X | X | X |
 | Xem nhật ký hệ thống (UC-43) | X | - | - |
 
@@ -97,7 +98,7 @@
 
 ---
 
-## 4. Danh sách Use Case (UC-01 → UC-54)
+## 4. Danh sách Use Case (UC-01 → UC-55)
 
 ### 4.1 Xác thực & tài khoản (Admin, Sales, Kỹ thuật)
 | UC | Tên | Ghi chú |
@@ -182,6 +183,11 @@
 | UC-28 | Gửi thông tin tài khoản qua email (mỗi lần gửi cấp mật khẩu tạm **mới**) |
 | UC-29 | Khóa / Mở khóa tài khoản |
 
+### 4.8 Thông tin chi nhánh (chỉ Admin)
+| UC | Tên |
+|---|---|
+| UC-55 | Cập nhật thông tin chi nhánh (xem và sửa họ tên, chức vụ, SĐT, fax của Giám đốc chi nhánh; một bản ghi duy nhất, là nguồn người ký bên mình trên hợp đồng, BR-56, BR-57) |
+
 ---
 
 ## 5. Đặc tả các luồng quan trọng
@@ -208,11 +214,12 @@
 - **UC-20 Xóa:** hộp thoại xác nhận (BR-49, MSG-054); **chặn** nếu sản phẩm nằm trong hợp đồng còn hiệu lực; xóa mềm.
 
 ### 5.4 Hợp đồng
-- **Tạo (UC-33):** bắt buộc Mã hợp đồng (nhập tay theo bản giấy), Tiêu đề, Loại hợp đồng, Khách hàng/NCC (đúng vai), Người phụ trách (BR-35). Tùy chọn: giá trị hợp đồng, người ký & chức vụ hai bên, số ủy quyền, nơi ký. **Biểu mẫu không có ô ngày và hàng hóa.** Lưu ở tiến độ **Nháp**, ghi nhật ký "Khởi tạo". Mã trùng → báo "Mã hợp đồng này đã có hợp đồng khác dùng...". **Chiều Bán/Mua** lấy theo mục đang đứng và **không đổi được**.
+- **Tạo (UC-33):** bắt buộc Mã hợp đồng (nhập tay theo bản giấy), Tiêu đề, Loại hợp đồng, Khách hàng/NCC (đúng vai), Người phụ trách (BR-35). Tùy chọn: giá trị hợp đồng, số ủy quyền, nơi ký. Người ký bên mình do hệ thống tự điền (BR-56); người ký & chức vụ bên đối tác tuỳ chọn. **Biểu mẫu không có ô ngày và hàng hóa.** Lưu ở tiến độ **Nháp**, ghi nhật ký "Khởi tạo". Mã trùng → báo "Mã hợp đồng này đã có hợp đồng khác dùng...". **Chiều Bán/Mua** lấy theo mục đang đứng và **không đổi được**.
 - **Ngày ký:** KHÔNG phải trường nhập tay; hệ thống đóng dấu ngày hiện tại khi Ký (UC-44). Ràng buộc Ngày ký ≤ Ngày hiệu lực ≤ Ngày kết thúc (BR-36). Chỉ điền một mốc hoặc hiệu lực sau kết thúc → MSG-045.
 - **Tiến độ (vòng đời):** `Nháp → Đã ký → Đã thanh lý | Chấm dứt sớm`.
 - **Trạng thái tự tính** (BR-17) từ ngày hiệu lực/kết thúc: *Chưa hiệu lực* (chưa tới ngày hiệu lực, hoặc thiếu ngày) / *Đang hiệu lực* / *Sắp hết hạn* (còn ≤ 30 ngày) / *Đã hết hạn*. Khác với "Tiến độ".
-- **Cập nhật (UC-35):** Nháp sửa mọi ô kể cả thời hạn; **đã ký** chỉ đổi được **Người phụ trách**; **Đã thanh lý/Chấm dứt sớm** không sửa. Sửa sai nhập liệu hợp đồng đã ký đi qua UC-54; sửa đổi thật đi qua phụ lục. Phụ lục còn Nháp: khoản giảm trừ lớn hơn giá trị còn lại của HĐ gốc bị từ chối.
+- **Cập nhật (UC-35):** Nháp sửa mọi ô kể cả thời hạn, trừ người ký bên mình (BR-56); **đã ký** chỉ đổi được **Người phụ trách**; **Đã thanh lý/Chấm dứt sớm** không sửa. Sửa sai nhập liệu hợp đồng đã ký đi qua UC-54; sửa đổi thật đi qua phụ lục. Phụ lục còn Nháp: khoản giảm trừ lớn hơn giá trị còn lại của HĐ gốc bị từ chối.
+- **Người ký bên mình (BR-56):** họ tên, chức vụ, SĐT, fax của Giám đốc chi nhánh, lấy từ Thông tin chi nhánh (UC-55); trên form tạo/sửa hợp đồng chỉ hiển thị, không sửa tay. Hệ thống chép vào hợp đồng khi tạo hợp đồng (UC-33) hoặc phụ lục (UC-46) và mỗi lần lưu bản Nháp (UC-35); từ Đã ký giữ nguyên, chữa sai sót (UC-54) không đổi bốn ô này. Chưa khai thông tin chi nhánh (họ tên GĐCN còn trống): form hiện MSG-060; tạo mới thì để trống cả bốn ô, bản Nháp giữ giá trị đang có.
 - **Huỷ bản ghi (UC-34, BR-37):** là xóa mềm do **nhập nhầm** (không phải hủy HĐ ngoài đời). **Bắt buộc lý do** (hộp thoại MSG-043). Nháp: Admin hoặc quản lý vùng. Đã ký trở đi: **chỉ Admin**. **Chặn** nếu HĐ đã có phụ lục. Kiểm quyền, đánh dấu huỷ và ghi nhật ký trong **một giao dịch**.
 - **Danh sách (UC-10):** hiển thị theo từng chiều (bán/mua); cột theo BR-16; bốn ô trạng thái đồng thời là bộ lọc; tìm theo mã, tiêu đề, tên đối tác; lọc theo loại, tỉnh/thành (chỉ HĐ bán), kỳ theo ngày ký, tiến độ, chỉ HĐ gốc, đang bàn giao. Mặc định mọi vai trò chỉ thấy HĐ **còn hiệu lực trong tháng hiện tại**; có chuyển "Của tôi / Toàn chi nhánh" và "Mọi thời điểm". Bộ lọc giữ khi phân trang và khi xuất Excel.
 - **Chi tiết (UC-11):** thanh vòng đời, hàng hóa, phụ lục, kỳ thanh toán, bàn giao, liên kết bán-mua, tài liệu, nhật ký. Người có quyền quản lý thấy thêm nút "Quản lý hợp đồng" (sang UC-35).
@@ -249,9 +256,15 @@
   - Không có thông báo nhắc hạn thanh toán.
 - Mở danh sách **KHÔNG** tự đánh dấu đã đọc; phải bấm từng thông báo hoặc "Đánh dấu tất cả đã đọc" (BR-21). Mã thông báo không thuộc người dùng → bỏ qua, không đổi dữ liệu.
 
+### 5.8 Thông tin chi nhánh (Admin)
+- **UC-55:** một bản ghi duy nhất (thông tin Giám đốc chi nhánh), **chỉ xem và sửa**, không tạo/xoá.
+- Bốn ô: Họ tên GĐCN, Chức vụ, Điện thoại, Fax; ràng buộc theo BR-57. Thiếu họ tên hoặc chức vụ → MSG-058; SĐT sai định dạng hoặc quá 20 ký tự → MSG-015; fax sai định dạng hoặc quá 20 ký tự → MSG-059. Lưu thành công → MSG-057.
+- Đây là nguồn người ký bên mình trên hợp đồng (BR-56, xem 5.4).
+- Sales, Kỹ thuật truy cập → MSG-022, không trả dữ liệu.
+
 ---
 
-## 6. Quy tắc nghiệp vụ (BR-01 → BR-55)
+## 6. Quy tắc nghiệp vụ (BR-01 → BR-57)
 
 | Mã | Quy tắc |
 |---|---|
@@ -310,16 +323,18 @@
 | BR-53 | Danh sách sản phẩm dạng card grid: Hình ảnh, Thẻ danh mục, Mã, Tên, Ngày cập nhật gần nhất. |
 | BR-54 | Bắt buộc khi tạo SP: Tên và Danh mục. Mã do hệ thống sinh. |
 | BR-55 | Mã SP duy nhất nhờ UNIQUE ở DB (không kiểm trùng ở tầng ứng dụng); trùng thì tự sinh lại. Mã không đổi sau khi tạo. |
+| BR-56 | Người ký bên mình (họ tên, chức vụ, SĐT, fax) luôn lấy từ Thông tin chi nhánh, không sửa tay trên form hợp đồng. Hệ thống chép vào hợp đồng khi tạo (UC-33, UC-46) và mỗi lần lưu khi hợp đồng còn Nháp (UC-35). Từ Đã ký trở đi giữ nguyên; UC-54 không đổi bốn ô này. Chưa khai thông tin chi nhánh (họ tên GĐCN còn trống): tạo mới thì để trống cả bốn ô, bản Nháp giữ giá trị đang có. |
+| BR-57 | Thông tin chi nhánh: họ tên và chức vụ GĐCN bắt buộc, tối đa 100 ký tự. SĐT và fax không bắt buộc; nếu nhập thì tối đa 20 ký tự, phải có 8–15 chữ số, ngoài chữ số chỉ cho phép dấu `+` ở đầu, khoảng trắng, dấu chấm, gạch ngang, ngoặc đơn (nhận cả số máy bàn, nên không áp BR-09). |
 
 ---
 
-## 7. Mô hình dữ liệu (29 bảng)
+## 7. Mô hình dữ liệu (30 bảng)
 
-Nguồn chính thức là `db/schema.sql`; bảng dưới tổng hợp đầy đủ 29 bảng trong hệ thống:
+Nguồn chính thức là `db/schema.sql`; bảng dưới tổng hợp đầy đủ 30 bảng trong hệ thống:
 
 | Nhóm | Bảng |
 |---|---|
-| Tài khoản & tổ chức (7) | `users`, `roles`, `departments`, `provinces`, `districts`, `addresses`, `user_provinces` (phân công địa bàn) |
+| Tài khoản & tổ chức (8) | `users`, `roles`, `departments`, `provinces`, `districts`, `addresses`, `user_provinces` (phân công địa bàn), `branch_info` (thông tin chi nhánh, một dòng duy nhất, UC-55) |
 | Khách hàng / Đối tác (5) | `enterprises`, `enterprise_roles` (vai đối tác: Khách mua / Nhà cung cấp), `enterprisecontacts`, `customer_lifecycle_events` (có `relationship_rating`), `customer_evaluation_rules` |
 | Sản phẩm (4) | `productcategories` (cây đa tầng), `products`, `productimages`, `productcatalogues` |
 | Hợp đồng (7) | `contracts`, `contractproducts`, `contract_payments` (nguồn duy nhất tính doanh thu dashboard & đánh giá KH), `contract_history` (nhật ký hợp đồng, UC-45/UC-54), `contract_handovers` (bàn giao liên phòng, UC-48/UC-49), `contract_documents` (tài liệu đính kèm, UC-52), `contract_links` (liên kết HĐ Bán ↔ Mua, UC-47) |
@@ -415,6 +430,10 @@ Loại: **Nội tuyến** (inline), **Toast**, **Hộp thoại**. "(chuyển tra
 | MSG-054 | Xác nhận xóa SP | "Bạn có chắc chắn muốn xóa sản phẩm [tên]? Hành động này không thể hoàn tác." |
 | MSG-055 | Xóa SP thành công | (chuyển trang) về danh sách sản phẩm. |
 | MSG-056 | Mã SP tự sinh bị trùng khi lưu | Không báo; tự sinh mã mới thử lại tối đa 5 lần (BR-55). |
+| MSG-057 | Lưu thông tin chi nhánh thành công | "Đã lưu thông tin chi nhánh." (Toast) |
+| MSG-058 | Thiếu họ tên hoặc chức vụ GĐCN (BR-57) | "Vui lòng nhập họ tên và chức vụ Giám đốc chi nhánh." (nội tuyến) |
+| MSG-059 | Fax sai định dạng hoặc quá 20 ký tự (BR-57) | "Số fax không hợp lệ." (nội tuyến; SĐT sai định dạng dùng lại MSG-015) |
+| MSG-060 | Chưa khai thông tin chi nhánh: họ tên GĐCN còn trống (BR-56) | "Chưa có thông tin Giám đốc chi nhánh. Admin khai tại trang Thông tin chi nhánh." (nội tuyến, trên form tạo/sửa hợp đồng) |
 
 **Thông báo lỗi ngoài danh mục MSG** (đúng nguyên văn trong báo cáo):
 - "Thông tin khách hàng (nhà cung cấp) chưa hợp lệ. Vui lòng kiểm tra lại các ô bắt buộc."
@@ -456,3 +475,4 @@ Loại: **Nội tuyến** (inline), **Toast**, **Hộp thoại**. "(chuyển tra
 9. Hai gói `poscs.service` và `poscs.validator` đã hoàn thiện đầy đủ cho toàn bộ module (mục 2 & `docs/ARCHITECTURE.md`).
 10. **Luồng chi tiết UC-36 → UC-54:** đã chốt theo hành vi code và JSP hiện tại (`ChangeRequestDAO` & `ChangeRequestController` cho UC-50/UC-51; `ContractService` & `ContractActionController` cho UC-54).
 11. Đã đối chiếu và đồng bộ toàn diện giữa `docs/SPEC.md`, `PERMISSIONS.md`, `README.md` và `db/schema.sql` (Task 7.4).
+12. **Người ký bên mình (chốt 19/11/2026; UC-55, BR-56, BR-57, MSG-057 → MSG-060 bổ sung sau báo cáo gốc):** luôn là **Giám đốc chi nhánh (GĐCN)**. Admin khai họ tên, chức vụ, SĐT, fax một lần ở trang "Thông tin chi nhánh" (bảng một dòng `branch_info`); trên form hợp đồng các ô này chỉ hiển thị, không sửa tay. SĐT và fax lưu vào từng hợp đồng (`contracts.signer_phone`, `contracts.signer_fax`) giống họ tên, chức vụ, để sau này đổi GĐCN thì hợp đồng cũ vẫn giữ đúng thông tin lúc ký. Thời điểm chép: lúc tạo hợp đồng/phụ lục và mỗi lần lưu khi hợp đồng còn Nháp, lấy GĐCN hiện tại; từ Đã ký trở đi giữ nguyên, UC-54 không đổi bốn ô này. Chưa khai GĐCN (họ tên còn trống, kể cả dòng gieo sẵn chỉ có chức vụ): tạo mới thì để trống cả bốn ô, bản Nháp giữ giá trị cũ. SĐT và fax tối đa 20 ký tự, khớp độ dài cột. Hợp đồng cũ trong CSDL không chạy lại dữ liệu. Người ký bên đối tác giữ nguyên nhập tay. Bảng, cột và code đi kèm làm theo Giai đoạn 8 của `task_tracker.md`.
