@@ -19,11 +19,13 @@ the specialized controllers (`CustomerController`, `CustomerListController`, `Cu
 `ContractController`, `ContractListController`, `ContractDetailController`, `ContractActionController`, `ContractPaymentController`, `ContractDocumentController`, `ContractHandoverController`, `ContractLinkController`, `ContractExportController`,
 `ProductController`,
 `TechnicalSupportTicketController`, `TicketListController`, `TicketDetailController`, `TicketActionController`, `TicketExportController`,
-`EmployeeController`) enforce this
+`EmployeeController`, `BranchInfoController`) enforce this
 matrix server-side via `poscs.service.PermissionService` and `poscs.common.AccessControl.requireFullAccess(...)`.
 `EmployeeController` gates once at the top of `doGet`/`doPost` instead of
 per-handler like the others, since Employee has no "View only" tier for
 any role — every single action (including list/view) requires Admin.
+`BranchInfoController` (`/branch`, UC-55) gates the same way, with
+`AccessControl.requireAdmin(...)`.
 
 ## Roles
 
@@ -155,6 +157,7 @@ has the same Full access to tickets as a Sales *manager*, unlike the † rows.
 | Ticket (`technicalrequests`) | Full | Full | Full | View only* |
 | Employee (`users`) | Full | No access | No access | No access |
 | System log (`/systemLog`) | Full | No access | No access | No access |
+| Branch info (`branch_info`, `/branch`, UC-55) | Full ‡ | No access | No access | No access |
 
 \* **Exception:** `Kỹ thuật` may update the `status`, `rootCause`,
 `causeCategory`, `handlingPlan` and `resolutionSummary` of a ticket assigned to them
@@ -366,3 +369,12 @@ hide what the controller would refuse.
   Server logs carry error messages with business context (contract codes,
   emails, the username of whoever acted) plus stack traces, so they stay
   Admin-only with no "View only" tier.
+- ‡ **Branch info** (`/branch`, UC-55: the branch director's name, position,
+  phone and fax — the source of "our signer" on contracts, BR-56) is a single
+  row seeded by V39, so "Full" here means view and update only: there is no
+  create or delete. It is not a `Resource` either: `BranchInfoController`
+  calls `AccessControl.requireAdmin(...)` once at the top of `doGet`/`doPost`
+  (so typing the URL by hand as Sales or Kỹ thuật gets a 403 with MSG-022),
+  and `BranchInfoService.update` re-checks `PermissionService.isAdmin` against
+  the database before writing. The sidebar entry "Thông tin chi nhánh" is
+  hidden from non-Admins, but that is presentation only.

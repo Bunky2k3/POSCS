@@ -257,7 +257,7 @@ Không còn mục nào.
   - Nhánh: `feat/task-8.2-branch-info-schema`.
   - Commit: `feat(db): thêm bảng branch_info và SĐT, fax người ký bên mình (Task 8.2)`
   - *Đã hoàn thành:* `db/migrations/V39__add_branch_info_and_contract_signer_contact__ndat2003.sql` (mới: bảng `branch_info` một dòng id = 1 gieo sẵn chức vụ, `contracts.signer_phone`/`signer_fax` sau `signer_position`); `db/schema.sql` mirror V39 (bảng mới ngay sau `users`, khớp từng cột); `src/java/poscs/model/BranchInfo.java` (mới); `src/java/poscs/model/Contract.java` thêm `signerPhone`, `signerFax`; `src/java/poscs/dao/BranchInfoDAO.java` (mới: `get()`, `update(info, actorId)`). Test: `test/poscs/dao/BranchInfoDAOTest.java` 14 test; `ant test` 1.978 test, 0 fail, 3 skipped. **Chưa chạy V39 lên `poscs_db`**: phải chạy trước khi kéo code Task 8.4 về checkout chính. QA report tại `docs/qa/Task-8.2.md`.
-- [ ] **Task 8.3:** Trang "Thông tin chi nhánh" cho Admin (xem và sửa thông tin GĐCN).
+- [x] **Task 8.3:** Trang "Thông tin chi nhánh" cho Admin (xem và sửa thông tin GĐCN).
   - UC: `UC-55`.
   - BR / MSG / NFR: `BR-57`, `MSG-057`, `MSG-058`, `MSG-059`, `MSG-015`, `MSG-022`.
   - File sửa:
@@ -274,6 +274,7 @@ Không còn mục nào.
   - Xong khi: đăng nhập `admin` thấy mục menu, sửa và lưu được; đăng nhập Sales gõ thẳng `/POSCS/branch` nhận 403.
   - Nhánh: `feat/task-8.3-branch-info-page`.
   - Commit: `feat(branch): trang Thông tin chi nhánh cho Admin (Task 8.3)`
+  - *Đã hoàn thành:* `src/java/poscs/validator/BranchInfoValidator.java` (mới: BR-57, trim trước khi kiểm, lỗi theo từng ô, MSG-058/MSG-015/MSG-059); `src/java/poscs/service/BranchInfoService.java` (mới: `get()`, `findUpdaterName()`, `update(info, actor)` kiểm lại Admin qua `PermissionService.isAdmin`, dữ liệu sai không gọi DAO, lưu xong trả MSG-057); `src/java/poscs/controller/BranchInfoController.java` (mới, `/branch`: `AccessControl.requireAdmin` ở đầu `doGet`/`doPost`, lưu xong redirect `saved=1`, lỗi kiểm tra hiện lại form giữ dữ liệu, không đọc được bản ghi thì MSG-018); `web/jsp/admin/branchInfo.jsp` (mới); `web/jsp/common/sidebar.jsp` (mục "Thông tin chi nhánh" dưới "Nhân viên", chỉ Admin); `PERMISSIONS.md`; `docs/ARCHITECTURE.md`. Test: `BranchInfoValidatorTest` 21, `BranchInfoServiceTest` 15, `BranchInfoControllerTest` 14; `ant test` 2.028 test, 0 fail, 3 skipped; `compile-jsps` pass. **Chưa thử trên Tomcat**: `poscs_db` chưa chạy V39 nên `/branch` sẽ báo MSG-018 tới khi chạy V39. QA report tại `docs/qa/Task-8.3.md`.
 - [ ] **Task 8.4:** Form hợp đồng lấy người ký bên mình từ Thông tin chi nhánh (khoá ô, thêm SĐT và fax).
   - UC: `UC-33`, `UC-35`, `UC-46`, `UC-54`, `UC-11`.
   - BR / MSG / NFR: `BR-56`, `MSG-060`.

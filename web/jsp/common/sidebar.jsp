@@ -6,7 +6,7 @@
     Trang gọi PHẢI set request attribute "activeNav" trước khi include, để
     tô sáng đúng mục đang đứng, vd:
         <c:set var="activeNav" value="customer" scope="request"/>
-    Giá trị hợp lệ: dashboard | customer | contract | product | ticket | employee.
+    Giá trị hợp lệ: dashboard | customer | contract | product | ticket | employee | branch.
     Không set thì không mục nào được tô sáng (không lỗi, chỉ mất highlight).
     'systemLog' và 'changerequest' không còn trong danh sách: hai mục đó đã bỏ
     khỏi menu. Trang của chúng vẫn set giá trị đó -- vô hại, chỉ là không mục
@@ -64,6 +64,9 @@
     <a href="${pageContext.request.contextPath}/product" class="sidebar-link ${activeNav == 'product' ? 'active' : ''}"><i class="fa-solid fa-box"></i><span>Sản phẩm</span></a>
     <a href="${pageContext.request.contextPath}/ticket" class="sidebar-link ${activeNav == 'ticket' ? 'active' : ''}"><i class="fa-solid fa-headset"></i><span>Phiếu hỗ trợ</span></a>
     <c:if test="${sessionScope.currentUser.role.roleName == 'Admin'}"><a href="${pageContext.request.contextPath}/employee" class="sidebar-link ${activeNav == 'employee' ? 'active' : ''}"><i class="fa-solid fa-user-tie"></i><span>Nhân viên</span></a></c:if>
+    <%-- Thông tin chi nhánh (UC-55): chỉ Admin. Ẩn ở đây chỉ là cho gọn menu;
+         BranchInfoController tự chặn quyền bằng AccessControl.requireAdmin. --%>
+    <c:if test="${sessionScope.currentUser.role.roleName == 'Admin'}"><a href="${pageContext.request.contextPath}/branch" class="sidebar-link ${activeNav == 'branch' ? 'active' : ''}"><i class="fa-solid fa-building"></i><span>Thông tin chi nhánh</span></a></c:if>
     <%-- KHÔNG còn mục "Nhật ký" ở menu (bỏ theo yêu cầu người dùng 18/09/2026).
 
          Trang /systemLog VẪN CHẠY và vẫn chặn quyền ở AccessControl.requireAdmin
