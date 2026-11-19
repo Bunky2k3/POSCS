@@ -3598,6 +3598,32 @@ VALUES
  'cskh4.test@example.com', NULL,
  (SELECT department_id FROM departments WHERE department_name = 'Kinh doanh'), '2024-06-17', 0);
 
+DROP TABLE IF EXISTS `branch_info`;
+-- Thông tin chi nhánh (V39, UC-55): thông tin Giám đốc chi nhánh (GĐCN), là
+-- nguồn người ký bên mình trên hợp đồng (BR-56). MỘT DÒNG DUY NHẤT, id = 1,
+-- gieo sẵn ngay dưới đây; trang Thông tin chi nhánh chỉ xem và sửa, không
+-- tạo/xoá, nên khoá chính không AUTO_INCREMENT.
+CREATE TABLE `branch_info` (
+  `branch_info_id`    tinyint NOT NULL,
+  -- Cả bốn cột thông tin để NULL được: dòng gieo sẵn chưa có họ tên. Bắt buộc
+  -- họ tên và chức vụ (BR-57) là việc của trang Thông tin chi nhánh.
+  `director_name`     varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `director_position` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `phone`             varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `fax`               varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  -- Admin sửa lần cuối. NULL = chưa ai sửa từ lúc gieo.
+  `updated_by`        int DEFAULT NULL,
+  `updated_at`        timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`branch_info_id`),
+  KEY `fk_branch_info_updated_by` (`updated_by`),
+  CONSTRAINT `fk_branch_info_updated_by` FOREIGN KEY (`updated_by`) REFERENCES `users` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Họ tên GĐCN để trống: tên giám đốc là dữ liệu thật của khách, không bịa. Họ
+-- tên còn trống nghĩa là "chưa khai GĐCN" (BR-56), dù đã có chức vụ gieo sẵn.
+INSERT INTO `branch_info` (`branch_info_id`, `director_position`) VALUES
+(1, 'Giám đốc chi nhánh');
+
 DROP TABLE IF EXISTS `enterprises`;
 CREATE TABLE `enterprises` (
   `enterprise_id` int NOT NULL AUTO_INCREMENT,
@@ -4383,6 +4409,10 @@ CREATE TABLE `contracts` (
   -- vốn ở cấp công ty. Có uỷ quyền thì hai thứ đó khác nhau. Xem V27.
   `signer_name` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `signer_position` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  -- SĐT, fax người ký bên mình, chép từ branch_info cùng lúc với họ tên, chức
+  -- vụ (BR-56): đổi GĐCN sau này thì hợp đồng cũ vẫn giữ đúng lúc ký. Xem V39.
+  `signer_phone` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `signer_fax` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `counterparty_signer_name` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `counterparty_signer_position` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `authorization_ref` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,

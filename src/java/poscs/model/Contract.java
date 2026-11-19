@@ -101,6 +101,13 @@ public class Contract {
     private String signerName;
     private String signerPosition;
 
+    /**
+     * SĐT, fax người ký bên mình (V39), chép từ Thông tin chi nhánh cùng lúc
+     * với họ tên, chức vụ (BR-56).
+     */
+    private String signerPhone;
+    private String signerFax;
+
     /** Người ký bên đối tác. */
     private String counterpartySignerName;
     private String counterpartySignerPosition;
@@ -254,6 +261,12 @@ public class Contract {
 
     public String getSignerPosition() { return signerPosition; }
     public void setSignerPosition(String signerPosition) { this.signerPosition = signerPosition; }
+
+    public String getSignerPhone() { return signerPhone; }
+    public void setSignerPhone(String signerPhone) { this.signerPhone = signerPhone; }
+
+    public String getSignerFax() { return signerFax; }
+    public void setSignerFax(String signerFax) { this.signerFax = signerFax; }
 
     public String getCounterpartySignerName() { return counterpartySignerName; }
     public void setCounterpartySignerName(String v) { this.counterpartySignerName = v; }
