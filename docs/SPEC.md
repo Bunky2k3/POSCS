@@ -56,10 +56,12 @@
 
 ### 3.1 Ba tác nhân
 1. **Admin:** toàn quyền hệ thống; quản lý nhân viên, phân công địa bàn, xem nhật ký hệ thống, chữa sai sót hợp đồng đã ký.
-2. **Sales:** quản lý khách hàng, hợp đồng. Quyền **ghi** phụ thuộc việc Sales có cấp trên hay không (xem 3.2).
-3. **Kỹ thuật:** quản lý sản phẩm; xử lý phiếu hỗ trợ kỹ thuật (với phiếu được giao).
+2. **Sales:** quản lý khách hàng, hợp đồng; quản lý sản phẩm; tạo và xử lý phiếu hỗ trợ kỹ thuật (người xử lý phiếu là một Sales). Quyền **ghi** trên Khách hàng và Hợp đồng phụ thuộc việc Sales có cấp trên hay không (xem 3.2).
+3. **Tổng hợp:** xem khách hàng, hợp đồng, sản phẩm (không thêm, sửa, xoá); **không vào** phiếu hỗ trợ; xác nhận bàn giao hợp đồng cho phòng mình (UC-49); ghi nhận kỳ thanh toán **đã thu** (UC-53), không lập, không xoá kỳ.
 
-> **Đã chốt:** hệ thống **không có vai trò CS (Customer Support)**. Chỉ có đúng 3 vai trò trên. Không tạo role, quyền hay màn hình riêng cho CS.
+**Phòng ban:** Ban giám đốc (Giám đốc, Phó giám đốc dùng tài khoản Admin), Phòng kinh doanh (vai Sales), Phòng tổng hợp (vai Tổng hợp; phòng duy nhất nhận bàn giao hợp đồng, xem 5.4).
+
+> **Đã chốt (đổi ngày 19/11/2026, theo cơ cấu chi nhánh thật):** đúng 3 vai trò **Admin, Sales, Tổng hợp**. Vai **Kỹ thuật** cũ đã bỏ: quản lý sản phẩm và xử lý phiếu hỗ trợ chuyển sang Sales. Hệ thống **không có vai trò CS (Customer Support)**; không tạo role, quyền hay màn hình riêng cho CS.
 
 ### 3.2 Quản lý vùng vs Sales có cấp trên (cơ chế cốt lõi)
 - **Người quản lý trực tiếp (cấp trên)** của nhân viên hiện được thiết lập **trực tiếp trong DB**; biểu mẫu nhân viên **không có ô này**.
@@ -70,22 +72,23 @@
 
 ### 3.3 Ma trận quyền theo màn hình (nguồn: báo cáo mục 3.1.4.2)
 
-| Chức năng | Admin | Kỹ thuật | Sales |
+| Chức năng | Admin | Sales | Tổng hợp |
 |---|:-:|:-:|:-:|
 | Đăng nhập / Đăng xuất / Quên MK / OTP / Đổi MK | X | X | X |
 | Xem bảng điều khiển; Xem & Cập nhật hồ sơ cá nhân | X | X | X |
 | Xem danh sách & chi tiết Khách hàng/NCC | X | X | X |
 | Xuất danh sách Khách hàng/NCC | X | X | X |
-| Tạo / Cập nhật / Xóa Khách hàng/NCC; Đánh giá khách hàng | X | - | X (*) |
+| Tạo / Cập nhật / Xóa Khách hàng/NCC; Đánh giá khách hàng | X | X (*) | - |
 | Xem danh sách & chi tiết Sản phẩm | X | X | X |
 | Tạo / Cập nhật / Xóa Sản phẩm | X | X | - |
 | Xem danh sách, chi tiết, nhật ký trạng thái Hợp đồng; Xuất danh sách HĐ | X | X | X |
-| Tạo, Cập nhật, Huỷ bản ghi, Ký HĐ; Tạo phụ lục; Liên kết Bán↔Mua; Khởi tạo bàn giao; Quản lý tài liệu; Quản lý kỳ thanh toán; Thêm/gỡ SP trong HĐ | X | - | X (*) |
+| Tạo, Cập nhật, Huỷ bản ghi, Ký HĐ; Tạo phụ lục; Liên kết Bán↔Mua; Khởi tạo bàn giao; Quản lý tài liệu; Lập / xoá kỳ thanh toán; Thêm/gỡ SP trong HĐ | X | X (*) | - |
+| Ghi nhận kỳ thanh toán **đã thu** (UC-53) | X | X (*) | X |
 | Chữa sai sót nhập liệu HĐ đã ký (UC-54) | X | - | - |
-| Xem danh sách, chi tiết, tìm kiếm Phiếu hỗ trợ; Xuất phiếu | X | X | X |
-| **Tạo** Phiếu hỗ trợ | X | - | X |
-| **Cập nhật** Phiếu hỗ trợ | X | X (chỉ phiếu được giao) | X |
-| **Xóa** Phiếu hỗ trợ | X | - | X |
+| Xem danh sách, chi tiết, tìm kiếm Phiếu hỗ trợ; Xuất phiếu | X | X | - |
+| **Tạo** Phiếu hỗ trợ | X | X | - |
+| **Cập nhật** Phiếu hỗ trợ | X | X | - |
+| **Xóa** Phiếu hỗ trợ | X | X | - |
 | Quản lý nhân viên (xem DS, chi tiết, tạo, sửa, khóa/mở khóa, gửi TK, đổi vai trò) | X | - | - |
 | Cập nhật thông tin chi nhánh (UC-55) | X | - | - |
 | Xem DS thông báo; Đánh dấu đã đọc | X | X | X |
@@ -93,14 +96,14 @@
 
 **Ghi chú:**
 - `(*)` = chỉ **Sales không có cấp trên (quản lý vùng)**. Riêng huỷ hợp đồng: bản **Nháp** Admin và quản lý vùng đều được; **đã ký** chỉ Admin.
-- UC-49 (xác nhận bàn giao): Admin hoặc nhân viên thuộc đúng phòng ban nhận bàn giao. UC-50: nhân viên có cấp trên. UC-51: quản lý trực tiếp của người gửi hoặc Admin. Ba UC này không nằm trong ma trận trên.
-- Kỹ thuật vào chức năng ghi của Khách hàng/Hợp đồng, hoặc Sales có cấp trên: trả trang "Không có quyền truy cập" (**MSG-022**).
+- UC-49 (xác nhận bàn giao): Admin hoặc nhân viên thuộc phòng nhận bàn giao, tức **phòng Tổng hợp** (xem 5.4). UC-50: nhân viên có cấp trên. UC-51: quản lý trực tiếp của người gửi hoặc Admin. Ba UC này không nằm trong ma trận trên.
+- Trả trang "Không có quyền truy cập" (**MSG-022**) khi: Tổng hợp vào chức năng ghi của Khách hàng/Sản phẩm/Hợp đồng (trừ ghi nhận kỳ đã thu) hoặc vào bất kỳ màn hình Phiếu hỗ trợ nào; Sales có cấp trên vào chức năng ghi đánh dấu `(*)`.
 
 ---
 
 ## 4. Danh sách Use Case (UC-01 → UC-55)
 
-### 4.1 Xác thực & tài khoản (Admin, Sales, Kỹ thuật)
+### 4.1 Xác thực & tài khoản (Admin, Sales, Tổng hợp)
 | UC | Tên | Ghi chú |
 |---|---|---|
 | UC-01 | Đăng nhập | Username + mật khẩu. BR-01, BR-02. Sau đăng nhập về trang tổng quan theo vai trò. |
@@ -114,62 +117,62 @@
 ### 4.2 Khách hàng / Nhà cung cấp
 | UC | Tên | Tác nhân |
 |---|---|---|
-| UC-08 | Xem danh sách KH/NCC | Admin, Kỹ thuật, Sales |
-| UC-09 | Xem chi tiết KH/NCC | Admin, Kỹ thuật, Sales |
+| UC-08 | Xem danh sách KH/NCC | Admin, Sales, Tổng hợp |
+| UC-09 | Xem chi tiết KH/NCC | Admin, Sales, Tổng hợp |
 | UC-30 | Thêm KH/NCC | Admin, Sales (quản lý vùng) |
 | UC-31 | Cập nhật KH/NCC | Admin, Sales (quản lý vùng) |
 | UC-32 | Xóa KH/NCC (xóa mềm) | Admin, Sales (quản lý vùng) |
-| UC-37 | Xuất danh sách KH ra Excel | Admin, Kỹ thuật, Sales |
+| UC-37 | Xuất danh sách KH ra Excel | Admin, Sales, Tổng hợp |
 | UC-38 | Đánh giá khách hàng (sự kiện vòng đời + mức quan hệ: Tốt / Cần theo dõi / Xấu / Có nguy cơ rời bỏ; ghi cùng một giao dịch) | Admin, Sales (quản lý vùng) |
 
 ### 4.3 Sản phẩm
 | UC | Tên | Tác nhân |
 |---|---|---|
-| UC-12 | Xem danh sách sản phẩm (card grid) | Admin, Kỹ thuật, Sales |
-| UC-13 | Xem chi tiết sản phẩm | Admin, Kỹ thuật, Sales |
-| UC-18 | Cập nhật sản phẩm | Admin, Kỹ thuật |
-| UC-19 | Thêm sản phẩm | Admin, Kỹ thuật |
-| UC-20 | Xóa sản phẩm (xóa mềm) | Admin, Kỹ thuật |
+| UC-12 | Xem danh sách sản phẩm (card grid) | Admin, Sales, Tổng hợp |
+| UC-13 | Xem chi tiết sản phẩm | Admin, Sales, Tổng hợp |
+| UC-18 | Cập nhật sản phẩm | Admin, Sales |
+| UC-19 | Thêm sản phẩm | Admin, Sales |
+| UC-20 | Xóa sản phẩm (xóa mềm) | Admin, Sales |
 
 ### 4.4 Hợp đồng
 | UC | Tên | Tác nhân |
 |---|---|---|
-| UC-10 | Xem danh sách hợp đồng | Admin, Kỹ thuật, Sales |
-| UC-11 | Xem chi tiết hợp đồng | Admin, Kỹ thuật, Sales |
+| UC-10 | Xem danh sách hợp đồng | Admin, Sales, Tổng hợp |
+| UC-11 | Xem chi tiết hợp đồng | Admin, Sales, Tổng hợp |
 | UC-33 | Tạo hợp đồng | Admin, Sales (quản lý vùng) |
 | UC-34 | Huỷ bản ghi hợp đồng (xóa mềm) | Admin, Sales (quản lý vùng) nếu Nháp; chỉ Admin nếu đã ký |
 | UC-35 | Cập nhật hợp đồng | Admin, Sales (quản lý vùng) |
 | UC-39 | Thêm / gỡ sản phẩm trong hợp đồng (kèm số lượng, đơn vị, ghi chú) | Admin, Sales (quản lý vùng) |
-| UC-41 | Xuất danh sách hợp đồng ra Excel (cùng bộ lọc, không phân trang, sắp theo tỉnh/thành) | Admin, Kỹ thuật, Sales |
+| UC-41 | Xuất danh sách hợp đồng ra Excel (cùng bộ lọc, không phân trang, sắp theo tỉnh/thành) | Admin, Sales, Tổng hợp |
 | UC-44 | Ký hợp đồng (Nháp → Đã ký; cần đủ ngày hiệu lực & kết thúc) | Admin, Sales (quản lý vùng) |
-| UC-45 | Xem nhật ký thay đổi trạng thái hợp đồng | Admin, Sales, Kỹ thuật |
+| UC-45 | Xem nhật ký thay đổi trạng thái hợp đồng | Admin, Sales, Tổng hợp |
 | UC-46 | Tạo phụ lục hợp đồng (điều chỉnh giá trị cho HĐ gốc **đã ký**, chưa phải phụ lục) | Admin, Sales (quản lý vùng) |
 | UC-47 | Liên kết hợp đồng Bán ↔ Mua (và gỡ liên kết) | Admin, Sales (quản lý vùng) |
-| UC-48 | Khởi tạo bàn giao hợp đồng cho một/nhiều phòng ban | Admin, Sales (quản lý vùng) |
-| UC-49 | Xác nhận xử lý bàn giao | Admin, nhân viên phòng nhận |
+| UC-48 | Khởi tạo bàn giao hợp đồng cho phòng Tổng hợp (phòng nhận duy nhất, xem 5.4) | Admin, Sales (quản lý vùng) |
+| UC-49 | Xác nhận xử lý bàn giao | Admin, nhân viên phòng nhận (phòng Tổng hợp) |
 | UC-50 | Gửi yêu cầu thay đổi (tạo mới/lập phụ lục) | Nhân viên có cấp trên |
 | UC-51 | Duyệt / từ chối yêu cầu thay đổi | Admin, quản lý trực tiếp của người gửi |
 | UC-52 | Quản lý tài liệu đính kèm (chỉ gắn **đường dẫn**, không upload; hủy mềm kèm lý do bắt buộc) | Admin, Sales (quản lý vùng) |
-| UC-53 | Quản lý kỳ thanh toán (lập kỳ, ghi nhận đã thu, xóa kỳ lập nhầm) | Admin, Sales (quản lý vùng) |
+| UC-53 | Quản lý kỳ thanh toán (lập kỳ, ghi nhận đã thu, xóa kỳ lập nhầm) | Admin, Sales (quản lý vùng); Tổng hợp: **chỉ ghi nhận đã thu** (không lập, không xoá kỳ) |
 | UC-54 | Chữa sai sót nhập liệu HĐ đã ký (chưa thanh lý/chấm dứt; bắt buộc lý do; ghi nhật ký loại sự kiện riêng; **ngày ký không sửa được**) | Admin |
 | ~~UC-40~~ | ~~Nhập HĐ từ PDF~~ (đã gỡ) | - |
 
 ### 4.5 Phiếu hỗ trợ kỹ thuật
 | UC | Tên | Tác nhân |
 |---|---|---|
-| UC-16 | Xem danh sách phiếu | Admin, Sales, Kỹ thuật |
-| UC-17 | Xem chi tiết phiếu | Admin, Sales, Kỹ thuật |
+| UC-16 | Xem danh sách phiếu | Admin, Sales |
+| UC-17 | Xem chi tiết phiếu | Admin, Sales |
 | UC-21 | Tạo phiếu | Admin, Sales |
-| UC-22 | Cập nhật phiếu | Admin, Sales, Kỹ thuật (Kỹ thuật: chỉ phiếu được giao) |
+| UC-22 | Cập nhật phiếu | Admin, Sales |
 | UC-23 | Xóa phiếu (xóa mềm) | Admin, Sales |
-| UC-42 | Xuất phiếu ra Excel hoặc PDF | Admin, Kỹ thuật, Sales |
+| UC-42 | Xuất phiếu ra Excel hoặc PDF | Admin, Sales |
 
 ### 4.6 Thông báo, tổng quan, nhật ký
 | UC | Tên | Tác nhân |
 |---|---|---|
-| UC-14 | Xem danh sách thông báo (chỉ của chính mình) | Admin, Sales, Kỹ thuật |
-| UC-15 | Đánh dấu thông báo đã đọc | Admin, Sales, Kỹ thuật |
-| UC-36 | Xem trang tổng quan (số KH, KH mới trong tháng, tình trạng HĐ, doanh thu tháng, tình trạng phiếu, HĐ sắp hết hạn) | Admin, Kỹ thuật, Sales |
+| UC-14 | Xem danh sách thông báo (chỉ của chính mình) | Admin, Sales, Tổng hợp |
+| UC-15 | Đánh dấu thông báo đã đọc | Admin, Sales, Tổng hợp |
+| UC-36 | Xem trang tổng quan (số KH, KH mới trong tháng, tình trạng HĐ, doanh thu tháng, tình trạng phiếu, HĐ sắp hết hạn) | Admin, Sales, Tổng hợp |
 | UC-43 | Xem nhật ký hệ thống (đọc tệp log trên trình duyệt, lọc từ khóa, tải 1 tệp) | Admin |
 | Hệ thống | `NotificationScheduler` (xem 5.7): bộ hẹn giờ chạy nền, tự sinh thông báo cho HĐ sắp hết hạn và phiếu sắp/đã quá hạn SLA | - |
 
@@ -223,15 +226,16 @@
 - **Huỷ bản ghi (UC-34, BR-37):** là xóa mềm do **nhập nhầm** (không phải hủy HĐ ngoài đời). **Bắt buộc lý do** (hộp thoại MSG-043). Nháp: Admin hoặc quản lý vùng. Đã ký trở đi: **chỉ Admin**. **Chặn** nếu HĐ đã có phụ lục. Kiểm quyền, đánh dấu huỷ và ghi nhật ký trong **một giao dịch**.
 - **Danh sách (UC-10):** hiển thị theo từng chiều (bán/mua); cột theo BR-16; bốn ô trạng thái đồng thời là bộ lọc; tìm theo mã, tiêu đề, tên đối tác; lọc theo loại, tỉnh/thành (chỉ HĐ bán), kỳ theo ngày ký, tiến độ, chỉ HĐ gốc, đang bàn giao. Mặc định mọi vai trò chỉ thấy HĐ **còn hiệu lực trong tháng hiện tại**; có chuyển "Của tôi / Toàn chi nhánh" và "Mọi thời điểm". Bộ lọc giữ khi phân trang và khi xuất Excel.
 - **Chi tiết (UC-11):** thanh vòng đời, hàng hóa, phụ lục, kỳ thanh toán, bàn giao, liên kết bán-mua, tài liệu, nhật ký. Người có quyền quản lý thấy thêm nút "Quản lý hợp đồng" (sang UC-35).
+- **Bàn giao (UC-48, UC-49):** phòng nhận bàn giao là **phòng Tổng hợp**, phòng duy nhất nhận (hai phòng Kế toán và Dự án cũ đã gộp vào). Admin hoặc Sales quản lý vùng khởi tạo bàn giao; Admin hoặc nhân viên phòng Tổng hợp xác nhận đã xử lý. Một hợp đồng không có hai chặng cùng đang mở ở một phòng.
 - Giá trị hợp đồng và số tiền từng kỳ thanh toán lưu & hiển thị trực tiếp trên hồ sơ HĐ (BR-18).
 
 ### 5.5 Phiếu hỗ trợ kỹ thuật
 - **Mã ticket** tự sinh duy nhất (BR-38).
-- **Bắt buộc khi tạo (BR-39):** Khách hàng, Loại phiếu, Mức độ ưu tiên, Kênh tiếp nhận, Mô tả sự cố, Kỹ thuật viên được chỉ định. **Trạng thái và Ngày tạo do hệ thống gán** (Mới tiếp nhận, thời điểm hiện tại).
+- **Bắt buộc khi tạo (BR-39):** Khách hàng, Loại phiếu, Mức độ ưu tiên, Kênh tiếp nhận, Mô tả sự cố, Người xử lý (chọn trong các **Sales** đang hoạt động). **Trạng thái và Ngày tạo do hệ thống gán** (Mới tiếp nhận, thời điểm hiện tại).
 - **Trạng thái (BR-40):** chỉ 3 giá trị `Mới tiếp nhận → Đang xử lý → Đã đóng`. Lần đầu sang *Đã đóng*: hệ thống ghi thời điểm hoàn tất. Mọi lần đổi trạng thái ghi vào lịch sử. Chuyển sai quy trình → MSG-051.
 - **Ưu tiên (BR-41):** Thấp / Bình thường / Cao / Khẩn cấp. **SLA (BR-42):** mỗi phiếu có hạn xử lý; quá hạn = vượt mốc mà chưa *Đã đóng*. **Cờ bảo hành (BR-43):** bắt buộc, Có/Không, mặc định **Có**.
-- **Danh sách (UC-16):** bảng, cột theo BR-45 (Mã, Loại, Khách hàng, Ưu tiên, Trạng thái, Người xử lý, Ngày tạo, Thao tác; mã hợp đồng chỉ ở chi tiết và Excel). Dải KPI: Mới tiếp nhận / Đang xử lý / Đã đóng / Khẩn cấp, đếm theo kỳ & người xử lý đang chọn. Tìm theo mã, mô tả, tên KH; lọc trạng thái, ưu tiên, kỳ (theo ngày tạo), người xử lý (Tất cả / Phiếu của tôi / một KTV). **Kỹ thuật viên mở lần đầu mặc định "Phiếu của tôi".**
-- **Chi tiết (UC-17, BR-46):** Thông tin chung, Người tạo phiếu, Nhân viên kỹ thuật xử lý, Lịch sử xử lý.
+- **Danh sách (UC-16):** bảng, cột theo BR-45 (Mã, Loại, Khách hàng, Ưu tiên, Trạng thái, Người xử lý, Ngày tạo, Thao tác; mã hợp đồng chỉ ở chi tiết và Excel). Dải KPI: Mới tiếp nhận / Đang xử lý / Đã đóng / Khẩn cấp, đếm theo kỳ & người xử lý đang chọn. Tìm theo mã, mô tả, tên KH; lọc trạng thái, ưu tiên, kỳ (theo ngày tạo), người xử lý (Tất cả / Phiếu của tôi / một người xử lý). Mở lần đầu mặc định **"Tất cả"**.
+- **Chi tiết (UC-17, BR-46):** Thông tin chung, Người tạo phiếu, Người xử lý (Sales), Lịch sử xử lý.
 - **Xóa (UC-23, BR-47):** hộp thoại xác nhận (MSG-048); **không xóa phiếu Đang xử lý** (chỉ xóa *Mới tiếp nhận* hoặc *Đã đóng*); xóa mềm.
 - **Cập nhật nhiều bảng** (phiếu + lịch sử trạng thái) trong **một giao dịch** (NFR-19).
 - **Thiết bị/lỗi (BR-44, đã chốt không làm):** phiếu liên kết với hợp đồng (nếu có); thiết bị gặp sự cố và mô tả lỗi ghi vào trường Mô tả/ghi chú. **Bỏ qua** phần "Thiết bị liên quan (tên/serial/lỗi)" xuất hiện trong mô tả UC-17, UC-21, UC-22 của báo cáo gốc.
@@ -249,7 +253,7 @@
 - **Thông báo không do người dùng tạo tay.** Hệ thống tự sinh thông báo từ hai nguồn:
   - **Định kỳ qua `NotificationScheduler`** (chạy nền, **chu kỳ 60 phút**) cho đúng hai trường hợp:
     1. **Hợp đồng sắp hết hạn** (`ref_type = "CONTRACT"`) → gửi cho **người phụ trách hợp đồng**. "Sắp hết hạn" theo BR-17 (còn ≤ 30 ngày tới ngày kết thúc).
-    2. **Phiếu hỗ trợ sắp / đã quá hạn SLA** (`ref_type = "TICKET"`) → gửi cho **kỹ thuật viên được phân công**. "Sắp quá hạn" = còn ≤ **24 giờ** tới hạn SLA.
+    2. **Phiếu hỗ trợ sắp / đã quá hạn SLA** (`ref_type = "TICKET"`) → gửi cho **người xử lý được phân công** (Sales). "Sắp quá hạn" = còn ≤ **24 giờ** tới hạn SLA.
     - Mỗi cặp (đối tượng, người nhận) chỉ sinh **một** thông báo; chạy lại nhiều lần **không tạo bản ghi trùng**.
   - **Theo sự kiện yêu cầu thay đổi (`UC-50`, `UC-51`, `ref_type = "CHANGE_REQUEST"`)**:
     3. Khi nhân viên có cấp trên gửi yêu cầu thay đổi (`UC-50`) → gửi thông báo cho **người quản lý trực tiếp** (`manager_id`). Khi người quản lý (hoặc Admin) duyệt / từ chối yêu cầu (`UC-51`) → gửi thông báo kết quả cho **người gửi yêu cầu** (`requested_by`).
@@ -260,7 +264,7 @@
 - **UC-55:** một bản ghi duy nhất (thông tin Giám đốc chi nhánh), **chỉ xem và sửa**, không tạo/xoá.
 - Bốn ô: Họ tên GĐCN, Chức vụ, Điện thoại, Fax; ràng buộc theo BR-57. Thiếu họ tên hoặc chức vụ → MSG-058; SĐT sai định dạng hoặc quá 20 ký tự → MSG-015; fax sai định dạng hoặc quá 20 ký tự → MSG-059. Lưu thành công → MSG-057.
 - Đây là nguồn người ký bên mình trên hợp đồng (BR-56, xem 5.4).
-- Sales, Kỹ thuật truy cập → MSG-022, không trả dữ liệu.
+- Sales, Tổng hợp truy cập → MSG-022, không trả dữ liệu.
 
 ---
 
@@ -306,14 +310,14 @@
 | BR-36 | Ngày ký ≤ Ngày hiệu lực ≤ Ngày kết thúc. |
 | BR-37 | Huỷ HĐ (nhập nhầm): bắt buộc lý do. Nháp: người có quyền quản lý HĐ đều huỷ được. Từ Đã ký: chỉ Admin; chặn nếu có phụ lục. |
 | BR-38 | Phiếu hỗ trợ tự sinh Mã ticket duy nhất. |
-| BR-39 | Bắt buộc của phiếu: Khách hàng, Loại phiếu, Mức ưu tiên, Kênh tiếp nhận, Mô tả sự cố, KTV được chỉ định. Trạng thái và Ngày tạo do hệ thống gán. |
+| BR-39 | Bắt buộc của phiếu: Khách hàng, Loại phiếu, Mức ưu tiên, Kênh tiếp nhận, Mô tả sự cố, Người xử lý (chọn trong các Sales đang hoạt động). Trạng thái và Ngày tạo do hệ thống gán. |
 | BR-40 | Trạng thái phiếu: Mới tiếp nhận → Đang xử lý → Đã đóng; mặc định Mới tiếp nhận; lần đầu Đã đóng ghi thời điểm hoàn tất; mọi lần đổi ghi lịch sử. |
 | BR-41 | Ưu tiên: Thấp / Bình thường / Cao / Khẩn cấp. |
 | BR-42 | Mỗi phiếu có hạn SLA; quá hạn khi vượt mốc mà chưa Đã đóng. |
 | BR-43 | Cờ bảo hành bắt buộc, Có/Không, mặc định Có. |
 | BR-44 | **Không làm (đã chốt):** dòng thiết bị (Tên thiết bị, Serial, Lỗi/Ghi chú) gắn theo phiếu. Phiếu gắn với hợp đồng; lỗi ghi ở Mô tả/ghi chú. |
 | BR-45 | Cột danh sách phiếu: Mã, Loại, KH, Ưu tiên, Trạng thái, Người xử lý, Ngày tạo, Thao tác (mã HĐ chỉ ở chi tiết và Excel). |
-| BR-46 | Chi tiết phiếu gồm: Thông tin chung, Người tạo phiếu, KTV xử lý, Lịch sử xử lý. |
+| BR-46 | Chi tiết phiếu gồm: Thông tin chung, Người tạo phiếu, Người xử lý, Lịch sử xử lý. |
 | BR-47 | Xóa phiếu: hộp thoại xác nhận; không xóa phiếu Đang xử lý. |
 | BR-48 | Ảnh sản phẩm tùy chọn; nếu có thì lưu và liên kết với sản phẩm. |
 | BR-49 | Xóa sản phẩm bắt buộc có hộp thoại xác nhận. |
@@ -342,6 +346,8 @@ Nguồn chính thức là `db/schema.sql`; bảng dưới tổng hợp đầy đ
 | Khác (3) | `change_requests` (yêu cầu thay đổi của cấp dưới, UC-50/UC-51), `notifications`, `schema_migrations` (mỗi file trong `db/migrations/` khi áp dụng ghi một dòng) |
 
 Lưu ý: dùng **xóa mềm** (`is_deleted`) cho KH, sản phẩm, hợp đồng, phiếu, tài liệu hợp đồng, danh mục.
+
+Danh mục tổ chức (theo cơ cấu chi nhánh, xem 3.1): `roles` có ba vai **Admin, Sales, Tổng hợp**; `departments` có ba phòng **Ban giám đốc, Kinh doanh, Tổng hợp**.
 
 ---
 
@@ -464,7 +470,7 @@ Loại: **Nội tuyến** (inline), **Toast**, **Hộp thoại**. "(chuyển tra
 ## 11. Quyết định đã chốt
 
 ### Đã chốt (theo `rules.md` §1)
-1. **Không có vai trò CS.** Chỉ 3 vai trò: Admin, Sales, Kỹ thuật.
+1. **Ba vai trò: Admin, Sales, Tổng hợp; ba phòng: Ban giám đốc, Kinh doanh, Tổng hợp** (đổi 19/11/2026; trước đó là Admin, Sales, Kỹ thuật). Lý do: theo cơ cấu chi nhánh thật, khoảng 12 người: Ban giám đốc (Giám đốc, Phó giám đốc dùng tài khoản Admin), Phòng kinh doanh (4 người ngang nhau, không gán cấp trên), Phòng tổng hợp; **không có phòng Kỹ thuật**. Vì vậy bỏ vai Kỹ thuật, quản lý sản phẩm và xử lý phiếu hỗ trợ chuyển sang Sales; gộp phòng Kế toán và Dự án thành phòng Tổng hợp; thêm vai Tổng hợp (xem khách hàng, hợp đồng, sản phẩm; không vào phiếu hỗ trợ; xác nhận bàn giao; ghi nhận kỳ thanh toán đã thu). Vẫn **không có vai trò CS**. Việc kho, gọi xe, xuất-nhập kho của Phòng tổng hợp không làm (thuộc "Ngoài phạm vi" ở mục 1).
 2. **BR-44 không làm.** Phiếu gắn với hợp đồng; lỗi/thiết bị ghi ở Mô tả/ghi chú. Bỏ qua phần thiết bị trong mô tả UC-17/21/22.
 3. **Không làm BR-50, BR-51**, và không làm nhập/xuất PDF từng hợp đồng (UC-40 đã gỡ).
 4. **Mã NCC là `NCC-xxx`** (3 chữ số), mã KH là `KH-xxxx`.

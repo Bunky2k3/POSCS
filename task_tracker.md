@@ -43,6 +43,7 @@ Dòng task viết như các task bên dưới (`**Task X.X:** <Tên task>`), kè
 10. **Thời điểm chép thông tin GĐCN vào hợp đồng** (đề xuất lúc lập kế hoạch 19/11/2026): lúc tạo hợp đồng/phụ lục, và mỗi lần lưu khi hợp đồng còn **Nháp**, lấy GĐCN **hiện tại**. Từ **Đã ký** trở đi giữ nguyên; UC-54 (chữa sai sót) không đổi bốn ô này. Chưa khai GĐCN (**họ tên GĐCN còn trống**, kể cả dòng gieo sẵn chỉ có chức vụ; chốt thêm theo QA Task 8.1): tạo mới thì để trống **cả bốn ô**, bản Nháp đang có thì giữ giá trị cũ. Hợp đồng cũ trong CSDL **không chạy lại dữ liệu**.
 11. **Người phụ trách hợp đồng (chốt 19/11/2026):** lấy theo **người tạo**, không chọn tay nữa. Sales (quản lý vùng) tạo → là chính mình; **Admin tạo → vẫn chọn một Sales**; **phụ lục → theo người phụ trách hợp đồng gốc**. Sau khi tạo **khoá luôn**, kể cả khi đã ký (bỏ việc đổi người phụ trách ở trang Sửa). Người phụ trách khác người ký bên mình (GĐCN, mục 9).
 12. **SĐT, fax của GĐCN tối đa 20 ký tự** (chốt 19/11/2026 theo QA Task 8.1): khớp cột `varchar(20)` của Task 8.2 (`branch_info.phone`, `branch_info.fax`, `contracts.signer_phone`, `contracts.signer_fax`); đã ghi vào BR-57. Vượt thì báo MSG-015 (SĐT) / MSG-059 (fax).
+13. **Cơ cấu theo chi nhánh thật (Giai đoạn 9, chốt 19/11/2026):** chi nhánh khoảng 12 người: Ban giám đốc (GĐ, PGĐ dùng tài khoản Admin), Phòng kinh doanh (4 người ngang nhau, không gán cấp trên), Phòng tổng hợp. Không có phòng Kỹ thuật: **bỏ vai Kỹ thuật**, quản lý sản phẩm và xử lý phiếu hỗ trợ **chuyển sang Sales**. **Gộp phòng Kế toán và Dự án thành "Tổng hợp"**. Thêm **vai Tổng hợp**: xem khách hàng, hợp đồng, sản phẩm (không vào phiếu hỗ trợ); xác nhận bàn giao; "Ghi nhận đã thu" kỳ thanh toán (không lập, không xoá kỳ). Vẫn đủ ba vai: Admin, Sales, Tổng hợp. Việc kho, gọi xe, xuất-nhập kho của Phòng tổng hợp **không làm** (ngoài phạm vi).
 
 ## Quyết định còn chờ người dùng
 
@@ -334,3 +335,27 @@ Không còn mục nào.
   - Xong khi: hai trang hướng dẫn và docx mô tả đúng cách làm mới; docx có dòng Task 8.6 trong Lịch sử thay đổi.
   - Nhánh: `docs/task-8.6-guide-branch-signer-owner`.
   - Commit: `docs(guide): hướng dẫn thông tin chi nhánh, người ký bên mình và người phụ trách (Task 8.6)`
+
+---
+
+## Giai đoạn 9: Vai trò và phòng ban theo cơ cấu chi nhánh thật
+
+> Yêu cầu người dùng 19/11/2026, quyết định ở mục 13 "Quyết định đã chốt". Làm **sau Giai đoạn 8**, theo thứ tự 9.1 → 9.5. Bộ Project_Report (diagram đang có actor "Kỹ thuật") **không** nằm trong giai đoạn này; đó là việc tài liệu riêng.
+
+- [x] **Task 9.1:** Cập nhật `docs/SPEC.md` theo cơ cấu mới: ba vai Admin / Sales / Tổng hợp, ba phòng Ban giám đốc / Kinh doanh / Tổng hợp.
+  - UC: đổi tác nhân Kỹ thuật → Sales ở `UC-12`, `UC-13`, `UC-16` → `UC-23`, `UC-42`; phòng nhận là Tổng hợp ở `UC-48`, `UC-49`; thêm Tổng hợp vào `UC-53` (chỉ ghi nhận đã thu).
+  - BR / MSG / NFR: `BR-39` (ô "Kỹ thuật viên được chỉ định" thành "Người xử lý", chọn trong Sales); `MSG-022`.
+  - File sửa: `docs/SPEC.md`:
+    - §3.1: ba tác nhân Admin, Sales, Tổng hợp. Sales thêm quản lý sản phẩm và xử lý phiếu hỗ trợ. Tổng hợp: xem khách hàng, hợp đồng, sản phẩm; không vào phiếu hỗ trợ; xác nhận bàn giao cho phòng mình; ghi nhận kỳ thanh toán đã thu (không lập, không xoá kỳ). Khung "Đã chốt" đổi thành ba vai mới, ghi ngày đổi.
+    - §3.3: ma trận theo cột Admin / Sales / Tổng hợp.
+    - §4.3, §4.5: đổi tác nhân; §4.4: UC-49, UC-53 thêm Tổng hợp.
+    - §5.4 (bàn giao): phòng nhận là Tổng hợp. §5.5: "Kỹ thuật viên" thành "Người xử lý (Sales)".
+    - §7: ghi chú `roles` có ba vai, `departments` có ba phòng.
+    - §11 quyết định 1: đổi thành ba vai mới, nêu lý do (cơ cấu chi nhánh thật, 19/11/2026).
+  - File test: không có (chỉ tài liệu); chạy `ant test`.
+  - Không đụng: code, `db/`, `PERMISSIONS.md` (sửa cùng code ở Task 9.3, 9.4).
+  - Lưu ý: sau khi sửa, `grep -n "Kỹ thuật" docs/SPEC.md` chỉ còn chỗ nói lịch sử/quyết định cũ hoặc chữ "hỗ trợ kỹ thuật" trong tên phiếu; liệt kê các chỗ còn lại trong report.
+  - Xong khi: SPEC không còn giao việc nào cho vai Kỹ thuật; ma trận §3.3 có cột Tổng hợp.
+  - Nhánh: `docs/task-9.1-spec-co-cau-chi-nhanh`.
+  - Commit: `docs(spec): vai trò và phòng ban theo cơ cấu chi nhánh (Task 9.1)`
+  - *Đã hoàn thành:* `docs/SPEC.md`: §3.1 ba vai Admin / Sales / Tổng hợp kèm dòng Phòng ban, khung "Đã chốt" ghi ngày đổi; §3.3 ma trận cột Admin / Sales / Tổng hợp, tách dòng "Ghi nhận kỳ thanh toán đã thu"; §4.1–§4.6 đổi tác nhân (UC-48, UC-49 phòng Tổng hợp; UC-53 Tổng hợp chỉ ghi nhận đã thu); §5.4 thêm mục Bàn giao; §5.5, BR-39, BR-46 đổi thành "Người xử lý" (Sales), danh sách phiếu mở lần đầu mặc định "Tất cả"; §5.7, §5.8, §7; §11 quyết định 1. `grep "Kỹ thuật"` chỉ còn tên phiếu "hỗ trợ kỹ thuật" và câu ghi lịch sử (dòng 64, 473). `ant test` 2.071 test, 0 fail, 3 skipped. QA report tại `docs/qa/Task-9.1.md` (ĐẠT). `rules.md` §1 vẫn ghi vai Kỹ thuật (ngoài dòng "File sửa"), chưa sửa.
