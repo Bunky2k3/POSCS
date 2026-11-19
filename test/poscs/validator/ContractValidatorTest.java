@@ -969,4 +969,73 @@ public class ContractValidatorTest {
         ValidationResult vr = validator.validateUpdate(updated, existing, Set.of("Khách mua"));
         assertTrue(vr.isValid());
     }
+
+    // =========================================================================
+    // Task 8.4 - BR-56: SĐT, fax người ký bên mình (varchar(20), quyết định 12)
+    // =========================================================================
+
+    @Test
+    public void testValidateRequiredFields_signerPhoneAndFaxLength() {
+        Contract c = createValidContract();
+
+        // null / đúng 20 ký tự: hợp lệ
+        assertTrue(validator.validateRequiredFields(c).isValid());
+        c.setSignerPhone("(024) 3852 1234 - 11"); // 20 ký tự
+        c.setSignerFax("+84 24 3852 1234 -11"); // 20 ký tự
+        assertTrue(validator.validateRequiredFields(c).isValid());
+
+        // 21 ký tự: vi phạm, báo đúng ô
+        c.setSignerPhone("(024) 3852 1234 - 110");
+        ValidationResult vr = validator.validateRequiredFields(c);
+        assertFalse(vr.isValid());
+        assertEquals("Điện thoại người ký không được vượt quá 20 ký tự.", vr.getError("signerPhone"));
+        assertNull(vr.getError("signerFax"));
+
+        c.setSignerPhone("0233 3852 123");
+        c.setSignerFax("+84 24 3852 1234 -110");
+        vr = validator.validateRequiredFields(c);
+        assertFalse(vr.isValid());
+        assertEquals("Fax người ký không được vượt quá 20 ký tự.", vr.getError("signerFax"));
+        assertNull(vr.getError("signerPhone"));
+    }
+
+    @Test
+    public void testHasRestrictedFieldsChanged_signerPhoneAndFax() {
+        Contract existing = createValidContract();
+        existing.setSignerName("Nguyễn Văn An");
+        existing.setSignerPosition("Giám đốc chi nhánh");
+        existing.setSignerPhone("0233 3852 123");
+        existing.setSignerFax("0233 3852 124");
+
+        Contract same = createValidContract();
+        same.setSignerName("Nguyễn Văn An");
+        same.setSignerPosition("Giám đốc chi nhánh");
+        same.setSignerPhone("0233 3852 123");
+        same.setSignerFax("0233 3852 124");
+        assertFalse(validator.hasRestrictedFieldsChanged(same, existing));
+
+        same.setSignerPhone("0233 3852 999");
+        assertTrue(validator.hasRestrictedFieldsChanged(same, existing));
+
+        same.setSignerPhone("0233 3852 123");
+        same.setSignerFax(null);
+        assertTrue(validator.hasRestrictedFieldsChanged(same, existing));
+    }
+
+    @Test
+    public void testValidateUpdate_signedContractChangingSignerPhone_isRestricted() {
+        Contract existing = createValidContract();
+        existing.setProgressStatus(ContractValidator.PROGRESS_SIGNED);
+        existing.setSigningDate(Date.valueOf("2026-01-01"));
+        existing.setSignerPhone("0233 3852 123");
+
+        Contract updated = createValidContract();
+        updated.setProgressStatus(ContractValidator.PROGRESS_SIGNED);
+        updated.setSigningDate(existing.getSigningDate());
+        updated.setSignerPhone("0233 3852 999");
+
+        ValidationResult vr = validator.validateUpdate(updated, existing, Set.of("Khách mua"));
+        assertFalse(vr.isValid());
+        assertEquals(ContractValidator.MSG_SIGNED_EDIT_RESTRICTED, vr.getError(ValidationResult.GLOBAL_KEY));
+    }
 }

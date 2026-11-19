@@ -5,6 +5,8 @@
     Request attribute do ContractController#showCreateForm thiết lập trước khi forward tới trang này:
       - customerList : List<poscs.model.Enterprise> (toàn bộ khách hàng, để đổ dropdown "Khách hàng")
       - userList      : List<poscs.model.User>       (nhân viên vai Sales, để đổ dropdown "Người phụ trách")
+      - branchInfo    : poscs.model.BranchInfo        (thông tin GĐCN, người ký bên mình theo BR-56; có thể null)
+      - branchSignerMissing : Boolean                 (true khi họ tên GĐCN còn trống -> hiện MSG-060)
 
     Form này chỉ tạo bản ghi trong bảng contracts. Hạng mục sản phẩm/dịch vụ
     (contractproducts) được gắn ở trang quản lý hợp đồng (updatecontract.jsp,
@@ -237,18 +239,42 @@
                             Thông tin ký kết
                         </div>
                         <div style="font-size:0.78rem; color:#9ca3af; margin-top:2px;">
-                            Không bắt buộc — điền khi đã chốt được người ký. Khác đại diện pháp luật
-                            của công ty khách: có uỷ quyền thì hai người này khác nhau.
+                            Người ký bên mình là Giám đốc chi nhánh, hệ thống tự điền từ trang Thông tin
+                            chi nhánh, không sửa ở đây. Người ký bên đối tác không bắt buộc — điền khi đã
+                            chốt. Khác đại diện pháp luật của công ty khách: có uỷ quyền thì hai người này
+                            khác nhau.
                         </div>
                     </div>
+                    <%-- BR-56: bốn ô người ký bên mình CHỈ HIỂN THỊ. Ô disabled và không có
+                         name nên không gửi lên; server cũng không đọc chúng từ request mà
+                         chép GĐCN hiện tại lúc lưu. Chưa khai GĐCN thì để trống cả bốn ô
+                         (kể cả chức vụ gieo sẵn) và hiện MSG-060. --%>
+                    <c:if test="${branchSignerMissing}">
+                        <div class="col-12">
+                            <div class="alert alert-warning py-2 px-3 mb-2" style="font-size: 0.85rem; border-radius: 12px;">
+                                Chưa có thông tin Giám đốc chi nhánh. Admin khai tại trang Thông tin chi nhánh.
+                                <c:if test="${sessionScope.currentUser.role.roleName == 'Admin'}">
+                                    <a href="${pageContext.request.contextPath}/branch" class="alert-link">Mở trang Thông tin chi nhánh</a>
+                                </c:if>
+                            </div>
+                        </div>
+                    </c:if>
+                    <c:set var="branchSigner" value="${branchSignerMissing ? null : branchInfo}"/>
                     <div class="col-md-6 field-row">
-                        <label>Người ký bên mình</label>
-                        <input type="text" class="form-control" id="signerName" name="signerName" maxlength="100">
+                        <label for="signerName">Người ký bên mình</label>
+                        <input type="text" class="form-control" id="signerName" value="${fn:escapeXml(branchSigner.directorName)}" disabled>
                     </div>
                     <div class="col-md-6 field-row">
-                        <label>Chức vụ</label>
-                        <input type="text" class="form-control" id="signerPosition" name="signerPosition"
-                               maxlength="100" placeholder="VD: Giám đốc chi nhánh">
+                        <label for="signerPosition">Chức vụ</label>
+                        <input type="text" class="form-control" id="signerPosition" value="${fn:escapeXml(branchSigner.directorPosition)}" disabled>
+                    </div>
+                    <div class="col-md-6 field-row">
+                        <label for="signerPhone">Điện thoại</label>
+                        <input type="text" class="form-control" id="signerPhone" value="${fn:escapeXml(branchSigner.phone)}" disabled>
+                    </div>
+                    <div class="col-md-6 field-row">
+                        <label for="signerFax">Fax</label>
+                        <input type="text" class="form-control" id="signerFax" value="${fn:escapeXml(branchSigner.fax)}" disabled>
                     </div>
                     <div class="col-md-6 field-row">
                         <label>Người ký bên đối tác</label>

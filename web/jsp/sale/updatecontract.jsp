@@ -7,6 +7,8 @@
       - contract     : poscs.model.Contract (hợp đồng đang sửa)
       - customerList : List<poscs.model.Enterprise>
       - userList      : List<poscs.model.User>
+      - branchInfo    : poscs.model.BranchInfo (thông tin GĐCN, người ký bên mình theo BR-56; có thể null)
+      - branchSignerMissing : Boolean (true khi họ tên GĐCN còn trống -> bản Nháp hiện MSG-060)
 
     Form sửa ở đầu trang chỉ sửa bản ghi trong bảng contracts. Hạng mục sản
     phẩm/dịch vụ thêm/gỡ ở tab Hàng hoá bên dưới (form riêng, đứng ngoài form sửa).
@@ -336,18 +338,43 @@
                             Thông tin ký kết
                         </div>
                         <div style="font-size:0.78rem; color:#9ca3af; margin-top:2px;">
-                            Phải điền trước khi ký thì hồ sơ mới đủ. Khác đại diện pháp luật
-                            của công ty khách: có uỷ quyền thì hai người này khác nhau.
+                            Người ký bên mình là Giám đốc chi nhánh, hệ thống tự điền từ trang Thông tin
+                            chi nhánh: bản Nháp lấy thông tin mới nhất mỗi lần lưu, đã ký thì giữ nguyên.
+                            Người ký bên đối tác phải điền trước khi ký thì hồ sơ mới đủ. Khác đại diện
+                            pháp luật của công ty khách: có uỷ quyền thì hai người này khác nhau.
                         </div>
                     </div>
+                    <%-- BR-56: bốn ô người ký bên mình CHỈ HIỂN THỊ, kể cả ở chế độ chữa
+                         sai sót (không gắn data-term nên nút "Chữa sai sót" không mở chúng).
+                         Ô disabled và không có name nên không gửi lên. Bản Nháp hiện GĐCN
+                         hiện tại vì lưu là chép theo; đã ký, hoặc Nháp khi chưa khai GĐCN,
+                         hiện giá trị đang lưu trên hợp đồng (lưu Nháp lúc đó giữ nguyên). --%>
+                    <c:set var="useBranchSigner" value="${canEditTerms and not branchSignerMissing}"/>
+                    <c:if test="${canEditTerms and branchSignerMissing}">
+                        <div class="col-12">
+                            <div class="alert alert-warning py-2 px-3 mb-2" style="font-size: 0.85rem; border-radius: 12px;">
+                                Chưa có thông tin Giám đốc chi nhánh. Admin khai tại trang Thông tin chi nhánh.
+                                <c:if test="${sessionScope.currentUser.role.roleName == 'Admin'}">
+                                    <a href="${pageContext.request.contextPath}/branch" class="alert-link">Mở trang Thông tin chi nhánh</a>
+                                </c:if>
+                            </div>
+                        </div>
+                    </c:if>
                     <div class="col-md-3 field-row">
-                        <label>Người ký bên mình</label>
-                        <input type="text" class="form-control" id="signerName" name="signerName" maxlength="100" value="${fn:escapeXml(contract.signerName)}" ${canEditTerms ? '' : 'disabled'} data-term="1">
+                        <label for="signerName">Người ký bên mình</label>
+                        <input type="text" class="form-control" id="signerName" value="${fn:escapeXml(useBranchSigner ? branchInfo.directorName : contract.signerName)}" disabled>
                     </div>
                     <div class="col-md-3 field-row">
-                        <label>Chức vụ</label>
-                        <input type="text" class="form-control" id="signerPosition" name="signerPosition"
-                               maxlength="100" placeholder="VD: Giám đốc chi nhánh" value="${fn:escapeXml(contract.signerPosition)}" ${canEditTerms ? '' : 'disabled'} data-term="1">
+                        <label for="signerPosition">Chức vụ</label>
+                        <input type="text" class="form-control" id="signerPosition" value="${fn:escapeXml(useBranchSigner ? branchInfo.directorPosition : contract.signerPosition)}" disabled>
+                    </div>
+                    <div class="col-md-3 field-row">
+                        <label for="signerPhone">Điện thoại</label>
+                        <input type="text" class="form-control" id="signerPhone" value="${fn:escapeXml(useBranchSigner ? branchInfo.phone : contract.signerPhone)}" disabled>
+                    </div>
+                    <div class="col-md-3 field-row">
+                        <label for="signerFax">Fax</label>
+                        <input type="text" class="form-control" id="signerFax" value="${fn:escapeXml(useBranchSigner ? branchInfo.fax : contract.signerFax)}" disabled>
                     </div>
                     <div class="col-md-3 field-row">
                         <label>Người ký bên đối tác</label>

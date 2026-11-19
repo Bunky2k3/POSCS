@@ -22,6 +22,7 @@ import poscs.dao.DBContext;
 import poscs.dao.EmployeeDAO;
 import poscs.dao.JdbcStub;
 import poscs.dao.ProductDAO;
+import poscs.model.BranchInfo;
 import poscs.model.Contract;
 import poscs.model.ContractHistory;
 import poscs.model.ContractProduct;
@@ -47,6 +48,8 @@ public class ContractServiceTest {
     private PermissionService permissionService;
     private ContractValidator contractValidator;
     private ContractService service;
+    /** Nguồn người ký bên mình (BR-56, Task 8.4); mock để không chạm CSDL thật. */
+    private BranchInfoService branchInfoService;
 
     private User adminUser;
     private User salesManager;
@@ -86,6 +89,11 @@ public class ContractServiceTest {
         permissionService = new PermissionService(employeeDAO);
         contractValidator = new ContractValidator();
         service = new ContractService(contractDAO, customerDAO, productDAO, permissionService, contractValidator);
+        // Task 8.4: dựng lại service với nguồn GĐCN giả. Mặc định get() trả null
+        // (= chưa khai GĐCN), nên mọi test cũ chạy y như trước và không chạm CSDL.
+        branchInfoService = mock(BranchInfoService.class);
+        service = new ContractService(contractDAO, customerDAO, productDAO, permissionService, contractValidator,
+                branchInfoService);
     }
 
     // ==================================================================
@@ -1401,6 +1409,268 @@ public class ContractServiceTest {
             verify(conn).rollback();
             verify(conn, never()).commit();
         }
+    }
+
+    // ==================================================================
+    // Task 8.4 - BR-56: người ký bên mình lấy từ Thông tin chi nhánh
+    // ==================================================================
+
+    @Test
+    public void isBranchSignerDeclared_onlyWhenDirectorNameNotBlank() {
+        assertTrue(ContractService.isBranchSignerDeclared(branch("Nguyễn Văn An", null, null, null)));
+        assertFalse(ContractService.isBranchSignerDeclared(null));
+        assertFalse(ContractService.isBranchSignerDeclared(branch(null, "Giám đốc chi nhánh", null, null)));
+        assertFalse(ContractService.isBranchSignerDeclared(branch("", "Giám đốc chi nhánh", null, null)));
+        assertFalse(ContractService.isBranchSignerDeclared(branch("   ", "Giám đốc chi nhánh", "0233 3852 123", null)));
+    }
+
+    @Test
+    public void applyBranchSigner_declared_copiesAllFourTrimmedAndBlankAsNull() {
+        Contract c = new Contract();
+        c.setSignerName("Tự gõ");
+        c.setSignerPosition("Chức vụ tự gõ");
+        c.setSignerPhone("0900000000");
+        c.setSignerFax("0900000001");
+
+        boolean applied = ContractService.applyBranchSigner(c,
+                branch("  Nguyễn Văn An  ", " Giám đốc chi nhánh ", " (0233) 3852 123 ", "   "));
+
+        assertTrue(applied);
+        assertEquals("Nguyễn Văn An", c.getSignerName());
+        assertEquals("Giám đốc chi nhánh", c.getSignerPosition());
+        assertEquals("(0233) 3852 123", c.getSignerPhone());
+        assertNull(c.getSignerFax());
+    }
+
+    @Test
+    public void applyBranchSigner_notDeclared_leavesContractUntouched() {
+        Contract c = contractWithSigner("Lê Văn Cũ", "Phó giám đốc", "0233 111 222", "0233 111 333");
+
+        // Dòng gieo sẵn của V39: chỉ có chức vụ, họ tên trống -> KHÔNG chép riêng chức vụ.
+        assertFalse(ContractService.applyBranchSigner(c, branch(null, "Giám đốc chi nhánh", null, null)));
+        assertFalse(ContractService.applyBranchSigner(c, branch("  ", "Giám đốc chi nhánh", "0233 999", "0233 998")));
+        assertFalse(ContractService.applyBranchSigner(c, null));
+        assertFalse(ContractService.applyBranchSigner(null, branch("Nguyễn Văn An", "Giám đốc", null, null)));
+
+        assertSigner(c, "Lê Văn Cũ", "Phó giám đốc", "0233 111 222", "0233 111 333");
+    }
+
+    @Test
+    public void copyBranchSigner_copiesFromSourceAndClearsWhenSourceNull() {
+        Contract source = contractWithSigner("Lê Văn Cũ", "Phó giám đốc", "0233 111 222", "0233 111 333");
+        Contract target = contractWithSigner("Tự gõ", "Tự gõ", "1", "2");
+
+        ContractService.copyBranchSigner(target, source);
+        assertSigner(target, "Lê Văn Cũ", "Phó giám đốc", "0233 111 222", "0233 111 333");
+
+        ContractService.copyBranchSigner(target, null);
+        assertSigner(target, null, null, null, null);
+
+        ContractService.copyBranchSigner(null, source); // không ném lỗi
+    }
+
+    @Test
+    public void findBranchInfo_delegatesToBranchInfoService() {
+        BranchInfo info = branch("Nguyễn Văn An", "Giám đốc chi nhánh", null, null);
+        when(branchInfoService.get()).thenReturn(info);
+
+        assertSame(info, service.findBranchInfo());
+    }
+
+    @Test
+    public void createContract_takesCurrentDirectorAndIgnoresSubmittedSigner() {
+        when(branchInfoService.get()).thenReturn(
+                branch("Nguyễn Văn An", "Giám đốc chi nhánh", "0233 3852 123", "0233 3852 124"));
+        Contract c = validDraftSellContract("HD-BR56-01");
+        c.setSignerName("Tên tự gõ trên form");
+        c.setSignerPosition("Chức vụ tự gõ");
+
+        ServiceResult<Integer> res = service.createContract(c, salesManager);
+
+        assertTrue(res.isSuccess());
+        assertSigner(contractDAO.findById(res.getData()),
+                "Nguyễn Văn An", "Giám đốc chi nhánh", "0233 3852 123", "0233 3852 124");
+    }
+
+    @Test
+    public void createContract_directorNotDeclared_leavesAllFourBlank() {
+        // Dòng gieo sẵn: chỉ có chức vụ. Tạo mới để trống CẢ BỐN ô, kể cả chức vụ.
+        when(branchInfoService.get()).thenReturn(branch(null, "Giám đốc chi nhánh", "0233 3852 123", null));
+        Contract c = validDraftSellContract("HD-BR56-02");
+        c.setSignerName("Tên tự gõ trên form");
+        c.setSignerPosition("Chức vụ tự gõ");
+        c.setSignerPhone("0900000000");
+        c.setSignerFax("0900000001");
+
+        ServiceResult<Integer> res = service.createContract(c, salesManager);
+
+        assertTrue(res.isSuccess());
+        assertSigner(contractDAO.findById(res.getData()), null, null, null, null);
+    }
+
+    @Test
+    public void createContract_branchInfoUnreadable_leavesAllFourBlank() {
+        when(branchInfoService.get()).thenReturn(null);
+        Contract c = validDraftSellContract("HD-BR56-03");
+        c.setSignerName("Tên tự gõ trên form");
+
+        ServiceResult<Integer> res = service.createContract(c, salesManager);
+
+        assertTrue(res.isSuccess());
+        assertSigner(contractDAO.findById(res.getData()), null, null, null, null);
+    }
+
+    @Test
+    public void createContract_forbidden_doesNotReadBranchInfo() {
+        ServiceResult<Integer> res = service.createContract(validDraftSellContract("HD-BR56-04"), techUser);
+
+        assertEquals(PermissionService.MSG_022, res.getMessage());
+        verify(branchInfoService, never()).get();
+    }
+
+    @Test
+    public void createAmendment_takesCurrentDirectorNotParentSigner() {
+        Contract parent = signedParentContract(10, "HD-PARENT-BR56", new BigDecimal("100000000"));
+        parent.setSignerName("GĐCN cũ");
+        parent.setSignerPosition("Giám đốc chi nhánh");
+        parent.setSignerPhone("0233 000 000");
+        contractDAO.putContract(parent);
+        when(branchInfoService.get()).thenReturn(
+                branch("Trần Thị Bình", "Giám đốc chi nhánh", "0233 3852 555", null));
+        Contract amendment = validDraftSellContract("PL-BR56-01");
+        amendment.setSignerName("Tên tự gõ");
+
+        ServiceResult<Integer> res = service.createAmendment(10, amendment, salesManager);
+
+        assertTrue(res.isSuccess());
+        assertSigner(contractDAO.findById(res.getData()), "Trần Thị Bình", "Giám đốc chi nhánh", "0233 3852 555", null);
+    }
+
+    @Test
+    public void createAmendment_directorNotDeclared_leavesAllFourBlank() {
+        Contract parent = signedParentContract(10, "HD-PARENT-BR56-2", new BigDecimal("100000000"));
+        parent.setSignerName("GĐCN cũ");
+        contractDAO.putContract(parent);
+        when(branchInfoService.get()).thenReturn(branch("", "Giám đốc chi nhánh", null, null));
+        Contract amendment = validDraftSellContract("PL-BR56-02");
+        amendment.setSignerName("Tên tự gõ");
+
+        ServiceResult<Integer> res = service.createAmendment(10, amendment, salesManager);
+
+        assertTrue(res.isSuccess());
+        assertSigner(contractDAO.findById(res.getData()), null, null, null, null);
+    }
+
+    @Test
+    public void updateContract_draft_takesCurrentDirector() {
+        Contract existing = draftWithSigner(70, "HD-BR56-70", "GĐCN cũ", "Giám đốc chi nhánh", "0233 000 000", "0233 000 001");
+        contractDAO.putContract(existing);
+        when(branchInfoService.get()).thenReturn(
+                branch("Trần Thị Bình", "Giám đốc chi nhánh", "0233 3852 555", "0233 3852 556"));
+        Contract edited = validDraftSellContract("HD-BR56-70");
+        edited.setContractId(70);
+        edited.setSignerName("Tên tự gõ");
+
+        ServiceResult<Void> res = service.updateContract(edited, salesManager);
+
+        assertTrue(res.isSuccess());
+        assertSigner(contractDAO.findById(70), "Trần Thị Bình", "Giám đốc chi nhánh", "0233 3852 555", "0233 3852 556");
+    }
+
+    @Test
+    public void updateContract_draft_directorNotDeclared_keepsStoredValues() {
+        Contract existing = draftWithSigner(71, "HD-BR56-71", "GĐCN cũ", "Giám đốc chi nhánh", "0233 000 000", "0233 000 001");
+        contractDAO.putContract(existing);
+        // Admin xoá trắng họ tên GĐCN: bản Nháp giữ giá trị đang có, không chép chức vụ gieo sẵn.
+        when(branchInfoService.get()).thenReturn(branch(null, "Giám đốc chi nhánh", "0233 9", null));
+        Contract edited = validDraftSellContract("HD-BR56-71");
+        edited.setContractId(71);
+        edited.setSignerName("Tên tự gõ");
+        edited.setSignerFax(null);
+
+        ServiceResult<Void> res = service.updateContract(edited, salesManager);
+
+        assertTrue(res.isSuccess());
+        assertSigner(contractDAO.findById(71), "GĐCN cũ", "Giám đốc chi nhánh", "0233 000 000", "0233 000 001");
+    }
+
+    @Test
+    public void updateContract_signed_keepsStoredSignerAndDoesNotReadBranchInfo() {
+        Contract signed = signedParentContract(72, "HD-BR56-72", new BigDecimal("100000000"));
+        signed.setSignerName("GĐCN lúc ký");
+        signed.setSignerPosition("Giám đốc chi nhánh");
+        signed.setSignerPhone("0233 000 000");
+        signed.setSignerFax("0233 000 001");
+        contractDAO.putContract(signed);
+        when(branchInfoService.get()).thenReturn(branch("GĐCN mới", "Giám đốc chi nhánh", "0233 9", "0233 8"));
+
+        // Form đã ký không gửi bốn ô người ký: chỉ đổi người phụ trách là phải qua được.
+        Contract edited = signedParentContract(72, "HD-BR56-72", new BigDecimal("100000000"));
+        edited.setOwnerId(3);
+        ServiceResult<Void> res = service.updateContract(edited, adminUser);
+
+        assertTrue(res.isSuccess());
+        assertSigner(edited, "GĐCN lúc ký", "Giám đốc chi nhánh", "0233 000 000", "0233 000 001");
+        assertSigner(contractDAO.findById(72), "GĐCN lúc ký", "Giám đốc chi nhánh", "0233 000 000", "0233 000 001");
+        verify(branchInfoService, never()).get();
+    }
+
+    @Test
+    public void correctSignedContract_keepsStoredSignerEvenWhenSubmittedOrBranchDiffers() {
+        Contract signed = signedParentContract(73, "HD-BR56-73", new BigDecimal("100000000"));
+        signed.setSignerName("GĐCN lúc ký");
+        signed.setSignerPosition("Giám đốc chi nhánh");
+        signed.setSignerPhone("0233 000 000");
+        signed.setSignerFax(null);
+        contractDAO.putContract(signed);
+        when(branchInfoService.get()).thenReturn(branch("GĐCN mới", "Giám đốc chi nhánh", "0233 9", "0233 8"));
+
+        Contract edited = signedParentContract(73, "HD-BR56-73-FIX", new BigDecimal("100000000"));
+        edited.setSignerName("Tên tự gõ");
+        edited.setSignerPhone("0999");
+        edited.setSignerFax("0998");
+        ServiceResult<Void> res = service.correctSignedContract(edited, adminUser, "Gõ nhầm mã");
+
+        assertTrue(res.isSuccess());
+        assertSigner(contractDAO.findById(73), "GĐCN lúc ký", "Giám đốc chi nhánh", "0233 000 000", null);
+        verify(branchInfoService, never()).get();
+    }
+
+    private static BranchInfo branch(String name, String position, String phone, String fax) {
+        BranchInfo b = new BranchInfo();
+        b.setDirectorName(name);
+        b.setDirectorPosition(position);
+        b.setPhone(phone);
+        b.setFax(fax);
+        return b;
+    }
+
+    private static Contract contractWithSigner(String name, String position, String phone, String fax) {
+        Contract c = new Contract();
+        c.setSignerName(name);
+        c.setSignerPosition(position);
+        c.setSignerPhone(phone);
+        c.setSignerFax(fax);
+        return c;
+    }
+
+    private Contract draftWithSigner(int id, String code, String name, String position, String phone, String fax) {
+        Contract c = validDraftSellContract(code);
+        c.setContractId(id);
+        c.setProgressStatus(ContractService.PROGRESS_DRAFT);
+        c.setSignerName(name);
+        c.setSignerPosition(position);
+        c.setSignerPhone(phone);
+        c.setSignerFax(fax);
+        return c;
+    }
+
+    private static void assertSigner(Contract c, String name, String position, String phone, String fax) {
+        assertNotNull(c);
+        assertEquals(name, c.getSignerName());
+        assertEquals(position, c.getSignerPosition());
+        assertEquals(phone, c.getSignerPhone());
+        assertEquals(fax, c.getSignerFax());
     }
 
     // ==================================================================

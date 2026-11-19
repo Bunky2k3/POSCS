@@ -275,7 +275,7 @@ Không còn mục nào.
   - Nhánh: `feat/task-8.3-branch-info-page`.
   - Commit: `feat(branch): trang Thông tin chi nhánh cho Admin (Task 8.3)`
   - *Đã hoàn thành:* `src/java/poscs/validator/BranchInfoValidator.java` (mới: BR-57, trim trước khi kiểm, lỗi theo từng ô, MSG-058/MSG-015/MSG-059); `src/java/poscs/service/BranchInfoService.java` (mới: `get()`, `findUpdaterName()`, `update(info, actor)` kiểm lại Admin qua `PermissionService.isAdmin`, dữ liệu sai không gọi DAO, lưu xong trả MSG-057); `src/java/poscs/controller/BranchInfoController.java` (mới, `/branch`: `AccessControl.requireAdmin` ở đầu `doGet`/`doPost`, lưu xong redirect `saved=1`, lỗi kiểm tra hiện lại form giữ dữ liệu, không đọc được bản ghi thì MSG-018); `web/jsp/admin/branchInfo.jsp` (mới); `web/jsp/common/sidebar.jsp` (mục "Thông tin chi nhánh" dưới "Nhân viên", chỉ Admin); `PERMISSIONS.md`; `docs/ARCHITECTURE.md`. Test: `BranchInfoValidatorTest` 21, `BranchInfoServiceTest` 15, `BranchInfoControllerTest` 14; `ant test` 2.028 test, 0 fail, 3 skipped; `compile-jsps` pass. **Chưa thử trên Tomcat**: `poscs_db` chưa chạy V39 nên `/branch` sẽ báo MSG-018 tới khi chạy V39. QA report tại `docs/qa/Task-8.3.md`.
-- [ ] **Task 8.4:** Form hợp đồng lấy người ký bên mình từ Thông tin chi nhánh (khoá ô, thêm SĐT và fax).
+- [x] **Task 8.4:** Form hợp đồng lấy người ký bên mình từ Thông tin chi nhánh (khoá ô, thêm SĐT và fax).
   - UC: `UC-33`, `UC-35`, `UC-46`, `UC-54`, `UC-11`.
   - BR / MSG / NFR: `BR-56`, `MSG-060`.
   - File sửa:
@@ -292,6 +292,7 @@ Không còn mục nào.
   - Xong khi: tạo hợp đồng mới thấy 4 ô đã điền sẵn GĐCN, không gõ được; lưu xong trang chi tiết hiện đủ 4 thông tin; Admin đổi GĐCN thì bản Nháp lưu lại sẽ đổi theo, hợp đồng đã ký giữ nguyên.
   - Nhánh: `feat/task-8.4-contract-branch-signer`.
   - Commit: `feat(contract): người ký bên mình lấy từ thông tin chi nhánh (Task 8.4)`
+  - *Đã hoàn thành:* `ContractDAO` thêm `signer_phone`, `signer_fax` vào INSERT/UPDATE/SELECT (chỉ số tham số phía sau dịch theo `SIGNING_PARTY_COLUMNS = 9`), nhật ký ghi thay đổi SĐT/fax, `withTermsFrom` và `correct` giữ 4 ô đang lưu; `ContractService` thêm `applyBranchSigner`, `copyBranchSigner`, `isBranchSignerDeclared`, `findBranchInfo` và constructor 6 tham số nhận `BranchInfoService`; `ContractController` và `ContractControllerHelper` (hàm mới `putBranchSigner`) thôi đọc người ký bên mình từ request, set `branchInfo`/`branchSignerMissing` cho form; `ContractActionController` (ngoài dòng "File sửa", người dùng đồng ý) gọi `putBranchSigner` ở 3 form; `ContractValidator` giới hạn 20 ký tự SĐT/fax, `hasRestrictedFieldsChanged` so thêm hai ô; `addnewcontract.jsp`, `updatecontract.jsp` 4 ô chỉ đọc + MSG-060, `viewcontractdetail.jsp` hiện SĐT/fax. Test: +43 test ở 5 lớp; `ant test` 2.071 test, 0 fail, 3 skipped; 3 JSP dịch qua Jasper của Tomcat 11 không lỗi (`compile-jsps` của dự án không dịch JSP). QA report tại `docs/qa/Task-8.4.md`.
 - [ ] **Task 8.5:** Người phụ trách hợp đồng lấy theo người tạo, không đổi được sau khi tạo.
   - UC: `UC-33`, `UC-35`, `UC-46`, `UC-54`.
   - BR / MSG / NFR: sửa `BR-35`; dùng lại `MSG_OWNER_REQUIRED`, `MSG_CANNOT_EDIT_LOCKED` đã có trong `ContractValidator`; không thêm MSG mới.

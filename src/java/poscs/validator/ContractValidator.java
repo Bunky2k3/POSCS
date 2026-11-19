@@ -33,6 +33,9 @@ public class ContractValidator extends BaseValidator {
     public static final int MAX_CONTRACT_TYPE_LENGTH = 100;
     public static final int MAX_SIGNER_NAME_LENGTH = 100;
     public static final int MAX_SIGNER_POSITION_LENGTH = 100;
+    /** BR-57 (quyết định 12): khớp cột varchar(20) contracts.signer_phone / signer_fax (V39). */
+    public static final int MAX_SIGNER_PHONE_LENGTH = 20;
+    public static final int MAX_SIGNER_FAX_LENGTH = 20;
     public static final int MAX_COUNTERPARTY_SIGNER_NAME_LENGTH = 100;
     public static final int MAX_COUNTERPARTY_SIGNER_POSITION_LENGTH = 100;
     public static final int MAX_AUTHORIZATION_REF_LENGTH = 255;
@@ -255,10 +258,25 @@ public class ContractValidator extends BaseValidator {
             result.addError(FIELD_CONTRACT_TYPE, MSG_TYPE_REQUIRED);
         }
 
+        validateSigningPartyLengths(result, c);
+
+        // Giá trị hợp đồng: không âm đối với hợp đồng gốc (phụ lục được phép mang giá trị âm khi giảm trừ)
+        if (c.getContractValue() != null && !c.isAmendment()) {
+            nonNegative(result, FIELD_CONTRACT_VALUE, c.getContractValue(), "Giá trị hợp đồng không được là số âm.");
+        }
+        return result;
+    }
+
+    /** Độ dài các ô thông tin ký kết, khớp cột của bảng contracts. */
+    private void validateSigningPartyLengths(ValidationResult result, Contract c) {
         maxLength(result, "signerName", c.getSignerName(), MAX_SIGNER_NAME_LENGTH,
                 "Tên người ký không được vượt quá " + MAX_SIGNER_NAME_LENGTH + " ký tự.");
         maxLength(result, "signerPosition", c.getSignerPosition(), MAX_SIGNER_POSITION_LENGTH,
                 "Chức vụ người ký không được vượt quá " + MAX_SIGNER_POSITION_LENGTH + " ký tự.");
+        maxLength(result, "signerPhone", c.getSignerPhone(), MAX_SIGNER_PHONE_LENGTH,
+                "Điện thoại người ký không được vượt quá " + MAX_SIGNER_PHONE_LENGTH + " ký tự.");
+        maxLength(result, "signerFax", c.getSignerFax(), MAX_SIGNER_FAX_LENGTH,
+                "Fax người ký không được vượt quá " + MAX_SIGNER_FAX_LENGTH + " ký tự.");
         maxLength(result, "counterpartySignerName", c.getCounterpartySignerName(), MAX_COUNTERPARTY_SIGNER_NAME_LENGTH,
                 "Tên người ký đối tác không được vượt quá " + MAX_COUNTERPARTY_SIGNER_NAME_LENGTH + " ký tự.");
         maxLength(result, "counterpartySignerPosition", c.getCounterpartySignerPosition(), MAX_COUNTERPARTY_SIGNER_POSITION_LENGTH,
@@ -267,12 +285,6 @@ public class ContractValidator extends BaseValidator {
                 "Số ủy quyền không được vượt quá " + MAX_AUTHORIZATION_REF_LENGTH + " ký tự.");
         maxLength(result, "signingPlace", c.getSigningPlace(), MAX_SIGNING_PLACE_LENGTH,
                 "Nơi ký không được vượt quá " + MAX_SIGNING_PLACE_LENGTH + " ký tự.");
-
-        // Giá trị hợp đồng: không âm đối với hợp đồng gốc (phụ lục được phép mang giá trị âm khi giảm trừ)
-        if (c.getContractValue() != null && !c.isAmendment()) {
-            nonNegative(result, FIELD_CONTRACT_VALUE, c.getContractValue(), "Giá trị hợp đồng không được là số âm.");
-        }
-        return result;
     }
 
     // UC-33: Kiểm tra khi tạo hợp đồng
@@ -359,6 +371,8 @@ public class ContractValidator extends BaseValidator {
                 || !isSameBigDecimal(c.getContractValue(), existing.getContractValue())
                 || !isSameString(c.getSignerName(), existing.getSignerName())
                 || !isSameString(c.getSignerPosition(), existing.getSignerPosition())
+                || !isSameString(c.getSignerPhone(), existing.getSignerPhone())
+                || !isSameString(c.getSignerFax(), existing.getSignerFax())
                 || !isSameString(c.getCounterpartySignerName(), existing.getCounterpartySignerName())
                 || !isSameString(c.getCounterpartySignerPosition(), existing.getCounterpartySignerPosition())
                 || !isSameString(c.getAuthorizationRef(), existing.getAuthorizationRef())

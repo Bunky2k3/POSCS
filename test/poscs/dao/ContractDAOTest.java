@@ -2760,6 +2760,223 @@ public class ContractDAOTest {
             verify(psDept).setInt(1, 3);
         }
     }
+
+    // ==================================================================
+    // Task 8.4 - BR-56: SĐT, fax người ký bên mình (contracts.signer_phone/signer_fax, V39)
+    // ==================================================================
+
+    private static long placeholders(String sql) {
+        return sql.chars().filter(ch -> ch == '?').count();
+    }
+
+    private static void setSigningParties(Contract c) {
+        c.setSignerName("Nguyễn Văn An");
+        c.setSignerPosition("Giám đốc chi nhánh");
+        c.setSignerPhone("0233 3852 123");
+        c.setSignerFax("0233 3852 124");
+        c.setCounterpartySignerName("Trần Văn Bình");
+        c.setCounterpartySignerPosition("Giám đốc");
+        c.setAuthorizationRef("GUQ số 05/2026");
+        c.setSigningPlace("Đông Hà");
+    }
+
+    /** INSERT: SĐT, fax đứng ngay sau chức vụ; mọi tham số phía sau dịch thêm 2 (parent_contract_id thành 21). */
+    @Test
+    public void insert_bindsSignerPhoneAndFaxAfterSignerPositionAndShiftsLaterParams() throws Exception {
+        ResultSet keys = singleRow(row("id", 1));
+        PreparedStatement ps = mock(PreparedStatement.class);
+        when(ps.executeUpdate()).thenReturn(1);
+        when(ps.getGeneratedKeys()).thenReturn(keys);
+        Connection conn = connectionReturning(ps);
+        Contract c = contract("HD-0001");
+        setSigningParties(c);
+        c.setContractValue(new BigDecimal("1250000000"));
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            assertEquals(1, dao.insert(c, ACTOR));
+
+            ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+            verify(conn).prepareStatement(sql.capture(), eq(Statement.RETURN_GENERATED_KEYS));
+            assertTrue(sql.getValue().contains("signer_name, signer_position, signer_phone, signer_fax,"));
+            assertEquals(21, placeholders(sql.getValue()));
+            verify(ps).setString(12, "Nguyễn Văn An");
+            verify(ps).setString(13, "Giám đốc chi nhánh");
+            verify(ps).setString(14, "0233 3852 123");
+            verify(ps).setString(15, "0233 3852 124");
+            verify(ps).setString(16, "Trần Văn Bình");
+            verify(ps).setString(17, "Giám đốc");
+            verify(ps).setString(18, "GUQ số 05/2026");
+            verify(ps).setString(19, "Đông Hà");
+            verify(ps).setBigDecimal(20, new BigDecimal("1250000000"));
+            verify(ps).setObject(21, null, java.sql.Types.INTEGER);
+        }
+    }
+
+    /** UPDATE bản Nháp: hai cột mới sau chức vụ, contract_id dịch từ 17 lên 19. */
+    @Test
+    public void update_draftContract_bindsSignerPhoneAndFaxAndShiftsContractIdParam() throws Exception {
+        ResultSet current = singleRow(parentRow(ContractDAO.PROGRESS_DRAFT, null));
+        PreparedStatement historyPs = mock(PreparedStatement.class);
+        PreparedStatement contractPs = mock(PreparedStatement.class);
+        when(contractPs.executeQuery()).thenReturn(current);
+        when(contractPs.executeUpdate()).thenReturn(1);
+        Connection conn = connectionRoutingOn("contract_history", historyPs, contractPs);
+        Contract submitted = resubmitted(new BigDecimal("1500000000"));
+        setSigningParties(submitted);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            assertTrue(dao.update(submitted, ACTOR));
+
+            ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+            verify(conn, atLeastOnce()).prepareStatement(sql.capture());
+            String updateSql = sql.getAllValues().stream()
+                    .filter(q -> q.startsWith("UPDATE contracts SET"))
+                    .findFirst().orElse("");
+            assertTrue(updateSql.contains("signer_position = ?, signer_phone = ?, signer_fax = ?, "));
+            assertEquals(19, placeholders(updateSql));
+            verify(contractPs).setString(10, "Nguyễn Văn An");
+            verify(contractPs).setString(11, "Giám đốc chi nhánh");
+            verify(contractPs).setString(12, "0233 3852 123");
+            verify(contractPs).setString(13, "0233 3852 124");
+            verify(contractPs).setString(14, "Trần Văn Bình");
+            verify(contractPs).setString(17, "Đông Hà");
+            verify(contractPs).setBigDecimal(18, new BigDecimal("1500000000"));
+            verify(contractPs).setInt(19, 3);
+        }
+    }
+
+    /** Nhật ký sửa bản Nháp ghi cả thay đổi SĐT, fax người ký bên mình. */
+    @Test
+    public void update_draftContract_logsSignerPhoneAndFaxChanges() throws Exception {
+        java.util.Map<String, Object> before = parentRow(ContractDAO.PROGRESS_DRAFT, null);
+        before.put("signer_phone", "0233 3852 111");
+        before.put("signer_fax", "0233 3852 112");
+        ResultSet current = singleRow(before);
+        PreparedStatement historyPs = mock(PreparedStatement.class);
+        PreparedStatement contractPs = mock(PreparedStatement.class);
+        when(contractPs.executeQuery()).thenReturn(current);
+        when(contractPs.executeUpdate()).thenReturn(1);
+        Connection conn = connectionRoutingOn("contract_history", historyPs, contractPs);
+        Contract submitted = resubmitted(null);
+        submitted.setSignerPhone("0233 3852 999");
+        submitted.setSignerFax(null);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            assertTrue(dao.update(submitted, ACTOR));
+
+            ArgumentCaptor<String> detail = ArgumentCaptor.forClass(String.class);
+            verify(historyPs).setString(eq(3), detail.capture());
+            assertEquals("Điện thoại người ký bên mình: 0233 3852 111 → 0233 3852 999; "
+                    + "Fax người ký bên mình: 0233 3852 112 → (trống)", detail.getValue());
+        }
+    }
+
+    /**
+     * Đã ký: withTermsFrom giữ cả bốn ô người ký bên mình từ CSDL. Không giữ
+     * thì so với bản ghi cũ sẽ sinh dòng nhật ký về một thay đổi không xảy ra.
+     */
+    @Test
+    public void update_signedContract_keepsStoredSignerPhoneAndFax() throws Exception {
+        java.util.Map<String, Object> before = parentRow(ContractDAO.PROGRESS_SIGNED, null);
+        before.put("signer_name", "GĐCN lúc ký");
+        before.put("signer_position", "Giám đốc chi nhánh");
+        before.put("signer_phone", "0233 3852 111");
+        before.put("signer_fax", "0233 3852 112");
+        ResultSet current = singleRow(before);
+        PreparedStatement historyPs = mock(PreparedStatement.class);
+        PreparedStatement contractPs = mock(PreparedStatement.class);
+        when(contractPs.executeQuery()).thenReturn(current);
+        when(contractPs.executeUpdate()).thenReturn(1);
+        Connection conn = connectionRoutingOn("contract_history", historyPs, contractPs);
+
+        Contract submitted = new Contract();
+        submitted.setContractId(3);
+        submitted.setOwnerId(5); // không đổi người phụ trách
+        submitted.setSignerName("GĐCN mới");
+        submitted.setSignerPhone("0999 999 999");
+        submitted.setSignerFax(null);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            assertTrue(dao.update(submitted, ACTOR));
+
+            verify(contractPs, never()).setString(anyInt(), eq("0999 999 999"));
+            verify(historyPs, never()).executeUpdate();
+            verify(conn).commit();
+        }
+    }
+
+    /** UC-54 không đổi bốn ô người ký bên mình: DAO lấy lại từ dòng đang khoá, bỏ giá trị bên gọi truyền. */
+    @Test
+    public void correct_keepsStoredBranchSignerFromLockedRow() throws Exception {
+        java.util.Map<String, Object> before = parentRow(ContractDAO.PROGRESS_SIGNED, null);
+        before.put("signer_name", "GĐCN lúc ký");
+        before.put("signer_position", "Giám đốc chi nhánh");
+        before.put("signer_phone", "0233 3852 111");
+        before.put("signer_fax", "0233 3852 112");
+        ResultSet current = singleRow(before);
+        PreparedStatement historyPs = mock(PreparedStatement.class);
+        PreparedStatement contractPs = mock(PreparedStatement.class);
+        when(contractPs.executeQuery()).thenReturn(current);
+        when(contractPs.executeUpdate()).thenReturn(1);
+        Connection conn = connectionRoutingOn("contract_history", historyPs, contractPs);
+
+        Contract c = new Contract();
+        c.setContractId(5);
+        c.setContractCode("02/2026/HĐKT-POSTEF");
+        c.setTitle("Hợp đồng gốc");
+        c.setContractType("Mua vật tư");
+        c.setEnterpriseId(12);
+        c.setOwnerId(5);
+        c.setSignerName("Tên tự gõ");
+        c.setSignerPosition("Chức vụ tự gõ");
+        c.setSignerPhone("0999 999 999");
+        c.setSignerFax("0999 999 998");
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            assertTrue(dao.correct(c, ACTOR, "Gõ nhầm mã"));
+
+            verify(contractPs).setString(10, "GĐCN lúc ký");
+            verify(contractPs).setString(11, "Giám đốc chi nhánh");
+            verify(contractPs).setString(12, "0233 3852 111");
+            verify(contractPs).setString(13, "0233 3852 112");
+            verify(contractPs).setInt(19, 5);
+            ArgumentCaptor<String> detail = ArgumentCaptor.forClass(String.class);
+            verify(historyPs).setString(eq(3), detail.capture());
+            assertFalse(detail.getValue().contains("người ký bên mình"));
+        }
+    }
+
+    @Test
+    public void findById_mapsSignerPhoneAndFax() throws Exception {
+        java.util.Map<String, Object> r = buyContractRow("Mua");
+        r.put("signer_name", "Nguyễn Văn An");
+        r.put("signer_phone", "0233 3852 123");
+        r.put("signer_fax", "0233 3852 124");
+        PreparedStatement ps = statementReturning(singleRow(r));
+        Connection conn = mock(Connection.class);
+        ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+        when(conn.prepareStatement(sql.capture())).thenReturn(ps);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            Contract c = dao.findById(7);
+
+            assertTrue(sql.getValue().contains("c.signer_phone, c.signer_fax"));
+            assertEquals("0233 3852 123", c.getSignerPhone());
+            assertEquals("0233 3852 124", c.getSignerFax());
+        }
+    }
 }
 
 

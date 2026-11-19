@@ -9,11 +9,13 @@ import java.util.Map;
 import poscs.dao.ContractDAO;
 import poscs.dao.CustomerDAO;
 import poscs.dao.ProductDAO;
+import poscs.model.BranchInfo;
 import poscs.model.Contract;
 import poscs.model.ContractHistory;
 import poscs.model.ContractProduct;
 import poscs.model.Product;
 import poscs.model.User;
+import poscs.validator.BranchInfoValidator;
 import poscs.validator.ContractValidator;
 import poscs.validator.ValidationResult;
 
@@ -74,6 +76,8 @@ public class ContractService extends BaseService {
     private final ProductDAO productDAO;
     private final PermissionService permissionService;
     private final ContractValidator contractValidator;
+    /** Nguồn người ký bên mình (BR-56): thông tin Giám đốc chi nhánh, UC-55. */
+    private final BranchInfoService branchInfoService;
 
     public ContractService() {
         this(new ContractDAO(), new CustomerDAO(), new ProductDAO(),
@@ -86,11 +90,18 @@ public class ContractService extends BaseService {
 
     public ContractService(ContractDAO contractDAO, CustomerDAO customerDAO, ProductDAO productDAO,
                            PermissionService permissionService, ContractValidator contractValidator) {
+        this(contractDAO, customerDAO, productDAO, permissionService, contractValidator, null);
+    }
+
+    public ContractService(ContractDAO contractDAO, CustomerDAO customerDAO, ProductDAO productDAO,
+                           PermissionService permissionService, ContractValidator contractValidator,
+                           BranchInfoService branchInfoService) {
         this.contractDAO = contractDAO != null ? contractDAO : new ContractDAO();
         this.customerDAO = customerDAO != null ? customerDAO : new CustomerDAO();
         this.productDAO = productDAO != null ? productDAO : new ProductDAO();
         this.permissionService = permissionService != null ? permissionService : new PermissionService();
         this.contractValidator = contractValidator != null ? contractValidator : new ContractValidator();
+        this.branchInfoService = branchInfoService != null ? branchInfoService : new BranchInfoService();
     }
 
     // ------------------------------------------------------------------
@@ -158,6 +169,76 @@ public class ContractService extends BaseService {
     }
 
     // ------------------------------------------------------------------
+    // BR-56: Người ký bên mình lấy từ Thông tin chi nhánh
+    // ------------------------------------------------------------------
+
+    /**
+     * Đã khai GĐCN chưa (BR-56): họ tên GĐCN còn trống sau khi trim là CHƯA,
+     * kể cả dòng gieo sẵn của V39 chỉ có chức vụ.
+     */
+    public static boolean isBranchSignerDeclared(BranchInfo branchInfo) {
+        return branchInfo != null && BranchInfoValidator.trimToNull(branchInfo.getDirectorName()) != null;
+    }
+
+    /**
+     * BR-56: chép họ tên, chức vụ, SĐT, fax của GĐCN hiện tại vào hợp đồng.
+     *
+     * <p>Chưa khai GĐCN (xem {@link #isBranchSignerDeclared}) thì KHÔNG đụng
+     * gì tới bốn ô của {@code contract}: bên gọi quyết định giá trị lúc đó (tạo
+     * mới thì để trống cả bốn, bản Nháp thì giữ giá trị đang có). Không chép
+     * riêng chức vụ gieo sẵn khi họ tên còn trống.
+     *
+     * @return {@code true} nếu đã chép thông tin GĐCN
+     */
+    public static boolean applyBranchSigner(Contract contract, BranchInfo branchInfo) {
+        if (contract == null || !isBranchSignerDeclared(branchInfo)) {
+            return false;
+        }
+        contract.setSignerName(BranchInfoValidator.trimToNull(branchInfo.getDirectorName()));
+        contract.setSignerPosition(BranchInfoValidator.trimToNull(branchInfo.getDirectorPosition()));
+        contract.setSignerPhone(BranchInfoValidator.trimToNull(branchInfo.getPhone()));
+        contract.setSignerFax(BranchInfoValidator.trimToNull(branchInfo.getFax()));
+        return true;
+    }
+
+    /**
+     * BR-56: chép bốn ô người ký bên mình từ bản ghi đang có ({@code source})
+     * sang {@code target}; {@code source} null thì xoá trắng cả bốn ô. Dùng để
+     * bỏ mọi giá trị gửi lên từ request: người ký bên mình không sửa tay.
+     */
+    public static void copyBranchSigner(Contract target, Contract source) {
+        if (target == null) {
+            return;
+        }
+        target.setSignerName(source != null ? source.getSignerName() : null);
+        target.setSignerPosition(source != null ? source.getSignerPosition() : null);
+        target.setSignerPhone(source != null ? source.getSignerPhone() : null);
+        target.setSignerFax(source != null ? source.getSignerFax() : null);
+    }
+
+    /** Thông tin chi nhánh hiện tại cho form hợp đồng; {@code null} khi không đọc được. */
+    public BranchInfo findBranchInfo() {
+        return branchInfoService.get();
+    }
+
+    /** BR-56, tạo hợp đồng/phụ lục: lấy GĐCN hiện tại, chưa khai thì để trống cả bốn ô. */
+    private void fillSignerForNewContract(Contract contract) {
+        copyBranchSigner(contract, null);
+        applyBranchSigner(contract, branchInfoService.get());
+    }
+
+    /**
+     * BR-56, sửa hợp đồng: bản Nháp lấy GĐCN hiện tại (chưa khai thì giữ giá
+     * trị đang có); từ Đã ký giữ nguyên bốn ô đang lưu.
+     */
+    private void fillSignerForUpdate(Contract contract, Contract existing) {
+        copyBranchSigner(contract, existing);
+        if (!existing.isTermsLocked()) {
+            applyBranchSigner(contract, branchInfoService.get());
+        }
+    }
+
+    // ------------------------------------------------------------------
     // UC-33: Tạo hợp đồng gốc (BR-35, BR-36)
     // ------------------------------------------------------------------
 
@@ -171,6 +252,7 @@ public class ContractService extends BaseService {
                     ContractValidator.MSG_CONTRACT_INVALID);
         }
         contract.setParentContractId(null);
+        fillSignerForNewContract(contract);
         ValidationResult vr = contractValidator.validateCreate(contract, findEnterpriseRoles(contract.getEnterpriseId()));
         if (!vr.isValid()) {
             return ServiceResult.fail(ERR_INVALID, vr.getErrors());
@@ -210,6 +292,7 @@ public class ContractService extends BaseService {
             return failure(ERR_AMENDMENT_NOT_ALLOWED);
         }
         prepareAmendmentFromParent(amendment, parent);
+        fillSignerForNewContract(amendment);
         ValidationResult vr = contractValidator.validateCreate(amendment, findEnterpriseRoles(parent.getEnterpriseId()));
         if (!vr.isValid()) {
             return ServiceResult.fail(ERR_INVALID, vr.getErrors());
@@ -277,6 +360,7 @@ public class ContractService extends BaseService {
             contract.setDirection(existing.getDirection());
         }
         contract.setParentContractId(existing.getParentContractId());
+        fillSignerForUpdate(contract, existing);
         ValidationResult vr = contractValidator.validateUpdate(
                 contract, existing, findEnterpriseRoles(contract.getEnterpriseId()));
         if (!vr.isValid()) {
@@ -463,6 +547,8 @@ public class ContractService extends BaseService {
         if (!existing.isSigned()) {
             return failure(ERR_CORRECT_FAILED);
         }
+        // BR-56: UC-54 không đổi bốn ô người ký bên mình.
+        copyBranchSigner(contract, existing);
         ServiceResult<Void> validRes = validateSignedCorrection(contract, existing);
         if (!validRes.isSuccess()) {
             return validRes;

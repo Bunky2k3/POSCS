@@ -40,6 +40,8 @@ import poscs.model.Enterprise;
 import poscs.model.Product;
 import poscs.model.Province;
 import poscs.model.User;
+import poscs.service.BranchInfoService;
+import poscs.service.ContractService;
 import poscs.service.PermissionService;
 
 /**
@@ -122,6 +124,8 @@ public class ContractController extends HttpServlet {
     private EmployeeDAO employeeDAO = new EmployeeDAO();
     private AddressDAO addressDAO = new AddressDAO();
     private ProductDAO productDAO = new ProductDAO();
+    /** Nguồn người ký bên mình (BR-56): thông tin Giám đốc chi nhánh, UC-55. */
+    private BranchInfoService branchInfoService = new BranchInfoService();
 
     private PermissionService permissionService;
     private ContractListController listController;
@@ -397,6 +401,7 @@ public class ContractController extends HttpServlet {
         request.setAttribute("direction", direction);
         request.setAttribute("kind", DIRECTION_BUY.equals(direction) ? "buy" : "sell");
         request.setAttribute("contractTypeOptions", contractTypesFor(direction));
+        ContractControllerHelper.putBranchSigner(request, branchInfoService.get());
         request.getRequestDispatcher(CREATE_VIEW).forward(request, response);
     }
 
@@ -438,6 +443,7 @@ public class ContractController extends HttpServlet {
         request.setAttribute("direction", parent.getDirection());
         request.setAttribute("kind", DIRECTION_BUY.equals(parent.getDirection()) ? "buy" : "sell");
         request.setAttribute("contractTypeOptions", contractTypesFor(parent.getDirection()));
+        ContractControllerHelper.putBranchSigner(request, branchInfoService.get());
         request.getRequestDispatcher(CREATE_VIEW).forward(request, response);
     }
 
@@ -490,6 +496,8 @@ public class ContractController extends HttpServlet {
 
         // Điều khoản khoá từ lúc ký: form chỉ còn hiển thị chúng, không nhập.
         request.setAttribute("canEditTerms", !contract.isTermsLocked());
+        // BR-56: bản Nháp hiện GĐCN hiện tại (lưu là chép theo), đã ký hiện giá trị đang lưu.
+        ContractControllerHelper.putBranchSigner(request, branchInfoService.get());
         // Đường chữa SAI SÓT NHẬP LIỆU, khác hẳn đường sửa nội dung. Admin, bắt
         // buộc lý do, sinh dòng nhật ký loại riêng. Không mở sau khi đóng băng:
         // luật KH nói "kể cả cấp cao", và Admin không phải ngoại lệ.
@@ -523,6 +531,8 @@ public class ContractController extends HttpServlet {
         // Chiều lấy từ mục con đang đứng, không từ form -- xem
         // buildContractFromRequest.
         c.setDirection(directionFromKind(request.getParameter("kind")));
+        // BR-56: người ký bên mình là GĐCN hiện tại; chưa khai thì để trống cả bốn ô.
+        ContractService.applyBranchSigner(c, branchInfoService.get());
         if (!isValid(c) || !counterpartyMatchesDirection(c)) {
             response.sendRedirect(request.getContextPath()
                     + "/contract?action=new&kind=" + (DIRECTION_BUY.equals(c.getDirection()) ? "buy" : "sell")
@@ -588,6 +598,9 @@ public class ContractController extends HttpServlet {
             }
         } else {
             c = buildContractFromRequest(request, new Contract());
+            // BR-56: bản Nháp lấy GĐCN hiện tại; chưa khai thì giữ bốn ô đang lưu.
+            ContractService.copyBranchSigner(c, existing);
+            ContractService.applyBranchSigner(c, branchInfoService.get());
         }
         c.setContractId(id);
         // Giữ nguyên chiều cũ -- DAO.update cũng không ghi cột này. Nhưng vẫn
@@ -653,6 +666,8 @@ public class ContractController extends HttpServlet {
         // counterpartyMatchesDirection() kiểm đúng thứ sẽ được ghi xuống.
         c.setEnterpriseId(parent.getEnterpriseId());
         c.setDirection(parent.getDirection());
+        // BR-56: phụ lục cũng lấy GĐCN hiện tại, không chép từ hợp đồng gốc.
+        ContractService.applyBranchSigner(c, branchInfoService.get());
         String back = "/contract?action=newAmendment&parentId=" + parentId;
 
         if (!isValid(c) || !counterpartyMatchesDirection(c)) {
@@ -735,6 +750,8 @@ public class ContractController extends HttpServlet {
         c.setDirection(existing.getDirection());
         // Ngày ký không sửa được kể cả ở đây -- DAO cũng giữ lại giá trị cũ.
         c.setSigningDate(existing.getSigningDate());
+        // BR-56: chữa sai sót không đổi bốn ô người ký bên mình.
+        ContractService.copyBranchSigner(c, existing);
         if (!isValid(c) || !counterpartyMatchesDirection(c)) {
             response.sendRedirect(request.getContextPath() + back + "&error=invalid");
             return;
@@ -1346,8 +1363,9 @@ public class ContractController extends HttpServlet {
         if (ownerId != null) {
             c.setOwnerId(ownerId);
         }
-        c.setSignerName(emptyToNull(request.getParameter("signerName")));
-        c.setSignerPosition(emptyToNull(request.getParameter("signerPosition")));
+        // BR-56: người ký bên mình (họ tên, chức vụ, SĐT, fax) KHÔNG đọc từ
+        // request. Form chỉ hiển thị bốn ô đó; bên gọi chép từ Thông tin chi
+        // nhánh hoặc từ bản ghi đang có.
         c.setCounterpartySignerName(emptyToNull(request.getParameter("counterpartySignerName")));
         c.setCounterpartySignerPosition(emptyToNull(request.getParameter("counterpartySignerPosition")));
         c.setAuthorizationRef(emptyToNull(request.getParameter("authorizationRef")));

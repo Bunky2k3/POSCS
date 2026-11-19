@@ -98,6 +98,7 @@ public class ContractActionController extends HttpServlet {
             return;
         }
         ContractControllerHelper.populateCreateForm(req, customerDAO, employeeDAO);
+        ContractControllerHelper.putBranchSigner(req, getContractService().findBranchInfo());
         req.getRequestDispatcher(ContractControllerHelper.CREATE_VIEW).forward(req, resp);
     }
 
@@ -115,6 +116,7 @@ public class ContractActionController extends HttpServlet {
             return;
         }
         ContractControllerHelper.populateAmendmentForm(req, parent, customerDAO, employeeDAO);
+        ContractControllerHelper.putBranchSigner(req, getContractService().findBranchInfo());
         req.getRequestDispatcher(ContractControllerHelper.CREATE_VIEW).forward(req, resp);
     }
 
@@ -128,6 +130,7 @@ public class ContractActionController extends HttpServlet {
         Contract c = id != null ? getContractService().findById(id) : null;
         if (c == null) { resp.sendRedirect(ContractControllerHelper.notFoundUrl(req)); return; }
         ContractControllerHelper.bindEditFormAttributes(req, c, u, contractDAO, customerDAO, employeeDAO, productDAO, getPermissionService(), canSign(u));
+        ContractControllerHelper.putBranchSigner(req, getContractService().findBranchInfo());
         req.getRequestDispatcher(ContractControllerHelper.UPDATE_VIEW).forward(req, resp);
     }
 
