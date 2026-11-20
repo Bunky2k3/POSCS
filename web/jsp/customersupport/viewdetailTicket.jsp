@@ -254,7 +254,7 @@
                     </div>
                 </div>
                 <%-- Ba mốc thời gian của phiếu đứng chung một hàng. Hạn xử lý trước
-                     đây chỉ thấy trong form sửa và bản PDF -- kỹ thuật viên xem
+                     đây chỉ thấy trong form sửa và bản PDF -- người xử lý xem
                      phiếu không biết mình còn bao lâu, dù danh sách đã gắn nhãn
                      "Quá hạn SLA" cho chính phiếu đó. --%>
                 <div class="col-md-4 field-row">
@@ -291,14 +291,12 @@
           phải theo thứ tự thời gian:
 
             - Khối 1 là lời của người tiếp nhận: khách báo hỏng cái gì.
-            - Khối 2 là đánh giá của kỹ thuật viên: vì sao hỏng và đã làm gì.
+            - Khối 2 là đánh giá của người xử lý: vì sao hỏng và đã làm gì.
 
           Trước đây mô tả / nguyên nhân / kết quả nằm thành ba thẻ rời ngang
           hàng nhau, đọc lướt không biết dòng nào do ai viết -- mà đây đúng là
-          câu hỏi người theo dõi phiếu cần trả lời đầu tiên. Gộp theo tác giả
-          cũng trùng khít với phân quyền: đúng những trường trong khối 2 là
-          những trường role Kỹ thuật được sửa trên phiếu của mình (xem
-          PERMISSIONS.md), khối 1 thì không.
+          câu hỏi người theo dõi phiếu cần trả lời đầu tiên. Cách chia chỉ để
+          dễ đọc, không theo phân quyền: Admin và Sales sửa được cả hai khối.
 
           Lịch sử xử lý vẫn đứng riêng bên dưới: nó do hệ thống ghi mỗi lần
           đổi trạng thái, không phải do ai gõ vào, nên không thuộc khối nào.

@@ -374,10 +374,9 @@ public class TicketService extends BaseService {
             return ServiceResult.fail(perm.getMessage());
         }
 
-        boolean fullAccess = permissionService.canCreateTicket(actor);
-        TechnicalRequest merged = mergeForUpdate(input, existing, fullAccess, contractPickerUsable, slaClearedOnPurpose);
+        TechnicalRequest merged = mergeForUpdate(input, existing, contractPickerUsable, slaClearedOnPurpose);
 
-        ServiceResult<Void> validation = validateUpdateRequest(merged, existing, fullAccess);
+        ServiceResult<Void> validation = validateUpdateRequest(merged, existing);
         if (!validation.isSuccess()) {
             return validation;
         }
@@ -405,28 +404,24 @@ public class TicketService extends BaseService {
     }
 
     private TechnicalRequest mergeForUpdate(TechnicalRequest input, TechnicalRequest existing,
-            boolean fullAccess, boolean contractPickerUsable, boolean slaClearedOnPurpose) {
+            boolean contractPickerUsable, boolean slaClearedOnPurpose) {
         TechnicalRequest target = new TechnicalRequest();
         target.setTicketId(existing.getTicketId());
         target.setTicketCode(existing.getTicketCode());
         target.setCreatedBy(existing.getCreatedBy());
         target.setCreatedDate(existing.getCreatedDate());
 
-        if (fullAccess) {
-            target.setEnterpriseId(input.getEnterpriseId());
-            target.setContractId(input.getContractId() != null || contractPickerUsable
-                    ? input.getContractId() : existing.getContractId());
-            target.setTicketType(emptyToNull(input.getTicketType()));
-            target.setPriority(emptyToNull(input.getPriority()));
-            target.setReceptionChannel(emptyToNull(input.getReceptionChannel()));
-            target.setSlaDeadline(input.getSlaDeadline() != null || slaClearedOnPurpose
-                    ? input.getSlaDeadline() : existing.getSlaDeadline());
-            target.setAssignedTechnicianId(input.getAssignedTechnicianId());
-            target.setDescription(emptyToNull(input.getDescription()));
-            target.setWarranty(input.isWarranty());
-        } else {
-            copyGeneralFieldsFromExisting(target, existing);
-        }
+        target.setEnterpriseId(input.getEnterpriseId());
+        target.setContractId(input.getContractId() != null || contractPickerUsable
+                ? input.getContractId() : existing.getContractId());
+        target.setTicketType(emptyToNull(input.getTicketType()));
+        target.setPriority(emptyToNull(input.getPriority()));
+        target.setReceptionChannel(emptyToNull(input.getReceptionChannel()));
+        target.setSlaDeadline(input.getSlaDeadline() != null || slaClearedOnPurpose
+                ? input.getSlaDeadline() : existing.getSlaDeadline());
+        target.setAssignedTechnicianId(input.getAssignedTechnicianId());
+        target.setDescription(emptyToNull(input.getDescription()));
+        target.setWarranty(input.isWarranty());
 
         target.setStatus(emptyToNull(input.getStatus()));
         target.setRootCause(emptyToNull(input.getRootCause()));
@@ -448,11 +443,8 @@ public class TicketService extends BaseService {
         target.setWarranty(existing.isWarranty());
     }
 
-    private ServiceResult<Void> validateUpdateRequest(TechnicalRequest merged, TechnicalRequest existing,
-            boolean fullAccess) {
-        ValidationResult vr = fullAccess
-                ? ticketValidator.validateUpdate(merged, existing)
-                : validateTechnicianFields(merged, existing);
+    private ServiceResult<Void> validateUpdateRequest(TechnicalRequest merged, TechnicalRequest existing) {
+        ValidationResult vr = ticketValidator.validateUpdate(merged, existing);
         if (!vr.isValid()) {
             String statusErr = vr.getErrors().get(TicketValidator.FIELD_STATUS);
             if (TicketValidator.MSG_051.equals(statusErr)) {
@@ -460,31 +452,11 @@ public class TicketService extends BaseService {
             }
             return ServiceResult.fail(ERR_INVALID, vr.getErrors());
         }
-        if (!fullAccess) {
-            return ServiceResult.ok(null);
-        }
         if (!isAssignedTechnicianValid(merged.getAssignedTechnicianId(), existing.getAssignedTechnicianId())) {
             vr.addError(TicketValidator.FIELD_ASSIGNED_TECHNICIAN_ID, TicketValidator.MSG_TECHNICIAN_REQUIRED);
             return ServiceResult.fail(ERR_INVALID, vr.getErrors());
         }
         return validateCustomerAndContract(merged, existing.getEnterpriseId(), vr);
-    }
-
-    private ValidationResult validateTechnicianFields(TechnicalRequest merged, TechnicalRequest existing) {
-        ValidationResult vr = new ValidationResult();
-        if (merged.getStatus() == null || merged.getStatus().trim().isEmpty()) {
-            vr.addError(TicketValidator.FIELD_STATUS, TicketValidator.MSG_STATUS_REQUIRED);
-        } else if (!ticketValidator.isAllowedStatus(merged.getStatus())) {
-            vr.addError(TicketValidator.FIELD_STATUS, TicketValidator.MSG_STATUS_INVALID);
-        } else if (existing != null && existing.getStatus() != null && !existing.getStatus().trim().isEmpty()
-                && !ticketValidator.isValidStatusTransition(existing.getStatus(), merged.getStatus())) {
-            vr.addError(TicketValidator.FIELD_STATUS, TicketValidator.MSG_051);
-        }
-        if (merged.getCauseCategory() != null
-                && merged.getCauseCategory().trim().length() > TicketValidator.MAX_CAUSE_CATEGORY_LENGTH) {
-            vr.addError(TicketValidator.FIELD_CAUSE_CATEGORY, TicketValidator.MSG_REQUIRED);
-        }
-        return vr;
     }
 
     private boolean isAssignedTechnicianValid(int technicianId, Integer keepTechnicianId) {

@@ -337,7 +337,6 @@ public class TicketActionControllerTest {
         controller.doGet(request, response);
 
         verify(request).setAttribute(eq("canManage"), eq(true));
-        verify(request).setAttribute(eq("lockGeneral"), eq(false));
         verify(dispatcher).forward(request, response);
     }
 
@@ -369,7 +368,6 @@ public class TicketActionControllerTest {
         controller.doGet(request, response);
 
         verify(request).setAttribute(eq("canManage"), eq(true));
-        verify(request).setAttribute(eq("lockGeneral"), eq(false));
         verify(dispatcher).forward(request, response);
     }
 

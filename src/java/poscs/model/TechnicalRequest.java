@@ -25,7 +25,7 @@ public class TechnicalRequest {
     private Timestamp slaDeadline;
     private Date createdDate;
     private String description;
-    /** Nguyên nhân sự cố, do kỹ thuật viên đánh giá sau khi xử lý (root_cause). */
+    /** Nguyên nhân sự cố, do người xử lý đánh giá sau khi xử lý (root_cause). */
     private String rootCause;
     /** Nhóm nguyên nhân để thống kê: do vận chuyển / lắp đặt / thiết bị / khác (cause_category). */
     private String causeCategory;
