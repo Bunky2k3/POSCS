@@ -518,13 +518,13 @@
                     </div>
                 </div>
                 <%-- "Đang chờ ở phòng nào" -- câu hỏi của giám đốc, hỏi ngay trên
-                     danh sách chứ không phải mở từng hợp đồng. Chỉ liệt kê các
-                     phòng nhận bàn giao, không đổ cả danh mục phòng ban. --%>
+                     danh sách chứ không phải mở từng hợp đồng. Chỉ liệt kê phòng
+                     nhận bàn giao (Tổng hợp, phòng duy nhất từ V40), không đổ cả
+                     danh mục phòng ban. --%>
                 <select id="filterWaitingDept" name="waitingDept">
                     <option value="">Mọi chặng xử lý</option>
                     <c:forEach var="dept" items="${departmentList}">
-                        <c:if test="${dept.departmentName == 'Kế toán' or dept.departmentName == 'Dự án'
-                                      or dept.departmentName == 'Kỹ thuật'}">
+                        <c:if test="${dept.departmentName == 'Tổng hợp'}">
                             <option value="${dept.departmentId}" ${waitingDeptFilter == dept.departmentId ? 'selected' : ''}>
                                 Đang chờ: ${fn:escapeXml(dept.departmentName)}
                             </option>

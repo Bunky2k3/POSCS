@@ -914,4 +914,95 @@ public class ContractHandoverDAOTest {
         assertNotNull(daoWithHist.getHandoverDAO());
         assertSame(hist, daoWithHist.getHandoverDAO().getHistoryDAO());
     }
+
+    // ------------------------------------------------------------------
+    // Task 9.2: phòng Tổng hợp là phòng nhận duy nhất
+    // ------------------------------------------------------------------
+
+    private static final int DEPT_TONG_HOP = 4;
+
+    @Test
+    public void handOver_choPhongTongHop_ghiNhatKyDungTenPhong() throws Exception {
+        ContractHistoryDAO mockHistoryDAO = mock(ContractHistoryDAO.class);
+        ContractHandoverDAO customDao = new ContractHandoverDAO(mockHistoryDAO);
+
+        PreparedStatement psLock = mock(PreparedStatement.class);
+        ResultSet rsLock = singleRow(row(
+                "contract_id", CONTRACT_ID,
+                "contract_code", "HD-001",
+                "progress_status", "Đã ký"
+        ));
+        when(psLock.executeQuery()).thenReturn(rsLock);
+        PreparedStatement psCheckPending = mock(PreparedStatement.class);
+        ResultSet rsCheckPending = emptyResultSet();
+        when(psCheckPending.executeQuery()).thenReturn(rsCheckPending);
+        PreparedStatement psDept = mock(PreparedStatement.class);
+        ResultSet rsDept = singleRow(row("department_name", "Tổng hợp"));
+        when(psDept.executeQuery()).thenReturn(rsDept);
+        PreparedStatement psInsert = mock(PreparedStatement.class);
+        when(psInsert.executeUpdate()).thenReturn(1);
+
+        Connection conn = mock(Connection.class);
+        when(conn.prepareStatement(contains("WHERE contract_id = ? AND is_deleted = 0 FOR UPDATE")))
+                .thenReturn(psLock);
+        when(conn.prepareStatement(contains("SELECT 1 FROM contract_handovers")))
+                .thenReturn(psCheckPending);
+        when(conn.prepareStatement(contains("SELECT department_name FROM departments")))
+                .thenReturn(psDept);
+        when(conn.prepareStatement(contains("INSERT INTO contract_handovers")))
+                .thenReturn(psInsert);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            int result = customDao.handOverToDepartments(CONTRACT_ID, List.of(DEPT_TONG_HOP),
+                    "Nhờ lưu hồ sơ", ACTOR_ID);
+
+            assertEquals(1, result);
+            verify(psInsert).setInt(2, DEPT_TONG_HOP);
+            verify(mockHistoryDAO).insertHistory(eq(conn), eq(CONTRACT_ID),
+                    eq(ContractHistory.EVENT_HANDOVER), eq("Bàn giao cho phòng Tổng hợp"),
+                    eq(ACTOR_ID), eq("Nhờ lưu hồ sơ"));
+            verify(conn).commit();
+        }
+    }
+
+    @Test
+    public void completeHandover_phongTongHop_ghiNhatKyDungTenPhong() throws Exception {
+        ContractHistoryDAO mockHistoryDAO = mock(ContractHistoryDAO.class);
+        ContractHandoverDAO customDao = new ContractHandoverDAO(mockHistoryDAO);
+
+        PreparedStatement psLock = mock(PreparedStatement.class);
+        ResultSet rsHandover = singleRow(row(
+                "contract_id", CONTRACT_ID,
+                "department_id", DEPT_TONG_HOP
+        ));
+        when(psLock.executeQuery()).thenReturn(rsHandover);
+        PreparedStatement psUpdate = mock(PreparedStatement.class);
+        when(psUpdate.executeUpdate()).thenReturn(1);
+        PreparedStatement psDept = mock(PreparedStatement.class);
+        ResultSet rsDept = singleRow(row("department_name", "Tổng hợp"));
+        when(psDept.executeQuery()).thenReturn(rsDept);
+
+        Connection conn = mock(Connection.class);
+        when(conn.prepareStatement(contains("WHERE handover_id = ? AND done_at IS NULL FOR UPDATE")))
+                .thenReturn(psLock);
+        when(conn.prepareStatement(contains("UPDATE contract_handovers")))
+                .thenReturn(psUpdate);
+        when(conn.prepareStatement(contains("SELECT department_name FROM departments")))
+                .thenReturn(psDept);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            assertTrue(customDao.completeHandover(HANDOVER_ID, ACTOR_ID, "Đã nhập sổ"));
+
+            verify(psDept).setInt(1, DEPT_TONG_HOP);
+            verify(mockHistoryDAO).insertHistory(eq(conn), eq(CONTRACT_ID),
+                    eq(ContractHistory.EVENT_HANDOVER),
+                    eq("Phòng Tổng hợp báo đã xử lý xong"),
+                    eq(ACTOR_ID), eq("Đã nhập sổ"));
+            verify(conn).commit();
+        }
+    }
 }

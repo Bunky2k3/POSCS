@@ -1398,4 +1398,83 @@ public class TechnicalSupportTicketControllerTest {
             assertTrue("Phần kết quả xử lý phải còn trong file", text.contains("KETTHUCKETQUA"));
         }
     }
+
+    // ------------------------------------------------------------------
+    // Task 9.2: vai Tổng hợp KHÔNG vào bất kỳ màn hình phiếu hỗ trợ nào (SPEC 3.3, MSG-022)
+    // ------------------------------------------------------------------
+
+    private static final String ROLE_TONG_HOP = "Tổng hợp";
+
+    @Test
+    public void tongHop_moDanhSachPhieu_bi403() throws Exception {
+        loginAs(ROLE_TONG_HOP, 70);
+        when(request.getParameter("action")).thenReturn(null);
+
+        controller.doGet(request, response);
+
+        verify(response).sendError(HttpServletResponse.SC_FORBIDDEN, AccessControl.MSG_022);
+        verify(ticketDAO, never()).findAll(anyInt(), anyInt(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    public void tongHop_xemChiTietPhieu_bi403() throws Exception {
+        loginAs(ROLE_TONG_HOP, 70);
+        when(request.getParameter("action")).thenReturn("view");
+        when(request.getParameter("id")).thenReturn("3");
+
+        controller.doGet(request, response);
+
+        verify(response).sendError(HttpServletResponse.SC_FORBIDDEN, AccessControl.MSG_022);
+        verify(ticketDAO, never()).findById(anyInt());
+    }
+
+    @Test
+    public void tongHop_moFormTaoVaSuaPhieu_bi403() throws Exception {
+        loginAs(ROLE_TONG_HOP, 70);
+        when(request.getParameter("action")).thenReturn("new");
+        controller.doGet(request, response);
+
+        when(request.getParameter("action")).thenReturn("edit");
+        when(request.getParameter("id")).thenReturn("3");
+        when(ticketDAO.findById(3)).thenReturn(fullyValidExistingTicket());
+        controller.doGet(request, response);
+
+        verify(response, times(2)).sendError(HttpServletResponse.SC_FORBIDDEN, AccessControl.MSG_022);
+        verify(request, never()).getRequestDispatcher(anyString());
+    }
+
+    @Test
+    public void tongHop_xuatExcelVaPdf_bi403() throws Exception {
+        loginAs(ROLE_TONG_HOP, 70);
+        when(request.getParameter("action")).thenReturn("exportExcel");
+        controller.doGet(request, response);
+
+        when(request.getParameter("action")).thenReturn("exportPdf");
+        when(request.getParameter("id")).thenReturn("3");
+        controller.doGet(request, response);
+
+        verify(response, times(2)).sendError(HttpServletResponse.SC_FORBIDDEN, AccessControl.MSG_022);
+        verify(response, never()).getOutputStream();
+    }
+
+    @Test
+    public void tongHop_taoSuaXoaPhieuQuaPost_bi403VaKhongGhiGi() throws Exception {
+        loginAs(ROLE_TONG_HOP, 70);
+        when(request.getParameter("action")).thenReturn("create");
+        controller.doPost(request, response);
+
+        when(request.getParameter("action")).thenReturn("update");
+        when(request.getParameter("ticketId")).thenReturn("3");
+        when(ticketDAO.findById(3)).thenReturn(fullyValidExistingTicket());
+        controller.doPost(request, response);
+
+        when(request.getParameter("action")).thenReturn("delete");
+        when(request.getParameter("id")).thenReturn("3");
+        controller.doPost(request, response);
+
+        verify(response, times(3)).sendError(HttpServletResponse.SC_FORBIDDEN, AccessControl.MSG_022);
+        verify(ticketDAO, never()).insert(any());
+        verify(ticketDAO, never()).update(any(), anyInt(), any());
+        verify(ticketDAO, never()).softDelete(anyInt());
+    }
 }

@@ -232,8 +232,8 @@ public class ContractDAO {
         " WHERE ch.parent_contract_id = c.contract_id AND ch.is_deleted = 0 AND NOT " + AMENDMENT_IS_SIGNED_SQL + ")";
 
     /**
-     * Các phòng đang giữ hợp đồng, gom thành một chuỗi -- nhãn "đang chờ: Kế
-     * toán, Dự án" trên danh sách.
+     * Các phòng đang giữ hợp đồng, gom thành một chuỗi -- nhãn "đang chờ: Tổng
+     * hợp" trên danh sách (có thể nhiều phòng nếu còn chặng cũ trước V40).
      *
      * <p>GROUP_CONCAT trong một câu con thay vì tra thêm cho từng dòng: mười
      * dòng một trang là mười lượt đi CSDL cho một nhãn nhỏ.
@@ -1414,9 +1414,10 @@ public class ContractDAO {
     // Bàn giao hợp đồng giữa các phòng
     // ==================================================================
     //
-    // Kinh doanh soạn xong thì chuyển xuống Kế toán và Dự án CÙNG LÚC, mỗi
-    // phòng tự báo xong. Thứ khách hàng (giám đốc) hỏi là "đang nằm ở đâu, bao
-    // lâu rồi", nên mỗi lượt giao là một dòng có mốc thời gian -- xem V32.
+    // Kinh doanh soạn xong thì chuyển xuống phòng Tổng hợp (phòng nhận duy nhất
+    // từ V40, gộp hai phòng Kế toán, Dự án của V32), phòng nhận tự báo xong.
+    // Thứ khách hàng (giám đốc) hỏi là "đang nằm ở đâu, bao lâu rồi", nên mỗi
+    // lượt giao là một dòng có mốc thời gian -- xem V32.
 
     /** Phòng đó đang còn giữ hợp đồng, không giao lại lượt mới được. [UC-48] */
     public static final int HANDOVER_ALREADY_PENDING = ContractHandoverDAO.HANDOVER_ALREADY_PENDING;
@@ -1434,8 +1435,8 @@ public class ContractDAO {
     public static final int HANDOVER_FAILED = ContractHandoverDAO.HANDOVER_FAILED;
 
     /**
-     * Bàn giao một hợp đồng cho nhiều phòng CÙNG LÚC (Kế toán + Dự án là mặc
-     * định của luồng).
+     * Bàn giao một hợp đồng cho các phòng được chọn CÙNG LÚC (từ V40 form chỉ
+     * còn phòng Tổng hợp).
      * [UC-48] Ủy quyền sang {@link ContractHandoverDAO#handOverToDepartments(int, List, String, int)}.
      */
     public int handOverToDepartments(int contractId, List<Integer> departmentIds, String note, int actorId) {

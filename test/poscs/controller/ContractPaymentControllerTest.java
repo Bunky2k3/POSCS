@@ -70,6 +70,10 @@ public class ContractPaymentControllerTest {
         when(permissionService.canManageContractPayments(adminUser)).thenReturn(true);
         when(permissionService.canManageContractPayments(salesManager)).thenReturn(true);
         when(permissionService.canManageContractPayments(salesSubordinate)).thenReturn(false);
+        // Task 9.2 (QA): handleMarkPaid kiểm canMarkPaymentPaid trước khi đọc ngày thu.
+        when(permissionService.canMarkPaymentPaid(adminUser)).thenReturn(true);
+        when(permissionService.canMarkPaymentPaid(salesManager)).thenReturn(true);
+        when(permissionService.canMarkPaymentPaid(salesSubordinate)).thenReturn(false);
     }
 
     private User buildUser(int userId, String roleName, Integer managerId) {
@@ -699,5 +703,198 @@ public class ContractPaymentControllerTest {
         assertSame(newEd, ctrl.getEmployeeDAO());
         assertSame(newPs, ctrl.getPermissionService());
         assertSame(newPms, ctrl.getPaymentService());
+    }
+
+    // ==================================================================
+    // 7. Task 9.2: vai Tổng hợp chỉ "Ghi nhận đã thu", quay về trang chi tiết
+    // ==================================================================
+
+    /** Tổng hợp: không quản lý được kỳ (không mở được trang Sửa). */
+    private User loginGeneralUser() {
+        User general = buildUser(6, PermissionService.ROLE_GENERAL, null);
+        when(permissionService.canManageContractPayments(general)).thenReturn(false);
+        when(permissionService.canMarkPaymentPaid(general)).thenReturn(true);
+        loginUser(general);
+        return general;
+    }
+
+    private void markPaidRequest(String paidDate) {
+        when(request.getParameter("action")).thenReturn("markPaid");
+        when(request.getParameter("contractId")).thenReturn("10");
+        when(request.getParameter("paymentId")).thenReturn("20");
+        when(request.getParameter("paidDate")).thenReturn(paidDate);
+    }
+
+    @Test
+    public void markPaid_tongHop_thanhCong_quayVeTrangChiTiet() throws Exception {
+        User general = loginGeneralUser();
+        markPaidRequest("2026-11-18");
+        when(paymentService.markPaymentPaid(10, 20, Date.valueOf("2026-11-18"), general))
+                .thenReturn(ServiceResult.ok(null));
+
+        controller.doPost(request, response);
+
+        verify(paymentService).markPaymentPaid(10, 20, Date.valueOf("2026-11-18"), general);
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=view&id=10");
+        verify(response, never()).sendRedirect(CONTEXT_PATH + "/contract?action=edit&id=10");
+    }
+
+    @Test
+    public void markPaid_tongHop_loiNghiepVu_baoLoiOTrangChiTiet() throws Exception {
+        User general = loginGeneralUser();
+        markPaidRequest("2026-11-18");
+        when(paymentService.markPaymentPaid(eq(10), eq(20), any(), eq(general)))
+                .thenReturn(ServiceResult.fail(ContractPaymentService.ERR_PAYMENT_FAILED));
+
+        controller.doPost(request, response);
+
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=view&id=10&error=payment_failed");
+    }
+
+    @Test
+    public void markPaid_tongHop_ngaySaiDinhDang_baoLoiOTrangChiTiet() throws Exception {
+        loginGeneralUser();
+        markPaidRequest("18/11/2026");
+
+        controller.doPost(request, response);
+
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=view&id=10&error=payment_failed");
+        verify(paymentService, never()).markPaymentPaid(anyInt(), anyInt(), any(), any());
+    }
+
+    @Test
+    public void markPaid_tongHop_khongTimThayKy_veDanhSachNotFound() throws Exception {
+        User general = loginGeneralUser();
+        markPaidRequest(null);
+        when(paymentService.markPaymentPaid(eq(10), eq(20), isNull(), eq(general)))
+                .thenReturn(ServiceResult.fail(ContractPaymentService.ERR_NOT_FOUND));
+
+        controller.doPost(request, response);
+
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?error=notfound");
+    }
+
+    @Test
+    public void addPayment_tongHop_bi403() throws Exception {
+        User general = loginGeneralUser();
+        when(request.getParameter("action")).thenReturn("addPayment");
+        when(request.getParameter("contractId")).thenReturn("10");
+        when(request.getParameter("invoiceAmount")).thenReturn("10.000.000");
+        when(request.getParameter("dueDate")).thenReturn("2026-12-01");
+        when(paymentService.addPayment(eq(10), any(ContractPayment.class), eq(general)))
+                .thenReturn(ServiceResult.fail(ContractPaymentService.ERR_FORBIDDEN));
+
+        controller.doPost(request, response);
+
+        verify(response).sendError(HttpServletResponse.SC_FORBIDDEN, PermissionService.MSG_022);
+        verify(response, never()).sendRedirect(anyString());
+    }
+
+    @Test
+    public void removePayment_tongHop_bi403() throws Exception {
+        User general = loginGeneralUser();
+        when(request.getParameter("action")).thenReturn("removePayment");
+        when(request.getParameter("contractId")).thenReturn("10");
+        when(request.getParameter("paymentId")).thenReturn("20");
+        when(paymentService.deletePayment(10, 20, general))
+                .thenReturn(ServiceResult.fail(ContractPaymentService.ERR_FORBIDDEN));
+
+        controller.doPost(request, response);
+
+        verify(response).sendError(HttpServletResponse.SC_FORBIDDEN, PermissionService.MSG_022);
+        verify(response, never()).sendRedirect(anyString());
+    }
+
+    @Test
+    public void markPaid_tongHop_dungServiceThatVaPermissionThat_ghiDuoc() throws Exception {
+        // Nối service thật + PermissionService thật: chứng minh đường đi từ controller
+        // xuống DAO mở cho Tổng hợp, không chỉ nhờ mock trả "ok".
+        User general = buildUser(6, PermissionService.ROLE_GENERAL, null);
+        when(employeeDAO.findById(6)).thenReturn(general);
+        PermissionService realPs = new PermissionService(employeeDAO);
+        ContractPaymentDAO paymentDAO = mock(ContractPaymentDAO.class);
+        ContractPaymentService realService = new ContractPaymentService(paymentDAO, contractDAO, realPs);
+        ContractPaymentController ctrl = new ContractPaymentController(contractDAO, employeeDAO, realService, realPs);
+        when(contractDAO.findById(10)).thenReturn(sampleContract(10, false));
+        when(paymentDAO.markPaymentPaid(20, 10, Date.valueOf("2026-11-18"), 6)).thenReturn(true);
+        loginUser(general);
+        markPaidRequest("2026-11-18");
+
+        ctrl.doPost(request, response);
+
+        verify(paymentDAO).markPaymentPaid(20, 10, Date.valueOf("2026-11-18"), 6);
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=view&id=10");
+    }
+
+    // ==================================================================
+    // 8. QA Task 9.2: kiểm quyền TRƯỚC khi đọc ngày thu
+    // ==================================================================
+
+    @Test
+    public void markPaid_khongCoQuyen_ngaySaiDinhDang_van403KhongRedirect() throws Exception {
+        // Trước bản vá: ngày sai định dạng được kiểm trước, người không có quyền
+        // nhận redirect error=payment_failed thay vì 403 MSG-022.
+        loginUser(salesSubordinate);
+        markPaidRequest("18/11/2026");
+
+        controller.doPost(request, response);
+
+        verify(response).sendError(HttpServletResponse.SC_FORBIDDEN, PermissionService.MSG_022);
+        verify(response, never()).sendRedirect(anyString());
+        verify(paymentService, never()).markPaymentPaid(anyInt(), anyInt(), any(), any());
+    }
+
+    @Test
+    public void markPaid_khongCoQuyen_ngayHopLe_bi403MaKhongGoiService() throws Exception {
+        loginUser(salesSubordinate);
+        markPaidRequest("2026-11-18");
+
+        controller.doPost(request, response);
+
+        verify(response).sendError(HttpServletResponse.SC_FORBIDDEN, PermissionService.MSG_022);
+        verify(paymentService, never()).markPaymentPaid(anyInt(), anyInt(), any(), any());
+    }
+
+    @Test
+    public void markPaid_chuaDangNhap_bi403() throws Exception {
+        loginUser(null);
+        markPaidRequest("18/11/2026");
+
+        controller.doPost(request, response);
+
+        verify(response).sendError(HttpServletResponse.SC_FORBIDDEN, PermissionService.MSG_022);
+        verify(response, never()).sendRedirect(anyString());
+    }
+
+    @Test
+    public void markPaid_thieuMaKy_vanVeNotFoundTruocKhiKiemQuyen() throws Exception {
+        // Thứ tự giữ nguyên với mã sai: thiếu mã kỳ là notfound, không phải 403.
+        loginUser(salesSubordinate);
+        when(request.getParameter("action")).thenReturn("markPaid");
+        when(request.getParameter("contractId")).thenReturn("10");
+        when(request.getParameter("paymentId")).thenReturn(null);
+
+        controller.doPost(request, response);
+
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?error=notfound");
+        verify(response, never()).sendError(anyInt(), anyString());
+    }
+
+    @Test
+    public void markPaid_permissionThat_kyThuatNgaySai_bi403() throws Exception {
+        // PermissionService thật: vai ngoài danh sách (Kỹ thuật) bị chặn bởi
+        // canMarkPaymentPaid thật, không nhờ mock trả false.
+        User tech = buildUser(8, PermissionService.ROLE_TECHNICAL, null);
+        when(employeeDAO.findById(8)).thenReturn(tech);
+        PermissionService realPs = new PermissionService(employeeDAO);
+        ContractPaymentController ctrl = new ContractPaymentController(contractDAO, employeeDAO, paymentService, realPs);
+        loginUser(tech);
+        markPaidRequest("18/11/2026");
+
+        ctrl.doPost(request, response);
+
+        verify(response).sendError(HttpServletResponse.SC_FORBIDDEN, PermissionService.MSG_022);
+        verify(response, never()).sendRedirect(anyString());
+        verify(paymentService, never()).markPaymentPaid(anyInt(), anyInt(), any(), any());
     }
 }

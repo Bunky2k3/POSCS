@@ -92,8 +92,8 @@ public class DashboardService extends BaseService {
     }
 
     private ScopeResolution resolveScope(User me, String scopeParam) {
-        boolean isAdmin = isAdminUser(me);
-        boolean mine = scopeParam == null ? (me != null && !isAdmin) : SCOPE_MINE.equals(scopeParam);
+        boolean defaultsToAll = isAdminUser(me) || isGeneralUser(me);
+        boolean mine = scopeParam == null ? (me != null && !defaultsToAll) : SCOPE_MINE.equals(scopeParam);
         List<Integer> ownerIds = mine && me != null ? employeeDAO.findTeamUserIds(me.getUserId()) : null;
         boolean effectiveMine = ownerIds != null;
         int teamSize = ownerIds == null ? 0 : ownerIds.size();
@@ -147,6 +147,15 @@ public class DashboardService extends BaseService {
     private static boolean isAdminUser(User user) {
         return user != null && user.getRole() != null
                 && PermissionService.ROLE_ADMIN.equals(user.getRole().getRoleName());
+    }
+
+    /**
+     * Vai Tổng hợp mở Dashboard thì mặc định "Toàn chi nhánh" như Admin: họ không đứng tên
+     * khách hàng hay hợp đồng nào, mặc định "Của tôi" là trang toàn số 0.
+     */
+    private static boolean isGeneralUser(User user) {
+        return user != null && user.getRole() != null
+                && PermissionService.ROLE_GENERAL.equals(user.getRole().getRoleName());
     }
 
     private static List<Integer> parseProvinceIds(String[] raw) {

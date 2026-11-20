@@ -885,4 +885,174 @@ public class PermissionServiceTest {
         PermissionService defaultService = new PermissionService();
         assertNotNull(defaultService);
     }
+
+    // ==================================================================
+    // Task 9.2: Vai Tổng hợp (SPEC 3.1, 3.3)
+    // ==================================================================
+
+    private static final int DEPT_TONG_HOP = 4;
+    private static final int DEPT_KINH_DOANH = 2;
+
+    private User generalUser() {
+        User u = createUser(7, "tonghop1", PermissionService.ROLE_GENERAL, DEPT_TONG_HOP, null);
+        when(employeeDAO.findById(7)).thenReturn(u);
+        return u;
+    }
+
+    @Test
+    public void isGeneral_chiDungVoiVaiTongHop() {
+        User general = generalUser();
+
+        assertEquals("Tổng hợp", PermissionService.ROLE_GENERAL);
+        assertTrue(permissionService.isGeneral(general));
+        assertFalse(permissionService.isGeneral(adminUser));
+        assertFalse(permissionService.isGeneral(salesRegionalManager));
+        assertFalse(permissionService.isGeneral(technicalUser));
+        assertFalse(permissionService.isGeneral(null));
+        // Tổng hợp không phải Admin hay Sales
+        assertFalse(permissionService.isAdmin(general));
+        assertFalse(permissionService.isSales(general));
+    }
+
+    @Test
+    public void tongHop_xemDuocKhachHangHopDongSanPham() {
+        User general = generalUser();
+
+        assertTrue(permissionService.canViewCustomers(general));
+        assertTrue(permissionService.checkCanViewCustomers(general).isSuccess());
+        assertTrue(permissionService.canExportCustomers(general));
+        assertTrue(permissionService.canViewContracts(general));
+        assertTrue(permissionService.checkCanViewContracts(general).isSuccess());
+        assertTrue(permissionService.canExportContracts(general));
+        assertTrue(permissionService.canViewProducts(general));
+        assertTrue(permissionService.checkCanViewProducts(general).isSuccess());
+        assertTrue(permissionService.canViewNotifications(general));
+    }
+
+    @Test
+    public void tongHop_khongGhiDuocKhachHangSanPhamHopDong_MSG022() {
+        User general = generalUser();
+
+        assertFalse(permissionService.canCreateCustomer(general));
+        assertMsg022(permissionService.checkCanCreateCustomer(general));
+        assertFalse(permissionService.canUpdateCustomer(general));
+        assertFalse(permissionService.canDeleteCustomer(general));
+        assertMsg022(permissionService.checkCanDeleteCustomer(general));
+        assertFalse(permissionService.canRateCustomer(general));
+
+        assertFalse(permissionService.canCreateProduct(general));
+        assertMsg022(permissionService.checkCanCreateProduct(general));
+        assertFalse(permissionService.canUpdateProduct(general));
+        assertFalse(permissionService.canDeleteProduct(general));
+
+        assertFalse(permissionService.canCreateContract(general));
+        assertMsg022(permissionService.checkCanCreateContract(general));
+        assertFalse(permissionService.canUpdateContract(general));
+        assertFalse(permissionService.canSignContract(general));
+        assertFalse(permissionService.canVoidContract(general, true));
+        assertFalse(permissionService.canVoidContract(general, false));
+        assertFalse(permissionService.canCreateAmendment(general));
+        assertFalse(permissionService.canLinkContracts(general));
+        assertFalse(permissionService.canInitiateHandover(general));
+        assertMsg022(permissionService.checkCanInitiateHandover(general));
+        assertFalse(permissionService.canManageContractDocuments(general));
+        assertFalse(permissionService.canManageContractProducts(general));
+        assertFalse(permissionService.canCorrectSignedContract(general));
+    }
+
+    @Test
+    public void tongHop_khongVaoPhieuHoTroVaNhanVien_MSG022() {
+        User general = generalUser();
+
+        assertFalse(permissionService.canViewTickets(general));
+        assertMsg022(permissionService.checkCanViewTickets(general));
+        assertFalse(permissionService.canExportTickets(general));
+        assertFalse(permissionService.canCreateTicket(general));
+        assertFalse(permissionService.canUpdateTicket(general, 7));
+        assertFalse(permissionService.canDeleteTicket(general));
+
+        assertFalse(permissionService.canManageEmployees(general));
+        assertMsg022(permissionService.checkCanManageEmployees(general));
+        assertFalse(permissionService.canViewSystemLogs(general));
+    }
+
+    @Test
+    public void ghiNhanDaThu_tongHopDuoc_nhungKhongLapXoaKy() {
+        User general = generalUser();
+
+        // Chỉ ghi nhận đã thu (UC-53)
+        assertTrue(permissionService.canMarkPaymentPaid(general));
+        assertTrue(permissionService.checkCanMarkPaymentPaid(general).isSuccess());
+        // Lập / xoá kỳ vẫn theo quyền quản lý kỳ
+        assertFalse(permissionService.canManageContractPayments(general));
+        assertMsg022(permissionService.checkCanManageContractPayments(general));
+    }
+
+    @Test
+    public void ghiNhanDaThu_maTranDayDuCacVai() {
+        // Admin, Sales quản lý vùng: được (như trước Task 9.2)
+        assertTrue(permissionService.canMarkPaymentPaid(adminUser));
+        assertTrue(permissionService.canMarkPaymentPaid(salesRegionalManager));
+        // Sales có cấp trên, Kỹ thuật, null: không
+        assertFalse(permissionService.canMarkPaymentPaid(salesStaff));
+        assertMsg022(permissionService.checkCanMarkPaymentPaid(salesStaff));
+        assertFalse(permissionService.canMarkPaymentPaid(technicalUser));
+        assertFalse(permissionService.canMarkPaymentPaid(null));
+    }
+
+    @Test
+    public void tongHopBiKhoaTaiKhoan_matHetQuyen() {
+        User general = generalUser();
+        User locked = createUser(7, "tonghop1", PermissionService.ROLE_GENERAL, DEPT_TONG_HOP, null);
+        locked.setDeleted(true);
+        when(employeeDAO.findById(7)).thenReturn(locked);
+
+        assertFalse(permissionService.isGeneral(general));
+        assertFalse(permissionService.canViewContracts(general));
+        assertFalse(permissionService.canMarkPaymentPaid(general));
+        assertFalse(permissionService.canConfirmHandover(general, DEPT_TONG_HOP));
+        ListScope lockedScope = permissionService.getContractListScope(general, "mine");
+        assertTrue(lockedScope.isNarrowed());
+        assertEquals(List.of(-1), lockedScope.getOwnerIds());
+    }
+
+    @Test
+    public void listScope_tongHopXemToanChiNhanh() {
+        User general = generalUser();
+
+        assertEquals(ListScope.all(), permissionService.getCustomerListScope(general, "mine"));
+        assertEquals(ListScope.all(), permissionService.getCustomerListScope(general, AccessControl.VIEW_ALL));
+        assertEquals(ListScope.all(), permissionService.getContractListScope(general, "mine"));
+        assertEquals(ListScope.all(), permissionService.getContractListScope(general, null));
+        // Không cần tra đội nhóm hay địa bàn của họ
+        verify(employeeDAO, never()).findTeamUserIds(7);
+        verify(employeeDAO, never()).findProvincesOf(7);
+    }
+
+    @Test
+    public void rowLevelScope_tongHopKhongGhiDuocTheoDong() {
+        User general = generalUser();
+        Enterprise customer = createEnterprise(50, 7, 1);
+
+        assertFalse(permissionService.isCustomerInScope(general, customer, List.of(PermissionService.ROLE_BUYER)));
+        assertFalse(permissionService.isContractInScope(general, 7, 1));
+        assertFalse(permissionService.canUpdateCustomer(general, customer, List.of(PermissionService.ROLE_BUYER)));
+    }
+
+    @Test
+    public void confirmHandover_tongHopXacNhanDuocPhongMinh_khongDuocPhongKhac() {
+        User general = generalUser();
+
+        assertTrue(permissionService.canConfirmHandover(general, DEPT_TONG_HOP));
+        assertTrue(permissionService.checkCanConfirmHandover(general, DEPT_TONG_HOP).isSuccess());
+
+        assertFalse(permissionService.canConfirmHandover(general, DEPT_KINH_DOANH));
+        assertMsg022(permissionService.checkCanConfirmHandover(general, DEPT_KINH_DOANH));
+        assertFalse(permissionService.canConfirmHandover(general, 0));
+
+        // Sales (phòng Kinh doanh) không xác nhận được chặng của phòng Tổng hợp
+        assertFalse(permissionService.canConfirmHandover(salesRegionalManager, DEPT_TONG_HOP));
+        // Admin xác nhận thay được
+        assertTrue(permissionService.canConfirmHandover(adminUser, DEPT_TONG_HOP));
+    }
 }

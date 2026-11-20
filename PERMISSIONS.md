@@ -34,6 +34,15 @@ any role — every single action (including list/view) requires Admin.
 | `Admin` | Full access to everything, including employee/user management |
 | `Sales` | Owns customer relationships, contracts, **and technical support tickets** (absorbed `CSKH`'s ticket ownership when that role was merged into Sales — see note below) |
 | `Kỹ thuật` (Technical) | Owns the product catalog and does technical support work |
+| `Tổng hợp` (General affairs) | The branch's `Phòng tổng hợp` (V40): views customers, contracts and products; confirms contract handovers sent to their department; records a payment instalment as collected. No other write access, and no access to tickets or employees |
+
+`Tổng hợp` was added on 2026-11-19 to match the branch's real structure
+(`docs/SPEC.md` §3.1): the separate `Kế toán` and `Dự án` departments of V32
+never existed as such — accounting, receiving handed-over contracts and
+collecting payments are all done by one department, `Tổng hợp`. V40 renames
+`Kế toán` to `Tổng hợp`, moves every handover of `Dự án` and `Kỹ thuật` onto
+it, closes the duplicates that leaves open on the same contract, and drops
+`Dự án`. `Tổng hợp` is now the **only** department that receives handovers.
 
 `CSKH` (Customer Support) has been **removed and merged into `Sales`**: the
 role added no distinct access beyond ticket ownership, so rather than keep a
@@ -149,15 +158,34 @@ The hierarchy split only narrows **Customer and Contract** (`HIERARCHY_RESTRICTE
 in `AccessControl`) — it does not apply to Ticket, so a Sales *staff* member
 has the same Full access to tickets as a Sales *manager*, unlike the † rows.
 
-| Resource | Admin | Sales — manager | Sales — staff | Kỹ thuật |
-|---|---|---|---|---|
-| Customer (`enterprises`) | Full | Full | View only † | View only |
-| Contract (`contracts`) | Full | Full | View only † | View only |
-| Product (`products`) | Full | View only | View only | Full |
-| Ticket (`technicalrequests`) | Full | Full | Full | View only* |
-| Employee (`users`) | Full | No access | No access | No access |
-| System log (`/systemLog`) | Full | No access | No access | No access |
-| Branch info (`branch_info`, `/branch`, UC-55) | Full ‡ | No access | No access | No access |
+| Resource | Admin | Sales — manager | Sales — staff | Kỹ thuật | Tổng hợp |
+|---|---|---|---|---|---|
+| Customer (`enterprises`) | Full | Full | View only † | View only | View only |
+| Contract (`contracts`) | Full | Full | View only † | View only | View only § |
+| Product (`products`) | Full | View only | View only | Full | View only |
+| Ticket (`technicalrequests`) | Full | Full | Full | View only* | No access |
+| Employee (`users`) | Full | No access | No access | No access | No access |
+| System log (`/systemLog`) | Full | No access | No access | No access | No access |
+| Branch info (`branch_info`, `/branch`, UC-55) | Full ‡ | No access | No access | No access | No access |
+
+§ **Two writes on Contract for `Tổng hợp`, neither through `FULL_ACCESS_ROLES`:**
+- **Record a payment instalment as collected** (UC-53, `action=markPaid`):
+  `PermissionService.canMarkPaymentPaid` = `canManageContractPayments`
+  (Admin, Sales manager) **or** `Tổng hợp`. Creating or deleting an instalment
+  still needs `canManageContractPayments`, so `Tổng hợp` gets `MSG-022` there.
+  The button sits on the contract **detail** page (`viewcontractdetail.jsp`,
+  modal with the collection date), since `Tổng hợp` cannot open the edit page;
+  `ContractPaymentController` sends them back to the detail page afterwards.
+- **Confirm a handover** (UC-49): checked by **department**, not role
+  (`AccessControl.canCompleteHandover`, `PermissionService.canConfirmHandover`)
+  — anyone in the `Tổng hợp` department may close that department's open
+  handover; Admin may close any.
+
+`Tổng hợp` sees the whole branch by default on the customer and contract lists
+and on the Dashboard (`getCustomerListScope` / `getContractListScope` return
+"all", like Admin): they own no customer or contract, so "mine" would be empty.
+Every ticket screen returns 403 for them (`PermissionService.canViewTickets`),
+and the sidebar hides the "Phiếu hỗ trợ" entry.
 
 \* **Exception:** `Kỹ thuật` may update the `status`, `rootCause`,
 `causeCategory`, `handlingPlan` and `resolutionSummary` of a ticket assigned to them

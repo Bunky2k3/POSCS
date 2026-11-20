@@ -449,4 +449,86 @@ public class ContractPaymentServiceTest {
         assertEquals("", ContractPaymentService.formatDate(null));
         assertEquals("20/10/2026", ContractPaymentService.formatDate(Date.valueOf("2026-10-20")));
     }
+
+    // ==================================================================
+    // Task 9.2: vai Tổng hợp CHỈ ghi nhận đã thu (SPEC 3.3, UC-53)
+    // ==================================================================
+
+    private User generalUser() {
+        User u = buildUser(6, PermissionService.ROLE_GENERAL, null, false);
+        when(employeeDAO.findById(6)).thenReturn(u);
+        return u;
+    }
+
+    @Test
+    public void markPaymentPaid_tongHop_ghiNhanDuocVaGhiDungNguoiBam() {
+        User general = generalUser();
+        when(contractDAO.findById(10)).thenReturn(sampleContract(10, PROGRESS_SIGNED));
+        Date paid = Date.valueOf("2026-11-18");
+        when(paymentDAO.markPaymentPaid(1, 10, paid, 6)).thenReturn(true);
+
+        ServiceResult<Void> r = service.markPaymentPaid(10, 1, paid, general);
+
+        assertTrue(r.isSuccess());
+        assertEquals("Ghi nhận đã thu thành công.", r.getMessage());
+        verify(paymentDAO).markPaymentPaid(1, 10, paid, 6);
+    }
+
+    @Test
+    public void markPaymentPaid_tongHop_hopDongDaThanhLyVanGhiNhanDuoc() {
+        // Như Admin/Sales: tiền bảo lãnh, bảo hành thường về sau thanh lý.
+        User general = generalUser();
+        when(contractDAO.findById(10)).thenReturn(sampleContract(10, PROGRESS_LIQUIDATED));
+        Date today = Date.valueOf(LocalDate.now());
+        when(paymentDAO.markPaymentPaid(1, 10, today, 6)).thenReturn(true);
+
+        assertTrue(service.markPaymentPaid(10, 1, null, general).isSuccess());
+        verify(paymentDAO).markPaymentPaid(1, 10, today, 6);
+    }
+
+    @Test
+    public void markPaymentPaid_tongHopDaKhoa_biChan() {
+        User lockedGeneral = buildUser(7, PermissionService.ROLE_GENERAL, null, true);
+        when(employeeDAO.findById(7)).thenReturn(lockedGeneral);
+
+        ServiceResult<Void> r = service.markPaymentPaid(10, 1, null, lockedGeneral);
+
+        assertFalse(r.isSuccess());
+        assertEquals(ContractPaymentService.ERR_FORBIDDEN, r.getMessage());
+        verify(paymentDAO, never()).markPaymentPaid(anyInt(), anyInt(), any(), anyInt());
+    }
+
+    @Test
+    public void markPaymentPaid_vaiKhacNgoaiDanhSach_vanBiChan() {
+        // Mở cho Tổng hợp không được mở luôn cho Kỹ thuật hay Sales có cấp trên.
+        ServiceResult<Void> tech = service.markPaymentPaid(10, 1, null, techUser);
+        ServiceResult<Void> staff = service.markPaymentPaid(10, 1, null, salesSubordinate);
+
+        assertEquals(ContractPaymentService.ERR_FORBIDDEN, tech.getMessage());
+        assertEquals(ContractPaymentService.ERR_FORBIDDEN, staff.getMessage());
+        verify(paymentDAO, never()).markPaymentPaid(anyInt(), anyInt(), any(), anyInt());
+    }
+
+    @Test
+    public void addPayment_tongHop_biChan() {
+        User general = generalUser();
+        ContractPayment payment = samplePayment(new BigDecimal("10000000"), Date.valueOf("2026-12-01"), null);
+
+        ServiceResult<ContractPayment> r = service.addPayment(10, payment, general);
+
+        assertFalse(r.isSuccess());
+        assertEquals(ContractPaymentService.ERR_FORBIDDEN, r.getMessage());
+        verify(paymentDAO, never()).insertPayment(anyInt(), any(), anyInt());
+    }
+
+    @Test
+    public void deletePayment_tongHop_biChan() {
+        User general = generalUser();
+
+        ServiceResult<Void> r = service.deletePayment(10, 1, general);
+
+        assertFalse(r.isSuccess());
+        assertEquals(ContractPaymentService.ERR_FORBIDDEN, r.getMessage());
+        verify(paymentDAO, never()).deletePayment(anyInt(), anyInt(), anyInt());
+    }
 }

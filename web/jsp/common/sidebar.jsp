@@ -56,13 +56,15 @@
              mình đang đứng ở đâu. Phải loại trừ cả handover. --%>
         <a href="${pageContext.request.contextPath}/contract?kind=sell" class="sidebar-link ${activeNav == 'contract' and activeContractKind != 'buy' and activeContractKind != 'handover' ? 'active' : ''}"><i class="fa-solid fa-file-export"></i><span>Hợp đồng bán</span></a>
         <a href="${pageContext.request.contextPath}/contract?kind=buy" class="sidebar-link ${activeNav == 'contract' and activeContractKind == 'buy' ? 'active' : ''}"><i class="fa-solid fa-file-import"></i><span>Hợp đồng mua</span></a>
-        <%-- Hàng đợi bàn giao: hợp đồng đang nằm chờ ở Kế toán / Dự án. Để
+        <%-- Hàng đợi bàn giao: hợp đồng đang nằm chờ ở phòng Tổng hợp. Để
              trong mục Hợp đồng vì đó là việc của hợp đồng, nhưng KHÔNG mang
              tham số kind -- nó không thuộc chiều bán hay mua nào cả. --%>
         <a href="${pageContext.request.contextPath}/contract?action=handovers" class="sidebar-link ${activeNav == 'contract' and activeContractKind == 'handover' ? 'active' : ''}"><i class="fa-solid fa-share-from-square"></i><span>Bàn giao xử lý</span></a>
     </div>
     <a href="${pageContext.request.contextPath}/product" class="sidebar-link ${activeNav == 'product' ? 'active' : ''}"><i class="fa-solid fa-box"></i><span>Sản phẩm</span></a>
-    <a href="${pageContext.request.contextPath}/ticket" class="sidebar-link ${activeNav == 'ticket' ? 'active' : ''}"><i class="fa-solid fa-headset"></i><span>Phiếu hỗ trợ</span></a>
+    <%-- Vai Tổng hợp không vào phiếu hỗ trợ (SPEC 3.3). Ẩn ở đây chỉ là cho
+         gọn menu; mọi màn hình phiếu tự trả 403 qua PermissionService.canViewTickets. --%>
+    <c:if test="${sessionScope.currentUser.role.roleName != 'Tổng hợp'}"><a href="${pageContext.request.contextPath}/ticket" class="sidebar-link ${activeNav == 'ticket' ? 'active' : ''}"><i class="fa-solid fa-headset"></i><span>Phiếu hỗ trợ</span></a></c:if>
     <c:if test="${sessionScope.currentUser.role.roleName == 'Admin'}"><a href="${pageContext.request.contextPath}/employee" class="sidebar-link ${activeNav == 'employee' ? 'active' : ''}"><i class="fa-solid fa-user-tie"></i><span>Nhân viên</span></a></c:if>
     <%-- Thông tin chi nhánh (UC-55): chỉ Admin. Ẩn ở đây chỉ là cho gọn menu;
          BranchInfoController tự chặn quyền bằng AccessControl.requireAdmin. --%>
