@@ -1,13 +1,16 @@
 package poscs.model;
 
+import java.sql.Date;
 import java.sql.Timestamp;
 import java.util.List;
 
 /**
- * Một giấy tờ kèm theo hợp đồng (bảng {@code contract_documents}, V34).
+ * Một giấy tờ của hợp đồng (bảng {@code contract_documents}, V34; dạng ô tích
+ * từ V44, BR-59 / UC-52): một tờ = loại, ngày trên giấy, số giấy, đường dẫn
+ * (không bắt buộc), ghi chú.
  *
- * <p>CHỈ lưu LINK, không lưu file: hồ sơ của khách đang nằm trên Drive và vẫn
- * sẽ nằm ở đó. Hệ quả phải nhớ -- hệ thống không giữ bản sao nào, ai xoá file
+ * <p>KHÔNG lưu file, chỉ lưu LINK nếu có: hồ sơ của khách đang nằm trên Drive và
+ * vẫn sẽ nằm ở đó. Hệ quả phải nhớ -- hệ thống không giữ bản sao nào, ai xoá file
  * trên Drive thì dòng này thành link chết, và quyền xem file do Drive quyết
  * chứ không phải POSCS.
  *
@@ -18,30 +21,46 @@ import java.util.List;
 public class ContractDocument {
 
     /**
-     * Danh mục loại giấy tờ hiện dùng cho ô chọn.
+     * Danh mục loại giấy tờ (BR-59), theo đúng thứ tự hiện trên tab "Giấy tờ".
      *
      * <p>Ở Java chứ không phải ENUM trong CSDL: cột {@code doc_type} là varchar
      * không ràng buộc giá trị, nên thêm một loại là sửa đúng danh sách này.
-     * Danh mục CHÍNH THỨC còn phải chốt với khách hàng -- đây là bộ tạm đủ
-     * dùng, dựng theo những giấy tờ đã nhắc tới trong lúc bàn.
+     * Nguồn: quyết định 15 trong {@code task_tracker.md} / SPEC §11 (người dùng chốt
+     * 19/11/2026, dựng theo hồ sơ một hợp đồng mua bán thật). "Khác" luôn đứng
+     * cuối và bắt nhập tên giấy tờ. Loại cũ trước V44 đã được đổi sang danh mục này.
      */
     public static final List<String> TYPES = List.of(
+            "Phiếu GQNCKH",
+            "Phiếu ĐCNB",
+            "Biên bản giao nhận hàng hoá",
             "Hợp đồng đã ký",
             "Phụ lục đã ký",
-            "Biên bản nghiệm thu",
-            "Biên bản bàn giao",
+            "Đề nghị tạm ứng",
+            "Bảo lãnh tạm ứng",
+            "Biên bản nghiệm thu bàn giao",
+            "CO",
+            "CQ",
+            "Đề nghị thanh toán",
+            "Hoá đơn GTGT",
+            "Biên bản phạt",
             "Biên bản thanh lý",
-            "Báo giá / Đơn đặt hàng",
-            "Hoá đơn",
             "Khác");
 
-    /** Loại mặc định của ô chọn -- và là loại mà V34 gán cho dữ liệu dời sang. */
+    /** Bản gốc của chính hợp đồng -- nút "Mở bản PDF" ở trang chi tiết lấy loại này. */
     public static final String TYPE_SIGNED_CONTRACT = "Hợp đồng đã ký";
+
+    /** Loại "Khác": bắt nhập tên giấy tờ (BR-59), và là chỗ gom loại lạ khi hiển thị. */
+    public static final String TYPE_OTHER = "Khác";
 
     private int documentId;
     private int contractId;
     private String docType;
     private String title;
+    /** Ngày ghi trên tờ giấy (BR-59): bắt buộc, không sau hôm nay. */
+    private Date docDate;
+    /** Số giấy, tối đa 50 ký tự; không bắt buộc. */
+    private String docNo;
+    /** Đường dẫn tới bản scan, KHÔNG bắt buộc từ V44 (nhiều tờ chỉ có bản giấy). */
     private String fileUrl;
     private String note;
     private int uploadedBy;
@@ -67,6 +86,12 @@ public class ContractDocument {
 
     public String getTitle() { return title; }
     public void setTitle(String title) { this.title = title; }
+
+    public Date getDocDate() { return docDate; }
+    public void setDocDate(Date docDate) { this.docDate = docDate; }
+
+    public String getDocNo() { return docNo; }
+    public void setDocNo(String docNo) { this.docNo = docNo; }
 
     public String getFileUrl() { return fileUrl; }
     public void setFileUrl(String fileUrl) { this.fileUrl = fileUrl; }
@@ -101,5 +126,15 @@ public class ContractDocument {
     /** Nhãn hiện trên màn hình: tên người dùng đặt, không có thì lấy loại giấy tờ. */
     public String getDisplayName() {
         return title == null || title.trim().isEmpty() ? docType : title;
+    }
+
+    /**
+     * Ô tích mà tờ này nằm dưới trên tab "Giấy tờ": chính loại của nó nếu loại có
+     * trong {@link #TYPES}, còn không thì "Khác". Loại cũ đã được V44 đổi hết sang
+     * danh mục mới; đây chỉ là chốt để một loại lạ (ghi thẳng vào CSDL) vẫn hiện ra
+     * thay vì biến mất khỏi màn hình.
+     */
+    public String getCategory() {
+        return docType != null && TYPES.contains(docType) ? docType : TYPE_OTHER;
     }
 }

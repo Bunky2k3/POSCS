@@ -146,7 +146,45 @@
         .btn-step.danger { color: var(--danger); border-color: var(--danger); }
         .locked-note { font-size: 0.83rem; color: #6b7280; display: flex; align-items: flex-start; gap: 8px; }
 
-        @media (max-width: 768px) { .card-box { padding: 20px 18px 22px; } }
+        /* ===== Giấy tờ dạng ô tích (BR-59) =====
+           Cùng bộ giá trị với khối "Giấy tờ" ở viewcontractdetail.jsp để hai trang
+           nhìn như một; trang kia chỉ đọc nên không có nút. */
+        .paper-list { list-style: none; margin: 0; padding: 0; }
+        .paper-item { border-bottom: 1px solid #f3f4f6; padding: 10px 0; }
+        .paper-item:last-child { border-bottom: none; }
+        .paper-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+        .paper-box {
+            width: 22px; height: 22px; border-radius: 6px; border: 1.5px solid #cbd5e1; background: #fff;
+            display: inline-flex; align-items: center; justify-content: center; flex: 0 0 22px; padding: 0;
+            font-size: 0.72rem; color: #fff;
+        }
+        button.paper-box { cursor: pointer; }
+        button.paper-box:hover { border-color: var(--primary); background: #eaf6ff; }
+        .paper-box.is-checked { background: var(--primary); border-color: var(--primary); }
+        .paper-name { font-size: 0.9rem; font-weight: 600; color: #111827; }
+        .paper-name.is-empty { font-weight: 500; color: #6b7280; }
+        .paper-count { font-size: 0.75rem; color: #6b7280; background: #f3f4f6; border-radius: 999px; padding: 2px 8px; }
+        .paper-add {
+            margin-left: auto; border: none; background: none; color: var(--primary); font-weight: 600;
+            font-size: 0.8rem; cursor: pointer; padding: 2px 4px;
+        }
+        .paper-add:hover { text-decoration: underline; }
+        .paper-sheets { list-style: none; margin: 8px 0 0 32px; padding: 0; }
+        .paper-sheet {
+            display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+            padding: 8px 12px; border-radius: 10px; background: #f9fafb; margin-bottom: 6px; font-size: 0.86rem;
+        }
+        .paper-sheet:last-child { margin-bottom: 0; }
+        .paper-sheet-meta { font-size: 0.78rem; color: #9ca3af; margin-top: 2px; }
+        .paper-sheet-actions { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+        .modal-body .paper-field { margin-bottom: 12px; }
+        .modal-body .paper-field .form-control { width: 100%; }
+        .modal-body .paper-field .req { color: var(--danger); }
+
+        @media (max-width: 768px) {
+            .card-box { padding: 20px 18px 22px; }
+            .paper-sheets { margin-left: 0; }
+        }
     </style>
 </head>
 <body>
@@ -195,7 +233,7 @@
                     <i class="fa-solid fa-lock" style="margin-top:3px;"></i>
                     <span><strong>Hợp đồng ở trạng thái “${fn:escapeXml(contract.progressStatus)}”.</strong>
                         Nội dung không sửa được nữa, kể cả bởi quản trị viên — phát sinh sau thời điểm
-                        này phải lập hợp đồng mới. Bên dưới vẫn làm được: ghi nhận tiền về, thêm/huỷ tài liệu,
+                        này phải lập hợp đồng mới. Bên dưới vẫn làm được: ghi nhận tiền về, tích/bỏ tích giấy tờ,
                         nối hợp đồng bán – mua, và đóng các chặng bàn giao còn đang treo.</span>
                 </div>
             </div>
@@ -209,17 +247,21 @@
 
         <%-- Thông báo lỗi đứng NGOÀI khối "chưa đóng băng" của form sửa.
              Trước V34 nó nằm bên trong, và điều đó vừa đủ đúng vì hợp đồng đã
-             đóng băng thì chẳng còn thao tác nào ghi được. Giờ thì có: tài liệu
-             thêm/huỷ được ở MỌI trạng thái, nên lỗi của chúng cũng phải hiện
+             đóng băng thì chẳng còn thao tác nào ghi được. Giờ thì có: giấy tờ
+             tích/bỏ tích được ở MỌI trạng thái, nên lỗi của chúng cũng phải hiện
              được ở mọi trạng thái -- để bên trong thì bấm hỏng trên một hợp
              đồng đã thanh lý là màn hình đứng im không nói gì. --%>
         <c:if test="${not empty param.error}">
         <div class="card-box" style="padding:14px 18px;">
                 <div class="alert alert-danger py-2 px-3 mb-3" style="font-size: 0.9rem; border-radius: 12px;">
                     <c:choose>
-                        <c:when test="${param.error == 'document_invalid'}">Không thêm được tài liệu: link phải bắt đầu bằng http:// hoặc https://, và loại tài liệu phải chọn trong danh sách.</c:when>
-                        <c:when test="${param.error == 'document_reason_required'}">Phải nêu lý do thì mới huỷ được tài liệu.</c:when>
-                        <c:when test="${param.error == 'document_failed'}">Không thực hiện được trên tài liệu này. Vui lòng thử lại.</c:when>
+                        <c:when test="${param.error == 'document_invalid'}">Không lưu được giấy tờ: link (nếu có) phải bắt đầu bằng http:// hoặc https://, loại giấy tờ phải chọn trong danh mục, số giấy tối đa 50 ký tự, lý do bỏ tích tối đa 255 ký tự.</c:when>
+                        <%-- MSG-062, MSG-063 (BR-59): chép đúng chữ của SPEC. --%>
+                        <c:when test="${param.error == 'document_date_required'}">Vui lòng nhập ngày trên giấy tờ.</c:when>
+                        <c:when test="${param.error == 'document_date_future'}">Ngày trên giấy tờ không được sau hôm nay.</c:when>
+                        <c:when test="${param.error == 'document_title_required'}">Loại “Khác” phải nhập tên giấy tờ.</c:when>
+                        <c:when test="${param.error == 'document_reason_required'}">Phải nêu lý do thì mới bỏ tích được giấy tờ.</c:when>
+                        <c:when test="${param.error == 'document_failed'}">Không thực hiện được trên giấy tờ này. Vui lòng thử lại.</c:when>
                         <c:when test="${param.error == 'invalid'}">Thông tin hợp đồng chưa hợp lệ. Vui lòng kiểm tra lại các ô bắt buộc.</c:when>
                         <c:when test="${param.error == 'duplicate_code'}">Mã hợp đồng này đã có hợp đồng khác dùng. Kiểm lại số trên bản giấy hoặc nhập mã khác.</c:when>
                         <c:when test="${param.error == 'update_failed'}">Không lưu được thay đổi. Vui lòng thử lại.</c:when>
@@ -269,7 +311,7 @@
                             <i class="fa-solid fa-file-signature" style="margin-top:3px;"></i>
                             <div>
                                 <strong>Hợp đồng đã ký — điều khoản đã khoá.</strong>
-                                Bản PDF đã ký và các biên bản thì treo ở tab <strong>Tài liệu</strong> bên dưới.
+                                Bản hợp đồng đã ký và các biên bản thì tích ở tab <strong>Giấy tờ</strong> bên dưới.
                                 <div style="margin-top:6px;">
                                     Cần thay đổi điều khoản thì <strong>lập phụ lục</strong> — một văn bản riêng, có chữ ký.
                                     <c:if test="${canCorrect}">
@@ -500,7 +542,7 @@
                     </div>
 
                     <%-- Ô "link file PDF" cũ đã bỏ (V34): giấy tờ giờ là danh sách
-                         nhiều dòng ở tab "Tài liệu", không còn là một trường của
+                         nhiều dòng ở tab "Giấy tờ" (dạng ô tích từ V44), không còn là một trường của
                          hợp đồng. Hệ quả kèm theo: sau khi KÝ, trường duy nhất còn
                          sửa được ở form này là NGƯỜI PHỤ TRÁCH -- lý do cũ để mở ô
                          link ("bản PDF đã ký thường chỉ có sau khi ký") giờ được
@@ -620,7 +662,7 @@
                 </li>
                 <li class="nav-item" role="presentation">
                     <button class="nav-link" data-bs-toggle="tab" data-bs-target="#pane-tai-lieu"
-                            type="button" role="tab"><i class="fa-solid fa-folder-open me-2"></i>Tài liệu<c:if
+                            type="button" role="tab"><i class="fa-solid fa-folder-open me-2"></i>Giấy tờ<c:if
                             test="${not empty contractDocuments}"> (${fn:length(contractDocuments)})</c:if></button>
                 </li>
                 <c:if test="${canAddAmendment or not empty amendments}">
@@ -1110,113 +1152,106 @@
         </div>
 
             </div>
-            <%-- Tab Tài liệu KHÔNG nằm trong c:if nào: nút của nó luôn hiện, kể cả
-                 trên phụ lục (biên bản, bản scan của chính phụ lục treo ở đây).
+            <%-- Tab Giấy tờ KHÔNG nằm trong c:if nào: nút của nó luôn hiện, kể cả
+                 trên phụ lục (biên bản, bản scan của chính phụ lục tích ở đây).
                  Trước đây khung này lọt vào c:if canLinkContracts của tab Nối bán –
                  mua ngay dưới, nên trên phụ lục nút có mà khung không -- bấm vào
-                 trống trơn, không thêm được tài liệu nào. --%>
+                 trống trơn, không thêm được giấy tờ nào. --%>
             <div class="tab-pane fade" id="pane-tai-lieu" role="tabpanel">
-        <!-- ===== Giấy tờ kèm theo (V34) ===== -->
-        <%-- CHỈ LƯU LINK, không tải file lên. Khách hàng chốt như vậy: hồ sơ của
-             họ đang nằm trên Drive và vẫn sẽ nằm ở đó. Nói thẳng điều đó ra trên
-             màn hình chứ không để người dùng tự đoán vì sao không có nút chọn file.
+        <!-- ===== Giấy tờ của hợp đồng (BR-59, UC-52) ===== -->
+        <%-- Danh mục CỐ ĐỊNH dạng ô tích (ContractDocument.TYPES, "Khác" cuối):
+             hiện đủ mọi loại kể cả loại chưa có tờ nào, để nhìn vào là thấy còn
+             thiếu giấy gì. Một loại có nhiều tờ được (giao nhiều đợt, mỗi kỳ một
+             đề nghị thanh toán), mỗi tờ một dòng có nút bỏ tích riêng.
+
+             Bỏ tích = huỷ MỀM, bắt buộc lý do (modal ask()). Thêm tờ mở modal
+             #paperModal. KHÔNG upload file: link bản scan không bắt buộc.
+
+             doc.category = loại của tờ, loại lạ (ngoài danh mục) gom vào "Khác"
+             -- xem ContractDocument.getCategory().
 
              Khối này đứng NGOÀI form sửa (form lồng form là HTML không hợp lệ),
              cùng lẽ với khối hàng hoá và kỳ thanh toán. --%>
         <div class="card-box">
-            <div class="section-header"><h5>Tài liệu kèm theo</h5></div>
+            <div class="section-header"><h5>Giấy tờ của hợp đồng</h5></div>
             <p style="font-size:0.85rem; color:#6b7280; margin:0 0 14px;">
-                Treo biên bản nghiệm thu, biên bản bàn giao, biên bản thanh lý, hoá đơn… vào đúng hợp đồng này.
-                Hệ thống <strong>chỉ lưu link</strong> — tải file lên Drive (hoặc kho nội bộ) rồi dán link vào đây;
-                ai xoá file ở đó thì link này thành link chết.
-                <strong>Thêm được ở mọi trạng thái</strong>, kể cả sau khi đã thanh lý — phần lớn giấy tờ chỉ
-                sinh ra ở thời điểm đó.
+                Tích vào loại giấy đã có để ghi <strong>ngày trên giấy</strong> và số giấy. Một loại có thể có
+                nhiều tờ — bấm “Thêm tờ”. Link bản scan <strong>không bắt buộc</strong>; hệ thống không lưu file.
+                Bỏ tích một tờ thì phải nêu lý do. Làm được ở mọi trạng thái, kể cả sau khi đã thanh lý.
             </p>
 
-            <c:choose>
-                <c:when test="${empty contractDocuments}">
-                    <p style="font-size:0.88rem; color:#9ca3af; margin:0 0 14px;">Chưa có tài liệu nào.</p>
-                </c:when>
-                <c:otherwise>
-                    <div class="table-responsive">
-                        <table class="table align-middle" style="font-size:0.9rem;">
-                            <thead>
-                                <tr><th>Loại</th><th>Tên tài liệu</th><th>Người thêm</th><th>Ngày</th><th></th></tr>
-                            </thead>
-                            <tbody>
+            <ul class="paper-list">
+                <c:forEach var="t" items="${documentTypes}">
+                    <c:set var="paperCount" value="${0}"/>
+                    <c:forEach var="doc" items="${contractDocuments}">
+                        <c:if test="${doc.category == t}"><c:set var="paperCount" value="${paperCount + 1}"/></c:if>
+                    </c:forEach>
+                    <li class="paper-item">
+                        <div class="paper-head">
+                            <c:choose>
+                                <c:when test="${paperCount > 0}">
+                                    <span class="paper-box is-checked" role="img" aria-label="Đã có"><i class="fa-solid fa-check"></i></span>
+                                    <span class="paper-name">${fn:escapeXml(t)}</span>
+                                    <c:if test="${paperCount > 1}"><span class="paper-count">${paperCount} tờ</span></c:if>
+                                    <button type="button" class="paper-add js-add-paper" data-doc-type="${fn:escapeXml(t)}">
+                                        <i class="fa-solid fa-plus"></i> Thêm tờ
+                                    </button>
+                                </c:when>
+                                <c:otherwise>
+                                    <button type="button" class="paper-box js-add-paper" data-doc-type="${fn:escapeXml(t)}"
+                                            role="checkbox" aria-checked="false"
+                                            title="Tích: thêm tờ ${fn:escapeXml(t)}"
+                                            aria-label="Tích ${fn:escapeXml(t)}"></button>
+                                    <span class="paper-name is-empty">${fn:escapeXml(t)}</span>
+                                </c:otherwise>
+                            </c:choose>
+                        </div>
+                        <c:if test="${paperCount > 0}">
+                            <ul class="paper-sheets">
                                 <c:forEach var="doc" items="${contractDocuments}">
-                                    <tr>
-                                        <td><span class="status-pill status-info">${fn:escapeXml(doc.docType)}</span></td>
-                                        <td>
-                                            <div>${fn:escapeXml(doc.displayName)}</div>
-                                            <c:if test="${not empty doc.note}">
-                                                <div style="font-size:0.8rem; color:#9ca3af;">${fn:escapeXml(doc.note)}</div>
-                                            </c:if>
-                                        </td>
-                                        <td style="font-size:0.84rem;">${fn:escapeXml(doc.uploadedByName)}</td>
-                                        <td style="font-size:0.84rem;">
-                                            <fmt:formatDate value="${doc.uploadedAt}" pattern="dd/MM/yyyy"/>
-                                        </td>
-                                        <td style="text-align:right; white-space:nowrap;">
-                                            <a href="${fn:escapeXml(doc.fileUrl)}" target="_blank" rel="noopener noreferrer"
-                                               class="btn-outline-action" style="padding:4px 10px; font-size:0.8rem;">
-                                                Mở <i class="fa-solid fa-arrow-up-right-from-square"></i>
-                                            </a>
-                                            <%-- Huỷ là xoá MỀM và bắt buộc có lý do -- nút chỉ mở modal,
-                                                 việc gửi do submitOp làm. --%>
-                                            <button type="button" class="btn-remove-item js-void-doc"
-                                                    data-doc-id="${doc.documentId}"
-                                                    data-doc-name="${fn:escapeXml(doc.displayName)}"
-                                                    title="Huỷ tài liệu này">
-                                                <i class="fa-solid fa-xmark"></i>
-                                            </button>
-                                        </td>
-                                    </tr>
+                                    <c:if test="${doc.category == t}">
+                                        <li class="paper-sheet">
+                                            <div class="paper-sheet-main">
+                                                <div>
+                                                    <strong><fmt:formatDate value="${doc.docDate}" pattern="dd/MM/yyyy"/></strong>
+                                                    <c:if test="${not empty doc.docNo}"> · Số ${fn:escapeXml(doc.docNo)}</c:if>
+                                                    <c:if test="${not empty doc.title}"> · ${fn:escapeXml(doc.title)}</c:if>
+                                                </div>
+                                                <div class="paper-sheet-meta">
+                                                    <c:if test="${not empty doc.note}">${fn:escapeXml(doc.note)} · </c:if>
+                                                    Thêm bởi ${fn:escapeXml(doc.uploadedByName)}
+                                                    ngày <fmt:formatDate value="${doc.uploadedAt}" pattern="dd/MM/yyyy"/>
+                                                </div>
+                                            </div>
+                                            <div class="paper-sheet-actions">
+                                                <c:if test="${not empty doc.fileUrl}">
+                                                    <a href="${fn:escapeXml(doc.fileUrl)}" target="_blank" rel="noopener noreferrer"
+                                                       class="btn-outline-action" style="padding:4px 10px; font-size:0.8rem;">
+                                                        Mở <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                                                    </a>
+                                                </c:if>
+                                                <%-- Bỏ tích là xoá MỀM và bắt buộc có lý do -- nút chỉ mở modal,
+                                                     việc gửi do submitOp làm. --%>
+                                                <button type="button" class="btn-remove-item js-void-doc"
+                                                        data-doc-id="${doc.documentId}"
+                                                        data-doc-name="${fn:escapeXml(doc.displayName)}<c:if test="${not empty doc.docNo}"> số ${fn:escapeXml(doc.docNo)}</c:if> ngày <fmt:formatDate value="${doc.docDate}" pattern="dd/MM/yyyy"/>"
+                                                        title="Bỏ tích tờ này">
+                                                    <i class="fa-solid fa-xmark"></i>
+                                                </button>
+                                            </div>
+                                        </li>
+                                    </c:if>
                                 </c:forEach>
-                            </tbody>
-                        </table>
-                    </div>
-                </c:otherwise>
-            </c:choose>
-
-            <form method="POST" action="${pageContext.request.contextPath}/contract" class="row g-2 align-items-end"
-                  style="margin-top:16px; padding-top:16px; border-top:1.5px solid #eef2f6;">
-                <input type="hidden" name="csrfToken" value="${csrfToken}">
-                <input type="hidden" name="action" value="addDocument">
-                <input type="hidden" name="contractId" value="${contract.contractId}">
-                <div class="col-md-3">
-                    <label style="font-size:0.8rem; color:#6b7280;">Loại tài liệu</label>
-                    <select name="docType" class="form-control" required>
-                        <c:forEach var="t" items="${documentTypes}">
-                            <option value="${fn:escapeXml(t)}">${fn:escapeXml(t)}</option>
-                        </c:forEach>
-                    </select>
-                </div>
-                <div class="col-md-3">
-                    <label style="font-size:0.8rem; color:#6b7280;">Tên tài liệu</label>
-                    <input type="text" name="docTitle" class="form-control" maxlength="255"
-                           placeholder="VD: Biên bản nghiệm thu giai đoạn 1">
-                </div>
-                <div class="col-md-4">
-                    <label style="font-size:0.8rem; color:#6b7280;">Link tài liệu <span style="color:var(--danger);">*</span></label>
-                    <input type="url" name="fileUrl" class="form-control" required maxlength="500"
-                           placeholder="https://drive.google.com/file/d/...">
-                </div>
-                <div class="col-md-2">
-                    <button type="submit" class="btn-primary" style="width:100%;">
-                        <i class="fa-solid fa-plus me-1"></i> Thêm
-                    </button>
-                </div>
-                <div class="col-12">
-                    <input type="text" name="docNote" class="form-control" maxlength="255"
-                           placeholder="Ghi chú (không bắt buộc) — vd: bản scan có dấu, ký ngày 10/9">
-                </div>
-            </form>
+                            </ul>
+                        </c:if>
+                    </li>
+                </c:forEach>
+            </ul>
         </div>
 
             </div>
             <%-- Điều kiện GIỐNG HỆT nút tab ở trên: canLinkContracts. Chỉ bọc đúng
-                 khung này thôi -- xem ghi chú ở khung Tài liệu. --%>
+                 khung này thôi -- xem ghi chú ở khung Giấy tờ. --%>
             <c:if test="${canLinkContracts}">
             <div class="tab-pane fade" id="pane-noi-hd" role="tabpanel">
         <!-- ===== Đầu ra kéo theo đầu vào ===== -->
@@ -1406,6 +1441,63 @@
                     <button type="button" class="btn-modal-primary" id="askOk">Xác nhận</button>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <%-- Thêm một tờ giấy (BR-59). Form THẬT nằm trong modal, đứng ngoài mọi form
+         khác. Loại giấy do ô vừa bấm quyết định (JS điền #paperType), không chọn lại
+         ở đây. Câu báo ngày đúng MSG-062 / MSG-063, kiểm ngay tại chỗ; server kiểm
+         lại (ContractDocumentService) và nếu lọt thì báo ở băng lỗi đầu trang. --%>
+    <div class="modal fade" id="paperModal" tabindex="-1" aria-hidden="true" aria-labelledby="paperModalTitle">
+        <div class="modal-dialog modal-dialog-centered">
+            <form class="modal-content" id="paperForm" method="POST" action="${pageContext.request.contextPath}/contract" novalidate>
+                <input type="hidden" name="csrfToken" value="${csrfToken}">
+                <input type="hidden" name="action" value="addDocument">
+                <input type="hidden" name="contractId" value="${contract.contractId}">
+                <input type="hidden" name="docType" id="paperType">
+                <div class="modal-header">
+                    <div class="modal-icon-ask"><i class="fa-solid fa-file-circle-check"></i></div>
+                </div>
+                <div class="modal-body">
+                    <h5 class="modal-title" id="paperModalTitle">Thêm tờ</h5>
+                    <div class="modal-msg" style="font-size:0.84rem; color:#6b7280;">
+                        Ghi theo đúng tờ giấy. Link bản scan không bắt buộc.
+                    </div>
+                    <div class="row g-2">
+                        <div class="col-sm-6 paper-field">
+                            <label class="form-label" for="paperDate">Ngày trên giấy <span class="req">*</span></label>
+                            <input type="date" class="form-control" name="docDate" id="paperDate">
+                            <div class="modal-err" id="paperDateErr"></div>
+                        </div>
+                        <div class="col-sm-6 paper-field">
+                            <label class="form-label" for="paperNo">Số giấy</label>
+                            <input type="text" class="form-control" name="docNo" id="paperNo" maxlength="50"
+                                   placeholder="VD: 12/2026/BBGN">
+                        </div>
+                    </div>
+                    <div class="paper-field">
+                        <label class="form-label" for="paperTitle">Tên giấy tờ <span class="req" id="paperTitleReq" style="display:none;">*</span></label>
+                        <input type="text" class="form-control" name="docTitle" id="paperTitle" maxlength="255"
+                               placeholder="VD: Biên bản giao nhận đợt 1">
+                        <div class="modal-err" id="paperTitleErr"></div>
+                    </div>
+                    <div class="paper-field">
+                        <label class="form-label" for="paperUrl">Link bản scan (không bắt buộc)</label>
+                        <input type="url" class="form-control" name="fileUrl" id="paperUrl" maxlength="500"
+                               placeholder="https://drive.google.com/file/d/...">
+                        <div class="modal-err" id="paperUrlErr"></div>
+                    </div>
+                    <div class="paper-field">
+                        <label class="form-label" for="paperNote">Ghi chú</label>
+                        <input type="text" class="form-control" name="docNote" id="paperNote" maxlength="255"
+                               placeholder="VD: bản gốc lưu phòng Tổng hợp">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn-modal-cancel" data-bs-dismiss="modal">Huỷ bỏ</button>
+                    <button type="submit" class="btn-modal-primary"><i class="fa-solid fa-check me-1"></i> Lưu tờ này</button>
+                </div>
+            </form>
         </div>
     </div>
 
@@ -1634,20 +1726,21 @@
                 });
         }
 
-        // Huỷ tài liệu: xoá MỀM nên BẮT BUỘC lý do -- dòng ở lại trong CSDL, và
-        // nhật ký phải nói được vì sao nó biến mất khỏi màn hình.
+        // Bỏ tích một tờ giấy: xoá MỀM nên BẮT BUỘC lý do (BR-59) -- dòng ở lại
+        // trong CSDL, và nhật ký phải nói được vì sao nó biến mất khỏi màn hình.
         document.querySelectorAll('.js-void-doc').forEach(function (btn) {
             btn.addEventListener('click', function () {
                 ask({
-                    title: 'Huỷ tài liệu',
-                    message: 'Huỷ "' + btn.dataset.docName + '" khỏi hồ sơ hợp đồng? '
-                           + 'Dòng này vẫn nằm trong nhật ký, kèm lý do bạn nhập.',
+                    title: 'Bỏ tích giấy tờ',
+                    message: 'Bỏ tích "' + btn.dataset.docName + '" khỏi hồ sơ hợp đồng? '
+                           + 'Tờ này vẫn nằm trong nhật ký, kèm lý do bạn nhập.',
                     // ask() coi noteLabel là "có ô ghi chú VÀ bắt buộc điền" --
                     // không có cờ riêng, đừng thêm noteRequired cho có.
-                    noteLabel: 'Lý do huỷ (bắt buộc)',
-                    notePlaceholder: 'VD: dán nhầm link của hợp đồng khác',
+                    noteLabel: 'Lý do bỏ tích (bắt buộc)',
+                    notePlaceholder: 'VD: nhập nhầm ngày trên giấy',
+                    noteRequiredMsg: 'Phải nêu lý do thì mới bỏ tích được.',
                     danger: true,
-                    okLabel: 'Huỷ tài liệu'
+                    okLabel: 'Bỏ tích'
                 }, function (reason) {
                     document.getElementById('opDocumentId').value = btn.dataset.docId;
                     document.getElementById('opDocReason').value = reason;
@@ -1655,6 +1748,89 @@
                 });
             });
         });
+
+        // ===== Thêm một tờ giấy (BR-59) =====
+        // Bấm ô trống hoặc "Thêm tờ" thì mở #paperModal với loại của dòng đó.
+        // Kiểm ngày ngay tại chỗ, đúng câu MSG-062 / MSG-063; "hôm nay" theo giờ máy
+        // người dùng (ô date cũng dùng giờ đó), server kiểm lại theo giờ máy chủ.
+        (function () {
+            var OTHER = 'Khác';
+            var MSG_062 = 'Vui lòng nhập ngày trên giấy tờ.';
+            var MSG_063 = 'Ngày trên giấy tờ không được sau hôm nay.';
+            var form = document.getElementById('paperForm');
+            if (!form) { return; }
+            var dateInput = document.getElementById('paperDate');
+            var dateErr = document.getElementById('paperDateErr');
+            var titleInput = document.getElementById('paperTitle');
+            var titleErr = document.getElementById('paperTitleErr');
+            var urlInput = document.getElementById('paperUrl');
+            var urlErr = document.getElementById('paperUrlErr');
+
+            function todayIso() {
+                var d = new Date();
+                var m = String(d.getMonth() + 1).padStart(2, '0');
+                var day = String(d.getDate()).padStart(2, '0');
+                return d.getFullYear() + '-' + m + '-' + day;
+            }
+
+            function showErr(el, msg) {
+                el.textContent = msg;
+                el.style.display = msg ? 'block' : 'none';
+            }
+
+            document.querySelectorAll('.js-add-paper').forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    var type = btn.dataset.docType;
+                    form.reset();
+                    document.getElementById('paperType').value = type;
+                    document.getElementById('paperModalTitle').textContent = 'Thêm tờ: ' + type;
+                    document.getElementById('paperTitleReq').style.display = type === OTHER ? '' : 'none';
+                    titleInput.placeholder = type === OTHER
+                        ? 'Bắt buộc với loại “Khác” — VD: Báo giá số 15/BG'
+                        : 'Không bắt buộc — VD: Biên bản giao nhận đợt 1';
+                    dateInput.max = todayIso();
+                    showErr(dateErr, '');
+                    showErr(titleErr, '');
+                    showErr(urlErr, '');
+                    var el = document.getElementById('paperModal');
+                    el.addEventListener('shown.bs.modal', function once() {
+                        el.removeEventListener('shown.bs.modal', once);
+                        dateInput.focus();
+                    });
+                    bootstrap.Modal.getOrCreateInstance(el).show();
+                });
+            });
+
+            form.addEventListener('submit', function (e) {
+                var ok = true;
+                var date = dateInput.value;
+                if (!date) {
+                    showErr(dateErr, MSG_062);
+                    ok = false;
+                } else if (date > todayIso()) {
+                    showErr(dateErr, MSG_063);
+                    ok = false;
+                } else {
+                    showErr(dateErr, '');
+                }
+                if (document.getElementById('paperType').value === OTHER && !titleInput.value.trim()) {
+                    showErr(titleErr, 'Loại “Khác” phải nhập tên giấy tờ.');
+                    ok = false;
+                } else {
+                    showErr(titleErr, '');
+                }
+                // Form để novalidate để mọi câu báo hiện cùng một chỗ, nên tự kiểm link:
+                // không bắt buộc, có thì phải http(s) như TextRules.isSafeHttpUrl.
+                var url = urlInput.value.trim();
+                if (url && !/^https?:\/\/\S+$/i.test(url)) {
+                    showErr(urlErr, 'Link phải bắt đầu bằng http:// hoặc https://.');
+                    ok = false;
+                } else {
+                    showErr(urlErr, '');
+                }
+                if (!ok) { e.preventDefault(); }
+            });
+        })();
 
         // Gỡ liên kết bán-mua: form nằm sẵn trong bảng, chặn lại để hỏi rồi mới gửi.
         document.querySelectorAll('form[data-confirm]').forEach(function (form) {

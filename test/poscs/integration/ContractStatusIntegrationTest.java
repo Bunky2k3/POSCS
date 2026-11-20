@@ -477,6 +477,7 @@ public class ContractStatusIntegrationTest {
         doc.setDocType("Biên bản thanh lý");
         doc.setTitle("BB thanh lý số 01");
         doc.setFileUrl("https://drive.google.com/file/d/bbtl/view");
+        doc.setDocDate(java.sql.Date.valueOf(java.time.LocalDate.now())); // Task 10.3: ngày trên giấy bắt buộc (BR-59)
         assertEquals(ContractDAO.DOC_OK, contractDAO.addDocument(doc, Fixtures.USER_ID));
 
         List<ContractDocument> docs = contractDAO.findDocumentsOf(contractId);
@@ -503,6 +504,7 @@ public class ContractStatusIntegrationTest {
         doc.setContractId(contractId);
         doc.setDocType("Hoá đơn");
         doc.setFileUrl("https://drive.google.com/file/d/hd01/view");
+        doc.setDocDate(java.sql.Date.valueOf(java.time.LocalDate.now())); // Task 10.3: ngày trên giấy bắt buộc (BR-59)
         assertEquals(ContractDAO.DOC_OK, contractDAO.addDocument(doc, Fixtures.USER_ID));
         int documentId = contractDAO.findDocumentsOf(contractId).get(0).getDocumentId();
 

@@ -310,6 +310,101 @@ public class ContractDocumentControllerTest {
         verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=edit&id=10&error=document_failed");
     }
 
+    // ------------------------------------------------------------------
+    // 3b. BR-59 (Task 10.3): ngày trên giấy, số giấy, link không bắt buộc
+    // ------------------------------------------------------------------
+
+    private ContractDocument captureAddedDocument() throws Exception {
+        org.mockito.ArgumentCaptor<ContractDocument> captor =
+                org.mockito.ArgumentCaptor.forClass(ContractDocument.class);
+        verify(documentService).addDocument(eq(10), captor.capture(), eq(adminUser));
+        return captor.getValue();
+    }
+
+    @Test
+    public void handleAddDocument_readsDocDateAndDocNo_linkMayBeEmpty() throws Exception {
+        when(request.getParameter("contractId")).thenReturn("10");
+        when(request.getParameter("docType")).thenReturn("Biên bản giao nhận hàng hoá");
+        when(request.getParameter("docDate")).thenReturn("2026-11-05");
+        when(request.getParameter("docNo")).thenReturn("12/BBGN");
+        when(request.getParameter("fileUrl")).thenReturn("");
+        when(documentService.addDocument(eq(10), any(), eq(adminUser)))
+                .thenReturn(ServiceResult.ok(new ContractDocument(), "ok"));
+
+        controller.handleAddDocument(request, response);
+
+        ContractDocument sent = captureAddedDocument();
+        assertEquals(java.sql.Date.valueOf("2026-11-05"), sent.getDocDate());
+        assertEquals("12/BBGN", sent.getDocNo());
+        assertNull(sent.getFileUrl());
+        assertEquals("Biên bản giao nhận hàng hoá", sent.getDocType());
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=edit&id=10");
+    }
+
+    @Test
+    public void handleAddDocument_blankOrMalformedDate_passesNullDateToService() throws Exception {
+        when(request.getParameter("contractId")).thenReturn("10");
+        when(request.getParameter("docType")).thenReturn("Phiếu GQNCKH");
+        when(request.getParameter("docNo")).thenReturn("   ");
+
+        for (String raw : new String[]{null, "", "05/11/2026"}) {
+            reset(documentService);
+            when(documentService.addDocument(eq(10), any(), eq(adminUser)))
+                    .thenReturn(ServiceResult.fail(ContractDocumentService.ERR_DATE_REQUIRED));
+            when(request.getParameter("docDate")).thenReturn(raw);
+
+            controller.handleAddDocument(request, response);
+
+            ContractDocument sent = captureAddedDocument();
+            assertNull("docDate=" + raw, sent.getDocDate());
+            assertNull(sent.getDocNo());
+        }
+    }
+
+    @Test
+    public void handleAddDocument_serviceDateRequired_redirectsWithMsg062Key() throws Exception {
+        when(request.getParameter("contractId")).thenReturn("10");
+        when(documentService.addDocument(eq(10), any(), eq(adminUser)))
+                .thenReturn(ServiceResult.fail(ContractDocumentService.ERR_DATE_REQUIRED));
+
+        controller.handleAddDocument(request, response);
+
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=edit&id=10&error=document_date_required");
+    }
+
+    @Test
+    public void handleAddDocument_serviceDateFuture_redirectsWithMsg063Key() throws Exception {
+        when(request.getParameter("contractId")).thenReturn("10");
+        when(documentService.addDocument(eq(10), any(), eq(adminUser)))
+                .thenReturn(ServiceResult.fail(ContractDocumentService.ERR_DATE_FUTURE));
+
+        controller.handleAddDocument(request, response);
+
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=edit&id=10&error=document_date_future");
+    }
+
+    @Test
+    public void handleAddDocument_serviceTitleRequired_redirectsWithTitleRequiredKey() throws Exception {
+        when(request.getParameter("contractId")).thenReturn("10");
+        when(documentService.addDocument(eq(10), any(), eq(adminUser)))
+                .thenReturn(ServiceResult.fail(ContractDocumentService.ERR_TITLE_REQUIRED));
+
+        controller.handleAddDocument(request, response);
+
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=edit&id=10&error=document_title_required");
+    }
+
+    @Test
+    public void handleAddDocument_unknownServiceError_fallsBackToDocumentFailed() throws Exception {
+        when(request.getParameter("contractId")).thenReturn("10");
+        when(documentService.addDocument(eq(10), any(), eq(adminUser)))
+                .thenReturn(ServiceResult.fail("loi_la"));
+
+        controller.handleAddDocument(request, response);
+
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=edit&id=10&error=document_failed");
+    }
+
     // ==================================================================
     // 4. handleVoidDocument
     // ==================================================================

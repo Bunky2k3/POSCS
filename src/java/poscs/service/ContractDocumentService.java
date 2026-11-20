@@ -1,5 +1,7 @@
 package poscs.service;
 
+import java.time.Clock;
+import java.time.LocalDate;
 import java.util.Collections;
 import java.util.List;
 import poscs.common.TextRules;
@@ -10,9 +12,12 @@ import poscs.model.ContractDocument;
 import poscs.model.User;
 
 /**
- * Service xử lý nghiệp vụ Quản lý Tài liệu đính kèm Hợp đồng (Task 4.16 - [UC-52]).
+ * Service xử lý nghiệp vụ Quản lý giấy tờ của hợp đồng (Task 4.16, Task 10.3 - [UC-52], BR-59).
  * Ràng buộc:
- * - Chỉ gắn đường dẫn (URL), không upload file lên hệ thống.
+ * - Mỗi tờ: loại trong danh mục {@link ContractDocument#TYPES}, ngày trên giấy (bắt buộc, không
+ *   sau hôm nay), số giấy, đường dẫn (KHÔNG bắt buộc; có thì phải http/https), ghi chú;
+ *   loại "Khác" bắt nhập tên. Một loại có nhiều tờ được.
+ * - Không upload file lên hệ thống, chỉ gắn đường dẫn nếu có.
  * - Huỷ mềm (is_deleted = 1), bắt buộc có lý do giải thích.
  * - Phân quyền theo ma trận SPEC: Admin, Sales quản lý vùng (MSG-022 nếu vi phạm).
  * - Không chặn trạng thái hợp đồng: hồ sơ thêm/huỷ được ở mọi giai đoạn (kể cả sau thanh lý).
@@ -24,10 +29,18 @@ public class ContractDocumentService extends BaseService {
     public static final String ERR_INVALID = "document_invalid";
     public static final String ERR_REASON_REQUIRED = "document_reason_required";
     public static final String ERR_FAILED = "document_failed";
+    /** MSG-062: thiếu ngày trên giấy tờ (BR-59). */
+    public static final String ERR_DATE_REQUIRED = "document_date_required";
+    /** MSG-063: ngày trên giấy tờ sau hôm nay (BR-59). */
+    public static final String ERR_DATE_FUTURE = "document_date_future";
+    /** Loại "Khác" mà không nhập tên giấy tờ (BR-59). */
+    public static final String ERR_TITLE_REQUIRED = "document_title_required";
 
     private final ContractDocumentDAO documentDAO;
     private final ContractDAO contractDAO;
     private final PermissionService permissionService;
+    /** Đồng hồ để biết "hôm nay" khi kiểm ngày trên giấy; test truyền đồng hồ cố định. */
+    private final Clock clock;
 
     public ContractDocumentService() {
         this(new ContractDocumentDAO(), new ContractDAO(), new PermissionService());
@@ -35,9 +48,15 @@ public class ContractDocumentService extends BaseService {
 
     public ContractDocumentService(ContractDocumentDAO documentDAO, ContractDAO contractDAO,
                                    PermissionService permissionService) {
+        this(documentDAO, contractDAO, permissionService, Clock.systemDefaultZone());
+    }
+
+    public ContractDocumentService(ContractDocumentDAO documentDAO, ContractDAO contractDAO,
+                                   PermissionService permissionService, Clock clock) {
         this.documentDAO = documentDAO != null ? documentDAO : new ContractDocumentDAO();
         this.contractDAO = contractDAO != null ? contractDAO : new ContractDAO();
         this.permissionService = permissionService != null ? permissionService : new PermissionService();
+        this.clock = clock != null ? clock : Clock.systemDefaultZone();
     }
 
     /**
@@ -125,13 +144,13 @@ public class ContractDocumentService extends BaseService {
         return false;
     }
 
+    /**
+     * Kiểm một tờ theo BR-59. Thứ tự: dữ liệu sai dạng (đường dẫn, loại, độ dài) báo
+     * {@link #ERR_INVALID} trước, rồi mới tới ngày trên giấy (MSG-062, MSG-063) và tên
+     * của loại "Khác" -- những lỗi người nhập hay gặp, có câu báo riêng.
+     */
     private ServiceResult<Void> validateDocumentInput(ContractDocument doc) {
-        if (doc == null) {
-            return ServiceResult.fail(ERR_INVALID);
-        }
-        String url = doc.getFileUrl() != null ? doc.getFileUrl().trim() : null;
-        if (url == null || url.isEmpty() || !TextRules.isSafeHttpUrl(url)
-                || url.length() > ContractDocumentDAO.FILE_URL_MAX_LENGTH) {
+        if (doc == null || !isValidLink(doc.getFileUrl())) {
             return ServiceResult.fail(ERR_INVALID);
         }
         String docType = doc.getDocType() != null ? doc.getDocType().trim() : null;
@@ -139,12 +158,34 @@ public class ContractDocumentService extends BaseService {
                 || docType.length() > ContractDocumentDAO.DOC_TYPE_MAX_LENGTH) {
             return ServiceResult.fail(ERR_INVALID);
         }
-        if (doc.getTitle() != null && doc.getTitle().trim().length() > ContractDocumentDAO.TITLE_MAX_LENGTH) {
+        if (exceeds(doc.getTitle(), ContractDocumentDAO.TITLE_MAX_LENGTH)
+                || exceeds(doc.getNote(), ContractDocumentDAO.NOTE_MAX_LENGTH)
+                || exceeds(doc.getDocNo(), ContractDocumentDAO.DOC_NO_MAX_LENGTH)) {
             return ServiceResult.fail(ERR_INVALID);
         }
-        if (doc.getNote() != null && doc.getNote().trim().length() > ContractDocumentDAO.NOTE_MAX_LENGTH) {
-            return ServiceResult.fail(ERR_INVALID);
+        // BR-59: ngày trên giấy bắt buộc (MSG-062) và không sau hôm nay (MSG-063).
+        if (doc.getDocDate() == null) {
+            return ServiceResult.fail(ERR_DATE_REQUIRED);
+        }
+        if (doc.getDocDate().toLocalDate().isAfter(LocalDate.now(clock))) {
+            return ServiceResult.fail(ERR_DATE_FUTURE);
+        }
+        // BR-59: loại "Khác" thì bắt nhập tên giấy tờ.
+        if (ContractDocument.TYPE_OTHER.equals(docType)
+                && (doc.getTitle() == null || doc.getTitle().trim().isEmpty())) {
+            return ServiceResult.fail(ERR_TITLE_REQUIRED);
         }
         return ServiceResult.ok(null);
+    }
+
+    /** BR-59: đường dẫn không bắt buộc; có nhập thì phải là http/https an toàn và không quá dài. */
+    private static boolean isValidLink(String fileUrl) {
+        String url = fileUrl != null ? fileUrl.trim() : "";
+        return url.isEmpty()
+                || (TextRules.isSafeHttpUrl(url) && url.length() <= ContractDocumentDAO.FILE_URL_MAX_LENGTH);
+    }
+
+    private static boolean exceeds(String value, int max) {
+        return value != null && value.trim().length() > max;
     }
 }

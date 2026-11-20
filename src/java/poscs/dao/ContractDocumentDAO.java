@@ -1,9 +1,11 @@
 package poscs.dao;
 
 import java.sql.Connection;
+import java.sql.Date;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import org.slf4j.Logger;
@@ -13,8 +15,9 @@ import poscs.model.ContractHistory;
 import poscs.model.User;
 
 /**
- * Data Access Object chuyên biệt cho tài liệu đính kèm của hợp đồng (bảng {@code contract_documents} - [UC-52]).
- * Tách từ {@link ContractDAO} (Task 4.5): chỉ lưu URL, không upload file; huỷ mềm kèm lý do; ghi nhật ký trong transaction (NFR-19).
+ * Data Access Object chuyên biệt cho giấy tờ của hợp đồng (bảng {@code contract_documents} - [UC-52], BR-59).
+ * Tách từ {@link ContractDAO} (Task 4.5): không upload file, đường dẫn không bắt buộc (V44); mỗi tờ có ngày
+ * trên giấy và số giấy; huỷ mềm kèm lý do; ghi nhật ký trong transaction (NFR-19).
  */
 public class ContractDocumentDAO {
 
@@ -24,12 +27,15 @@ public class ContractDocumentDAO {
     public static final int DOC_NO_CONTRACT = -1;
     public static final int DOC_FAILED = -99;
 
-    /** Giới hạn độ dài các cột theo db/schema.sql (dòng 4608-4619). */
+    /** Giới hạn độ dài các cột theo bảng {@code contract_documents} trong db/schema.sql. */
     public static final int DOC_TYPE_MAX_LENGTH = 50;
+    public static final int DOC_NO_MAX_LENGTH = 50;
     public static final int FILE_URL_MAX_LENGTH = 500;
     public static final int TITLE_MAX_LENGTH = 255;
     public static final int NOTE_MAX_LENGTH = 255;
     public static final int DELETE_REASON_MAX_LENGTH = 255;
+
+    private static final DateTimeFormatter PAPER_DATE = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
     private final ContractHistoryDAO historyDAO;
 
@@ -74,19 +80,24 @@ public class ContractDocumentDAO {
 
     /**
      * Treo một giấy tờ vào hợp đồng (tự mở kết nối và quản lý transaction).
+     *
+     * <p>BR-59: ngày trên giấy bắt buộc (cột NOT NULL), đường dẫn không bắt buộc. Service
+     * đã kiểm đủ luật; ở đây chỉ chặn dữ liệu mà câu INSERT không ghi được.
      */
     public int addDocument(ContractDocument doc, int actorId) {
-        if (doc == null || doc.getContractId() <= 0 || actorId <= 0) {
+        if (doc == null || doc.getContractId() <= 0 || actorId <= 0 || doc.getDocDate() == null) {
             return DOC_FAILED;
         }
         String docType = trimToNull(doc.getDocType());
         String fileUrl = trimToNull(doc.getFileUrl());
         if (docType == null || docType.length() > DOC_TYPE_MAX_LENGTH
-                || fileUrl == null || fileUrl.length() > FILE_URL_MAX_LENGTH) {
+                || (fileUrl != null && fileUrl.length() > FILE_URL_MAX_LENGTH)) {
             return DOC_FAILED;
         }
         String title = truncate(trimToNull(doc.getTitle()), TITLE_MAX_LENGTH);
         String note = truncate(trimToNull(doc.getNote()), NOTE_MAX_LENGTH);
+        String docNo = truncate(trimToNull(doc.getDocNo()), DOC_NO_MAX_LENGTH);
+        PaperRow paper = new PaperRow(docType, title, fileUrl, note, doc.getDocDate(), docNo);
 
         try (Connection conn = DBContext.getConnection()) {
             conn.setAutoCommit(false);
@@ -95,11 +106,12 @@ public class ContractDocumentDAO {
                 if (!lockContract(conn, doc.getContractId())) {
                     return DOC_NO_CONTRACT;
                 }
-                if (!insertDocumentRow(conn, doc.getContractId(), docType, title, fileUrl, note, actorId)) {
+                if (!insertDocumentRow(conn, doc.getContractId(), paper, actorId)) {
                     return DOC_FAILED;
                 }
                 historyDAO.insertHistory(conn, doc.getContractId(), ContractHistory.EVENT_DOCUMENT,
-                        "Thêm tài liệu: " + docType + (title == null ? "" : " — " + title),
+                        "Thêm tài liệu: " + docType + (title == null ? "" : " — " + title)
+                                + paperRef(docNo, doc.getDocDate()),
                         actorId, note);
                 conn.commit();
                 committed = true;
@@ -134,9 +146,12 @@ public class ContractDocumentDAO {
                 if (!updateDocumentVoidStatus(conn, documentId, actorId, safeReason)) {
                     return false;
                 }
+                // BR-59: một loại có nhiều tờ -- kèm số và ngày trên giấy như lúc thêm, để
+                // nhật ký phân biệt được tờ nào đã bị bỏ tích.
                 historyDAO.insertHistory(conn, target.contractId, ContractHistory.EVENT_DOCUMENT,
                         "Huỷ tài liệu: " + target.docType
-                                + (target.title == null || target.title.trim().isEmpty() ? "" : " — " + target.title),
+                                + (target.title == null || target.title.trim().isEmpty() ? "" : " — " + target.title)
+                                + paperRef(trimToNull(target.docNo), target.docDate),
                         actorId, cleanReason);
                 conn.commit();
                 committed = true;
@@ -151,6 +166,21 @@ public class ContractDocumentDAO {
     }
 
     /**
+     * Phần "(số ..., ngày ...)" của dòng nhật ký khi thêm hoặc bỏ tích một tờ (BR-59), để
+     * đọc nhật ký phân biệt được các tờ cùng loại. Không có số thì chỉ ghi ngày.
+     */
+    static String paperRef(String docNo, Date docDate) {
+        String date = docDate == null ? null : docDate.toLocalDate().format(PAPER_DATE);
+        if (docNo == null && date == null) {
+            return "";
+        }
+        if (docNo == null) {
+            return " (ngày " + date + ")";
+        }
+        return date == null ? " (số " + docNo + ")" : " (số " + docNo + ", ngày " + date + ")";
+    }
+
+    /**
      * Danh sách giấy tờ CÒN HIỆU LỰC (chưa bị huỷ mềm) của một hợp đồng, cũ trước mới sau.
      */
     public List<ContractDocument> findDocumentsOf(int contractId) {
@@ -158,7 +188,8 @@ public class ContractDocumentDAO {
         if (contractId <= 0) {
             return result;
         }
-        String sql = "SELECT d.document_id, d.contract_id, d.doc_type, d.title, d.file_url, d.note, "
+        String sql = "SELECT d.document_id, d.contract_id, d.doc_type, d.title, d.doc_date, d.doc_no, "
+                + "       d.file_url, d.note, "
                 + "       d.uploaded_by, d.uploaded_at, u.last_name, u.middle_name, u.first_name "
                 + "FROM contract_documents d "
                 + "LEFT JOIN users u ON u.user_id = d.uploaded_by "
@@ -188,29 +219,33 @@ public class ContractDocumentDAO {
         }
     }
 
-    private boolean insertDocumentRow(Connection conn, int contractId, String docType,
-            String title, String fileUrl, String note, int actorId) throws SQLException {
+    /** Hai cột mới của V44 đứng CUỐI câu INSERT để chỉ số bind của các cột cũ giữ nguyên. */
+    private boolean insertDocumentRow(Connection conn, int contractId, PaperRow paper, int actorId)
+            throws SQLException {
         String sql = "INSERT INTO contract_documents "
-                + "(contract_id, doc_type, title, file_url, note, uploaded_by) VALUES (?, ?, ?, ?, ?, ?)";
+                + "(contract_id, doc_type, title, file_url, note, uploaded_by, doc_date, doc_no) "
+                + "VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, contractId);
-            ps.setString(2, docType);
-            ps.setString(3, title);
-            ps.setString(4, fileUrl);
-            ps.setString(5, note);
+            ps.setString(2, paper.docType);
+            ps.setString(3, paper.title);
+            ps.setString(4, paper.fileUrl);
+            ps.setString(5, paper.note);
             ps.setInt(6, actorId);
+            ps.setDate(7, paper.docDate);
+            ps.setString(8, paper.docNo);
             return ps.executeUpdate() > 0;
         }
     }
 
     private DocumentTarget lockDocumentForVoid(Connection conn, int documentId) throws SQLException {
-        String sql = "SELECT contract_id, doc_type, title FROM contract_documents "
+        String sql = "SELECT contract_id, doc_type, title, doc_no, doc_date FROM contract_documents "
                 + "WHERE document_id = ? AND is_deleted = 0 FOR UPDATE";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, documentId);
             try (ResultSet rs = ps.executeQuery()) {
-                return rs.next() ? new DocumentTarget(
-                        rs.getInt("contract_id"), rs.getString("doc_type"), rs.getString("title")) : null;
+                return rs.next() ? new DocumentTarget(rs.getInt("contract_id"), rs.getString("doc_type"),
+                        rs.getString("title"), rs.getString("doc_no"), rs.getDate("doc_date")) : null;
             }
         }
     }
@@ -248,6 +283,8 @@ public class ContractDocumentDAO {
         d.setContractId(rs.getInt("contract_id"));
         d.setDocType(rs.getString("doc_type"));
         d.setTitle(rs.getString("title"));
+        d.setDocDate(rs.getDate("doc_date"));
+        d.setDocNo(rs.getString("doc_no"));
         d.setFileUrl(rs.getString("file_url"));
         d.setNote(rs.getString("note"));
         d.setUploadedBy(rs.getInt("uploaded_by"));
@@ -256,15 +293,38 @@ public class ContractDocumentDAO {
         return d;
     }
 
+    /** Các giá trị đã làm sạch của một tờ sắp ghi -- gom lại để câu INSERT không mang 8 tham số rời. */
+    private static class PaperRow {
+        final String docType;
+        final String title;
+        final String fileUrl;
+        final String note;
+        final Date docDate;
+        final String docNo;
+
+        PaperRow(String docType, String title, String fileUrl, String note, Date docDate, String docNo) {
+            this.docType = docType;
+            this.title = title;
+            this.fileUrl = fileUrl;
+            this.note = note;
+            this.docDate = docDate;
+            this.docNo = docNo;
+        }
+    }
+
     private static class DocumentTarget {
         final int contractId;
         final String docType;
         final String title;
+        final String docNo;
+        final Date docDate;
 
-        DocumentTarget(int contractId, String docType, String title) {
+        DocumentTarget(int contractId, String docType, String title, String docNo, Date docDate) {
             this.contractId = contractId;
             this.docType = docType;
             this.title = title;
+            this.docNo = docNo;
+            this.docDate = docDate;
         }
     }
 }
