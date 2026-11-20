@@ -120,6 +120,12 @@ public class ContractDocumentDAOTest {
 
     @Test
     public void addDocument_validationFailures_returnsFailedCode() {
+        // Task 10.3 (BR-59): doc ở test này không có docDate, nên các khối docType / fileUrl
+        // bên dưới dừng ở nhánh thiếu ngày chứ không phải nhánh chúng định kiểm. Khối
+        // "invalid fileUrl" giữ nguyên theo rules §3 nhưng không còn là luật (link không bắt
+        // buộc). Nhánh loại/link sai khi CÓ ngày kiểm ở
+        // addDocument_withDocDate_rejectsInvalidDocTypeAndOverlongUrl, link trống ở
+        // addDocument_withoutLink_insertsNullUrlWithDateAndNumber.
         // null doc
         assertEquals(ContractDocumentDAO.DOC_FAILED, dao.addDocument(null, ACTOR_ID));
 
@@ -177,6 +183,7 @@ public class ContractDocumentDAOTest {
         doc.setTitle("  Bản scan có chữ ký & đóng dấu đỏ  ");
         doc.setFileUrl("https://drive.google.com/file/d/xyz");
         doc.setNote("  Lưu trữ phòng Hành chính  ");
+        doc.setDocDate(java.sql.Date.valueOf("2026-03-01")); // Task 10.3: ngày trên giấy bắt buộc
 
         PreparedStatement psLock = mock(PreparedStatement.class);
         ResultSet rsLock = resultSetOf(List.of(row("contract_id", CONTRACT_ID)));
@@ -211,7 +218,7 @@ public class ContractDocumentDAOTest {
                     eq(conn),
                     eq(CONTRACT_ID),
                     eq(ContractHistory.EVENT_DOCUMENT),
-                    eq("Thêm tài liệu: Hợp đồng đã ký — Bản scan có chữ ký & đóng dấu đỏ"),
+                    eq("Thêm tài liệu: Hợp đồng đã ký — Bản scan có chữ ký & đóng dấu đỏ (ngày 01/03/2026)"),
                     eq(ACTOR_ID),
                     eq("Lưu trữ phòng Hành chính")
             );
@@ -235,6 +242,7 @@ public class ContractDocumentDAOTest {
         doc.setFileUrl("   https://drive.google.com/doc   ");
         String longNote = "Ghi chú: " + "N".repeat(300);
         doc.setNote("   " + longNote + "   ");
+        doc.setDocDate(java.sql.Date.valueOf("2026-03-01")); // Task 10.3: ngày trên giấy bắt buộc
 
         PreparedStatement psLock = mock(PreparedStatement.class);
         ResultSet rsLock = resultSetOf(List.of(row("contract_id", CONTRACT_ID)));
@@ -293,6 +301,7 @@ public class ContractDocumentDAOTest {
         doc.setTitle("   ");
         doc.setFileUrl("https://drive.google.com/file/d/xyz");
         doc.setNote(null);
+        doc.setDocDate(java.sql.Date.valueOf("2026-03-01")); // Task 10.3: ngày trên giấy bắt buộc
 
         PreparedStatement psLock = mock(PreparedStatement.class);
         ResultSet rsLock = resultSetOf(List.of(row("contract_id", CONTRACT_ID)));
@@ -320,7 +329,7 @@ public class ContractDocumentDAOTest {
                     eq(conn),
                     eq(CONTRACT_ID),
                     eq(ContractHistory.EVENT_DOCUMENT),
-                    eq("Thêm tài liệu: Phụ lục đã ký"),
+                    eq("Thêm tài liệu: Phụ lục đã ký (ngày 01/03/2026)"),
                     eq(ACTOR_ID),
                     isNull()
             );
@@ -338,6 +347,7 @@ public class ContractDocumentDAOTest {
         doc.setContractId(CONTRACT_ID);
         doc.setDocType("Hợp đồng đã ký");
         doc.setFileUrl("https://drive.google.com/test");
+        doc.setDocDate(java.sql.Date.valueOf("2026-03-01")); // Task 10.3: ngày trên giấy bắt buộc
 
         PreparedStatement psLock = mock(PreparedStatement.class);
         ResultSet rsLock = resultSetOf(List.of()); // contract not found or deleted
@@ -365,6 +375,7 @@ public class ContractDocumentDAOTest {
         doc.setContractId(CONTRACT_ID);
         doc.setDocType("Hợp đồng đã ký");
         doc.setFileUrl("https://drive.google.com/test");
+        doc.setDocDate(java.sql.Date.valueOf("2026-03-01")); // Task 10.3: ngày trên giấy bắt buộc
 
         PreparedStatement psLock = mock(PreparedStatement.class);
         ResultSet rsLock = resultSetOf(List.of(row("contract_id", CONTRACT_ID)));
@@ -396,6 +407,7 @@ public class ContractDocumentDAOTest {
         doc.setContractId(CONTRACT_ID);
         doc.setDocType("Hợp đồng đã ký");
         doc.setFileUrl("https://drive.google.com/test");
+        doc.setDocDate(java.sql.Date.valueOf("2026-03-01")); // Task 10.3: ngày trên giấy bắt buộc
 
         PreparedStatement psLock = mock(PreparedStatement.class);
         ResultSet rsLock = resultSetOf(List.of(row("contract_id", CONTRACT_ID)));
@@ -457,7 +469,7 @@ public class ContractDocumentDAOTest {
         when(psUpdate.executeUpdate()).thenReturn(1);
 
         Connection conn = mock(Connection.class);
-        when(conn.prepareStatement(contains("SELECT contract_id, doc_type, title FROM contract_documents")))
+        when(conn.prepareStatement(contains("SELECT contract_id, doc_type, title, doc_no, doc_date FROM contract_documents")))
                 .thenReturn(psSelect);
         when(conn.prepareStatement(contains("UPDATE contract_documents SET is_deleted = 1")))
                 .thenReturn(psUpdate);
@@ -505,7 +517,7 @@ public class ContractDocumentDAOTest {
         when(psUpdate.executeUpdate()).thenReturn(1);
 
         Connection conn = mock(Connection.class);
-        when(conn.prepareStatement(contains("SELECT contract_id, doc_type, title FROM contract_documents")))
+        when(conn.prepareStatement(contains("SELECT contract_id, doc_type, title, doc_no, doc_date FROM contract_documents")))
                 .thenReturn(psSelect);
         when(conn.prepareStatement(contains("UPDATE contract_documents SET is_deleted = 1")))
                 .thenReturn(psUpdate);
@@ -544,7 +556,7 @@ public class ContractDocumentDAOTest {
         when(psUpdate.executeUpdate()).thenReturn(1);
 
         Connection conn = mock(Connection.class);
-        when(conn.prepareStatement(contains("SELECT contract_id, doc_type, title FROM contract_documents")))
+        when(conn.prepareStatement(contains("SELECT contract_id, doc_type, title, doc_no, doc_date FROM contract_documents")))
                 .thenReturn(psSelect);
         when(conn.prepareStatement(contains("UPDATE contract_documents SET is_deleted = 1")))
                 .thenReturn(psUpdate);
@@ -582,7 +594,7 @@ public class ContractDocumentDAOTest {
         when(psSelect.executeQuery()).thenReturn(rsSelect);
 
         Connection conn = mock(Connection.class);
-        when(conn.prepareStatement(contains("SELECT contract_id, doc_type, title FROM contract_documents")))
+        when(conn.prepareStatement(contains("SELECT contract_id, doc_type, title, doc_no, doc_date FROM contract_documents")))
                 .thenReturn(psSelect);
 
         try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
@@ -609,7 +621,7 @@ public class ContractDocumentDAOTest {
         when(psUpdate.executeUpdate()).thenReturn(0);
 
         Connection conn = mock(Connection.class);
-        when(conn.prepareStatement(contains("SELECT contract_id, doc_type, title FROM contract_documents")))
+        when(conn.prepareStatement(contains("SELECT contract_id, doc_type, title, doc_no, doc_date FROM contract_documents")))
                 .thenReturn(psSelect);
         when(conn.prepareStatement(contains("UPDATE contract_documents SET is_deleted = 1")))
                 .thenReturn(psUpdate);
@@ -637,7 +649,7 @@ public class ContractDocumentDAOTest {
         when(psUpdate.executeUpdate()).thenThrow(new SQLException("Deadlock / connection loss"));
 
         Connection conn = mock(Connection.class);
-        when(conn.prepareStatement(contains("SELECT contract_id, doc_type, title FROM contract_documents")))
+        when(conn.prepareStatement(contains("SELECT contract_id, doc_type, title, doc_no, doc_date FROM contract_documents")))
                 .thenReturn(psSelect);
         when(conn.prepareStatement(contains("UPDATE contract_documents SET is_deleted = 1")))
                 .thenReturn(psUpdate);
@@ -729,6 +741,245 @@ public class ContractDocumentDAOTest {
             assertEquals("Biên bản nghiệm thu", d2.getDocType());
             assertNull(d2.getTitle());
             assertEquals("Trần Bình", d2.getUploadedByName());
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // 5. BR-59 (Task 10.3): doc_date, doc_no, file_url NULL, nhật ký có số và ngày
+    // ------------------------------------------------------------------
+
+    private static final java.sql.Date PAPER_DATE = java.sql.Date.valueOf("2026-11-05");
+
+    private ContractDocument paperDoc(String docType, String docNo, String fileUrl) {
+        ContractDocument doc = new ContractDocument();
+        doc.setContractId(CONTRACT_ID);
+        doc.setDocType(docType);
+        doc.setDocDate(PAPER_DATE);
+        doc.setDocNo(docNo);
+        doc.setFileUrl(fileUrl);
+        return doc;
+    }
+
+    /** Kết nối giả: khoá hợp đồng thấy dòng, câu INSERT ghi được một dòng. */
+    private Connection lockAndInsertConnection(PreparedStatement psInsert) throws Exception {
+        PreparedStatement psLock = mock(PreparedStatement.class);
+        ResultSet rsLock = resultSetOf(List.of(row("contract_id", CONTRACT_ID)));
+        when(psLock.executeQuery()).thenReturn(rsLock);
+        when(psInsert.executeUpdate()).thenReturn(1);
+        Connection conn = mock(Connection.class);
+        when(conn.prepareStatement(contains("FROM contracts WHERE contract_id = ? AND is_deleted = 0 FOR UPDATE")))
+                .thenReturn(psLock);
+        when(conn.prepareStatement(contains("INSERT INTO contract_documents")))
+                .thenReturn(psInsert);
+        return conn;
+    }
+
+    @Test
+    public void addDocument_withoutDocDate_failsBeforeOpeningConnection() {
+        ContractDocument doc = paperDoc("Phiếu GQNCKH", null, null);
+        doc.setDocDate(null);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            assertEquals(ContractDocumentDAO.DOC_FAILED, dao.addDocument(doc, ACTOR_ID));
+            db.verifyNoInteractions();
+        }
+    }
+
+    @Test
+    public void addDocument_withDocDate_rejectsInvalidDocTypeAndOverlongUrl() {
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            assertEquals(ContractDocumentDAO.DOC_FAILED, dao.addDocument(paperDoc(null, null, null), ACTOR_ID));
+            assertEquals(ContractDocumentDAO.DOC_FAILED, dao.addDocument(paperDoc("", null, null), ACTOR_ID));
+            assertEquals(ContractDocumentDAO.DOC_FAILED, dao.addDocument(paperDoc("   ", null, null), ACTOR_ID));
+            assertEquals(ContractDocumentDAO.DOC_FAILED,
+                    dao.addDocument(paperDoc("A".repeat(51), null, null), ACTOR_ID));
+            String url501 = "https://example.com/" + "a".repeat(481);
+            assertEquals(501, url501.length());
+            assertEquals(ContractDocumentDAO.DOC_FAILED, dao.addDocument(paperDoc("CO", null, url501), ACTOR_ID));
+            db.verifyNoInteractions();
+        }
+    }
+
+    @Test
+    public void addDocument_linkExactly500_isWritten() throws Exception {
+        ContractDocumentDAO customDao = new ContractDocumentDAO(mock(ContractHistoryDAO.class));
+        PreparedStatement psInsert = mock(PreparedStatement.class);
+        Connection conn = lockAndInsertConnection(psInsert);
+        String url500 = "https://example.com/" + "a".repeat(480);
+        assertEquals(500, url500.length());
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            assertEquals(ContractDocumentDAO.DOC_OK, customDao.addDocument(paperDoc("CQ", null, url500), ACTOR_ID));
+            verify(psInsert).setString(4, url500);
+        }
+    }
+
+    @Test
+    public void voidDocument_historyIncludesNumberAndDateOfSheet() throws Exception {
+        ContractHistoryDAO mockHistory = mock(ContractHistoryDAO.class);
+        ContractDocumentDAO customDao = new ContractDocumentDAO(mockHistory);
+        PreparedStatement psSelect = mock(PreparedStatement.class);
+        ResultSet rsSelect = resultSetOf(List.of(row("contract_id", CONTRACT_ID,
+                "doc_type", "Biên bản giao nhận hàng hoá", "title", null,
+                "doc_no", "02/BBGN", "doc_date", PAPER_DATE)));
+        when(psSelect.executeQuery()).thenReturn(rsSelect);
+        PreparedStatement psUpdate = mock(PreparedStatement.class);
+        when(psUpdate.executeUpdate()).thenReturn(1);
+        Connection conn = mock(Connection.class);
+        when(conn.prepareStatement(contains("SELECT contract_id, doc_type, title, doc_no, doc_date FROM contract_documents")))
+                .thenReturn(psSelect);
+        when(conn.prepareStatement(contains("UPDATE contract_documents SET is_deleted = 1")))
+                .thenReturn(psUpdate);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            assertTrue(customDao.voidDocument(DOCUMENT_ID, ACTOR_ID, "Nhập nhầm ngày"));
+
+            verify(mockHistory).insertHistory(eq(conn), eq(CONTRACT_ID), eq(ContractHistory.EVENT_DOCUMENT),
+                    eq("Huỷ tài liệu: Biên bản giao nhận hàng hoá (số 02/BBGN, ngày 05/11/2026)"),
+                    eq(ACTOR_ID), eq("Nhập nhầm ngày"));
+            verify(conn).commit();
+        }
+    }
+
+    @Test
+    public void voidDocument_blankNumber_historyHasDateOnly() throws Exception {
+        ContractHistoryDAO mockHistory = mock(ContractHistoryDAO.class);
+        ContractDocumentDAO customDao = new ContractDocumentDAO(mockHistory);
+        PreparedStatement psSelect = mock(PreparedStatement.class);
+        ResultSet rsSelect = resultSetOf(List.of(row("contract_id", CONTRACT_ID,
+                "doc_type", "Khác", "title", "Báo giá", "doc_no", "   ", "doc_date", PAPER_DATE)));
+        when(psSelect.executeQuery()).thenReturn(rsSelect);
+        PreparedStatement psUpdate = mock(PreparedStatement.class);
+        when(psUpdate.executeUpdate()).thenReturn(1);
+        Connection conn = mock(Connection.class);
+        when(conn.prepareStatement(contains("SELECT contract_id, doc_type, title, doc_no, doc_date FROM contract_documents")))
+                .thenReturn(psSelect);
+        when(conn.prepareStatement(contains("UPDATE contract_documents SET is_deleted = 1")))
+                .thenReturn(psUpdate);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            assertTrue(customDao.voidDocument(DOCUMENT_ID, ACTOR_ID, "Trùng"));
+
+            verify(mockHistory).insertHistory(eq(conn), eq(CONTRACT_ID), eq(ContractHistory.EVENT_DOCUMENT),
+                    eq("Huỷ tài liệu: Khác — Báo giá (ngày 05/11/2026)"), eq(ACTOR_ID), eq("Trùng"));
+        }
+    }
+
+    @Test
+    public void addDocument_withoutLink_insertsNullUrlWithDateAndNumber() throws Exception {
+        ContractHistoryDAO mockHistory = mock(ContractHistoryDAO.class);
+        ContractDocumentDAO customDao = new ContractDocumentDAO(mockHistory);
+        PreparedStatement psInsert = mock(PreparedStatement.class);
+        Connection conn = lockAndInsertConnection(psInsert);
+        ContractDocument doc = paperDoc("Biên bản giao nhận hàng hoá", "  12/BBGN  ", "   ");
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            assertEquals(ContractDocumentDAO.DOC_OK, customDao.addDocument(doc, ACTOR_ID));
+
+            ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+            verify(conn, times(2)).prepareStatement(sql.capture());
+            assertTrue(sql.getAllValues().get(1).contains(
+                    "(contract_id, doc_type, title, file_url, note, uploaded_by, doc_date, doc_no)"));
+            verify(psInsert).setString(2, "Biên bản giao nhận hàng hoá");
+            verify(psInsert).setString(4, null);
+            verify(psInsert).setDate(7, PAPER_DATE);
+            verify(psInsert).setString(8, "12/BBGN");
+            verify(mockHistory).insertHistory(eq(conn), eq(CONTRACT_ID), eq(ContractHistory.EVENT_DOCUMENT),
+                    eq("Thêm tài liệu: Biên bản giao nhận hàng hoá (số 12/BBGN, ngày 05/11/2026)"),
+                    eq(ACTOR_ID), isNull());
+            verify(conn).commit();
+        }
+    }
+
+    @Test
+    public void addDocument_withoutNumber_historyHasDateOnly_andTitleKept() throws Exception {
+        ContractHistoryDAO mockHistory = mock(ContractHistoryDAO.class);
+        ContractDocumentDAO customDao = new ContractDocumentDAO(mockHistory);
+        PreparedStatement psInsert = mock(PreparedStatement.class);
+        Connection conn = lockAndInsertConnection(psInsert);
+        ContractDocument doc = paperDoc("Khác", null, "https://drive.google.com/file/d/bg");
+        doc.setTitle("Báo giá");
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            assertEquals(ContractDocumentDAO.DOC_OK, customDao.addDocument(doc, ACTOR_ID));
+
+            verify(psInsert).setString(4, "https://drive.google.com/file/d/bg");
+            verify(psInsert).setString(8, null);
+            verify(mockHistory).insertHistory(eq(conn), eq(CONTRACT_ID), eq(ContractHistory.EVENT_DOCUMENT),
+                    eq("Thêm tài liệu: Khác — Báo giá (ngày 05/11/2026)"), eq(ACTOR_ID), isNull());
+        }
+    }
+
+    @Test
+    public void addDocument_docNoLongerThan50_truncatedForColumn() throws Exception {
+        ContractDocumentDAO customDao = new ContractDocumentDAO(mock(ContractHistoryDAO.class));
+        PreparedStatement psInsert = mock(PreparedStatement.class);
+        Connection conn = lockAndInsertConnection(psInsert);
+        ContractDocument doc = paperDoc("CO", "X".repeat(60), null);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            assertEquals(ContractDocumentDAO.DOC_OK, customDao.addDocument(doc, ACTOR_ID));
+
+            verify(psInsert).setString(8, "X".repeat(50));
+        }
+    }
+
+    @Test
+    public void paperRef_formatsNumberAndDate() {
+        assertEquals("", ContractDocumentDAO.paperRef(null, null));
+        assertEquals(" (ngày 05/11/2026)", ContractDocumentDAO.paperRef(null, PAPER_DATE));
+        assertEquals(" (số 12/BBGN)", ContractDocumentDAO.paperRef("12/BBGN", null));
+        assertEquals(" (số 12/BBGN, ngày 05/11/2026)", ContractDocumentDAO.paperRef("12/BBGN", PAPER_DATE));
+    }
+
+    @Test
+    public void findDocumentsOf_mapsDocDateDocNo_andNullLink() throws Exception {
+        var paperRow = row(
+                "document_id", 7,
+                "contract_id", CONTRACT_ID,
+                "doc_type", "Biên bản giao nhận hàng hoá",
+                "title", null,
+                "doc_date", PAPER_DATE,
+                "doc_no", "12/BBGN",
+                "file_url", null,
+                "note", null,
+                "uploaded_by", 10,
+                "uploaded_at", Timestamp.valueOf("2026-11-06 08:00:00"),
+                "last_name", "Nguyễn",
+                "middle_name", null,
+                "first_name", "An"
+        );
+        ResultSet rs = resultSetOf(List.of(paperRow));
+        PreparedStatement ps = mock(PreparedStatement.class);
+        when(ps.executeQuery()).thenReturn(rs);
+        Connection conn = connectionReturning(ps);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            List<ContractDocument> list = dao.findDocumentsOf(CONTRACT_ID);
+
+            ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
+            verify(conn).prepareStatement(sqlCaptor.capture());
+            assertTrue(sqlCaptor.getValue().contains("d.doc_date, d.doc_no"));
+            assertEquals(1, list.size());
+            ContractDocument d = list.get(0);
+            assertEquals(PAPER_DATE, d.getDocDate());
+            assertEquals("12/BBGN", d.getDocNo());
+            assertNull(d.getFileUrl());
+            assertEquals("Biên bản giao nhận hàng hoá", d.getCategory());
         }
     }
 

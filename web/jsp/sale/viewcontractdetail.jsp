@@ -254,6 +254,31 @@
            ở thanh tab), nên nó cần một câu tử tế chứ không phải khoảng trắng. */
         .tab-empty { font-size: 0.88rem; color: #9ca3af; margin: 0; }
 
+        /* ===== Giấy tờ dạng ô tích, chỉ đọc (BR-59) =====
+           Cùng bộ giá trị với tab "Giấy tờ" ở updatecontract.jsp để hai trang nhìn
+           như một; ở đây không có nút thêm hay bỏ tích. */
+        .paper-list { list-style: none; margin: 0; padding: 0; }
+        .paper-item { border-bottom: 1px solid #f3f4f6; padding: 10px 0; }
+        .paper-item:last-child { border-bottom: none; }
+        .paper-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+        .paper-box {
+            width: 22px; height: 22px; border-radius: 6px; border: 1.5px solid #cbd5e1; background: #fff;
+            display: inline-flex; align-items: center; justify-content: center; flex: 0 0 22px;
+            font-size: 0.72rem; color: #fff;
+        }
+        .paper-box.is-checked { background: var(--primary); border-color: var(--primary); }
+        .paper-name { font-size: 0.9rem; font-weight: 600; color: #111827; }
+        .paper-name.is-empty { font-weight: 500; color: #9ca3af; }
+        .paper-count { font-size: 0.75rem; color: #6b7280; background: #f3f4f6; border-radius: 999px; padding: 2px 8px; }
+        .paper-sheets { list-style: none; margin: 8px 0 0 32px; padding: 0; }
+        .paper-sheet {
+            display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+            padding: 8px 12px; border-radius: 10px; background: #f9fafb; margin-bottom: 6px; font-size: 0.86rem;
+        }
+        .paper-sheet:last-child { margin-bottom: 0; }
+        .paper-sheet-meta { font-size: 0.78rem; color: #9ca3af; margin-top: 2px; }
+        @media (max-width: 768px) { .paper-sheets { margin-left: 0; } }
+
         @media (max-width: 768px) { .info-card, .detail-header { padding: 20px; } }
 
         .toast-msg {
@@ -763,7 +788,7 @@
                 </li>
                 <li class="nav-item" role="presentation">
                     <button class="nav-link" data-bs-toggle="tab" data-bs-target="#pane-tai-lieu"
-                            type="button" role="tab"><i class="fa-solid fa-folder-open me-2"></i>Tài liệu<c:if
+                            type="button" role="tab"><i class="fa-solid fa-folder-open me-2"></i>Giấy tờ<c:if
                             test="${not empty contractDocuments}"> (${fn:length(contractDocuments)})</c:if></button>
                 </li>
                 <li class="nav-item" role="presentation">
@@ -1131,52 +1156,69 @@
 
             </div>
             <div class="tab-pane fade" id="pane-tai-lieu" role="tabpanel">
-        <%-- ===== Giấy tờ kèm theo (V34) =====
-             CHỈ ĐỌC ở trang này như mọi khối khác; treo thêm hoặc huỷ nằm ở trang
-             quản lý. Link mở tab mới kèm rel="noopener noreferrer" -- trang đích
-             là site ngoài (Drive), không cho nó cầm window.opener của mình.
+        <%-- ===== Giấy tờ của hợp đồng (BR-59, UC-11) =====
+             CHỈ ĐỌC ở trang này như mọi khối khác; tích thêm hoặc bỏ tích nằm ở
+             trang quản lý. Cùng danh mục dạng ô tích (ContractDocument.TYPES) để
+             nhìn vào là biết còn thiếu giấy gì; doc.category gom loại lạ vào "Khác".
 
-             Không kiểm lại scheme từng dòng ở đây được (chỉ bản "Hợp đồng đã ký"
-             đi qua controller), nên link nào cũng đi kèm rel và target như nhau;
-             chốt chặn thật là TextRules.isSafeHttpUrl lúc THÊM. --%>
+             Link mở tab mới kèm rel="noopener noreferrer" -- trang đích là site
+             ngoài (Drive), không cho nó cầm window.opener của mình. Không kiểm lại
+             scheme từng dòng ở đây được (chỉ bản "Hợp đồng đã ký" đi qua
+             controller), nên chốt chặn thật là TextRules.isSafeHttpUrl lúc THÊM.
+             Từ V44 link không bắt buộc: tờ không có link thì không có nút "Mở". --%>
         <div class="info-card card-box">
-            <div class="section-header"><h5>Tài liệu kèm theo</h5></div>
-            <c:if test="${empty contractDocuments}">
-                <p class="tab-empty">Chưa có tài liệu nào. Treo biên bản nghiệm thu, bàn giao, thanh lý,
-                    hoá đơn… ở trang quản lý.</p>
-            </c:if>
-            <c:if test="${not empty contractDocuments}">
-            <div class="table-responsive">
-                <table class="table align-middle" style="font-size:0.9rem;">
-                    <thead>
-                        <tr><th>Loại</th><th>Tên tài liệu</th><th>Người thêm</th><th>Ngày thêm</th><th></th></tr>
-                    </thead>
-                    <tbody>
-                        <c:forEach var="doc" items="${contractDocuments}">
-                            <tr>
-                                <td><span class="status-pill status-info">${fn:escapeXml(doc.docType)}</span></td>
-                                <td>
-                                    <div>${fn:escapeXml(doc.displayName)}</div>
-                                    <c:if test="${not empty doc.note}">
-                                        <div style="font-size:0.8rem; color:#9ca3af;">${fn:escapeXml(doc.note)}</div>
+            <div class="section-header"><h5>Giấy tờ của hợp đồng</h5></div>
+            <ul class="paper-list">
+                <c:forEach var="t" items="${documentTypes}">
+                    <c:set var="paperCount" value="${0}"/>
+                    <c:forEach var="doc" items="${contractDocuments}">
+                        <c:if test="${doc.category == t}"><c:set var="paperCount" value="${paperCount + 1}"/></c:if>
+                    </c:forEach>
+                    <li class="paper-item">
+                        <div class="paper-head">
+                            <c:choose>
+                                <c:when test="${paperCount > 0}">
+                                    <span class="paper-box is-checked" role="img" aria-label="Đã có"><i class="fa-solid fa-check"></i></span>
+                                    <span class="paper-name">${fn:escapeXml(t)}</span>
+                                    <c:if test="${paperCount > 1}"><span class="paper-count">${paperCount} tờ</span></c:if>
+                                </c:when>
+                                <c:otherwise>
+                                    <span class="paper-box" role="img" aria-label="Chưa có"></span>
+                                    <span class="paper-name is-empty">${fn:escapeXml(t)}</span>
+                                </c:otherwise>
+                            </c:choose>
+                        </div>
+                        <c:if test="${paperCount > 0}">
+                            <ul class="paper-sheets">
+                                <c:forEach var="doc" items="${contractDocuments}">
+                                    <c:if test="${doc.category == t}">
+                                        <li class="paper-sheet">
+                                            <div>
+                                                <div>
+                                                    <strong><fmt:formatDate value="${doc.docDate}" pattern="dd/MM/yyyy"/></strong>
+                                                    <c:if test="${not empty doc.docNo}"> · Số ${fn:escapeXml(doc.docNo)}</c:if>
+                                                    <c:if test="${not empty doc.title}"> · ${fn:escapeXml(doc.title)}</c:if>
+                                                </div>
+                                                <div class="paper-sheet-meta">
+                                                    <c:if test="${not empty doc.note}">${fn:escapeXml(doc.note)} · </c:if>
+                                                    Thêm bởi ${fn:escapeXml(doc.uploadedByName)}
+                                                    ngày <fmt:formatDate value="${doc.uploadedAt}" pattern="dd/MM/yyyy"/>
+                                                </div>
+                                            </div>
+                                            <c:if test="${not empty doc.fileUrl}">
+                                                <a href="${fn:escapeXml(doc.fileUrl)}" target="_blank" rel="noopener noreferrer"
+                                                   style="color:var(--primary); font-weight:600; font-size:0.84rem; text-decoration:none; white-space:nowrap;">
+                                                    Mở <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                                                </a>
+                                            </c:if>
+                                        </li>
                                     </c:if>
-                                </td>
-                                <td style="font-size:0.84rem;">${fn:escapeXml(doc.uploadedByName)}</td>
-                                <td style="font-size:0.84rem;">
-                                    <fmt:formatDate value="${doc.uploadedAt}" pattern="dd/MM/yyyy"/>
-                                </td>
-                                <td style="text-align:right;">
-                                    <a href="${fn:escapeXml(doc.fileUrl)}" target="_blank" rel="noopener noreferrer"
-                                       style="color:var(--primary); font-weight:600; font-size:0.84rem; text-decoration:none;">
-                                        Mở <i class="fa-solid fa-arrow-up-right-from-square"></i>
-                                    </a>
-                                </td>
-                            </tr>
-                        </c:forEach>
-                    </tbody>
-                </table>
-            </div>
-            </c:if>
+                                </c:forEach>
+                            </ul>
+                        </c:if>
+                    </li>
+                </c:forEach>
+            </ul>
         </div>
 
         <%-- KHÔNG nhúng khung xem PDF ở đây nữa (bỏ 2026-09-21). Khung 640px

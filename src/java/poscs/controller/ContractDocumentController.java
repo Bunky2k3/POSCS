@@ -21,8 +21,8 @@ import poscs.service.PermissionService;
 import poscs.service.ServiceResult;
 
 /**
- * Controller chuyên trách xử lý tài liệu đính kèm hợp đồng (Task 4.16 - [UC-52]):
- * - Gắn đường dẫn tài liệu vào hợp đồng (không upload file).
+ * Controller chuyên trách xử lý giấy tờ của hợp đồng (Task 4.16, Task 10.3 - [UC-52], BR-59):
+ * - Thêm một tờ: loại, ngày trên giấy, số giấy, đường dẫn (không bắt buộc, không upload file), ghi chú.
  * - Huỷ mềm tài liệu kèm lý do bắt buộc.
  * - Phân quyền RBAC qua PermissionService (Admin, Sales quản lý vùng).
  */
@@ -153,6 +153,10 @@ public class ContractDocumentController extends HttpServlet {
         doc.setContractId(contractId);
         doc.setDocType(ContractControllerHelper.emptyToNull(request.getParameter("docType")));
         doc.setTitle(ContractControllerHelper.emptyToNull(request.getParameter("docTitle")));
+        // BR-59: ngày trên giấy (yyyy-MM-dd từ ô date). Sai dạng thì coi như chưa nhập
+        // -- service báo MSG-062, cùng câu với khi bỏ trống.
+        doc.setDocDate(ContractControllerHelper.parseDateOrNull(request.getParameter("docDate")));
+        doc.setDocNo(ContractControllerHelper.emptyToNull(request.getParameter("docNo")));
         doc.setFileUrl(ContractControllerHelper.emptyToNull(request.getParameter("fileUrl")));
         doc.setNote(ContractControllerHelper.emptyToNull(request.getParameter("docNote")));
 
@@ -198,15 +202,22 @@ public class ContractDocumentController extends HttpServlet {
         }
         LOG.warn("{} (actor={}, contractId={}, err={})",
                 logPrefix, Logs.actor(request), contractId, errorMessage);
-        String errParam;
-        if (ContractDocumentService.ERR_REASON_REQUIRED.equals(errorMessage)) {
-            errParam = "document_reason_required";
-        } else if (ContractDocumentService.ERR_INVALID.equals(errorMessage)) {
-            errParam = "document_invalid";
-        } else {
-            errParam = "document_failed";
-        }
         response.sendRedirect(request.getContextPath()
-                + "/contract?action=edit&id=" + contractId + "&error=" + errParam);
+                + "/contract?action=edit&id=" + contractId + "&error=" + errorParamOf(errorMessage));
+    }
+
+    /**
+     * Mã lỗi gửi về trang Sửa (tham số {@code error}); JSP dịch ra câu báo nội tuyến.
+     * Ngày trên giấy có câu riêng theo SPEC: MSG-062 (thiếu), MSG-063 (sau hôm nay).
+     */
+    private static String errorParamOf(String errorMessage) {
+        if (ContractDocumentService.ERR_REASON_REQUIRED.equals(errorMessage)
+                || ContractDocumentService.ERR_INVALID.equals(errorMessage)
+                || ContractDocumentService.ERR_DATE_REQUIRED.equals(errorMessage)
+                || ContractDocumentService.ERR_DATE_FUTURE.equals(errorMessage)
+                || ContractDocumentService.ERR_TITLE_REQUIRED.equals(errorMessage)) {
+            return errorMessage;
+        }
+        return "document_failed";
     }
 }

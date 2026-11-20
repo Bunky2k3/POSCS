@@ -4657,13 +4657,18 @@ DROP TABLE IF EXISTS `contract_documents`;
 -- Hệ thống không giữ bản sao nào, và quyền xem file do Drive quyết.
 --
 -- doc_type là VARCHAR chứ không ENUM (cùng lẽ với event_type, relation_type):
--- danh mục còn phải chốt với khách, thêm loại phải là thêm một chuỗi.
+-- danh mục nằm ở ContractDocument.TYPES (BR-59), thêm loại là thêm một chuỗi.
+--
+-- Giấy tờ dạng ô tích (V44, BR-59): mỗi tờ có ngày trên giấy (bắt buộc, không
+-- sau hôm nay) và số giấy; đường dẫn không bắt buộc vì nhiều tờ chỉ có bản giấy.
 CREATE TABLE `contract_documents` (
   `document_id`   int NOT NULL AUTO_INCREMENT,
   `contract_id`   int NOT NULL,
   `doc_type`      varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
   `title`         varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `file_url`      varchar(500) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `doc_date`      date NOT NULL,
+  `doc_no`        varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `file_url`      varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `note`          varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `uploaded_by`   int NOT NULL,
   `uploaded_at`   timestamp NULL DEFAULT CURRENT_TIMESTAMP,
@@ -5057,8 +5062,11 @@ UPDATE contracts
 -- LINK DEMO, CỐ Ý GIỮ: trỏ vào một PDF catalogue công khai trên Drive, dùng để
 -- trình diễn tính năng đính kèm cho khách. Đừng "dọn" nó đi. Trước V34 nó nằm
 -- ở cột contracts.attachment_url; giờ là một dòng trong contract_documents.
-INSERT INTO contract_documents (contract_id, doc_type, title, file_url, note, uploaded_by)
+-- Ngày trên giấy (bắt buộc từ V44) lấy theo ngày ký của hợp đồng; chưa ký thì
+-- lấy hôm nay, như V44 làm với dòng cũ.
+INSERT INTO contract_documents (contract_id, doc_type, title, doc_date, file_url, note, uploaded_by)
 SELECT c.contract_id, N'Hợp đồng đã ký', N'Bản PDF hợp đồng',
+       COALESCE(c.signing_date, CURRENT_DATE),
        'https://drive.google.com/file/d/1lAoND44iEzSuLYnXEj7DfHNGJfHMDcBD/view',
        N'Link demo để trình bày với khách.', c.owner_id
 FROM contracts c

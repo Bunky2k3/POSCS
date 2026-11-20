@@ -215,6 +215,52 @@ public class ContractDetailControllerTest {
         verify(request).setAttribute("primaryDocumentUrl", "https://poscs.example.com/contract-05.pdf");
     }
 
+    /**
+     * Task 10.3 (BR-59): link không bắt buộc. Tờ "Hợp đồng đã ký" không có link đứng
+     * trước không được chặn mất link của tờ cùng loại phía sau -- nút "Mở bản PDF"
+     * vẫn phải trỏ vào tờ có link.
+     */
+    @Test
+    public void view_primaryDocumentUrl_skipsSignedContractSheetWithoutLink() throws Exception {
+        when(request.getParameter("id")).thenReturn("5");
+        Contract contract = new Contract();
+        contract.setContractId(5);
+        when(contractDAO.findById(5)).thenReturn(contract);
+
+        ContractDocument paperOnly = new ContractDocument();
+        paperOnly.setDocumentId(1);
+        paperOnly.setDocType(ContractDocument.TYPE_SIGNED_CONTRACT);
+        paperOnly.setFileUrl(null);
+        ContractDocument scanned = new ContractDocument();
+        scanned.setDocumentId(2);
+        scanned.setDocType(ContractDocument.TYPE_SIGNED_CONTRACT);
+        scanned.setFileUrl("https://poscs.example.com/contract-05.pdf");
+        when(contractDAO.findDocumentsOf(5)).thenReturn(List.of(paperOnly, scanned));
+
+        controller.doGet(request, response);
+
+        verify(request).setAttribute("primaryDocumentUrl", "https://poscs.example.com/contract-05.pdf");
+        verify(request, never()).setAttribute(eq("primaryDocumentUrl"), isNull());
+    }
+
+    @Test
+    public void view_primaryDocumentUrl_notBoundWhenNoSignedSheetHasLink() throws Exception {
+        when(request.getParameter("id")).thenReturn("5");
+        Contract contract = new Contract();
+        contract.setContractId(5);
+        when(contractDAO.findById(5)).thenReturn(contract);
+
+        ContractDocument paperOnly = new ContractDocument();
+        paperOnly.setDocumentId(1);
+        paperOnly.setDocType(ContractDocument.TYPE_SIGNED_CONTRACT);
+        paperOnly.setFileUrl("   ");
+        when(contractDAO.findDocumentsOf(5)).thenReturn(List.of(paperOnly));
+
+        controller.doGet(request, response);
+
+        verify(request, never()).setAttribute(eq("primaryDocumentUrl"), any());
+    }
+
     @Test
     public void view_clusterMismatchWarning_boundWhenValuesDiffer() throws Exception {
         when(request.getParameter("id")).thenReturn("5");

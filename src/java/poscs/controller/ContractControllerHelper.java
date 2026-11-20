@@ -241,8 +241,11 @@ public final class ContractControllerHelper {
         List<ContractDocument> docs = cd.findDocumentsOf(id);
         req.setAttribute("contractDocuments", docs);
         req.setAttribute("documentTypes", ContractDocument.TYPES);
+        // BR-59: link không bắt buộc, mà isSafeHttpUrl coi chuỗi rỗng/null là an toàn --
+        // phải bỏ qua tờ không có link, không thì nó chặn mất tờ có link phía sau.
         for (ContractDocument d : docs) {
-            if (ContractDocument.TYPE_SIGNED_CONTRACT.equals(d.getDocType()) && TextRules.isSafeHttpUrl(d.getFileUrl())) {
+            if (ContractDocument.TYPE_SIGNED_CONTRACT.equals(d.getDocType())
+                    && !isBlank(d.getFileUrl()) && TextRules.isSafeHttpUrl(d.getFileUrl())) {
                 req.setAttribute("primaryDocumentUrl", d.getFileUrl());
                 break;
             }

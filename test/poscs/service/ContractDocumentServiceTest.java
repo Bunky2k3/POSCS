@@ -1,5 +1,10 @@
 package poscs.service;
 
+import java.sql.Date;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.Arrays;
 import java.util.List;
 import org.junit.Before;
@@ -77,6 +82,9 @@ public class ContractDocumentServiceTest {
     private ContractDocument sampleDocument(String docType, String url, String title, String note) {
         ContractDocument d = new ContractDocument();
         d.setDocType(docType);
+        // Task 10.3 (BR-59): ngày trên giấy bắt buộc -- dữ liệu dựng dùng hôm qua, tính theo
+        // cùng đồng hồ hệ thống mà `service` ở setUp() dùng, để không bao giờ rơi vào MSG-063.
+        d.setDocDate(Date.valueOf(LocalDate.now().minusDays(1)));
         d.setFileUrl(url);
         d.setTitle(title);
         d.setNote(note);
@@ -115,7 +123,7 @@ public class ContractDocumentServiceTest {
         when(contractDAO.findById(10)).thenReturn(sampleContract(10, false));
         when(documentDAO.addDocument(any(), eq(2))).thenReturn(ContractDocumentDAO.DOC_OK);
 
-        ContractDocument doc = sampleDocument("Biên bản nghiệm thu",
+        ContractDocument doc = sampleDocument("Biên bản nghiệm thu bàn giao",
                 "http://example.com/doc.pdf", null, null);
         ServiceResult<ContractDocument> result = service.addDocument(10, doc, salesManager);
 
@@ -234,22 +242,25 @@ public class ContractDocumentServiceTest {
     @Test
     public void addDocument_urlNull_invalid() {
         when(contractDAO.findById(10)).thenReturn(sampleContract(10, false));
+        when(documentDAO.addDocument(any(), eq(1))).thenReturn(ContractDocumentDAO.DOC_OK);
         ContractDocument doc = sampleDocument(ContractDocument.TYPE_SIGNED_CONTRACT, null, "HĐ", null);
         ServiceResult<ContractDocument> result = service.addDocument(10, doc, adminUser);
 
-        assertFalse(result.isSuccess());
-        assertEquals(ContractDocumentService.ERR_INVALID, result.getMessage());
+        // Task 10.3 (BR-59): link không bắt buộc nữa -- không có link vẫn lưu được.
+        assertTrue(result.isSuccess());
     }
 
     @Test
     public void addDocument_urlEmptyOrBlank_invalid() {
         when(contractDAO.findById(10)).thenReturn(sampleContract(10, false));
+        when(documentDAO.addDocument(any(), eq(1))).thenReturn(ContractDocumentDAO.DOC_OK);
 
+        // Task 10.3 (BR-59): link không bắt buộc nữa -- link rỗng / toàn khoảng trắng vẫn lưu được.
         ContractDocument d1 = sampleDocument(ContractDocument.TYPE_SIGNED_CONTRACT, "", "HĐ", null);
-        assertEquals(ContractDocumentService.ERR_INVALID, service.addDocument(10, d1, adminUser).getMessage());
+        assertTrue(service.addDocument(10, d1, adminUser).isSuccess());
 
         ContractDocument d2 = sampleDocument(ContractDocument.TYPE_SIGNED_CONTRACT, "   ", "HĐ", null);
-        assertEquals(ContractDocumentService.ERR_INVALID, service.addDocument(10, d2, adminUser).getMessage());
+        assertTrue(service.addDocument(10, d2, adminUser).isSuccess());
     }
 
     @Test
@@ -534,5 +545,204 @@ public class ContractDocumentServiceTest {
     public void constructor_default_initializesDependencies() {
         ContractDocumentService s = new ContractDocumentService();
         assertNotNull(s);
+    }
+
+    // ==================================================================
+    // 10. BR-59 giấy tờ dạng ô tích (Task 10.3): ngày trên giấy, số giấy,
+    //     link không bắt buộc, loại "Khác" bắt tên, nhiều tờ cùng loại
+    // ==================================================================
+
+    /** "Hôm nay" cố định 20/11/2026 theo giờ Việt Nam, để mốc "không sau hôm nay" không trôi. */
+    private static final Clock TODAY_2026_11_20 = Clock.fixed(
+            Instant.parse("2026-11-20T03:00:00Z"), ZoneId.of("Asia/Ho_Chi_Minh"));
+
+    private ContractDocumentService clockedService() {
+        return new ContractDocumentService(documentDAO, contractDAO, permissionService, TODAY_2026_11_20);
+    }
+
+    private ContractDocument paper(String docType, String docDate, String docNo, String url, String title) {
+        ContractDocument d = new ContractDocument();
+        d.setDocType(docType);
+        d.setDocDate(docDate == null ? null : Date.valueOf(docDate));
+        d.setDocNo(docNo);
+        d.setFileUrl(url);
+        d.setTitle(title);
+        return d;
+    }
+
+    private void contractExistsAndDaoAccepts() {
+        when(contractDAO.findById(10)).thenReturn(sampleContract(10, false));
+        when(documentDAO.addDocument(any(), anyInt())).thenReturn(ContractDocumentDAO.DOC_OK);
+    }
+
+    @Test
+    public void addDocument_withoutDocDate_returnsMsg062AndDoesNotSave() {
+        contractExistsAndDaoAccepts();
+        ContractDocument doc = paper("Biên bản giao nhận hàng hoá", null, "12/BBGN", null, null);
+
+        ServiceResult<ContractDocument> result = clockedService().addDocument(10, doc, adminUser);
+
+        assertFalse(result.isSuccess());
+        assertEquals(ContractDocumentService.ERR_DATE_REQUIRED, result.getMessage());
+        verify(documentDAO, never()).addDocument(any(), anyInt());
+    }
+
+    @Test
+    public void addDocument_docDateAfterToday_returnsMsg063AndDoesNotSave() {
+        contractExistsAndDaoAccepts();
+        ContractDocument doc = paper("Phiếu GQNCKH", "2026-11-21", null, null, null);
+
+        ServiceResult<ContractDocument> result = clockedService().addDocument(10, doc, adminUser);
+
+        assertFalse(result.isSuccess());
+        assertEquals(ContractDocumentService.ERR_DATE_FUTURE, result.getMessage());
+        verify(documentDAO, never()).addDocument(any(), anyInt());
+    }
+
+    @Test
+    public void addDocument_docDateToday_isAccepted() {
+        contractExistsAndDaoAccepts();
+        ContractDocument doc = paper("Phiếu GQNCKH", "2026-11-20", null, null, null);
+
+        ServiceResult<ContractDocument> result = clockedService().addDocument(10, doc, adminUser);
+
+        assertTrue(result.isSuccess());
+        verify(documentDAO).addDocument(doc, 1);
+    }
+
+    @Test
+    public void addDocument_withoutLink_isAccepted() {
+        contractExistsAndDaoAccepts();
+        ContractDocument noUrl = paper("Biên bản giao nhận hàng hoá", "2026-11-05", "12/BBGN", null, null);
+        ContractDocument blankUrl = paper("Phiếu ĐCNB", "2026-11-03", null, "   ", null);
+
+        assertTrue(clockedService().addDocument(10, noUrl, salesManager).isSuccess());
+        assertTrue(clockedService().addDocument(10, blankUrl, salesManager).isSuccess());
+        verify(documentDAO).addDocument(noUrl, 2);
+        verify(documentDAO).addDocument(blankUrl, 2);
+    }
+
+    @Test
+    public void addDocument_linkGivenButUnsafe_stillRejected() {
+        contractExistsAndDaoAccepts();
+        ContractDocument js = paper("Hoá đơn GTGT", "2026-11-05", "0001234", "javascript:alert(1)", null);
+        ContractDocument ftp = paper("Hoá đơn GTGT", "2026-11-05", "0001234", "ftp://example.com/hd.pdf", null);
+
+        assertEquals(ContractDocumentService.ERR_INVALID, clockedService().addDocument(10, js, adminUser).getMessage());
+        assertEquals(ContractDocumentService.ERR_INVALID, clockedService().addDocument(10, ftp, adminUser).getMessage());
+        verify(documentDAO, never()).addDocument(any(), anyInt());
+    }
+
+    @Test
+    public void addDocument_validLinkKept_isAccepted() {
+        contractExistsAndDaoAccepts();
+        ContractDocument doc = paper("Hợp đồng đã ký", "2026-11-10", "01/2026/HĐMB",
+                "https://drive.google.com/file/d/abc/view", null);
+
+        assertTrue(clockedService().addDocument(10, doc, adminUser).isSuccess());
+    }
+
+    @Test
+    public void addDocument_typeOtherWithoutTitle_returnsTitleRequired() {
+        contractExistsAndDaoAccepts();
+        ContractDocument noTitle = paper(ContractDocument.TYPE_OTHER, "2026-11-05", null, null, null);
+        ContractDocument blankTitle = paper(ContractDocument.TYPE_OTHER, "2026-11-05", null, null, "   ");
+
+        assertEquals(ContractDocumentService.ERR_TITLE_REQUIRED,
+                clockedService().addDocument(10, noTitle, adminUser).getMessage());
+        assertEquals(ContractDocumentService.ERR_TITLE_REQUIRED,
+                clockedService().addDocument(10, blankTitle, adminUser).getMessage());
+        verify(documentDAO, never()).addDocument(any(), anyInt());
+    }
+
+    @Test
+    public void addDocument_typeOtherWithTitle_isAccepted() {
+        contractExistsAndDaoAccepts();
+        ContractDocument doc = paper(ContractDocument.TYPE_OTHER, "2026-11-05", "15/BG", null, "Báo giá");
+
+        assertTrue(clockedService().addDocument(10, doc, adminUser).isSuccess());
+    }
+
+    @Test
+    public void addDocument_titleNotRequiredForCatalogTypes() {
+        contractExistsAndDaoAccepts();
+        ContractDocument doc = paper("Đề nghị thanh toán", "2026-11-05", "05/ĐNTT", null, null);
+
+        assertTrue(clockedService().addDocument(10, doc, adminUser).isSuccess());
+    }
+
+    @Test
+    public void addDocument_twoSheetsOfSameType_bothAccepted() {
+        contractExistsAndDaoAccepts();
+        ContractDocument first = paper("Biên bản giao nhận hàng hoá", "2026-11-01", "01/BBGN", null, "Đợt 1");
+        ContractDocument second = paper("Biên bản giao nhận hàng hoá", "2026-11-08", "02/BBGN", null, "Đợt 2");
+
+        assertTrue(clockedService().addDocument(10, first, adminUser).isSuccess());
+        assertTrue(clockedService().addDocument(10, second, adminUser).isSuccess());
+        verify(documentDAO).addDocument(first, 1);
+        verify(documentDAO).addDocument(second, 1);
+    }
+
+    @Test
+    public void addDocument_docNoLength_maxFiftyChars() {
+        contractExistsAndDaoAccepts();
+        ContractDocument fifty = paper("CO", "2026-11-05", "N".repeat(50), null, null);
+        ContractDocument fiftyOne = paper("CQ", "2026-11-05", "N".repeat(51), null, null);
+
+        assertTrue(clockedService().addDocument(10, fifty, adminUser).isSuccess());
+        assertEquals(ContractDocumentService.ERR_INVALID,
+                clockedService().addDocument(10, fiftyOne, adminUser).getMessage());
+    }
+
+    @Test
+    public void addDocument_typesRemovedFromCatalog_rejected() {
+        contractExistsAndDaoAccepts();
+        for (String oldType : new String[]{"Biên bản nghiệm thu", "Hoá đơn", "Biên bản bàn giao",
+                "Báo giá / Đơn đặt hàng"}) {
+            ContractDocument doc = paper(oldType, "2026-11-05", null, null, "Tên");
+            assertEquals(oldType, ContractDocumentService.ERR_INVALID,
+                    clockedService().addDocument(10, doc, adminUser).getMessage());
+        }
+        verify(documentDAO, never()).addDocument(any(), anyInt());
+    }
+
+    @Test
+    public void addDocument_forbiddenUserStillBlockedBeforeDateCheck() {
+        ContractDocument doc = paper("Phiếu GQNCKH", null, null, null, null);
+
+        ServiceResult<ContractDocument> result = clockedService().addDocument(10, doc, salesSubordinate);
+
+        assertEquals(ContractDocumentService.ERR_FORBIDDEN, result.getMessage());
+    }
+
+    @Test
+    public void addDocument_nullClock_fallsBackToSystemClock() {
+        contractExistsAndDaoAccepts();
+        ContractDocumentService s = new ContractDocumentService(documentDAO, contractDAO, permissionService, null);
+        ContractDocument doc = paper("Phiếu GQNCKH", LocalDate.now().minusDays(1).toString(), null, null, null);
+
+        assertTrue(s.addDocument(10, doc, adminUser).isSuccess());
+    }
+
+    @Test
+    public void types_followBr59CatalogInOrder_withOtherLast() {
+        assertEquals(Arrays.asList(
+                "Phiếu GQNCKH", "Phiếu ĐCNB", "Biên bản giao nhận hàng hoá", "Hợp đồng đã ký",
+                "Phụ lục đã ký", "Đề nghị tạm ứng", "Bảo lãnh tạm ứng", "Biên bản nghiệm thu bàn giao",
+                "CO", "CQ", "Đề nghị thanh toán", "Hoá đơn GTGT", "Biên bản phạt", "Biên bản thanh lý",
+                "Khác"), ContractDocument.TYPES);
+        assertEquals(ContractDocument.TYPE_OTHER, ContractDocument.TYPES.get(ContractDocument.TYPES.size() - 1));
+        assertTrue(ContractDocument.TYPES.contains(ContractDocument.TYPE_SIGNED_CONTRACT));
+    }
+
+    @Test
+    public void category_knownTypeKept_unknownOrNullGoesToOther() {
+        ContractDocument known = paper("Biên bản thanh lý", "2026-11-05", null, null, null);
+        ContractDocument unknown = paper("Biên bản nghiệm thu", "2026-11-05", null, null, null);
+        ContractDocument nullType = paper(null, "2026-11-05", null, null, null);
+
+        assertEquals("Biên bản thanh lý", known.getCategory());
+        assertEquals(ContractDocument.TYPE_OTHER, unknown.getCategory());
+        assertEquals(ContractDocument.TYPE_OTHER, nullType.getCategory());
     }
 }
