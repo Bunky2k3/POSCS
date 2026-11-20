@@ -40,8 +40,8 @@
 <p>Mỗi hợp đồng đi qua các bước sau, <strong>chỉ đi tới, không quay lại</strong>:</p>
 <table class="guide-table">
     <tr><th>Tiến độ</th><th>Nghĩa</th><th>Còn làm được gì</th></tr>
-    <tr><td>Nháp</td><td>Vừa tạo, chưa ký.</td><td>Sửa mọi thông tin, điền thời hạn, thêm/gỡ hàng hoá. Xoá được (huỷ bản ghi).</td></tr>
-    <tr><td>Đã ký</td><td>Hai bên đã ký; nội dung trở thành chứng cứ.</td><td>Chỉ còn đổi người phụ trách; thay đổi điều khoản phải lập <a href="#phu-luc">phụ lục</a>. Vẫn lập kỳ thanh toán, bàn giao, thêm tài liệu, nối bán – mua.</td></tr>
+    <tr><td>Nháp</td><td>Vừa tạo, chưa ký.</td><td>Sửa thông tin (trừ người phụ trách và người ký bên mình), điền thời hạn, thêm/gỡ hàng hoá. Xoá được (huỷ bản ghi).</td></tr>
+    <tr><td>Đã ký</td><td>Hai bên đã ký; nội dung trở thành chứng cứ.</td><td>Form thông tin khoá hết; thay đổi điều khoản phải lập <a href="#phu-luc">phụ lục</a>. Vẫn lập kỳ thanh toán, bàn giao, thêm tài liệu, nối bán – mua.</td></tr>
     <tr><td>Đã thanh lý</td><td>Hợp đồng đã xong, có biên bản thanh lý.</td><td>Không sửa được gì nữa, kể cả quản trị viên. Vẫn ghi nhận tiền về, thêm/huỷ tài liệu, nối bán – mua, đóng chặng bàn giao còn treo.</td></tr>
     <tr><td>Chấm dứt sớm</td><td>Dừng trước hạn.</td><td>Như Đã thanh lý.</td></tr>
 </table>
@@ -72,6 +72,7 @@
     <tr><td>Kỳ thanh toán, bàn giao, tài liệu, nối bán – mua, thanh lý, chấm dứt sớm</td><td>Được</td><td>Được (*)</td><td>Không</td></tr>
     <tr><td>Xoá bản nháp</td><td>Được</td><td>Được (*)</td><td>Không</td></tr>
     <tr><td>Huỷ bản ghi hợp đồng đã ký, chữa sai sót nhập liệu</td><td>Được</td><td>Không</td><td>Không</td></tr>
+    <tr><td>Chọn người phụ trách khi tạo; thay người phụ trách đã bị khoá tài khoản</td><td>Được</td><td>Không</td><td>Không</td></tr>
     <tr><td>Báo “Đã xử lý xong” một chặng bàn giao</td><td>Mọi phòng</td><td>Nếu thuộc phòng nhận</td><td>Nếu thuộc phòng nhận</td></tr>
 </table>
 <div class="guide-note">
@@ -149,21 +150,24 @@
     <li><strong>Mã hợp đồng</strong>: nhập đúng số ghi trên bản hợp đồng giấy. Không được trùng với hợp đồng hay phụ lục nào khác.</li>
     <li><strong>Tiêu đề hợp đồng</strong>.</li>
     <li><strong>Khách hàng</strong> (ở hợp đồng mua ô này mang nhãn <strong>Nhà cung cấp</strong>): hợp đồng bán chỉ chọn được khách hàng mua; hợp đồng mua chỉ chọn được nhà cung cấp. Đối tác chưa có trong danh sách thì tạo ở phân hệ Khách hàng trước, hoặc tick thêm vai còn thiếu ở trang Sửa của họ.</li>
-    <li><strong>Người phụ trách</strong>: chọn một nhân viên Sales.</li>
+    <li><strong>Người phụ trách</strong>: Sales tạo thì là chính mình — ô chỉ hiện tên, không chọn được. Admin tạo thì chọn một nhân viên Sales đang hoạt động. Tạo xong thì người phụ trách không đổi được nữa, kể cả khi hợp đồng còn Nháp (ngoại lệ duy nhất ở <a href="#thay-nguoi-phu-trach">mục 5.2</a>).</li>
     <li><strong>Loại hợp đồng</strong>: bộ loại khác nhau giữa hợp đồng bán và mua (xem bảng ở <a href="#tong-quan">mục 1</a>).</li>
-    <li><strong>Thông tin ký kết</strong> (không bắt buộc): người ký hai bên và chức vụ, căn cứ uỷ quyền (chỉ khi người ký không phải đại diện pháp luật), nơi ký. Nên điền đủ trước khi ký.</li>
+    <li><strong>Thông tin ký kết</strong>: <em>người ký bên mình</em> luôn là Giám đốc chi nhánh — bốn ô Người ký bên mình, Chức vụ, Điện thoại, Fax do hệ thống tự điền từ trang Thông tin chi nhánh, chỉ để xem, không gõ được. Bạn chỉ nhập phần bên đối tác (không bắt buộc, nên điền đủ trước khi ký): người ký bên đối tác và chức vụ, căn cứ uỷ quyền (chỉ khi người ký không phải đại diện pháp luật), nơi ký.</li>
     <li><strong>Giá trị hợp đồng</strong> (VNĐ): tổng giá trị theo điều khoản. Gõ số, hệ thống tự chèn dấu chấm và đọc thành chữ ngay bên dưới. Để trống nếu chưa chốt giá.</li>
     <li>Bấm <strong>Tạo hợp đồng</strong>. Trang chi tiết của hợp đồng vừa tạo mở ra.</li>
 </ol>
 <div class="guide-note">
     <p>Form tạo <strong>không có ô ngày nào</strong>, và hợp đồng mới luôn ở trạng thái <strong>Nháp</strong>. Thời hạn (ngày hiệu lực, ngày kết thúc) điền ở trang Quản lý khi đã chốt với khách (<a href="#quan-ly">mục 5</a>); ngày ký do hệ thống ghi lúc bấm Ký (<a href="#ky">mục 6</a>). Hàng hoá cũng thêm ở trang Quản lý.</p>
 </div>
+<div class="guide-warn">
+    <p>Admin chưa khai Giám đốc chi nhánh thì bốn ô người ký bên mình để trống và form hiện dải vàng <em>Chưa có thông tin Giám đốc chi nhánh. Admin khai tại trang Thông tin chi nhánh.</em> Hợp đồng vẫn tạo được; khi Admin khai xong, bản Nháp nhận thông tin ở lần bấm Lưu thay đổi kế tiếp. Cách khai: xem hướng dẫn Nhân viên, mục 9.</p>
+</div>
 
 <h3 id="loi-tao">3.1. Khi không lưu được</h3>
 <p>Trước khi gửi, trang kiểm các ô bắt buộc và hiện chữ đỏ ngay dưới ô còn trống. Nếu hệ thống từ chối sau khi gửi, thông báo đỏ hiện ở đầu form:</p>
 <table class="guide-table">
     <tr><th>Thông báo</th><th>Nguyên nhân và cách xử lý</th></tr>
-    <tr><td>Thông tin hợp đồng chưa hợp lệ. Vui lòng kiểm tra lại các ô bắt buộc.</td><td>Còn ô bắt buộc để trống, hoặc đối tác vừa chọn không còn giữ đúng vai (khách hàng mua cho hợp đồng bán, nhà cung cấp cho hợp đồng mua).</td></tr>
+    <tr><td>Thông tin hợp đồng chưa hợp lệ. Vui lòng kiểm tra lại các ô bắt buộc.</td><td>Còn ô bắt buộc để trống, đối tác vừa chọn không còn giữ đúng vai (khách hàng mua cho hợp đồng bán, nhà cung cấp cho hợp đồng mua), hoặc người phụ trách Admin vừa chọn đã bị khoá tài khoản.</td></tr>
     <tr><td>Mã hợp đồng này đã có hợp đồng khác dùng. Kiểm lại số trên bản giấy hoặc nhập mã khác.</td><td>Mã trùng với một hợp đồng hoặc phụ lục đã có. Tìm mã đó ở danh sách (nhớ bấm <em>Xem mọi thời điểm</em>).</td></tr>
     <tr><td>Không lưu được hợp đồng. Vui lòng thử lại.</td><td>Lỗi hệ thống. Thử lại; vẫn lỗi thì báo quản trị viên.</td></tr>
 </table>
@@ -180,7 +184,7 @@
     <li><strong>Mở bản PDF</strong>: mở bản hợp đồng đã ký ở tab mới. Nút chỉ hiện khi tab Tài liệu có một tài liệu loại <em>Hợp đồng đã ký</em> (<a href="#tai-lieu">mục 9</a>).</li>
     <li><strong>Quản lý hợp đồng</strong>: sang trang có các nút thao tác. Chỉ người có quyền sửa mới thấy nút này.</li>
     <li><strong>Tiến trình hợp đồng</strong>: Soạn thảo → Ký hợp đồng → Thanh lý (hoặc Chấm dứt sớm). Mỗi bước đã qua ghi ngày và người làm; bước thanh lý ghi kèm căn cứ.</li>
-    <li><strong>Thông tin hợp đồng</strong>: mã, loại, khách hàng (bấm để mở hồ sơ khách), người phụ trách, chiều mua/bán, người ký, nơi ký, giá trị. Thẻ này luôn hiện, dù đang đứng ở tab nào.</li>
+    <li><strong>Thông tin hợp đồng</strong>: mã, loại, khách hàng (bấm để mở hồ sơ khách), người phụ trách, chiều mua/bán, người ký hai bên (bên mình kèm điện thoại, fax nếu có), nơi ký, giá trị. Thẻ này luôn hiện, dù đang đứng ở tab nào.</li>
     <li><strong>Bảy tab</strong>: Kỳ thanh toán, Bàn giao, Hàng hoá, Tài liệu, Phụ lục, Nối bán – mua, Nhật ký. Số trong ngoặc là số dòng đang có. Trang nhớ tab bạn mở gần nhất.</li>
 </ol>
 <div class="guide-note">
@@ -208,7 +212,7 @@
     <figcaption>Hình 7. Trang Quản lý của một bản nháp chưa chốt thời hạn</figcaption>
 </figure>
 <ol class="guide-steps">
-    <li><strong>Thông tin chung</strong> và <strong>thông tin ký kết</strong>: khi còn Nháp sửa được hết — mã, tiêu đề, khách hàng, người phụ trách, loại, người ký.</li>
+    <li><strong>Thông tin chung</strong> và <strong>thông tin ký kết</strong>: khi còn Nháp sửa được mã, tiêu đề, khách hàng, loại và phần bên đối tác. <em>Người phụ trách</em> và bốn ô <em>người ký bên mình</em> chỉ để xem: mỗi lần bấm Lưu thay đổi, hệ thống chép lại thông tin Giám đốc chi nhánh mới nhất vào bản Nháp.</li>
     <li><strong>Giá trị hợp đồng</strong>.</li>
     <li><strong>Ngày hiệu lực</strong> và <strong>ngày kết thúc</strong>: điền khi đã chốt với khách. Phải có đủ hai ngày thì mới ký được; ngày hiệu lực không được sau ngày kết thúc.</li>
     <li><strong>Ngày ký</strong>: chỉ để xem — hệ thống ghi vào lúc bấm Ký.</li>
@@ -235,6 +239,13 @@
 </ol>
 <div class="guide-warn">
     <p>Hàng hoá <strong>chỉ thêm/gỡ được khi hợp đồng còn là Nháp</strong>. Ký rồi thì hàng hoá là nội dung hợp đồng: thay đổi phải lập <a href="#phu-luc">phụ lục</a>. Hệ thống không lưu đơn giá từng dòng — tiền của hợp đồng là một con số tổng ở ô Giá trị hợp đồng.</p>
+</div>
+
+<h3 id="thay-nguoi-phu-trach">5.2. Thay người phụ trách đã nghỉ việc</h3>
+<div class="guide-who"><span class="lbl">Ai làm được:</span><span class="role">Admin</span><span class="role no">Sales</span><span class="role no">Kỹ thuật</span></div>
+<p>Người phụ trách là người tạo hợp đồng (hoặc Sales do Admin chọn lúc tạo) và không đổi được ở mọi tiến độ. Ngoại lệ duy nhất: người đó đã bị <strong>khoá tài khoản</strong>, thường vì nghỉ việc (xem hướng dẫn Nhân viên, mục 7). Khi đó Admin mở trang Quản lý sẽ thấy ô <strong>Người phụ trách</strong> thành ô chọn, kèm dòng <em>Người phụ trách đã bị khoá tài khoản, chọn người thay.</em> Chọn một nhân viên Sales đang hoạt động rồi bấm <strong>Lưu thay đổi</strong>. Việc thay người được ghi vào Nhật ký.</p>
+<div class="guide-note">
+    <p>Thay được cả ở bản Nháp lẫn hợp đồng đã ký, trừ hợp đồng đã thanh lý hoặc chấm dứt sớm. Ở bản Nháp, để trống ô chọn thì vẫn giữ người cũ và chỉ lưu các ô khác; ở hợp đồng đã ký thì phải chọn người thay mới lưu được. Mỗi phụ lục có người phụ trách riêng (chép từ hợp đồng gốc lúc lập): thay ở hợp đồng gốc thì thay tiếp ở từng phụ lục còn đứng tên người cũ.</p>
 </div>
 
 <h2 id="ky">6. Ký hợp đồng</h2>
@@ -271,15 +282,16 @@
 </figure>
 <ol class="guide-steps">
     <li><strong>Dải vàng</strong> báo điều khoản đã khoá.</li>
-    <li><strong>Người phụ trách</strong>: ô duy nhất còn sửa được, dùng khi đổi người theo dõi hợp đồng.</li>
-    <li><strong>Các ô mờ</strong>: đã khoá, không sửa được. Muốn đổi điều khoản — thêm hàng, gia hạn, đổi giá trị — thì lập <a href="#phu-luc">phụ lục</a>.</li>
+    <li><strong>Các ô mờ</strong>: mọi ô đều đã khoá, kể cả người phụ trách và người ký bên mình. Muốn đổi điều khoản — thêm hàng, gia hạn, đổi giá trị — thì lập <a href="#phu-luc">phụ lục</a>.</li>
     <li><strong>Chữa sai sót nhập liệu</strong>: chỉ Admin thấy nút này (<a href="#chua-sai-sot">mục 6.2</a>).</li>
-    <li><strong>Lưu thay đổi</strong>.</li>
 </ol>
+<div class="guide-note">
+    <p>Form của hợp đồng đã ký không có nút <strong>Lưu thay đổi</strong>: nút chỉ hiện khi Admin bật chữa sai sót, hoặc khi Admin đang thay người phụ trách đã bị khoá tài khoản (<a href="#thay-nguoi-phu-trach">mục 5.2</a>). Người ký bên mình giữ đúng người lúc ký, kể cả khi sau này Admin đổi Thông tin chi nhánh.</p>
+</div>
 
 <h3 id="chua-sai-sot">6.2. Chữa sai sót nhập liệu</h3>
 <div class="guide-who"><span class="lbl">Ai làm được:</span><span class="role">Admin</span><span class="role no">Sales</span><span class="role no">Kỹ thuật</span></div>
-<p>Dùng khi dữ liệu trên hệ thống gõ sai so với chính bản giấy đã ký — nhầm một chữ số trong mã, chọn nhầm khách hàng. Không dùng để thay đổi điều khoản: việc đó là phụ lục. Bấm <strong>Chữa sai sót nhập liệu</strong> (số 4 ở Hình 11): các ô mở lại để sửa và ô Lý do hiện ra.</p>
+<p>Dùng khi dữ liệu trên hệ thống gõ sai so với chính bản giấy đã ký — nhầm một chữ số trong mã, chọn nhầm khách hàng. Không dùng để thay đổi điều khoản: việc đó là phụ lục. Bấm <strong>Chữa sai sót nhập liệu</strong> (số 3 ở Hình 11): các ô mở lại để sửa, ô Lý do và nút Lưu thay đổi hiện ra.</p>
 <figure class="guide-shot">
     <a href="${img}/12-chua-sai-sot.png" target="_blank"><img src="${img}/12-chua-sai-sot.png" alt="Chế độ chữa sai sót nhập liệu"></a>
     <figcaption>Hình 12. Chế độ chữa sai sót nhập liệu</figcaption>
@@ -289,7 +301,7 @@
     <li>Sửa ô sai rồi bấm <strong>Lưu thay đổi</strong>.</li>
 </ol>
 <div class="guide-note">
-    <p>Thay đổi được ghi vào Nhật ký dưới tên bạn, kèm lý do. Ngày ký vẫn không sửa được. Muốn thoát chế độ này mà không lưu thì tải lại trang. Hợp đồng đã thanh lý hoặc chấm dứt thì không chữa được nữa.</p>
+    <p>Thay đổi được ghi vào Nhật ký dưới tên bạn, kèm lý do. Ngày ký, người phụ trách và bốn ô người ký bên mình vẫn không sửa được. Muốn thoát chế độ này mà không lưu thì tải lại trang. Hợp đồng đã thanh lý hoặc chấm dứt thì không chữa được nữa.</p>
 </div>
 
 <h2 id="ky-thanh-toan">7. Kỳ thanh toán</h2>
@@ -384,7 +396,7 @@
 <ul>
     <li>Chỉ lập được từ hợp đồng gốc <strong>đã ký và chưa thanh lý / chấm dứt</strong>. Hợp đồng đã thanh lý thì phát sinh sau đó là một hợp đồng mới.</li>
     <li>Chỉ một tầng: không lập phụ lục cho một phụ lục.</li>
-    <li>Khách hàng và chiều mua/bán lấy theo hợp đồng gốc.</li>
+    <li>Khách hàng, chiều mua/bán và người phụ trách lấy theo hợp đồng gốc. Người ký bên mình tự điền từ Thông tin chi nhánh như khi tạo hợp đồng.</li>
     <li>Phụ lục hiện thành dòng riêng trên danh sách, mang nhãn “PL của &lt;mã gốc&gt;”.</li>
 </ul>
 <p>Ở trang Quản lý của hợp đồng gốc, mở tab <strong>Phụ lục</strong>.</p>
@@ -405,7 +417,7 @@
 <ol class="guide-steps">
     <li><strong>Dải nhắc</strong>: phụ lục ra đời ở trạng thái Nháp và phải được ký như một hợp đồng thường.</li>
     <li><strong>Mã phụ lục</strong>: số ghi trên bản phụ lục giấy, không trùng mã nào khác.</li>
-    <li><strong>Khách hàng</strong>: theo hợp đồng gốc, không đổi được.</li>
+    <li><strong>Khách hàng</strong>: theo hợp đồng gốc, không đổi được. Ô <em>Người phụ trách</em> bên cạnh cũng vậy.</li>
     <li><strong>Điều chỉnh giá trị</strong>: <em>Bổ sung</em>, <em>Giảm trừ</em>, hoặc <em>Không đổi giá trị</em> (phụ lục chỉ gia hạn hoặc sửa hàng hoá).</li>
     <li><strong>Số tiền điều chỉnh</strong>: nhập số dương, là <strong>phần chênh lệch</strong> — không phải tổng giá trị mới.</li>
     <li>Bấm <strong>Lập phụ lục</strong>. Trang chi tiết của phụ lục mở ra; từ đó bấm Quản lý hợp đồng để điền thời hạn, thêm hàng hoá, rồi <a href="#ky">Ký</a> như hợp đồng thường.</li>

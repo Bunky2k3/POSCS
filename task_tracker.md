@@ -321,7 +321,7 @@ Không còn mục nào.
   - Nhánh: `feat/task-8.5-contract-owner-creator`.
   - Commit: `feat(contract): người phụ trách lấy theo người tạo, không đổi sau khi tạo (Task 8.5)`
   - *Đã hoàn thành:* `docs/SPEC.md` (BR-35, §5.4 Tạo/Cập nhật, §11 quyết định 13); `ContractService` thêm hàm tĩnh `applyCreateOwner`, `canReplaceOwner`, `updateContractOwner` chỉ còn ngoại lệ Admin thay người đã bị khoá (khác thì MSG-022), `updateDraftReplacingOwner` (kiểm người thay → lưu bản Nháp → mới đổi người, theo QA-8.5-01), `updateContract` từ chối hợp đồng đã ký, sửa/chữa sai sót giữ người phụ trách cũ; `ContractDAO.update`/`correct` luôn giữ `owner_id` cũ, thêm `replaceOwner` (một giao dịch, có nhật ký); `ContractController` và `ContractActionController` áp luật ở cả hai lối, set `ownerSelectable`/`canReplaceOwner`; `addnewcontract.jsp`, `updatecontract.jsp` ô người phụ trách chỉ đọc (Admin chọn khi tạo, chọn người thay khi người cũ bị khoá), ẩn nút Lưu với hợp đồng đã ký. Test: +68 test ở 4 lớp, sửa các test cũ khẳng định "đổi được người phụ trách" (ghi rõ trong QA report); `ant test` 2.139 test, 0 fail, 3 skipped; 2 JSP dịch qua Jasper của Tomcat 11 không lỗi. Không có migration. QA report tại `docs/qa/Task-8.5.md`.
-- [ ] **Task 8.6:** Cập nhật hướng dẫn sử dụng (trang trong app và bản Word) cho Thông tin chi nhánh, người ký bên mình và người phụ trách.
+- [x] **Task 8.6:** Cập nhật hướng dẫn sử dụng (trang trong app và bản Word) cho Thông tin chi nhánh, người ký bên mình và người phụ trách.
   - UC: `UC-55`, `UC-33`, `UC-35`.
   - BR / MSG / NFR: `BR-35`, `BR-56`, `BR-57`, `MSG-060`.
   - File sửa:
@@ -336,6 +336,7 @@ Không còn mục nào.
   - Xong khi: hai trang hướng dẫn và docx mô tả đúng cách làm mới; docx có dòng Task 8.6 trong Lịch sử thay đổi.
   - Nhánh: `docs/task-8.6-guide-branch-signer-owner`.
   - Commit: `docs(guide): hướng dẫn thông tin chi nhánh, người ký bên mình và người phụ trách (Task 8.6)`
+  - *Đã hoàn thành:* `web/jsp/guide/contract.jsp` (bảng tiến độ, bảng quyền thêm dòng chọn/thay người phụ trách; mục 3 người phụ trách theo BR-35, người ký bên mình theo BR-56, cảnh báo MSG-060; mục 4, mục 5; mục mới 5.2 "Thay người phụ trách đã nghỉ việc"; mục 6.1, 6.2; phụ lục); `web/jsp/guide/employee.jsp` (mục mới 9 "Thông tin chi nhánh" theo BR-57, lỗi chung thành mục 10, bước nghỉ việc trỏ Hợp đồng mục 5.2); `tools/guide/shots/contract.mjs` (ảnh 04 khoanh ô người phụ trách chỉ đọc, ảnh 11 còn 3 khoanh); chụp lại `web/guide/contract/` 04, 07, 11, 12, 19 trên Tomcat 8081 với bản sao `poscs_db` (người dùng đồng ý; GĐCN mẫu tên và số giả; đã dọn CSDL tạm); `tools/guide/word/export_word.py` thêm dòng CHANGES; `docs/Report6_HuongDanSuDung.docx` xuất lại. Không có test Java mới; `ant test` 2.204 test, 0 fail, 3 skipped. QA report tại `docs/qa/Task-8.6.md`.
 
 ---
 

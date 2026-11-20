@@ -17,6 +17,12 @@
  * nháp đủ thời hạn), 15/2026 (id 39, đã ký nhưng chưa tới ngày hiệu lực, có
  * bản PDF, chờ ba phòng).
  *
+ * Trang Thông tin chi nhánh (/branch, Task 8.3) phải đã khai họ tên Giám đốc
+ * chi nhánh: chưa khai thì form tạo/sửa hiện dải MSG-060 và bốn ô người ký bên
+ * mình để trống (BR-56), ảnh 04, 07, 19 không còn đúng với hướng dẫn. Người
+ * phụ trách (BR-35) chỉ là ô chọn #owner khi Admin tạo hợp đồng gốc hoặc thay
+ * người đã bị khoá tài khoản; còn lại là ô chỉ đọc không có id.
+ *
  * Trang hợp đồng NHỚ TAB cuối cùng (sessionStorage), nên ảnh nào cần tab nào
  * thì tự bấm tab đó -- đừng dựa vào tab mặc định.
  */
@@ -112,7 +118,8 @@ export default {
                 { sel: '#contractCode', n: 1 },
                 { sel: '#title', n: 2 },
                 { sel: '#customer', n: 3 },
-                { sel: '#owner', n: 4 },
+                // Sales tạo: ô Người phụ trách chỉ đọc, ghi tên chính mình (BR-35).
+                { within: { sel: '#createContractForm .field-row', text: 'Người phụ trách' }, sel: 'input', n: 4 },
                 { sel: '#contractType', n: 5 },
                 { sel: '#createContractForm .col-12', text: 'Thông tin ký kết', n: 6 },
                 { sel: '#contractValue', n: 7 },
@@ -230,12 +237,12 @@ export default {
             file: '11-da-ky.png',
             user: 'admin',
             url: edit(6),
+            // Đã ký: mọi ô khoá, kể cả người phụ trách (BR-35); nút Lưu thay đổi
+            // ẩn tới khi bật chữa sai sót, nên ảnh này không khoanh nút đó.
             marks: [
                 { sel: '#createContractForm > div', n: 1 },
-                { sel: '#owner', n: 2 },
-                { sel: '#contractCode', n: 3 },
-                { sel: '#toggleCorrection', n: 4 },
-                { sel: '#createContractForm .action-bar .btn-primary', n: 5 }
+                { sel: '#contractCode', n: 2 },
+                { sel: '#toggleCorrection', n: 3 }
             ],
             // Thẻ đầu tiên của trang = thẻ chứa form sửa.
             clip: '.page-container .card-box'

@@ -758,6 +758,8 @@ CHANGES = [
                         'vai (PR #172).'),
     ('01/10/2026', 'S', 'Khách hàng: Sales không đổi được người phụ trách chính ở trang Sửa (PR #173).'),
     ('16/11/2026', 'S', 'Nhân viên, Phiếu hỗ trợ: thông báo không có quyền ghi đúng câu MSG-022 (Task 7.4a).'),
+    ('20/11/2026', 'T', 'Nhân viên: mục Thông tin chi nhánh. Hợp đồng: người ký bên mình lấy từ Thông tin chi nhánh; '
+                        'người phụ trách theo người tạo, Admin chỉ thay được người đã bị khoá tài khoản (Task 8.6).'),
 ]
 
 
