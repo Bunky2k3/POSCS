@@ -89,7 +89,7 @@
                 <div class="page-header-row">
                     <div>
                         <h2>Lập phụ lục hợp đồng</h2>
-                        <p>Sửa đổi cho hợp đồng <strong style="color:var(--primary-dark)">${fn:escapeXml(parentContract.contractCode)}</strong>
+                        <p>Sửa đổi cho hợp đồng <strong style="color:var(--primary-dark)">${fn:escapeXml(parentContract.displayCode)}</strong>
                            — ${fn:escapeXml(parentContract.title)}</p>
                     </div>
                     <a href="${pageContext.request.contextPath}/guide?module=contract#lap-phu-luc" target="_blank" rel="noopener" class="guide-btn" title="Mở hướng dẫn sử dụng ở tab mới"><i class="fa-regular fa-circle-question"></i> Hướng dẫn</a>
@@ -148,13 +148,15 @@
                     <%-- Mã hợp đồng do NGƯỜI DÙNG nhập, chính là số ghi trên bản
                          giấy. Hệ thống KHÔNG sinh mã nữa (V28) -- trước đó nó tự
                          sinh HD-xxxx và có thêm một ô "Số hợp đồng" riêng, hai cột
-                         cho một khái niệm. --%>
+                         cho một khái niệm. Form tạo luôn ra bản Nháp, nên ô này để
+                         trống được: hồ sơ mở từ lúc làm phiếu GQNCKH, chưa có số
+                         trên giấy; bắt buộc trước khi Ký (BR-58). --%>
                     <div class="col-12 field-row">
-                        <label>Mã hợp đồng <span class="req">*</span></label>
+                        <label>Mã hợp đồng</label>
                         <input type="text" class="form-control" id="contractCode" name="contractCode"
                                maxlength="50"
-                               placeholder="${empty parentContract ? 'VD: 01/2026/HĐKT-POSTEF' : fn:escapeXml(parentContract.contractCode).concat('/PL01')}">
-                        <span class="error-text" id="err-contractCode">Mã hợp đồng không được để trống.</span>
+                               placeholder="${empty parentContract or not parentContract.hasContractCode() ? 'VD: 01/2026/HĐKT-POSTEF' : fn:escapeXml(parentContract.contractCode).concat('/PL01')}">
+                        <span style="font-size:0.78rem; color:#6b7280; display:block; margin-top:6px;">Để trống nếu chưa có số; bắt buộc trước khi ký.</span>
                         <span style="font-size:0.78rem; color:#9ca3af; display:block; margin-top:6px;">
                             <c:choose>
                                 <c:when test="${not empty parentContract}">
@@ -410,11 +412,7 @@
             var title = document.getElementById('title');
             if (!title.value.trim()) { document.getElementById('err-title').style.display = 'block'; valid = false; }
 
-            var contractCode = document.getElementById('contractCode');
-            if (!contractCode.value.trim()) {
-                document.getElementById('err-contractCode').style.display = 'block';
-                valid = false;
-            }
+            // Không kiểm ô "Mã hợp đồng": bản Nháp để trống được tới lúc Ký (BR-58).
 
             // Ô "Khách hàng" KHÔNG tồn tại ở chế độ phụ lục (đối tác lấy theo
             // hợp đồng gốc), nên phải bỏ qua khi vắng mặt thay vì nổ ở

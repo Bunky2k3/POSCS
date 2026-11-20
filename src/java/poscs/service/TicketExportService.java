@@ -82,7 +82,7 @@ public class TicketExportService extends BaseService {
                 t.getTicketCode(),
                 t.getTicketType(),
                 t.getEnterprise() != null ? t.getEnterprise().getEnterpriseName() : "",
-                t.getContract() != null ? t.getContract().getContractCode() : "",
+                t.getContract() != null ? t.getContract().getDisplayCode() : "",
                 t.getPriority(),
                 t.getReceptionChannel(),
                 t.getStatus(),
@@ -139,7 +139,7 @@ public class TicketExportService extends BaseService {
         lines.add(new PdfLine(17, "PHIẾU HỖ TRỢ KỸ THUẬT", 22));
         lines.add(new PdfLine(11, "Mã phiếu: " + nz(ticket.getTicketCode()), 26));
         addPair(lines, "Khách hàng", ticket.getEnterprise() != null ? ticket.getEnterprise().getEnterpriseName() : "—");
-        addPair(lines, "Hợp đồng liên quan", ticket.getContract() != null ? ticket.getContract().getContractCode() : "—");
+        addPair(lines, "Hợp đồng liên quan", ticket.getContract() != null ? ticket.getContract().getDisplayCode() : "—");
         addPair(lines, "Loại phiếu", ticket.getTicketType());
         addPair(lines, "Mức ưu tiên", ticket.getPriority());
         addPair(lines, "Kênh tiếp nhận", ticket.getReceptionChannel());

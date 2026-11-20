@@ -297,6 +297,20 @@
             <span>Phải có lý do thì mới huỷ được bản ghi hợp đồng.</span>
         </div>
     </c:if>
+    <%-- MSG-061 (BR-58): bấm Ký khi hợp đồng chưa có mã. --%>
+    <c:if test="${param.error == 'missing_code'}">
+        <div class="toast-msg blocked show">
+            <i class="fa-solid fa-circle-xmark"></i>
+            <span>Hợp đồng chưa có mã. Vui lòng nhập mã hợp đồng trước khi ký.</span>
+        </div>
+    </c:if>
+    <%-- BR-58: mã đã nhập trùng hợp đồng khác thì chưa ký được. --%>
+    <c:if test="${param.error == 'duplicate_code'}">
+        <div class="toast-msg blocked show">
+            <i class="fa-solid fa-circle-xmark"></i>
+            <span>Mã hợp đồng này đã có hợp đồng khác dùng. Kiểm lại số trên bản giấy hoặc nhập mã khác.</span>
+        </div>
+    </c:if>
     <c:if test="${param.error == 'missing_term'}">
         <div class="toast-msg blocked show">
             <i class="fa-solid fa-circle-xmark"></i>
@@ -342,7 +356,7 @@
             <div class="doc-info">
                 <div class="doc-icon"><i class="fa-solid fa-file-contract"></i></div>
                 <div>
-                    <span class="contract-code">${fn:escapeXml(contract.contractCode)}</span>
+                    <span class="contract-code">${fn:escapeXml(contract.displayCode)}</span>
                     <%-- Số hợp đồng KHÔNG lặp lại ở đây: nó đã đứng đầu khối
                          "Thông tin chung" bên dưới, hiện cùng mã nội bộ. --%>
                     <h2>
@@ -520,7 +534,7 @@
                      hai cột cho một khái niệm. --%>
                 <div class="col-md-6 field-row">
                     <label>Mã hợp đồng</label>
-                    <div class="view-value"><strong>${fn:escapeXml(contract.contractCode)}</strong></div>
+                    <div class="view-value"><strong>${fn:escapeXml(contract.displayCode)}</strong></div>
                 </div>
                 <div class="col-md-6 field-row">
                     <label>Loại hợp đồng</label>
@@ -570,7 +584,7 @@
                         <label>Phụ lục của hợp đồng</label>
                         <div class="view-value">
                             <a href="${pageContext.request.contextPath}/contract?action=view&id=${contract.parentContractId}">
-                                ${fn:escapeXml(contract.parentContractCode)}</a>
+                                ${fn:escapeXml(contract.parentDisplayCode)}</a>
                         </div>
                     </div>
                 </c:if>
@@ -981,7 +995,7 @@
                     <tbody>
                         <c:forEach var="pl" items="${amendments}">
                             <tr>
-                                <td><strong>${fn:escapeXml(pl.contractCode)}</strong></td>
+                                <td><strong>${fn:escapeXml(pl.displayCode)}</strong></td>
                                 <td>${fn:escapeXml(pl.title)}</td>
                                 <td>
                                     <c:choose>
@@ -1271,7 +1285,7 @@
                     <tbody>
                         <c:forEach var="lk" items="${contractLinks}">
                             <tr>
-                                <td><strong>${fn:escapeXml(lk.other.contractCode)}</strong></td>
+                                <td><strong>${fn:escapeXml(lk.other.displayCode)}</strong></td>
                                 <td>
                                     ${fn:escapeXml(lk.other.title)}
                                     <c:if test="${lk.shared}">

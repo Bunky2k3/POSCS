@@ -550,7 +550,8 @@ public class ContractController extends HttpServlet {
         // Kiểm trùng TRƯỚC để báo đúng lý do. Chốt chặn thật vẫn là UNIQUE KEY
         // trên contract_code: hai người lưu cùng lúc cùng một mã thì chỉ ràng
         // buộc ở CSDL mới bắt được, và insert() trả DUPLICATE_CODE.
-        if (contractDAO.contractCodeExists(c.getContractCode(), 0)) {
+        // BR-58: để trống mã thì không kiểm trùng.
+        if (c.hasContractCode() && contractDAO.contractCodeExists(c.getContractCode(), 0)) {
             response.sendRedirect(request.getContextPath()
                     + "/contract?action=new&kind=" + (DIRECTION_BUY.equals(c.getDirection()) ? "buy" : "sell")
                     + "&error=duplicate_code");
@@ -616,7 +617,8 @@ public class ContractController extends HttpServlet {
             response.sendRedirect(request.getContextPath() + "/contract?action=edit&id=" + id + "&error=invalid");
             return;
         }
-        if (contractDAO.contractCodeExists(c.getContractCode(), id)) {
+        // BR-58: bản Nháp để trống mã thì không kiểm trùng.
+        if (c.hasContractCode() && contractDAO.contractCodeExists(c.getContractCode(), id)) {
             response.sendRedirect(request.getContextPath() + "/contract?action=edit&id=" + id + "&error=duplicate_code");
             return;
         }
@@ -732,7 +734,8 @@ public class ContractController extends HttpServlet {
             response.sendRedirect(request.getContextPath() + back + "&error=invalid");
             return;
         }
-        if (contractDAO.contractCodeExists(c.getContractCode(), 0)) {
+        // BR-58: phụ lục để trống mã thì không kiểm trùng.
+        if (c.hasContractCode() && contractDAO.contractCodeExists(c.getContractCode(), 0)) {
             response.sendRedirect(request.getContextPath() + back + "&error=duplicate_code");
             return;
         }
@@ -812,7 +815,8 @@ public class ContractController extends HttpServlet {
         ContractService.copyBranchSigner(c, existing);
         // BR-35: chữa sai sót cũng không đổi người phụ trách.
         c.setOwnerId(existing.getOwnerId());
-        if (!isValid(c) || !counterpartyMatchesDirection(c)) {
+        // BR-58: hợp đồng đã ký luôn có mã, chữa sai sót không xoá trắng được.
+        if (!isValid(c) || !c.hasContractCode() || !counterpartyMatchesDirection(c)) {
             response.sendRedirect(request.getContextPath() + back + "&error=invalid");
             return;
         }
@@ -870,10 +874,10 @@ public class ContractController extends HttpServlet {
         // transaction của DAO -- ở đây dữ liệu đã đọc từ trước nên có thể lỗi
         // thời, còn ở đó nó được khoá lại.
         Contract target = contractDAO.findById(id);
-        if (ContractDAO.PROGRESS_SIGNED.equals(toStatus)
-                && (target.getEffectiveDate() == null || target.getEndDate() == null)) {
+        String signError = ContractDAO.PROGRESS_SIGNED.equals(toStatus) ? signBlocker(target) : null;
+        if (signError != null) {
             response.sendRedirect(request.getContextPath()
-                    + "/contract?action=view&id=" + id + "&error=missing_term");
+                    + "/contract?action=view&id=" + id + "&error=" + signError);
             return;
         }
 
@@ -886,6 +890,24 @@ public class ContractController extends HttpServlet {
             return;
         }
         response.sendRedirect(request.getContextPath() + "/contract?action=view&id=" + id);
+    }
+
+    /**
+     * Lý do chưa ký được {@code target}, dạng giá trị {@code error} của trang
+     * chi tiết; null khi ký được. Theo thứ tự SPEC §5.4: chưa có mã (BR-58,
+     * MSG-061), mã trùng hợp đồng khác (BR-58), thiếu thời hạn (MSG-045).
+     */
+    private String signBlocker(Contract target) {
+        if (!target.hasContractCode()) {
+            return "missing_code";
+        }
+        if (contractDAO.contractCodeExists(target.getContractCode(), target.getContractId())) {
+            return "duplicate_code";
+        }
+        if (target.getEffectiveDate() == null || target.getEndDate() == null) {
+            return "missing_term";
+        }
+        return null;
     }
 
     /**
@@ -1404,7 +1426,8 @@ public class ContractController extends HttpServlet {
      */
     private Contract buildContractFromRequest(HttpServletRequest request, Contract c) {
         // Mã hợp đồng do NGƯỜI DÙNG nhập (V28), chính là số ghi trên bản giấy.
-        // Không còn sinh tự động, nên đây là ô bắt buộc -- isValid() kiểm.
+        // Để trống được khi còn Nháp, bắt buộc trước khi Ký (BR-58): trống thì
+        // là null, không phải chuỗi rỗng.
         c.setContractCode(emptyToNull(request.getParameter("contractCode")));
         c.setTitle(emptyToNull(request.getParameter("title")));
         c.setContractType(emptyToNull(request.getParameter("contractType")));
@@ -1481,9 +1504,13 @@ public class ContractController extends HttpServlet {
         return (current == null ? java.math.BigDecimal.ZERO : current).add(delta).signum() < 0;
     }
 
-    /** BR-36: các trường bắt buộc phải có, và Ngày ký ≤ Ngày hiệu lực ≤ Ngày kết thúc. */
+    /**
+     * BR-35, BR-36: các trường bắt buộc phải có, và Ngày ký ≤ Ngày hiệu lực ≤
+     * Ngày kết thúc. Mã hợp đồng KHÔNG bắt buộc ở đây (BR-58): bản Nháp để trống
+     * được tới lúc Ký; đường chữa sai sót hợp đồng đã ký tự kiểm có mã.
+     */
     private boolean isValid(Contract c) {
-        if (c.getContractCode() == null || c.getTitle() == null || c.getContractType() == null
+        if (c.getTitle() == null || c.getContractType() == null
                 || c.getEnterpriseId() <= 0 || c.getOwnerId() <= 0) {
             return false;
         }

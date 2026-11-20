@@ -53,6 +53,8 @@ public class ContractService extends BaseService {
     public static final String ERR_AMENDMENT_NOT_ALLOWED = "amendment_not_allowed";
     public static final String ERR_MISSING_REASON = "missing_reason";
     public static final String ERR_MISSING_TERM = "missing_term";
+    /** BR-58 & MSG-061: bấm Ký khi hợp đồng chưa có mã. */
+    public static final String ERR_MISSING_CODE = "missing_code";
     public static final String ERR_PROGRESS_FAILED = "progress_failed";
     public static final String ERR_VOID_REASON_REQUIRED = "void_reason_required";
     public static final String ERR_VOID_HAS_AMENDMENT = "void_has_amendment";
@@ -307,7 +309,8 @@ public class ContractService extends BaseService {
         }
         normalizeCodeAndTitle(contract);
         contract.setProgressStatus(PROGRESS_DRAFT);
-        if (contractDAO.contractCodeExists(contract.getContractCode(), 0)) {
+        // BR-58: để trống mã thì không kiểm trùng.
+        if (contract.hasContractCode() && contractDAO.contractCodeExists(contract.getContractCode(), 0)) {
             return failField(ERR_DUPLICATE_CODE, ContractValidator.FIELD_CONTRACT_CODE, MSG_DUPLICATE_CODE);
         }
         return mapInsertResult(contractDAO.insert(contract, actor.getUserId()));
@@ -351,7 +354,8 @@ public class ContractService extends BaseService {
             return failField(ERR_VALUE_NEGATIVE, ContractValidator.FIELD_CONTRACT_VALUE,
                     ContractValidator.MSG_EXCEEDS_REMAINING_VALUE);
         }
-        if (contractDAO.contractCodeExists(amendment.getContractCode(), 0)) {
+        // BR-58: để trống mã thì không kiểm trùng.
+        if (amendment.hasContractCode() && contractDAO.contractCodeExists(amendment.getContractCode(), 0)) {
             return failField(ERR_DUPLICATE_CODE, ContractValidator.FIELD_CONTRACT_CODE, MSG_DUPLICATE_CODE);
         }
         return mapInsertResult(contractDAO.insert(amendment, actor.getUserId()));
@@ -427,7 +431,9 @@ public class ContractService extends BaseService {
 
     private ServiceResult<Void> checkDraftUpdateRules(Contract contract, Contract existing) {
         normalizeCodeAndTitle(contract);
-        if (contractDAO.contractCodeExists(contract.getContractCode(), contract.getContractId())) {
+        // BR-58: để trống mã thì không kiểm trùng.
+        if (contract.hasContractCode()
+                && contractDAO.contractCodeExists(contract.getContractCode(), contract.getContractId())) {
             return failField(ERR_DUPLICATE_CODE, ContractValidator.FIELD_CONTRACT_CODE, MSG_DUPLICATE_CODE);
         }
         if (existing.isAmendment()) {
@@ -524,7 +530,27 @@ public class ContractService extends BaseService {
             return failField(ERR_PROGRESS_FAILED, ContractValidator.FIELD_PROGRESS_STATUS,
                     ContractValidator.MSG_ONLY_DRAFT_CAN_SIGN);
         }
-        // BR-36: Kiểm tra Ngày ký (hôm nay) <= Ngày hiệu lực <= Ngày kết thúc
+        ServiceResult<Void> signable = checkSignable(target);
+        if (!signable.isSuccess()) {
+            return signable;
+        }
+        String trimmedNote = (note != null && !note.trim().isEmpty()) ? note.trim() : null;
+        boolean ok = contractDAO.changeProgressStatus(contractId, PROGRESS_SIGNED, actor.getUserId(), trimmedNote);
+        return ok ? success(null) : failure(ERR_PROGRESS_FAILED);
+    }
+
+    /**
+     * Điều kiện ký một bản Nháp, không ghi gì xuống CSDL: có mã và mã không
+     * trùng hợp đồng khác (BR-58, MSG-061), đủ thời hạn và Ngày ký (hôm nay)
+     * ≤ hiệu lực ≤ kết thúc (BR-36), phụ lục không kéo giá trị hợp đồng gốc âm.
+     */
+    private ServiceResult<Void> checkSignable(Contract target) {
+        if (!target.hasContractCode()) {
+            return failField(ERR_MISSING_CODE, ContractValidator.FIELD_CONTRACT_CODE, ContractValidator.MSG_061);
+        }
+        if (contractDAO.contractCodeExists(target.getContractCode(), target.getContractId())) {
+            return failField(ERR_DUPLICATE_CODE, ContractValidator.FIELD_CONTRACT_CODE, MSG_DUPLICATE_CODE);
+        }
         ValidationResult vr = contractValidator.validateSigning(target, LocalDate.now());
         if (!vr.isValid()) {
             return ServiceResult.fail(ERR_MISSING_TERM, vr.getErrors());
@@ -536,9 +562,7 @@ public class ContractService extends BaseService {
                         ContractValidator.MSG_EXCEEDS_REMAINING_VALUE);
             }
         }
-        String trimmedNote = (note != null && !note.trim().isEmpty()) ? note.trim() : null;
-        boolean ok = contractDAO.changeProgressStatus(contractId, PROGRESS_SIGNED, actor.getUserId(), trimmedNote);
-        return ok ? success(null) : failure(ERR_PROGRESS_FAILED);
+        return success(null);
     }
 
     public ServiceResult<Void> changeProgressStatus(int contractId, String toStatus, User actor, String note) {
@@ -821,8 +845,11 @@ public class ContractService extends BaseService {
     }
 
     private static void normalizeCodeAndTitle(Contract contract) {
+        // BR-58: mã toàn khoảng trắng là chưa có mã -- ghi NULL, không ghi chuỗi rỗng,
+        // để nhiều bản Nháp cùng chưa có mã không bị coi là trùng.
         if (contract.getContractCode() != null) {
-            contract.setContractCode(contract.getContractCode().trim());
+            String code = contract.getContractCode().trim();
+            contract.setContractCode(code.isEmpty() ? null : code);
         }
         if (contract.getTitle() != null) {
             contract.setTitle(contract.getTitle().trim());

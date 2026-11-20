@@ -1038,4 +1038,113 @@ public class ContractValidatorTest {
         assertFalse(vr.isValid());
         assertEquals(ContractValidator.MSG_SIGNED_EDIT_RESTRICTED, vr.getError(ValidationResult.GLOBAL_KEY));
     }
+
+    // =========================================================================
+    // Task 10.2 -- BR-58: mã hợp đồng để trống khi còn Nháp, bắt buộc khi Ký (MSG-061)
+    // =========================================================================
+
+    @Test
+    public void br58_validateCreate_draftWithoutCode_isValid() {
+        for (String code : new String[]{null, "", "   "}) {
+            Contract c = createValidContract();
+            c.setContractCode(code);
+            ValidationResult vr = validator.validateCreate(c, Set.of("Khách mua"));
+            assertTrue("Nháp không mã phải hợp lệ (mã = '" + code + "')", vr.isValid());
+            assertNull(vr.getError(ContractValidator.FIELD_CONTRACT_CODE));
+        }
+    }
+
+    @Test
+    public void br58_validateCreate_codeTooLong_stillRejected() {
+        Contract c = createValidContract();
+        c.setContractCode("A".repeat(51));
+        ValidationResult vr = validator.validateCreate(c, Set.of("Khách mua"));
+        assertFalse(vr.isValid());
+        assertTrue(vr.getError(ContractValidator.FIELD_CONTRACT_CODE).contains("50"));
+    }
+
+    @Test
+    public void br58_validateUpdate_draftClearingCode_isValid() {
+        Contract existing = createValidContract();
+        Contract updated = createValidContract();
+        updated.setContractCode(null);
+        ValidationResult vr = validator.validateUpdate(updated, existing, Set.of("Khách mua"));
+        assertTrue(vr.isValid());
+    }
+
+    @Test
+    public void br58_validateRequiredFields_codeOptionalOnlyWhenAsked() {
+        Contract c = createValidContract();
+        c.setContractCode(null);
+        assertTrue(validator.validateRequiredFields(c, false).isValid());
+        // Bản một tham số giữ cho hợp đồng đã ký (UC-54): mã vẫn bắt buộc.
+        assertEquals(ContractValidator.MSG_CODE_REQUIRED,
+                validator.validateRequiredFields(c, true).getError(ContractValidator.FIELD_CONTRACT_CODE));
+        assertEquals(ContractValidator.MSG_CODE_REQUIRED,
+                validator.validateRequiredFields(c).getError(ContractValidator.FIELD_CONTRACT_CODE));
+    }
+
+    @Test
+    public void br58_validateSigning_withoutCode_blockedWithMsg061() {
+        for (String code : new String[]{null, "", "   "}) {
+            Contract c = createValidContract();
+            c.setContractCode(code);
+            c.setEffectiveDate(Date.valueOf("2026-02-01"));
+            c.setEndDate(Date.valueOf("2026-12-31"));
+            ValidationResult vr = validator.validateSigning(c, LocalDate.of(2026, 1, 15));
+            assertFalse("Ký không mã phải bị chặn (mã = '" + code + "')", vr.isValid());
+            assertEquals(ContractValidator.MSG_061, vr.getError(ContractValidator.FIELD_CONTRACT_CODE));
+        }
+    }
+
+    @Test
+    public void br58_validateSigning_withCode_passesCodeCheck() {
+        Contract c = createValidContract();
+        c.setEffectiveDate(Date.valueOf("2026-02-01"));
+        c.setEndDate(Date.valueOf("2026-12-31"));
+        ValidationResult vr = validator.validateSigning(c, LocalDate.of(2026, 1, 15));
+        assertTrue(vr.isValid());
+        assertNull(vr.getError(ContractValidator.FIELD_CONTRACT_CODE));
+    }
+
+    @Test
+    public void br58_msg061_matchesSpecText() {
+        assertEquals("Hợp đồng chưa có mã. Vui lòng nhập mã hợp đồng trước khi ký.", ContractValidator.MSG_061);
+    }
+
+    @Test
+    public void br58_displayCode_showsChuaCoSoWhenBlank() {
+        Contract c = new Contract();
+        assertEquals("Chưa có số", c.getDisplayCode());
+        assertFalse(c.hasContractCode());
+        c.setContractCode("   ");
+        assertEquals("Chưa có số", c.getDisplayCode());
+        assertFalse(c.hasContractCode());
+        c.setContractCode("01/2026/HĐKT-POSTEF");
+        assertEquals("01/2026/HĐKT-POSTEF", c.getDisplayCode());
+        assertTrue(c.hasContractCode());
+    }
+
+    @Test
+    public void br58_parentDisplayCode_rootNullAmendmentChuaCoSo() {
+        Contract root = new Contract();
+        assertNull("Hợp đồng gốc không có mã gốc để hiện", root.getParentDisplayCode());
+
+        Contract amendment = new Contract();
+        amendment.setParentContractId(7);
+        assertEquals("Phụ lục của hợp đồng gốc chưa có mã", "Chưa có số", amendment.getParentDisplayCode());
+        amendment.setParentContractCode("01/2026/HĐKT-POSTEF");
+        assertEquals("01/2026/HĐKT-POSTEF", amendment.getParentDisplayCode());
+    }
+
+    /** QA 10.2 #3: hàng chờ bàn giao đọc mã qua ContractHandover. */
+    @Test
+    public void br58_contractHandover_displayCode_showsChuaCoSoWhenBlank() {
+        poscs.model.ContractHandover h = new poscs.model.ContractHandover();
+        assertEquals("Chưa có số", h.getDisplayCode());
+        h.setContractCode("  ");
+        assertEquals("Chưa có số", h.getDisplayCode());
+        h.setContractCode("01/2026/HĐKT-POSTEF");
+        assertEquals("01/2026/HĐKT-POSTEF", h.getDisplayCode());
+    }
 }

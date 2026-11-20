@@ -322,4 +322,33 @@ public class TicketExportServiceTest {
     public void exportTicketToPdf_nullServletContext_throwsException() throws IOException {
         exportService.exportTicketToPdf(new ByteArrayOutputStream(), createSampleTicket(), null);
     }
+
+    // Task 10.2 (BR-58): phiếu gắn hợp đồng Nháp chưa có mã
+
+    private TechnicalRequest ticketOnUncodedContract() {
+        TechnicalRequest t = createSampleTicket();
+        Contract c = new Contract();
+        c.setContractId(7);
+        t.setContract(c);
+        return t;
+    }
+
+    @Test
+    public void br58_buildExportRows_contractWithoutCode_writesChuaCoSo() {
+        Object[] row = exportService.buildExportRows(Collections.singletonList(ticketOnUncodedContract())).get(0);
+        assertEquals("Chưa có số", row[3]);
+    }
+
+    @Test
+    public void br58_exportTicketToPdf_contractWithoutCode_printsChuaCoSo() throws Exception {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        exportService.exportTicketToPdf(out, ticketOnUncodedContract(), servletContext);
+
+        try (PDDocument doc = Loader.loadPDF(out.toByteArray())) {
+            String text = new PDFTextStripper().getText(doc);
+            assertTrue(text, text.contains("Hợp đồng liên quan"));
+            assertTrue(text, text.contains("Chưa có số"));
+            assertFalse(text, text.contains("null"));
+        }
+    }
 }

@@ -85,8 +85,9 @@ public class ContractExportService extends BaseService {
             }
             rows.add(new Object[]{
                 stt++,
-                c.getContractCode() != null ? c.getContractCode() : "",
-                c.getParentContractCode() != null ? c.getParentContractCode() : "",
+                // BR-58: chưa có mã thì ghi "Chưa có số"; hợp đồng gốc để trống cột mã gốc.
+                c.getDisplayCode(),
+                c.getParentDisplayCode() != null ? c.getParentDisplayCode() : "",
                 c.getTitle() != null ? c.getTitle() : "",
                 c.getContractType() != null ? c.getContractType() : "",
                 provinceNameOf(c),

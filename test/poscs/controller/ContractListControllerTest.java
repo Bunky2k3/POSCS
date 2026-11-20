@@ -275,6 +275,28 @@ public class ContractListControllerTest {
         assertTrue(json.contains("\\\"Dự án\\\""));
     }
 
+    /** Task 10.2 (BR-58): ô chọn hợp đồng của phiếu hiện "Chưa có số" cho bản Nháp chưa có mã. */
+    @Test
+    public void byEnterpriseJson_contractWithoutCode_showsChuaCoSo() throws Exception {
+        when(request.getServletPath()).thenReturn("/contract/byEnterprise");
+        when(request.getParameter("enterpriseId")).thenReturn("12");
+
+        Contract c = new Contract();
+        c.setContractId(9);
+        c.setTitle("Bản nháp chưa có số");
+        when(contractDAO.findByEnterpriseId(12)).thenReturn(List.of(c));
+
+        StringWriter sw = new StringWriter();
+        when(response.getWriter()).thenReturn(new PrintWriter(sw));
+
+        controller.doGet(request, response);
+
+        String json = sw.toString();
+        assertTrue(json, json.contains("\"code\":\"Chưa có số\""));
+        assertFalse(json, json.contains("\"code\":\"\""));
+        assertFalse(json, json.contains("null"));
+    }
+
     @Test
     public void list_gettersAndSettersAndConstructors() {
         ContractListController clc = new ContractListController();

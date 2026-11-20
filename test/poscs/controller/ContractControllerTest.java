@@ -114,6 +114,8 @@ public class ContractControllerTest {
     private static Contract contractWithProgress(String progressStatus) {
         Contract c = new Contract();
         c.setContractId(5);
+        // Task 10.2 (BR-58): bản Nháp đem đi Ký phải có mã, thiếu thì trượt sang nhánh missing_code.
+        c.setContractCode("01/2026/HĐKT-POSTEF");
         c.setProgressStatus(progressStatus);
         c.setEffectiveDate(sqlDate(2026, 1, 15));
         c.setEndDate(sqlDate(2026, 12, 31));
@@ -1636,6 +1638,8 @@ public class ContractControllerTest {
         when(request.getParameter("toStatus")).thenReturn(ContractDAO.PROGRESS_SIGNED);
         Contract noTerm = new Contract();
         noTerm.setContractId(5);
+        // Task 10.2 (BR-58): có mã, để test vẫn đi đúng nhánh thiếu thời hạn.
+        noTerm.setContractCode("01/2026/HĐKT-POSTEF");
         noTerm.setProgressStatus(ContractDAO.PROGRESS_DRAFT);
         when(contractDAO.findById(5)).thenReturn(noTerm);
 
@@ -2788,5 +2792,141 @@ public class ContractControllerTest {
 
         verify(response).sendError(HttpServletResponse.SC_FORBIDDEN, PermissionService.MSG_022);
         verify(contractDAO, never()).handOverToDepartments(anyInt(), anyList(), any(), anyInt());
+    }
+
+    // ------------------------------------------------------------------
+    // Task 10.2 -- BR-58: mã hợp đồng để trống khi còn Nháp, bắt buộc khi Ký (MSG-061)
+    // ------------------------------------------------------------------
+
+    /** Bản Nháp đủ thời hạn nhưng chưa có mã -- dùng cho nhóm test Ký. */
+    private static Contract draftToSign(String code) {
+        Contract c = contractWithProgress(ContractDAO.PROGRESS_DRAFT);
+        c.setContractCode(code);
+        return c;
+    }
+
+    private void stubSignRequest() {
+        when(request.getParameter("action")).thenReturn("changeProgress");
+        when(request.getParameter("contractId")).thenReturn("5");
+        when(request.getParameter("toStatus")).thenReturn(ContractDAO.PROGRESS_SIGNED);
+    }
+
+    @Test
+    public void br58_create_withoutCode_insertsNullCodeAndRedirectsToDetail() throws Exception {
+        for (String typed : new String[]{null, "", "   "}) {
+            reset(contractDAO, response);
+            when(request.getParameter("action")).thenReturn("create");
+            stubValidContractFields();
+            when(request.getParameter("contractCode")).thenReturn(typed);
+            when(contractDAO.insert(any(Contract.class), anyInt())).thenReturn(78);
+
+            controller.doPost(request, response);
+
+            verify(contractDAO).insert(argThat((Contract c) -> c.getContractCode() == null), anyInt());
+            // QA 10.2 #2: để trống mã thì không kiểm trùng (SPEC §5.4).
+            verify(contractDAO, never()).contractCodeExists(any(), anyInt());
+            verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=view&id=78");
+        }
+    }
+
+    @Test
+    public void br58_update_draftClearingCode_isSaved() throws Exception {
+        when(request.getParameter("action")).thenReturn("update");
+        when(request.getParameter("contractId")).thenReturn("5");
+        when(contractDAO.findById(5)).thenReturn(draftContract());
+        stubValidContractFields();
+        when(request.getParameter("contractCode")).thenReturn("  ");
+        when(contractDAO.update(any(Contract.class), anyInt())).thenReturn(true);
+
+        controller.doPost(request, response);
+
+        verify(contractDAO).update(argThat((Contract c) -> c.getContractCode() == null), anyInt());
+        verify(contractDAO, never()).contractCodeExists(any(), anyInt());
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=view&id=5");
+    }
+
+    @Test
+    public void br58_createAmendment_withoutCode_inserts() throws Exception {
+        when(request.getParameter("action")).thenReturn("createAmendment");
+        when(request.getParameter("parentId")).thenReturn("5");
+        when(contractDAO.findById(5)).thenReturn(signedContract());
+        stubValidContractFields();
+        when(request.getParameter("contractCode")).thenReturn(null);
+        when(contractDAO.insert(any(Contract.class), anyInt())).thenReturn(79);
+
+        controller.doPost(request, response);
+
+        verify(contractDAO).insert(argThat((Contract c) -> c.getContractCode() == null
+                && Integer.valueOf(5).equals(c.getParentContractId())), anyInt());
+        verify(contractDAO, never()).contractCodeExists(any(), anyInt());
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=view&id=79");
+    }
+
+    @Test
+    public void br58_sign_withoutCode_redirectsWithMissingCodeAndNeverSigns() throws Exception {
+        for (String code : new String[]{null, "   "}) {
+            reset(contractDAO, response);
+            stubSignRequest();
+            when(contractDAO.findById(5)).thenReturn(draftToSign(code));
+
+            controller.doPost(request, response);
+
+            verify(contractDAO, never()).changeProgressStatus(anyInt(), anyString(), anyInt(), any());
+            verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=view&id=5&error=missing_code");
+        }
+    }
+
+    @Test
+    public void br58_sign_withoutCodeAndTerm_reportsCodeFirst() throws Exception {
+        stubSignRequest();
+        Contract noCodeNoTerm = draftToSign(null);
+        noCodeNoTerm.setEffectiveDate(null);
+        noCodeNoTerm.setEndDate(null);
+        when(contractDAO.findById(5)).thenReturn(noCodeNoTerm);
+
+        controller.doPost(request, response);
+
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=view&id=5&error=missing_code");
+    }
+
+    @Test
+    public void br58_sign_duplicateCode_redirectsWithDuplicateAndNeverSigns() throws Exception {
+        stubSignRequest();
+        when(contractDAO.findById(5)).thenReturn(draftToSign("01/2026/HĐKT-POSTEF"));
+        when(contractDAO.contractCodeExists("01/2026/HĐKT-POSTEF", 5)).thenReturn(true);
+
+        controller.doPost(request, response);
+
+        verify(contractDAO, never()).changeProgressStatus(anyInt(), anyString(), anyInt(), any());
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=view&id=5&error=duplicate_code");
+    }
+
+    @Test
+    public void br58_sign_withCode_signs() throws Exception {
+        stubSignRequest();
+        when(contractDAO.findById(5)).thenReturn(draftToSign("01/2026/HĐKT-POSTEF"));
+        when(contractDAO.changeProgressStatus(eq(5), eq(ContractDAO.PROGRESS_SIGNED), anyInt(), any()))
+                .thenReturn(true);
+
+        controller.doPost(request, response);
+
+        verify(contractDAO).changeProgressStatus(eq(5), eq(ContractDAO.PROGRESS_SIGNED), eq(99), any());
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=view&id=5");
+    }
+
+    @Test
+    public void br58_correct_signedContractBlankCode_isRejected() throws Exception {
+        loginAs("Admin");
+        when(request.getParameter("action")).thenReturn("correct");
+        when(request.getParameter("contractId")).thenReturn("5");
+        when(contractDAO.findById(5)).thenReturn(signedContract());
+        when(request.getParameter("correctionReason")).thenReturn("Gõ nhầm mã");
+        stubValidContractFields();
+        when(request.getParameter("contractCode")).thenReturn("   ");
+
+        controller.doPost(request, response);
+
+        verify(contractDAO, never()).correct(any(Contract.class), anyInt(), anyString());
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=edit&id=5&error=invalid");
     }
 }

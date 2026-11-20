@@ -218,7 +218,8 @@ public class ContractListController extends HttpServlet {
             Contract c = contracts.get(i);
             if (i > 0) sb.append(',');
             sb.append("{\"id\":").append(c.getContractId())
-              .append(",\"code\":\"").append(escapeJson(c.getContractCode())).append("\"")
+              // BR-58: hợp đồng chưa có mã hiện "Chưa có số" trong ô chọn hợp đồng của phiếu.
+              .append(",\"code\":\"").append(escapeJson(c.getDisplayCode())).append("\"")
               .append(",\"title\":\"").append(escapeJson(c.getTitle())).append("\"}");
         }
         return sb.append(']').toString();

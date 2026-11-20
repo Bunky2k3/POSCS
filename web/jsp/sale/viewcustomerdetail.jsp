@@ -440,7 +440,7 @@
                                 <tbody>
                                     <c:forEach var="contract" items="${contractList}">
                                         <tr>
-                                            <td><a href="${pageContext.request.contextPath}/contract?action=view&id=${contract.contractId}">${fn:escapeXml(contract.contractCode)}</a></td>
+                                            <td><a href="${pageContext.request.contextPath}/contract?action=view&id=${contract.contractId}">${fn:escapeXml(contract.displayCode)}</a></td>
                                             <td>${fn:escapeXml(contract.title)}</td>
                                             <td>
                                                 <c:choose>
