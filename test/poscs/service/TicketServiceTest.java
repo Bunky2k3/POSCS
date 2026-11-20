@@ -699,6 +699,44 @@ public class TicketServiceTest {
     }
 
     /**
+     * Task 9.5 (BR-39): isAssignedTechnicianValid mở public để lối /ticket (controller ghi
+     * thẳng qua DAO) dùng chung luật với service. Gọi thẳng: chỉ Sales đang hoạt động hợp lệ.
+     */
+    @Test
+    public void isAssignedTechnicianValid_onlyActiveSalesWhenCreating() {
+        assertTrue(service.isAssignedTechnicianValid(techAssigned.getUserId(), null));
+        assertTrue(service.isAssignedTechnicianValid(salesSubordinate.getUserId(), null));
+
+        assertFalse("Admin", service.isAssignedTechnicianValid(adminUser.getUserId(), null));
+        assertFalse("Tổng hợp", service.isAssignedTechnicianValid(generalUser.getUserId(), null));
+        assertFalse("Sales đã khoá", service.isAssignedTechnicianValid(deletedUser.getUserId(), null));
+        assertFalse("không tồn tại", service.isAssignedTechnicianValid(999, null));
+        assertFalse("chưa chọn", service.isAssignedTechnicianValid(0, null));
+        assertFalse("số âm", service.isAssignedTechnicianValid(-1, null));
+    }
+
+    /**
+     * Task 9.5 (BR-39): gửi lại đúng người đang giữ phiếu thì luôn hợp lệ, kể cả khi người
+     * đó đã khoá hay đổi vai; đổi sang người khác thì kiểm như tạo mới.
+     */
+    @Test
+    public void isAssignedTechnicianValid_keepsCurrentHandlerEvenIfLockedOrNotSales() {
+        assertTrue("giữ Sales đã khoá",
+                service.isAssignedTechnicianValid(deletedUser.getUserId(), deletedUser.getUserId()));
+        assertTrue("giữ người đã đổi sang Tổng hợp",
+                service.isAssignedTechnicianValid(generalUser.getUserId(), generalUser.getUserId()));
+
+        assertTrue("đổi sang Sales đang hoạt động",
+                service.isAssignedTechnicianValid(techOther.getUserId(), deletedUser.getUserId()));
+        assertFalse("đổi sang Admin",
+                service.isAssignedTechnicianValid(adminUser.getUserId(), techAssigned.getUserId()));
+        assertFalse("đổi sang Sales đã khoá",
+                service.isAssignedTechnicianValid(deletedUser.getUserId(), techAssigned.getUserId()));
+        assertFalse("bỏ trống dù phiếu đang có người",
+                service.isAssignedTechnicianValid(0, techAssigned.getUserId()));
+    }
+
+    /**
      * Task 9.3: người xử lý (Sales) có toàn quyền nên phiếu cũ được kiểm như mọi lần sửa:
      * mức ưu tiên ngoài danh mục phải chọn lại; khách hàng cũ (nhà cung cấp, lập trước khi
      * ô này lọc vai) vẫn được giữ vì không đổi khách.

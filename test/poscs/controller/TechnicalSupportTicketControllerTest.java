@@ -87,6 +87,9 @@ public class TechnicalSupportTicketControllerTest {
         // Mặc định khách của phiếu là khách mua -- vai duy nhất lập được phiếu.
         // Các test về luật vai tự ghi đè dòng này.
         when(customerDAO.findRolesOf(anyInt())).thenReturn(Collections.singletonList("Khách mua"));
+        // Task 9.5 (BR-39): người xử lý 50 mà các test tạo/sửa gửi lên là Sales đang hoạt
+        // động -- lối /ticket giờ kiểm điều này ở server. Các test về luật này tự ghi đè.
+        when(employeeDAO.findById(50)).thenReturn(employee(50, "Sales", false));
 
         // exportPdf đọc font tiếng Việt qua ServletContext. Dùng ĐÚNG file font
         // trong web/WEB-INF/fonts thay vì mock trả byte giả: PDType0Font.load
@@ -104,6 +107,15 @@ public class TechnicalSupportTicketControllerTest {
         user.setUserId(userId);
         user.setRole(new Role(1, roleName));
         when(session.getAttribute("currentUser")).thenReturn(user);
+    }
+
+    /** Nhân viên trả về từ employeeDAO.findById -- dùng cho luật người xử lý (BR-39). */
+    private static User employee(int userId, String roleName, boolean locked) {
+        User u = new User();
+        u.setUserId(userId);
+        u.setRole(new Role(1, roleName));
+        u.setDeleted(locked);
+        return u;
     }
 
     private static void setField(Object target, String fieldName, Object value) throws Exception {
@@ -1523,5 +1535,144 @@ public class TechnicalSupportTicketControllerTest {
         verify(ticketDAO, never()).insert(any());
         verify(ticketDAO, never()).update(any(), anyInt(), any());
         verify(ticketDAO, never()).softDelete(anyInt());
+    }
+
+    // ------------------------------------------------------------------
+    // Task 9.5 (BR-39): lối /ticket kiểm người xử lý ở server
+    // ------------------------------------------------------------------
+    //
+    // Dropdown chỉ liệt kê Sales đang hoạt động, nhưng đó là khoá hình: POST tự
+    // dựng gửi được id bất kỳ. Controller ghi thẳng qua DAO nên phải tự gọi
+    // TicketService.isAssignedTechnicianValid trước khi ghi.
+
+    private static final String CREATE_INVALID_HANDLER = CONTEXT_PATH + "/ticket?action=new&error=invalid_handler";
+    private static final String UPDATE_INVALID_HANDLER = CONTEXT_PATH + "/ticket?action=edit&id=3&error=invalid_handler";
+
+    /** POST create đủ trường hợp lệ, chỉ đổi người xử lý gửi lên. */
+    private void postCreateWithHandler(int handlerId) throws Exception {
+        when(request.getParameter("action")).thenReturn("create");
+        stubValidCreateFields();
+        when(request.getParameter("assignedTechnicianId")).thenReturn(String.valueOf(handlerId));
+        when(ticketDAO.generateNextTicketCode()).thenReturn("TK-0001");
+        when(ticketDAO.insert(any(TechnicalRequest.class))).thenReturn(7);
+
+        controller.doPost(request, response);
+    }
+
+    private void assertCreateRejectedForHandler() throws Exception {
+        verify(response).sendRedirect(CREATE_INVALID_HANDLER);
+        verify(ticketDAO, never()).insert(any());
+        verify(ticketDAO, never()).generateNextTicketCode();
+    }
+
+    @Test
+    public void create_handlerIsAdmin_redirectsInvalidHandlerWithoutInserting() throws Exception {
+        when(employeeDAO.findById(60)).thenReturn(employee(60, "Admin", false));
+
+        postCreateWithHandler(60);
+
+        assertCreateRejectedForHandler();
+    }
+
+    @Test
+    public void create_handlerIsTongHop_redirectsInvalidHandlerWithoutInserting() throws Exception {
+        when(employeeDAO.findById(70)).thenReturn(employee(70, ROLE_TONG_HOP, false));
+
+        postCreateWithHandler(70);
+
+        assertCreateRejectedForHandler();
+    }
+
+    @Test
+    public void create_handlerIsLockedSales_redirectsInvalidHandlerWithoutInserting() throws Exception {
+        when(employeeDAO.findById(51)).thenReturn(employee(51, "Sales", true));
+
+        postCreateWithHandler(51);
+
+        assertCreateRejectedForHandler();
+    }
+
+    @Test
+    public void create_handlerDoesNotExist_redirectsInvalidHandlerWithoutInserting() throws Exception {
+        when(employeeDAO.findById(404)).thenReturn(null);
+
+        postCreateWithHandler(404);
+
+        assertCreateRejectedForHandler();
+    }
+
+    /** Người xử lý là Sales đang hoạt động khác 50 -> tạo được, lưu đúng người đã chọn. */
+    @Test
+    public void create_handlerIsAnotherActiveSales_inserts() throws Exception {
+        when(employeeDAO.findById(52)).thenReturn(employee(52, "Sales", false));
+
+        postCreateWithHandler(52);
+
+        verify(ticketDAO).insert(argThat((TechnicalRequest t) -> t.getAssignedTechnicianId() == 52));
+        verify(response).sendRedirect(CONTEXT_PATH + "/ticket?action=view&id=7");
+        verify(response, never()).sendRedirect(CREATE_INVALID_HANDLER);
+    }
+
+    /** Phiếu đang giao cho Sales 50; đổi sang Admin hay Tổng hợp đều bị chặn, không ghi gì. */
+    @Test
+    public void update_changeHandlerToNonSales_redirectsInvalidHandlerWithoutUpdating() throws Exception {
+        when(employeeDAO.findById(60)).thenReturn(employee(60, "Admin", false));
+        when(employeeDAO.findById(70)).thenReturn(employee(70, ROLE_TONG_HOP, false));
+        stubValidUpdateParams();
+        when(ticketDAO.findById(3)).thenReturn(fullyValidExistingTicket());
+
+        when(request.getParameter("assignedTechnicianId")).thenReturn("60");
+        controller.doPost(request, response);
+        when(request.getParameter("assignedTechnicianId")).thenReturn("70");
+        controller.doPost(request, response);
+
+        verify(response, times(2)).sendRedirect(UPDATE_INVALID_HANDLER);
+        verify(ticketDAO, never()).update(any(), anyInt(), any());
+    }
+
+    @Test
+    public void update_changeHandlerToLockedSales_redirectsInvalidHandlerWithoutUpdating() throws Exception {
+        when(employeeDAO.findById(51)).thenReturn(employee(51, "Sales", true));
+        stubValidUpdateParams();
+        when(request.getParameter("assignedTechnicianId")).thenReturn("51");
+        when(ticketDAO.findById(3)).thenReturn(fullyValidExistingTicket());
+
+        controller.doPost(request, response);
+
+        verify(response).sendRedirect(UPDATE_INVALID_HANDLER);
+        verify(ticketDAO, never()).update(any(), anyInt(), any());
+    }
+
+    /**
+     * Phiếu cũ mà người xử lý (50) đã nghỉ: sửa phiếu, gửi lại đúng người đó thì vẫn lưu
+     * được -- không bắt đổi người chỉ để sửa một ô khác.
+     */
+    @Test
+    public void update_keepLockedCurrentHandler_stillSaves() throws Exception {
+        when(employeeDAO.findById(50)).thenReturn(employee(50, "Sales", true));
+        stubValidUpdateParams(); // gửi lại đúng người xử lý 50 đang giữ phiếu
+        when(ticketDAO.findById(3)).thenReturn(fullyValidExistingTicket());
+
+        controller.doPost(request, response);
+
+        verify(ticketDAO).update(argThat((TechnicalRequest t) -> t.getAssignedTechnicianId() == 50),
+                eq(99), any());
+        verify(response).sendRedirect(CONTEXT_PATH + "/ticket?action=view&id=3");
+        verify(response, never()).sendRedirect(UPDATE_INVALID_HANDLER);
+    }
+
+    /** Đổi sang một Sales đang hoạt động khác -> lưu được. */
+    @Test
+    public void update_changeHandlerToAnotherActiveSales_saves() throws Exception {
+        when(employeeDAO.findById(52)).thenReturn(employee(52, "Sales", false));
+        stubValidUpdateParams();
+        when(request.getParameter("assignedTechnicianId")).thenReturn("52");
+        when(ticketDAO.findById(3)).thenReturn(fullyValidExistingTicket());
+
+        controller.doPost(request, response);
+
+        verify(ticketDAO).update(argThat((TechnicalRequest t) -> t.getAssignedTechnicianId() == 52),
+                eq(99), any());
+        verify(response).sendRedirect(CONTEXT_PATH + "/ticket?action=view&id=3");
     }
 }

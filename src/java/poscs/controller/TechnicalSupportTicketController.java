@@ -314,6 +314,11 @@ public class TechnicalSupportTicketController extends HttpServlet {
             response.sendRedirect(request.getContextPath() + "/ticket?action=new&error=invalid");
             return;
         }
+        // BR-39: người xử lý phải là Sales đang hoạt động (isValid chỉ kiểm > 0).
+        if (!getTicketService().isAssignedTechnicianValid(t.getAssignedTechnicianId(), null)) {
+            response.sendRedirect(request.getContextPath() + "/ticket?action=new&error=invalid_handler");
+            return;
+        }
         if (!customerIsBuyer(t, null)) {
             response.sendRedirect(request.getContextPath() + "/ticket?action=new&error=not_buyer");
             return;
@@ -382,6 +387,12 @@ public class TechnicalSupportTicketController extends HttpServlet {
 
         if (!isValid(t) || !TechnicalSupportTicketDAO.isAllowedStatus(t.getStatus())) {
             response.sendRedirect(request.getContextPath() + "/ticket?action=edit&id=" + id + "&error=invalid");
+            return;
+        }
+        // BR-39: như handleCreate; giữ nguyên người xử lý cũ (kể cả đã nghỉ) thì vẫn lưu được.
+        if (!getTicketService().isAssignedTechnicianValid(t.getAssignedTechnicianId(),
+                existing.getAssignedTechnicianId())) {
+            response.sendRedirect(request.getContextPath() + "/ticket?action=edit&id=" + id + "&error=invalid_handler");
             return;
         }
         if (!customerIsBuyer(t, existing.getEnterpriseId())) {
@@ -530,6 +541,10 @@ public class TechnicalSupportTicketController extends HttpServlet {
      * còn dropdown chỉ là giao diện -- một POST tự dựng đặt được giá trị thứ
      * năm, và phiếu đó rơi xuống cuối mọi bảng sắp xếp theo
      * {@code FIELD(t.priority, ...)} mà không có màn hình nào nói vì sao.
+     *
+     * <p>Người xử lý ở đây chỉ kiểm "đã chọn" ({@code > 0}); luật BR-39 (phải là
+     * Sales đang hoạt động) kiểm riêng ngay sau, qua
+     * {@link TicketService#isAssignedTechnicianValid}, để báo đúng câu lỗi.
      */
     private boolean isValid(TechnicalRequest t) {
         return t.getEnterpriseId() > 0
