@@ -11,18 +11,23 @@
       - contractHistory  : List<poscs.model.ContractHistory> -- nhật ký thay đổi, mới nhất trước
       - createdEvent / signedEvent / closedEvent : ba mốc tiến trình, để dựng thanh tiến trình
 
-    TRANG NÀY CHỈ ĐỌC, TRỪ ĐÚNG MỘT NÚT. Thao tác làm thay đổi hợp đồng -- ký,
+    TRANG NÀY CHỈ ĐỌC, TRỪ ĐÚNG HAI NÚT. Thao tác làm thay đổi hợp đồng -- ký,
     thanh lý, chấm dứt, huỷ bản ghi, gắn/gỡ hàng hoá, lập kỳ thanh toán, ghi
     nhận đã thu, nối hợp đồng -- nằm ở updatecontract.jsp. Đừng thêm nút thao
     tác vào đây.
 
-    NGOẠI LỆ DUY NHẤT: nút "Đã xử lý xong" của một chặng bàn giao (cờ
-    canCompleteHandover_<id>). Nó ở đây vì người bấm là phòng Kế toán / Dự án,
-    mà họ không có quyền ghi hợp đồng nên KHÔNG mở được updatecontract.jsp --
-    trang này là trang duy nhất họ vào được. Quyền kiểm theo PHÒNG BAN
-    (AccessControl.canCompleteHandover), không phải quyền ghi hợp đồng.
+    Hai ngoại lệ, cùng một lẽ: người bấm là Phòng tổng hợp (vai Tổng hợp), họ
+    không có quyền ghi hợp đồng nên KHÔNG mở được updatecontract.jsp -- trang
+    này là trang duy nhất họ vào được.
+      - Nút "Đã xử lý xong" của một chặng bàn giao (cờ canCompleteHandover_<id>).
+        Quyền kiểm theo PHÒNG BAN (AccessControl.canCompleteHandover).
+      - Nút "Ghi nhận đã thu" của một kỳ thanh toán chưa thu, chỉ hiện cho vai
+        Tổng hợp (SPEC 3.3: Tổng hợp chỉ ghi nhận đã thu, không lập, không xoá
+        kỳ). Admin và Sales quản lý vùng vẫn bấm ở trang quản lý. Chốt chặn
+        thật ở PermissionService.canMarkPaymentPaid, gọi trong
+        ContractPaymentService.markPaymentPaid.
 
-    Đừng lấy ngoại lệ này làm tiền lệ cho nút thứ hai: mọi thao tác còn lại
+    Đừng lấy hai ngoại lệ này làm tiền lệ cho nút thứ ba: mọi thao tác còn lại
     đều do người CÓ quyền ghi bấm, mà người đó mở thẳng trang quản lý được.
 
     Hạng mục sản phẩm/dịch vụ hiển thị sản phẩm/số lượng/đơn vị/ghi chú thật
@@ -49,6 +54,21 @@
         .page-container { max-width: 1180px; margin: 28px auto; padding: 0 20px 32px; }
         .back-link-top { color: var(--primary); font-size: 0.85rem; text-decoration: none; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; margin-bottom: 16px; }
         .back-link-top:hover { text-decoration: underline; }
+
+        /* Modal "Ghi nhận đã thu" (vai Tổng hợp) -- cùng kiểu modal của updatecontract.jsp. */
+        .modal-content { border-radius: 16px; border: none; }
+        .modal-header { border-bottom: none; padding: 24px 24px 0; }
+        .modal-body { padding: 12px 24px 6px; color: #374151; font-size: 0.92rem; }
+        .modal-footer { border-top: none; padding: 18px 24px 24px; }
+        .btn-modal-cancel { background: #fff; border: 1.5px solid #e5e7eb; color: #6b7280; border-radius: 10px; padding: 8px 18px; font-weight: 600; font-size: 0.88rem; }
+        .btn-modal-primary { background: linear-gradient(120deg, var(--primary), var(--primary-light)); border: none; color: #fff; border-radius: 10px; padding: 8px 18px; font-weight: 600; font-size: 0.88rem; }
+        .modal-icon-ask { width: 52px; height: 52px; border-radius: 50%; background: #eaf6ff; color: var(--primary); display: flex; align-items: center; justify-content: center; font-size: 1.3rem; margin-bottom: 4px; }
+        .modal-title { font-weight: 700; color: var(--primary-dark); font-size: 1.05rem; }
+        .modal-body .form-label { font-weight: 600; font-size: 0.85rem; color: #374151; margin-bottom: 6px; display: block; }
+        .modal-msg { white-space: pre-line; margin-bottom: 14px; }
+        .modal-err { color: var(--danger); font-size: 0.82rem; margin-top: 6px; display: none; }
+        .btn-mark-paid { border: 1px solid #cfe3d0; background: #f3f7f3; color: #2f6b34; border-radius: 8px; padding: 4px 10px; font-size: 0.82rem; font-weight: 600; white-space: nowrap; }
+        .btn-mark-paid:hover { background: #e6f0e6; }
 
         .detail-header { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 16px; padding: 22px 26px; margin-bottom: 20px; }
         .detail-header .doc-icon {
@@ -262,7 +282,9 @@
 
 
     <%-- Chỉ những mã controller gửi về TRANG NÀY (action=view). Lỗi hàng hoá và
-         kỳ thanh toán thì về trang quản lý -- câu của chúng nằm bên đó. --%>
+         kỳ thanh toán thì về trang quản lý -- câu của chúng nằm bên đó. Riêng
+         "Ghi nhận đã thu" do vai Tổng hợp bấm ở trang này thì lỗi về đây
+         (payment_failed, xem ContractPaymentController#markPaidReturnPage). --%>
     <c:if test="${param.error == 'amendment_not_allowed'}">
         <div class="toast-msg blocked show">
             <i class="fa-solid fa-circle-xmark"></i>
@@ -299,6 +321,12 @@
         <div class="toast-msg blocked show">
             <i class="fa-solid fa-circle-xmark"></i>
             <span>Không xác nhận được chặng bàn giao &mdash; có thể phòng bạn đã báo xong trước đó rồi.</span>
+        </div>
+    </c:if>
+    <c:if test="${param.error == 'payment_failed'}">
+        <div class="toast-msg blocked show">
+            <i class="fa-solid fa-circle-xmark"></i>
+            <span>Không ghi nhận được kỳ thanh toán &mdash; có thể kỳ này đã được ghi nhận thu trước đó, hoặc ngày thu không hợp lệ.</span>
         </div>
     </c:if>
 
@@ -850,6 +878,10 @@
                 </div>
             </c:if>
 
+            <%-- Nút "Ghi nhận đã thu" chỉ cho vai Tổng hợp (xem ghi chú đầu trang).
+                 Ẩn/hiện ở đây chỉ là trình bày, cùng cách sidebar.jsp đọc vai từ
+                 phiên đăng nhập; chặn thật ở PermissionService.canMarkPaymentPaid. --%>
+            <c:set var="canMarkPaidHere" value="${sessionScope.currentUser.role.roleName == 'Tổng hợp'}"/>
             <c:choose>
                 <c:when test="${empty contractPayments}">
                     <div class="empty-mini" style="color:#9ca3af; font-size:0.87rem;">Chưa lập kỳ thanh toán nào.</div>
@@ -886,6 +918,14 @@
                                             </c:choose>
                                         </td>
                                         <td style="text-align:right;">
+                                            <c:if test="${p.paidDate == null and canMarkPaidHere}">
+                                                <button type="button" class="btn-mark-paid js-mark-paid"
+                                                        data-payment-id="${p.paymentId}"
+                                                        data-payment-no="${row.index + 1}"
+                                                        data-amount="${p.invoiceAmount}">
+                                                    <i class="fa-solid fa-check"></i> Ghi nhận đã thu
+                                                </button>
+                                            </c:if>
                                         </td>
                                     </tr>
                                 </c:forEach>
@@ -1292,7 +1332,76 @@
 
     </script>
 
+    <%-- Modal "Ghi nhận đã thu" (vai Tổng hợp): modal trong trang, không dùng hộp
+         thoại của trình duyệt. Gửi về /contract (action=markPaid) như trang quản
+         lý; ContractPaymentController đưa vai Tổng hợp quay lại trang này. --%>
+    <c:if test="${canMarkPaidHere}">
+    <div class="modal fade" id="markPaidModal" tabindex="-1" aria-hidden="true" aria-labelledby="markPaidTitle">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <form method="POST" action="${pageContext.request.contextPath}/contract" id="markPaidForm">
+                    <input type="hidden" name="csrfToken" value="${csrfToken}">
+                    <input type="hidden" name="action" value="markPaid">
+                    <input type="hidden" name="contractId" value="${contract.contractId}">
+                    <input type="hidden" name="paymentId" id="markPaidPaymentId" value="">
+                    <div class="modal-header">
+                        <div class="modal-icon-ask"><i class="fa-solid fa-circle-question"></i></div>
+                    </div>
+                    <div class="modal-body">
+                        <h5 class="modal-title" id="markPaidTitle">Ghi nhận đã thu</h5>
+                        <div class="modal-msg" id="markPaidMessage"></div>
+                        <label class="form-label" for="markPaidDate">Ngày thu</label>
+                        <input type="date" class="form-control" id="markPaidDate" name="paidDate">
+                        <div class="modal-err" id="markPaidErr">Chọn ngày tiền về.</div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn-modal-cancel" data-bs-dismiss="modal">Huỷ bỏ</button>
+                        <button type="submit" class="btn-modal-primary">Ghi nhận đã thu</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    </c:if>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+        // Mở modal "Ghi nhận đã thu" cho đúng kỳ vừa bấm. Ngày thu mặc định hôm
+        // nay (giờ máy người dùng), sửa được nếu tiền về từ hôm trước.
+        (function () {
+            var modalEl = document.getElementById('markPaidModal');
+            if (!modalEl || !window.bootstrap) { return; }
+            var dateInput = document.getElementById('markPaidDate');
+            var err = document.getElementById('markPaidErr');
+            function today() {
+                var d = new Date();
+                var mm = String(d.getMonth() + 1).padStart(2, '0');
+                var dd = String(d.getDate()).padStart(2, '0');
+                return d.getFullYear() + '-' + mm + '-' + dd;
+            }
+            document.querySelectorAll('.js-mark-paid').forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    document.getElementById('markPaidPaymentId').value = btn.dataset.paymentId;
+                    var amount = Number(btn.dataset.amount);
+                    var amountText = isNaN(amount) ? ''
+                        : ' · ' + amount.toLocaleString('vi-VN', { maximumFractionDigits: 0 }) + ' ₫';
+                    document.getElementById('markPaidMessage').textContent =
+                        'Kỳ ' + btn.dataset.paymentNo + amountText + '\nGhi nhận tiền của kỳ này đã về vào ngày:';
+                    dateInput.value = today();
+                    err.style.display = 'none';
+                    bootstrap.Modal.getOrCreateInstance(modalEl).show();
+                });
+            });
+            document.getElementById('markPaidForm').addEventListener('submit', function (e) {
+                if (dateInput.value === '') {
+                    e.preventDefault();
+                    err.style.display = 'block';
+                    dateInput.focus();
+                }
+            });
+        })();
+    </script>
 
     <script>
         // Nhớ tab đang mở trong phiên làm việc, giống trang quản lý: bấm sang trang

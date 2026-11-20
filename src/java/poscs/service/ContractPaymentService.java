@@ -102,11 +102,12 @@ public class ContractPaymentService extends BaseService {
 
     /**
      * Ghi nhận một kỳ thanh toán đã thu tiền [UC-53].
-     * Tác nhân: Admin hoặc Sales quản lý vùng.
+     * Tác nhân: Admin, Sales quản lý vùng, hoặc vai Tổng hợp (SPEC 3.3: Tổng hợp chỉ có
+     * thao tác này, không lập, không xoá kỳ).
      * Không chặn kể cả khi hợp đồng đã thanh lý (tiền bảo lãnh/bảo hành thường về sau thanh lý).
      */
     public ServiceResult<Void> markPaymentPaid(int contractId, int paymentId, Date paidDate, User actor) {
-        if (!permissionService.canManageContractPayments(actor)) {
+        if (!permissionService.canMarkPaymentPaid(actor)) {
             return ServiceResult.fail(ERR_FORBIDDEN);
         }
         if (contractId <= 0 || paymentId <= 0) {

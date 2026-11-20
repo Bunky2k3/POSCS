@@ -26,7 +26,8 @@ import poscs.service.ServiceResult;
  * Controller chuyên trách xử lý nghiệp vụ Quản lý Kỳ thanh toán Hợp đồng (Task 4.15):
  * - UC-53: Lập kỳ thanh toán, ghi nhận đã thu, xoá kỳ lập nhầm.
  * - BR-18: Quản lý và hiển thị số tiền kỳ thanh toán theo chuẩn tiền tệ VNĐ.
- * - RBAC: Phân quyền chặt chẽ qua PermissionService (Admin, Sales quản lý vùng).
+ * - RBAC: Phân quyền chặt chẽ qua PermissionService (Admin, Sales quản lý vùng; vai Tổng
+ *   hợp chỉ được ghi nhận đã thu).
  */
 @WebServlet(name = "ContractPaymentController", urlPatterns = {"/contract/payment", "/contract/payments"})
 public class ContractPaymentController extends HttpServlet {
@@ -169,18 +170,39 @@ public class ContractPaymentController extends HttpServlet {
             response.sendRedirect(ContractControllerHelper.notFoundUrl(request));
             return;
         }
+        // Kiểm quyền TRƯỚC khi đọc ngày thu: người không được ghi nhận đã thu phải
+        // nhận 403 MSG-022 ngay, kể cả khi gửi kèm ngày sai định dạng -- không để
+        // lỗi định dạng che mất lỗi quyền. Service vẫn kiểm lại (chốt chặn thật).
+        if (!getPermissionService().canMarkPaymentPaid(actor)) {
+            response.sendError(HttpServletResponse.SC_FORBIDDEN, PermissionService.MSG_022);
+            return;
+        }
         String rawPaidDate = request.getParameter("paidDate");
         Date paidDate = ContractControllerHelper.parseDateOrNull(rawPaidDate);
         if (rawPaidDate != null && !rawPaidDate.trim().isEmpty() && paidDate == null) {
-            handleServiceError(request, response, contractId, ContractPaymentService.ERR_INVALID, "Dinh dang ngay thu khong hop le");
+            handleServiceError(request, response, contractId, markPaidReturnPage(actor, contractId),
+                    ContractPaymentService.ERR_INVALID, "Dinh dang ngay thu khong hop le");
             return;
         }
         ServiceResult<Void> res = getPaymentService().markPaymentPaid(contractId, paymentId, paidDate, actor);
+        String back = markPaidReturnPage(actor, contractId);
         if (!res.isSuccess()) {
-            handleServiceError(request, response, contractId, res.getMessage(), "Ghi nhan da thu that bai");
+            handleServiceError(request, response, contractId, back, res.getMessage(), "Ghi nhan da thu that bai");
             return;
         }
-        response.sendRedirect(request.getContextPath() + "/contract?action=edit&id=" + contractId);
+        response.sendRedirect(request.getContextPath() + back);
+    }
+
+    /**
+     * Trang quay về sau khi bấm "Ghi nhận đã thu".
+     *
+     * <p>Người quản lý được kỳ (Admin, Sales quản lý vùng) bấm từ trang Sửa thì về trang
+     * Sửa. Vai Tổng hợp bấm từ trang chi tiết và không mở được trang Sửa (không có quyền
+     * ghi hợp đồng), đẩy họ về đó là ăn ngay 403 -- nên về trang chi tiết.
+     */
+    private String markPaidReturnPage(User actor, int contractId) {
+        String action = getPermissionService().canManageContractPayments(actor) ? "edit" : "view";
+        return "/contract?action=" + action + "&id=" + contractId;
     }
 
     public void handleRemovePayment(HttpServletRequest request, HttpServletResponse response) throws IOException {
@@ -206,6 +228,14 @@ public class ContractPaymentController extends HttpServlet {
 
     private void handleServiceError(HttpServletRequest request, HttpServletResponse response,
                                     int contractId, String errorMessage, String logPrefix) throws IOException {
+        handleServiceError(request, response, contractId, "/contract?action=edit&id=" + contractId,
+                errorMessage, logPrefix);
+    }
+
+    /** Như trên, nhưng lỗi nghiệp vụ quay về {@code backPage} (trang Sửa hoặc trang chi tiết). */
+    private void handleServiceError(HttpServletRequest request, HttpServletResponse response,
+                                    int contractId, String backPage, String errorMessage,
+                                    String logPrefix) throws IOException {
         if (ContractPaymentService.ERR_FORBIDDEN.equals(errorMessage)) {
             response.sendError(HttpServletResponse.SC_FORBIDDEN, PermissionService.MSG_022);
             return;
@@ -216,7 +246,6 @@ public class ContractPaymentController extends HttpServlet {
         }
         LOG.warn("{} (actor={}, contractId={}, err={})",
                 logPrefix, Logs.actor(request), contractId, errorMessage);
-        response.sendRedirect(request.getContextPath()
-                + "/contract?action=edit&id=" + contractId + "&error=payment_failed");
+        response.sendRedirect(request.getContextPath() + backPage + "&error=payment_failed");
     }
 }

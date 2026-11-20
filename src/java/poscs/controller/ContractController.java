@@ -1045,13 +1045,13 @@ public class ContractController extends HttpServlet {
      *   <li><b>Giám đốc</b> nhìn toàn cảnh -- hợp đồng nào đang nằm ở phòng
      *       nào, bao nhiêu ngày rồi, của nhân viên nào. Đó là câu hỏi sinh ra
      *       cả tính năng này.</li>
-     *   <li><b>Phòng nhận</b> (Kế toán, Dự án) thấy đúng phần việc của phòng
-     *       mình và đóng chặng ngay tại đây -- họ không có quyền ghi trên hợp
-     *       đồng nên trang quản lý hợp đồng không phải chỗ của họ.</li>
+     *   <li><b>Phòng nhận</b> (Tổng hợp) thấy đúng phần việc của phòng mình
+     *       và đóng chặng ngay tại đây -- họ không có quyền ghi trên hợp đồng
+     *       nên trang quản lý hợp đồng không phải chỗ của họ.</li>
      * </ul>
      *
-     * <p>KHÔNG đi qua requireFullAccess(CONTRACT): người phòng Kế toán/Dự án
-     * phải vào được. Ai cũng xem được hàng đợi -- nó chỉ cho biết hợp đồng đang
+     * <p>KHÔNG đi qua requireFullAccess(CONTRACT): người phòng Tổng hợp phải
+     * vào được. Ai cũng xem được hàng đợi -- nó chỉ cho biết hợp đồng đang
      * nằm đâu, còn nút bấm thì lọc theo phòng của từng người.
      *
      * <p>Hai trục lọc, đúng bằng hai người đọc ở trên: <b>phòng</b> cho phòng
@@ -1062,9 +1062,9 @@ public class ContractController extends HttpServlet {
         // ===== Phạm vi: mặc định TOÀN CHI NHÁNH =====
         //
         // Khác hẳn hai màn danh sách, nơi Sales mở ra là thấy "của tôi". Ở đây
-        // mặc định đó sẽ hỏng: người phòng Kế toán/Dự án -- một trong hai người
-        // đọc chính của trang -- KHÔNG đứng tên hợp đồng nào cả, nên "của tôi"
-        // với họ là màn hình trống. Hàng đợi là việc chung; ai muốn thu hẹp về
+        // mặc định đó sẽ hỏng: người phòng Tổng hợp -- một trong hai người đọc
+        // chính của trang -- KHÔNG đứng tên hợp đồng nào cả, nên "của tôi" với
+        // họ là màn hình trống. Hàng đợi là việc chung; ai muốn thu hẹp về
         // phần mình thì tự chọn.
         User me = AccessControl.currentUser(request);
         boolean mine = AccessControl.VIEW_MINE.equals(request.getParameter("view")) && me != null;
@@ -1075,8 +1075,9 @@ public class ContractController extends HttpServlet {
 
         // Dải tổng quan đếm trên tập ĐÃ áp phạm vi nhưng CHƯA áp bộ lọc phòng.
         // Đó là điều kiện để nó làm được việc thứ hai của nó -- cái công tắc
-        // chuyển phòng: lọc luôn cả nó thì chọn Kế toán xong là mất số của Dự
-        // án, không còn đường bấm sang.
+        // chuyển phòng: lọc luôn cả nó thì chọn một phòng xong là mất số của
+        // các phòng khác, không còn đường bấm sang. Từ V40 chỉ còn Tổng hợp
+        // nhận bàn giao, nhưng chặng cũ của phòng khác (nếu có) vẫn đếm được.
         //
         // Cũng vì thế mà lọc phòng làm ở Java chứ không thêm điều kiện vào SQL:
         // dải đếm cần đúng tập chưa lọc phòng, nên hỏi CSDL lần nữa chỉ để lấy
@@ -1115,8 +1116,8 @@ public class ContractController extends HttpServlet {
     // ------------------------------------------------------------------
 
     /**
-     * Bàn giao hợp đồng cho các phòng đã tích trên form (mặc định Kế toán và
-     * Dự án, hai phòng của luồng khách hàng mô tả).
+     * Bàn giao hợp đồng cho các phòng đã tích trên form (form chỉ liệt kê và
+     * tích sẵn phòng Tổng hợp, phòng nhận duy nhất -- SPEC 5.4).
      *
      * <p>Người bàn giao là người có quyền ghi trên hợp đồng -- đây là một bước
      * của quy trình soạn thảo, không phải việc của phòng nhận.
@@ -1168,9 +1169,9 @@ public class ContractController extends HttpServlet {
     /**
      * Phòng nhận báo đã xử lý xong.
      *
-     * <p>KHÔNG đi qua {@code requireFullAccess(CONTRACT)}: người của phòng Kế
-     * toán hay Dự án không có quyền ghi hợp đồng, và cũng không nên có -- họ
-     * chỉ đóng đúng chặng của mình. Quyền kiểm theo PHÒNG BAN, xem
+     * <p>KHÔNG đi qua {@code requireFullAccess(CONTRACT)}: người của phòng
+     * Tổng hợp không có quyền ghi hợp đồng, và cũng không nên có -- họ chỉ
+     * đóng đúng chặng của mình. Quyền kiểm theo PHÒNG BAN, xem
      * AccessControl.canCompleteHandover.
      */
     private void handleCompleteHandover(HttpServletRequest request, HttpServletResponse response) throws IOException {
@@ -1188,12 +1189,12 @@ public class ContractController extends HttpServlet {
             return;
         }
         // Quay lại đúng chỗ vừa bấm. Ba chỗ bấm được, và chỗ nào cũng phải
-        // quay về chính nó: đẩy người của Kế toán/Dự án về action=edit là đẩy
+        // quay về chính nó: đẩy người của phòng Tổng hợp về action=edit là đẩy
         // họ vào trang họ không có quyền mở -- xác nhận xong thì ăn ngay 403.
         String returnTo = request.getParameter("returnTo");
         String back;
         if ("from-queue".equals(returnTo)) {
-            // Mang theo bộ lọc đang bật. Không có nó thì người của Kế toán lọc
+            // Mang theo bộ lọc đang bật. Không có nó thì người của Tổng hợp lọc
             // ra việc phòng mình, xác nhận một chặng, rồi bị đẩy về danh sách
             // của cả chi nhánh và phải lọc lại từ đầu cho từng dòng -- đúng
             // cái phiền mà bộ lọc sinh ra để bỏ.

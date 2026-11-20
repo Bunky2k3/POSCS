@@ -258,4 +258,44 @@ public class DashboardServiceTest {
         assertEquals(1, s.getContractValues().size());
         assertEquals(0, BigDecimal.valueOf(2_000_000).compareTo(s.getContractValues().get(15)));
     }
+
+    // ---- Task 9.2: vai Tổng hợp mặc định "Toàn chi nhánh" ----
+
+    @Test
+    public void loadDashboard_tongHopMacDinhToanChiNhanh() {
+        User general = user(20, PermissionService.ROLE_GENERAL);
+
+        DashboardSummary s = service.loadDashboard(
+                general, null, null, null, false, null, LocalDate.of(2026, 11, 20)).getData();
+
+        assertEquals("all", s.getScopeFilter());
+        assertEquals(0, s.getTeamSize());
+        // Không thu hẹp theo người phụ trách: ownerIds truyền xuống là null
+        verify(contractDAO).countStatusSummary(eq(List.of()), isNull(), isNull(), eq(false), isNull());
+        verify(employeeDAO, never()).findTeamUserIds(20);
+    }
+
+    @Test
+    public void loadDashboard_tongHopChonCuaToi_vanThuHepDuoc() {
+        // Mặc định khác Sales, nhưng tham số scope trên URL vẫn được nghe theo.
+        User general = user(20, PermissionService.ROLE_GENERAL);
+
+        DashboardSummary s = service.loadDashboard(
+                general, null, null, "mine", false, null, LocalDate.of(2026, 11, 20)).getData();
+
+        assertEquals("mine", s.getScopeFilter());
+        assertEquals(1, s.getTeamSize());
+        verify(contractDAO).countStatusSummary(eq(List.of()), isNull(), isNull(), eq(false), eq(List.of(20)));
+    }
+
+    @Test
+    public void loadDashboard_vaiKhacNgoaiAdminVaTongHop_vanMacDinhCuaToi() {
+        // Chỉ thêm Tổng hợp vào nhóm mặc định "Toàn chi nhánh"; Sales giữ nguyên "Của tôi".
+        User sales = user(21, PermissionService.ROLE_SALES);
+
+        DashboardSummary s = service.loadDashboard(
+                sales, null, null, null, false, null, LocalDate.of(2026, 11, 20)).getData();
+
+        assertEquals("mine", s.getScopeFilter());
+    }
 }

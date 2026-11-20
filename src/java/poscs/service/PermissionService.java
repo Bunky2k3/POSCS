@@ -17,7 +17,8 @@ import poscs.model.User;
  *
  * <p>Quy tắc nghiệp vụ:
  * <ul>
- *   <li>Ma trận 3 vai trò: Admin, Sales, Kỹ thuật (không có vai trò CS - NFR-10).</li>
+ *   <li>Ma trận vai trò: Admin, Sales, Kỹ thuật, Tổng hợp (không có vai trò CS - NFR-10).
+ *       Vai Kỹ thuật bỏ ở Task 9.3; Tổng hợp chỉ xem, xác nhận bàn giao, ghi nhận đã thu.</li>
  *   <li>Sales quản lý vùng (không có cấp trên): được thực hiện các thao tác ghi (*).</li>
  *   <li>Sales có cấp trên: chỉ xem; muốn đổi thì gửi yêu cầu thay đổi (UC-50).</li>
  *   <li>Cấp trên, trạng thái và vai trò được đối chiếu trực tiếp từ CSDL qua {@link EmployeeDAO}.</li>
@@ -32,6 +33,8 @@ public class PermissionService extends BaseService {
     public static final String ROLE_ADMIN = "Admin";
     public static final String ROLE_SALES = "Sales";
     public static final String ROLE_TECHNICAL = "Kỹ thuật";
+    /** Vai của Phòng tổng hợp (V40, SPEC 3.1) -- khớp roles.role_name. */
+    public static final String ROLE_GENERAL = "Tổng hợp";
 
     public static final String ROLE_BUYER = "Khách mua";
     public static final String ROLE_SUPPLIER = "Nhà cung cấp";
@@ -94,6 +97,16 @@ public class PermissionService extends BaseService {
         User effective = getEffectiveUser(user);
         return effective != null && !effective.isDeleted() && effective.getRole() != null
                 && ROLE_TECHNICAL.equals(effective.getRole().getRoleName());
+    }
+
+    /**
+     * Vai Tổng hợp (SPEC 3.1): xem khách hàng, hợp đồng, sản phẩm; xác nhận bàn
+     * giao cho phòng mình; ghi nhận kỳ thanh toán đã thu. Không có quyền ghi nào khác.
+     */
+    public boolean isGeneral(User user) {
+        User effective = getEffectiveUser(user);
+        return effective != null && !effective.isDeleted() && effective.getRole() != null
+                && ROLE_GENERAL.equals(effective.getRole().getRoleName());
     }
 
     /**
@@ -160,7 +173,7 @@ public class PermissionService extends BaseService {
     // ==================================================================
 
     public boolean canViewCustomers(User user) {
-        return isAdmin(user) || isSales(user) || isTechnical(user);
+        return isAdmin(user) || isSales(user) || isTechnical(user) || isGeneral(user);
     }
 
     public ServiceResult<Void> checkCanViewCustomers(User user) {
@@ -248,7 +261,7 @@ public class PermissionService extends BaseService {
     // ==================================================================
 
     public boolean canViewProducts(User user) {
-        return isAdmin(user) || isSales(user) || isTechnical(user);
+        return isAdmin(user) || isSales(user) || isTechnical(user) || isGeneral(user);
     }
 
     public ServiceResult<Void> checkCanViewProducts(User user) {
@@ -292,7 +305,7 @@ public class PermissionService extends BaseService {
     // ==================================================================
 
     public boolean canViewContracts(User user) {
-        return isAdmin(user) || isSales(user) || isTechnical(user);
+        return isAdmin(user) || isSales(user) || isTechnical(user) || isGeneral(user);
     }
 
     public ServiceResult<Void> checkCanViewContracts(User user) {
@@ -379,6 +392,10 @@ public class PermissionService extends BaseService {
 
     /**
      * Xác nhận xử lý bàn giao (UC-49): Admin hoặc nhân viên thuộc đúng phòng ban nhận bàn giao.
+     *
+     * <p>Kiểm theo PHÒNG, không theo vai: phòng nhận duy nhất là Tổng hợp (SPEC 5.4), người
+     * của phòng đó mang vai Tổng hợp, nhưng ai thuộc phòng cũng xác nhận được. Không giả
+     * định vai nào, nên vai Tổng hợp không cần nhánh riêng ở đây.
      */
     public boolean canConfirmHandover(User user, int targetDepartmentId) {
         if (!isActiveUser(user)) {
@@ -408,6 +425,19 @@ public class PermissionService extends BaseService {
 
     public ServiceResult<Void> checkCanManageContractPayments(User user) {
         return checkPermission(canManageContractPayments(user));
+    }
+
+    /**
+     * Ghi nhận kỳ thanh toán đã thu (UC-53): ai quản lý được kỳ (Admin, Sales quản lý vùng)
+     * cộng thêm vai Tổng hợp. Tổng hợp CHỈ có thao tác này: lập, xoá kỳ vẫn theo
+     * {@link #canManageContractPayments}.
+     */
+    public boolean canMarkPaymentPaid(User user) {
+        return canManageContractPayments(user) || isGeneral(user);
+    }
+
+    public ServiceResult<Void> checkCanMarkPaymentPaid(User user) {
+        return checkPermission(canMarkPaymentPaid(user));
     }
 
     public boolean canManageContractProducts(User user) {
@@ -474,6 +504,7 @@ public class PermissionService extends BaseService {
     // 6. Phiếu hỗ trợ kỹ thuật (Technical Requests - UC-16, 17, 21..23, 42)
     // ==================================================================
 
+    /** Tổng hợp KHÔNG vào phiếu hỗ trợ (SPEC 3.3): mọi màn hình phiếu trả MSG-022. */
     public boolean canViewTickets(User user) {
         return isAdmin(user) || isSales(user) || isTechnical(user);
     }
@@ -594,7 +625,9 @@ public class PermissionService extends BaseService {
         if (!isActiveUser(user) || !canViewCustomers(user)) {
             return ListScope.of(List.of(-1), Collections.emptyList());
         }
-        if (isAdmin(user) || isTechnical(user)) {
+        // Tổng hợp xem toàn chi nhánh như Admin: họ không đứng tên khách hàng hay
+        // hợp đồng nào, thu hẹp theo "của tôi" là màn hình trống.
+        if (isAdmin(user) || isTechnical(user) || isGeneral(user)) {
             return ListScope.all();
         }
         if (AccessControl.VIEW_ALL.equals(viewMode)) {
@@ -611,7 +644,9 @@ public class PermissionService extends BaseService {
         if (!isActiveUser(user) || !canViewContracts(user)) {
             return ListScope.of(List.of(-1), Collections.emptyList());
         }
-        if (isAdmin(user) || isTechnical(user)) {
+        // Tổng hợp xem toàn chi nhánh như Admin: họ không đứng tên khách hàng hay
+        // hợp đồng nào, thu hẹp theo "của tôi" là màn hình trống.
+        if (isAdmin(user) || isTechnical(user) || isGeneral(user)) {
             return ListScope.all();
         }
         if (AccessControl.VIEW_ALL.equals(viewMode)) {

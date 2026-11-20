@@ -2701,4 +2701,92 @@ public class ContractControllerTest {
         controller.doGet(request, response); // Admin, người phụ trách còn hoạt động
         verify(request, times(2)).setAttribute("canReplaceOwner", false);
     }
+
+    // ------------------------------------------------------------------
+    // Task 9.2: vai Tổng hợp thuộc phòng Tổng hợp (phòng nhận bàn giao duy nhất)
+    // ------------------------------------------------------------------
+
+    private static final int DEPT_TONG_HOP = 4;
+    private static final String ROLE_TONG_HOP = "Tổng hợp";
+
+    private void completeHandoverRequest(String departmentId) {
+        when(request.getParameter("action")).thenReturn("completeHandover");
+        when(request.getParameter("contractId")).thenReturn("5");
+        when(request.getParameter("handoverId")).thenReturn("9");
+        when(request.getParameter("departmentId")).thenReturn(departmentId);
+        when(request.getParameter("doneNote")).thenReturn("đã nhập sổ, lưu hồ sơ");
+        when(request.getParameter("returnTo")).thenReturn("from-view");
+    }
+
+    @Test
+    public void completeHandover_tongHopDungPhong_dongDuocVaQuayLaiTrangXem() throws Exception {
+        completeHandoverRequest(String.valueOf(DEPT_TONG_HOP));
+        dangNhapVoiPhongBan(DEPT_TONG_HOP, ROLE_TONG_HOP);
+        when(contractDAO.completeHandover(9, 77, "đã nhập sổ, lưu hồ sơ")).thenReturn(true);
+
+        controller.doPost(request, response);
+
+        verify(contractDAO).completeHandover(9, 77, "đã nhập sổ, lưu hồ sơ");
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=view&id=5");
+    }
+
+    @Test
+    public void completeHandover_tongHopPhongKhac_biTuChoi() throws Exception {
+        completeHandoverRequest("6");
+        dangNhapVoiPhongBan(DEPT_TONG_HOP, ROLE_TONG_HOP);
+
+        controller.doPost(request, response);
+
+        verify(contractDAO, never()).completeHandover(anyInt(), anyInt(), any());
+        verify(response).sendRedirect(CONTEXT_PATH + "/error/403.jsp");
+    }
+
+    @Test
+    public void view_tongHopXemDuocVaCoNutXacNhanChangPhongMinh() throws Exception {
+        Contract contract = signedContract();
+        when(request.getParameter("action")).thenReturn("view");
+        when(request.getParameter("id")).thenReturn("5");
+        when(contractDAO.findById(5)).thenReturn(contract);
+        ContractHandover pending = new ContractHandover();
+        pending.setHandoverId(9);
+        pending.setDepartmentId(DEPT_TONG_HOP);
+        when(contractDAO.findHandoversOf(5)).thenReturn(List.of(pending));
+        dangNhapVoiPhongBan(DEPT_TONG_HOP, ROLE_TONG_HOP);
+        RequestDispatcher dispatcher = mock(RequestDispatcher.class);
+        when(request.getRequestDispatcher(anyString())).thenReturn(dispatcher);
+
+        controller.doGet(request, response);
+
+        verify(response, never()).sendError(eq(HttpServletResponse.SC_FORBIDDEN), anyString());
+        verify(dispatcher).forward(request, response);
+        verify(request).setAttribute("canCompleteHandover_9", true);
+        // Không có quyền ghi hợp đồng: trang xem không mọc nút quản lý (cờ này
+        // được đặt ở cả ContractController lẫn ContractDetailController).
+        verify(request, atLeastOnce()).setAttribute("canManage", false);
+        verify(request, never()).setAttribute("canManage", true);
+    }
+
+    @Test
+    public void edit_tongHop_bi403() throws Exception {
+        when(request.getParameter("action")).thenReturn("edit");
+        when(request.getParameter("id")).thenReturn("5");
+        dangNhapVoiPhongBan(DEPT_TONG_HOP, ROLE_TONG_HOP);
+
+        controller.doGet(request, response);
+
+        verify(response).sendError(HttpServletResponse.SC_FORBIDDEN, PermissionService.MSG_022);
+    }
+
+    @Test
+    public void handOver_tongHopKhongKhoiTaoDuoc_bi403() throws Exception {
+        when(request.getParameter("action")).thenReturn("handOver");
+        when(request.getParameter("contractId")).thenReturn("5");
+        when(request.getParameterValues("departmentId")).thenReturn(new String[]{String.valueOf(DEPT_TONG_HOP)});
+        dangNhapVoiPhongBan(DEPT_TONG_HOP, ROLE_TONG_HOP);
+
+        controller.doPost(request, response);
+
+        verify(response).sendError(HttpServletResponse.SC_FORBIDDEN, PermissionService.MSG_022);
+        verify(contractDAO, never()).handOverToDepartments(anyInt(), anyList(), any(), anyInt());
+    }
 }

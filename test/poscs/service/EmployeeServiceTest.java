@@ -606,4 +606,60 @@ public class EmployeeServiceTest {
         assertFalse(result.isSuccess());
         assertEquals(EmployeeService.ERR_TOGGLE_FAILED, result.getMessage());
     }
+
+    // -------------------------------------------------------------------------
+    // Task 9.2: ô Vai trò có Tổng hợp (UC-26, UC-27)
+    // -------------------------------------------------------------------------
+    private static final int ROLE_TONG_HOP_ID = 4;
+
+    private void rolesIncludingTongHop() {
+        when(employeeDAO.findAllRoles()).thenReturn(List.of(
+                new Role(1, "Admin"), new Role(2, "Sales"), new Role(3, "Kỹ thuật"),
+                new Role(ROLE_TONG_HOP_ID, PermissionService.ROLE_GENERAL)));
+    }
+
+    @Test
+    public void assignableRoles_coTongHop_khiTaoVaKhiSuaNhanVienKhongPhaiAdmin() {
+        rolesIncludingTongHop();
+
+        List<Role> forNew = service.assignableRoles(null);
+        List<Role> forEditingGeneral = service.assignableRoles(ROLE_TONG_HOP_ID);
+
+        assertTrue(forNew.stream().anyMatch(r -> PermissionService.ROLE_GENERAL.equals(r.getRoleName())));
+        assertTrue(forNew.stream().noneMatch(r -> "Admin".equals(r.getRoleName())));
+        assertEquals(3, forNew.size());
+        assertTrue(forEditingGeneral.stream().anyMatch(r -> r.getRoleId() == ROLE_TONG_HOP_ID));
+        assertEquals(3, forEditingGeneral.size());
+    }
+
+    @Test
+    public void createEmployee_vaiTongHop_taoDuoc() {
+        rolesIncludingTongHop();
+        User u = createSampleUser(0, ROLE_TONG_HOP_ID);
+        when(employeeDAO.existsByPhone("0987654321", null)).thenReturn(false);
+        when(employeeDAO.existsByCitizenId("001092001122", null)).thenReturn(false);
+        when(employeeDAO.findAllProvincesWithHolder()).thenReturn(Collections.emptyList());
+        when(employeeDAO.generateUniqueUsername(any(), any(), any())).thenReturn("tonghop2");
+        when(employeeDAO.insert(any(User.class))).thenReturn(30);
+        when(employeeDAO.replaceProvincesOf(eq(30), anyList())).thenReturn(true);
+
+        ServiceResult<Integer> result = service.createEmployee(u, List.of(), adminActor);
+
+        assertTrue(result.isSuccess());
+        assertEquals(Integer.valueOf(30), result.getData());
+        ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
+        verify(employeeDAO).insert(captor.capture());
+        assertEquals(ROLE_TONG_HOP_ID, captor.getValue().getRoleId());
+    }
+
+    @Test
+    public void createEmployee_salesKhongTaoDuocNhanVienVaiTongHop_MSG022() {
+        User u = createSampleUser(0, ROLE_TONG_HOP_ID);
+
+        ServiceResult<Integer> result = service.createEmployee(u, List.of(), salesActor);
+
+        assertFalse(result.isSuccess());
+        assertEquals(EmployeeService.ERR_FORBIDDEN, result.getMessage());
+        verify(employeeDAO, never()).insert(any());
+    }
 }

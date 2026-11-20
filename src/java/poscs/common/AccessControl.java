@@ -35,6 +35,13 @@ public final class AccessControl {
     // Từ ngày gộp vai (xem PERMISSIONS.md): CSKH đã xoá, nhập chung vào Sales
     // -- Resource.TICKET (trước đây "Admin", "CSKH") giờ Sales cầm thay,
     // CỘNG THÊM vào quyền Customer/Contract đã có sẵn, không phải đổi chỗ.
+    //
+    // Vai "Tổng hợp" (V40) CỐ Ý không có mặt ở dòng nào: View only trên
+    // CUSTOMER, CONTRACT, PRODUCT; KHÔNG vào TICKET (PermissionService.
+    // canViewTickets trả 403 ở mọi màn hình phiếu) và EMPLOYEE (No access như
+    // mọi vai khác ngoài Admin). Hai thao tác ghi duy nhất của họ -- xác nhận
+    // bàn giao, ghi nhận kỳ đã thu -- không đi qua bảng này: xem
+    // canCompleteHandover bên dưới và PermissionService.canMarkPaymentPaid.
     private static final Map<Resource, Set<String>> FULL_ACCESS_ROLES = Map.of(
             Resource.CUSTOMER, Set.of("Admin", "Sales"),
             Resource.CONTRACT, Set.of("Admin", "Sales"),
@@ -142,8 +149,8 @@ public final class AccessControl {
      * Phạm vi mặc định khi mở danh sách khách hàng / hợp đồng.
      *
      * <p>CHỈ Sales bị thu hẹp. Admin nhìn toàn bộ (họ quản trị, không cầm khách).
-     * Kỹ thuật cũng nhìn toàn bộ: không đứng tên khách nào cả, thu hẹp theo
-     * "khách của tôi" là họ thấy đúng 0 dòng và hết làm việc được.
+     * Kỹ thuật và Tổng hợp cũng nhìn toàn bộ: không đứng tên khách nào cả, thu
+     * hẹp theo "khách của tôi" là họ thấy đúng 0 dòng và hết làm việc được.
      *
      * <p>Thu hẹp này là MẶC ĐỊNH, KHÔNG phải rào quyền: còn {@code view=all} để xem
      * toàn chi nhánh, và trang chi tiết từng bản ghi không chặn gì thêm. Ai cần rào
@@ -202,13 +209,14 @@ public final class AccessControl {
      * một phòng.
      *
      * <p>Kiểm theo PHÒNG BAN chứ không theo vai trò, khác mọi chỗ còn lại của
-     * lớp này. Lý do: Kế toán và Dự án là hai phòng trong luồng bàn giao nhưng
-     * KHÔNG có vai trò tương ứng trong `roles` -- người của hai phòng đó vẫn
-     * mang một trong bốn vai cũ. Bắt theo vai thì hoặc phải đẻ thêm vai, hoặc
-     * mở quyền hợp đồng cho cả những người không liên quan.
+     * lớp này. Phòng nhận bàn giao duy nhất là Tổng hợp (V40 gộp hai phòng Kế
+     * toán, Dự án của V32 vào đó). Người của phòng thường mang vai Tổng hợp,
+     * nhưng quyền đi theo phòng: bàn giao là giao cho PHÒNG, ai thuộc phòng cũng
+     * đóng được chặng, và bắt theo vai thì phải mở quyền hợp đồng cho cả những
+     * người không thuộc phòng nhận.
      *
-     * <p>Admin xác nhận được mọi phòng: hai phòng mới hiện chưa có nhân sự nào,
-     * mà luồng phải chạy được ngay hôm nay.
+     * <p>Admin xác nhận được mọi phòng: xác nhận thay khi phòng nhận chưa có
+     * người hoặc người phụ trách vắng mặt.
      */
     public static boolean canCompleteHandover(HttpServletRequest request, int departmentId) {
         User user = currentUser(request);

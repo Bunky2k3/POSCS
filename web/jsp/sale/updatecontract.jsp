@@ -947,20 +947,20 @@
             </c:if>
             <div class="tab-pane fade" id="pane-ban-giao" role="tabpanel">
         <!-- ===== Bàn giao phòng ban ===== -->
-        <%-- Kinh doanh soạn xong thì chuyển xuống Kế toán và Dự án CÙNG LÚC,
-             mỗi phòng tự báo xong. Đây là trục thứ tư, đứng RIÊNG với trục tiến
-             độ (Nháp/Đã ký/Thanh lý): trạng thái pháp lý của hợp đồng và công
-             việc nội bộ không suy ra nhau. --%>
+        <%-- Kinh doanh soạn xong thì chuyển xuống phòng Tổng hợp (phòng nhận duy
+             nhất từ V40, gộp hai phòng Kế toán, Dự án cũ), phòng nhận tự báo xong.
+             Đây là trục thứ tư, đứng RIÊNG với trục tiến độ (Nháp/Đã ký/Thanh lý):
+             trạng thái pháp lý của hợp đồng và công việc nội bộ không suy ra nhau. --%>
         <div class="card-box">
             <div class="section-header"><h5>Bàn giao xử lý</h5></div>
             <%-- Câu này trước ghi "Soạn xong thì chuyển xuống..." -- đọc ra thành việc
                  TRƯỚC khi ký, trái hẳn với thiết kế ghi ở đầu khối (bàn giao là trục
-                 RIÊNG, không suy ra từ trục tiến độ). Phần lớn việc của Kế toán và
-                 Dự án lại rơi vào SAU khi ký. --%>
+                 RIÊNG, không suy ra từ trục tiến độ). Phần lớn việc của Phòng tổng hợp
+                 lại rơi vào SAU khi ký. --%>
             <p style="font-size:0.86rem; color:#6b7280; margin:0 0 12px;">
-                Chuyển hợp đồng xuống các phòng liên quan &mdash; lúc nào cũng được, trước hay sau khi ký,
-                vì đây là việc nội bộ chứ không phải một chặng của tiến trình ký kết. Mỗi phòng tự bấm
-                <strong>Đã xử lý xong</strong> kèm ghi chú, và thời gian nằm chờ ở từng phòng được đếm từ lúc bàn giao.
+                Chuyển hợp đồng xuống phòng Tổng hợp &mdash; lúc nào cũng được, trước hay sau khi ký,
+                vì đây là việc nội bộ chứ không phải một chặng của tiến trình ký kết. Phòng nhận tự bấm
+                <strong>Đã xử lý xong</strong> kèm ghi chú, và thời gian nằm chờ được đếm từ lúc bàn giao.
             </p>
 
             <%-- Thanh lý xong thì không mở lượt mới nữa (chặn thật ở
@@ -1062,8 +1062,9 @@
             </c:choose>
 
             <c:if test="${not contract.frozen}">
-                <%-- Mặc định tích sẵn Kế toán và Dự án: đó là luồng khách hàng mô
-                     tả. Vẫn cho bỏ tích, vì không phải hợp đồng nào cũng qua cả hai. --%>
+                <%-- Chỉ liệt kê phòng Tổng hợp, phòng nhận bàn giao duy nhất (SPEC
+                     5.4), và tích sẵn. Không đổ cả danh mục phòng ban: Ban giám đốc,
+                     Kinh doanh không phải nơi nhận bàn giao. --%>
                 <form method="POST" action="${pageContext.request.contextPath}/contract" class="row g-2 align-items-end">
                     <input type="hidden" name="csrfToken" value="${csrfToken}">
                     <input type="hidden" name="action" value="handOver">
@@ -1072,11 +1073,9 @@
                         <label style="font-size:0.8rem; color:#6b7280;">Bàn giao cho phòng</label>
                         <div style="display:flex; flex-wrap:wrap; gap:12px; padding-top:6px;">
                             <c:forEach var="dept" items="${departmentList}">
-                                <c:if test="${dept.departmentName == 'Kế toán' or dept.departmentName == 'Dự án'
-                                              or dept.departmentName == 'Kỹ thuật'}">
+                                <c:if test="${dept.departmentName == 'Tổng hợp'}">
                                     <label class="filter-toggle" style="font-size:0.84rem;">
-                                        <input type="checkbox" name="departmentId" value="${dept.departmentId}"
-                                               ${dept.departmentName == 'Kế toán' or dept.departmentName == 'Dự án' ? 'checked' : ''}>
+                                        <input type="checkbox" name="departmentId" value="${dept.departmentId}" checked>
                                         ${fn:escapeXml(dept.departmentName)}
                                     </label>
                                 </c:if>

@@ -926,11 +926,13 @@ public class ContractStatusIntegrationTest {
     public void handover_daThanhLyThiKhongGiaoThemNhungVanDongDuocChangCu() throws Exception {
         IntegrationDb.assumeAvailable();
 
-        int ketToan = departmentId("Kế toán");
-        int duAn = departmentId("Dự án");
-        int kyThuat = departmentId("Kỹ thuật");
+        // V40: Tổng hợp là phòng nhận duy nhất. Phòng thử mở lượt mới sau thanh lý
+        // là một phòng KHÁC, chưa giữ hợp đồng -- để kết quả FROZEN không thể là
+        // ALREADY_PENDING đội lốt.
+        int tongHop = departmentId("Tổng hợp");
+        int kinhDoanh = departmentId("Kinh doanh");
 
-        assertEquals(2, contractDAO.handOverToDepartments(3, List.of(ketToan, duAn), null, Fixtures.USER_ID));
+        assertEquals(1, contractDAO.handOverToDepartments(3, List.of(tongHop), null, Fixtures.USER_ID));
         // Hợp đồng gieo trong lớp này đã ở 'Đã ký' sẵn (insertContract ghi thẳng
         // vào bảng), nên đi thẳng sang thanh lý chứ không ký lại.
         assertTrue(contractDAO.changeProgressStatus(3, ContractDAO.PROGRESS_LIQUIDATED,
@@ -938,13 +940,13 @@ public class ContractStatusIntegrationTest {
 
         assertEquals("đã thanh lý thì không mở lượt mới",
                 ContractDAO.HANDOVER_FROZEN,
-                contractDAO.handOverToDepartments(3, List.of(kyThuat), null, Fixtures.USER_ID));
+                contractDAO.handOverToDepartments(3, List.of(kinhDoanh), null, Fixtures.USER_ID));
         assertTrue("không được ghi thêm chặng nào",
-                contractDAO.findHandoversOf(3).stream().noneMatch(h -> h.getDepartmentId() == kyThuat));
+                contractDAO.findHandoversOf(3).stream().noneMatch(h -> h.getDepartmentId() == kinhDoanh));
 
         // Chặng cũ vẫn đóng được -- nếu không thì nó treo vĩnh viễn ở hàng đợi.
         int cu = contractDAO.findHandoversOf(3).stream()
-                .filter(h -> h.getDepartmentId() == ketToan).findFirst().orElseThrow().getHandoverId();
+                .filter(h -> h.getDepartmentId() == tongHop).findFirst().orElseThrow().getHandoverId();
         assertTrue("chặng đang treo phải đóng được sau thanh lý",
                 contractDAO.completeHandover(cu, Fixtures.USER_ID, "quyết toán xong"));
     }
@@ -960,27 +962,30 @@ public class ContractStatusIntegrationTest {
     public void handover_nhanChoVaBoLocHienTrenDanhSach() throws Exception {
         IntegrationDb.assumeAvailable();
 
-        int ketToan = departmentId("Kế toán");
-        int duAn = departmentId("Dự án");
-        assertEquals(2, contractDAO.handOverToDepartments(2, List.of(ketToan, duAn), null, Fixtures.USER_ID));
+        // Từ V40 form chỉ giao cho Tổng hợp, nhưng SQL của nhãn vẫn phải gom được
+        // nhiều phòng (chặng cũ trước khi gộp). Phòng thứ hai lấy Kinh doanh --
+        // phòng nào cũng được, DAO không giới hạn phòng nhận.
+        int tongHop = departmentId("Tổng hợp");
+        int kinhDoanh = departmentId("Kinh doanh");
+        assertEquals(2, contractDAO.handOverToDepartments(2, List.of(tongHop, kinhDoanh), null, Fixtures.USER_ID));
 
         Contract listed = contractDAO.findAll(1, 50, "HD-0002", null, null, null, false, null, null, null, false)
                 .stream().filter(c -> c.getContractId() == 2).findFirst().orElseThrow();
         assertTrue("phải khai là đang chờ", listed.isWaitingAtDepartment());
-        assertEquals("Dự án, Kế toán", listed.getPendingDepartments());
+        assertEquals("Kinh doanh, Tổng hợp", listed.getPendingDepartments());
 
         // Lọc theo phòng: danh sách và bộ đếm phải ra cùng một con số, nếu
         // không thì phân trang đếm một đằng liệt kê một nẻo.
-        int rows = contractDAO.findAll(1, 50, null, null, null, null, false, null, null, null, false, ketToan).size();
+        int rows = contractDAO.findAll(1, 50, null, null, null, null, false, null, null, null, false, tongHop).size();
         assertEquals(1, rows);
-        assertEquals(rows, contractDAO.countAll(null, null, null, null, null, null, null, false, ketToan));
+        assertEquals(rows, contractDAO.countAll(null, null, null, null, null, null, null, false, tongHop));
 
-        // Đóng chặng Kế toán -> hợp đồng rơi khỏi bộ lọc đó, nhưng vẫn còn chờ Dự án.
+        // Đóng chặng Tổng hợp -> hợp đồng rơi khỏi bộ lọc đó, nhưng vẫn còn chờ Kinh doanh.
         int handoverId = contractDAO.findHandoversOf(2).stream()
-                .filter(h -> h.getDepartmentId() == ketToan).findFirst().orElseThrow().getHandoverId();
+                .filter(h -> h.getDepartmentId() == tongHop).findFirst().orElseThrow().getHandoverId();
         assertTrue(contractDAO.completeHandover(handoverId, Fixtures.USER_ID, "xong"));
-        assertEquals(0, contractDAO.countAll(null, null, null, null, null, null, null, false, ketToan));
-        assertEquals(1, contractDAO.countAll(null, null, null, null, null, null, null, false, duAn));
+        assertEquals(0, contractDAO.countAll(null, null, null, null, null, null, null, false, tongHop));
+        assertEquals(1, contractDAO.countAll(null, null, null, null, null, null, null, false, kinhDoanh));
     }
 
     /** Hợp đồng mua dựng qua DAO -- bốn hợp đồng gieo sẵn đều là chiều bán. */
@@ -1007,15 +1012,18 @@ public class ContractStatusIntegrationTest {
     /**
      * Vòng đầy đủ của một lượt bàn giao trên CSDL thật: giao cho hai phòng cùng
      * lúc, mỗi phòng tự đóng chặng, và mỗi bước để lại vết trong nhật ký.
+     *
+     * <p>Từ V40 form chỉ giao cho Tổng hợp, nhưng DAO vẫn nhận nhiều phòng một
+     * lượt; phòng thứ hai lấy Kinh doanh để giữ nguyên điều đang kiểm.
      */
     @Test
     public void handover_giaoHaiPhongCungLucVaTungPhongDongChang() throws Exception {
         IntegrationDb.assumeAvailable();
 
-        int ketToan = departmentId("Kế toán");
-        int duAn = departmentId("Dự án");
+        int tongHop = departmentId("Tổng hợp");
+        int kinhDoanh = departmentId("Kinh doanh");
 
-        assertEquals(2, contractDAO.handOverToDepartments(2, List.of(ketToan, duAn),
+        assertEquals(2, contractDAO.handOverToDepartments(2, List.of(tongHop, kinhDoanh),
                 "soạn xong, nhờ kiểm", Fixtures.USER_ID));
 
         List<ContractHandover> handovers = contractDAO.findHandoversOf(2);
@@ -1026,16 +1034,16 @@ public class ContractStatusIntegrationTest {
                 IntegrationDb.count("contract_history",
                         "contract_id = 2 AND event_type = N'Bàn giao phòng ban'"));
 
-        // Đóng chặng của Kế toán; Dự án vẫn còn giữ -- đó là "điểm nghẽn" mà
-        // màn hình theo dõi phải chỉ ra được.
+        // Đóng chặng của Tổng hợp; Kinh doanh vẫn còn giữ -- đó là "điểm nghẽn"
+        // mà màn hình theo dõi phải chỉ ra được.
         ContractHandover accounting = handovers.stream()
-                .filter(h -> h.getDepartmentId() == ketToan).findFirst().orElseThrow();
+                .filter(h -> h.getDepartmentId() == tongHop).findFirst().orElseThrow();
         assertTrue(contractDAO.completeHandover(accounting.getHandoverId(), Fixtures.USER_ID,
                 "đã lập lịch thu hai kỳ"));
 
         List<ContractHandover> pending = contractDAO.findPendingHandovers(null);
         assertEquals(1, pending.size());
-        assertEquals("Dự án", pending.get(0).getDepartmentName());
+        assertEquals("Kinh doanh", pending.get(0).getDepartmentName());
         assertEquals("Đóng chặng cũng là một dòng nhật ký", 3,
                 IntegrationDb.count("contract_history",
                         "contract_id = 2 AND event_type = N'Bàn giao phòng ban'"));
@@ -1046,8 +1054,8 @@ public class ContractStatusIntegrationTest {
     public void handover_dongChangKhongCoGhiChu_biTuChoi() throws Exception {
         IntegrationDb.assumeAvailable();
 
-        int ketToan = departmentId("Kế toán");
-        assertEquals(1, contractDAO.handOverToDepartments(2, List.of(ketToan), null, Fixtures.USER_ID));
+        int tongHop = departmentId("Tổng hợp");
+        assertEquals(1, contractDAO.handOverToDepartments(2, List.of(tongHop), null, Fixtures.USER_ID));
         int handoverId = contractDAO.findHandoversOf(2).get(0).getHandoverId();
 
         assertFalse(contractDAO.completeHandover(handoverId, Fixtures.USER_ID, "   "));
@@ -1065,26 +1073,34 @@ public class ContractStatusIntegrationTest {
     public void handover_giaoLaiKhiPhongConGiu_biTuChoi() throws Exception {
         IntegrationDb.assumeAvailable();
 
-        int ketToan = departmentId("Kế toán");
-        assertEquals(1, contractDAO.handOverToDepartments(2, List.of(ketToan), null, Fixtures.USER_ID));
+        int tongHop = departmentId("Tổng hợp");
+        assertEquals(1, contractDAO.handOverToDepartments(2, List.of(tongHop), null, Fixtures.USER_ID));
         assertEquals(ContractDAO.HANDOVER_ALREADY_PENDING,
-                contractDAO.handOverToDepartments(2, List.of(ketToan), null, Fixtures.USER_ID));
+                contractDAO.handOverToDepartments(2, List.of(tongHop), null, Fixtures.USER_ID));
 
         int handoverId = contractDAO.findHandoversOf(2).get(0).getHandoverId();
         assertTrue(contractDAO.completeHandover(handoverId, Fixtures.USER_ID, "xong đợt một"));
         assertEquals("Đóng xong thì giao lại được", 1,
-                contractDAO.handOverToDepartments(2, List.of(ketToan), "sửa xong, gửi lại", Fixtures.USER_ID));
+                contractDAO.handOverToDepartments(2, List.of(tongHop), "sửa xong, gửi lại", Fixtures.USER_ID));
         assertEquals("Mỗi lượt là một dòng riêng để đếm được số lần làm lại",
                 2, contractDAO.findHandoversOf(2).size());
     }
 
-    /** Hai phòng của luồng phải tồn tại sau V32 -- không có thì không bàn giao cho ai được. */
+    /**
+     * Sau V40 phòng nhận bàn giao duy nhất là Tổng hợp -- không có thì không bàn
+     * giao cho ai được. Hai phòng Kế toán, Dự án của V32 đã gộp vào đó, còn sót
+     * lại thì form bàn giao và hàng chờ lại hiện hai phòng cho cùng một nhóm
+     * người. Vai Tổng hợp cũng phải có để Admin chọn được cho nhân viên.
+     */
     @Test
-    public void handover_haiPhongMoiPhaiCoTrongDanhMuc() throws Exception {
+    public void handover_phongTongHopCoTrongDanhMuc_keToanDuAnDaGop() throws Exception {
         IntegrationDb.assumeAvailable();
 
-        assertTrue(departmentId("Kế toán") > 0);
-        assertTrue(departmentId("Dự án") > 0);
+        assertTrue(departmentId("Tổng hợp") > 0);
+        assertEquals("0", IntegrationDb.scalar(
+                "SELECT COUNT(*) FROM departments WHERE department_name IN (N'Kế toán', N'Dự án')"));
+        assertEquals("1", IntegrationDb.scalar(
+                "SELECT COUNT(*) FROM roles WHERE role_name = N'Tổng hợp'"));
     }
 
     private int departmentId(String name) throws Exception {

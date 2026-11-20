@@ -495,4 +495,105 @@ public class ContractHandoverServiceTest {
         assertEquals(1, departments.size());
         assertEquals("Kế toán", departments.get(0).getDepartmentName());
     }
+
+    // ==================================================================
+    // Task 9.2: phòng Tổng hợp nhận bàn giao, vai Tổng hợp xác nhận (UC-48, UC-49)
+    // ==================================================================
+
+    private static final int DEPT_TONG_HOP = 7;
+    private static final int DEPT_KINH_DOANH = 2;
+
+    private User generalUser() {
+        User u = buildUser(8, PermissionService.ROLE_GENERAL, DEPT_TONG_HOP, null, false);
+        when(employeeDAO.findById(8)).thenReturn(u);
+        return u;
+    }
+
+    @Test
+    public void completeHandover_tongHopXacNhanChangCuaPhongMinh() {
+        User general = generalUser();
+        when(handoverDAO.findHandoversOf(10)).thenReturn(List.of(sampleHandover(300, 10, DEPT_TONG_HOP)));
+        when(contractDAO.findById(10)).thenReturn(sampleContract(10, PROGRESS_SIGNED));
+        when(handoverDAO.completeHandover(300, 8, "Đã nhập sổ, lưu hồ sơ")).thenReturn(true);
+
+        ServiceResult<Void> r = service.completeHandover(10, 300, DEPT_TONG_HOP, "  Đã nhập sổ, lưu hồ sơ ", general);
+
+        assertTrue(r.isSuccess());
+        assertEquals("Xác nhận xử lý bàn giao thành công.", r.getMessage());
+        verify(handoverDAO).completeHandover(300, 8, "Đã nhập sổ, lưu hồ sơ");
+    }
+
+    @Test
+    public void completeHandover_tongHopKhongXacNhanDuocChangPhongKhac_MSG022() {
+        User general = generalUser();
+        when(handoverDAO.findHandoversOf(10)).thenReturn(List.of(sampleHandover(301, 10, DEPT_KINH_DOANH)));
+
+        ServiceResult<Void> r = service.completeHandover(10, 301, DEPT_KINH_DOANH, "Đã xử lý", general);
+
+        assertFalse(r.isSuccess());
+        assertEquals(ContractHandoverService.ERR_FORBIDDEN, r.getMessage());
+        verify(handoverDAO, never()).completeHandover(anyInt(), anyInt(), anyString());
+    }
+
+    @Test
+    public void completeHandover_tongHopGiaMaoPhongTrenForm_biChan() {
+        // Chặng thật của phòng Kinh doanh; form gửi lên departmentId = Tổng hợp để qua mặt.
+        User general = generalUser();
+        when(handoverDAO.findHandoversOf(10)).thenReturn(List.of(sampleHandover(302, 10, DEPT_KINH_DOANH)));
+
+        ServiceResult<Void> r = service.completeHandover(10, 302, DEPT_TONG_HOP, "Đã xử lý", general);
+
+        assertFalse(r.isSuccess());
+        assertEquals(ContractHandoverService.ERR_INVALID, r.getMessage());
+        verify(handoverDAO, never()).completeHandover(anyInt(), anyInt(), anyString());
+    }
+
+    @Test
+    public void completeHandover_salesKhongXacNhanDuocChangCuaTongHop_MSG022() {
+        when(handoverDAO.findHandoversOf(10)).thenReturn(List.of(sampleHandover(303, 10, DEPT_TONG_HOP)));
+
+        ServiceResult<Void> r = service.completeHandover(10, 303, DEPT_TONG_HOP, "Đã xử lý", salesManager);
+
+        assertFalse(r.isSuccess());
+        assertEquals(ContractHandoverService.ERR_FORBIDDEN, r.getMessage());
+    }
+
+    @Test
+    public void initiateHandover_tongHopKhongKhoiTaoDuoc_MSG022() {
+        // Tổng hợp là phòng NHẬN, không phải người bàn giao (UC-48: Admin, Sales quản lý vùng).
+        User general = generalUser();
+
+        ServiceResult<Integer> r = service.initiateHandover(10, List.of(DEPT_TONG_HOP), null, general);
+
+        assertFalse(r.isSuccess());
+        assertEquals(ContractHandoverService.ERR_FORBIDDEN, r.getMessage());
+        verify(handoverDAO, never()).handOverToDepartments(anyInt(), anyList(), any(), anyInt());
+    }
+
+    @Test
+    public void initiateHandover_salesQuanLyVungGiaoChoTongHop() {
+        when(contractDAO.findById(10)).thenReturn(sampleContract(10, PROGRESS_SIGNED));
+        when(handoverDAO.handOverToDepartments(10, List.of(DEPT_TONG_HOP), "Nhờ lưu hồ sơ", 2)).thenReturn(1);
+
+        ServiceResult<Integer> r = service.initiateHandover(10, List.of(DEPT_TONG_HOP), "Nhờ lưu hồ sơ", salesManager);
+
+        assertTrue(r.isSuccess());
+        assertEquals(Integer.valueOf(1), r.getData());
+    }
+
+    @Test
+    public void getQueueOverview_motPhongTongHop_demDungSoHopDong() {
+        ContractHandover h1 = new ContractHandover();
+        h1.setDepartmentName("Tổng hợp");
+        h1.setHandedAt(Timestamp.from(Instant.now().minusSeconds(86400L * 3)));
+        ContractHandover h2 = new ContractHandover();
+        h2.setDepartmentName("Tổng hợp");
+        h2.setHandedAt(Timestamp.from(Instant.now().minusSeconds(86400L)));
+
+        ContractHandoverService.HandoverQueueOverview overview = service.getQueueOverview(List.of(h1, h2));
+
+        assertEquals(2, overview.getTotalScope());
+        assertEquals(1, overview.getCountByDepartment().size());
+        assertEquals(Integer.valueOf(2), overview.getCountByDepartment().get("Tổng hợp"));
+    }
 }

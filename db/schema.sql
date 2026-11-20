@@ -3445,10 +3445,13 @@ CREATE TABLE `roles` (
 
 -- Xem PERMISSIONS.md ở gốc repo để biết ma trận quyền theo role x resource.
 -- CSKH đã gộp vào Sales (không còn là vai riêng) -- xem PERMISSIONS.md.
+-- Tổng hợp (V40): vai của Phòng tổng hợp -- xem khách hàng, hợp đồng, sản
+-- phẩm; xác nhận bàn giao; ghi nhận kỳ thanh toán đã thu.
 INSERT INTO `roles` (`role_name`) VALUES
 ('Admin'),
 ('Sales'),
-('Kỹ thuật');
+('Kỹ thuật'),
+('Tổng hợp');
 
 DROP TABLE IF EXISTS `departments`;
 CREATE TABLE `departments` (
@@ -3464,11 +3467,10 @@ INSERT INTO `departments` (`department_name`) VALUES
 ('Ban giám đốc'),
 ('Kinh doanh'),
 ('Kỹ thuật'),
--- Hai phòng của luồng bàn giao (V32). Chưa có vai trò tương ứng trong `roles`
--- và chưa có nhân sự nào -- cố ý: bàn giao là giao cho PHÒNG, và Admin xác
--- nhận thay được cho tới khi có người.
-('Kế toán'),
-('Dự án');
+-- Phòng DUY NHẤT nhận bàn giao hợp đồng (V40 gộp hai phòng Kế toán, Dự án của
+-- V32 vào đây). Bàn giao là giao cho PHÒNG: ai thuộc phòng này cũng xác nhận
+-- được, Admin xác nhận thay được.
+('Tổng hợp');
 
 DROP TABLE IF EXISTS `users`;
 CREATE TABLE `users` (
@@ -3597,6 +3599,22 @@ VALUES
  'Trịnh', 'Thị Hồng', 'Nhung', 'Nữ', '1998-04-02', '001198012357', '0912340013',
  'cskh4.test@example.com', NULL,
  (SELECT department_id FROM departments WHERE department_name = 'Kinh doanh'), '2024-06-17', 0);
+
+-- Tài khoản test vai Tổng hợp, phòng Tổng hợp (giữ đồng bộ với
+-- db/migrations/V41__seed_tonghop_test_account__ndat2003.sql). Cùng mật khẩu
+-- "Poscs@123" và cùng cảnh báo CHỈ DÙNG CHO DEV/TEST như khối trên.
+INSERT INTO users
+  (username, password_hash, role_id, last_name, middle_name, first_name,
+   gender, date_of_birth, citizen_id, phone, personal_email, address_id,
+   department_id, hire_date, is_deleted)
+SELECT 'tonghop1', '$2a$10$Zy5dXkGNLYjaOkebo0qWgeR/CYPfCpu1SUkcHX9LPe6LMsIormrA2',
+       (SELECT role_id FROM roles WHERE role_name = 'Tổng hợp'),
+       'Nguyễn', 'Thị Thanh', 'Hương', 'Nữ', '1992-04-11', '001192012358', '0912340014',
+       'tonghop1.test@example.com', NULL,
+       (SELECT department_id FROM departments WHERE department_name = 'Tổng hợp'),
+       '2021-03-01', 0
+FROM DUAL
+WHERE NOT EXISTS (SELECT 1 FROM users WHERE username = 'tonghop1');
 
 DROP TABLE IF EXISTS `branch_info`;
 -- Thông tin chi nhánh (V39, UC-55): thông tin Giám đốc chi nhánh (GĐCN), là
@@ -4586,10 +4604,12 @@ CREATE TABLE `contract_history` (
 
 DROP TABLE IF EXISTS `contract_handovers`;
 -- Bàn giao hợp đồng giữa các phòng (V32): Kinh doanh soạn xong thì chuyển
--- xuống Kế toán và Dự án CÙNG LÚC, mỗi phòng tự báo đã xử lý xong.
+-- xuống phòng Tổng hợp, phòng nhận báo đã xử lý xong. V32 giao cho hai phòng
+-- Kế toán và Dự án cùng lúc; V40 gộp hai phòng đó thành Tổng hợp, phòng nhận
+-- duy nhất.
 --
 -- Mỗi lượt giao là một DÒNG có mốc thời gian, không phải một cột "phòng đang
--- giữ": hai phòng nhận cùng lúc nên một cột không đủ, và cột thì mất sạch
+-- giữ": một hợp đồng có thể giao đi giao lại nhiều lượt, và cột thì mất sạch
 -- "đã chờ mấy ngày ở phòng nào" -- đúng con số khách hàng (giám đốc) hỏi.
 --
 -- Đây KHÔNG phải quan hệ phòng-phòng: bảng nối HỢP ĐỒNG với PHÒNG theo thời
