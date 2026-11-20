@@ -256,9 +256,9 @@ public class TechnicalSupportTicketDAO {
 
     /**
      * Hai cột nói "phiếu này là của ai": người được giao xử lý và người tiếp
-     * nhận. Phạm vi "của tôi" trên Dashboard khớp CẢ HAI, vì Kỹ thuật nhìn vào
-     * cột thứ nhất còn Sales (tạo phiếu, gộp thêm việc của CSKH cũ) nhìn vào
-     * cột thứ hai.
+     * nhận. Phạm vi "của tôi" trên Dashboard khớp CẢ HAI, vì cùng một Sales có
+     * thể là người xử lý phiếu này (cột thứ nhất) và là người tiếp nhận phiếu
+     * khác (cột thứ hai).
      */
     private static final List<String> OWNER_COLUMNS =
             List.of("t.assigned_technician_id", "t.created_by");
@@ -280,8 +280,9 @@ public class TechnicalSupportTicketDAO {
 
     /**
      * Như trên nhưng chỉ đếm phiếu "của" những người này: phiếu họ được giao xử
-     * lý HOẶC phiếu họ tiếp nhận -- hai vai trò khác nhau (Kỹ thuật và Sales)
-     * cùng nhìn một trang Dashboard. Rỗng/null = toàn chi nhánh.
+     * lý HOẶC phiếu họ tiếp nhận -- hai vai trò khác nhau trên phiếu (người xử
+     * lý và người tiếp nhận) cùng nhìn một trang Dashboard. Rỗng/null = toàn
+     * chi nhánh.
      */
     public Map<String, Integer> countStatusSummary(List<Integer> provinceIds, Period period,
             List<Integer> ownerIds) {
@@ -332,7 +333,7 @@ public class TechnicalSupportTicketDAO {
 
     /**
      * Bốn ô đếm ở đầu trang DANH SÁCH phiếu: theo kỳ và theo ô lọc "Người xử
-     * lý" (null = mọi người), để kỹ thuật viên đang xem "Phiếu của tôi" thấy
+     * lý" (null = mọi người), để người xử lý đang xem "Phiếu của tôi" thấy
      * số của chính mình, khớp với bảng bên dưới. Không theo ô tìm / trạng
      * thái / mức ưu tiên -- đếm theo trạng thái mà lọc cả trạng thái thì ba
      * ô kia luôn bằng 0.
@@ -462,8 +463,8 @@ public class TechnicalSupportTicketDAO {
 
     /**
      * Như countOverdueOrDueSoon(), nhưng trả về danh sách đầy đủ thay vì chỉ
-     * đếm -- phục vụ NotificationScheduler tạo thông báo nhắc từng kỹ thuật
-     * viên được giao phiếu sắp/đã quá hạn SLA.
+     * đếm -- phục vụ NotificationScheduler tạo thông báo nhắc từng người xử
+     * lý được giao phiếu sắp/đã quá hạn SLA.
      */
     public List<TechnicalRequest> findOverdueOrDueSoon() {
         List<TechnicalRequest> result = new ArrayList<>();
@@ -484,7 +485,7 @@ public class TechnicalSupportTicketDAO {
         return result;
     }
 
-    /** Lấy chi tiết 1 phiếu hỗ trợ theo ID, đã join khách hàng/hợp đồng/kỹ thuật viên/người tạo. Trả về null nếu không tồn tại. */
+    /** Lấy chi tiết 1 phiếu hỗ trợ theo ID, đã join khách hàng/hợp đồng/người xử lý/người tạo. Trả về null nếu không tồn tại. */
     public TechnicalRequest findById(int ticketId) {
         String sql = SELECT_BASE + "WHERE t.ticket_id = ? AND t.is_deleted = 0";
         try (Connection conn = DBContext.getConnection();

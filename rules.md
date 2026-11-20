@@ -25,7 +25,7 @@ Ant **không nằm trong PATH**. Luôn gọi bằng đường dẫn đầy đủ
 - Mục đánh dấu `[CẦN XÁC NHẬN]` trong SPEC, hoặc SPEC mơ hồ/thiếu/mâu thuẫn: **DỪNG và hỏi người dùng**, không tự đoán.
 - **Agent không sửa `docs/SPEC.md`.** Phát hiện sai lệch giữa SPEC và code thì liệt kê cho người dùng. Cấu trúc code mới ghi vào `docs/ARCHITECTURE.md`.
 - Các quyết định đã chốt (không làm lại, không đề xuất lại):
-  - **Không có vai trò CS.** Chỉ 3 vai trò: Admin, Sales, Kỹ thuật.
+  - **Không có vai trò CS.** Chỉ 3 vai trò: Admin, Sales, Tổng hợp.
   - **Không làm BR-44** (thiết bị trong phiếu). Phiếu gắn với hợp đồng; thiết bị/lỗi ghi ở Mô tả/ghi chú. Không tạo `DeviceDAO`, không làm giao diện thiết bị.
   - Không làm BR-50, BR-51, và không làm nhập/xuất PDF từng hợp đồng (UC-40 đã gỡ).
   - Mã khách hàng `KH-xxxx`, mã nhà cung cấp `NCC-xxx`.

@@ -166,7 +166,6 @@ public class TicketActionController extends HttpServlet {
 
         request.setAttribute("ticket", ticket);
         request.setAttribute("canManage", fullAccess);
-        request.setAttribute("lockGeneral", !fullAccess);
         TicketActionHelper.setDropdownAttributes(request, getTicketService(),
                 ticket.getAssignedTechnicianId(), ticket.getEnterpriseId());
         request.getRequestDispatcher(TicketActionHelper.UPDATE_VIEW).forward(request, response);

@@ -12,17 +12,9 @@
     Dropdown "Hợp đồng liên quan" nạp qua AJAX giống addnewTicket.jsp, JS tự
     chọn lại đúng hợp đồng hiện tại (nếu có) sau khi danh sách tải xong.
 
-    canManage (controller đặt cho mọi action) = false nghĩa là người đang mở
-    form là KỸ THUẬT VIÊN ĐƯỢC GIAO phiếu này -- người khác không vào tới đây.
+    Chỉ Admin và Sales mở được form này (vai khác nhận 403 MSG-022 ở
+    controller), và hai vai này sửa được mọi ô của phiếu.
 --%>
-<%--
-    Kỹ thuật viên được giao chỉ ghi được năm trường của khối "Nhân viên kỹ
-    thuật xử lý" (cộng ghi chú nội bộ) -- handleUpdate bỏ qua mọi ô khác. Trước
-    đây các ô đó vẫn mở cho họ sửa: đổi Mức ưu tiên rồi bấm Lưu, trang chi tiết
-    mở ra như đã lưu xong mà ưu tiên vẫn như cũ. Giờ khoá hẳn (chỉ để xem).
-    Đây chỉ là lớp trình bày; chốt chặn thật vẫn ở controller.
---%>
-<c:set var="lockGeneral" value="${not canManage}"/>
 <!DOCTYPE html>
 <html lang="vi">
 <head>
@@ -72,8 +64,9 @@
             background-color: #f9fafb; font-size: 0.9rem; color: #111827;
         }
         .picker-field:hover { border-color: var(--primary-light); }
-        /* Chữ đậm như ô chọn bị khoá của Bootstrap bên cạnh (kỹ thuật viên xem
-           khách hàng/hợp đồng ở đây); trạng thái chờ vẫn nhạt nhờ .picker-placeholder. */
+        /* Ô chọn hợp đồng mờ đi khi chưa bấm được (đang nạp danh sách, chưa có
+           khách hàng, tải lỗi), như ô chọn bị khoá của Bootstrap; chữ chờ vẫn
+           nhạt nhờ .picker-placeholder. */
         .picker-field.disabled { cursor: not-allowed; color: #374151; background-color: #e9ecef; }
         .picker-field i { color: #9ca3af; font-size: 0.85rem; flex-shrink: 0; margin-left: 10px; }
         .picker-placeholder { color: #9ca3af; }
@@ -123,8 +116,7 @@
                 <h2>Cập nhật phiếu hỗ trợ</h2>
                 <p>Mã phiếu: <strong style="color:var(--primary-dark)">${fn:escapeXml(ticket.ticketCode)}</strong></p>
             </div>
-            <%-- Kỹ thuật viên được giao đọc thẳng mục của mình (cập nhật xử lý). --%>
-            <a href="${pageContext.request.contextPath}/guide?module=ticket#${lockGeneral ? 'cap-nhat-xu-ly' : 'sua'}" target="_blank" rel="noopener" class="guide-btn" title="Mở hướng dẫn sử dụng ở tab mới"><i class="fa-regular fa-circle-question"></i> Hướng dẫn</a>
+            <a href="${pageContext.request.contextPath}/guide?module=ticket#sua" target="_blank" rel="noopener" class="guide-btn" title="Mở hướng dẫn sử dụng ở tab mới"><i class="fa-regular fa-circle-question"></i> Hướng dẫn</a>
         </div>
 
         <div class="card-box">
@@ -147,21 +139,14 @@
                         </c:choose>
                     </div>
                 </c:if>
-                <c:if test="${lockGeneral}">
-                    <div class="alert alert-primary py-2 px-3 mb-3 lock-note" style="font-size: 0.9rem; border-radius: 12px;">
-                        <i class="fa-solid fa-circle-info me-1"></i>
-                        Bạn là người xử lý được giao phiếu này: chỉ sửa được khối <strong>Người xử lý đánh giá</strong> và <strong>Ghi chú nội bộ</strong>. Các ô còn lại chỉ để xem; cần đổi thì báo Sales hoặc Admin.
-                    </div>
-                </c:if>
 
                 <div class="section-header">
                     <h5>Thông tin chung</h5>
-                    <c:if test="${lockGeneral}"><span class="section-hint"><i class="fa-solid fa-lock"></i> Chỉ xem</span></c:if>
                 </div>
                 <div class="row">
                     <div class="col-md-6 field-row">
                         <label>Khách hàng <span class="req">*</span></label>
-                        <div class="picker-field ${lockGeneral ? 'disabled' : ''}" id="customerPickerField" onclick="openCustomerPicker()">
+                        <div class="picker-field" id="customerPickerField" onclick="openCustomerPicker()">
                             <span id="customerPickerText" class="picker-placeholder">-- Chọn khách hàng --</span>
                             <i class="fa-solid fa-magnifying-glass"></i>
                         </div>
@@ -182,7 +167,7 @@
 
                     <div class="col-md-4 field-row">
                         <label>Loại phiếu <span class="req">*</span></label>
-                        <select class="form-select" id="ticketType" name="ticketType" ${lockGeneral ? 'disabled' : ''}>
+                        <select class="form-select" id="ticketType" name="ticketType">
                             <option value="">-- Chọn loại phiếu --</option>
                             <option value="Bảo hành" ${ticket.ticketType == 'Bảo hành' ? 'selected' : ''}>Bảo hành</option>
                             <option value="Bảo trì" ${ticket.ticketType == 'Bảo trì' ? 'selected' : ''}>Bảo trì</option>
@@ -194,7 +179,7 @@
                     </div>
                     <div class="col-md-4 field-row">
                         <label>Mức ưu tiên <span class="req">*</span></label>
-                        <select class="form-select" id="priority" name="priority" ${lockGeneral ? 'disabled' : ''}>
+                        <select class="form-select" id="priority" name="priority">
                             <option value="">-- Chọn mức ưu tiên --</option>
                             <option value="Khẩn cấp" ${ticket.priority == 'Khẩn cấp' ? 'selected' : ''}>Khẩn cấp</option>
                             <option value="Cao" ${ticket.priority == 'Cao' ? 'selected' : ''}>Cao</option>
@@ -205,7 +190,7 @@
                     </div>
                     <div class="col-md-4 field-row">
                         <label>Kênh tiếp nhận <span class="req">*</span></label>
-                        <select class="form-select" id="receptionChannel" name="receptionChannel" ${lockGeneral ? 'disabled' : ''}>
+                        <select class="form-select" id="receptionChannel" name="receptionChannel">
                             <option value="">-- Chọn kênh tiếp nhận --</option>
                             <option value="Điện thoại" ${ticket.receptionChannel == 'Điện thoại' ? 'selected' : ''}>Điện thoại</option>
                             <option value="Email" ${ticket.receptionChannel == 'Email' ? 'selected' : ''}>Email</option>
@@ -221,12 +206,12 @@
                          hai chức năng đó coi như không chạy. Không bắt buộc. --%>
                     <div class="col-md-6 field-row">
                         <label>Hạn xử lý (SLA)</label>
-                        <input type="datetime-local" class="form-control" id="slaDeadline" name="slaDeadline" value="<fmt:formatDate value="${ticket.slaDeadline}" pattern="yyyy-MM-dd'T'HH:mm"/>" ${lockGeneral ? 'disabled' : ''}>
+                        <input type="datetime-local" class="form-control" id="slaDeadline" name="slaDeadline" value="<fmt:formatDate value="${ticket.slaDeadline}" pattern="yyyy-MM-dd'T'HH:mm"/>">
                     </div>
 
                     <div class="col-md-6 field-row">
                         <label>Người xử lý <span class="req">*</span></label>
-                        <select class="form-select" id="technician" name="assignedTechnicianId" ${lockGeneral ? 'disabled' : ''}>
+                        <select class="form-select" id="technician" name="assignedTechnicianId">
                             <option value="">-- Chọn người xử lý --</option>
                             <c:forEach var="staff" items="${userList}">
                                 <option value="${staff.userId}" ${staff.userId == ticket.assignedTechnicianId ? 'selected' : ''}>${fn:escapeXml(staff.fullName)}</option>
@@ -237,7 +222,7 @@
 
                     <div class="col-md-6 field-row" style="display:flex; align-items:center;">
                         <div class="form-check">
-                            <input type="checkbox" class="form-check-input" id="isWarranty" name="isWarranty" ${ticket.warranty ? 'checked' : ''} ${lockGeneral ? 'disabled' : ''}>
+                            <input type="checkbox" class="form-check-input" id="isWarranty" name="isWarranty" ${ticket.warranty ? 'checked' : ''}>
                             <label class="form-check-label" for="isWarranty">Còn trong thời hạn bảo hành</label>
                         </div>
                     </div>
@@ -247,15 +232,8 @@
                 <%--
                   Từ đây xuống chia khối theo NGƯỜI VIẾT RA NỘI DUNG, khớp với
                   trang chi tiết phiếu: một khối là lời người tiếp nhận, một
-                  khối là đánh giá của kỹ thuật viên.
-
-                  Ở form thì cách chia này còn nói thêm một điều: đúng năm
-                  trường trong khối "Nhân viên kỹ thuật xử lý" (trạng thái,
-                  nhóm nguyên nhân, nguyên nhân, phương hướng xử lý, kết quả
-                  xử lý) là năm trường role Kỹ thuật được sửa trên phiếu giao
-                  cho mình -- xem
-                  PERMISSIONS.md. Người ở role đó mở form ra là thấy ngay phần
-                  nào của mình, không phải thử rồi ăn 403.
+                  khối là đánh giá của người xử lý. Cách chia chỉ để dễ đọc:
+                  Admin và Sales mở form này sửa được cả hai khối.
                 --%>
                 <div class="section-header">
                     <h5>Người tạo phiếu ghi nhận</h5>
@@ -271,13 +249,13 @@
                 <div class="row">
                     <div class="col-12 field-row">
                         <label>Mô tả sự cố <span class="req">*</span></label>
-                        <textarea class="form-control" id="description" name="description" rows="4" ${lockGeneral ? 'disabled' : ''}>${fn:escapeXml(ticket.description)}</textarea>
+                        <textarea class="form-control" id="description" name="description" rows="4">${fn:escapeXml(ticket.description)}</textarea>
                         <span class="error-text" id="err-description">Vui lòng mô tả sự cố.</span>
                     </div>
                 </div>
 
                 <%--
-                  Không gắn TÊN kỹ thuật viên vào tiêu đề khối này như bên
+                  Không gắn TÊN người xử lý vào tiêu đề khối này như bên
                   trang xem: ở form, người phụ trách là ô chọn sửa được ngay
                   phía trên, gắn tên tĩnh vào đây thì đổi dropdown một cái là
                   tiêu đề nói sai. Thay bằng một dòng nhắc vai trò.
@@ -411,8 +389,6 @@
         var contextPath = '${pageContext.request.contextPath}';
         var currentEnterpriseId = '${ticket.enterpriseId}';
         var currentContractId = '${ticket.contractId}';
-        // Kỹ thuật viên được giao: khách hàng và hợp đồng chỉ để xem (xem lockGeneral ở đầu trang).
-        var lockGeneral = ${lockGeneral};
         var customerHiddenInput = document.getElementById('customer');
         var customerPickerText = document.getElementById('customerPickerText');
         var contractHiddenInput = document.getElementById('contract');
@@ -424,9 +400,6 @@
         var contractPickerModal = new bootstrap.Modal(document.getElementById('contractPickerModal'));
 
         function openCustomerPicker() {
-            if (lockGeneral) {
-                return;
-            }
             document.getElementById('customerSearchInput').value = '';
             filterPickerList('customerPickerList', 'customerPickerEmpty', '');
             customerPickerModal.show();
@@ -553,13 +526,7 @@
                     contractPickerText.textContent = contracts.length === 0
                         ? '-- Không có hợp đồng liên quan --'
                         : '-- Chọn hợp đồng --';
-                    // Khoá thì ô vẫn mờ; phiếu không gắn hợp đồng thì nói đúng như
-                    // vậy thay vì một lời mời "Chọn hợp đồng" không bấm được.
-                    if (lockGeneral) {
-                        contractPickerText.textContent = '-- Không gắn hợp đồng --';
-                    } else {
-                        contractPickerField.classList.remove('disabled');
-                    }
+                    contractPickerField.classList.remove('disabled');
                     document.getElementById('contractLoaded').value = '1';
 
                     if (selectedContractId) {
