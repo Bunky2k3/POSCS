@@ -71,6 +71,9 @@ public class ContractHandover {
     public String getContractCode() { return contractCode; }
     public void setContractCode(String contractCode) { this.contractCode = contractCode; }
 
+    /** BR-58: mã hợp đồng để hiển thị ở hàng chờ bàn giao, "Chưa có số" khi còn trống. */
+    public String getDisplayCode() { return Contract.displayCodeOf(contractCode); }
+
     public String getContractTitle() { return contractTitle; }
     public void setContractTitle(String contractTitle) { this.contractTitle = contractTitle; }
 

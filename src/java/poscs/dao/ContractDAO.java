@@ -966,7 +966,8 @@ public class ContractDAO {
     private int executeInsertStatement(Connection conn, Contract contract, int enterpriseId,
             String direction, Integer parentId) throws SQLException {
         try (PreparedStatement ps = conn.prepareStatement(SQL_INSERT, Statement.RETURN_GENERATED_KEYS)) {
-            ps.setString(1, contract.getContractCode());
+            // BR-58: bản Nháp chưa có số thì ghi NULL (xem bindAllUpdateColumns).
+            ps.setString(1, ContractDocumentDAO.trimToNull(contract.getContractCode()));
             ps.setString(2, contract.getTitle());
             ps.setString(3, contract.getContractType());
             ps.setString(4, direction);
@@ -1004,10 +1005,11 @@ public class ContractDAO {
         // NPE làm hỏng cả lần tạo hợp đồng chỉ vì một dòng mô tả.
         insertHistory(conn, newId, ContractHistory.EVENT_CREATED,
                 (parent == null ? "Tạo bản nháp " : "Tạo bản nháp phụ lục ")
-                        + contract.getContractCode()
+                        // BR-58: Nháp chưa có mã thì ghi "Chưa có số", không ghi "null".
+                        + contract.getDisplayCode()
                         + (parent == null
                                 ? (direction == null ? "" : " — hợp đồng " + direction.toLowerCase())
-                                : " — sửa đổi cho hợp đồng " + parent.getContractCode())
+                                : " — sửa đổi cho hợp đồng " + parent.getDisplayCode())
                         // Nháp có thể chưa chốt thời hạn (V26). Bỏ hẳn mệnh đề
                         // đó khi thiếu, thay vì để lại 'hiệu lực  đến ' cụt lủn.
                         + (contract.getEffectiveDate() == null || contract.getEndDate() == null
@@ -1021,7 +1023,7 @@ public class ContractDAO {
         // hỏi khi đang mở hợp đồng gốc, không phải khi đang mở phụ lục.
         if (parent != null) {
             insertHistory(conn, parent.getContractId(), ContractHistory.EVENT_AMENDMENT_CREATED,
-                    "Lập phụ lục " + contract.getContractCode()
+                    "Lập phụ lục " + contract.getDisplayCode()
                             + " — " + truncate(contract.getTitle(), 200),
                     actorId, null);
         }
@@ -1255,7 +1257,9 @@ public class ContractDAO {
 
     private void bindAllUpdateColumns(PreparedStatement ps, Contract written, Date signingDate,
             int contractId) throws SQLException {
-        ps.setString(1, written.getContractCode());
+        // BR-58: mã trống ghi NULL, không ghi chuỗi rỗng -- UNIQUE coi hai chuỗi
+        // rỗng là trùng, còn nhiều dòng NULL thì không.
+        ps.setString(1, ContractDocumentDAO.trimToNull(written.getContractCode()));
         ps.setString(2, written.getTitle());
         ps.setString(3, written.getContractType());
         ps.setDate(4, signingDate);
@@ -1381,6 +1385,10 @@ public class ContractDAO {
         // thời gian mọc ra những dòng "Sửa sai sót" cho thứ chưa ai ký,
         // và làm loãng đúng loại sự kiện sinh ra để nổi bật.
         if (before == null || before.isFrozen() || before.isDraft()) {
+            return false;
+        }
+        // BR-58: hợp đồng đã ký luôn có mã -- chữa sai sót không được xoá trắng nó.
+        if (!contract.hasContractCode()) {
             return false;
         }
         // BR-56: chữa sai sót KHÔNG đổi bốn ô người ký bên mình. Lấy từ bản ghi
@@ -1636,7 +1644,7 @@ public class ContractDAO {
         if (voided != null && voided.isAmendment() && !voided.isDraft()
                 && voided.getContractValue() != null && voided.getContractValue().signum() != 0) {
             logValueAdjustment(conn, voided.getParentContractId(), voided.getContractValue().negate(),
-                    actorId, "Huỷ bản ghi phụ lục " + voided.getContractCode());
+                    actorId, "Huỷ bản ghi phụ lục " + voided.getDisplayCode());
         }
     }
 
@@ -1708,8 +1716,10 @@ public class ContractDAO {
             return false;
         }
         // BR-35, BR-36: không đưa hợp đồng thiếu thời hạn hiệu lực sang Đã ký.
+        // BR-58: chưa có mã cũng không ký được (MSG-061 báo ở tầng trên).
         if (PROGRESS_SIGNED.equals(toStatus)
-                && (current.getEffectiveDate() == null || current.getEndDate() == null)) {
+                && (current.getEffectiveDate() == null || current.getEndDate() == null
+                        || !current.hasContractCode())) {
             return false;
         }
 
@@ -1742,7 +1752,7 @@ public class ContractDAO {
         if (PROGRESS_SIGNED.equals(toStatus) && current.isAmendment()
                 && current.getContractValue() != null && current.getContractValue().signum() != 0) {
             logValueAdjustment(conn, current.getParentContractId(), current.getContractValue(),
-                    actorId, "Phụ lục " + current.getContractCode() + " được ký");
+                    actorId, "Phụ lục " + current.getDisplayCode() + " được ký");
         }
     }
 

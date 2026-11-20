@@ -170,10 +170,10 @@ public class ContractLinkDAO {
                 }
 
                 historyDAO.insertHistory(conn, sellContractId, ContractHistory.EVENT_LINKED,
-                        "Nối với hợp đồng mua " + buy.getContractCode()
+                        "Nối với hợp đồng mua " + buy.getDisplayCode()
                                 + " — đầu vào phục vụ hợp đồng này", actorId, safeNote);
                 historyDAO.insertHistory(conn, buyContractId, ContractHistory.EVENT_LINKED,
-                        "Phục vụ hợp đồng bán " + sell.getContractCode(), actorId, safeNote);
+                        "Phục vụ hợp đồng bán " + sell.getDisplayCode(), actorId, safeNote);
 
                 conn.commit();
                 committed = true;
@@ -249,9 +249,9 @@ public class ContractLinkDAO {
                 }
 
                 historyDAO.insertHistory(conn, target.sellId, ContractHistory.EVENT_LINKED,
-                        "Gỡ liên kết với hợp đồng mua " + target.buyCode, actorId, null);
+                        "Gỡ liên kết với hợp đồng mua " + Contract.displayCodeOf(target.buyCode), actorId, null);
                 historyDAO.insertHistory(conn, target.buyId, ContractHistory.EVENT_LINKED,
-                        "Gỡ liên kết với hợp đồng bán " + target.sellCode, actorId, null);
+                        "Gỡ liên kết với hợp đồng bán " + Contract.displayCodeOf(target.sellCode), actorId, null);
 
                 conn.commit();
                 committed = true;

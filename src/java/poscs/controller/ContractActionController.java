@@ -216,14 +216,33 @@ public class ContractActionController extends HttpServlet {
         String toStatus = ContractControllerHelper.emptyToNull(req.getParameter("toStatus")), note = req.getParameter("progressNote");
         if (ContractService.PROGRESS_SIGNED.equals(toStatus)) {
             if (!canSign(u)) { resp.sendError(HttpServletResponse.SC_FORBIDDEN, "Bạn không được ký hợp đồng. Việc này thuộc về cấp trên."); return; }
-            if (target.getEffectiveDate() == null || target.getEndDate() == null) {
-                resp.sendRedirect(req.getContextPath() + "/contract?action=view&id=" + id + "&error=missing_term");
+            String signError = signBlocker(target);
+            if (signError != null) {
+                resp.sendRedirect(req.getContextPath() + "/contract?action=view&id=" + id + "&error=" + signError);
                 return;
             }
             ContractActionResultHelper.redirectProgressResult(req, resp, getContractService().signContract(id, u, note), id, toStatus);
         } else {
             ContractActionResultHelper.redirectProgressResult(req, resp, getContractService().changeProgressStatus(id, toStatus, u, note), id, toStatus);
         }
+    }
+
+    /**
+     * Lý do chưa ký được {@code target} (giá trị {@code error} của trang chi
+     * tiết), null khi ký được: chưa có mã (BR-58, MSG-061), mã trùng hợp đồng
+     * khác (BR-58), thiếu thời hạn (MSG-045). Service kiểm lại cả ba.
+     */
+    private String signBlocker(Contract target) {
+        if (!target.hasContractCode()) {
+            return ContractService.ERR_MISSING_CODE;
+        }
+        if (getContractService().contractCodeExists(target.getContractCode(), target.getContractId())) {
+            return ContractService.ERR_DUPLICATE_CODE;
+        }
+        if (target.getEffectiveDate() == null || target.getEndDate() == null) {
+            return ContractService.ERR_MISSING_TERM;
+        }
+        return null;
     }
 
     public void handleDelete(HttpServletRequest req, HttpServletResponse resp) throws IOException {

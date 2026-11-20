@@ -176,7 +176,7 @@ public class ContractExportServiceTest {
         assertEquals(1, rows.size());
         Object[] row = rows.get(0);
         assertEquals(1, row[0]);
-        assertEquals("", row[1]); // code
+        assertEquals("Chưa có số", row[1]); // code -- Task 10.2 (BR-58): chưa có mã ghi "Chưa có số"
         assertEquals("", row[2]); // parent code
         assertEquals("", row[3]); // title
         assertEquals("", row[4]); // type
@@ -298,5 +298,34 @@ public class ContractExportServiceTest {
                 isNull(),
                 eq(scope)
         );
+    }
+
+    // Task 10.2 -- BR-58: chưa có mã thì Excel ghi "Chưa có số"
+
+    @Test
+    public void br58_buildExportRows_contractWithoutCode_writesChuaCoSo() {
+        Contract draft = new Contract();
+        draft.setTitle("Bản nháp chưa có số");
+        Contract blank = new Contract();
+        blank.setContractCode("   ");
+
+        List<Object[]> rows = service.buildExportRows(List.of(draft, blank));
+
+        assertEquals("Chưa có số", rows.get(0)[1]);
+        assertEquals("Chưa có số", rows.get(1)[1]);
+        assertEquals("Hợp đồng gốc để trống cột mã gốc", "", rows.get(0)[2]);
+    }
+
+    @Test
+    public void br58_buildExportRows_amendmentOfUncodedParent_writesChuaCoSoAsParentCode() {
+        Contract amendment = new Contract();
+        amendment.setContractCode("PL-01");
+        amendment.setParentContractId(7);
+        amendment.setParentContractCode(null);
+
+        Object[] row = service.buildExportRows(List.of(amendment)).get(0);
+
+        assertEquals("PL-01", row[1]);
+        assertEquals("Chưa có số", row[2]);
     }
 }

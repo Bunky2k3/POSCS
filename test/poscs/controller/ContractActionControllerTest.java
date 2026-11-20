@@ -1693,4 +1693,103 @@ public class ContractActionControllerTest {
         verify(contractDAO).correct(argThat((Contract c) -> c.getOwnerId() == 55), eq(99), eq("Gõ nhầm mã"));
         verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=view&id=5");
     }
+
+    // ------------------------------------------------------------------
+    // Task 10.2 -- BR-58: mã hợp đồng để trống khi còn Nháp, bắt buộc khi Ký (MSG-061)
+    // ------------------------------------------------------------------
+
+    private User loginAsSigner() {
+        User u = loginAs(PermissionService.ROLE_SALES, null);
+        when(permissionService.canUpdateContract(u)).thenReturn(true);
+        when(permissionService.canSignContract(u)).thenReturn(true);
+        when(request.getParameter("action")).thenReturn("changeProgress");
+        when(request.getParameter("contractId")).thenReturn("5");
+        when(request.getParameter("toStatus")).thenReturn(ContractService.PROGRESS_SIGNED);
+        return u;
+    }
+
+    @Test
+    public void br58_handleCreate_withoutCode_passesNullCodeToServiceAndRedirectsToDetail() throws Exception {
+        User u = loginAs(PermissionService.ROLE_SALES, null);
+        when(permissionService.canCreateContract(u)).thenReturn(true);
+        when(request.getParameter("action")).thenReturn("create");
+        when(request.getParameter("contractCode")).thenReturn("   ");
+        when(contractService.createContract(any(), eq(u))).thenReturn(ServiceResult.ok(106));
+
+        controller.doPost(request, response);
+
+        verify(contractService).createContract(argThat((Contract c) -> c.getContractCode() == null), eq(u));
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=view&id=106");
+    }
+
+    @Test
+    public void br58_handleChangeProgress_signWithoutCode_redirectsWithMissingCode() throws Exception {
+        for (String code : new String[]{null, "  "}) {
+            reset(contractService, response);
+            loginAsSigner();
+            Contract c = draftContract(5);
+            c.setContractCode(code);
+            when(contractService.findById(5)).thenReturn(c);
+
+            controller.doPost(request, response);
+
+            verify(contractService, never()).signContract(anyInt(), any(), any());
+            verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=view&id=5&error=missing_code");
+        }
+    }
+
+    @Test
+    public void br58_handleChangeProgress_signWithoutCodeAndTerm_reportsCodeFirst() throws Exception {
+        loginAsSigner();
+        Contract c = draftContract(5);
+        c.setContractCode(null);
+        c.setEffectiveDate(null);
+        when(contractService.findById(5)).thenReturn(c);
+
+        controller.doPost(request, response);
+
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=view&id=5&error=missing_code");
+    }
+
+    @Test
+    public void br58_handleChangeProgress_signDuplicateCode_redirectsWithDuplicateCode() throws Exception {
+        loginAsSigner();
+        when(contractService.findById(5)).thenReturn(draftContract(5));
+        when(contractService.contractCodeExists("HD-005", 5)).thenReturn(true);
+
+        controller.doPost(request, response);
+
+        verify(contractService, never()).signContract(anyInt(), any(), any());
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=view&id=5&error=duplicate_code");
+    }
+
+    /**
+     * QA 10.2 #1: controller kiểm trước rồi nhưng service vẫn từ chối (mã bị xoá
+     * trắng ngay trước lúc ký) -- phải báo MSG-061 chứ không phải "progress_failed".
+     */
+    @Test
+    public void br58_handleChangeProgress_serviceRejectsMissingCode_redirectsWithMissingCode() throws Exception {
+        User u = loginAsSigner();
+        when(contractService.findById(5)).thenReturn(draftContract(5));
+        when(contractService.signContract(eq(5), eq(u), any()))
+                .thenReturn(ServiceResult.fail(ContractService.ERR_MISSING_CODE));
+
+        controller.doPost(request, response);
+
+        verify(contractService).signContract(eq(5), eq(u), any());
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=view&id=5&error=missing_code");
+    }
+
+    @Test
+    public void br58_handleChangeProgress_serviceRejectsDuplicateCode_redirectsWithDuplicateCode() throws Exception {
+        User u = loginAsSigner();
+        when(contractService.findById(5)).thenReturn(draftContract(5));
+        when(contractService.signContract(eq(5), eq(u), any()))
+                .thenReturn(ServiceResult.fail(ContractService.ERR_DUPLICATE_CODE));
+
+        controller.doPost(request, response);
+
+        verify(contractService).signContract(eq(5), eq(u), any());
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=view&id=5&error=duplicate_code");
+    }
 }

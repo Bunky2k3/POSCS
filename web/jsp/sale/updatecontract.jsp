@@ -166,7 +166,7 @@
             <div>
                 <h2>${contract.amendment ? 'Cập nhật phụ lục' : 'Cập nhật hợp đồng'}</h2>
                 <p>Mã ${contract.amendment ? 'phụ lục' : 'hợp đồng'}:
-                   <strong style="color:var(--primary-dark)">${fn:escapeXml(contract.contractCode)}</strong></p>
+                   <strong style="color:var(--primary-dark)">${fn:escapeXml(contract.displayCode)}</strong></p>
             </div>
             <a href="${pageContext.request.contextPath}/guide?module=contract#quan-ly" target="_blank" rel="noopener" class="guide-btn" title="Mở hướng dẫn sử dụng ở tab mới"><i class="fa-regular fa-circle-question"></i> Hướng dẫn</a>
         </div>
@@ -180,7 +180,7 @@
                     <i class="fa-solid fa-link" style="margin-top:3px;"></i>
                     <span>Đây là <strong>phụ lục</strong> của hợp đồng
                         <a href="${pageContext.request.contextPath}/contract?action=view&id=${contract.parentContractId}">
-                            ${fn:escapeXml(contract.parentContractCode)}</a>.
+                            ${fn:escapeXml(contract.parentDisplayCode)}</a>.
                         Nó có tiến trình riêng và phải được ký như một hợp đồng thường.</span>
                 </div>
             </div>
@@ -287,13 +287,19 @@
                     <%-- Mã hợp đồng sửa được: nó là số trên bản giấy do người dùng
                          nhập, và nhập sai thì phải có đường chữa. Các bảng khác trỏ
                          sang hợp đồng bằng contract_id chứ không bằng mã, nên đổi
-                         chuỗi này không làm gãy liên kết nào. --%>
+                         chuỗi này không làm gãy liên kết nào. Bản Nháp (canEditTerms)
+                         để trống được tới lúc Ký; hợp đồng đã ký luôn có mã, nên ở
+                         chế độ chữa sai sót ô này bắt buộc (BR-58). --%>
                     <div class="col-12 field-row">
-                        <label>Mã hợp đồng <span class="req">*</span></label>
+                        <label>Mã hợp đồng <c:if test="${not canEditTerms}"><span class="req">*</span></c:if></label>
                         <input type="text" class="form-control" id="contractCode" name="contractCode"
                                maxlength="50" placeholder="VD: 01/2026/HĐKT-POSTEF"
+                               data-required="${canEditTerms ? '0' : '1'}"
                                value="${fn:escapeXml(contract.contractCode)}" ${canEditTerms ? '' : 'disabled'} data-term="1">
                         <span class="error-text" id="err-contractCode">Mã hợp đồng không được để trống.</span>
+                        <c:if test="${canEditTerms}">
+                            <span style="font-size:0.78rem; color:#6b7280; display:block; margin-top:6px;">Để trống nếu chưa có số; bắt buộc trước khi ký.</span>
+                        </c:if>
                     </div>
 
                     <div class="col-12 field-row">
@@ -438,7 +444,7 @@
                             <c:choose>
                                 <c:when test="${contract.amendment}">
                                     Phần chênh lệch cộng vào hợp đồng gốc
-                                    <strong>${fn:escapeXml(contract.parentContractCode)}</strong>, tính từ lúc phụ lục này được ký.
+                                    <strong>${fn:escapeXml(contract.parentDisplayCode)}</strong>, tính từ lúc phụ lục này được ký.
                                 </c:when>
                                 <c:when test="${contract.valueAdjusted}">
                                     Giá trị theo bản gốc đã ký. Sau ${contract.amendmentCount} phụ lục, giá trị hiện hành là
@@ -838,7 +844,7 @@
                             <tbody>
                                 <c:forEach var="pl" items="${amendments}">
                                     <tr>
-                                        <td><strong>${fn:escapeXml(pl.contractCode)}</strong></td>
+                                        <td><strong>${fn:escapeXml(pl.displayCode)}</strong></td>
                                         <td>${fn:escapeXml(pl.title)}</td>
                                         <td>
                                             <c:choose>
@@ -926,6 +932,13 @@
                     </button>
                 </c:if>
             </div>
+            <%-- BR-58 & MSG-061: nói trước vì sao bấm Ký sẽ bị chặn, như dòng thiếu thời hạn bên dưới. --%>
+            <c:if test="${canSign and not contract.hasContractCode()}">
+                <div class="locked-note" style="margin-top:12px;">
+                    <i class="fa-solid fa-circle-info" style="margin-top:3px; color:var(--primary);"></i>
+                    <span>Hợp đồng chưa có mã. Vui lòng nhập mã hợp đồng trước khi ký.</span>
+                </div>
+            </c:if>
             <c:if test="${canSign and (contract.effectiveDate == null or contract.endDate == null)}">
                 <div class="locked-note" style="margin-top:12px;">
                     <i class="fa-solid fa-circle-info" style="margin-top:3px; color:var(--primary);"></i>
@@ -1282,7 +1295,7 @@
                             <tbody>
                                 <c:forEach var="lk" items="${contractLinks}">
                                     <tr>
-                                        <td><strong>${fn:escapeXml(lk.other.contractCode)}</strong></td>
+                                        <td><strong>${fn:escapeXml(lk.other.displayCode)}</strong></td>
                                         <td>
                                             ${fn:escapeXml(lk.other.title)}
                                             <%-- Đơn mua gom: giá trị của nó được tính TRỌN VẸN vào
@@ -1306,7 +1319,7 @@
                                                class="btn-outline-action"><i class="fa-solid fa-eye"></i> Xem</a>
                                             <form method="POST" action="${pageContext.request.contextPath}/contract"
                                                   style="display:inline;"
-                                                  data-confirm="Gỡ liên kết với hợp đồng ${fn:escapeXml(lk.other.contractCode)}?">
+                                                  data-confirm="Gỡ liên kết với hợp đồng ${fn:escapeXml(lk.other.displayCode)}?">
                                                 <input type="hidden" name="csrfToken" value="${csrfToken}">
                                                 <input type="hidden" name="action" value="unlinkContract">
                                                 <input type="hidden" name="contractId" value="${contract.contractId}">
@@ -1338,7 +1351,7 @@
                     <select name="otherContractId" class="form-control" required>
                         <option value="">-- Chọn hợp đồng --</option>
                         <c:forEach var="cand" items="${linkCandidates}">
-                            <option value="${cand.contractId}">${fn:escapeXml(cand.contractCode)} — ${fn:escapeXml(cand.title)}</option>
+                            <option value="${cand.contractId}">${fn:escapeXml(cand.displayCode)} — ${fn:escapeXml(cand.title)}</option>
                         </c:forEach>
                     </select>
                 </div>
@@ -1429,8 +1442,11 @@
             var title = activeValue('title');
             if (title !== null && !title.trim()) { document.getElementById('err-title').style.display = 'block'; valid = false; }
 
+            // BR-58: bản Nháp để trống mã được; chỉ chế độ chữa sai sót hợp đồng
+            // đã ký (data-required="1") mới bắt nhập.
             var contractCode = activeValue('contractCode');
-            if (contractCode !== null && !contractCode.trim()) {
+            var codeRequired = document.getElementById('contractCode').getAttribute('data-required') === '1';
+            if (codeRequired && contractCode !== null && !contractCode.trim()) {
                 document.getElementById('err-contractCode').style.display = 'block';
                 valid = false;
             }

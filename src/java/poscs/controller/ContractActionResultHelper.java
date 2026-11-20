@@ -109,6 +109,12 @@ public final class ContractActionResultHelper {
             resp.sendRedirect(req.getContextPath() + "/contract?action=view&id=" + id);
         } else if (ContractService.ERR_FORBIDDEN.equals(res.getMessage())) {
             resp.sendError(HttpServletResponse.SC_FORBIDDEN, PermissionService.MSG_022);
+        } else if (ContractService.ERR_MISSING_CODE.equals(res.getMessage())) {
+            // BR-58 & MSG-061: service chặn Ký vì chưa có mã (controller đã kiểm trước,
+            // nhánh này đỡ trường hợp mã bị xoá trắng ngay trước lúc ký).
+            resp.sendRedirect(req.getContextPath() + "/contract?action=view&id=" + id + "&error=missing_code");
+        } else if (ContractService.ERR_DUPLICATE_CODE.equals(res.getMessage())) {
+            resp.sendRedirect(req.getContextPath() + "/contract?action=view&id=" + id + "&error=duplicate_code");
         } else if (ContractService.ERR_MISSING_TERM.equals(res.getMessage())) {
             resp.sendRedirect(req.getContextPath() + "/contract?action=view&id=" + id + "&error=missing_term");
         } else {

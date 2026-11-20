@@ -226,6 +226,37 @@ public class Contract {
     public String getContractCode() { return contractCode; }
     public void setContractCode(String contractCode) { this.contractCode = contractCode; }
 
+    /** BR-58: chữ hiện thay cho mã khi hợp đồng chưa có số (bản Nháp mở từ phiếu GQNCKH). */
+    public static final String NO_CODE_LABEL = "Chưa có số";
+
+    /** BR-58: {@code code} để hiển thị, hoặc "Chưa có số" khi null / toàn khoảng trắng. */
+    public static String displayCodeOf(String code) {
+        return code == null || code.trim().isEmpty() ? NO_CODE_LABEL : code;
+    }
+
+    /** BR-58: true nếu đã có mã hợp đồng -- điều kiện để Ký (MSG-061). */
+    public boolean hasContractCode() {
+        return contractCode != null && !contractCode.trim().isEmpty();
+    }
+
+    /** BR-58: mã để hiển thị, "Chưa có số" khi còn trống. Không bao giờ null. */
+    public String getDisplayCode() {
+        return displayCodeOf(contractCode);
+    }
+
+    /**
+     * BR-58: mã hợp đồng gốc để hiển thị trên một phụ lục ("PL của ..."), "Chưa
+     * có số" khi hợp đồng gốc chưa có mã. null với hợp đồng gốc (không có hợp
+     * đồng cha), để chỗ hiển thị vẫn để trống như trước.
+     */
+    public String getParentDisplayCode() {
+        boolean noParentCode = parentContractCode == null || parentContractCode.trim().isEmpty();
+        if (parentContractId == null && noParentCode) {
+            return null;
+        }
+        return displayCodeOf(parentContractCode);
+    }
+
     public String getTitle() { return title; }
     public void setTitle(String title) { this.title = title; }
 

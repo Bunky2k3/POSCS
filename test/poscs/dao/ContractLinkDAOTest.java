@@ -763,4 +763,70 @@ public class ContractLinkDAOTest {
         assertNotNull(daoWithHist.getLinkDAO());
         assertSame(hist, daoWithHist.getLinkDAO().getHistoryDAO());
     }
+
+    // ------------------------------------------------------------------
+    // Task 10.2 (BR-58): hợp đồng Nháp chưa có mã -- nhật ký ghi "Chưa có số"
+    // ------------------------------------------------------------------
+
+    @Test
+    public void br58_linkContracts_withoutCodes_historySaysChuaCoSo() throws Exception {
+        ContractHistoryDAO mockHistory = mock(ContractHistoryDAO.class);
+        ContractLinkDAO customDao = new ContractLinkDAO(mockHistory);
+
+        PreparedStatement psLock = mock(PreparedStatement.class);
+        ResultSet rsSell = resultSetOf(List.of(
+                row("contract_id", SELL_ID, "contract_code", null, "direction", "Bán", "parent_contract_id", null)
+        ));
+        ResultSet rsBuy = resultSetOf(List.of(
+                row("contract_id", BUY_ID, "contract_code", null, "direction", "Mua", "parent_contract_id", null)
+        ));
+        when(psLock.executeQuery()).thenReturn(rsSell, rsBuy);
+        PreparedStatement psInsert = mock(PreparedStatement.class);
+        when(psInsert.executeUpdate()).thenReturn(1);
+
+        Connection conn = mock(Connection.class);
+        when(conn.prepareStatement(contains("FROM contracts WHERE contract_id = ? AND is_deleted = 0 FOR UPDATE")))
+                .thenReturn(psLock);
+        when(conn.prepareStatement(contains("INSERT INTO contract_links"))).thenReturn(psInsert);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            assertEquals(ContractLinkDAO.LINK_OK, customDao.linkContracts(SELL_ID, BUY_ID, null, ACTOR_ID));
+
+            verify(mockHistory).insertHistory(eq(conn), eq(SELL_ID), eq(ContractHistory.EVENT_LINKED),
+                    eq("Nối với hợp đồng mua Chưa có số — đầu vào phục vụ hợp đồng này"), eq(ACTOR_ID), isNull());
+            verify(mockHistory).insertHistory(eq(conn), eq(BUY_ID), eq(ContractHistory.EVENT_LINKED),
+                    eq("Phục vụ hợp đồng bán Chưa có số"), eq(ACTOR_ID), isNull());
+        }
+    }
+
+    @Test
+    public void br58_unlinkContracts_withoutCodes_historySaysChuaCoSo() throws Exception {
+        ContractHistoryDAO mockHistory = mock(ContractHistoryDAO.class);
+        ContractLinkDAO customDao = new ContractLinkDAO(mockHistory);
+
+        PreparedStatement psSelect = mock(PreparedStatement.class);
+        ResultSet rsSelect = resultSetOf(List.of(
+                row("sell_contract_id", SELL_ID, "buy_contract_id", BUY_ID, "sell_code", null, "buy_code", "  ")
+        ));
+        when(psSelect.executeQuery()).thenReturn(rsSelect);
+        PreparedStatement psDelete = mock(PreparedStatement.class);
+        when(psDelete.executeUpdate()).thenReturn(1);
+
+        Connection conn = mock(Connection.class);
+        when(conn.prepareStatement(contains("WHERE l.link_id = ? FOR UPDATE"))).thenReturn(psSelect);
+        when(conn.prepareStatement(contains("DELETE FROM contract_links WHERE link_id = ?"))).thenReturn(psDelete);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            assertTrue(customDao.unlinkContracts(LINK_ID, ACTOR_ID));
+
+            verify(mockHistory).insertHistory(eq(conn), eq(SELL_ID), eq(ContractHistory.EVENT_LINKED),
+                    eq("Gỡ liên kết với hợp đồng mua Chưa có số"), eq(ACTOR_ID), isNull());
+            verify(mockHistory).insertHistory(eq(conn), eq(BUY_ID), eq(ContractHistory.EVENT_LINKED),
+                    eq("Gỡ liên kết với hợp đồng bán Chưa có số"), eq(ACTOR_ID), isNull());
+        }
+    }
 }

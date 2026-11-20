@@ -758,7 +758,9 @@ public class ContractDAOTest {
      * hợp đồng thiếu thời hạn thì KHÔNG ký được.
      */
     private static java.util.Map<String, Object> contractRow(String progressStatus) {
-        return row("progress_status", progressStatus,
+        // Task 10.2 (BR-58): có mã -- bản Nháp chưa có mã không ký được.
+        return row("contract_code", "01/2026/HĐKT-POSTEF",
+                "progress_status", progressStatus,
                 "effective_date", Date.valueOf(LocalDate.now()),
                 "end_date", Date.valueOf(LocalDate.now().plusYears(1)));
     }
@@ -3154,6 +3156,161 @@ public class ContractDAOTest {
             assertTrue(sql.getValue().contains("c.signer_phone, c.signer_fax"));
             assertEquals("0233 3852 123", c.getSignerPhone());
             assertEquals("0233 3852 124", c.getSignerFax());
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // Task 10.2 -- BR-58: mã hợp đồng để trống khi còn Nháp (contract_code NULL)
+    // ------------------------------------------------------------------
+
+    /** Dòng hợp đồng Nháp đủ thời hạn, mã cho trước (null = chưa có số). */
+    private static java.util.Map<String, Object> draftRowWithCode(String code) {
+        return row("contract_id", 5,
+                "contract_code", code,
+                "progress_status", ContractDAO.PROGRESS_DRAFT,
+                "effective_date", Date.valueOf(LocalDate.now()),
+                "end_date", Date.valueOf(LocalDate.now().plusYears(1)));
+    }
+
+    @Test
+    public void br58_insert_blankCode_bindsNullNotEmptyString() throws Exception {
+        for (String code : new String[]{null, "", "   "}) {
+            ResultSet keys = singleRow(row("id", 124));
+            PreparedStatement ps = mock(PreparedStatement.class);
+            when(ps.executeUpdate()).thenReturn(1);
+            when(ps.getGeneratedKeys()).thenReturn(keys);
+            Connection conn = connectionReturning(ps);
+
+            try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+                db.when(DBContext::getConnection).thenReturn(conn);
+
+                assertEquals(124, dao.insert(contract(code), ACTOR));
+                verify(ps).setString(1, null);
+                verify(ps, never()).setString(eq(1), eq(""));
+                verify(ps, never()).setString(eq(1), eq("   "));
+            }
+        }
+    }
+
+    @Test
+    public void br58_insert_withoutCode_historySaysChuaCoSoNotNull() throws Exception {
+        ResultSet keys = singleRow(row("id", 125));
+        PreparedStatement historyPs = mock(PreparedStatement.class);
+        PreparedStatement contractPs = mock(PreparedStatement.class);
+        when(contractPs.executeUpdate()).thenReturn(1);
+        when(contractPs.getGeneratedKeys()).thenReturn(keys);
+        Connection conn = connectionRoutingOn("contract_history", historyPs, contractPs);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            Contract c = contract(null);
+            c.setDirection("Bán");
+            assertEquals(125, dao.insert(c, ACTOR));
+
+            ArgumentCaptor<String> detail = ArgumentCaptor.forClass(String.class);
+            verify(historyPs).setString(eq(3), detail.capture());
+            assertTrue(detail.getValue(), detail.getValue().startsWith("Tạo bản nháp Chưa có số"));
+            assertFalse(detail.getValue(), detail.getValue().contains("null"));
+        }
+    }
+
+    @Test
+    public void br58_update_draftClearingCode_bindsNull() throws Exception {
+        ResultSet current = singleRow(parentRow(ContractDAO.PROGRESS_DRAFT, null));
+        PreparedStatement historyPs = mock(PreparedStatement.class);
+        PreparedStatement contractPs = mock(PreparedStatement.class);
+        when(contractPs.executeQuery()).thenReturn(current);
+        when(contractPs.executeUpdate()).thenReturn(1);
+        Connection conn = connectionRoutingOn("contract_history", historyPs, contractPs);
+
+        Contract submitted = new Contract();
+        submitted.setContractId(5);
+        submitted.setContractCode("   ");
+        submitted.setTitle("Tiêu đề mới");
+        submitted.setContractType("Cung cấp thiết bị");
+        submitted.setEnterpriseId(12);
+        submitted.setOwnerId(88);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            assertTrue(dao.update(submitted, ACTOR));
+            verify(contractPs).setString(1, null);
+            verify(contractPs, never()).setString(eq(1), eq("   "));
+        }
+    }
+
+    @Test
+    public void br58_contractCodeExists_nullOrBlank_falseWithoutTouchingDb() throws Exception {
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            assertFalse(dao.contractCodeExists(null, 0));
+            assertFalse(dao.contractCodeExists("", 0));
+            assertFalse(dao.contractCodeExists("   ", 5));
+            db.verify(DBContext::getConnection, never());
+        }
+    }
+
+    @Test
+    public void br58_changeProgressStatus_signingWithoutCode_refusedInsideTransaction() throws Exception {
+        ResultSet current = singleRow(draftRowWithCode(null));
+        PreparedStatement historyPs = mock(PreparedStatement.class);
+        PreparedStatement contractPs = mock(PreparedStatement.class);
+        when(contractPs.executeQuery()).thenReturn(current);
+        when(contractPs.executeUpdate()).thenReturn(1);
+        Connection conn = connectionRoutingOn("contract_history", historyPs, contractPs);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            assertFalse(dao.changeProgressStatus(5, ContractDAO.PROGRESS_SIGNED, ACTOR, null));
+            verify(contractPs, never()).executeUpdate();
+            verify(historyPs, never()).executeUpdate();
+            verify(conn, never()).commit();
+            verify(conn).rollback();
+        }
+    }
+
+    @Test
+    public void br58_changeProgressStatus_signingWithCode_signs() throws Exception {
+        ResultSet current = singleRow(draftRowWithCode("01/2026/HĐKT-POSTEF"));
+        PreparedStatement historyPs = mock(PreparedStatement.class);
+        PreparedStatement contractPs = mock(PreparedStatement.class);
+        when(contractPs.executeQuery()).thenReturn(current);
+        when(contractPs.executeUpdate()).thenReturn(1);
+        Connection conn = connectionRoutingOn("contract_history", historyPs, contractPs);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            assertTrue(dao.changeProgressStatus(5, ContractDAO.PROGRESS_SIGNED, ACTOR, null));
+            verify(conn).commit();
+        }
+    }
+
+    @Test
+    public void br58_correct_signedContractBlankCode_refusedWithoutWriting() throws Exception {
+        ResultSet current = singleRow(parentRow(ContractDAO.PROGRESS_SIGNED, null));
+        PreparedStatement historyPs = mock(PreparedStatement.class);
+        PreparedStatement contractPs = mock(PreparedStatement.class);
+        when(contractPs.executeQuery()).thenReturn(current);
+        when(contractPs.executeUpdate()).thenReturn(1);
+        Connection conn = connectionRoutingOn("contract_history", historyPs, contractPs);
+
+        Contract submitted = new Contract();
+        submitted.setContractId(3);
+        submitted.setContractCode("  ");
+        submitted.setTitle("Hợp đồng gốc");
+        submitted.setContractType("Mua vật tư");
+        submitted.setEnterpriseId(12);
+        submitted.setOwnerId(5);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            assertFalse(dao.correct(submitted, ACTOR, "Gõ nhầm mã"));
+            verify(contractPs, never()).executeUpdate();
+            verify(conn, never()).commit();
         }
     }
 }

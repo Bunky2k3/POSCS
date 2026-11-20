@@ -630,7 +630,7 @@
                                                  "dòng này là cái gì", mà câu đó phải đọc được trước
                                                  khi đọc chi tiết. Hợp đồng gốc không mang nhãn nào --
                                                  chúng là số đông, gắn nhãn cho số đông là không gắn. --%>
-                                            <c:if test="${contract.amendment}"><span class="pl-tag">PL của ${fn:escapeXml(contract.parentContractCode)}</span> &middot; </c:if>
+                                            <c:if test="${contract.amendment}"><span class="pl-tag">PL của ${fn:escapeXml(contract.parentDisplayCode)}</span> &middot; </c:if>
                                             <c:choose>
                                                 <c:when test="${contract.enterprise != null}"><c:if test="${contract.enterprise.address.district.province != null}"><span class="prov-tag">${fn:escapeXml(contract.enterprise.address.district.province.shortName)}</span> &middot; </c:if>${fn:escapeXml(contract.enterprise.enterpriseName)}</c:when>
                                                 <c:otherwise>&mdash;</c:otherwise>

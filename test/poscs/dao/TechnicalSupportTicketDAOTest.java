@@ -739,4 +739,51 @@ public class TechnicalSupportTicketDAOTest {
             assertNull(t.getCauseCategory());
         }
     }
+
+    // ------------------------------------------------------------------
+    // Task 10.2 (BR-58): hợp đồng Nháp chưa có mã (contract_code NULL)
+    // ------------------------------------------------------------------
+
+    /** Phiếu gắn hợp đồng chưa có mã vẫn giữ hợp đồng liên quan, hiện "Chưa có số". */
+    @Test
+    public void findById_contractWithoutCode_keepsContractAndShowsChuaCoSo() throws Exception {
+        PreparedStatement ps = statementReturning(singleRow(row(
+                "ticket_id", 9,
+                "ticket_code", "TK-0009",
+                "contract_id", 7,
+                "contract_code", null,
+                "status", TechnicalSupportTicketDAO.STATUS_NEW)));
+        Connection conn = connectionReturning(ps);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            TechnicalRequest t = dao.findById(9);
+
+            assertNotNull(t.getContract());
+            assertEquals(7, t.getContract().getContractId());
+            assertNull(t.getContract().getContractCode());
+            assertEquals("Chưa có số", t.getContract().getDisplayCode());
+        }
+    }
+
+    /** Phiếu không gắn hợp đồng (contract_id NULL) vẫn không có hợp đồng như trước. */
+    @Test
+    public void findById_noContract_leavesContractNull() throws Exception {
+        PreparedStatement ps = statementReturning(singleRow(row(
+                "ticket_id", 9,
+                "ticket_code", "TK-0009",
+                "contract_id", null,
+                "status", TechnicalSupportTicketDAO.STATUS_NEW)));
+        Connection conn = connectionReturning(ps);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            TechnicalRequest t = dao.findById(9);
+
+            assertNull(t.getContractId());
+            assertNull(t.getContract());
+        }
+    }
 }

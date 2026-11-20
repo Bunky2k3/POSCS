@@ -308,7 +308,7 @@
                                         <span class="cust-name"><c:choose><c:when test="${ticket.enterprise != null}">${fn:escapeXml(ticket.enterprise.enterpriseName)}</c:when><c:otherwise>&mdash;</c:otherwise></c:choose></span>
                                         <span class="cell-sub">
                                             <c:choose>
-                                                <c:when test="${ticket.contract != null}"><a href="${pageContext.request.contextPath}/contract?action=view&id=${ticket.contractId}" class="contract-link">${fn:escapeXml(ticket.contract.contractCode)}</a></c:when>
+                                                <c:when test="${ticket.contract != null}"><a href="${pageContext.request.contextPath}/contract?action=view&id=${ticket.contractId}" class="contract-link">${fn:escapeXml(ticket.contract.displayCode)}</a></c:when>
                                                 <c:otherwise>Không gắn hợp đồng</c:otherwise>
                                             </c:choose>
                                         </span>

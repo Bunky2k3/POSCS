@@ -530,7 +530,7 @@
                                         <tr>
                                             <td>
                                                 <div class="cell-2line">
-                                                    <a href="${pageContext.request.contextPath}/contract?action=view&id=${ct.contractId}" class="link">${fn:escapeXml(ct.contractCode)}</a>
+                                                    <a href="${pageContext.request.contextPath}/contract?action=view&id=${ct.contractId}" class="link">${fn:escapeXml(ct.displayCode)}</a>
                                                     <span class="cell-sub">
                                                         <c:choose>
                                                             <c:when test="${ct.enterprise != null}">${fn:escapeXml(ct.enterprise.enterpriseName)}</c:when>

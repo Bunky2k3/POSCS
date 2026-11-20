@@ -202,7 +202,7 @@
                                         <td>
                                             <a href="${pageContext.request.contextPath}/contract?action=view&id=${hv.contractId}"
                                                style="color:var(--primary); font-weight:600; text-decoration:none;">
-                                                ${fn:escapeXml(hv.contractCode)}
+                                                ${fn:escapeXml(hv.displayCode)}
                                             </a>
                                             <div style="font-size:0.8rem; color:#6b7280;">${fn:escapeXml(hv.contractTitle)}</div>
                                             <%-- Người phụ trách đứng ngay đây: câu hỏi của giám đốc là

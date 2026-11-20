@@ -930,11 +930,13 @@ public class TechnicalSupportTicketDAO {
             t.setEnterprise(e);
         }
 
-        String contractCode = rs.getString("contract_code");
-        if (contractCode != null && t.getContractId() != null) {
+        // BR-58: hợp đồng Nháp có thể chưa có mã (contract_code NULL). Dựng theo
+        // contract_id -- khoá ngoại bảo đảm có id là có dòng hợp đồng -- để phiếu
+        // vẫn hiện hợp đồng liên quan ("Chưa có số") thay vì mất hẳn.
+        if (t.getContractId() != null) {
             Contract c = new Contract();
             c.setContractId(t.getContractId());
-            c.setContractCode(contractCode);
+            c.setContractCode(rs.getString("contract_code"));
             t.setContract(c);
         }
 

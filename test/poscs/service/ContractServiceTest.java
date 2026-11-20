@@ -206,19 +206,19 @@ public class ContractServiceTest {
         assertEquals(ContractValidator.MSG_CONTRACT_INVALID,
                 nullRes.getFieldErrors().get(ContractValidator.FIELD_CONTRACT_CODE));
 
-        // Mã hợp đồng chỉ chứa khoảng trắng
+        // Mã hợp đồng chỉ chứa khoảng trắng. Task 10.2 (BR-58) đổi luật: bản Nháp
+        // để trống mã được tới lúc Ký -- tạo thành công, mã ghi NULL.
         Contract blankCode = validDraftSellContract("    ");
         ServiceResult<Integer> blankRes = service.createContract(blankCode, adminUser);
-        assertFalse(blankRes.isSuccess());
-        assertEquals(ContractService.ERR_INVALID, blankRes.getMessage());
-        assertEquals(ContractValidator.MSG_CODE_REQUIRED,
-                blankRes.getFieldErrors().get(ContractValidator.FIELD_CONTRACT_CODE));
+        assertTrue(blankRes.isSuccess());
+        assertNull(blankCode.getContractCode());
 
         Contract empty = new Contract();
         ServiceResult<Integer> res = service.createContract(empty, adminUser);
         assertFalse(res.isSuccess());
         assertEquals(ContractService.ERR_INVALID, res.getMessage());
-        assertTrue(res.getFieldErrors().containsKey(ContractValidator.FIELD_CONTRACT_CODE));
+        // Task 10.2 (BR-58): thiếu mã không còn là lỗi khi tạo; các ô bắt buộc khác vẫn báo.
+        assertFalse(res.getFieldErrors().containsKey(ContractValidator.FIELD_CONTRACT_CODE));
         assertTrue(res.getFieldErrors().containsKey(ContractValidator.FIELD_TITLE));
         assertTrue(res.getFieldErrors().containsKey(ContractValidator.FIELD_CONTRACT_TYPE));
         assertTrue(res.getFieldErrors().containsKey(ContractValidator.FIELD_ENTERPRISE_ID));
@@ -1703,6 +1703,8 @@ public class ContractServiceTest {
     @Test
     public void signContract_whenDatabaseFailsMidTransaction_rollsBackAndReturnsFailure() throws SQLException {
         ResultSet lockedRow = JdbcStub.singleRow(JdbcStub.row(
+                // Task 10.2 (BR-58): bản Nháp đem đi ký phải có mã, kể cả dòng đã khoá trong giao dịch.
+                "contract_code", "HD-TX-80",
                 "progress_status", ContractService.PROGRESS_DRAFT,
                 "parent_contract_id", null,
                 "contract_value", new BigDecimal("100000000"),
@@ -1721,6 +1723,14 @@ public class ContractServiceTest {
             @Override
             public Contract findById(int contractId) {
                 return validDraftForSign(contractId);
+            }
+
+            // Task 10.2 (BR-58): signContract giờ hỏi mã có trùng không trước khi ký.
+            // Kết nối giả trả cùng một dòng cho mọi câu SELECT, nên phải trả lời ở đây
+            // "không trùng" để test vẫn đi tới đúng chỗ nó muốn khoá: lỗi giữa giao dịch.
+            @Override
+            public boolean contractCodeExists(String code, int exceptId) {
+                return false;
             }
         };
 
@@ -2088,6 +2098,189 @@ public class ContractServiceTest {
         assertEquals(position, c.getSignerPosition());
         assertEquals(phone, c.getSignerPhone());
         assertEquals(fax, c.getSignerFax());
+    }
+
+    // ==================================================================
+    // Task 10.2 -- BR-58: mã hợp đồng để trống khi còn Nháp, bắt buộc khi Ký (MSG-061)
+    // ==================================================================
+
+    @Test
+    public void br58_createContract_withoutCode_succeedsAndStoresNull() {
+        Contract nullCode = validDraftSellContract(null);
+        ServiceResult<Integer> r1 = service.createContract(nullCode, salesManager);
+        assertTrue(r1.isSuccess());
+        assertNull(contractDAO.findById(r1.getData()).getContractCode());
+
+        // Toàn khoảng trắng = chưa có mã: ghi NULL, không ghi chuỗi rỗng.
+        Contract blankCode = validDraftSellContract("    ");
+        ServiceResult<Integer> r2 = service.createContract(blankCode, salesManager);
+        assertTrue(r2.isSuccess());
+        assertNull(contractDAO.findById(r2.getData()).getContractCode());
+        assertEquals(ContractService.PROGRESS_DRAFT, contractDAO.findById(r2.getData()).getProgressStatus());
+    }
+
+    @Test
+    public void br58_twoContractsWithoutCode_areNotDuplicates() {
+        assertTrue(service.createContract(validDraftSellContract(null), salesManager).isSuccess());
+        ServiceResult<Integer> second = service.createContract(validDraftSellContract(""), salesManager);
+        assertTrue("Hai bản Nháp cùng chưa có mã không bị coi là trùng", second.isSuccess());
+    }
+
+    @Test
+    public void br58_createContract_codeTypedStillCheckedForDuplicate() {
+        assertTrue(service.createContract(validDraftSellContract("HD-BR58-01"), salesManager).isSuccess());
+        ServiceResult<Integer> dup = service.createContract(validDraftSellContract(" HD-BR58-01 "), salesManager);
+        assertFalse(dup.isSuccess());
+        assertEquals(ContractService.ERR_DUPLICATE_CODE, dup.getMessage());
+    }
+
+    @Test
+    public void br58_createAmendment_withoutCode_succeeds() {
+        contractDAO.putContract(signedParentContract(10, "HD-PARENT-58", new BigDecimal("100000000")));
+        Contract amendment = validDraftSellContract(null);
+        ServiceResult<Integer> res = service.createAmendment(10, amendment, salesManager);
+        assertTrue(res.isSuccess());
+        assertNull(contractDAO.findById(res.getData()).getContractCode());
+    }
+
+    @Test
+    public void br58_updateDraft_clearingCode_succeedsAndStoresNull() {
+        Contract draft = validDraftSellContract("HD-BR58-UPD");
+        draft.setContractId(70);
+        draft.setProgressStatus(ContractService.PROGRESS_DRAFT);
+        contractDAO.putContract(draft);
+        Contract other = validDraftSellContract(null);
+        other.setContractId(71);
+        other.setProgressStatus(ContractService.PROGRESS_DRAFT);
+        contractDAO.putContract(other);
+
+        Contract edited = validDraftSellContract("   ");
+        edited.setContractId(70);
+        ServiceResult<Void> res = service.updateContract(edited, salesManager);
+        assertTrue(res.isSuccess());
+        assertNull(contractDAO.findById(70).getContractCode());
+    }
+
+    @Test
+    public void br58_signContract_withoutCode_blockedWithMsg061AndNotSigned() {
+        for (String code : new String[]{null, "   "}) {
+            Contract draft = validDraftSellContract(code);
+            draft.setContractId(72);
+            draft.setProgressStatus(ContractService.PROGRESS_DRAFT);
+            contractDAO.putContract(draft);
+
+            ServiceResult<Void> res = service.signContract(72, salesManager, null);
+            assertFalse(res.isSuccess());
+            assertEquals(ContractService.ERR_MISSING_CODE, res.getMessage());
+            assertEquals(ContractValidator.MSG_061, res.getFieldErrors().get(ContractValidator.FIELD_CONTRACT_CODE));
+            assertEquals(ContractService.PROGRESS_DRAFT, contractDAO.findById(72).getProgressStatus());
+            assertNull(contractDAO.findById(72).getSigningDate());
+        }
+        // Lối chung changeProgressStatus("Đã ký") đi qua đúng luật đó.
+        assertEquals(ContractService.ERR_MISSING_CODE,
+                service.changeProgressStatus(72, ContractService.PROGRESS_SIGNED, salesManager, null).getMessage());
+    }
+
+    @Test
+    public void br58_signContract_codeCheckedBeforeTerm() {
+        Contract draft = validDraftSellContract(null);
+        draft.setContractId(73);
+        draft.setProgressStatus(ContractService.PROGRESS_DRAFT);
+        draft.setEffectiveDate(null);
+        draft.setEndDate(null);
+        contractDAO.putContract(draft);
+        assertEquals("Thiếu cả mã lẫn thời hạn thì báo mã trước (SPEC §5.4)",
+                ContractService.ERR_MISSING_CODE, service.signContract(73, salesManager, null).getMessage());
+    }
+
+    @Test
+    public void br58_signContract_duplicateCode_blocked() {
+        Contract draft = validDraftSellContract("HD-BR58-DUP");
+        draft.setContractId(74);
+        draft.setProgressStatus(ContractService.PROGRESS_DRAFT);
+        contractDAO.putContract(draft);
+        // Dữ liệu lệch (trước V43 hoặc nhập tay vào CSDL): hợp đồng khác cùng mã.
+        Contract clash = validDraftSellContract("hd-br58-dup");
+        clash.setContractId(75);
+        clash.setProgressStatus(ContractService.PROGRESS_DRAFT);
+        contractDAO.putContract(clash);
+
+        ServiceResult<Void> res = service.signContract(74, salesManager, null);
+        assertFalse(res.isSuccess());
+        assertEquals(ContractService.ERR_DUPLICATE_CODE, res.getMessage());
+        assertEquals(ContractService.PROGRESS_DRAFT, contractDAO.findById(74).getProgressStatus());
+    }
+
+    @Test
+    public void br58_signContract_withCode_succeeds() {
+        Contract draft = validDraftSellContract("HD-BR58-OK");
+        draft.setContractId(76);
+        draft.setProgressStatus(ContractService.PROGRESS_DRAFT);
+        contractDAO.putContract(draft);
+        assertTrue(service.signContract(76, salesManager, null).isSuccess());
+        assertEquals(ContractService.PROGRESS_SIGNED, contractDAO.findById(76).getProgressStatus());
+    }
+
+    @Test
+    public void br58_correctSignedContract_blankCode_rejected() {
+        contractDAO.putContract(signedParentContract(77, "HD-BR58-SIGNED", new BigDecimal("100000000")));
+        Contract edited = signedParentContract(77, "   ", new BigDecimal("100000000"));
+        ServiceResult<Void> res = service.correctSignedContract(edited, adminUser, "Sửa lỗi gõ");
+        assertFalse(res.isSuccess());
+        assertEquals(ContractService.ERR_INVALID, res.getMessage());
+        assertEquals(ContractValidator.MSG_CODE_REQUIRED,
+                res.getFieldErrors().get(ContractValidator.FIELD_CONTRACT_CODE));
+        assertEquals("HD-BR58-SIGNED", contractDAO.findById(77).getContractCode());
+    }
+
+    /** QA 10.2 #2: service dựng trên ContractDAO mock để đếm lời gọi kiểm trùng mã. */
+    private ContractService serviceOn(ContractDAO dao) {
+        return new ContractService(dao, customerDAO, productDAO, permissionService, contractValidator,
+                branchInfoService);
+    }
+
+    @Test
+    public void br58_createContract_withoutCode_neverChecksDuplicate() {
+        ContractDAO dao = mock(ContractDAO.class);
+        when(dao.insert(any(Contract.class), anyInt())).thenReturn(90);
+
+        assertTrue(serviceOn(dao).createContract(validDraftSellContract(null), salesManager).isSuccess());
+        verify(dao, never()).contractCodeExists(any(), anyInt());
+    }
+
+    @Test
+    public void br58_createAmendment_withoutCode_neverChecksDuplicate() {
+        ContractDAO dao = mock(ContractDAO.class);
+        when(dao.findById(10)).thenReturn(signedParentContract(10, "HD-PARENT-58M", new BigDecimal("100000000")));
+        when(dao.insert(any(Contract.class), anyInt())).thenReturn(91);
+
+        assertTrue(serviceOn(dao).createAmendment(10, validDraftSellContract("   "), salesManager).isSuccess());
+        verify(dao, never()).contractCodeExists(any(), anyInt());
+    }
+
+    @Test
+    public void br58_updateDraft_withoutCode_neverChecksDuplicate() {
+        ContractDAO dao = mock(ContractDAO.class);
+        Contract stored = validDraftSellContract("HD-BR58-OLD");
+        stored.setContractId(92);
+        stored.setProgressStatus(ContractService.PROGRESS_DRAFT);
+        when(dao.findById(92)).thenReturn(stored);
+        when(dao.update(any(Contract.class), anyInt())).thenReturn(true);
+        Contract edited = validDraftSellContract(null);
+        edited.setContractId(92);
+
+        assertTrue(serviceOn(dao).updateContract(edited, salesManager).isSuccess());
+        verify(dao, never()).contractCodeExists(any(), anyInt());
+    }
+
+    @Test
+    public void br58_createContract_withCode_stillChecksDuplicate() {
+        ContractDAO dao = mock(ContractDAO.class);
+        when(dao.contractCodeExists("HD-BR58-TAKEN", 0)).thenReturn(true);
+
+        ServiceResult<Integer> res = serviceOn(dao).createContract(validDraftSellContract("HD-BR58-TAKEN"), salesManager);
+        assertEquals(ContractService.ERR_DUPLICATE_CODE, res.getMessage());
+        verify(dao, never()).insert(any(Contract.class), anyInt());
     }
 
     // ==================================================================

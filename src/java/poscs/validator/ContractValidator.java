@@ -12,7 +12,8 @@ import poscs.model.Contract;
 /**
  * Validator cho module Hợp đồng (UC-33, UC-35, UC-44).
  * Quy tắc: BR-17 (trạng thái tự tính), BR-35 (trường bắt buộc, đối tác đúng vai, ngày ký do hệ thống đóng dấu),
- * BR-36 & MSG-045 (thời hạn), UC-35 (giảm trừ phụ lục, khóa HĐ thanh lý/chấm dứt, HĐ đã ký chỉ đổi owner).
+ * BR-36 & MSG-045 (thời hạn), UC-35 (giảm trừ phụ lục, khóa HĐ thanh lý/chấm dứt, HĐ đã ký chỉ đổi owner),
+ * BR-58 & MSG-061 (mã hợp đồng để trống được khi còn Nháp, bắt buộc khi Ký).
  */
 public class ContractValidator extends BaseValidator {
 
@@ -84,6 +85,8 @@ public class ContractValidator extends BaseValidator {
     public static final String MSG_SIGNING_AFTER_EFFECTIVE = "Ngày ký phải trước hoặc bằng ngày hiệu lực.";
     public static final String MSG_SIGNING_AFTER_END = "Ngày ký phải trước hoặc bằng ngày kết thúc.";
     public static final String MSG_ONLY_DRAFT_CAN_SIGN = "Chỉ hợp đồng ở tiến độ Nháp mới có thể ký.";
+    /** MSG-061 (BR-58): bấm Ký khi hợp đồng chưa có mã. */
+    public static final String MSG_061 = "Hợp đồng chưa có mã. Vui lòng nhập mã hợp đồng trước khi ký.";
 
     // BR-35: Vai trò đối tác theo chiều hợp đồng (cặp đôi chéo)
     public static String counterpartyRoleFor(String direction) {
@@ -221,15 +224,27 @@ public class ContractValidator extends BaseValidator {
         return true;
     }
 
-    // BR-35: Kiểm tra trường bắt buộc và giới hạn độ dài
+    /**
+     * BR-35: trường bắt buộc và giới hạn độ dài, với mã hợp đồng BẮT BUỘC --
+     * dùng cho hợp đồng đã ký (UC-54 chữa sai sót): hợp đồng đã ký luôn có mã
+     * (BR-58). Bản Nháp đi qua {@link #validateRequiredFields(Contract, boolean)}.
+     */
     public ValidationResult validateRequiredFields(Contract c) {
+        return validateRequiredFields(c, true);
+    }
+
+    /**
+     * BR-35, BR-58: trường bắt buộc và giới hạn độ dài. {@code codeRequired} =
+     * false với bản Nháp: mã để trống được tới lúc Ký, có nhập thì vẫn kiểm độ dài.
+     */
+    public ValidationResult validateRequiredFields(Contract c, boolean codeRequired) {
         ValidationResult result = new ValidationResult();
         if (c == null) {
             result.addGlobalError(MSG_CONTRACT_INVALID);
             return result;
         }
 
-        if (required(result, FIELD_CONTRACT_CODE, c.getContractCode(), MSG_CODE_REQUIRED)) {
+        if (!codeRequired || required(result, FIELD_CONTRACT_CODE, c.getContractCode(), MSG_CODE_REQUIRED)) {
             maxLength(result, FIELD_CONTRACT_CODE, c.getContractCode(), MAX_CONTRACT_CODE_LENGTH,
                     "Mã hợp đồng không được vượt quá " + MAX_CONTRACT_CODE_LENGTH + " ký tự.");
         }
@@ -287,9 +302,9 @@ public class ContractValidator extends BaseValidator {
                 "Nơi ký không được vượt quá " + MAX_SIGNING_PLACE_LENGTH + " ký tự.");
     }
 
-    // UC-33: Kiểm tra khi tạo hợp đồng
+    // UC-33: Kiểm tra khi tạo hợp đồng (luôn ra bản Nháp, mã để trống được -- BR-58)
     public ValidationResult validateCreate(Contract c, Collection<String> enterpriseRoles) {
-        ValidationResult result = validateRequiredFields(c);
+        ValidationResult result = validateRequiredFields(c, false);
         if (c == null) return result;
 
         // BR-35: Kiểm tra đối tác đúng vai (fail-closed)
@@ -348,8 +363,8 @@ public class ContractValidator extends BaseValidator {
             return result;
         }
 
-        // Nháp: sửa mọi ô kể cả thời hạn
-        result.merge(validateRequiredFields(c));
+        // Nháp: sửa mọi ô kể cả thời hạn; mã để trống được tới lúc Ký (BR-58)
+        result.merge(validateRequiredFields(c, false));
         if (c.getEnterpriseId() > 0 && !result.getErrors().containsKey(FIELD_DIRECTION)) {
             validateCounterpartyRole(result, c.getDirection(), enterpriseRoles);
         }
@@ -392,6 +407,10 @@ public class ContractValidator extends BaseValidator {
         }
         if (!PROGRESS_DRAFT.equals(c.getProgressStatus())) {
             result.addError(FIELD_PROGRESS_STATUS, MSG_ONLY_DRAFT_CAN_SIGN);
+        }
+        // BR-58 & MSG-061: chưa có mã thì không ký được.
+        if (!c.hasContractCode()) {
+            result.addError(FIELD_CONTRACT_CODE, MSG_061);
         }
         if (c.getEffectiveDate() == null || c.getEndDate() == null) {
             result.addError(FIELD_EFFECTIVE_DATE, MSG_045);

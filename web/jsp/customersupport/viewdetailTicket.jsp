@@ -225,7 +225,7 @@
                     <div class="view-value">
                         <c:choose>
                             <c:when test="${ticket.contract != null}">
-                                <a href="${pageContext.request.contextPath}/contract?action=view&id=${ticket.contractId}">${fn:escapeXml(ticket.contract.contractCode)}</a>
+                                <a href="${pageContext.request.contextPath}/contract?action=view&id=${ticket.contractId}">${fn:escapeXml(ticket.contract.displayCode)}</a>
                             </c:when>
                             <c:otherwise>&mdash;</c:otherwise>
                         </c:choose>

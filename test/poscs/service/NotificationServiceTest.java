@@ -431,4 +431,25 @@ public class NotificationServiceTest {
         verify(notificationDAO, never()).markAsRead(42, 8);
         assertNull(service.openNotification(0, 7));
     }
+
+    /**
+     * Task 10.2 (BR-58): contract_code giờ để NULL được. Lịch nhắc chỉ lấy hợp
+     * đồng đã ký (luôn có mã), nhưng dòng dữ liệu NULL lọt vào cũng không được
+     * in chữ "null" vào tiêu đề thông báo.
+     */
+    @Test
+    public void br58_generateContractExpiring_nullCode_neverPrintsNull() {
+        Contract nullCode = contract(13, null, 7, TODAY.plusDays(3));
+        when(contractDAO.findExpiringSoon(Integer.MAX_VALUE)).thenReturn(Arrays.asList(nullCode));
+        when(notificationDAO.existsForUserAndRef(anyInt(), anyString(), anyInt())).thenReturn(false);
+        when(notificationDAO.insert(anyInt(), anyString(), anyString(), anyInt())).thenReturn(true);
+
+        assertEquals(1, service.generateContractExpiringNotifications());
+
+        ArgumentCaptor<String> titleCaptor = ArgumentCaptor.forClass(String.class);
+        verify(notificationDAO).insert(eq(7), titleCaptor.capture(),
+                eq(NotificationService.REF_CONTRACT_EXPIRING), eq(13));
+        assertFalse(titleCaptor.getValue(), titleCaptor.getValue().contains("null"));
+        assertTrue(titleCaptor.getValue(), titleCaptor.getValue().contains("#13"));
+    }
 }

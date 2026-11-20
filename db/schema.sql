@@ -4413,7 +4413,9 @@ CREATE TABLE `contracts` (
   -- Mã hợp đồng, chính là số ghi trên bản giấy ("01/2026/HĐKT-POSTEF").
   -- NGƯỜI DÙNG NHẬP, hệ thống không sinh (V28). UNIQUE là chốt chặn thật cho
   -- việc trùng mã; controller kiểm trước chỉ để báo lỗi tử tế.
-  `contract_code` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  -- NULL khi bản Nháp chưa có số (V43, BR-58): bắt buộc trước khi Ký; nhiều
+  -- dòng NULL không bị UNIQUE coi là trùng. Màn hình hiện "Chưa có số".
+  `contract_code` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `title` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
   `contract_type` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
   -- 'Bán' = mình bán ra (đối tác giữ vai 'Khách mua')
