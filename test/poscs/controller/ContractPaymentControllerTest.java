@@ -884,7 +884,7 @@ public class ContractPaymentControllerTest {
     public void markPaid_permissionThat_kyThuatNgaySai_bi403() throws Exception {
         // PermissionService thật: vai ngoài danh sách (Kỹ thuật) bị chặn bởi
         // canMarkPaymentPaid thật, không nhờ mock trả false.
-        User tech = buildUser(8, PermissionService.ROLE_TECHNICAL, null);
+        User tech = buildUser(8, "Kỹ thuật", null);
         when(employeeDAO.findById(8)).thenReturn(tech);
         PermissionService realPs = new PermissionService(employeeDAO);
         ContractPaymentController ctrl = new ContractPaymentController(contractDAO, employeeDAO, paymentService, realPs);

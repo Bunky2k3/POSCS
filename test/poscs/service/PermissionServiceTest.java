@@ -49,7 +49,7 @@ public class PermissionServiceTest {
         adminUser = createUser(1, "admin1", PermissionService.ROLE_ADMIN, 1, null);
         salesRegionalManager = createUser(2, "sales_lead", PermissionService.ROLE_SALES, 2, null);
         salesStaff = createUser(3, "sales_staff", PermissionService.ROLE_SALES, 2, 2);
-        technicalUser = createUser(4, "tech1", PermissionService.ROLE_TECHNICAL, 3, null);
+        technicalUser = createUser(4, "tech1", "Kỹ thuật", 3, null);
 
         // Mặc định mock DB trả về chính User đó
         when(employeeDAO.findById(adminUser.getUserId())).thenReturn(adminUser);
@@ -315,38 +315,72 @@ public class PermissionServiceTest {
     }
 
     // ==================================================================
-    // 3. Quản lý Sản phẩm (UC-18, 19, 20) - Admin và Kỹ thuật
+    // 3. Quản lý Sản phẩm (UC-18, 19, 20) - Admin và Sales (Task 9.3)
     // ==================================================================
 
+    /**
+     * Task 9.3: Sales nhận việc quản lý sản phẩm của vai Kỹ thuật cũ. MỌI Sales, kể cả
+     * Sales có cấp trên: SPEC 3.3 không đánh dấu (*) ở dòng Sản phẩm.
+     */
     @Test
-    public void manageProduct_adminAndTechnicalAllowed_salesDenied() {
-        assertTrue(permissionService.canCreateProduct(adminUser));
-        assertTrue(permissionService.checkCanCreateProduct(adminUser).isSuccess());
-        assertTrue(permissionService.canUpdateProduct(adminUser));
-        assertTrue(permissionService.checkCanUpdateProduct(adminUser).isSuccess());
-        assertTrue(permissionService.canDeleteProduct(adminUser));
-        assertTrue(permissionService.checkCanDeleteProduct(adminUser).isSuccess());
+    public void manageProduct_adminAndAllSalesAllowed_generalDenied() {
+        for (User u : List.of(adminUser, salesRegionalManager, salesStaff)) {
+            assertTrue(permissionService.canManageProducts(u));
+            assertTrue(permissionService.checkCanManageProducts(u).isSuccess());
+            assertTrue(permissionService.canCreateProduct(u));
+            assertTrue(permissionService.checkCanCreateProduct(u).isSuccess());
+            assertTrue(permissionService.canUpdateProduct(u));
+            assertTrue(permissionService.checkCanUpdateProduct(u).isSuccess());
+            assertTrue(permissionService.canDeleteProduct(u));
+            assertTrue(permissionService.checkCanDeleteProduct(u).isSuccess());
+        }
 
-        assertTrue(permissionService.canCreateProduct(technicalUser));
-        assertTrue(permissionService.checkCanCreateProduct(technicalUser).isSuccess());
-        assertTrue(permissionService.canUpdateProduct(technicalUser));
-        assertTrue(permissionService.checkCanUpdateProduct(technicalUser).isSuccess());
-        assertTrue(permissionService.canDeleteProduct(technicalUser));
-        assertTrue(permissionService.checkCanDeleteProduct(technicalUser).isSuccess());
+        // Tổng hợp chỉ xem sản phẩm: mọi thao tác ghi trả MSG-022
+        User general = generalUser();
+        assertTrue(permissionService.canViewProducts(general));
+        assertFalse(permissionService.canCreateProduct(general));
+        assertMsg022(permissionService.checkCanCreateProduct(general));
+        assertFalse(permissionService.canUpdateProduct(general));
+        assertMsg022(permissionService.checkCanUpdateProduct(general));
+        assertFalse(permissionService.canDeleteProduct(general));
+        assertMsg022(permissionService.checkCanDeleteProduct(general));
 
-        assertFalse(permissionService.canCreateProduct(salesRegionalManager));
-        assertMsg022(permissionService.checkCanCreateProduct(salesRegionalManager));
-        assertFalse(permissionService.canUpdateProduct(salesRegionalManager));
-        assertMsg022(permissionService.checkCanUpdateProduct(salesRegionalManager));
-        assertFalse(permissionService.canDeleteProduct(salesRegionalManager));
-        assertMsg022(permissionService.checkCanDeleteProduct(salesRegionalManager));
+        // Người dùng không hợp lệ
+        assertFalse(permissionService.canManageProducts(null));
+        assertMsg022(permissionService.checkCanManageProducts(null));
+    }
 
-        assertFalse(permissionService.canCreateProduct(salesStaff));
-        assertMsg022(permissionService.checkCanCreateProduct(salesStaff));
-        assertFalse(permissionService.canUpdateProduct(salesStaff));
-        assertMsg022(permissionService.checkCanUpdateProduct(salesStaff));
-        assertFalse(permissionService.canDeleteProduct(salesStaff));
-        assertMsg022(permissionService.checkCanDeleteProduct(salesStaff));
+    /**
+     * Task 9.3: vai Kỹ thuật đã gộp vào Sales (V42). Tài khoản còn sót tên vai cũ
+     * (CSDL chưa chạy V42) không còn quyền gì: không xem, không ghi sản phẩm, không
+     * vào phiếu hỗ trợ, kể cả phiếu đang giao cho chính họ; danh sách thu về rỗng.
+     */
+    @Test
+    public void vaiKyThuatCu_khongConQuyenNao() {
+        assertFalse(permissionService.canViewCustomers(technicalUser));
+        assertMsg022(permissionService.checkCanViewCustomers(technicalUser));
+        assertFalse(permissionService.canViewProducts(technicalUser));
+        assertMsg022(permissionService.checkCanViewProducts(technicalUser));
+        assertFalse(permissionService.canViewContracts(technicalUser));
+        assertMsg022(permissionService.checkCanViewContracts(technicalUser));
+        assertFalse(permissionService.canViewTickets(technicalUser));
+        assertMsg022(permissionService.checkCanViewTickets(technicalUser));
+
+        assertFalse(permissionService.canManageProducts(technicalUser));
+        assertMsg022(permissionService.checkCanCreateProduct(technicalUser));
+        assertMsg022(permissionService.checkCanUpdateProduct(technicalUser));
+        assertMsg022(permissionService.checkCanDeleteProduct(technicalUser));
+
+        assertFalse(permissionService.canUpdateTicket(technicalUser, technicalUser.getUserId()));
+        assertMsg022(permissionService.checkCanUpdateTicket(technicalUser, technicalUser.getUserId()));
+
+        // Phạm vi rỗng (owner -1), không phải "toàn chi nhánh" như trước
+        ListScope customerScope = permissionService.getCustomerListScope(technicalUser, "mine");
+        ListScope contractScope = permissionService.getContractListScope(technicalUser, "mine");
+        assertTrue(customerScope.isNarrowed());
+        assertEquals(List.of(-1), customerScope.getOwnerIds());
+        assertTrue(contractScope.isNarrowed());
+        assertEquals(List.of(-1), contractScope.getOwnerIds());
     }
 
     // ==================================================================
@@ -378,27 +412,28 @@ public class PermissionServiceTest {
         assertMsg022(permissionService.checkCanDeleteTicket(technicalUser));
     }
 
+    /**
+     * Task 9.3: Admin và Sales cập nhật được mọi phiếu, người xử lý là ai cũng vậy
+     * (Sales là người xử lý phiếu). Hết ngoại lệ "chỉ sửa phiếu giao cho mình".
+     */
     @Test
-    public void ticketUpdate_technicalOnlyAllowedForAssignedTicket() {
-        // Admin và Sales cập nhật được mọi phiếu
-        assertTrue(permissionService.canUpdateTicket(adminUser, 999));
-        assertTrue(permissionService.checkCanUpdateTicket(adminUser, 999).isSuccess());
-        assertTrue(permissionService.canUpdateTicket(salesRegionalManager, 999));
-        assertTrue(permissionService.checkCanUpdateTicket(salesRegionalManager, 999).isSuccess());
-        assertTrue(permissionService.canUpdateTicket(salesStaff, 999));
-        assertTrue(permissionService.checkCanUpdateTicket(salesStaff, 999).isSuccess());
+    public void ticketUpdate_adminAndSalesAllowedOnAnyTicket_othersDenied() {
+        Integer salesStaffId = salesStaff.getUserId();
+        for (Integer assignee : java.util.Arrays.asList(999, salesStaffId, null)) {
+            assertTrue(permissionService.canUpdateTicket(adminUser, assignee));
+            assertTrue(permissionService.checkCanUpdateTicket(adminUser, assignee).isSuccess());
+            assertTrue(permissionService.canUpdateTicket(salesRegionalManager, assignee));
+            assertTrue(permissionService.checkCanUpdateTicket(salesRegionalManager, assignee).isSuccess());
+            assertTrue(permissionService.canUpdateTicket(salesStaff, assignee));
+            assertTrue(permissionService.checkCanUpdateTicket(salesStaff, assignee).isSuccess());
+        }
 
-        // Kỹ thuật: chỉ cập nhật phiếu được giao cho mình
-        assertTrue(permissionService.canUpdateTicket(technicalUser, technicalUser.getUserId()));
-        assertTrue(permissionService.checkCanUpdateTicket(technicalUser, technicalUser.getUserId()).isSuccess());
-
-        // Kỹ thuật khác được giao: từ chối với MSG-022
-        assertFalse(permissionService.canUpdateTicket(technicalUser, 999));
-        assertMsg022(permissionService.checkCanUpdateTicket(technicalUser, 999));
-
-        // Chưa giao ai (null): từ chối với MSG-022
-        assertFalse(permissionService.canUpdateTicket(technicalUser, null));
-        assertMsg022(permissionService.checkCanUpdateTicket(technicalUser, null));
+        // Tổng hợp không vào phiếu hỗ trợ; người dùng null bị từ chối
+        User general = generalUser();
+        assertFalse(permissionService.canUpdateTicket(general, general.getUserId()));
+        assertMsg022(permissionService.checkCanUpdateTicket(general, general.getUserId()));
+        assertFalse(permissionService.canUpdateTicket(null, 999));
+        assertMsg022(permissionService.checkCanUpdateTicket(null, 999));
     }
 
     // ==================================================================
@@ -412,7 +447,7 @@ public class PermissionServiceTest {
         assertTrue(permissionService.checkCanSubmitChangeRequest(salesStaff).isSuccess());
 
         // Kỹ thuật có cấp trên: ĐƯỢC phép gửi yêu cầu thay đổi
-        User techSubordinate = createUser(15, "tech_sub", PermissionService.ROLE_TECHNICAL, 3, 4);
+        User techSubordinate = createUser(15, "tech_sub", "Kỹ thuật", 3, 4);
         when(employeeDAO.findById(15)).thenReturn(techSubordinate);
         assertTrue(permissionService.canSubmitChangeRequest(techSubordinate));
         assertTrue(permissionService.checkCanSubmitChangeRequest(techSubordinate).isSuccess());
@@ -593,12 +628,11 @@ public class PermissionServiceTest {
     // 9. Phạm vi dữ liệu "Của tôi" (ListScope & Row-level Scope)
     // ==================================================================
 
+    /** Task 9.3: vai Kỹ thuật đã bỏ; vai cũ còn sót xem {@link #vaiKyThuatCu_khongConQuyenNao}. */
     @Test
-    public void listScope_adminAndTechnicalSeeAll() {
+    public void listScope_adminSeesAll() {
         assertEquals(ListScope.all(), permissionService.getCustomerListScope(adminUser, "mine"));
-        assertEquals(ListScope.all(), permissionService.getCustomerListScope(technicalUser, "mine"));
         assertEquals(ListScope.all(), permissionService.getContractListScope(adminUser, "mine"));
-        assertEquals(ListScope.all(), permissionService.getContractListScope(technicalUser, "mine"));
     }
 
     @Test
@@ -793,7 +827,8 @@ public class PermissionServiceTest {
 
     @Test
     public void viewAndExport_allowedForStandardRoles_deniedForInvalidUser() {
-        for (User u : List.of(adminUser, salesRegionalManager, salesStaff, technicalUser)) {
+        // Task 9.3: bỏ vai Kỹ thuật khỏi danh sách vai chuẩn (Admin, Sales hai tầng)
+        for (User u : List.of(adminUser, salesRegionalManager, salesStaff)) {
             assertTrue(permissionService.canViewCustomers(u));
             assertTrue(permissionService.checkCanViewCustomers(u).isSuccess());
             assertTrue(permissionService.canExportCustomers(u));

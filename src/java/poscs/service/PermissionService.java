@@ -17,8 +17,9 @@ import poscs.model.User;
  *
  * <p>Quy tắc nghiệp vụ:
  * <ul>
- *   <li>Ma trận vai trò: Admin, Sales, Kỹ thuật, Tổng hợp (không có vai trò CS - NFR-10).
- *       Vai Kỹ thuật bỏ ở Task 9.3; Tổng hợp chỉ xem, xác nhận bàn giao, ghi nhận đã thu.</li>
+ *   <li>Ma trận vai trò: Admin, Sales, Tổng hợp (không có vai trò CS - NFR-10). Vai Kỹ
+ *       thuật cũ đã gộp vào Sales (V42): Sales quản lý sản phẩm và xử lý phiếu hỗ trợ.
+ *       Tổng hợp chỉ xem, xác nhận bàn giao, ghi nhận đã thu.</li>
  *   <li>Sales quản lý vùng (không có cấp trên): được thực hiện các thao tác ghi (*).</li>
  *   <li>Sales có cấp trên: chỉ xem; muốn đổi thì gửi yêu cầu thay đổi (UC-50).</li>
  *   <li>Cấp trên, trạng thái và vai trò được đối chiếu trực tiếp từ CSDL qua {@link EmployeeDAO}.</li>
@@ -32,7 +33,6 @@ public class PermissionService extends BaseService {
 
     public static final String ROLE_ADMIN = "Admin";
     public static final String ROLE_SALES = "Sales";
-    public static final String ROLE_TECHNICAL = "Kỹ thuật";
     /** Vai của Phòng tổng hợp (V40, SPEC 3.1) -- khớp roles.role_name. */
     public static final String ROLE_GENERAL = "Tổng hợp";
 
@@ -91,12 +91,6 @@ public class PermissionService extends BaseService {
         User effective = getEffectiveUser(user);
         return effective != null && !effective.isDeleted() && effective.getRole() != null
                 && ROLE_SALES.equals(effective.getRole().getRoleName());
-    }
-
-    public boolean isTechnical(User user) {
-        User effective = getEffectiveUser(user);
-        return effective != null && !effective.isDeleted() && effective.getRole() != null
-                && ROLE_TECHNICAL.equals(effective.getRole().getRoleName());
     }
 
     /**
@@ -173,7 +167,7 @@ public class PermissionService extends BaseService {
     // ==================================================================
 
     public boolean canViewCustomers(User user) {
-        return isAdmin(user) || isSales(user) || isTechnical(user) || isGeneral(user);
+        return isAdmin(user) || isSales(user) || isGeneral(user);
     }
 
     public ServiceResult<Void> checkCanViewCustomers(User user) {
@@ -261,15 +255,19 @@ public class PermissionService extends BaseService {
     // ==================================================================
 
     public boolean canViewProducts(User user) {
-        return isAdmin(user) || isSales(user) || isTechnical(user) || isGeneral(user);
+        return isAdmin(user) || isSales(user) || isGeneral(user);
     }
 
     public ServiceResult<Void> checkCanViewProducts(User user) {
         return checkPermission(canViewProducts(user));
     }
 
+    /**
+     * Thêm, sửa, xoá sản phẩm (UC-18, UC-19, UC-20): Admin và MỌI Sales (SPEC 3.3). Không
+     * xét cấp trên như khách hàng, hợp đồng: sản phẩm không có dòng {@code (*)} trong ma trận.
+     */
     public boolean canManageProducts(User user) {
-        return isAdmin(user) || isTechnical(user);
+        return isAdmin(user) || isSales(user);
     }
 
     public ServiceResult<Void> checkCanManageProducts(User user) {
@@ -305,7 +303,7 @@ public class PermissionService extends BaseService {
     // ==================================================================
 
     public boolean canViewContracts(User user) {
-        return isAdmin(user) || isSales(user) || isTechnical(user) || isGeneral(user);
+        return isAdmin(user) || isSales(user) || isGeneral(user);
     }
 
     public ServiceResult<Void> checkCanViewContracts(User user) {
@@ -506,7 +504,7 @@ public class PermissionService extends BaseService {
 
     /** Tổng hợp KHÔNG vào phiếu hỗ trợ (SPEC 3.3): mọi màn hình phiếu trả MSG-022. */
     public boolean canViewTickets(User user) {
-        return isAdmin(user) || isSales(user) || isTechnical(user);
+        return isAdmin(user) || isSales(user);
     }
 
     public ServiceResult<Void> checkCanViewTickets(User user) {
@@ -525,21 +523,17 @@ public class PermissionService extends BaseService {
     }
 
     /**
-     * Cập nhật phiếu (UC-22):
-     * - Admin và Sales: toàn quyền.
-     * - Kỹ thuật: CHỈ được cập nhật phiếu được giao cho chính mình.
+     * Cập nhật phiếu (UC-22): Admin và Sales, toàn quyền trên mọi phiếu (SPEC 3.3).
+     *
+     * <p>{@code assignedTechnicianId} (người xử lý của phiếu) giữ trong chữ ký cho các nơi
+     * gọi sẵn có, nhưng không còn quyết định quyền: ngoại lệ "chỉ sửa phiếu giao cho mình"
+     * thuộc vai Kỹ thuật cũ, đã gộp vào Sales (V42).
      */
     public boolean canUpdateTicket(User user, Integer assignedTechnicianId) {
         if (!isActiveUser(user)) {
             return false;
         }
-        if (isAdmin(user) || isSales(user)) {
-            return true;
-        }
-        if (isTechnical(user)) {
-            return assignedTechnicianId != null && assignedTechnicianId.intValue() == user.getUserId();
-        }
-        return false;
+        return isAdmin(user) || isSales(user);
     }
 
     public ServiceResult<Void> checkCanUpdateTicket(User user, Integer assignedTechnicianId) {
@@ -627,7 +621,7 @@ public class PermissionService extends BaseService {
         }
         // Tổng hợp xem toàn chi nhánh như Admin: họ không đứng tên khách hàng hay
         // hợp đồng nào, thu hẹp theo "của tôi" là màn hình trống.
-        if (isAdmin(user) || isTechnical(user) || isGeneral(user)) {
+        if (isAdmin(user) || isGeneral(user)) {
             return ListScope.all();
         }
         if (AccessControl.VIEW_ALL.equals(viewMode)) {
@@ -646,7 +640,7 @@ public class PermissionService extends BaseService {
         }
         // Tổng hợp xem toàn chi nhánh như Admin: họ không đứng tên khách hàng hay
         // hợp đồng nào, thu hẹp theo "của tôi" là màn hình trống.
-        if (isAdmin(user) || isTechnical(user) || isGeneral(user)) {
+        if (isAdmin(user) || isGeneral(user)) {
             return ListScope.all();
         }
         if (AccessControl.VIEW_ALL.equals(viewMode)) {

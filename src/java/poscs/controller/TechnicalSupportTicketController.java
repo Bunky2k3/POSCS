@@ -32,12 +32,9 @@ import poscs.validator.TicketValidator;
  * Controller CRUD cho phiếu hỗ trợ kỹ thuật (bảng technicalrequests). Điều
  * hướng theo tham số "action", theo đúng khuôn mẫu của CustomerController/
  * ContractController -- quyền hạn theo PERMISSIONS.md (Sales và Admin có
- * toàn quyền -- Sales gộp thêm việc của CSKH cũ, xem PERMISSIONS.md -- Kỹ
- * thuật chỉ xem, trừ đúng phiếu được giao) enforce bằng
- * AccessControl.requireFullAccess ở đầu mỗi hàm handleCreate/handleDelete.
- * Riêng handleUpdate có thêm ngoại lệ: Kỹ thuật được tự đổi trạng thái/ghi
- * chú xử lý của đúng phiếu đang giao cho mình, xem
- * AccessControl.canUpdateAssignedTicket.
+ * toàn quyền -- Sales gộp thêm việc của CSKH cũ và Kỹ thuật cũ, xem
+ * PERMISSIONS.md) enforce bằng AccessControl.requireFullAccess /
+ * hasFullAccess ở đầu mỗi hàm handleCreate/handleUpdate/handleDelete.
  */
 @WebServlet(name = "TechnicalSupportTicketController", urlPatterns = {"/ticket"})
 public class TechnicalSupportTicketController extends HttpServlet {
@@ -46,11 +43,11 @@ public class TechnicalSupportTicketController extends HttpServlet {
 
     private static final int PAGE_SIZE = 10;
     /**
-     * Vai được giao XỬ LÝ phiếu -- khớp roles.role_name, xem AccessControl.
-     * Khác hẳn vai được quyền TẠO phiếu (Sales, gộp thêm việc của CSKH cũ):
-     * người tiếp nhận và người đi sửa là hai người khác nhau.
+     * Vai được giao XỬ LÝ phiếu (BR-39) -- khớp roles.role_name, xem
+     * AccessControl. Cùng vai được quyền TẠO phiếu: Kỹ thuật cũ đã gộp vào
+     * Sales (V42), người xử lý chọn trong các Sales đang hoạt động.
      */
-    private static final String TECHNICIAN_ROLE = "Kỹ thuật";
+    private static final String HANDLER_ROLE = "Sales";
     /**
      * Vai khách hàng được lập phiếu hỗ trợ -- khớp enterprise_roles.role (V20).
      * Phiếu là yêu cầu hỗ trợ của bên MUA hàng của mình; nhà cung cấp không
@@ -282,16 +279,16 @@ public class TechnicalSupportTicketController extends HttpServlet {
 
     private void showEditForm(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
+        // Kiểm quyền TRƯỚC khi tra phiếu: vai không có quyền nhận 403 MSG-022 dù id có
+        // tồn tại hay không, không đoán được id nào có thật qua chênh lệch phản hồi.
+        if (!AccessControl.requireFullAccess(request, response, AccessControl.Resource.TICKET)) {
+            return;
+        }
+
         Integer id = parseIntOrNull(request.getParameter("id"));
         TechnicalRequest ticket = id != null ? ticketDAO.findById(id) : null;
         if (ticket == null) {
             response.sendRedirect(request.getContextPath() + "/ticket?error=notfound");
-            return;
-        }
-
-        if (!AccessControl.hasFullAccess(request, AccessControl.Resource.TICKET)
-                && !AccessControl.canUpdateAssignedTicket(request, ticket)) {
-            response.sendError(HttpServletResponse.SC_FORBIDDEN, AccessControl.MSG_022);
             return;
         }
 
@@ -337,6 +334,11 @@ public class TechnicalSupportTicketController extends HttpServlet {
     }
 
     private void handleUpdate(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        // Như showEditForm: kiểm quyền trước khi đọc tham số hay tra CSDL.
+        if (!AccessControl.requireFullAccess(request, response, AccessControl.Resource.TICKET)) {
+            return;
+        }
+
         Integer id = parseIntOrNull(request.getParameter("ticketId"));
         if (id == null) {
             response.sendRedirect(request.getContextPath() + "/ticket?error=notfound");
@@ -349,14 +351,7 @@ public class TechnicalSupportTicketController extends HttpServlet {
             return;
         }
 
-        boolean fullAccess = AccessControl.hasFullAccess(request, AccessControl.Resource.TICKET);
-        boolean assignedTechnicianUpdate = !fullAccess && AccessControl.canUpdateAssignedTicket(request, existing);
-        if (!fullAccess && !assignedTechnicianUpdate) {
-            response.sendError(HttpServletResponse.SC_FORBIDDEN, AccessControl.MSG_022);
-            return;
-        }
-
-        TechnicalRequest t = fullAccess ? buildTicketFromRequest(request, new TechnicalRequest()) : existing;
+        TechnicalRequest t = buildTicketFromRequest(request, new TechnicalRequest());
         t.setTicketId(id);
 
         boolean contractPickerWasUsable = "1".equals(request.getParameter("contractLoaded"));
@@ -440,7 +435,7 @@ public class TechnicalSupportTicketController extends HttpServlet {
     // ------------------------------------------------------------------
 
     /**
-     * @param keepUserId kỹ thuật viên đang được giao phiếu đang sửa -- giữ
+     * @param keepUserId người xử lý đang được giao phiếu đang sửa -- giữ
      *        trong dropdown kể cả khi họ đã đổi vai, xem
      *        EmployeeDAO.findActiveByRole.
      * @param keepCustomerId khách hàng đang đứng trên phiếu đang sửa -- giữ
@@ -453,10 +448,10 @@ public class TechnicalSupportTicketController extends HttpServlet {
         // nhà cung cấp -- chọn nhầm một nhà cung cấp thì ô hợp đồng bên cạnh
         // liệt kê hợp đồng MUA của mình với họ.
         request.setAttribute("customerList", customerDAO.findAllByRole(ROLE_BUYER, keepCustomerId));
-        // Phiếu giao cho Kỹ thuật. Trước đây đổ cả 15 người vào đây trong khi
-        // ô này tên là "Kỹ thuật viên phụ trách" -- chọn nhầm một CSKH thì
-        // phiếu nằm im vì người đó không có quyền sửa phiếu được giao.
-        request.setAttribute("userList", employeeDAO.findActiveByRole(TECHNICIAN_ROLE, keepUserId));
+        // BR-39: người xử lý chọn trong các Sales đang hoạt động. Không đổ mọi
+        // nhân viên: Admin hay Tổng hợp được giao phiếu thì phiếu nằm im (Tổng
+        // hợp không vào được màn hình phiếu).
+        request.setAttribute("userList", employeeDAO.findActiveByRole(HANDLER_ROLE, keepUserId));
     }
 
     private TechnicalRequest buildTicketFromRequest(HttpServletRequest request, TechnicalRequest t) {
@@ -478,7 +473,7 @@ public class TechnicalSupportTicketController extends HttpServlet {
         return t;
     }
 
-    /** Người tạo phiếu là user đang đăng nhập; session chưa enforce nên tạm dùng kỹ thuật viên được chọn khi chưa có session. */
+    /** Người tạo phiếu là user đang đăng nhập; session chưa enforce nên tạm dùng người xử lý được chọn khi chưa có session. */
     private int resolveCurrentUserId(HttpServletRequest request, int fallbackUserId) {
         HttpSession session = request.getSession(false);
         if (session != null) {

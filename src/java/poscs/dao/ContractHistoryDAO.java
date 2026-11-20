@@ -167,7 +167,7 @@ public class ContractHistoryDAO {
 
     /**
      * Lấy toàn bộ nhật ký thay đổi của 1 hợp đồng (tự mở kết nối).
-     * [UC-45] Cho phép Admin, Sales, Kỹ thuật xem chi tiết lịch sử hợp đồng.
+     * [UC-45] Cho phép Admin, Sales, Tổng hợp xem chi tiết lịch sử hợp đồng.
      *
      * @param contractId ID hợp đồng
      * @return danh sách các dòng nhật ký (không bao giờ null)

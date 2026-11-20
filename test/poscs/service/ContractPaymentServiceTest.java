@@ -50,7 +50,7 @@ public class ContractPaymentServiceTest {
         adminUser = buildUser(1, PermissionService.ROLE_ADMIN, null, false);
         salesManager = buildUser(2, PermissionService.ROLE_SALES, null, false);
         salesSubordinate = buildUser(3, PermissionService.ROLE_SALES, 2, false);
-        techUser = buildUser(4, PermissionService.ROLE_TECHNICAL, null, false);
+        techUser = buildUser(4, "Kỹ thuật", null, false);
         deletedUser = buildUser(5, PermissionService.ROLE_SALES, null, true);
 
         when(employeeDAO.findById(1)).thenReturn(adminUser);

@@ -52,7 +52,7 @@ public class ContractHandoverServiceTest {
         adminUser = buildUser(1, PermissionService.ROLE_ADMIN, 1, null, false);
         salesManager = buildUser(2, PermissionService.ROLE_SALES, 2, null, false);
         salesSubordinate = buildUser(3, PermissionService.ROLE_SALES, 2, 2, false);
-        techUserDept1 = buildUser(4, PermissionService.ROLE_TECHNICAL, 1, null, false);
+        techUserDept1 = buildUser(4, "Kỹ thuật", 1, null, false);
         employeeDept2 = buildUser(5, PermissionService.ROLE_SALES, 2, 2, false);
         deletedUser = buildUser(6, PermissionService.ROLE_SALES, 2, null, true);
 

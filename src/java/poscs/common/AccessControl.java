@@ -6,7 +6,6 @@ import java.util.Set;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
-import poscs.model.TechnicalRequest;
 import poscs.model.User;
 
 /**
@@ -35,6 +34,8 @@ public final class AccessControl {
     // Từ ngày gộp vai (xem PERMISSIONS.md): CSKH đã xoá, nhập chung vào Sales
     // -- Resource.TICKET (trước đây "Admin", "CSKH") giờ Sales cầm thay,
     // CỘNG THÊM vào quyền Customer/Contract đã có sẵn, không phải đổi chỗ.
+    // Vai Kỹ thuật cũng đã gộp vào Sales (V42): Resource.PRODUCT (trước đây
+    // "Admin", "Kỹ thuật") giờ Sales cầm thay.
     //
     // Vai "Tổng hợp" (V40) CỐ Ý không có mặt ở dòng nào: View only trên
     // CUSTOMER, CONTRACT, PRODUCT; KHÔNG vào TICKET (PermissionService.
@@ -45,7 +46,7 @@ public final class AccessControl {
     private static final Map<Resource, Set<String>> FULL_ACCESS_ROLES = Map.of(
             Resource.CUSTOMER, Set.of("Admin", "Sales"),
             Resource.CONTRACT, Set.of("Admin", "Sales"),
-            Resource.PRODUCT, Set.of("Admin", "Kỹ thuật"),
+            Resource.PRODUCT, Set.of("Admin", "Sales"),
             Resource.TICKET, Set.of("Admin", "Sales"),
             Resource.EMPLOYEE, Set.of("Admin")
     );
@@ -59,9 +60,9 @@ public final class AccessControl {
 
     // Tài nguyên mà cây tổ chức có tiếng nói: cấp dưới chỉ được xem, dù vai
     // trò của họ vốn có quyền Full. Khớp hai ô đánh dấu trong "Access matrix"
-    // của PERMISSIONS.md. Phiếu hỗ trợ và Sản phẩm KHÔNG nằm ở đây -- kỹ
-    // thuật viên là cấp dưới của ai đó không làm họ mất quyền ghi trên phiếu
-    // được giao cho mình.
+    // của PERMISSIONS.md. Phiếu hỗ trợ và Sản phẩm KHÔNG nằm ở đây -- SPEC
+    // 3.3 không đánh dấu (*) ở hai dòng đó: Sales có cấp trên vẫn thêm/sửa/
+    // xoá sản phẩm và xử lý phiếu như mọi Sales khác.
     private static final Set<Resource> HIERARCHY_RESTRICTED = Set.of(
             Resource.CUSTOMER, Resource.CONTRACT
     );
@@ -149,8 +150,8 @@ public final class AccessControl {
      * Phạm vi mặc định khi mở danh sách khách hàng / hợp đồng.
      *
      * <p>CHỈ Sales bị thu hẹp. Admin nhìn toàn bộ (họ quản trị, không cầm khách).
-     * Kỹ thuật và Tổng hợp cũng nhìn toàn bộ: không đứng tên khách nào cả, thu
-     * hẹp theo "khách của tôi" là họ thấy đúng 0 dòng và hết làm việc được.
+     * Tổng hợp cũng nhìn toàn bộ: không đứng tên khách nào cả, thu hẹp theo
+     * "khách của tôi" là họ thấy đúng 0 dòng và hết làm việc được.
      *
      * <p>Thu hẹp này là MẶC ĐỊNH, KHÔNG phải rào quyền: còn {@code view=all} để xem
      * toàn chi nhánh, và trang chi tiết từng bản ghi không chặn gì thêm. Ai cần rào
@@ -224,29 +225,5 @@ public final class AccessControl {
             return false;
         }
         return isAdmin(request) || user.getDepartmentId() == departmentId;
-    }
-
-    /**
-     * Ngoại lệ riêng cho TICKET: role "Kỹ thuật" chỉ View only trên toàn bộ
-     * ticket (không có trong FULL_ACCESS_ROLES), nhưng vẫn cần tự cập nhật
-     * tiến độ/trạng thái của đúng phiếu đang được giao cho mình -- theo yêu
-     * cầu nghiệp vụ (vai trò Technical: "Handling assigned technical
-     * requests, updating progress and status"). Không cấp Full access vì họ
-     * không được đổi khách hàng/hợp đồng/độ ưu tiên/người xử lý của ticket.
-     *
-     * <p>Hàm này chỉ trả lời "có phải kỹ thuật viên của đúng phiếu này không";
-     * DANH SÁCH CỘT được sửa nằm ở TechnicalSupportTicketController.
-     * handleUpdate (hiện là status, root_cause, cause_category, handling_plan,
-     * resolution_summary -- xem PERMISSIONS.md). Ba cột nguyên nhân/phương
-     * hướng nằm trong danh sách đó vì theo yêu cầu khách hàng, cả mạch chẩn
-     * đoán lẫn hướng xử lý đều là phần do chính nhân viên kỹ thuật đánh giá.
-     */
-    public static boolean canUpdateAssignedTicket(HttpServletRequest request, TechnicalRequest ticket) {
-        User user = currentUser(request);
-        if (user == null || user.getRole() == null || ticket == null) {
-            return false;
-        }
-        return "Kỹ thuật".equals(user.getRole().getRoleName())
-                && ticket.getAssignedTechnicianId() == user.getUserId();
     }
 }

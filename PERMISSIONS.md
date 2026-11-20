@@ -32,8 +32,7 @@ any role — every single action (including list/view) requires Admin.
 | `role_name` in DB | Description |
 |---|---|
 | `Admin` | Full access to everything, including employee/user management |
-| `Sales` | Owns customer relationships, contracts, **and technical support tickets** (absorbed `CSKH`'s ticket ownership when that role was merged into Sales — see note below) |
-| `Kỹ thuật` (Technical) | Owns the product catalog and does technical support work |
+| `Sales` | Owns customer relationships, contracts, **the product catalog and technical support tickets** — both creating a ticket and being the person it is assigned to (absorbed `CSKH`'s ticket ownership and `Kỹ thuật`'s products and ticket handling when those roles were merged into Sales — see notes below) |
 | `Tổng hợp` (General affairs) | The branch's `Phòng tổng hợp` (V40): views customers, contracts and products; confirms contract handovers sent to their department; records a payment instalment as collected. No other write access, and no access to tickets or employees |
 
 `Tổng hợp` was added on 2026-11-19 to match the branch's real structure
@@ -50,8 +49,20 @@ fourth role around for that one difference, ticket Full access moved onto
 `Sales` directly (`AccessControl.FULL_ACCESS_ROLES`). Existing `CSKH` accounts
 were reassigned to `Sales` in the same migration that dropped the role row
 (see `db/migrations/`). Nothing about *how* tickets work changed — creation,
-the assigned-technician exception, the two-column ownership scope — only
-*which role name* is allowed to do it.
+the two-column ownership scope — only *which role name* is allowed to do it.
+
+`Kỹ thuật` (Technical) has been **removed and merged into `Sales`** too
+(V42, decided 2026-11-19 with the rest of the branch structure in
+`docs/SPEC.md` §3.1): the branch has no technical department, so the product
+catalog and ticket handling moved onto `Sales`. Product Full access moved from
+`Kỹ thuật` to `Sales` in `AccessControl.FULL_ACCESS_ROLES`; the ticket handler
+(`assigned_technician_id`, labelled "Người xử lý") is picked from active
+`Sales` users (BR-39). V42 moved every `Kỹ thuật` user to `Sales` and every
+member of the `Kỹ thuật` department to `Kinh doanh`, then dropped both rows.
+Tickets keep their handler — that person now carries the `Sales` role. The
+assigned-technician exception that used to let a `Kỹ thuật` user update five
+fields of their own ticket (`AccessControl.canUpdateAssignedTicket`) went with
+the role: every handler is a `Sales` user with Full access on tickets.
 
 ## Access matrix
 
@@ -151,22 +162,23 @@ the condition is now reachable and is what the `isDraft()` branch above checks.
 
 `Sales` is split into the two tiers of the org chart: a **manager** (`quản lý
 vùng`) and the **staff** under them (`nhân viên cầm tỉnh`, one province each).
-Every other role is a single tier — a `Kỹ thuật` user having a manager
+Every other role is a single tier — a `Tổng hợp` user having a manager
 changes nothing about their access.
 
 The hierarchy split only narrows **Customer and Contract** (`HIERARCHY_RESTRICTED`
-in `AccessControl`) — it does not apply to Ticket, so a Sales *staff* member
-has the same Full access to tickets as a Sales *manager*, unlike the † rows.
+in `AccessControl`) — it does not apply to Ticket or Product, so a Sales
+*staff* member has the same Full access to tickets and products as a Sales
+*manager*, unlike the † rows.
 
-| Resource | Admin | Sales — manager | Sales — staff | Kỹ thuật | Tổng hợp |
-|---|---|---|---|---|---|
-| Customer (`enterprises`) | Full | Full | View only † | View only | View only |
-| Contract (`contracts`) | Full | Full | View only † | View only | View only § |
-| Product (`products`) | Full | View only | View only | Full | View only |
-| Ticket (`technicalrequests`) | Full | Full | Full | View only* | No access |
-| Employee (`users`) | Full | No access | No access | No access | No access |
-| System log (`/systemLog`) | Full | No access | No access | No access | No access |
-| Branch info (`branch_info`, `/branch`, UC-55) | Full ‡ | No access | No access | No access | No access |
+| Resource | Admin | Sales — manager | Sales — staff | Tổng hợp |
+|---|---|---|---|---|
+| Customer (`enterprises`) | Full | Full | View only † | View only |
+| Contract (`contracts`) | Full | Full | View only † | View only § |
+| Product (`products`) | Full | Full | Full | View only |
+| Ticket (`technicalrequests`) | Full | Full* | Full* | No access |
+| Employee (`users`) | Full | No access | No access | No access |
+| System log (`/systemLog`) | Full | No access | No access | No access |
+| Branch info (`branch_info`, `/branch`, UC-55) | Full ‡ | No access | No access | No access |
 
 § **Two writes on Contract for `Tổng hợp`, neither through `FULL_ACCESS_ROLES`:**
 - **Record a payment instalment as collected** (UC-53, `action=markPaid`):
@@ -187,25 +199,21 @@ and on the Dashboard (`getCustomerListScope` / `getContractListScope` return
 Every ticket screen returns 403 for them (`PermissionService.canViewTickets`),
 and the sidebar hides the "Phiếu hỗ trợ" entry.
 
-\* **Exception:** `Kỹ thuật` may update the `status`, `rootCause`,
-`causeCategory`, `handlingPlan` and `resolutionSummary` of a ticket assigned to them
-(`assigned_technician_id` matches their own user id) — everything else about
-Ticket stays View only for that role (can't create, delete, reassign, or
-touch any other field, including on tickets assigned to someone else). This
-reflects the Technical role's real responsibility ("handling assigned
-technical requests, updating progress and status") without giving them Full
-CRUD. The two cause fields belong on that list for the same reason: the
-customer asked that a ticket read as symptom → cause → result, and the cause
-is **the technician's own assessment** — nobody else on the ticket is in a
-position to fill it in. Enforced in
-`TechnicalSupportTicketController.handleUpdate` via
-`AccessControl.canUpdateAssignedTicket(...)`: for a non-Full-access actor the
-handler keeps the row it read from the database and overwrites only these
-five fields, so widening the exception means adding a `set...` call there and
-nowhere else.
+\* **Ticket handler (BR-39):** a ticket is assigned to one active `Sales`
+user — "Người xử lý", stored in `assigned_technician_id` (the column kept its
+old name). The person who takes the call and the person who handles the
+ticket are both `Sales` now, often two different people; "Phiếu của tôi" on
+the ticket list means the tickets assigned to me, and the list opens on "Tất
+cả" for everyone. There is no partial-write tier on tickets any more: the old
+`Kỹ thuật` exception (update five fields of a ticket assigned to you, nothing
+else) was removed with that role, see [Roles](#roles).
 
-Those five are the whole of what a technician records on a ticket: the status,
-then the diagnosis narrative — cause, its category, the plan, the outcome. Each
+The handler's part of a ticket is five fields: the status, then the diagnosis
+narrative — cause, its category, the plan, the outcome. The customer asked
+that a ticket read as symptom → cause → result, and the cause is **the
+handler's own assessment**, so the detail page groups these five under the
+handler's name ("Người xử lý đánh giá"), apart from what the person who took
+the call wrote. Each
 has its own column on purpose. Before `handlingPlan` existed the plan was being
 written into the status-change note instead, which left the history repeating
 what the ticket already said and answering a question it was never meant to
@@ -272,16 +280,13 @@ refused — deleting the old ones would be rewriting the record.
 
 Scope and consequences worth knowing before implementing:
 
-- **Customer and Contract only.** Ticket and Product are untouched — in
-  particular the `Kỹ thuật` exception documented above still stands, so an
-  assigned technician keeps writing `status`, `resolutionSummary`,
-  `rootCause` and `causeCategory` on their own ticket. A technician being
-  somebody's subordinate does not make them read-only on tickets.
+- **Customer and Contract only.** Ticket and Product are untouched — a
+  Sales user being somebody's subordinate does not make them read-only on
+  tickets or products.
 - **This moves permissions onto a second axis.** Today the only question is
   *which role*; this adds *who owns the row* (`contracts.owner_id`) and
   *who manages whom*, so the checks become row-level rather than a lookup
-  in `FULL_ACCESS_ROLES`. The existing `canUpdateAssignedTicket` is the
-  closest precedent in shape, though much narrower in reach.
+  in `FULL_ACCESS_ROLES`.
 - **Change requests must carry an intent, not a diff.** Because creation is
   gated too, a request to add a customer has no existing row to point at —
   the record it proposes has to live in the request itself. Model it as
@@ -376,9 +381,7 @@ hide what the controller would refuse.
 - The **form pages themselves** (`?action=new`, `?action=edit`) are gated the same way as the POST that
   submits them, so typing the URL by hand gets a 403 instead of a form that
   can only fail on submit. Ticket's `?action=edit` follows the same rule as
-  `handleUpdate`: Full access *or* the assigned technician — gating the form
-  more tightly than the write would leave that technician with permission to
-  save and no way in.
+  `handleUpdate`: Full access (Admin, Sales).
 - `Employee` (user account management) has no "View only" tier for
   non-Admin roles — it's Admin-only end to end.
 - **`Admin` cannot be assigned through the employee add/edit forms.** The
@@ -402,7 +405,7 @@ hide what the controller would refuse.
   row seeded by V39, so "Full" here means view and update only: there is no
   create or delete. It is not a `Resource` either: `BranchInfoController`
   calls `AccessControl.requireAdmin(...)` once at the top of `doGet`/`doPost`
-  (so typing the URL by hand as Sales or Kỹ thuật gets a 403 with MSG-022),
+  (so typing the URL by hand as Sales or Tổng hợp gets a 403 with MSG-022),
   and `BranchInfoService.update` re-checks `PermissionService.isAdmin` against
   the database before writing. The sidebar entry "Thông tin chi nhánh" is
   hidden from non-Admins, but that is presentation only.

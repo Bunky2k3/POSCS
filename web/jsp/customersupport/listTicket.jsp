@@ -251,14 +251,12 @@
                 <option value="Bình thường" ${priorityFilter == 'Bình thường' ? 'selected' : ''}>Bình thường</option>
                 <option value="Thấp" ${priorityFilter == 'Thấp' ? 'selected' : ''}>Thấp</option>
             </select>
-            <%-- Người xử lý. Kỹ thuật viên mặc định "Phiếu của tôi" (controller chọn
-                 khi không có tham số); chọn "Tất cả" gửi assignee=all tường minh.
-                 Không có mục "chưa giao": cột assigned_technician_id NOT NULL. --%>
+            <%-- Người xử lý (SPEC 5.5): Tất cả / Phiếu của tôi / một người xử lý.
+                 Mở lần đầu mặc định "Tất cả" (controller chọn khi không có tham
+                 số). Không có mục "chưa giao": cột assigned_technician_id NOT NULL. --%>
             <select id="filterAssignee" name="assignee">
                 <option value="all" ${assigneeFilter == 'all' ? 'selected' : ''}>Tất cả người xử lý</option>
-                <c:if test="${isTechnician}">
-                    <option value="mine" ${assigneeFilter == 'mine' ? 'selected' : ''}>Phiếu của tôi</option>
-                </c:if>
+                <option value="mine" ${assigneeFilter == 'mine' ? 'selected' : ''}>Phiếu của tôi</option>
                 <c:forEach var="tech" items="${technicianList}">
                     <option value="${tech.userId}" ${assigneeFilter == tech.userId.toString() ? 'selected' : ''}>${fn:escapeXml(tech.fullName)}</option>
                 </c:forEach>

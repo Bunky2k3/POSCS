@@ -68,12 +68,25 @@ public class TicketActionControllerTest {
         loginAs("Sales", 99);
         when(customerDAO.findRolesOf(anyInt())).thenReturn(Collections.singletonList("Khách mua"));
 
-        // Kỹ thuật viên mặc định (id=50, role="Kỹ thuật")
+        // Tài khoản còn mang vai Kỹ thuật cũ (id=50, role="Kỹ thuật") -- dùng trong các
+        // test bị chặn. Task 9.3: vai này đã gộp vào Sales, không còn quyền gì trên phiếu.
         User tech50 = new User();
         tech50.setUserId(50);
         tech50.setRole(new Role(2, "Kỹ thuật"));
         tech50.setDeleted(false);
         when(employeeDAO.findById(50)).thenReturn(tech50);
+
+        // Người xử lý mặc định của phiếu (BR-39, Task 9.3): Sales đang hoạt động (id=51, 52)
+        when(employeeDAO.findById(51)).thenReturn(activeSales(51));
+        when(employeeDAO.findById(52)).thenReturn(activeSales(52));
+    }
+
+    private static User activeSales(int userId) {
+        User u = new User();
+        u.setUserId(userId);
+        u.setRole(new Role(1, "Sales"));
+        u.setDeleted(false);
+        return u;
     }
 
     private void loginAs(String roleName, int userId) {
@@ -90,7 +103,7 @@ public class TicketActionControllerTest {
         t.setTicketType("Bảo hành");
         t.setPriority("Cao");
         t.setReceptionChannel("Điện thoại");
-        t.setAssignedTechnicianId(50);
+        t.setAssignedTechnicianId(51);
         t.setDescription("Thiết bị lỗi nguồn");
         t.setStatus("Đang xử lý");
         return t;
@@ -101,7 +114,7 @@ public class TicketActionControllerTest {
         when(request.getParameter("ticketType")).thenReturn("Bảo hành");
         when(request.getParameter("priority")).thenReturn("Cao");
         when(request.getParameter("receptionChannel")).thenReturn("Điện thoại");
-        when(request.getParameter("assignedTechnicianId")).thenReturn("50");
+        when(request.getParameter("assignedTechnicianId")).thenReturn("51");
         when(request.getParameter("description")).thenReturn("Thiết bị lỗi nguồn");
     }
 
@@ -111,7 +124,7 @@ public class TicketActionControllerTest {
         when(request.getParameter("ticketType")).thenReturn("Bảo hành");
         when(request.getParameter("priority")).thenReturn("Cao");
         when(request.getParameter("receptionChannel")).thenReturn("Điện thoại");
-        when(request.getParameter("assignedTechnicianId")).thenReturn("50");
+        when(request.getParameter("assignedTechnicianId")).thenReturn("51");
         when(request.getParameter("description")).thenReturn("Thiết bị lỗi nguồn");
         when(request.getParameter("status")).thenReturn("Đang xử lý");
     }
@@ -304,16 +317,17 @@ public class TicketActionControllerTest {
         loginAs("Kỹ thuật", 1);
         when(request.getParameter("action")).thenReturn("edit");
         when(request.getParameter("id")).thenReturn("3");
-        when(ticketDAO.findById(3)).thenReturn(fullyValidTicket()); // assigned to 50
+        when(ticketDAO.findById(3)).thenReturn(fullyValidTicket()); // assigned to 51
 
         controller.doGet(request, response);
 
         verify(response).sendError(eq(HttpServletResponse.SC_FORBIDDEN), eq(PermissionService.MSG_022));
     }
 
+    /** Task 9.3: người xử lý được giao là Sales -- mở form đầy đủ, không khoá ô nào. */
     @Test
-    public void showEditForm_assignedTechnician_opensFormWithLockGeneralAndCanManageFalse() throws Exception {
-        loginAs("Kỹ thuật", 50);
+    public void showEditForm_assignedSalesHandler_opensFullFormWithCanManageTrue() throws Exception {
+        loginAs("Sales", 51);
         when(request.getParameter("action")).thenReturn("edit");
         when(request.getParameter("id")).thenReturn("3");
         when(ticketDAO.findById(3)).thenReturn(fullyValidTicket());
@@ -322,9 +336,25 @@ public class TicketActionControllerTest {
 
         controller.doGet(request, response);
 
-        verify(request).setAttribute(eq("canManage"), eq(false));
-        verify(request).setAttribute(eq("lockGeneral"), eq(true));
+        verify(request).setAttribute(eq("canManage"), eq(true));
+        verify(request).setAttribute(eq("lockGeneral"), eq(false));
         verify(dispatcher).forward(request, response);
+    }
+
+    /** Task 9.3: tài khoản còn vai Kỹ thuật cũ, kể cả khi phiếu giao cho chính họ -> 403. */
+    @Test
+    public void showEditForm_legacyTechnicianAssigned_returns403() throws Exception {
+        loginAs("Kỹ thuật", 50);
+        when(request.getParameter("action")).thenReturn("edit");
+        when(request.getParameter("id")).thenReturn("3");
+        TechnicalRequest assignedTo50 = fullyValidTicket();
+        assignedTo50.setAssignedTechnicianId(50);
+        when(ticketDAO.findById(3)).thenReturn(assignedTo50);
+
+        controller.doGet(request, response);
+
+        verify(response).sendError(eq(HttpServletResponse.SC_FORBIDDEN), eq(PermissionService.MSG_022));
+        verify(request, never()).getRequestDispatcher(anyString());
     }
 
     @Test
@@ -370,9 +400,13 @@ public class TicketActionControllerTest {
         verify(ticketDAO, never()).update(any(), anyInt(), any());
     }
 
+    /**
+     * Task 9.3: người xử lý được giao (Sales) có toàn quyền -- ghi các trường xử lý
+     * VÀ đổi được người xử lý sang một Sales khác.
+     */
     @Test
-    public void handleUpdate_assignedTechnician_updatesTechnicalFieldsAndLeavesGeneralUntouched() throws Exception {
-        loginAs("Kỹ thuật", 50);
+    public void handleUpdate_assignedSalesHandler_updatesHandlingFieldsAndReassigns() throws Exception {
+        loginAs("Sales", 51);
         when(request.getParameter("action")).thenReturn("update");
         stubValidUpdateFields();
         when(request.getParameter("status")).thenReturn("Đã đóng");
@@ -380,8 +414,8 @@ public class TicketActionControllerTest {
         when(request.getParameter("causeCategory")).thenReturn("Do thiết bị");
         when(request.getParameter("handlingPlan")).thenReturn("Thay thế tụ mới");
         when(request.getParameter("resolutionSummary")).thenReturn("Đã thay và test tải ổn định");
-        // Giả mạo đổi người phụ trách sang 999
-        when(request.getParameter("assignedTechnicianId")).thenReturn("999");
+        // Chuyển phiếu cho Sales khác (52)
+        when(request.getParameter("assignedTechnicianId")).thenReturn("52");
 
         TechnicalRequest existing = fullyValidTicket();
         when(ticketDAO.findById(3)).thenReturn(existing);
@@ -394,9 +428,24 @@ public class TicketActionControllerTest {
                 && "Do thiết bị".equals(t.getCauseCategory())
                 && "Thay thế tụ mới".equals(t.getHandlingPlan())
                 && "Đã thay và test tải ổn định".equals(t.getResolutionSummary())
-                && t.getAssignedTechnicianId() == 50), // Không đổi người phụ trách
-                eq(50), any());
+                && t.getAssignedTechnicianId() == 52),
+                eq(51), any());
         verify(response).sendRedirect(CONTEXT_PATH + "/ticket?action=view&id=3");
+    }
+
+    /** BR-39 (Task 9.3): đổi người xử lý sang người không phải Sales (vai Kỹ thuật cũ) -> invalid. */
+    @Test
+    public void handleUpdate_reassignToNonSales_redirectsInvalid() throws Exception {
+        loginAs("Sales", 51);
+        when(request.getParameter("action")).thenReturn("update");
+        stubValidUpdateFields();
+        when(request.getParameter("assignedTechnicianId")).thenReturn("50");
+        when(ticketDAO.findById(3)).thenReturn(fullyValidTicket());
+
+        controller.doPost(request, response);
+
+        verify(ticketDAO, never()).update(any(), anyInt(), any());
+        verify(response).sendRedirect(CONTEXT_PATH + "/ticket?action=edit&id=3&error=invalid");
     }
 
     @Test

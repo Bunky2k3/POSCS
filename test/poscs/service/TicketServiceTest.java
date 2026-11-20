@@ -54,9 +54,13 @@ public class TicketServiceTest {
     private User adminUser;
     private User salesManager;
     private User salesSubordinate;
+    // Người xử lý phiếu (BR-39). Task 9.3: vai Sales -- vai Kỹ thuật cũ đã gộp vào
+    // Sales; tên biến giữ từ thời người xử lý mang vai Kỹ thuật.
     private User techAssigned;
     private User techOther;
     private User deletedUser;
+    // Vai Tổng hợp: không vào phiếu hỗ trợ (SPEC 3.3) -- người bị chặn trong test quyền.
+    private User generalUser;
 
     @Before
     public void setUp() {
@@ -68,9 +72,10 @@ public class TicketServiceTest {
         adminUser = buildUser(1, PermissionService.ROLE_ADMIN, null, false);
         salesManager = buildUser(2, PermissionService.ROLE_SALES, null, false);
         salesSubordinate = buildUser(3, PermissionService.ROLE_SALES, 2, false);
-        techAssigned = buildUser(4, PermissionService.ROLE_TECHNICAL, null, false);
-        techOther = buildUser(5, PermissionService.ROLE_TECHNICAL, null, false);
+        techAssigned = buildUser(4, PermissionService.ROLE_SALES, null, false);
+        techOther = buildUser(5, PermissionService.ROLE_SALES, null, false);
         deletedUser = buildUser(6, PermissionService.ROLE_SALES, null, true);
+        generalUser = buildUser(8, PermissionService.ROLE_GENERAL, null, false);
 
         employeeDAO.putUser(adminUser);
         employeeDAO.putUser(salesManager);
@@ -78,6 +83,7 @@ public class TicketServiceTest {
         employeeDAO.putUser(techAssigned);
         employeeDAO.putUser(techOther);
         employeeDAO.putUser(deletedUser);
+        employeeDAO.putUser(generalUser);
 
         customerDAO.putRoles(10, List.of(TicketService.ROLE_BUYER));
         customerDAO.putRoles(20, List.of(PermissionService.ROLE_SUPPLIER));
@@ -554,12 +560,15 @@ public class TicketServiceTest {
     // ==================================================================
 
     @Test
-    public void createTicket_rbac_allowsAdminAndSalesButBlocksTechnicianAndInvalidUsers() {
+    public void createTicket_rbac_allowsAdminAndSalesButBlocksGeneralAndInvalidUsers() {
         assertTrue(service.createTicket(validCreateRequest(), adminUser).isSuccess());
         assertTrue(service.createTicket(validCreateRequest(), salesManager).isSuccess());
         assertTrue(service.createTicket(validCreateRequest(), salesSubordinate).isSuccess());
+        // Task 9.3: người xử lý (Sales) cũng tạo được phiếu
+        assertTrue(service.createTicket(validCreateRequest(), techAssigned).isSuccess());
 
-        ServiceResult<Integer> rTech = service.createTicket(validCreateRequest(), techAssigned);
+        // Tổng hợp không vào phiếu hỗ trợ -> MSG-022
+        ServiceResult<Integer> rTech = service.createTicket(validCreateRequest(), generalUser);
         assertFalse(rTech.isSuccess());
         assertEquals(PermissionService.MSG_022, rTech.getMessage());
 
@@ -572,52 +581,61 @@ public class TicketServiceTest {
         assertEquals(PermissionService.MSG_022, rDeleted.getMessage());
     }
 
+    /**
+     * Task 9.3: người xử lý là Sales, có toàn quyền trên phiếu -- sửa được mọi trường,
+     * kể cả phiếu không giao cho mình. Hết ngoại lệ "kỹ thuật viên chỉ sửa năm trường
+     * của phiếu được giao". Tổng hợp không vào phiếu hỗ trợ -> MSG-022.
+     */
     @Test
-    public void updateTicket_rbac_technicianCanOnlyUpdateAssignedTicketAndCannotModifyGeneralFields() {
+    public void updateTicket_rbac_salesHandlerUpdatesAllFieldsAndGeneralIsBlocked() {
         TechnicalRequest createReq = validCreateRequest();
         createReq.setPriority(TicketService.PRIORITY_NORMAL);
         createReq.setContractId(100);
         createReq.setWarranty(true);
         int id = service.createTicket(createReq, salesManager).getData();
 
-        // Kỹ thuật viên KHÁC (không được giao phiếu) -> bị chặn với MSG-022
+        // Tổng hợp -> bị chặn với MSG-022, phiếu không đổi
+        TechnicalRequest generalAttempt = copyOf(ticketDAO.findById(id));
+        generalAttempt.setStatus(TicketService.STATUS_IN_PROGRESS);
+        ServiceResult<Void> rGeneral = service.updateTicket(generalAttempt, "Sửa hộ", generalUser);
+        assertFalse(rGeneral.isSuccess());
+        assertEquals(PermissionService.MSG_022, rGeneral.getMessage());
+        assertEquals(TicketService.STATUS_NEW, ticketDAO.findById(id).getStatus());
+
+        // Sales KHÔNG được giao phiếu vẫn sửa được (toàn quyền trên phiếu)
         TechnicalRequest otherAttempt = copyOf(ticketDAO.findById(id));
         otherAttempt.setStatus(TicketService.STATUS_IN_PROGRESS);
-        ServiceResult<Void> rOther = service.updateTicket(otherAttempt, "Sửa hộ", techOther);
-        assertFalse(rOther.isSuccess());
-        assertEquals(PermissionService.MSG_022, rOther.getMessage());
+        assertTrue(service.updateTicket(otherAttempt, "Nhận xử lý", techOther).isSuccess());
 
-        // Kỹ thuật viên ĐƯỢC GIAO cố tình sửa khách hàng, hợp đồng, mức ưu tiên, người xử lý, mô tả, bảo hành
-        TechnicalRequest techAttempt = copyOf(ticketDAO.findById(id));
-        techAttempt.setEnterpriseId(30);
-        techAttempt.setContractId(200);
-        techAttempt.setTicketType("Tư vấn");
-        techAttempt.setPriority(TicketService.PRIORITY_URGENT);
-        techAttempt.setReceptionChannel("Website");
-        techAttempt.setAssignedTechnicianId(techOther.getUserId());
-        techAttempt.setDescription("Mô tả bị sửa trái phép");
-        techAttempt.setWarranty(false);
-        // Các trường kỹ thuật được phép sửa:
-        techAttempt.setStatus(TicketService.STATUS_IN_PROGRESS);
-        techAttempt.setRootCause("Lỗi cảm biến áp suất");
-        techAttempt.setCauseCategory("Do lắp đặt");
-        techAttempt.setHandlingPlan("Hiệu chuẩn lại cảm biến");
-        techAttempt.setResolutionSummary("Đang hiệu chuẩn");
+        // Người xử lý ĐƯỢC GIAO sửa khách hàng, hợp đồng, mức ưu tiên, người xử lý, mô tả,
+        // bảo hành cùng các trường xử lý: tất cả đều được lưu
+        TechnicalRequest handlerAttempt = copyOf(ticketDAO.findById(id));
+        handlerAttempt.setEnterpriseId(30);
+        handlerAttempt.setContractId(200);
+        handlerAttempt.setTicketType("Tư vấn");
+        handlerAttempt.setPriority(TicketService.PRIORITY_URGENT);
+        handlerAttempt.setReceptionChannel("Website");
+        handlerAttempt.setAssignedTechnicianId(techOther.getUserId());
+        handlerAttempt.setDescription("Mô tả được người xử lý chỉnh lại");
+        handlerAttempt.setWarranty(false);
+        handlerAttempt.setStatus(TicketService.STATUS_IN_PROGRESS);
+        handlerAttempt.setRootCause("Lỗi cảm biến áp suất");
+        handlerAttempt.setCauseCategory("Do lắp đặt");
+        handlerAttempt.setHandlingPlan("Hiệu chuẩn lại cảm biến");
+        handlerAttempt.setResolutionSummary("Đang hiệu chuẩn");
 
-        ServiceResult<Void> rAssigned = service.updateTicket(techAttempt, "Bắt đầu xử lý", techAssigned);
+        ServiceResult<Void> rAssigned = service.updateTicket(handlerAttempt, "Bắt đầu xử lý", techAssigned);
         assertTrue(rAssigned.isSuccess());
 
         TechnicalRequest stored = ticketDAO.findById(id);
-        // Trường quản trị phải được giữ nguyên từ bản ghi gốc:
-        assertEquals(10, stored.getEnterpriseId());
-        assertEquals(Integer.valueOf(100), stored.getContractId());
-        assertEquals("Bảo hành", stored.getTicketType());
-        assertEquals(TicketService.PRIORITY_NORMAL, stored.getPriority());
-        assertEquals("Điện thoại", stored.getReceptionChannel());
-        assertEquals(techAssigned.getUserId(), stored.getAssignedTechnicianId());
-        assertEquals("Hệ thống lọc bụi báo lỗi áp suất cao", stored.getDescription());
-        assertTrue(stored.isWarranty());
-        // Trường kỹ thuật được cập nhật:
+        assertEquals(30, stored.getEnterpriseId());
+        assertEquals(Integer.valueOf(200), stored.getContractId());
+        assertEquals("Tư vấn", stored.getTicketType());
+        assertEquals(TicketService.PRIORITY_URGENT, stored.getPriority());
+        assertEquals("Website", stored.getReceptionChannel());
+        assertEquals(techOther.getUserId(), stored.getAssignedTechnicianId());
+        assertEquals("Mô tả được người xử lý chỉnh lại", stored.getDescription());
+        assertFalse(stored.isWarranty());
         assertEquals(TicketService.STATUS_IN_PROGRESS, stored.getStatus());
         assertEquals("Lỗi cảm biến áp suất", stored.getRootCause());
         assertEquals("Do lắp đặt", stored.getCauseCategory());
@@ -625,13 +643,27 @@ public class TicketServiceTest {
         assertEquals("Đang hiệu chuẩn", stored.getResolutionSummary());
     }
 
+    /**
+     * BR-39 (Task 9.3): người xử lý phải là một Sales đang hoạt động. Admin, Tổng hợp,
+     * Sales đã khoá, tài khoản còn sót vai Kỹ thuật cũ, hay user không tồn tại đều bị từ chối.
+     */
     @Test
-    public void createAndUpdateTicket_validateAssignedTechnicianMustBeActiveTechnician() {
-        User deletedTech = buildUser(7, PermissionService.ROLE_TECHNICAL, null, true);
-        employeeDAO.putUser(deletedTech);
+    public void createAndUpdateTicket_validateAssignedTechnicianMustBeActiveSales() {
+        User legacyTech = buildUser(7, "Kỹ thuật", null, false);
+        employeeDAO.putUser(legacyTech);
 
-        // 1. Tạo phiếu với userId không tồn tại (999), Sales, Admin, hoặc Kỹ thuật đã bị khóa -> ERR_INVALID
-        for (int invalidTechId : new int[]{999, salesManager.getUserId(), adminUser.getUserId(), deletedTech.getUserId()}) {
+        // 0. Sales đang hoạt động (cả quản lý vùng lẫn có cấp trên) -> hợp lệ
+        for (User handler : List.of(techAssigned, salesManager, salesSubordinate)) {
+            TechnicalRequest ok = validCreateRequest();
+            ok.setAssignedTechnicianId(handler.getUserId());
+            assertTrue("Should accept Sales handler " + handler.getUserId(),
+                    service.createTicket(ok, adminUser).isSuccess());
+        }
+
+        // 1. Tạo phiếu với userId không tồn tại (999), Admin, Tổng hợp, Sales đã bị khóa,
+        //    hoặc vai Kỹ thuật cũ -> ERR_INVALID
+        for (int invalidTechId : new int[]{999, adminUser.getUserId(), generalUser.getUserId(),
+                deletedUser.getUserId(), legacyTech.getUserId()}) {
             TechnicalRequest badTech = validCreateRequest();
             badTech.setAssignedTechnicianId(invalidTechId);
             ServiceResult<Integer> res = service.createTicket(badTech, adminUser);
@@ -641,28 +673,38 @@ public class TicketServiceTest {
                     res.getFieldErrors().get(TicketValidator.FIELD_ASSIGNED_TECHNICIAN_ID));
         }
 
-        // 2. Tạo phiếu hợp lệ rồi cập nhật đổi sang Sales hoặc user không tồn tại -> ERR_INVALID
+        // 2. Tạo phiếu hợp lệ rồi cập nhật đổi sang Admin -> ERR_INVALID; đổi sang Sales khác -> được
         int id = service.createTicket(validCreateRequest(), adminUser).getData();
 
-        TechnicalRequest updToSales = copyOf(ticketDAO.findById(id));
-        updToSales.setAssignedTechnicianId(salesManager.getUserId());
-        ServiceResult<Void> rUpdSales = service.updateTicket(updToSales, null, adminUser);
+        TechnicalRequest updToAdmin = copyOf(ticketDAO.findById(id));
+        updToAdmin.setAssignedTechnicianId(adminUser.getUserId());
+        ServiceResult<Void> rUpdSales = service.updateTicket(updToAdmin, null, adminUser);
         assertFalse(rUpdSales.isSuccess());
         assertEquals(TicketService.ERR_INVALID, rUpdSales.getMessage());
         assertEquals(TicketValidator.MSG_TECHNICIAN_REQUIRED,
                 rUpdSales.getFieldErrors().get(TicketValidator.FIELD_ASSIGNED_TECHNICIAN_ID));
 
-        // 3. Giữ nguyên kỹ thuật viên cũ trên phiếu (kể cả khi người đó sau này đổi vai trò) -> vẫn cho lưu
-        User roleChangedTech = buildUser(techAssigned.getUserId(), PermissionService.ROLE_SALES, null, false);
+        TechnicalRequest updToOtherSales = copyOf(ticketDAO.findById(id));
+        updToOtherSales.setAssignedTechnicianId(techOther.getUserId());
+        assertTrue(service.updateTicket(updToOtherSales, null, adminUser).isSuccess());
+        assertEquals(techOther.getUserId(), ticketDAO.findById(id).getAssignedTechnicianId());
+
+        // 3. Giữ nguyên người xử lý cũ trên phiếu (kể cả khi người đó sau này đổi vai trò) -> vẫn cho lưu
+        User roleChangedTech = buildUser(techOther.getUserId(), PermissionService.ROLE_GENERAL, null, false);
         employeeDAO.putUser(roleChangedTech);
         TechnicalRequest keepSameTech = copyOf(ticketDAO.findById(id));
         keepSameTech.setDescription("Cập nhật mô tả giữ nguyên người xử lý cũ");
         assertTrue(service.updateTicket(keepSameTech, null, adminUser).isSuccess());
-        employeeDAO.putUser(techAssigned);
+        employeeDAO.putUser(techOther);
     }
 
+    /**
+     * Task 9.3: người xử lý (Sales) có toàn quyền nên phiếu cũ được kiểm như mọi lần sửa:
+     * mức ưu tiên ngoài danh mục phải chọn lại; khách hàng cũ (nhà cung cấp, lập trước khi
+     * ô này lọc vai) vẫn được giữ vì không đổi khách.
+     */
     @Test
-    public void updateTicket_technicianCanUpdateLegacyTicketWithOutOfCatalogGeneralFields() {
+    public void updateTicket_salesHandlerUpdatesLegacyTicket_mustFixOutOfCatalogPriority() {
         TechnicalRequest legacy = validCreateRequest();
         legacy.setTicketId(50);
         legacy.setTicketCode("TK-0050");
@@ -672,15 +714,28 @@ public class TicketServiceTest {
         legacy.setAssignedTechnicianId(techAssigned.getUserId());
         ticketDAO.putTicket(legacy);
 
+        // Giữ nguyên ưu tiên ngoài danh mục -> bị chặn ở ô Mức ưu tiên, phiếu không đổi
+        TechnicalRequest keepPriority = copyOf(legacy);
+        keepPriority.setStatus(TicketService.STATUS_IN_PROGRESS);
+        ServiceResult<Void> rKeep = service.updateTicket(keepPriority, null, techAssigned);
+        assertFalse(rKeep.isSuccess());
+        assertEquals(TicketService.ERR_INVALID, rKeep.getMessage());
+        assertEquals(TicketValidator.MSG_PRIORITY_INVALID,
+                rKeep.getFieldErrors().get(TicketValidator.FIELD_PRIORITY));
+        assertEquals(TicketService.STATUS_NEW, ticketDAO.findById(50).getStatus());
+
+        // Chọn lại ưu tiên hợp lệ -> lưu được, khách hàng cũ giữ nguyên
         TechnicalRequest techUpdate = copyOf(legacy);
+        techUpdate.setPriority(TicketService.PRIORITY_NORMAL);
         techUpdate.setStatus(TicketService.STATUS_IN_PROGRESS);
         techUpdate.setRootCause("Đứt cáp tín hiệu");
         techUpdate.setCauseCategory("Do vận chuyển");
         ServiceResult<Void> res = service.updateTicket(techUpdate, "Tiếp nhận phiếu cũ", techAssigned);
         assertTrue(res.isSuccess());
         assertEquals(TicketService.STATUS_IN_PROGRESS, ticketDAO.findById(50).getStatus());
+        assertEquals(20, ticketDAO.findById(50).getEnterpriseId());
 
-        // Kỹ thuật gửi nhóm nguyên nhân vượt quá 100 ký tự -> bị chặn
+        // Người xử lý gửi nhóm nguyên nhân vượt quá 100 ký tự -> bị chặn
         TechnicalRequest badCause = copyOf(ticketDAO.findById(50));
         badCause.setCauseCategory("Z".repeat(TicketValidator.MAX_CAUSE_CATEGORY_LENGTH + 1));
         ServiceResult<Void> rBadCause = service.updateTicket(badCause, null, techAssigned);
@@ -878,11 +933,11 @@ public class TicketServiceTest {
     }
 
     @Test
-    public void deleteTicket_blocksWhenInProgressAndBlocksTechnicianRole() {
+    public void deleteTicket_blocksWhenInProgressAndBlocksGeneralRole() {
         int id = service.createTicket(validCreateRequest(), salesManager).getData();
 
-        // Kỹ thuật viên không có quyền xóa (kể cả phiếu Mới tiếp nhận giao cho mình) -> MSG-022
-        ServiceResult<Void> rTech = service.deleteTicket(id, techAssigned);
+        // Tổng hợp không có quyền xóa (Task 9.3: người bị chặn đổi từ Kỹ thuật sang Tổng hợp) -> MSG-022
+        ServiceResult<Void> rTech = service.deleteTicket(id, generalUser);
         assertFalse(rTech.isSuccess());
         assertEquals(PermissionService.MSG_022, rTech.getMessage());
         assertNotNull(ticketDAO.findById(id));
@@ -912,9 +967,15 @@ public class TicketServiceTest {
     // 9. UC-16 & UC-17: Danh sách, Bộ lọc người xử lý & Xem chi tiết
     // ==================================================================
 
+    /** SPEC 5.5 (Task 9.3): mở lần đầu mặc định "Tất cả" với mọi vai, kể cả người xử lý. */
     @Test
-    public void resolveAssigneeFilterAndId_defaultsMineForTechnicianAndAllForOthers() {
-        assertEquals(TicketService.ASSIGNEE_MINE, service.resolveAssigneeFilter(null, techAssigned));
+    public void resolveAssigneeFilterAndId_defaultsAllForEveryone() {
+        assertEquals(TicketService.ASSIGNEE_ALL, service.resolveAssigneeFilter(null, techAssigned));
+        assertEquals(TicketService.ASSIGNEE_ALL, service.resolveAssigneeFilter("", techAssigned));
+        assertEquals(TicketService.ASSIGNEE_ALL, service.resolveAssigneeFilter(null, null));
+
+        // Người xử lý chọn tường minh "Phiếu của tôi"
+        assertEquals(TicketService.ASSIGNEE_MINE, service.resolveAssigneeFilter("mine", techAssigned));
         assertEquals(Integer.valueOf(techAssigned.getUserId()),
                 service.resolveAssigneeId(TicketService.ASSIGNEE_MINE, techAssigned));
 
@@ -922,7 +983,7 @@ public class TicketServiceTest {
         assertEquals(TicketService.ASSIGNEE_ALL, service.resolveAssigneeFilter("  ", adminUser));
         assertNull(service.resolveAssigneeId(TicketService.ASSIGNEE_ALL, adminUser));
 
-        // Kỹ thuật chọn tường minh "all"
+        // Người xử lý chọn tường minh "all"
         assertEquals(TicketService.ASSIGNEE_ALL, service.resolveAssigneeFilter("all", techAssigned));
         assertNull(service.resolveAssigneeId("all", techAssigned));
 
@@ -935,22 +996,52 @@ public class TicketServiceTest {
         assertEquals(TicketService.ASSIGNEE_ALL, service.resolveAssigneeFilter("abc", adminUser));
     }
 
+    /**
+     * BR-39 (Task 9.3): danh sách người xử lý chỉ gồm các Sales đang hoạt động -- không có
+     * Admin, Tổng hợp, Sales đã khoá, hay tài khoản còn sót vai Kỹ thuật cũ. Người xử lý
+     * hiện tại của phiếu đang sửa vẫn được giữ trong danh sách dù đã đổi vai.
+     */
+    @Test
+    public void findActiveTechnicians_listsOnlyActiveSalesPlusKeptHandler() {
+        employeeDAO.putUser(buildUser(7, "Kỹ thuật", null, false));
+
+        List<User> handlers = service.findActiveTechnicians(null);
+        assertEquals("Sales", TicketService.HANDLER_ROLE);
+        assertEquals(TicketService.HANDLER_ROLE, employeeDAO.lastRoleQueried);
+        assertEquals(new java.util.HashSet<>(List.of(2, 3, 4, 5)), idsOf(handlers));
+
+        // Phiếu đang sửa giao cho một người đã đổi sang vai Tổng hợp: vẫn giữ người đó
+        List<User> withKept = service.findActiveTechnicians(generalUser.getUserId());
+        assertEquals(new java.util.HashSet<>(List.of(2, 3, 4, 5, 8)), idsOf(withKept));
+    }
+
+    private static java.util.Set<Integer> idsOf(List<User> users) {
+        java.util.Set<Integer> ids = new java.util.HashSet<>();
+        for (User u : users) {
+            ids.add(u.getUserId());
+        }
+        return ids;
+    }
+
     @Test
     public void getTicketDetail_returnsPermissionsAndHistoryAccordingToRoleAndStatus() {
         int id = service.createTicket(validCreateRequest(), salesManager).getData();
 
-        // Kỹ thuật được giao xem chi tiết: canEdit = true, canDelete = false
+        // Task 9.3: người xử lý được giao (Sales) xem chi tiết: canEdit = true, canDelete = true
         ServiceResult<TicketService.TicketDetail> rAssigned = service.getTicketDetail(id, techAssigned);
         assertTrue(rAssigned.isSuccess());
         assertTrue(rAssigned.getData().isCanEdit());
-        assertFalse(rAssigned.getData().isCanDelete());
+        assertTrue(rAssigned.getData().isCanDelete());
         assertEquals(1, rAssigned.getData().getHistory().size());
 
-        // Kỹ thuật khác xem chi tiết: canEdit = false, canDelete = false
+        // Sales khác (không được giao) cũng sửa, xoá được: canEdit = true, canDelete = true
         ServiceResult<TicketService.TicketDetail> rOtherTech = service.getTicketDetail(id, techOther);
         assertTrue(rOtherTech.isSuccess());
-        assertFalse(rOtherTech.getData().isCanEdit());
-        assertFalse(rOtherTech.getData().isCanDelete());
+        assertTrue(rOtherTech.getData().isCanEdit());
+        assertTrue(rOtherTech.getData().isCanDelete());
+
+        // Tổng hợp không vào phiếu hỗ trợ -> MSG-022
+        assertEquals(PermissionService.MSG_022, service.getTicketDetail(id, generalUser).getMessage());
 
         // Sales xem chi tiết khi Mới tiếp nhận: canEdit = true, canDelete = true
         ServiceResult<TicketService.TicketDetail> rSales = service.getTicketDetail(id, salesManager);
@@ -1049,6 +1140,32 @@ public class TicketServiceTest {
         @Override
         public User findById(int userId) {
             return users.get(userId);
+        }
+
+        /** Vai được hỏi ở lần gọi findActiveByRole gần nhất. */
+        String lastRoleQueried;
+
+        /** Giống câu SQL thật: đúng vai, chưa khoá; cộng thêm các user_id được giữ lại. */
+        @Override
+        public List<User> findActiveByRole(String roleName, Integer... alsoInclude) {
+            lastRoleQueried = roleName;
+            List<Integer> keep = new ArrayList<>();
+            if (alsoInclude != null) {
+                for (Integer id : alsoInclude) {
+                    if (id != null) {
+                        keep.add(id);
+                    }
+                }
+            }
+            List<User> result = new ArrayList<>();
+            for (User u : users.values()) {
+                boolean activeInRole = !u.isDeleted() && u.getRole() != null
+                        && roleName.equals(u.getRole().getRoleName());
+                if (activeInRole || keep.contains(u.getUserId())) {
+                    result.add(u);
+                }
+            }
+            return result;
         }
     }
 

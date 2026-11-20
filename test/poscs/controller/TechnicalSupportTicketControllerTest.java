@@ -45,10 +45,9 @@ import static org.mockito.Mockito.*;
 /**
  * Test tầng Controller cho TechnicalSupportTicketController -- tập trung
  * vào phân quyền TICKET (Full access Sales/Admin -- Sales gộp thêm việc của
- * CSKH cũ, xem PERMISSIONS.md -- cộng ngoại lệ Kỹ thuật
- * được tự cập nhật đúng phiếu giao cho mình -- AccessControl.
- * canUpdateAssignedTicket) và quy tắc stamp resolved_at chỉ 1 lần khi
- * chuyển sang "Đã đóng". JUnit 4 + Mockito, xem CustomerControllerTest.
+ * CSKH cũ và Kỹ thuật cũ, người xử lý phiếu là Sales, xem PERMISSIONS.md) và
+ * quy tắc stamp resolved_at chỉ 1 lần khi chuyển sang "Đã đóng". JUnit 4 +
+ * Mockito, xem CustomerControllerTest.
  */
 public class TechnicalSupportTicketControllerTest {
 
@@ -252,11 +251,11 @@ public class TechnicalSupportTicketControllerTest {
         verify(ticketDAO, never()).update(any(), anyInt(), any());
     }
 
+    /** Task 9.3: người xử lý được giao là Sales -- đóng phiếu qua form đầy đủ. */
     @Test
-    public void update_assignedTechnician_canCloseOwnTicketAndStampsResolvedAt() throws Exception {
-        loginAs("Kỹ thuật", 50); // đúng người được giao phiếu (assignedTechnicianId=50)
-        when(request.getParameter("action")).thenReturn("update");
-        when(request.getParameter("ticketId")).thenReturn("3");
+    public void update_assignedSalesHandler_canCloseOwnTicketAndStampsResolvedAt() throws Exception {
+        loginAs("Sales", 50); // đúng người được giao phiếu (assignedTechnicianId=50)
+        stubValidUpdateParams();
         when(request.getParameter("status")).thenReturn(TechnicalSupportTicketDAO.STATUS_CLOSED);
         when(request.getParameter("resolutionSummary")).thenReturn("Đã thay nguồn");
         TechnicalRequest existing = fullyValidExistingTicket(); // status ban đầu "Đang xử lý", resolvedAt=null
@@ -353,16 +352,13 @@ public class TechnicalSupportTicketControllerTest {
     // ------------------------------------------------------------------
 
     /**
-     * Ngoại lệ của role Kỹ thuật được nới thêm ĐÚNG hai cột nguyên nhân: theo
-     * yêu cầu khách hàng, nguyên nhân là phần do chính kỹ thuật viên đánh giá,
-     * nên nếu họ không ghi được thì trường mới coi như vô dụng -- người duy
-     * nhất biết câu trả lời lại là người không có quyền điền.
+     * Nguyên nhân là phần do chính người xử lý đánh giá (theo yêu cầu khách hàng).
+     * Task 9.3: người xử lý là Sales, ghi qua form đầy đủ như mọi lần sửa.
      */
     @Test
-    public void update_assignedTechnician_canWriteRootCauseAndCategory() throws Exception {
-        loginAs("Kỹ thuật", 50); // đúng người được giao phiếu
-        when(request.getParameter("action")).thenReturn("update");
-        when(request.getParameter("ticketId")).thenReturn("3");
+    public void update_assignedSalesHandler_canWriteRootCauseAndCategory() throws Exception {
+        loginAs("Sales", 50); // đúng người được giao phiếu
+        stubValidUpdateParams();
         when(request.getParameter("status")).thenReturn(TechnicalSupportTicketDAO.STATUS_CLOSED);
         when(request.getParameter("resolutionSummary")).thenReturn("Đã thay nguồn");
         when(request.getParameter("rootCause")).thenReturn("Gãy chân cắm nguồn do va đập khi vận chuyển");
@@ -380,47 +376,37 @@ public class TechnicalSupportTicketControllerTest {
     }
 
     /**
-     * Nới quyền cho kỹ thuật viên phải dừng đúng ở hai cột nguyên nhân. Ca này
-     * gửi lên một form đã bị sửa tay (đổi khách hàng, độ ưu tiên, người xử lý
-     * -- những trường form thật KHÔNG cho họ đụng tới): phiếu lưu xuống phải
-     * giữ nguyên giá trị cũ, chỉ nguyên nhân là mới.
+     * Task 9.3: ngoại lệ "kỹ thuật viên sửa năm trường của phiếu giao cho mình"
+     * đã bỏ cùng vai Kỹ thuật. Tài khoản còn sót vai cũ, kể cả khi phiếu giao
+     * đúng cho họ, nhận 403 MSG-022 và không ghi gì.
      */
     @Test
-    public void update_assignedTechnician_cannotUseCauseFieldsToSmuggleOtherChanges() throws Exception {
-        loginAs("Kỹ thuật", 50);
+    public void update_legacyTechnicianRole_cannotUpdateEvenAssignedTicket() throws Exception {
+        loginAs("Kỹ thuật", 50); // đúng assignedTechnicianId của phiếu
         when(request.getParameter("action")).thenReturn("update");
         when(request.getParameter("ticketId")).thenReturn("3");
         when(request.getParameter("status")).thenReturn(TechnicalSupportTicketDAO.STATUS_IN_PROGRESS);
         when(request.getParameter("rootCause")).thenReturn("Lắp sai cực nguồn");
         when(request.getParameter("causeCategory")).thenReturn("Do lắp đặt");
-        // Các tham số dưới đây được nhét thêm vào request, không có trên form.
-        when(request.getParameter("enterpriseId")).thenReturn("777");
-        when(request.getParameter("priority")).thenReturn("Thấp");
-        when(request.getParameter("assignedTechnicianId")).thenReturn("999");
         when(ticketDAO.findById(3)).thenReturn(fullyValidExistingTicket());
         when(ticketDAO.update(any(), anyInt(), any())).thenReturn(true);
 
         controller.doPost(request, response);
 
-        verify(ticketDAO).update(argThat((TechnicalRequest t) ->
-                "Lắp sai cực nguồn".equals(t.getRootCause())
-                        && t.getEnterpriseId() == 10      // giữ khách hàng cũ
-                        && "Cao".equals(t.getPriority())  // giữ độ ưu tiên cũ
-                        && t.getAssignedTechnicianId() == 50), // giữ người xử lý cũ
-                anyInt(), any());
+        verify(response).sendError(HttpServletResponse.SC_FORBIDDEN, AccessControl.MSG_022);
+        verify(ticketDAO, never()).update(any(), anyInt(), any());
     }
 
     /**
-     * Phương hướng xử lý là trường THỨ NĂM mà kỹ thuật viên được giao phiếu
-     * sửa được. Trước khi có cột này, phương hướng bị ghi nhờ vào ghi chú nội
-     * bộ của dòng lịch sử -- chỗ chỉ để trả lời "vì sao lúc đó đổi trạng
-     * thái", nên lịch sử vừa lặp nội dung vừa sai mục đích.
+     * Phương hướng xử lý có cột riêng. Trước khi có cột này, phương hướng bị ghi
+     * nhờ vào ghi chú nội bộ của dòng lịch sử -- chỗ chỉ để trả lời "vì sao lúc
+     * đó đổi trạng thái", nên lịch sử vừa lặp nội dung vừa sai mục đích.
+     * Task 9.3: người xử lý là Sales.
      */
     @Test
-    public void update_assignedTechnician_canWriteHandlingPlan() throws Exception {
-        loginAs("Kỹ thuật", 50);
-        when(request.getParameter("action")).thenReturn("update");
-        when(request.getParameter("ticketId")).thenReturn("3");
+    public void update_assignedSalesHandler_canWriteHandlingPlan() throws Exception {
+        loginAs("Sales", 50);
+        stubValidUpdateParams();
         when(request.getParameter("status")).thenReturn(TechnicalSupportTicketDAO.STATUS_IN_PROGRESS);
         when(request.getParameter("rootCause")).thenReturn("Quạt tản nhiệt hỏng bạc đạn");
         when(request.getParameter("causeCategory")).thenReturn("Do thiết bị");
@@ -443,9 +429,8 @@ public class TechnicalSupportTicketControllerTest {
      */
     @Test
     public void update_dangXuLy_coNguyenNhanVaPhuongHuongNhungChuaCoKetQua() throws Exception {
-        loginAs("Kỹ thuật", 50);
-        when(request.getParameter("action")).thenReturn("update");
-        when(request.getParameter("ticketId")).thenReturn("3");
+        loginAs("Sales", 50); // Task 9.3: người xử lý là Sales
+        stubValidUpdateParams();
         when(request.getParameter("status")).thenReturn(TechnicalSupportTicketDAO.STATUS_IN_PROGRESS);
         when(request.getParameter("rootCause")).thenReturn("Nứt vỏ cell do va đập");
         when(request.getParameter("handlingPlan")).thenReturn("Thay ngăn hỏng rồi đo kiểm tải");
@@ -600,13 +585,15 @@ public class TechnicalSupportTicketControllerTest {
     }
 
     /**
-     * Kỹ thuật viên mở danh sách không kèm tham số: mặc định "Phiếu của tôi" --
-     * cả bảng, phân trang lẫn bốn ô đếm đều chỉ tính phiếu giao cho mình.
+     * Task 9.3: người xử lý (Sales) chọn "Phiếu của tôi" -- cả bảng, phân trang
+     * lẫn bốn ô đếm đều chỉ tính phiếu giao cho mình. Mở lần đầu thì mặc định
+     * "Tất cả" như mọi vai (SPEC 5.5), không còn cờ isTechnician.
      */
     @Test
-    public void list_technicianNoParam_defaultsToOwnTickets() throws Exception {
-        loginAs("Kỹ thuật", 50);
+    public void list_salesHandlerChoosesMine_seesOwnTickets() throws Exception {
+        loginAs("Sales", 50);
         stubListView();
+        when(request.getParameter("assignee")).thenReturn("mine");
 
         controller.doGet(request, response);
 
@@ -614,7 +601,7 @@ public class TechnicalSupportTicketControllerTest {
         verify(ticketDAO).countAll(any(), any(), any(), any(), eq(50));
         verify(ticketDAO).countListSummary(any(), eq(50));
         verify(request).setAttribute("assigneeFilter", "mine");
-        verify(request).setAttribute("isTechnician", true);
+        verify(request, never()).setAttribute(eq("isTechnician"), any());
     }
 
     /** Admin / Sales mặc định thấy mọi phiếu. */
@@ -630,12 +617,12 @@ public class TechnicalSupportTicketControllerTest {
     }
 
     /**
-     * Kỹ thuật viên chủ động chọn "Tất cả": assignee=all tường minh, mặc định
-     * "của tôi" không được đè lên lựa chọn đó (nhất là khi sang trang 2).
+     * Người xử lý (Sales) chủ động chọn "Tất cả": assignee=all tường minh được giữ
+     * nguyên (nhất là khi sang trang 2).
      */
     @Test
-    public void list_technicianChoosesAll_seesEveryone() throws Exception {
-        loginAs("Kỹ thuật", 50);
+    public void list_salesHandlerChoosesAll_seesEveryone() throws Exception {
+        loginAs("Sales", 50);
         stubListView();
         when(request.getParameter("assignee")).thenReturn("all");
 
@@ -669,10 +656,11 @@ public class TechnicalSupportTicketControllerTest {
         verify(request).setAttribute("assigneeFilter", "all");
     }
 
-    /** Xuất Excel theo đúng ô "Người xử lý" như danh sách, kể cả mặc định của kỹ thuật viên. */
+    /** Xuất Excel theo đúng ô "Người xử lý" như danh sách: người xử lý chọn "Phiếu của tôi". */
     @Test
-    public void exportExcel_technicianNoParam_exportsOwnTickets() throws Exception {
-        loginAs("Kỹ thuật", 50);
+    public void exportExcel_salesHandlerChoosesMine_exportsOwnTickets() throws Exception {
+        loginAs("Sales", 50);
+        when(request.getParameter("assignee")).thenReturn("mine");
         when(request.getParameter("action")).thenReturn("exportExcel");
         when(ticketDAO.findAll(anyInt(), anyInt(), any(), any(), any(), any(), any()))
                 .thenReturn(Collections.emptyList());
@@ -1271,13 +1259,66 @@ public class TechnicalSupportTicketControllerTest {
     }
 
     /**
-     * Ngoại lệ của PERMISSIONS.md: kỹ thuật viên được giao phiếu vẫn phải mở
-     * được form sửa -- gác quyền ở GET không được chặt tay hơn handleUpdate,
-     * không thì họ có quyền lưu nhưng không có đường vào để lưu.
+     * QA Task 9.3: kiểm quyền đứng TRƯỚC bước tra phiếu. Vai không có quyền gửi id
+     * không tồn tại hoặc thiếu id vẫn nhận 403 MSG-022 (như id có thật), không phải
+     * redirect "notfound" -- không đoán được id nào tồn tại, và không đụng tới CSDL.
      */
     @Test
-    public void editForm_assignedTechnician_canOpenTheForm() throws Exception {
-        loginAs("Kỹ thuật", 50); // đúng assignedTechnicianId của phiếu
+    public void editForm_noAccessRole_unknownOrMissingId_returns403BeforeLookup() throws Exception {
+        loginAs(ROLE_TONG_HOP, 7);
+        when(request.getParameter("action")).thenReturn("edit");
+        when(request.getParameter("id")).thenReturn("999");
+        when(ticketDAO.findById(999)).thenReturn(null);
+
+        controller.doGet(request, response);
+
+        when(request.getParameter("id")).thenReturn(null);
+        controller.doGet(request, response);
+
+        verify(response, times(2)).sendError(HttpServletResponse.SC_FORBIDDEN, AccessControl.MSG_022);
+        verify(response, never()).sendRedirect(anyString());
+        verify(ticketDAO, never()).findById(anyInt());
+    }
+
+    /** QA Task 9.3: như form sửa -- POST update kiểm quyền trước khi đọc ticketId hay tra CSDL. */
+    @Test
+    public void update_noAccessRole_unknownOrMissingTicketId_returns403BeforeLookup() throws Exception {
+        loginAs("Kỹ thuật", 50); // vai cũ còn sót, không còn quyền gì trên phiếu
+        when(request.getParameter("action")).thenReturn("update");
+        when(request.getParameter("ticketId")).thenReturn("999");
+        when(ticketDAO.findById(999)).thenReturn(null);
+
+        controller.doPost(request, response);
+
+        when(request.getParameter("ticketId")).thenReturn(null);
+        controller.doPost(request, response);
+
+        verify(response, times(2)).sendError(HttpServletResponse.SC_FORBIDDEN, AccessControl.MSG_022);
+        verify(response, never()).sendRedirect(anyString());
+        verify(ticketDAO, never()).findById(anyInt());
+        verify(ticketDAO, never()).update(any(), anyInt(), any());
+    }
+
+    /** Người có quyền (Sales) mở form với id không tồn tại vẫn về danh sách kèm "notfound". */
+    @Test
+    public void editForm_salesWithUnknownId_stillRedirectsNotFound() throws Exception {
+        when(request.getParameter("action")).thenReturn("edit");
+        when(request.getParameter("id")).thenReturn("999");
+        when(ticketDAO.findById(999)).thenReturn(null);
+
+        controller.doGet(request, response);
+
+        verify(response).sendRedirect(CONTEXT_PATH + "/ticket?error=notfound");
+        verify(response, never()).sendError(anyInt(), anyString());
+    }
+
+    /**
+     * Task 9.3: người xử lý được giao là Sales -- mở form sửa như mọi Sales. Tài
+     * khoản còn sót vai Kỹ thuật cũ thì 403, kể cả khi phiếu giao cho chính họ.
+     */
+    @Test
+    public void editForm_assignedSalesHandlerOpens_legacyTechnicianGets403() throws Exception {
+        loginAs("Sales", 50); // đúng assignedTechnicianId của phiếu
         when(request.getParameter("action")).thenReturn("edit");
         when(request.getParameter("id")).thenReturn("3");
         when(ticketDAO.findById(3)).thenReturn(fullyValidExistingTicket());
@@ -1288,32 +1329,38 @@ public class TechnicalSupportTicketControllerTest {
 
         verify(response, never()).sendError(eq(HttpServletResponse.SC_FORBIDDEN), anyString());
         verify(dispatcher).forward(request, response);
+
+        loginAs("Kỹ thuật", 50);
+        controller.doGet(request, response);
+
+        verify(response).sendError(HttpServletResponse.SC_FORBIDDEN, AccessControl.MSG_022);
+        verify(dispatcher, times(1)).forward(request, response);
     }
 
     // ------------------------------------------------------------------
-    // Dropdown "Kỹ thuật viên phụ trách" chỉ liệt kê vai Kỹ thuật
+    // Dropdown "Người xử lý" chỉ liệt kê Sales đang hoạt động (BR-39)
     // ------------------------------------------------------------------
     //
-    // Khác hẳn màn Khách hàng/Hợp đồng (lọc Sales): phiếu giao cho Kỹ thuật.
-    // Trước đây cả ba màn dùng chung findAllActive() nên ô này -- vốn tên là
-    // "Kỹ thuật viên phụ trách" -- liệt kê cả CSKH lẫn Admin. Giao nhầm cho
-    // một CSKH thì phiếu nằm im: họ không có quyền sửa phiếu được giao.
+    // Task 9.3: vai Kỹ thuật đã gộp vào Sales, người xử lý chọn trong các Sales
+    // đang hoạt động. Không đổ findAllActive(): giao nhầm cho Admin hay Tổng hợp
+    // thì phiếu nằm im (Tổng hợp không vào được màn hình phiếu).
 
     @Test
-    public void createForm_chiDoNhanVienKyThuatVaoDropdown() throws Exception {
+    public void createForm_chiDoSalesDangHoatDongVaoDropdown() throws Exception {
         when(request.getParameter("action")).thenReturn("new");
         RequestDispatcher dispatcher = mock(RequestDispatcher.class);
         when(request.getRequestDispatcher("/jsp/customersupport/addnewTicket.jsp")).thenReturn(dispatcher);
 
         controller.doGet(request, response);
 
-        verify(employeeDAO).findActiveByRole("Kỹ thuật", (Integer) null);
+        verify(employeeDAO).findActiveByRole("Sales", (Integer) null);
+        verify(employeeDAO, never()).findActiveByRole(eq("Kỹ thuật"), any());
         verify(employeeDAO, never()).findAllActive();
     }
 
-    /** Kỹ thuật viên đang giữ phiếu phải còn trong ô kể cả khi đã đổi vai. */
+    /** Người xử lý đang giữ phiếu phải còn trong ô kể cả khi đã đổi vai. */
     @Test
-    public void editForm_giuLaiKyThuatVienDangDuocGiao() throws Exception {
+    public void editForm_giuLaiNguoiXuLyDangDuocGiao() throws Exception {
         when(request.getParameter("action")).thenReturn("edit");
         when(request.getParameter("id")).thenReturn("3");
         when(ticketDAO.findById(3)).thenReturn(fullyValidExistingTicket());
@@ -1322,7 +1369,7 @@ public class TechnicalSupportTicketControllerTest {
 
         controller.doGet(request, response);
 
-        verify(employeeDAO).findActiveByRole("Kỹ thuật", 50);
+        verify(employeeDAO).findActiveByRole("Sales", 50);
         verify(employeeDAO, never()).findAllActive();
     }
 

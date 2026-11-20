@@ -28,7 +28,7 @@ import poscs.validator.TicketValidator;
  * - BR-14: Hiển thị trạng thái trống khi danh sách không có dữ liệu.
  * - BR-45: Cung cấp đầy đủ các cột và dải KPI đầu trang (Mới tiếp nhận, Đang xử lý, Đã đóng, Khẩn cấp)
  *   theo kỳ và người xử lý đang chọn.
- * - UC-16: Kỹ thuật viên mở lần đầu mặc định bộ lọc "Phiếu của tôi" (mine); giữ nguyên bộ lọc khi phân trang.
+ * - UC-16: Mở lần đầu mặc định bộ lọc "Tất cả" (SPEC 5.5); giữ nguyên bộ lọc khi phân trang.
  * - Phân quyền qua {@link PermissionService}, vi phạm trả MSG-022.
  */
 @WebServlet(name = "TicketListController", urlPatterns = {"/ticket/list"})
@@ -181,7 +181,6 @@ public class TicketListController extends HttpServlet {
         request.setAttribute("statusFilter", fp.statusFilter);
         request.setAttribute("priorityFilter", fp.priorityFilter);
         request.setAttribute("assigneeFilter", fp.assigneeFilter);
-        request.setAttribute("isTechnician", ps.isTechnical(currentUser));
         Integer keepTechnicianId = ASSIGNEE_MINE.equals(fp.assigneeFilter) ? null : fp.assigneeId;
         request.setAttribute("technicianList", ts.findActiveTechnicians(keepTechnicianId));
         ContractFilterHelper.setPeriodAttributes(request, fp.period);

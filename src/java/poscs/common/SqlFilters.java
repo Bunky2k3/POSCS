@@ -63,8 +63,8 @@ public final class SqlFilters {
      * {@code " AND (a IN (?,?) OR b IN (?,?))"}.
      *
      * <p>Phiếu hỗ trợ cần nó: "phiếu của tôi" vừa là phiếu tôi được giao xử lý,
-     * vừa là phiếu tôi tiếp nhận -- hai vai trò khác nhau (Kỹ thuật và Sales)
-     * nhìn cùng một trang Dashboard.
+     * vừa là phiếu tôi tiếp nhận -- hai việc khác nhau, thường của hai Sales
+     * khác nhau, cùng nhìn một trang Dashboard.
      */
     public static String inClauseAny(List<String> columns, List<Integer> ids) {
         if (isEmpty(ids) || columns == null || columns.isEmpty()) {

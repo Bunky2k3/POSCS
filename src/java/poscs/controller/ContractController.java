@@ -49,8 +49,8 @@ import poscs.service.PermissionService;
  * sản phẩm, kỳ thanh toán, phụ lục, liên kết bán&harr;mua, bàn giao liên
  * phòng, tài liệu. Điều hướng theo tham số "action" -- quyền hạn theo
  * PERMISSIONS.md, enforce bằng AccessControl.requireFullAccess ở đầu mỗi hàm
- * handleCreate/handleUpdate/handleDelete (Kỹ thuật chỉ View only trên
- * Contract -- CSKH đã gộp vào Sales, xem PERMISSIONS.md).
+ * handleCreate/handleUpdate/handleDelete (Tổng hợp chỉ View only trên
+ * Contract -- CSKH và Kỹ thuật đã gộp vào Sales, xem PERMISSIONS.md).
  *
  * <p>Hạng mục sản phẩm (contractproducts) gắn/gỡ bằng hai action riêng
  * (addProduct / removeProduct) trên form sửa, không nằm trong form tạo:
@@ -1377,7 +1377,7 @@ public class ContractController extends HttpServlet {
             String direction, Integer keepCustomerId) {
         request.setAttribute("customerList", customerDAO.findAllByRole(
                 counterpartyRoleFor(direction), keepCustomerId));
-        // Hợp đồng giao cho Sales, không đổ cả Admin/Kỹ thuật vào ô
+        // Hợp đồng giao cho Sales, không đổ cả Admin/Tổng hợp vào ô
         // "người phụ trách".
         request.setAttribute("userList", employeeDAO.findActiveByRole(SALES_ROLE, keepUserId));
     }

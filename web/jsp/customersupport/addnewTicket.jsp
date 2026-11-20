@@ -5,7 +5,7 @@
     Request attribute do TechnicalSupportTicketController#showCreateForm
     thiết lập trước khi forward tới trang này:
       - customerList : List<poscs.model.Enterprise> (khách giữ vai "Khách mua", để đổ ô chọn "Khách hàng")
-      - userList      : List<poscs.model.User>       (nhân viên vai Kỹ thuật, để đổ dropdown "Kỹ thuật viên phụ trách")
+      - userList      : List<poscs.model.User>       (Sales đang hoạt động, để đổ dropdown "Người xử lý" -- BR-39)
 
     Dropdown "Hợp đồng liên quan" KHÔNG đổ sẵn từ server -- JS nạp qua AJAX
     (GET /contract/byEnterprise?enterpriseId=..., xem ContractController)
@@ -188,14 +188,14 @@
                     </div>
 
                     <div class="col-md-6 field-row">
-                        <label>Kỹ thuật viên phụ trách <span class="req">*</span></label>
+                        <label>Người xử lý <span class="req">*</span></label>
                         <select class="form-select" id="technician" name="assignedTechnicianId">
-                            <option value="">-- Chọn kỹ thuật viên --</option>
+                            <option value="">-- Chọn người xử lý --</option>
                             <c:forEach var="staff" items="${userList}">
                                 <option value="${staff.userId}">${fn:escapeXml(staff.fullName)}</option>
                             </c:forEach>
                         </select>
-                        <span class="error-text" id="err-technician">Vui lòng chọn kỹ thuật viên phụ trách.</span>
+                        <span class="error-text" id="err-technician">Vui lòng chọn người xử lý.</span>
                     </div>
                     <div class="col-md-6 field-row" style="display:flex; align-items:flex-end;">
                         <div class="form-check">

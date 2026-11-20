@@ -806,7 +806,7 @@
                                         <td>${not empty cp.notes ? fn:escapeXml(cp.notes) : '—'}</td>
                                         <td>
                                             <%-- Nút này TRƯỚC ĐÂY không hề kiểm quyền: vai chỉ-xem
-                                                 (Kỹ thuật, CSKH) mở trang cũng thấy nút gỡ, bấm vào
+                                                 (Tổng hợp) mở trang cũng thấy nút gỡ, bấm vào
                                                  mới nhận 403. Giờ dùng chung đúng một điều kiện với
                                                  form thêm bên dưới. --%>
                                         </td>

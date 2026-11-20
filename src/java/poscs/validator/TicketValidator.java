@@ -9,7 +9,7 @@ import poscs.model.TechnicalRequest;
 /**
  * Validator cho module Phiếu hỗ trợ kỹ thuật (UC-21, UC-22).
  * Quy tắc:
- * - BR-39: Bắt buộc Khách hàng, Loại phiếu, Mức ưu tiên, Kênh tiếp nhận, Mô tả sự cố, Kỹ thuật viên.
+ * - BR-39: Bắt buộc Khách hàng, Loại phiếu, Mức ưu tiên, Kênh tiếp nhận, Mô tả sự cố, Người xử lý.
  *          Trạng thái và Ngày tạo do hệ thống gán, không phải trường nhập.
  * - BR-40: Trạng thái hợp lệ và luồng chuyển: Mới tiếp nhận -> Đang xử lý -> Đã đóng (MSG-051).
  * - BR-41: Mức ưu tiên ∈ {Khẩn cấp, Cao, Bình thường, Thấp}.
@@ -75,7 +75,7 @@ public class TicketValidator extends BaseValidator {
     public static final String MSG_PRIORITY_REQUIRED = "Vui lòng chọn mức ưu tiên.";
     public static final String MSG_PRIORITY_INVALID = "Mức ưu tiên không hợp lệ.";
     public static final String MSG_CHANNEL_REQUIRED = "Vui lòng chọn kênh tiếp nhận.";
-    public static final String MSG_TECHNICIAN_REQUIRED = "Vui lòng chọn kỹ thuật viên phụ trách.";
+    public static final String MSG_TECHNICIAN_REQUIRED = "Vui lòng chọn người xử lý.";
     public static final String MSG_DESCRIPTION_REQUIRED = "Vui lòng mô tả sự cố.";
     public static final String MSG_STATUS_REQUIRED = "Trạng thái phiếu không được để trống.";
     public static final String MSG_STATUS_INVALID = "Trạng thái phiếu không hợp lệ.";
