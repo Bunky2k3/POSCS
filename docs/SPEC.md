@@ -57,7 +57,7 @@
 ### 3.1 Ba tác nhân
 1. **Admin:** toàn quyền hệ thống; quản lý nhân viên, phân công địa bàn, xem nhật ký hệ thống, chữa sai sót hợp đồng đã ký.
 2. **Sales:** quản lý khách hàng, hợp đồng; quản lý sản phẩm; tạo và xử lý phiếu hỗ trợ kỹ thuật (người xử lý phiếu là một Sales). Quyền **ghi** trên Khách hàng và Hợp đồng phụ thuộc việc Sales có cấp trên hay không (xem 3.2).
-3. **Tổng hợp:** xem khách hàng, hợp đồng, sản phẩm (không thêm, sửa, xoá); **không vào** phiếu hỗ trợ; xác nhận bàn giao hợp đồng cho phòng mình (UC-49); ghi nhận kỳ thanh toán **đã thu** (UC-53), không lập, không xoá kỳ.
+3. **Tổng hợp:** xem khách hàng, hợp đồng, sản phẩm (không thêm, sửa, xoá); **không vào** phiếu hỗ trợ; xác nhận bàn giao hợp đồng cho phòng mình (UC-49); ghi nhận kỳ thanh toán **đã thu**, nhập được số tiền thực thu (UC-53); không lập, sửa, xoá kỳ, không ghi nhận nộp hồ sơ.
 
 **Phòng ban:** Ban giám đốc (Giám đốc, Phó giám đốc dùng tài khoản Admin), Phòng kinh doanh (vai Sales), Phòng tổng hợp (vai Tổng hợp; phòng duy nhất nhận bàn giao hợp đồng, xem 5.4).
 
@@ -82,8 +82,8 @@
 | Xem danh sách & chi tiết Sản phẩm | X | X | X |
 | Tạo / Cập nhật / Xóa Sản phẩm | X | X | - |
 | Xem danh sách, chi tiết, nhật ký trạng thái Hợp đồng; Xuất danh sách HĐ | X | X | X |
-| Tạo, Cập nhật, Huỷ bản ghi, Ký HĐ; Tạo phụ lục; Liên kết Bán↔Mua; Khởi tạo bàn giao; Quản lý tài liệu; Lập / xoá kỳ thanh toán; Thêm/gỡ SP trong HĐ | X | X (*) | - |
-| Ghi nhận kỳ thanh toán **đã thu** (UC-53) | X | X (*) | X |
+| Tạo, Cập nhật, Huỷ bản ghi, Ký HĐ; Tạo phụ lục; Liên kết Bán↔Mua; Khởi tạo bàn giao; Quản lý giấy tờ (UC-52); Lập / sửa / xoá kỳ thanh toán, ghi nhận **đã nộp hồ sơ** (UC-53); Thêm/gỡ SP trong HĐ | X | X (*) | - |
+| Ghi nhận kỳ thanh toán **đã thu**, kèm số tiền thực thu (UC-53) | X | X (*) | X |
 | Chữa sai sót nhập liệu HĐ đã ký (UC-54) | X | - | - |
 | Xem danh sách, chi tiết, tìm kiếm Phiếu hỗ trợ; Xuất phiếu | X | X | - |
 | **Tạo** Phiếu hỗ trợ | X | X | - |
@@ -137,14 +137,14 @@
 ### 4.4 Hợp đồng
 | UC | Tên | Tác nhân |
 |---|---|---|
-| UC-10 | Xem danh sách hợp đồng | Admin, Sales, Tổng hợp |
-| UC-11 | Xem chi tiết hợp đồng | Admin, Sales, Tổng hợp |
-| UC-33 | Tạo hợp đồng | Admin, Sales (quản lý vùng) |
+| UC-10 | Xem danh sách hợp đồng (chưa có mã hiện "Chưa có số", BR-58; hợp đồng Nháp có nhãn và bộ lọc bước giao hàng, BR-61) | Admin, Sales, Tổng hợp |
+| UC-11 | Xem chi tiết hợp đồng (giấy tờ dạng ô tích chỉ đọc, BR-59; kỳ thanh toán kèm tình trạng, BR-60; bước giao hàng và ngày giao, BR-61) | Admin, Sales, Tổng hợp |
+| UC-33 | Tạo hợp đồng (mở hồ sơ Nháp từ lúc làm phiếu GQNCKH; mã hợp đồng để trống được tới lúc Ký, BR-58) | Admin, Sales (quản lý vùng) |
 | UC-34 | Huỷ bản ghi hợp đồng (xóa mềm) | Admin, Sales (quản lý vùng) nếu Nháp; chỉ Admin nếu đã ký |
 | UC-35 | Cập nhật hợp đồng | Admin, Sales (quản lý vùng) |
 | UC-39 | Thêm / gỡ sản phẩm trong hợp đồng (kèm số lượng, đơn vị, ghi chú) | Admin, Sales (quản lý vùng) |
 | UC-41 | Xuất danh sách hợp đồng ra Excel (cùng bộ lọc, không phân trang, sắp theo tỉnh/thành) | Admin, Sales, Tổng hợp |
-| UC-44 | Ký hợp đồng (Nháp → Đã ký; cần đủ ngày hiệu lực & kết thúc) | Admin, Sales (quản lý vùng) |
+| UC-44 | Ký hợp đồng (Nháp → Đã ký; cần có mã hợp đồng không trùng, BR-58, MSG-061, và đủ ngày hiệu lực & kết thúc) | Admin, Sales (quản lý vùng) |
 | UC-45 | Xem nhật ký thay đổi trạng thái hợp đồng | Admin, Sales, Tổng hợp |
 | UC-46 | Tạo phụ lục hợp đồng (điều chỉnh giá trị cho HĐ gốc **đã ký**, chưa phải phụ lục) | Admin, Sales (quản lý vùng) |
 | UC-47 | Liên kết hợp đồng Bán ↔ Mua (và gỡ liên kết) | Admin, Sales (quản lý vùng) |
@@ -152,8 +152,8 @@
 | UC-49 | Xác nhận xử lý bàn giao | Admin, nhân viên phòng nhận (phòng Tổng hợp) |
 | UC-50 | Gửi yêu cầu thay đổi (tạo mới/lập phụ lục) | Nhân viên có cấp trên |
 | UC-51 | Duyệt / từ chối yêu cầu thay đổi | Admin, quản lý trực tiếp của người gửi |
-| UC-52 | Quản lý tài liệu đính kèm (chỉ gắn **đường dẫn**, không upload; hủy mềm kèm lý do bắt buộc) | Admin, Sales (quản lý vùng) |
-| UC-53 | Quản lý kỳ thanh toán (lập kỳ, ghi nhận đã thu, xóa kỳ lập nhầm) | Admin, Sales (quản lý vùng); Tổng hợp: **chỉ ghi nhận đã thu** (không lập, không xoá kỳ) |
+| UC-52 | Quản lý giấy tờ của hợp đồng (danh mục dạng ô tích; mỗi tờ có ngày trên giấy, số giấy, đường dẫn **không bắt buộc**, không upload; huỷ mềm kèm lý do bắt buộc; BR-59) | Admin, Sales (quản lý vùng) |
+| UC-53 | Quản lý kỳ thanh toán (lập, sửa kỳ; ghi nhận đã nộp hồ sơ; ghi nhận đã thu kèm số tiền thực thu; xóa kỳ lập nhầm; BR-60) | Admin, Sales (quản lý vùng); Tổng hợp: **chỉ ghi nhận đã thu**, nhập được số tiền thực thu (không lập, sửa, xoá kỳ, không ghi nhận nộp hồ sơ) |
 | UC-54 | Chữa sai sót nhập liệu HĐ đã ký (chưa thanh lý/chấm dứt; bắt buộc lý do; ghi nhật ký loại sự kiện riêng; **ngày ký không sửa được**) | Admin |
 | ~~UC-40~~ | ~~Nhập HĐ từ PDF~~ (đã gỡ) | - |
 
@@ -172,9 +172,9 @@
 |---|---|---|
 | UC-14 | Xem danh sách thông báo (chỉ của chính mình) | Admin, Sales, Tổng hợp |
 | UC-15 | Đánh dấu thông báo đã đọc | Admin, Sales, Tổng hợp |
-| UC-36 | Xem trang tổng quan (số KH, KH mới trong tháng, tình trạng HĐ, doanh thu tháng, tình trạng phiếu, HĐ sắp hết hạn) | Admin, Sales, Tổng hợp |
+| UC-36 | Xem trang tổng quan (số KH, KH mới trong tháng, tình trạng HĐ, doanh thu tháng theo số tiền thực thu (BR-18), tình trạng phiếu, HĐ sắp hết hạn, HĐ "Đã giao – chưa ký" (BR-61)) | Admin, Sales, Tổng hợp |
 | UC-43 | Xem nhật ký hệ thống (đọc tệp log trên trình duyệt, lọc từ khóa, tải 1 tệp) | Admin |
-| Hệ thống | `NotificationScheduler` (xem 5.7): bộ hẹn giờ chạy nền, tự sinh thông báo cho HĐ sắp hết hạn và phiếu sắp/đã quá hạn SLA | - |
+| Hệ thống | `NotificationScheduler` (xem 5.7): bộ hẹn giờ chạy nền, tự sinh thông báo cho HĐ sắp hết hạn, phiếu sắp/đã quá hạn SLA và HĐ đã giao hàng quá 15 ngày chưa ký (BR-62) | - |
 
 ### 4.7 Quản lý nhân viên (chỉ Admin)
 | UC | Tên |
@@ -217,15 +217,24 @@
 - **UC-20 Xóa:** hộp thoại xác nhận (BR-49, MSG-054); **chặn** nếu sản phẩm nằm trong hợp đồng còn hiệu lực; xóa mềm.
 
 ### 5.4 Hợp đồng
-- **Tạo (UC-33):** bắt buộc Mã hợp đồng (nhập tay theo bản giấy), Tiêu đề, Loại hợp đồng, Khách hàng/NCC (đúng vai), Người phụ trách (lấy theo người tạo, xem BR-35). Tùy chọn: giá trị hợp đồng, số ủy quyền, nơi ký. Người ký bên mình do hệ thống tự điền (BR-56); người ký & chức vụ bên đối tác tuỳ chọn. **Biểu mẫu không có ô ngày và hàng hóa.** Lưu ở tiến độ **Nháp**, ghi nhật ký "Khởi tạo". Mã trùng → báo "Mã hợp đồng này đã có hợp đồng khác dùng...". **Chiều Bán/Mua** lấy theo mục đang đứng và **không đổi được**.
-- **Ngày ký:** KHÔNG phải trường nhập tay; hệ thống đóng dấu ngày hiện tại khi Ký (UC-44). Ràng buộc Ngày ký ≤ Ngày hiệu lực ≤ Ngày kết thúc (BR-36). Chỉ điền một mốc hoặc hiệu lực sau kết thúc → MSG-045.
-- **Tiến độ (vòng đời):** `Nháp → Đã ký → Đã thanh lý | Chấm dứt sớm`.
+- **Vòng đời theo cách chi nhánh làm (quyết định 14, mục 11):** luồng thật là phiếu GQNCKH → phiếu ĐCNB → gọi xe → giao hàng cho khách → thương thảo, ký hợp đồng → bàn giao phòng Tổng hợp → tạm ứng (nếu có) → nghiệm thu, nộp hồ sơ thanh toán cho bên mua → bên mua trả trong số ngày đã thoả thuận → thanh lý. Hồ sơ hợp đồng **Nháp** mở từ lúc làm phiếu GQNCKH; **mã hợp đồng để trống tới lúc Ký** (BR-58); ngày hiệu lực/kết thúc để trống tới khi chốt với khách. Các mốc trước khi ký theo dõi qua giấy tờ của hợp đồng (BR-59): từ đó hệ thống suy ra **bước giao hàng** "Chuẩn bị hàng" / "Đã giao – chưa ký" (BR-61) và nhắc người phụ trách khi đã giao hàng quá 15 ngày mà chưa ký (BR-62). POSCS chỉ theo dõi hợp đồng: không theo dõi số lượng hàng, tồn kho, điều xe; không làm kế toán hay quản lý hồ sơ.
+- **Tạo (UC-33):** bắt buộc Tiêu đề, Loại hợp đồng, Khách hàng/NCC (đúng vai), Người phụ trách (lấy theo người tạo, xem BR-35). **Mã hợp đồng** nhập tay theo bản giấy, **để trống được** khi còn Nháp (BR-58). Tùy chọn: giá trị hợp đồng, số ủy quyền, nơi ký. Người ký bên mình do hệ thống tự điền (BR-56); người ký & chức vụ bên đối tác tuỳ chọn. **Biểu mẫu không có ô ngày và hàng hóa.** Lưu ở tiến độ **Nháp**, ghi nhật ký "Khởi tạo". Có nhập mã mà trùng hợp đồng khác → báo "Mã hợp đồng này đã có hợp đồng khác dùng..."; để trống mã thì không kiểm trùng. **Chiều Bán/Mua** lấy theo mục đang đứng và **không đổi được**.
+- **Ký (UC-44):** chỉ hợp đồng **Nháp**. Phải có mã hợp đồng (chưa có → MSG-061), mã không trùng hợp đồng khác (BR-58), và đủ ngày hiệu lực & kết thúc (thiếu → MSG-045). **Ngày ký** KHÔNG phải trường nhập tay; hệ thống đóng dấu ngày hiện tại khi bấm Ký, hiệu lực tính từ ngày ký. Ràng buộc Ngày ký ≤ Ngày hiệu lực ≤ Ngày kết thúc (BR-36, không nới cho hàng đã giao trước khi ký). Chỉ điền một mốc hoặc hiệu lực sau kết thúc → MSG-045.
+- **Tiến độ (vòng đời):** `Nháp → Đã ký → Đã thanh lý | Chấm dứt sớm`. Giữ nguyên bốn giá trị này; bước giao hàng (BR-61) là trục riêng, suy ra mỗi lần đọc, không phải một giá trị tiến độ.
 - **Trạng thái tự tính** (BR-17) từ ngày hiệu lực/kết thúc: *Chưa hiệu lực* (chưa tới ngày hiệu lực, hoặc thiếu ngày) / *Đang hiệu lực* / *Sắp hết hạn* (còn ≤ 30 ngày) / *Đã hết hạn*. Khác với "Tiến độ".
-- **Cập nhật (UC-35):** Nháp sửa mọi ô kể cả thời hạn, trừ người ký bên mình (BR-56); Người phụ trách không đổi được ở mọi tiến độ (trừ ngoại lệ của Admin ở BR-35); **đã ký** thì form Sửa không còn ô nào sửa được (thay đổi đi qua phụ lục, sai sót nhập liệu đi qua UC-54); **Đã thanh lý/Chấm dứt sớm** không sửa. Sửa sai nhập liệu hợp đồng đã ký đi qua UC-54; sửa đổi thật đi qua phụ lục. Phụ lục còn Nháp: khoản giảm trừ lớn hơn giá trị còn lại của HĐ gốc bị từ chối.
+- **Cập nhật (UC-35):** Nháp sửa mọi ô kể cả thời hạn và mã hợp đồng (để trống được, BR-58), trừ người ký bên mình (BR-56); Người phụ trách không đổi được ở mọi tiến độ (trừ ngoại lệ của Admin ở BR-35); **đã ký** thì form Sửa không còn ô nào sửa được (thay đổi đi qua phụ lục, sai sót nhập liệu đi qua UC-54); **Đã thanh lý/Chấm dứt sớm** không sửa. Sửa sai nhập liệu hợp đồng đã ký đi qua UC-54; sửa đổi thật đi qua phụ lục. Phụ lục còn Nháp: khoản giảm trừ lớn hơn giá trị còn lại của HĐ gốc bị từ chối.
 - **Người ký bên mình (BR-56):** họ tên, chức vụ, SĐT, fax của Giám đốc chi nhánh, lấy từ Thông tin chi nhánh (UC-55); trên form tạo/sửa hợp đồng chỉ hiển thị, không sửa tay. Hệ thống chép vào hợp đồng khi tạo hợp đồng (UC-33) hoặc phụ lục (UC-46) và mỗi lần lưu bản Nháp (UC-35); từ Đã ký giữ nguyên, chữa sai sót (UC-54) không đổi bốn ô này. Chưa khai thông tin chi nhánh (họ tên GĐCN còn trống): form hiện MSG-060; tạo mới thì để trống cả bốn ô, bản Nháp giữ giá trị đang có.
 - **Huỷ bản ghi (UC-34, BR-37):** là xóa mềm do **nhập nhầm** (không phải hủy HĐ ngoài đời). **Bắt buộc lý do** (hộp thoại MSG-043). Nháp: Admin hoặc quản lý vùng. Đã ký trở đi: **chỉ Admin**. **Chặn** nếu HĐ đã có phụ lục. Kiểm quyền, đánh dấu huỷ và ghi nhật ký trong **một giao dịch**.
-- **Danh sách (UC-10):** hiển thị theo từng chiều (bán/mua); cột theo BR-16; bốn ô trạng thái đồng thời là bộ lọc; tìm theo mã, tiêu đề, tên đối tác; lọc theo loại, tỉnh/thành (chỉ HĐ bán), kỳ theo ngày ký, tiến độ, chỉ HĐ gốc, đang bàn giao. Mặc định mọi vai trò chỉ thấy HĐ **còn hiệu lực trong tháng hiện tại**; có chuyển "Của tôi / Toàn chi nhánh" và "Mọi thời điểm". Bộ lọc giữ khi phân trang và khi xuất Excel.
-- **Chi tiết (UC-11):** thanh vòng đời, hàng hóa, phụ lục, kỳ thanh toán, bàn giao, liên kết bán-mua, tài liệu, nhật ký. Người có quyền quản lý thấy thêm nút "Quản lý hợp đồng" (sang UC-35).
+- **Danh sách (UC-10):** hiển thị theo từng chiều (bán/mua); cột theo BR-16; bốn ô trạng thái đồng thời là bộ lọc; tìm theo mã, tiêu đề, tên đối tác; lọc theo loại, tỉnh/thành (chỉ HĐ bán), kỳ theo ngày ký, tiến độ, bước giao hàng (BR-61), chỉ HĐ gốc, đang bàn giao. Hợp đồng chưa có mã hiện "Chưa có số" ở mọi chỗ (danh sách, chi tiết, Excel, hàng chờ bàn giao, tổng quan; phụ lục của hợp đồng gốc chưa có mã ghi "PL của Chưa có số"), vẫn tìm được theo tiêu đề (BR-58). Hợp đồng Nháp có nhãn bước giao hàng cạnh tiến độ. Mặc định mọi vai trò chỉ thấy HĐ **còn hiệu lực trong tháng hiện tại**; có chuyển "Của tôi / Toàn chi nhánh" và "Mọi thời điểm". Bộ lọc giữ khi phân trang và khi xuất Excel.
+- **Chi tiết (UC-11):** thanh vòng đời, hàng hóa, phụ lục, kỳ thanh toán (loại kỳ, hạn thu, tình trạng; số tiền thực thu khi khác số tiền kỳ; BR-60), bàn giao, liên kết bán-mua, giấy tờ (danh mục dạng ô tích, chỉ đọc; tờ có đường dẫn thì có nút mở; BR-59), nhật ký. Hợp đồng Nháp hiện bước giao hàng, ngày giao và số ngày đã giao (BR-61). Vai Tổng hợp ghi nhận đã thu ngay ở trang chi tiết, nhập được số tiền thực thu. Người có quyền quản lý thấy thêm nút "Quản lý hợp đồng" (sang UC-35).
+- **Giấy tờ (UC-52, BR-59):** thay mục "Tài liệu" cũ, vẫn trên bảng `contract_documents` (không có bảng hay mô-đun mới). Một danh sách chung cho cả hợp đồng: không tách theo kỳ thanh toán, không có mẫu giấy theo loại kỳ. Màn hình hiện đủ danh mục ở BR-59 dạng ô tích: loại đã có tờ thì có dấu tích kèm từng tờ (ngày, số, đường dẫn nếu có); bấm ô trống hoặc "Thêm tờ" để nhập ngày trên giấy, số giấy, tên giấy tờ (bắt buộc với loại "Khác"), đường dẫn, ghi chú. Thiếu ngày → MSG-062; ngày sau hôm nay → MSG-063. Đường dẫn không bắt buộc; có nhập thì phải là đường dẫn `http://` hoặc `https://` hợp lệ (vẫn chỉ gắn đường dẫn, không upload file). Bỏ tích một tờ là huỷ mềm, bắt buộc lý do (hộp thoại trong trang). Thêm và huỷ ghi nhật ký hợp đồng. Làm được ở mọi tiến độ, kể cả sau thanh lý. Admin, Sales quản lý vùng thêm/huỷ; Sales có cấp trên và Tổng hợp chỉ xem.
+- **Kỳ thanh toán (UC-53, BR-60):** theo mẫu điều khoản thanh toán của hợp đồng thật (tạm ứng, rồi thanh toán sau khi nghiệm thu và nộp hồ sơ; bên mua trả trong số ngày đã thoả thuận).
+  - **Lập / sửa kỳ:** loại (Tạm ứng / Thanh toán), số tiền, điều kiện (ghi ngắn), số ngày phải trả kể từ khi nộp hồ sơ (không bắt buộc), hạn thu (để trống được). Form có ô "%" tính sẵn số tiền từ giá trị hợp đồng; chỉ lưu số tiền, số tiền kỳ không tự tính lại khi phụ lục đổi giá trị hợp đồng.
+  - **"Đã nộp hồ sơ":** nhập ngày nộp (sau hôm nay → MSG-064). Kỳ có số ngày thì hệ thống tính hạn thu = ngày nộp + số ngày; kỳ không có số ngày thì nhập hạn thu tay (không bắt buộc, chốt 20/11/2026; kỳ đã có hạn thu thì điền sẵn hạn đó).
+  - **"Đã thu":** nhập ngày thu và số tiền thực thu (điền sẵn số tiền kỳ, phải lớn hơn 0; khác số tiền kỳ thì không cần lý do).
+  - **Tình trạng** suy ra theo BR-60: Chưa nộp hồ sơ → Chờ thu → Quá hạn → Đã thu. Kỳ đã nộp hồ sơ mà chưa có hạn thu hiện **Chờ thu** (chốt 20/11/2026).
+  - **Ai, khi nào:** lập, sửa, xoá kỳ: Admin, Sales quản lý vùng, chỉ khi kỳ chưa thu và hợp đồng chưa ở tiến độ Đã thanh lý / Chấm dứt sớm. "Đã nộp hồ sơ": Admin, Sales quản lý vùng. "Đã thu": Admin, Sales quản lý vùng, Tổng hợp. Hai thao tác "Đã nộp hồ sơ" và "Đã thu" làm được cả sau thanh lý. Mỗi thao tác ghi nhật ký hợp đồng.
+  - **Không làm:** trạng thái "Đủ hồ sơ", giấy riêng của từng kỳ, bảng "kỳ cần giấy gì", kỳ "Thanh toán 100%" tự tạo, cảnh báo tổng tỷ lệ; tạm ứng không thu hồi dần.
 - **Bàn giao (UC-48, UC-49):** phòng nhận bàn giao là **phòng Tổng hợp**, phòng duy nhất nhận (hai phòng Kế toán và Dự án cũ đã gộp vào). Admin hoặc Sales quản lý vùng khởi tạo bàn giao; Admin hoặc nhân viên phòng Tổng hợp xác nhận đã xử lý. Một hợp đồng không có hai chặng cùng đang mở ở một phòng.
 - Giá trị hợp đồng và số tiền từng kỳ thanh toán lưu & hiển thị trực tiếp trên hồ sơ HĐ (BR-18).
 
@@ -251,12 +260,13 @@
 ### 5.7 Thông báo
 - Chỉ xem thông báo của chính mình; sắp xếp mới nhất lên đầu, hiển thị số chưa đọc (BR-20).
 - **Thông báo không do người dùng tạo tay.** Hệ thống tự sinh thông báo từ hai nguồn:
-  - **Định kỳ qua `NotificationScheduler`** (chạy nền, **chu kỳ 60 phút**) cho đúng hai trường hợp:
+  - **Định kỳ qua `NotificationScheduler`** (chạy nền, **chu kỳ 60 phút**) cho đúng ba trường hợp:
     1. **Hợp đồng sắp hết hạn** (`ref_type = "CONTRACT"`) → gửi cho **người phụ trách hợp đồng**. "Sắp hết hạn" theo BR-17 (còn ≤ 30 ngày tới ngày kết thúc).
     2. **Phiếu hỗ trợ sắp / đã quá hạn SLA** (`ref_type = "TICKET"`) → gửi cho **người xử lý được phân công** (Sales). "Sắp quá hạn" = còn ≤ **24 giờ** tới hạn SLA.
-    - Mỗi cặp (đối tượng, người nhận) chỉ sinh **một** thông báo; chạy lại nhiều lần **không tạo bản ghi trùng**.
+    3. **Hợp đồng đã giao hàng mà chưa ký** (BR-62; `ref_type` riêng, khác loại 1) → gửi cho **người phụ trách hiện tại** của hợp đồng, không gửi Admin. Hợp đồng Nháp ở bước "Đã giao – chưa ký" (BR-61) có ngày giao ≤ hôm nay − 15 ngày. Nội dung MSG-065; bấm vào thông báo mở trang chi tiết hợp đồng. Chỉ nhắc **một lần**, không nhắc lặp lại.
+    - Mỗi cặp (đối tượng, người nhận) chỉ sinh **một** thông báo cho mỗi loại; chạy lại nhiều lần **không tạo bản ghi trùng**.
   - **Theo sự kiện yêu cầu thay đổi (`UC-50`, `UC-51`, `ref_type = "CHANGE_REQUEST"`)**:
-    3. Khi nhân viên có cấp trên gửi yêu cầu thay đổi (`UC-50`) → gửi thông báo cho **người quản lý trực tiếp** (`manager_id`). Khi người quản lý (hoặc Admin) duyệt / từ chối yêu cầu (`UC-51`) → gửi thông báo kết quả cho **người gửi yêu cầu** (`requested_by`).
+    4. Khi nhân viên có cấp trên gửi yêu cầu thay đổi (`UC-50`) → gửi thông báo cho **người quản lý trực tiếp** (`manager_id`). Khi người quản lý (hoặc Admin) duyệt / từ chối yêu cầu (`UC-51`) → gửi thông báo kết quả cho **người gửi yêu cầu** (`requested_by`).
   - Không có thông báo nhắc hạn thanh toán.
 - Mở danh sách **KHÔNG** tự đánh dấu đã đọc; phải bấm từng thông báo hoặc "Đánh dấu tất cả đã đọc" (BR-21). Mã thông báo không thuộc người dùng → bỏ qua, không đổi dữ liệu.
 
@@ -268,7 +278,7 @@
 
 ---
 
-## 6. Quy tắc nghiệp vụ (BR-01 → BR-57)
+## 6. Quy tắc nghiệp vụ (BR-01 → BR-62)
 
 | Mã | Quy tắc |
 |---|---|
@@ -289,7 +299,7 @@
 | BR-15 | Dashboard lọc theo Năm và Kỳ (quý/tháng/năm) chọn từ dropdown; năm không hợp lệ/trống → coi như không lọc (hiện toàn bộ). |
 | BR-16 | Cột danh sách HĐ: STT, Hợp đồng (tiêu đề + tỉnh/thành · KH), Loại, Thời hạn (ngày ký → kết thúc), Trạng thái, Tiến độ, Phụ trách, Thao tác. |
 | BR-17 | Trạng thái HĐ tự tính: Chưa hiệu lực / Đang hiệu lực / Sắp hết hạn (≤ 30 ngày) / Đã hết hạn (xem 5.4). |
-| BR-18 | Doanh thu hiển thị VND, có dấu phân cách hàng nghìn. Giá trị HĐ và số tiền kỳ thanh toán cũng lưu/hiển thị trên hồ sơ HĐ. |
+| BR-18 | Doanh thu hiển thị VND, có dấu phân cách hàng nghìn. Doanh thu cộng **số tiền thực thu** của các kỳ đã thu, tính theo **ngày thu**; chưa tách riêng tạm ứng. Giá trị HĐ và số tiền kỳ thanh toán cũng lưu/hiển thị trên hồ sơ HĐ. |
 | BR-19 | Chi tiết sản phẩm gồm: Thông tin (mã, danh mục, mô tả, ngày tạo), Hình ảnh, Catalogue, Hợp đồng sử dụng. |
 | BR-20 | Trung tâm thông báo hiện số chưa đọc, mới nhất lên đầu. |
 | BR-21 | Mở danh sách thông báo KHÔNG tự đánh dấu đã đọc. |
@@ -306,7 +316,7 @@
 | BR-32 | Ngày tham gia của KH không ở tương lai. |
 | BR-33 | SĐT và email liên hệ của KH phải hợp lệ. |
 | BR-34 | Xóa KH: có hộp thoại xác nhận, **xóa mềm** (Inactive); cấm xóa nếu KH có HĐ còn hiệu lực. |
-| BR-35 | Bắt buộc khi tạo HĐ: Mã HĐ, Tiêu đề, Khách hàng, Loại HĐ, Người phụ trách. Ngày ký không nhập tay; hệ thống đóng dấu khi bấm Ký. Người phụ trách: Sales tạo → chính người tạo, không chọn; Admin tạo → chọn một Sales đang hoạt động; phụ lục → người phụ trách của hợp đồng gốc. Không đổi được sau khi tạo; ngoại lệ: Admin đổi được khi người phụ trách hiện tại đã bị khoá tài khoản. |
+| BR-35 | Bắt buộc khi tạo HĐ: Tiêu đề, Khách hàng, Loại HĐ, Người phụ trách. Mã HĐ không bắt buộc khi còn Nháp, bắt buộc trước khi Ký (BR-58). Ngày ký không nhập tay; hệ thống đóng dấu khi bấm Ký. Người phụ trách: Sales tạo → chính người tạo, không chọn; Admin tạo → chọn một Sales đang hoạt động; phụ lục → người phụ trách của hợp đồng gốc. Không đổi được sau khi tạo; ngoại lệ: Admin đổi được khi người phụ trách hiện tại đã bị khoá tài khoản. |
 | BR-36 | Ngày ký ≤ Ngày hiệu lực ≤ Ngày kết thúc. |
 | BR-37 | Huỷ HĐ (nhập nhầm): bắt buộc lý do. Nháp: người có quyền quản lý HĐ đều huỷ được. Từ Đã ký: chỉ Admin; chặn nếu có phụ lục. |
 | BR-38 | Phiếu hỗ trợ tự sinh Mã ticket duy nhất. |
@@ -329,6 +339,11 @@
 | BR-55 | Mã SP duy nhất nhờ UNIQUE ở DB (không kiểm trùng ở tầng ứng dụng); trùng thì tự sinh lại. Mã không đổi sau khi tạo. |
 | BR-56 | Người ký bên mình (họ tên, chức vụ, SĐT, fax) luôn lấy từ Thông tin chi nhánh, không sửa tay trên form hợp đồng. Hệ thống chép vào hợp đồng khi tạo (UC-33, UC-46) và mỗi lần lưu khi hợp đồng còn Nháp (UC-35). Từ Đã ký trở đi giữ nguyên; UC-54 không đổi bốn ô này. Chưa khai thông tin chi nhánh (họ tên GĐCN còn trống): tạo mới thì để trống cả bốn ô, bản Nháp giữ giá trị đang có. |
 | BR-57 | Thông tin chi nhánh: họ tên và chức vụ GĐCN bắt buộc, tối đa 100 ký tự. SĐT và fax không bắt buộc; nếu nhập thì tối đa 20 ký tự, phải có 8–15 chữ số, ngoài chữ số chỉ cho phép dấu `+` ở đầu, khoảng trắng, dấu chấm, gạch ngang, ngoặc đơn (nhận cả số máy bàn, nên không áp BR-09). |
+| BR-58 | **Mã hợp đồng:** nhập tay theo bản giấy. Không bắt buộc khi còn Nháp; bắt buộc và duy nhất trước khi Ký (UC-44): chưa có mã thì chặn Ký, báo MSG-061. Mã đã nhập (kể cả khi còn Nháp) không được trùng hợp đồng khác; nhiều hợp đồng cùng chưa có mã không bị coi là trùng. Chưa có mã thì mọi chỗ hiển thị ghi "Chưa có số". |
+| BR-59 | **Giấy tờ của hợp đồng (UC-52):** một danh sách chung cho cả hợp đồng. Mỗi tờ có: loại, ngày trên giấy (bắt buộc, không sau hôm nay; MSG-062, MSG-063), số giấy, link (không bắt buộc), ghi chú; loại "Khác" thì bắt nhập tên. Danh mục: Phiếu GQNCKH, Phiếu ĐCNB, Biên bản giao nhận hàng hoá, Hợp đồng đã ký, Phụ lục đã ký, Đề nghị tạm ứng, Bảo lãnh tạm ứng, Biên bản nghiệm thu bàn giao, CO, CQ, Đề nghị thanh toán, Hoá đơn GTGT, Biên bản phạt, Biên bản thanh lý, Khác. Một loại có thể có nhiều tờ. "Biên bản giao nhận hàng hoá" là tờ ký lúc hàng tới khách (có thể trước ngày ký); "Biên bản nghiệm thu bàn giao" là tờ trong hồ sơ thanh toán. Huỷ một tờ (bỏ tích) là huỷ mềm, bắt buộc lý do. Thêm và huỷ đều ghi nhật ký hợp đồng. Làm được ở mọi tiến độ, kể cả sau thanh lý. |
+| BR-60 | **Kỳ thanh toán (UC-53):** mỗi kỳ có: loại (Tạm ứng / Thanh toán), số tiền, điều kiện (ghi ngắn), số ngày phải trả kể từ khi nộp hồ sơ (không bắt buộc), hạn thu (để trống được khi lập). "Đã nộp hồ sơ": ghi ngày nộp (không sau hôm nay, MSG-064); kỳ có số ngày thì hạn thu = ngày nộp + số ngày, không có thì nhập hạn tay (không bắt buộc). "Đã thu": ngày thu và số tiền thực thu (mặc định bằng số tiền kỳ, lớn hơn 0; khác số tiền kỳ thì không bắt lý do). Tình trạng suy ra, không lưu, xét theo thứ tự: có ngày thu → **Đã thu**; hạn thu trước hôm nay → **Quá hạn**; có hạn thu, hoặc đã có ngày nộp hồ sơ dù chưa có hạn thu → **Chờ thu**; còn lại → **Chưa nộp hồ sơ**. Lập, sửa, xoá kỳ chỉ khi kỳ chưa thu và hợp đồng chưa thanh lý/chấm dứt; "Đã nộp hồ sơ" và "Đã thu" bấm được cả sau thanh lý. Form có ô "%" để tính sẵn số tiền từ giá trị hợp đồng; chỉ lưu số tiền. Tạm ứng không thu hồi dần. |
+| BR-61 | **Bước giao hàng** (suy ra, không lưu, chỉ với hợp đồng Nháp; tính từ giấy tờ chưa huỷ ở BR-59): có Phiếu GQNCKH hoặc Phiếu ĐCNB mà chưa có Biên bản giao nhận hàng hoá → "Chuẩn bị hàng"; có Biên bản giao nhận hàng hoá → "Đã giao – chưa ký". Ngày giao = ngày sớm nhất trong các biên bản giao nhận chưa huỷ. Ký xong (rời Nháp) thì không còn bước giao hàng. |
+| BR-62 | **Nhắc ký:** hợp đồng "Đã giao – chưa ký" (BR-61) quá 15 ngày tính từ ngày giao (tức ngày giao ≤ hôm nay − 15 ngày) mà vẫn chưa ký thì nhắc người phụ trách, một lần (thông báo MSG-065, xem 5.7). |
 
 ---
 
@@ -341,11 +356,16 @@ Nguồn chính thức là `db/schema.sql`; bảng dưới tổng hợp đầy đ
 | Tài khoản & tổ chức (8) | `users`, `roles`, `departments`, `provinces`, `districts`, `addresses`, `user_provinces` (phân công địa bàn), `branch_info` (thông tin chi nhánh, một dòng duy nhất, UC-55) |
 | Khách hàng / Đối tác (5) | `enterprises`, `enterprise_roles` (vai đối tác: Khách mua / Nhà cung cấp), `enterprisecontacts`, `customer_lifecycle_events` (có `relationship_rating`), `customer_evaluation_rules` |
 | Sản phẩm (4) | `productcategories` (cây đa tầng), `products`, `productimages`, `productcatalogues` |
-| Hợp đồng (7) | `contracts`, `contractproducts`, `contract_payments` (nguồn duy nhất tính doanh thu dashboard & đánh giá KH), `contract_history` (nhật ký hợp đồng, UC-45/UC-54), `contract_handovers` (bàn giao liên phòng, UC-48/UC-49), `contract_documents` (tài liệu đính kèm, UC-52), `contract_links` (liên kết HĐ Bán ↔ Mua, UC-47) |
+| Hợp đồng (7) | `contracts`, `contractproducts`, `contract_payments` (nguồn duy nhất tính doanh thu dashboard & đánh giá KH), `contract_history` (nhật ký hợp đồng, UC-45/UC-54), `contract_handovers` (bàn giao liên phòng, UC-48/UC-49), `contract_documents` (giấy tờ của hợp đồng, UC-52), `contract_links` (liên kết HĐ Bán ↔ Mua, UC-47) |
 | Phiếu hỗ trợ (3) | `technicalrequests`, `technicalrequestdevices` (có bảng nhưng **không dùng**, theo quyết định bỏ BR-44), `technicalrequesthistory` |
 | Khác (3) | `change_requests` (yêu cầu thay đổi của cấp dưới, UC-50/UC-51), `notifications`, `schema_migrations` (mỗi file trong `db/migrations/` khi áp dụng ghi một dòng) |
 
-Lưu ý: dùng **xóa mềm** (`is_deleted`) cho KH, sản phẩm, hợp đồng, phiếu, tài liệu hợp đồng, danh mục.
+Lưu ý: dùng **xóa mềm** (`is_deleted`) cho KH, sản phẩm, hợp đồng, phiếu, giấy tờ hợp đồng, danh mục.
+
+Cột theo vòng đời hợp đồng (Giai đoạn 10, quyết định 14 và 15 ở mục 11; không thêm bảng):
+- `contracts.contract_code`: cho phép NULL (Nháp chưa có số, BR-58), vẫn giữ UNIQUE (nhiều dòng NULL không bị coi là trùng).
+- `contract_documents` (BR-59): thêm `doc_date` (ngày trên giấy, bắt buộc) và `doc_no` (số giấy, tối đa 50 ký tự, không bắt buộc); `file_url` cho phép NULL (đường dẫn không bắt buộc).
+- `contract_payments` (BR-60): thêm `payment_type` (Tạm ứng / Thanh toán, mặc định Thanh toán), `condition_note` (điều kiện, tối đa 255 ký tự), `payment_days` (số ngày phải trả kể từ khi nộp hồ sơ), `submitted_date` (ngày nộp hồ sơ), `paid_amount` (số tiền thực thu); `due_date` (hạn thu) cho phép NULL. Tình trạng kỳ suy ra, không có cột lưu.
 
 Danh mục tổ chức (theo cơ cấu chi nhánh, xem 3.1): `roles` có ba vai **Admin, Sales, Tổng hợp**; `departments` có ba phòng **Ban giám đốc, Kinh doanh, Tổng hợp**.
 
@@ -376,7 +396,7 @@ Danh mục tổ chức (theo cơ cấu chi nhánh, xem 3.1): `roles` có ba vai 
 
 ## 9. Thông báo hệ thống (MSG)
 
-Loại: **Nội tuyến** (inline), **Toast**, **Hộp thoại**. "(chuyển trang)" = không hiện thông báo riêng, hệ thống điều hướng như mô tả.
+Loại: **Nội tuyến** (inline), **Toast**, **Hộp thoại**, **Thông báo** (bản ghi hệ thống tự sinh trong trung tâm thông báo, xem 5.7). "(chuyển trang)" = không hiện thông báo riêng, hệ thống điều hướng như mô tả.
 
 | Mã | Khi nào | Nội dung |
 |---|---|---|
@@ -440,6 +460,11 @@ Loại: **Nội tuyến** (inline), **Toast**, **Hộp thoại**. "(chuyển tra
 | MSG-058 | Thiếu họ tên hoặc chức vụ GĐCN (BR-57) | "Vui lòng nhập họ tên và chức vụ Giám đốc chi nhánh." (nội tuyến) |
 | MSG-059 | Fax sai định dạng hoặc quá 20 ký tự (BR-57) | "Số fax không hợp lệ." (nội tuyến; SĐT sai định dạng dùng lại MSG-015) |
 | MSG-060 | Chưa khai thông tin chi nhánh: họ tên GĐCN còn trống (BR-56) | "Chưa có thông tin Giám đốc chi nhánh. Admin khai tại trang Thông tin chi nhánh." (nội tuyến, trên form tạo/sửa hợp đồng) |
+| MSG-061 | Bấm Ký khi hợp đồng chưa có mã (BR-58) | "Hợp đồng chưa có mã. Vui lòng nhập mã hợp đồng trước khi ký." (nội tuyến) |
+| MSG-062 | Thêm giấy tờ thiếu ngày trên giấy (BR-59) | "Vui lòng nhập ngày trên giấy tờ." (nội tuyến) |
+| MSG-063 | Ngày trên giấy tờ sau hôm nay (BR-59) | "Ngày trên giấy tờ không được sau hôm nay." (nội tuyến) |
+| MSG-064 | Ngày nộp hồ sơ thanh toán sau hôm nay (BR-60) | "Ngày nộp hồ sơ không được sau hôm nay." (nội tuyến) |
+| MSG-065 | Hợp đồng đã giao hàng quá 15 ngày mà chưa ký (BR-62) | "Hợp đồng [tên hợp đồng] đã giao hàng [n] ngày nhưng chưa ký." (thông báo, gửi người phụ trách; [n] là số ngày tính từ ngày giao) |
 
 **Thông báo lỗi ngoài danh mục MSG** (đúng nguyên văn trong báo cáo):
 - "Thông tin khách hàng (nhà cung cấp) chưa hợp lệ. Vui lòng kiểm tra lại các ô bắt buộc."
@@ -462,7 +487,7 @@ Loại: **Nội tuyến** (inline), **Toast**, **Hộp thoại**. "(chuyển tra
 ## 10. Quy ước đặt tên & mức độ triển khai hiện tại
 
 - Mã tự sinh: `KH-xxxx`, `NCC-xxx`, Mã ticket, Mã sản phẩm: **người dùng không nhập tay**.
-- Mã hợp đồng: **nhập tay theo bản giấy**, phải duy nhất.
+- Mã hợp đồng: **nhập tay theo bản giấy**, phải duy nhất; để trống được khi còn Nháp, bắt buộc trước khi Ký; chưa có mã thì hiện "Chưa có số" (BR-58).
 - Nhật ký hợp đồng ghi các sự kiện: Khởi tạo, Sửa thông tin, Huỷ bản ghi, đổi trạng thái, chữa sai sót (loại sự kiện riêng).
 
 ---
@@ -476,10 +501,15 @@ Loại: **Nội tuyến** (inline), **Toast**, **Hộp thoại**. "(chuyển tra
 4. **Mã NCC là `NCC-xxx`** (3 chữ số), mã KH là `KH-xxxx`.
 5. Trạng thái phiếu dùng **Đã đóng** (theo BR-40), không dùng "Đã giải quyết" như mô tả UC-16.
 6. Trạng thái và ngày tạo của phiếu do **hệ thống gán** (theo BR-39), không phải trường nhập như mô tả UC-21.
-7. **Ngưỡng thông báo:** hợp đồng sắp hết hạn là **30 ngày** (BR-17); phiếu hỗ trợ là **24 giờ** trước hạn SLA (`NotificationScheduler` chu kỳ 60 phút, cộng thêm thông báo sự kiện `CHANGE_REQUEST` cho UC-50/UC-51, xem 5.7).
+7. **Ngưỡng thông báo:** hợp đồng sắp hết hạn là **30 ngày** (BR-17); phiếu hỗ trợ là **24 giờ** trước hạn SLA; hợp đồng đã giao chưa ký là **15 ngày** sau ngày giao, nhắc một lần (BR-62) (`NotificationScheduler` chu kỳ 60 phút, cộng thêm thông báo sự kiện `CHANGE_REQUEST` cho UC-50/UC-51, xem 5.7).
 8. Cách lấy IP cho BR-01: giữ nguyên qua `ClientIp`.
 9. Hai gói `poscs.service` và `poscs.validator` đã hoàn thiện đầy đủ cho toàn bộ module (mục 2 & `docs/ARCHITECTURE.md`).
 10. **Luồng chi tiết UC-36 → UC-54:** đã chốt theo hành vi code và JSP hiện tại (`ChangeRequestDAO` & `ChangeRequestController` cho UC-50/UC-51; `ContractService` & `ContractActionController` cho UC-54).
 11. Đã đối chiếu và đồng bộ toàn diện giữa `docs/SPEC.md`, `PERMISSIONS.md`, `README.md` và `db/schema.sql` (Task 7.4).
 12. **Người ký bên mình (chốt 19/11/2026; UC-55, BR-56, BR-57, MSG-057 → MSG-060 bổ sung sau báo cáo gốc):** luôn là **Giám đốc chi nhánh (GĐCN)**. Admin khai họ tên, chức vụ, SĐT, fax một lần ở trang "Thông tin chi nhánh" (bảng một dòng `branch_info`); trên form hợp đồng các ô này chỉ hiển thị, không sửa tay. SĐT và fax lưu vào từng hợp đồng (`contracts.signer_phone`, `contracts.signer_fax`) giống họ tên, chức vụ, để sau này đổi GĐCN thì hợp đồng cũ vẫn giữ đúng thông tin lúc ký. Thời điểm chép: lúc tạo hợp đồng/phụ lục và mỗi lần lưu khi hợp đồng còn Nháp, lấy GĐCN hiện tại; từ Đã ký trở đi giữ nguyên, UC-54 không đổi bốn ô này. Chưa khai GĐCN (họ tên còn trống, kể cả dòng gieo sẵn chỉ có chức vụ): tạo mới thì để trống cả bốn ô, bản Nháp giữ giá trị cũ. SĐT và fax tối đa 20 ký tự, khớp độ dài cột. Hợp đồng cũ trong CSDL không chạy lại dữ liệu. Người ký bên đối tác giữ nguyên nhập tay. Bảng, cột và code đi kèm làm theo Giai đoạn 8 của `task_tracker.md`.
 13. **Người phụ trách hợp đồng (chốt 19/11/2026; BR-35):** lấy theo **người tạo**, không chọn tay nữa. Sales (quản lý vùng) tạo thì là chính mình; Admin tạo thì vẫn chọn một Sales đang hoạt động; phụ lục theo người phụ trách của hợp đồng gốc. Sau khi tạo **khoá luôn**, kể cả khi đã ký (trang Sửa không còn đổi người phụ trách). Người phụ trách khác người ký bên mình (Giám đốc chi nhánh, quyết định 12). **Ngoại lệ duy nhất:** Admin đổi được khi người phụ trách hiện tại đã bị khoá tài khoản (nghỉ việc), sang một Sales đang hoạt động. Phòng kinh doanh không gán cấp trên, nên ai tạo hợp đồng thì đứng tên.
+14. **Vòng đời hợp đồng theo cách chi nhánh làm (chốt 19/11/2026; UC-10, UC-11, UC-33, UC-44, BR-58, BR-61, BR-62, MSG-061, MSG-065 bổ sung sau báo cáo gốc):** POSCS chỉ để theo dõi hợp đồng, không làm kế toán hay quản lý hồ sơ, nhưng vòng đời phải khớp cách chi nhánh làm thật: phiếu GQNCKH → phiếu ĐCNB → gọi xe → giao cho khách → thương thảo, ký hợp đồng → bàn giao phòng Tổng hợp → tạm ứng (nếu có) → nghiệm thu, nộp hồ sơ thanh toán cho bên mua → bên mua trả trong số ngày đã thoả thuận → thanh lý. Hồ sơ hợp đồng Nháp mở từ lúc làm phiếu GQNCKH; **mã hợp đồng để trống tới lúc Ký** (bắt buộc khi Ký); ngày hiệu lực/kết thúc để trống tới khi chốt với khách. Ngày ký vẫn là ngày bấm Ký, hiệu lực tính từ ngày ký (không nới BR-36). **Tiến độ giữ nguyên** Nháp → Đã ký → Đã thanh lý / Chấm dứt sớm; hệ thống suy ra bước "Chuẩn bị hàng" / "Đã giao – chưa ký" từ giấy tờ đã có (quyết định 15). Đã giao quá 15 ngày chưa ký thì nhắc người phụ trách một lần. Không theo dõi số lượng hàng, tồn kho, điều xe. Cột và code đi kèm làm theo Giai đoạn 10 của `task_tracker.md`.
+15. **Giấy tờ và kỳ thanh toán, bản rút gọn (chốt 19/11/2026, bổ sung 20/11/2026; UC-52, UC-53, BR-18, BR-59, BR-60, MSG-062 → MSG-064 bổ sung sau báo cáo gốc; mẫu dựng theo điều khoản thanh toán của một hợp đồng mua bán thật):**
+    - **Giấy tờ:** giữ mục Tài liệu sẵn có (bảng `contract_documents`), **không** làm bảng hay mô-đun mới. Thêm ngày trên giấy (bắt buộc, không sau hôm nay) và số giấy; đường dẫn thành không bắt buộc. Một danh sách chung cho cả hợp đồng: không tách theo kỳ, không có mẫu giấy theo loại kỳ. Giao diện dạng ô tích theo danh mục cố định trong code cộng "Khác"; một loại có thể có nhiều tờ (giao nhiều đợt, mỗi kỳ một đề nghị thanh toán). Bỏ tích là huỷ mềm, bắt buộc lý do. Sales có quyền ghi hợp đồng thì tích giấy. Giấy tờ đã có trong CSDL giữ nguyên.
+    - **Kỳ thanh toán:** giữ số tiền, hạn thu, ngày thu. Thêm loại kỳ **Tạm ứng / Thanh toán**, điều kiện (ghi ngắn), số ngày phải trả kể từ khi nộp hồ sơ (không bắt buộc), **ngày nộp hồ sơ** và **số tiền thực thu** (mặc định bằng số tiền kỳ, khác thì không bắt lý do). Hạn thu để trống được khi lập; bấm "Đã nộp hồ sơ" thì ghi ngày nộp, kỳ có số ngày thì hạn thu = ngày nộp + số ngày, không có thì nhập hạn tay (không bắt buộc, chốt 20/11/2026). Tình trạng suy ra: Chưa nộp hồ sơ → Chờ thu → Quá hạn → Đã thu; kỳ đã nộp hồ sơ mà chưa có hạn thu là Chờ thu (chốt 20/11/2026). Ô "%" trên form chỉ tính sẵn số tiền từ giá trị hợp đồng, vẫn lưu số tiền. Thêm thao tác **sửa kỳ** (kỳ chưa thu, hợp đồng chưa thanh lý/chấm dứt). Tổng quan cộng số tiền thực thu theo ngày thu, chưa tách tạm ứng; tạm ứng không thu hồi dần. Admin, Sales quản lý vùng (theo quyền quản lý kỳ) bấm "Đã nộp hồ sơ"; vai Tổng hợp chỉ thêm được "Đã thu", và khi bấm thì nhập được số tiền thực thu (chốt 20/11/2026).
+    - **Không làm:** trạng thái "Đủ hồ sơ", giấy riêng của từng kỳ, bảng "kỳ cần giấy gì", kỳ "Thanh toán 100%" tự tạo, tự tính lại số tiền kỳ khi phụ lục đổi giá trị, cảnh báo tổng tỷ lệ.
