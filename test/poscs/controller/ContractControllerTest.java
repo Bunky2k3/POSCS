@@ -11,6 +11,7 @@ import jakarta.servlet.http.HttpSession;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import poscs.common.Period;
 import poscs.dao.AddressDAO;
 import poscs.dao.ContractDAO;
@@ -287,6 +288,9 @@ public class ContractControllerTest {
     private static Contract draftContract() {
         Contract c = new Contract();
         c.setProgressStatus("Nháp");
+        // Task 8.5 (BR-35): form Sửa lấy người phụ trách từ bản ghi đang lưu, nên
+        // fixture phải có người phụ trách như mọi hợp đồng thật (owner_id NOT NULL).
+        c.setOwnerId(99);
         return c;
     }
 
@@ -294,7 +298,12 @@ public class ContractControllerTest {
     // Siết form sửa + phụ lục (đợt 3)
     // ------------------------------------------------------------------
 
-    /** Hợp đồng đã ký: mọi ô điều khoản trên form bị bỏ qua, chỉ hai trường đi tiếp. */
+    /**
+     * Hợp đồng đã ký: form Sửa không còn ô nào sửa được (BR-35, UC-35).
+     *
+     * <p>Task 8.5 sửa test này: trước đây điều khoản bị bỏ qua nhưng người phụ
+     * trách gửi lên (88) vẫn được ghi. Giờ cả hai bị từ chối, không ghi gì.
+     */
     @Test
     public void update_signedContract_keepsTermsFromTheStoredRecord() throws Exception {
         Contract signed = signedContract();
@@ -306,13 +315,14 @@ public class ContractControllerTest {
         stubValidContractFields();
         when(request.getParameter("title")).thenReturn("Tiêu đề bị đổi lén");
         when(request.getParameter("ownerId")).thenReturn("88");
-        when(contractDAO.update(any(Contract.class), anyInt())).thenReturn(true);
 
         controller.doPost(request, response);
 
-        verify(contractDAO).update(argThat((Contract c) ->
-                "Hợp đồng gốc".equals(c.getTitle()) && c.getOwnerId() == 88), anyInt());
-        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=view&id=5");
+        verify(contractDAO, never()).update(any(Contract.class), anyInt());
+        verify(contractDAO, never()).replaceOwner(anyInt(), anyInt(), anyInt());
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=edit&id=5&error=update_failed");
+        assertEquals("Hợp đồng gốc", signed.getTitle());
+        assertEquals(99, signed.getOwnerId());
     }
 
     /**
@@ -2241,21 +2251,26 @@ public class ContractControllerTest {
                 "GĐCN cũ", "Giám đốc chi nhánh", "0233 000 000", "0233 000 001")), anyInt());
     }
 
+    /**
+     * Task 8.5 (BR-35) sửa test này: trước đây hợp đồng đã ký vẫn lưu được
+     * (đổi người phụ trách sang 88, giữ người ký đang lưu). Giờ form Sửa của
+     * hợp đồng đã ký bị từ chối: không ghi gì, không đọc Thông tin chi nhánh.
+     */
     @Test
     public void update_signed_keepsStoredSignerAndDoesNotReadBranchInfo() throws Exception {
         when(request.getParameter("action")).thenReturn("update");
         when(request.getParameter("contractId")).thenReturn("5");
-        when(contractDAO.findById(5)).thenReturn(withStoredSigner(signedContract()));
+        Contract signed = withStoredSigner(signedContract());
+        when(contractDAO.findById(5)).thenReturn(signed);
         stubValidContractFields();
         stubTypedSigner();
         when(request.getParameter("ownerId")).thenReturn("88");
         when(branchInfoService.get()).thenReturn(director("Nguyễn Văn An"));
-        when(contractDAO.update(any(Contract.class), anyInt())).thenReturn(true);
 
         controller.doPost(request, response);
 
-        verify(contractDAO).update(argThat((Contract c) -> c.getOwnerId() == 88 && signerIs(c,
-                "GĐCN cũ", "Giám đốc chi nhánh", "0233 000 000", "0233 000 001")), anyInt());
+        verify(contractDAO, never()).update(any(Contract.class), anyInt());
+        assertTrue(signerIs(signed, "GĐCN cũ", "Giám đốc chi nhánh", "0233 000 000", "0233 000 001"));
         verify(branchInfoService, never()).get();
     }
 
@@ -2334,5 +2349,356 @@ public class ContractControllerTest {
 
         verify(request).setAttribute("branchInfo", null);
         verify(request).setAttribute("branchSignerMissing", true);
+    }
+
+    // ------------------------------------------------------------------
+    // BR-35 (Task 8.5): người phụ trách theo người tạo, khoá sau khi tạo
+    // ------------------------------------------------------------------
+
+    /** Một nhân viên trong CSDL: vai và trạng thái khoá tài khoản đọc qua employeeDAO. */
+    private void stubEmployee(int userId, String roleName, boolean locked) {
+        User u = new User();
+        u.setUserId(userId);
+        u.setRole(new Role(1, roleName));
+        u.setDeleted(locked);
+        when(employeeDAO.findById(userId)).thenReturn(u);
+    }
+
+    /** Hợp đồng đã ký của người phụ trách #55. */
+    private static Contract signedOwnedBy55() {
+        Contract c = signedContract();
+        c.setOwnerId(55);
+        return c;
+    }
+
+    private void stubUpdateOf(Contract existing, String ownerIdParam) {
+        when(request.getParameter("action")).thenReturn("update");
+        when(request.getParameter("contractId")).thenReturn("5");
+        when(contractDAO.findById(5)).thenReturn(existing);
+        stubValidContractFields();
+        when(request.getParameter("ownerId")).thenReturn(ownerIdParam);
+    }
+
+    @Test
+    public void create_sales_ownerIsCreatorEvenWhenAnotherOwnerIdIsPosted() throws Exception {
+        when(request.getParameter("action")).thenReturn("create");
+        stubValidContractFields();
+        when(request.getParameter("ownerId")).thenReturn("88");
+        when(contractDAO.insert(any(Contract.class), anyInt())).thenReturn(77);
+
+        controller.doPost(request, response);
+
+        verify(contractDAO).insert(argThat((Contract c) -> c.getOwnerId() == 99), eq(99));
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=view&id=77");
+    }
+
+    @Test
+    public void create_sales_withoutOwnerId_stillCreatesAsCreator() throws Exception {
+        when(request.getParameter("action")).thenReturn("create");
+        stubValidContractFields();
+        when(request.getParameter("ownerId")).thenReturn(null);
+        when(contractDAO.insert(any(Contract.class), anyInt())).thenReturn(77);
+
+        controller.doPost(request, response);
+
+        verify(contractDAO).insert(argThat((Contract c) -> c.getOwnerId() == 99), anyInt());
+    }
+
+    @Test
+    public void create_admin_keepsChosenActiveSales() throws Exception {
+        loginAs("Admin");
+        when(request.getParameter("action")).thenReturn("create");
+        stubValidContractFields();
+        when(request.getParameter("ownerId")).thenReturn("88");
+        stubEmployee(88, "Sales", false);
+        when(contractDAO.insert(any(Contract.class), anyInt())).thenReturn(77);
+
+        controller.doPost(request, response);
+
+        verify(contractDAO).insert(argThat((Contract c) -> c.getOwnerId() == 88), anyInt());
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=view&id=77");
+    }
+
+    @Test
+    public void create_admin_chosenOwnerNotActiveSales_redirectsInvalidWithoutInserting() throws Exception {
+        loginAs("Admin");
+        when(request.getParameter("action")).thenReturn("create");
+        stubValidContractFields();
+        stubEmployee(88, "Admin", false);
+        stubEmployee(89, "Sales", true);
+
+        for (String ownerId : new String[] {"88", "89", "90", ""}) {
+            when(request.getParameter("ownerId")).thenReturn(ownerId);
+            controller.doPost(request, response);
+        }
+
+        verify(contractDAO, never()).insert(any(Contract.class), anyInt());
+        verify(response, times(4)).sendRedirect(CONTEXT_PATH + "/contract?action=new&kind=sell&error=invalid");
+    }
+
+    @Test
+    public void createAmendment_ownerFollowsParentNotTheForm() throws Exception {
+        loginAs("Admin");
+        Contract parent = signedOwnedBy55();
+        parent.setContractId(3);
+        when(request.getParameter("action")).thenReturn("createAmendment");
+        when(request.getParameter("parentId")).thenReturn("3");
+        when(contractDAO.findById(3)).thenReturn(parent);
+        stubValidContractFields();
+        when(request.getParameter("ownerId")).thenReturn("88");
+        when(contractDAO.insert(any(Contract.class), anyInt())).thenReturn(90);
+
+        controller.doPost(request, response);
+
+        verify(contractDAO).insert(argThat((Contract c) -> c.getOwnerId() == 55), anyInt());
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=view&id=90");
+    }
+
+    @Test
+    public void update_draft_postedOwnerIdIsIgnored() throws Exception {
+        Contract draft = draftContract();
+        draft.setOwnerId(55);
+        stubUpdateOf(draft, "88");
+        when(contractDAO.update(any(Contract.class), anyInt())).thenReturn(true);
+
+        controller.doPost(request, response);
+
+        verify(contractDAO).update(argThat((Contract c) -> c.getOwnerId() == 55), anyInt());
+        verify(contractDAO, never()).replaceOwner(anyInt(), anyInt(), anyInt());
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=view&id=5");
+    }
+
+    @Test
+    public void update_draft_adminWithActiveOwner_postedOwnerIdIsIgnored() throws Exception {
+        loginAs("Admin");
+        Contract draft = draftContract();
+        draft.setOwnerId(55);
+        stubUpdateOf(draft, "88");
+        stubEmployee(55, "Sales", false);
+        stubEmployee(88, "Sales", false);
+        when(contractDAO.update(any(Contract.class), anyInt())).thenReturn(true);
+
+        controller.doPost(request, response);
+
+        verify(contractDAO).update(argThat((Contract c) -> c.getOwnerId() == 55), anyInt());
+        verify(contractDAO, never()).replaceOwner(anyInt(), anyInt(), anyInt());
+    }
+
+    @Test
+    public void update_draft_adminLockedOwner_withChoice_replacesThenSavesOtherFields() throws Exception {
+        loginAs("Admin");
+        Contract draft = draftContract();
+        draft.setOwnerId(55);
+        stubUpdateOf(draft, "88");
+        stubEmployee(55, "Sales", true);
+        stubEmployee(88, "Sales", false);
+        when(contractDAO.replaceOwner(5, 88, 99)).thenReturn(true);
+        when(contractDAO.update(any(Contract.class), anyInt())).thenReturn(true);
+
+        controller.doPost(request, response);
+
+        InOrder order = inOrder(contractDAO);
+        order.verify(contractDAO).replaceOwner(5, 88, 99);
+        order.verify(contractDAO).update(argThat((Contract c) -> c.getContractId() == 5), anyInt());
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=view&id=5");
+    }
+
+    @Test
+    public void update_draft_adminLockedOwner_withoutChoice_savesWithoutReplacing() throws Exception {
+        loginAs("Admin");
+        Contract draft = draftContract();
+        draft.setOwnerId(55);
+        stubUpdateOf(draft, "");
+        stubEmployee(55, "Sales", true);
+        when(contractDAO.update(any(Contract.class), anyInt())).thenReturn(true);
+
+        controller.doPost(request, response);
+
+        verify(contractDAO, never()).replaceOwner(anyInt(), anyInt(), anyInt());
+        verify(contractDAO).update(argThat((Contract c) -> c.getOwnerId() == 55), anyInt());
+    }
+
+    @Test
+    public void update_draft_adminLockedOwner_newOwnerNotSales_redirectsInvalidAndWritesNothing() throws Exception {
+        loginAs("Admin");
+        Contract draft = draftContract();
+        draft.setOwnerId(55);
+        stubUpdateOf(draft, "88");
+        stubEmployee(55, "Sales", true);
+        stubEmployee(88, "Admin", false);
+
+        controller.doPost(request, response);
+
+        verify(contractDAO, never()).replaceOwner(anyInt(), anyInt(), anyInt());
+        verify(contractDAO, never()).update(any(Contract.class), anyInt());
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=edit&id=5&error=invalid");
+    }
+
+    @Test
+    public void update_draft_adminLockedOwner_replaceFails_redirectsUpdateFailedWithoutUpdating() throws Exception {
+        loginAs("Admin");
+        Contract draft = draftContract();
+        draft.setOwnerId(55);
+        stubUpdateOf(draft, "88");
+        stubEmployee(55, "Sales", true);
+        stubEmployee(88, "Sales", false);
+        when(contractDAO.replaceOwner(5, 88, 99)).thenReturn(false);
+
+        controller.doPost(request, response);
+
+        verify(contractDAO, never()).update(any(Contract.class), anyInt());
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=edit&id=5&error=update_failed");
+    }
+
+    @Test
+    public void update_signed_adminReplacesLockedOwnerWithActiveSales() throws Exception {
+        loginAs("Admin");
+        stubUpdateOf(signedOwnedBy55(), "88");
+        stubEmployee(55, "Sales", true);
+        stubEmployee(88, "Sales", false);
+        when(contractDAO.replaceOwner(5, 88, 99)).thenReturn(true);
+
+        controller.doPost(request, response);
+
+        verify(contractDAO).replaceOwner(5, 88, 99);
+        verify(contractDAO, never()).update(any(Contract.class), anyInt());
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=view&id=5");
+    }
+
+    @Test
+    public void update_signed_adminButOwnerStillActive_isRefused() throws Exception {
+        loginAs("Admin");
+        stubUpdateOf(signedOwnedBy55(), "88");
+        stubEmployee(55, "Sales", false);
+        stubEmployee(88, "Sales", false);
+
+        controller.doPost(request, response);
+
+        verify(contractDAO, never()).replaceOwner(anyInt(), anyInt(), anyInt());
+        verify(contractDAO, never()).update(any(Contract.class), anyInt());
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=edit&id=5&error=update_failed");
+    }
+
+    @Test
+    public void update_signed_salesEvenWhenOwnerLocked_isRefused() throws Exception {
+        stubUpdateOf(signedOwnedBy55(), "88");
+        stubEmployee(55, "Sales", true);
+        stubEmployee(88, "Sales", false);
+
+        controller.doPost(request, response);
+
+        verify(contractDAO, never()).replaceOwner(anyInt(), anyInt(), anyInt());
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=edit&id=5&error=update_failed");
+    }
+
+    @Test
+    public void update_signed_adminLockedOwner_newOwnerNotActiveSalesOrMissing_redirectsInvalid() throws Exception {
+        loginAs("Admin");
+        stubUpdateOf(signedOwnedBy55(), "88");
+        stubEmployee(55, "Sales", true);
+        stubEmployee(88, "Admin", false);
+        stubEmployee(89, "Sales", true);
+
+        for (String ownerId : new String[] {"88", "89", "90", ""}) {
+            when(request.getParameter("ownerId")).thenReturn(ownerId);
+            controller.doPost(request, response);
+        }
+
+        verify(contractDAO, never()).replaceOwner(anyInt(), anyInt(), anyInt());
+        verify(response, times(4)).sendRedirect(CONTEXT_PATH + "/contract?action=edit&id=5&error=invalid");
+    }
+
+    @Test
+    public void update_signed_adminLockedOwner_daoFails_redirectsUpdateFailed() throws Exception {
+        loginAs("Admin");
+        stubUpdateOf(signedOwnedBy55(), "88");
+        stubEmployee(55, "Sales", true);
+        stubEmployee(88, "Sales", false);
+        when(contractDAO.replaceOwner(5, 88, 99)).thenReturn(false);
+
+        controller.doPost(request, response);
+
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=edit&id=5&error=update_failed");
+    }
+
+    @Test
+    public void update_frozen_adminLockedOwner_isRefused() throws Exception {
+        loginAs("Admin");
+        Contract liquidated = signedOwnedBy55();
+        liquidated.setProgressStatus(ContractDAO.PROGRESS_LIQUIDATED);
+        stubUpdateOf(liquidated, "88");
+        stubEmployee(55, "Sales", true);
+        stubEmployee(88, "Sales", false);
+
+        controller.doPost(request, response);
+
+        verify(contractDAO, never()).replaceOwner(anyInt(), anyInt(), anyInt());
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=edit&id=5&error=update_failed");
+    }
+
+    @Test
+    public void correct_postedOwnerIdIsIgnored() throws Exception {
+        loginAs("Admin");
+        when(request.getParameter("action")).thenReturn("correct");
+        when(request.getParameter("contractId")).thenReturn("5");
+        when(contractDAO.findById(5)).thenReturn(signedOwnedBy55());
+        when(request.getParameter("correctionReason")).thenReturn("Gõ nhầm mã");
+        stubValidContractFields();
+        when(request.getParameter("ownerId")).thenReturn("88");
+        when(contractDAO.correct(any(Contract.class), anyInt(), anyString())).thenReturn(true);
+
+        controller.doPost(request, response);
+
+        verify(contractDAO).correct(argThat((Contract c) -> c.getOwnerId() == 55), anyInt(), anyString());
+        verify(contractDAO, never()).replaceOwner(anyInt(), anyInt(), anyInt());
+    }
+
+    @Test
+    public void createForm_ownerSelectableOnlyForAdmin() throws Exception {
+        when(request.getRequestDispatcher(anyString())).thenReturn(mock(RequestDispatcher.class));
+        when(request.getParameter("action")).thenReturn("new");
+
+        controller.doGet(request, response);
+        verify(request).setAttribute("ownerSelectable", false);
+
+        loginAs("Admin");
+        controller.doGet(request, response);
+        verify(request).setAttribute("ownerSelectable", true);
+    }
+
+    @Test
+    public void amendmentForm_ownerNotSelectableEvenForAdmin() throws Exception {
+        loginAs("Admin");
+        Contract parent = signedOwnedBy55();
+        parent.setContractId(3);
+        when(request.getRequestDispatcher(anyString())).thenReturn(mock(RequestDispatcher.class));
+        when(request.getParameter("action")).thenReturn("newAmendment");
+        when(request.getParameter("parentId")).thenReturn("3");
+        when(contractDAO.findById(3)).thenReturn(parent);
+
+        controller.doGet(request, response);
+
+        verify(request).setAttribute("ownerSelectable", false);
+        verify(request, never()).setAttribute("ownerSelectable", true);
+    }
+
+    @Test
+    public void editForm_canReplaceOwnerOnlyForAdminWhenOwnerLocked() throws Exception {
+        when(request.getRequestDispatcher(anyString())).thenReturn(mock(RequestDispatcher.class));
+        when(request.getParameter("action")).thenReturn("edit");
+        when(request.getParameter("id")).thenReturn("5");
+        when(contractDAO.findById(5)).thenReturn(signedOwnedBy55());
+        stubEmployee(55, "Sales", true);
+
+        controller.doGet(request, response); // Sales
+        verify(request).setAttribute("canReplaceOwner", false);
+
+        loginAs("Admin");
+        controller.doGet(request, response); // Admin, người phụ trách đã bị khoá
+        verify(request).setAttribute("canReplaceOwner", true);
+
+        stubEmployee(55, "Sales", false);
+        controller.doGet(request, response); // Admin, người phụ trách còn hoạt động
+        verify(request, times(2)).setAttribute("canReplaceOwner", false);
     }
 }

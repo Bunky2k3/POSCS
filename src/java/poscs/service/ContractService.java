@@ -239,6 +239,49 @@ public class ContractService extends BaseService {
     }
 
     // ------------------------------------------------------------------
+    // BR-35: Người phụ trách lấy theo người tạo, không đổi sau khi tạo
+    // ------------------------------------------------------------------
+
+    /**
+     * BR-35, lúc tạo: chọn người phụ trách cho hợp đồng/phụ lục mới. Dùng chung
+     * cho {@code ContractService} và lối {@code /contract} của
+     * {@code ContractController}.
+     *
+     * <ul>
+     *   <li>Phụ lục ({@code parent} khác null): người phụ trách hợp đồng gốc.</li>
+     *   <li>Admin tạo hợp đồng gốc: giữ lựa chọn gửi lên; bên gọi vẫn phải
+     *       kiểm đó là một Sales đang hoạt động.</li>
+     *   <li>Người khác (Sales quản lý vùng) tạo: chính người tạo, bỏ qua giá
+     *       trị gửi lên.</li>
+     * </ul>
+     */
+    public static void applyCreateOwner(Contract contract, Contract parent, int actorId, boolean actorIsAdmin) {
+        if (contract == null) {
+            return;
+        }
+        if (parent != null) {
+            contract.setOwnerId(parent.getOwnerId());
+        } else if (!actorIsAdmin) {
+            contract.setOwnerId(actorId);
+        }
+    }
+
+    /**
+     * BR-35, ngoại lệ duy nhất: Admin đổi được người phụ trách khi người hiện
+     * tại đã bị khoá tài khoản (nghỉ việc), ở mọi tiến độ trừ khi hợp đồng đã
+     * thanh lý/chấm dứt sớm.
+     */
+    public static boolean canReplaceOwner(Contract existing, boolean actorIsAdmin, boolean currentOwnerActive) {
+        return existing != null && actorIsAdmin && !currentOwnerActive && !existing.isFrozen();
+    }
+
+    /** {@link #canReplaceOwner(Contract, boolean, boolean)} với vai và tài khoản đọc từ CSDL. */
+    public boolean canReplaceOwner(Contract existing, User actor) {
+        return existing != null
+                && canReplaceOwner(existing, permissionService.isAdmin(actor), isActiveOwner(existing.getOwnerId()));
+    }
+
+    // ------------------------------------------------------------------
     // UC-33: Tạo hợp đồng gốc (BR-35, BR-36)
     // ------------------------------------------------------------------
 
@@ -252,12 +295,14 @@ public class ContractService extends BaseService {
                     ContractValidator.MSG_CONTRACT_INVALID);
         }
         contract.setParentContractId(null);
+        applyCreateOwner(contract, null, actor.getUserId(), permissionService.isAdmin(actor));
         fillSignerForNewContract(contract);
         ValidationResult vr = contractValidator.validateCreate(contract, findEnterpriseRoles(contract.getEnterpriseId()));
         if (!vr.isValid()) {
             return ServiceResult.fail(ERR_INVALID, vr.getErrors());
         }
-        if (!isActiveOwner(contract.getOwnerId())) {
+        // BR-35: người phụ trách phải là một Sales đang hoạt động (Admin chọn, hoặc chính Sales tạo).
+        if (!isActiveSales(contract.getOwnerId())) {
             return failField(ERR_INVALID, ContractValidator.FIELD_OWNER_ID, ContractValidator.MSG_OWNER_REQUIRED);
         }
         normalizeCodeAndTitle(contract);
@@ -292,6 +337,8 @@ public class ContractService extends BaseService {
             return failure(ERR_AMENDMENT_NOT_ALLOWED);
         }
         prepareAmendmentFromParent(amendment, parent);
+        // BR-35: phụ lục theo người phụ trách hợp đồng gốc, bỏ qua giá trị gửi lên.
+        applyCreateOwner(amendment, parent, actor.getUserId(), permissionService.isAdmin(actor));
         fillSignerForNewContract(amendment);
         ValidationResult vr = contractValidator.validateCreate(amendment, findEnterpriseRoles(parent.getEnterpriseId()));
         if (!vr.isValid()) {
@@ -352,7 +399,10 @@ public class ContractService extends BaseService {
         if (existing == null) {
             return failure(ERR_NOT_FOUND);
         }
-        if (existing.isFrozen()) {
+        // BR-35/UC-35: từ Đã ký trở đi form Sửa không còn ô nào sửa được: thay đổi
+        // đi qua phụ lục, sai sót nhập liệu đi qua UC-54, người phụ trách chỉ đổi
+        // qua ngoại lệ của Admin (updateContractOwner).
+        if (existing.isTermsLocked()) {
             return failField(ERR_UPDATE_FAILED, ContractValidator.FIELD_PROGRESS_STATUS,
                     ContractValidator.MSG_CANNOT_EDIT_LOCKED);
         }
@@ -360,20 +410,17 @@ public class ContractService extends BaseService {
             contract.setDirection(existing.getDirection());
         }
         contract.setParentContractId(existing.getParentContractId());
+        // BR-35: người phụ trách không đổi sau khi tạo, bỏ qua giá trị gửi lên.
+        contract.setOwnerId(existing.getOwnerId());
         fillSignerForUpdate(contract, existing);
         ValidationResult vr = contractValidator.validateUpdate(
                 contract, existing, findEnterpriseRoles(contract.getEnterpriseId()));
         if (!vr.isValid()) {
             return ServiceResult.fail(ERR_INVALID, vr.getErrors());
         }
-        if (!isActiveOwner(contract.getOwnerId())) {
-            return failField(ERR_INVALID, ContractValidator.FIELD_OWNER_ID, ContractValidator.MSG_OWNER_REQUIRED);
-        }
-        if (existing.isDraft()) {
-            ServiceResult<Void> draftCheck = checkDraftUpdateRules(contract, existing);
-            if (!draftCheck.isSuccess()) {
-                return draftCheck;
-            }
+        ServiceResult<Void> draftCheck = checkDraftUpdateRules(contract, existing);
+        if (!draftCheck.isSuccess()) {
+            return draftCheck;
         }
         return contractDAO.update(contract, actor.getUserId()) ? success(null) : failure(ERR_UPDATE_FAILED);
     }
@@ -393,16 +440,49 @@ public class ContractService extends BaseService {
         return success(null);
     }
 
+    /**
+     * BR-35, ngoại lệ duy nhất để đổi người phụ trách sau khi tạo: chỉ Admin, chỉ
+     * khi người phụ trách hiện tại đã bị khoá tài khoản, người mới phải là Sales
+     * đang hoạt động. Áp được cả khi đã ký, trừ khi đã thanh lý/chấm dứt sớm.
+     * Ngoài ngoại lệ này trả MSG-022.
+     */
     public ServiceResult<Void> updateContractOwner(int contractId, int newOwnerId, User actor) {
-        ServiceResult<Void> perm = permissionService.checkCanUpdateContract(actor);
+        ServiceResult<Void> check = checkOwnerReplacement(contractId, newOwnerId, actor);
+        if (!check.isSuccess()) {
+            return check;
+        }
+        return contractDAO.replaceOwner(contractId, newOwnerId, actor.getUserId())
+                ? success(null) : failure(ERR_UPDATE_FAILED);
+    }
+
+    /**
+     * BR-35, ngoại lệ của Admin trên bản Nháp: vừa thay người phụ trách đã bị
+     * khoá tài khoản, vừa lưu các ô khác của form Sửa. Kiểm người thay trước,
+     * lưu bản Nháp (kiểm hợp lệ mọi ô), rồi mới đổi người phụ trách -- form lỗi
+     * thì không ghi gì, kể cả người phụ trách (QA-8.5-01).
+     */
+    public ServiceResult<Void> updateDraftReplacingOwner(Contract contract, int newOwnerId, User actor) {
+        int contractId = contract != null ? contract.getContractId() : 0;
+        ServiceResult<Void> check = checkOwnerReplacement(contractId, newOwnerId, actor);
+        if (!check.isSuccess()) {
+            return check;
+        }
+        ServiceResult<Void> saved = updateContract(contract, actor);
+        if (!saved.isSuccess()) {
+            return saved;
+        }
+        return contractDAO.replaceOwner(contractId, newOwnerId, actor.getUserId())
+                ? success(null) : failure(ERR_UPDATE_FAILED);
+    }
+
+    /** Mọi điều kiện của ngoại lệ BR-35 ({@link #updateContractOwner}), không ghi gì xuống CSDL. */
+    private ServiceResult<Void> checkOwnerReplacement(int contractId, int newOwnerId, User actor) {
+        ServiceResult<Void> perm = permissionService.checkPermission(permissionService.isAdmin(actor));
         if (!perm.isSuccess()) {
             return failure(perm.getMessage());
         }
         if (contractId <= 0) {
             return failure(ERR_NOT_FOUND);
-        }
-        if (!isActiveOwner(newOwnerId)) {
-            return failField(ERR_INVALID, ContractValidator.FIELD_OWNER_ID, ContractValidator.MSG_OWNER_REQUIRED);
         }
         Contract existing = contractDAO.findById(contractId);
         if (existing == null) {
@@ -412,8 +492,13 @@ public class ContractService extends BaseService {
             return failField(ERR_UPDATE_FAILED, ContractValidator.FIELD_PROGRESS_STATUS,
                     ContractValidator.MSG_CANNOT_EDIT_LOCKED);
         }
-        existing.setOwnerId(newOwnerId);
-        return contractDAO.update(existing, actor.getUserId()) ? success(null) : failure(ERR_UPDATE_FAILED);
+        if (!canReplaceOwner(existing, true, isActiveOwner(existing.getOwnerId()))) {
+            return failure(ERR_FORBIDDEN);
+        }
+        if (!isActiveSales(newOwnerId)) {
+            return failField(ERR_INVALID, ContractValidator.FIELD_OWNER_ID, ContractValidator.MSG_OWNER_REQUIRED);
+        }
+        return success(null);
     }
 
     // ------------------------------------------------------------------
@@ -549,6 +634,8 @@ public class ContractService extends BaseService {
         }
         // BR-56: UC-54 không đổi bốn ô người ký bên mình.
         copyBranchSigner(contract, existing);
+        // BR-35: chữa sai sót cũng không đổi người phụ trách.
+        contract.setOwnerId(existing.getOwnerId());
         ServiceResult<Void> validRes = validateSignedCorrection(contract, existing);
         if (!validRes.isSuccess()) {
             return validRes;
@@ -574,9 +661,6 @@ public class ContractService extends BaseService {
         }
         if (!vr.isValid()) {
             return ServiceResult.fail(ERR_INVALID, vr.getErrors());
-        }
-        if (!isActiveOwner(contract.getOwnerId())) {
-            return failField(ERR_INVALID, ContractValidator.FIELD_OWNER_ID, ContractValidator.MSG_OWNER_REQUIRED);
         }
         normalizeCodeAndTitle(contract);
         if (contractDAO.contractCodeExists(contract.getContractCode(), contract.getContractId())) {
@@ -724,6 +808,16 @@ public class ContractService extends BaseService {
         probe.setUserId(ownerId);
         User dbUser = permissionService.getEffectiveUser(probe);
         return dbUser != null && !dbUser.isDeleted();
+    }
+
+    /** BR-35: người phụ trách được chọn phải giữ vai Sales và chưa bị khoá tài khoản. */
+    private boolean isActiveSales(int ownerId) {
+        if (ownerId <= 0) {
+            return false;
+        }
+        User probe = new User();
+        probe.setUserId(ownerId);
+        return permissionService.isSales(probe);
     }
 
     private static void normalizeCodeAndTitle(Contract contract) {

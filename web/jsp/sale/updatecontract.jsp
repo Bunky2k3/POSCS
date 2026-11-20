@@ -9,6 +9,8 @@
       - userList      : List<poscs.model.User>
       - branchInfo    : poscs.model.BranchInfo (thông tin GĐCN, người ký bên mình theo BR-56; có thể null)
       - branchSignerMissing : Boolean (true khi họ tên GĐCN còn trống -> bản Nháp hiện MSG-060)
+      - canReplaceOwner : Boolean (BR-35: true khi Admin xem và người phụ trách đã bị khoá tài khoản
+                          -> hiện ô chọn Sales thay thế; còn lại người phụ trách chỉ đọc)
 
     Form sửa ở đầu trang chỉ sửa bản ghi trong bảng contracts. Hạng mục sản
     phẩm/dịch vụ thêm/gỡ ở tab Hàng hoá bên dưới (form riêng, đứng ngoài form sửa).
@@ -251,7 +253,8 @@
             <form id="createContractForm" action="${pageContext.request.contextPath}/contract" method="POST" onsubmit="return validateForm();">
                 <input type="hidden" name="csrfToken" value="${csrfToken}">
                 <%-- Một form, hai đích. Bình thường gửi "update" (sau khi ký thì
-                     server chỉ nhận người phụ trách). Admin bật chế độ
+                     server từ chối, trừ ngoại lệ Admin thay người phụ trách đã
+                     bị khoá tài khoản -- BR-35). Admin bật chế độ
                      chữa sai sót thì script đổi ô này thành "correct" -- đường
                      duy nhất chạm được vào điều khoản của hợp đồng đã ký, và nó
                      bắt buộc kèm lý do. --%>
@@ -266,9 +269,7 @@
                             <i class="fa-solid fa-file-signature" style="margin-top:3px;"></i>
                             <div>
                                 <strong>Hợp đồng đã ký — điều khoản đã khoá.</strong>
-                                Chỉ còn <strong>người phụ trách</strong> sửa được — đó là phân công nội bộ,
-                                không nằm trên tờ giấy hai bên ký. Bản PDF đã ký và các biên bản thì treo ở
-                                tab <strong>Tài liệu</strong> bên dưới.
+                                Bản PDF đã ký và các biên bản thì treo ở tab <strong>Tài liệu</strong> bên dưới.
                                 <div style="margin-top:6px;">
                                     Cần thay đổi điều khoản thì <strong>lập phụ lục</strong> — một văn bản riêng, có chữ ký.
                                     <c:if test="${canCorrect}">
@@ -312,13 +313,26 @@
                     </div>
                     <div class="col-md-4 field-row">
                         <label>Người phụ trách <span class="req">*</span></label>
-                        <select class="form-select" id="owner" name="ownerId">
-                            <option value="">-- Chọn nhân viên --</option>
-                            <c:forEach var="staff" items="${userList}">
-                                <option value="${staff.userId}" ${staff.userId == contract.ownerId ? 'selected' : ''}>${fn:escapeXml(staff.fullName)}</option>
-                            </c:forEach>
-                        </select>
-                        <span class="error-text" id="err-owner">Vui lòng chọn người phụ trách.</span>
+                        <%-- BR-35: người phụ trách không đổi sau khi tạo, ở mọi tiến độ.
+                             Ngoại lệ duy nhất: Admin chọn người thay khi người hiện tại
+                             đã bị khoá tài khoản (userList chỉ có Sales đang hoạt động).
+                             Ô chỉ đọc không có name: server cũng bỏ qua ownerId gửi lên. --%>
+                        <c:choose>
+                            <c:when test="${canReplaceOwner}">
+                                <select class="form-select" id="owner" name="ownerId">
+                                    <option value="">-- Chọn người thay --</option>
+                                    <c:forEach var="staff" items="${userList}">
+                                        <option value="${staff.userId}">${fn:escapeXml(staff.fullName)}</option>
+                                    </c:forEach>
+                                </select>
+                                <span style="font-size:0.78rem; color:#b45309; display:block; margin-top:6px;">
+                                    Người phụ trách đã bị khoá tài khoản, chọn người thay.
+                                </span>
+                            </c:when>
+                            <c:otherwise>
+                                <input type="text" class="form-control" value="${fn:escapeXml(contract.owner.fullName)}" disabled>
+                            </c:otherwise>
+                        </c:choose>
                     </div>
                     <div class="col-md-4 field-row">
                         <label>Loại hợp đồng <span class="req">*</span></label>
@@ -527,7 +541,13 @@
                             <i class="fa-solid fa-pen-ruler me-1"></i> Chữa sai sót nhập liệu
                         </button>
                     </c:if>
-                    <button type="submit" class="btn-primary"><i class="fa-solid fa-check me-1"></i> Lưu thay đổi</button>
+                    <%-- Đã khoá điều khoản thì form Sửa không còn gì để lưu (BR-35): nút
+                         chỉ hiện khi Admin đang thấy ô chọn người thay, hoặc sau khi
+                         Admin bật "Chữa sai sót nhập liệu" (script bên dưới bật lên). --%>
+                    <c:if test="${canEditTerms or canReplaceOwner or canCorrect}">
+                        <button type="submit" class="btn-primary" id="saveContractBtn"
+                                ${canEditTerms or canReplaceOwner ? '' : 'style="display:none"'}><i class="fa-solid fa-check me-1"></i> Lưu thay đổi</button>
+                    </c:if>
                 </div>
             </form>
         </div>
@@ -1416,7 +1436,9 @@
                 valid = false;
             }
 
-            ['customer', 'contractType', 'owner'].forEach(function (id) {
+            // Không kiểm ô "Người phụ trách": BR-35 khoá nó sau khi tạo. Ô chọn người
+            // thay của Admin để trống ở bản Nháp nghĩa là giữ nguyên người cũ.
+            ['customer', 'contractType'].forEach(function (id) {
                 var value = activeValue(id);
                 if (value !== null && !value) { document.getElementById('err-' + id).style.display = 'block'; valid = false; }
             });
@@ -1452,6 +1474,12 @@
                 document.querySelectorAll('[data-term]').forEach(function (el) { el.disabled = false; });
                 document.getElementById('formAction').value = 'correct';
                 document.getElementById('correctionBox').style.display = 'block';
+                // Chữa sai sót không đổi người phụ trách (BR-35): khoá ô chọn người thay
+                // để lựa chọn trong đó không bị bỏ qua mà người dùng không biết.
+                var ownerSelect = document.getElementById('owner');
+                if (ownerSelect) { ownerSelect.disabled = true; }
+                var saveBtn = document.getElementById('saveContractBtn');
+                if (saveBtn) { saveBtn.style.display = ''; }
                 toggleCorrection.disabled = true;
                 document.getElementById('correctionReason').focus();
             });

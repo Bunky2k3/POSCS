@@ -402,6 +402,8 @@ public class ContractController extends HttpServlet {
         request.setAttribute("kind", DIRECTION_BUY.equals(direction) ? "buy" : "sell");
         request.setAttribute("contractTypeOptions", contractTypesFor(direction));
         ContractControllerHelper.putBranchSigner(request, branchInfoService.get());
+        // BR-35: chỉ Admin chọn người phụ trách; Sales tạo thì là chính mình.
+        request.setAttribute("ownerSelectable", AccessControl.isAdmin(request));
         request.getRequestDispatcher(CREATE_VIEW).forward(request, response);
     }
 
@@ -437,13 +439,13 @@ public class ContractController extends HttpServlet {
         }
 
         request.setAttribute("parentContract", parent);
-        // Người phụ trách gợi ý theo cha, nhưng sửa được: phụ lục có thể do
-        // người khác theo, nhất là khi nhân sự đã đổi từ lúc ký hợp đồng gốc.
         setDropdownAttributes(request, parent.getOwnerId(), parent.getDirection(), parent.getEnterpriseId());
         request.setAttribute("direction", parent.getDirection());
         request.setAttribute("kind", DIRECTION_BUY.equals(parent.getDirection()) ? "buy" : "sell");
         request.setAttribute("contractTypeOptions", contractTypesFor(parent.getDirection()));
         ContractControllerHelper.putBranchSigner(request, branchInfoService.get());
+        // BR-35: phụ lục theo người phụ trách hợp đồng gốc, không chọn.
+        request.setAttribute("ownerSelectable", false);
         request.getRequestDispatcher(CREATE_VIEW).forward(request, response);
     }
 
@@ -498,6 +500,8 @@ public class ContractController extends HttpServlet {
         request.setAttribute("canEditTerms", !contract.isTermsLocked());
         // BR-56: bản Nháp hiện GĐCN hiện tại (lưu là chép theo), đã ký hiện giá trị đang lưu.
         ContractControllerHelper.putBranchSigner(request, branchInfoService.get());
+        // BR-35: ô chọn người thay chỉ hiện cho Admin khi người phụ trách đã bị khoá tài khoản.
+        request.setAttribute("canReplaceOwner", canReplaceOwner(request, contract));
         // Đường chữa SAI SÓT NHẬP LIỆU, khác hẳn đường sửa nội dung. Admin, bắt
         // buộc lý do, sinh dòng nhật ký loại riêng. Không mở sau khi đóng băng:
         // luật KH nói "kể cả cấp cao", và Admin không phải ngoại lệ.
@@ -531,9 +535,13 @@ public class ContractController extends HttpServlet {
         // Chiều lấy từ mục con đang đứng, không từ form -- xem
         // buildContractFromRequest.
         c.setDirection(directionFromKind(request.getParameter("kind")));
+        // BR-35: Sales tạo thì là chính mình (bỏ qua ownerId gửi lên); Admin chọn
+        // thì người được chọn phải là Sales đang hoạt động.
+        boolean admin = AccessControl.isAdmin(request);
+        ContractService.applyCreateOwner(c, null, actorId(request), admin);
         // BR-56: người ký bên mình là GĐCN hiện tại; chưa khai thì để trống cả bốn ô.
         ContractService.applyBranchSigner(c, branchInfoService.get());
-        if (!isValid(c) || !counterpartyMatchesDirection(c)) {
+        if (!isValid(c) || !counterpartyMatchesDirection(c) || (admin && !isActiveSales(c.getOwnerId()))) {
             response.sendRedirect(request.getContextPath()
                     + "/contract?action=new&kind=" + (DIRECTION_BUY.equals(c.getDirection()) ? "buy" : "sell")
                     + "&error=invalid");
@@ -581,27 +589,20 @@ public class ContractController extends HttpServlet {
         }
 
         Contract existing = contractDAO.findById(id);
-        Contract c;
+        boolean replaceable = canReplaceOwner(request, existing);
         if (existing.isTermsLocked()) {
-            // ĐÃ KÝ: form chỉ còn hai ô nhập được, các trường điều khoản hiển
-            // thị dạng chữ và KHÔNG gửi lên. Nên dựng bản ghi từ giá trị đang
-            // có rồi chỉ chồng hai ô đó lên -- đọc từ form thì mọi trường khoá
-            // về null và isValid() từ chối ngay, tức là đổi người phụ trách
-            // cũng không lưu được.
-            //
-            // DAO vẫn tự lọc lần nữa (ContractDAO.withTermsFrom): chỗ này chỉ
-            // lo cho người dùng bình thường, còn một POST nặn tay thì không.
-            c = existing;
-            Integer ownerId = parseIntOrNull(request.getParameter("ownerId"));
-            if (ownerId != null) {
-                c.setOwnerId(ownerId);
-            }
-        } else {
-            c = buildContractFromRequest(request, new Contract());
-            // BR-56: bản Nháp lấy GĐCN hiện tại; chưa khai thì giữ bốn ô đang lưu.
-            ContractService.copyBranchSigner(c, existing);
-            ContractService.applyBranchSigner(c, branchInfoService.get());
+            replaceOwnerOfSigned(request, response, id, replaceable);
+            return;
         }
+        // BR-35, ngoại lệ của Admin trên bản Nháp: chọn người thay thì thay
+        // trước rồi lưu tiếp các ô khác; để trống thì giữ nguyên người cũ.
+        Integer newOwnerId = replaceable ? parseIntOrNull(request.getParameter("ownerId")) : null;
+        Contract c = buildContractFromRequest(request, new Contract());
+        // BR-35: người phụ trách không đổi qua form Sửa (DAO cũng giữ giá trị cũ).
+        c.setOwnerId(existing.getOwnerId());
+        // BR-56: bản Nháp lấy GĐCN hiện tại; chưa khai thì giữ bốn ô đang lưu.
+        ContractService.copyBranchSigner(c, existing);
+        ContractService.applyBranchSigner(c, branchInfoService.get());
         c.setContractId(id);
         // Giữ nguyên chiều cũ -- DAO.update cũng không ghi cột này. Nhưng vẫn
         // phải gán để kiểm được khách hàng mới chọn có đúng vai không.
@@ -610,7 +611,8 @@ public class ContractController extends HttpServlet {
         // đó ở dạng chỉ đọc và không gửi lên): nó là dấu của một hành động đã
         // xảy ra. Thiếu dòng này thì mỗi lần bấm Lưu là xoá mất ngày ký.
         c.setSigningDate(existing.getSigningDate());
-        if (!isValid(c) || !counterpartyMatchesDirection(c)) {
+        if (!isValid(c) || !counterpartyMatchesDirection(c)
+                || (newOwnerId != null && !isActiveSales(newOwnerId))) {
             response.sendRedirect(request.getContextPath() + "/contract?action=edit&id=" + id + "&error=invalid");
             return;
         }
@@ -628,6 +630,11 @@ public class ContractController extends HttpServlet {
                     + "&error=value_negative");
             return;
         }
+        if (newOwnerId != null && !contractDAO.replaceOwner(id, newOwnerId, actorId(request))) {
+            LOG.warn("Doi nguoi phu trach hop dong that bai (actor={}, contractId={})", Logs.actor(request), id);
+            response.sendRedirect(request.getContextPath() + "/contract?action=edit&id=" + id + "&error=update_failed");
+            return;
+        }
 
         boolean ok = contractDAO.update(c, actorId(request));
         if (!ok) {
@@ -636,6 +643,55 @@ public class ContractController extends HttpServlet {
             return;
         }
         response.sendRedirect(request.getContextPath() + "/contract?action=view&id=" + id);
+    }
+
+    /**
+     * Form Sửa gửi lên cho một hợp đồng ĐÃ KÝ (BR-35, UC-35): không còn ô nào
+     * sửa được -- thay đổi đi qua phụ lục, sai sót nhập liệu đi qua "correct"
+     * (UC-54). Còn đúng một việc: Admin thay người phụ trách đã bị khoá tài
+     * khoản bằng một Sales đang hoạt động. Ngoài ngoại lệ đó thì từ chối, không
+     * ghi gì.
+     */
+    private void replaceOwnerOfSigned(HttpServletRequest request, HttpServletResponse response,
+            int id, boolean replaceable) throws IOException {
+        String back = request.getContextPath() + "/contract?action=edit&id=" + id;
+        if (!replaceable) {
+            response.sendRedirect(back + "&error=update_failed");
+            return;
+        }
+        Integer newOwnerId = parseIntOrNull(request.getParameter("ownerId"));
+        if (newOwnerId == null || !isActiveSales(newOwnerId)) {
+            response.sendRedirect(back + "&error=invalid");
+            return;
+        }
+        if (!contractDAO.replaceOwner(id, newOwnerId, actorId(request))) {
+            LOG.warn("Doi nguoi phu trach hop dong that bai (actor={}, contractId={})", Logs.actor(request), id);
+            response.sendRedirect(back + "&error=update_failed");
+            return;
+        }
+        response.sendRedirect(request.getContextPath() + "/contract?action=view&id=" + id);
+    }
+
+    /** BR-35: Admin thay được người phụ trách khi người hiện tại đã bị khoá tài khoản. */
+    private boolean canReplaceOwner(HttpServletRequest request, Contract existing) {
+        return existing != null && ContractService.canReplaceOwner(existing,
+                AccessControl.isAdmin(request), isActiveAccount(existing.getOwnerId()));
+    }
+
+    /** Tài khoản {@code userId} còn hoạt động, chưa bị khoá (đọc từ CSDL). */
+    private boolean isActiveAccount(int userId) {
+        return userId > 0 && getPermissionService().isActiveUser(probeUser(userId));
+    }
+
+    /** BR-35: {@code userId} là Sales đang hoạt động -- người duy nhất được đứng tên phụ trách. */
+    private boolean isActiveSales(int userId) {
+        return userId > 0 && getPermissionService().isSales(probeUser(userId));
+    }
+
+    private static User probeUser(int userId) {
+        User probe = new User();
+        probe.setUserId(userId);
+        return probe;
     }
 
     /**
@@ -666,6 +722,8 @@ public class ContractController extends HttpServlet {
         // counterpartyMatchesDirection() kiểm đúng thứ sẽ được ghi xuống.
         c.setEnterpriseId(parent.getEnterpriseId());
         c.setDirection(parent.getDirection());
+        // BR-35: phụ lục theo người phụ trách hợp đồng gốc, bỏ qua ownerId gửi lên.
+        ContractService.applyCreateOwner(c, parent, actorId(request), AccessControl.isAdmin(request));
         // BR-56: phụ lục cũng lấy GĐCN hiện tại, không chép từ hợp đồng gốc.
         ContractService.applyBranchSigner(c, branchInfoService.get());
         String back = "/contract?action=newAmendment&parentId=" + parentId;
@@ -752,6 +810,8 @@ public class ContractController extends HttpServlet {
         c.setSigningDate(existing.getSigningDate());
         // BR-56: chữa sai sót không đổi bốn ô người ký bên mình.
         ContractService.copyBranchSigner(c, existing);
+        // BR-35: chữa sai sót cũng không đổi người phụ trách.
+        c.setOwnerId(existing.getOwnerId());
         if (!isValid(c) || !counterpartyMatchesDirection(c)) {
             response.sendRedirect(request.getContextPath() + back + "&error=invalid");
             return;

@@ -2089,8 +2089,14 @@ public class ContractDAOTest {
         }
     }
 
+    /**
+     * Task 8.5 (BR-35) chuyển test này sang {@code replaceOwner}: trước đây
+     * {@code update()} trên hợp đồng đã ký đổi được người phụ trách; giờ chỉ
+     * ngoại lệ Admin thay người đã bị khoá tài khoản mới đổi, và vẫn phải ghi
+     * đúng một dòng nhật ký "Người phụ trách: cũ → mới".
+     */
     @Test
-    public void update_signedContract_whenOwnerChanged_logsOnlyOwnerChangeAndIgnoresLockedFields() throws Exception {
+    public void replaceOwner_signedContract_logsOnlyOwnerChangeAndIgnoresLockedFields() throws Exception {
         ResultSet current = singleRow(parentRow(ContractDAO.PROGRESS_SIGNED, null));
         ResultSet oldOwnerLabel = singleRow(row("label", "Nguyễn Văn Cũ"));
         ResultSet newOwnerLabel = singleRow(row("label", "Trần Thị Mới"));
@@ -2100,15 +2106,10 @@ public class ContractDAOTest {
         when(contractPs.executeUpdate()).thenReturn(1);
         Connection conn = connectionRoutingOn("contract_history", historyPs, contractPs);
 
-        Contract submitted = new Contract();
-        submitted.setContractId(3);
-        submitted.setOwnerId(88); // Đổi từ 5 sang 88
-        submitted.setTitle("Tiêu đề gửi kèm nhưng đã khóa");
-
         try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
             db.when(DBContext::getConnection).thenReturn(conn);
 
-            assertTrue(dao.update(submitted, ACTOR));
+            assertTrue(dao.replaceOwner(3, 88, ACTOR)); // Đổi từ 5 sang 88
 
             ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
             verify(conn, atLeastOnce()).prepareStatement(sql.capture());
@@ -2125,6 +2126,184 @@ public class ContractDAOTest {
             assertTrue(detail.getValue().contains("Người phụ trách: Nguyễn Văn Cũ → Trần Thị Mới"));
             assertFalse(detail.getValue().contains("Tiêu đề"));
             verify(conn).commit();
+        }
+    }
+
+    /** BR-35: ngoại lệ áp được cả bản Nháp, vẫn chỉ ghi cột owner_id. */
+    @Test
+    public void replaceOwner_draftContract_writesOnlyOwnerColumn() throws Exception {
+        ResultSet current = singleRow(parentRow(ContractDAO.PROGRESS_DRAFT, null));
+        PreparedStatement historyPs = mock(PreparedStatement.class);
+        PreparedStatement contractPs = mock(PreparedStatement.class);
+        when(contractPs.executeQuery()).thenReturn(current);
+        when(contractPs.executeUpdate()).thenReturn(1);
+        Connection conn = connectionRoutingOn("contract_history", historyPs, contractPs);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            assertTrue(dao.replaceOwner(3, 88, ACTOR));
+
+            ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+            verify(conn, atLeastOnce()).prepareStatement(sql.capture());
+            assertEquals(List.of("UPDATE contracts SET owner_id = ? WHERE contract_id = ? AND is_deleted = 0"),
+                    sql.getAllValues().stream().filter(q -> q.startsWith("UPDATE contracts")).toList());
+            // Một lần cho UPDATE owner_id, một lần tra tên người mới cho dòng nhật ký.
+            verify(contractPs, times(2)).setInt(1, 88);
+            verify(contractPs).setInt(2, 3);
+            verify(historyPs).executeUpdate();
+            verify(conn).commit();
+        }
+    }
+
+    /** BR-43: thanh lý/chấm dứt sớm rồi thì kể cả ngoại lệ của Admin cũng không đổi. */
+    @Test
+    public void replaceOwner_frozenContract_refusesAndWritesNothing() throws Exception {
+        ResultSet current = singleRow(parentRow(ContractDAO.PROGRESS_LIQUIDATED, null));
+        PreparedStatement historyPs = mock(PreparedStatement.class);
+        PreparedStatement contractPs = mock(PreparedStatement.class);
+        when(contractPs.executeQuery()).thenReturn(current);
+        Connection conn = connectionRoutingOn("contract_history", historyPs, contractPs);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            assertFalse(dao.replaceOwner(3, 88, ACTOR));
+
+            verify(contractPs, never()).executeUpdate();
+            verify(historyPs, never()).executeUpdate();
+            verify(conn, never()).commit();
+        }
+    }
+
+    @Test
+    public void replaceOwner_contractMissingOrNoRowUpdated_returnsFalse() throws Exception {
+        ResultSet noRow = emptyResultSet();
+        PreparedStatement missingPs = mock(PreparedStatement.class);
+        when(missingPs.executeQuery()).thenReturn(noRow);
+        Connection missingConn = connectionReturning(missingPs);
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(missingConn);
+            assertFalse(dao.replaceOwner(3, 88, ACTOR));
+            verify(missingPs, never()).executeUpdate();
+        }
+
+        ResultSet signedRow = singleRow(parentRow(ContractDAO.PROGRESS_SIGNED, null));
+        PreparedStatement historyPs = mock(PreparedStatement.class);
+        PreparedStatement contractPs = mock(PreparedStatement.class);
+        when(contractPs.executeQuery()).thenReturn(signedRow);
+        when(contractPs.executeUpdate()).thenReturn(0);
+        Connection conn = connectionRoutingOn("contract_history", historyPs, contractPs);
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+            assertFalse(dao.replaceOwner(3, 88, ACTOR));
+            verify(historyPs, never()).executeUpdate();
+            verify(conn, never()).commit();
+        }
+    }
+
+    @Test
+    public void replaceOwner_invalidIds_returnFalseWithoutTouchingDatabase() {
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            assertFalse(dao.replaceOwner(0, 88, ACTOR));
+            assertFalse(dao.replaceOwner(3, 0, ACTOR));
+            assertFalse(dao.replaceOwner(-1, -1, ACTOR));
+            db.verifyNoInteractions();
+        }
+    }
+
+    @Test
+    public void replaceOwner_sqlException_returnsFalse() throws Exception {
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenThrow(new SQLException("mất kết nối"));
+            assertFalse(dao.replaceOwner(3, 88, ACTOR));
+        }
+    }
+
+    /** BR-35 (Task 8.5): update() trên hợp đồng đã ký không đổi người phụ trách nữa. */
+    @Test
+    public void update_signedContract_ignoresSubmittedOwnerAndLogsNothing() throws Exception {
+        ResultSet current = singleRow(parentRow(ContractDAO.PROGRESS_SIGNED, null));
+        PreparedStatement historyPs = mock(PreparedStatement.class);
+        PreparedStatement contractPs = mock(PreparedStatement.class);
+        when(contractPs.executeQuery()).thenReturn(current);
+        when(contractPs.executeUpdate()).thenReturn(1);
+        Connection conn = connectionRoutingOn("contract_history", historyPs, contractPs);
+
+        Contract submitted = new Contract();
+        submitted.setContractId(3);
+        submitted.setOwnerId(88);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            assertTrue(dao.update(submitted, ACTOR));
+
+            verify(contractPs).setInt(1, 5);
+            verify(contractPs, never()).setInt(1, 88);
+            verify(historyPs, never()).executeUpdate();
+        }
+    }
+
+    /** BR-35 (Task 8.5): bản Nháp ghi mọi cột, riêng owner_id luôn là giá trị đang lưu. */
+    @Test
+    public void update_draftContract_keepsStoredOwner() throws Exception {
+        ResultSet current = singleRow(parentRow(ContractDAO.PROGRESS_DRAFT, null));
+        PreparedStatement historyPs = mock(PreparedStatement.class);
+        PreparedStatement contractPs = mock(PreparedStatement.class);
+        when(contractPs.executeQuery()).thenReturn(current);
+        when(contractPs.executeUpdate()).thenReturn(1);
+        Connection conn = connectionRoutingOn("contract_history", historyPs, contractPs);
+
+        Contract submitted = new Contract();
+        submitted.setContractId(3);
+        submitted.setContractCode("01/2026/HĐMB-POSTEF");
+        submitted.setTitle("Hợp đồng gốc");
+        submitted.setContractType("Mua vật tư");
+        submitted.setEnterpriseId(12);
+        submitted.setOwnerId(88);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            assertTrue(dao.update(submitted, ACTOR));
+
+            verify(contractPs).setInt(8, 5);
+            verify(contractPs, never()).setInt(8, 88);
+            // Không ô nào thực sự đổi -> không có dòng nhật ký "Người phụ trách".
+            verify(historyPs, never()).executeUpdate();
+        }
+    }
+
+    /** BR-35 (Task 8.5): chữa sai sót (UC-54) cũng không đổi người phụ trách. */
+    @Test
+    public void correct_keepsStoredOwner() throws Exception {
+        ResultSet current = singleRow(parentRow(ContractDAO.PROGRESS_SIGNED, null));
+        PreparedStatement historyPs = mock(PreparedStatement.class);
+        PreparedStatement contractPs = mock(PreparedStatement.class);
+        when(contractPs.executeQuery()).thenReturn(current);
+        when(contractPs.executeUpdate()).thenReturn(1);
+        Connection conn = connectionRoutingOn("contract_history", historyPs, contractPs);
+
+        Contract c = new Contract();
+        c.setContractId(3);
+        c.setContractCode("01/2026/HĐMB-POSTEF");
+        c.setTitle("Hợp đồng gốc");
+        c.setContractType("Mua vật tư");
+        c.setEnterpriseId(12);
+        c.setOwnerId(88);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            assertTrue(dao.correct(c, ACTOR, "Gõ nhầm"));
+
+            verify(contractPs).setInt(8, 5);
+            verify(contractPs, never()).setInt(8, 88);
+            assertEquals(5, c.getOwnerId());
+            ArgumentCaptor<String> detail = ArgumentCaptor.forClass(String.class);
+            verify(historyPs).setString(eq(3), detail.capture());
+            assertFalse(detail.getValue().contains("Người phụ trách"));
         }
     }
 
