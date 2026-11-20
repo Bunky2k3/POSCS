@@ -33,6 +33,7 @@
     <li><strong>Trạng thái</strong>: <em>Đang hoạt động</em>, hoặc <em>Ngừng hoạt động</em> khi đã bị khoá (<a href="#khoa">mục 7</a>).</li>
 </ul>
 <p>Mã nhân viên dạng <code>NV-22</code> là số hệ thống tự cấp, không sửa được.</p>
+<p>Ngay dưới mục Nhân viên trên thanh bên trái là <strong>Thông tin chi nhánh</strong>: nơi khai Giám đốc chi nhánh, người ký bên mình trên hợp đồng (<a href="#thong-tin-chi-nhanh">mục 9</a>).</p>
 
 <h3 id="vong-doi">1.1. Nhân viên mới nhận tài khoản thế nào</h3>
 <table class="guide-table">
@@ -208,7 +209,7 @@
 </div>
 <div class="guide-warn">
     <p><strong>Khoá không chuyển giao gì cả.</strong> Tỉnh người đó cầm vẫn đứng tên họ; khách hàng, hợp đồng, phiếu hỗ trợ họ phụ trách vẫn giữ nguyên. Khi nhân viên nghỉ việc:</p>
-    <p>1. Khoá tài khoản. 2. Mở trang Sửa của người đó, bỏ tích địa bàn, bấm Lưu thay đổi. 3. Giao các tỉnh đó cho người mới. 4. Đổi người phụ trách ở từng khách hàng, hợp đồng, và người xử lý ở các phiếu hỗ trợ còn mở.</p>
+    <p>1. Khoá tài khoản. 2. Mở trang Sửa của người đó, bỏ tích địa bàn, bấm Lưu thay đổi. 3. Giao các tỉnh đó cho người mới. 4. Đổi người phụ trách ở từng khách hàng, hợp đồng (với hợp đồng, chỉ đổi được sau khi đã khoá tài khoản ở bước 1: xem hướng dẫn Hợp đồng, mục 5.2), và người xử lý ở các phiếu hỗ trợ còn mở.</p>
 </div>
 
 <h2 id="cap-tren">8. Cấp trên và địa bàn quản lý</h2>
@@ -222,10 +223,33 @@
     <p>Phần mềm <strong>chưa có chỗ gán cấp trên</strong>: form thêm/sửa không có ô này, và việc gán hiện do người quản trị hệ thống làm trực tiếp trong cơ sở dữ liệu. Chưa ai được gán cấp trên thì chưa ai bị giới hạn.</p>
 </div>
 
-<h2 id="loi-thuong-gap">9. Thông báo lỗi thường gặp</h2>
+<h2 id="thong-tin-chi-nhanh">9. Thông tin chi nhánh</h2>
+<div class="guide-who"><span class="lbl">Ai làm được:</span><span class="role">Admin</span><span class="role no">Sales</span><span class="role no">Kỹ thuật</span></div>
+<p>Thông tin Giám đốc chi nhánh — người ký bên mình trên mọi hợp đồng. Chi nhánh chỉ có một bản ghi này: khai một lần, sửa khi đổi giám đốc; không có nút tạo hay xoá. Trên thanh bên trái, bấm <strong>Thông tin chi nhánh</strong> (mục chỉ hiện với Admin), sửa các ô rồi bấm <strong>Lưu thay đổi</strong>. Lưu xong, góc trên bên phải báo <em>Đã lưu thông tin chi nhánh.</em></p>
+<ul>
+    <li><strong>Họ tên Giám đốc chi nhánh</strong> và <strong>Chức vụ</strong>: bắt buộc, tối đa 100 ký tự.</li>
+    <li><strong>Điện thoại</strong> và <strong>Fax</strong> (không bắt buộc): tối đa 20 ký tự, có từ 8 tới 15 chữ số; ngoài chữ số chỉ được dấu <code>+</code> ở đầu, khoảng trắng, dấu chấm, gạch ngang và ngoặc đơn. Nhận cả số máy bàn có mã vùng trong ngoặc.</li>
+</ul>
+<p>Dưới form có dòng <em>Cập nhật lần cuối bởi … lúc …</em> cho biết ai sửa gần nhất.</p>
+<div class="guide-note">
+    <p>Hợp đồng chép thông tin này lúc tạo hợp đồng, lập phụ lục và mỗi lần lưu bản Nháp (xem hướng dẫn Hợp đồng, mục 3). Hợp đồng đã ký giữ nguyên người ký lúc ký: đổi giám đốc không làm đổi các hợp đồng đó.</p>
+</div>
+<div class="guide-warn">
+    <p>Chưa khai họ tên Giám đốc chi nhánh thì form hợp đồng để trống bốn ô người ký bên mình và hiện dải vàng nhắc Admin khai. Nên khai ngay khi bắt đầu dùng phần mềm.</p>
+</div>
 <table class="guide-table">
     <tr><th>Thông báo</th><th>Nguyên nhân và cách xử lý</th></tr>
-    <tr><td>Bạn không có quyền truy cập nội dung này.</td><td>Người không phải Admin mở trang nhân viên.</td></tr>
+    <tr><td>Vui lòng nhập họ tên và chức vụ Giám đốc chi nhánh.</td><td>Còn trống ô Họ tên hoặc Chức vụ.</td></tr>
+    <tr><td>Số điện thoại không hợp lệ.</td><td>Ô Điện thoại có chữ cái, ít hơn 8 hoặc nhiều hơn 15 chữ số, hoặc dài quá 20 ký tự.</td></tr>
+    <tr><td>Số fax không hợp lệ.</td><td>Như trên, với ô Fax.</td></tr>
+    <tr><td>Không lưu được thông tin chi nhánh. Vui lòng thử lại.</td><td>Lỗi hệ thống. Thử lại; vẫn lỗi thì báo người quản trị hệ thống.</td></tr>
+    <tr><td>Có lỗi khi tải dữ liệu. Vui lòng thử lại.</td><td>Không đọc được thông tin chi nhánh nên trang không hiện form. Tải lại trang; vẫn lỗi thì báo người quản trị hệ thống.</td></tr>
+</table>
+
+<h2 id="loi-thuong-gap">10. Thông báo lỗi thường gặp</h2>
+<table class="guide-table">
+    <tr><th>Thông báo</th><th>Nguyên nhân và cách xử lý</th></tr>
+    <tr><td>Bạn không có quyền truy cập nội dung này.</td><td>Người không phải Admin mở trang nhân viên hoặc trang Thông tin chi nhánh.</td></tr>
     <tr><td>Không tìm thấy nhân viên này…</td><td>Link cũ, hoặc mã nhân viên trên đường dẫn không đúng.</td></tr>
     <tr><td>Vui lòng nhập đầy đủ và đúng định dạng các trường bắt buộc.</td><td>Còn ô có dấu * để trống, hoặc số điện thoại, email, ngày sinh sai định dạng.</td></tr>
     <tr><td>Số điện thoại / Số CCCD/CMND này đã được sử dụng bởi tài khoản khác.</td><td>Trùng với một nhân viên khác. Kiểm lại số.</td></tr>
