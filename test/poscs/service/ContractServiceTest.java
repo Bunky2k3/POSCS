@@ -364,10 +364,14 @@ public class ContractServiceTest {
         assertFalse(nullAmend.isSuccess());
         assertEquals(ContractService.ERR_INVALID, nullAmend.getMessage());
 
-        // Người phụ trách không tồn tại -> ERR_INVALID + FIELD_OWNER_ID
+        // Task 8.5 (BR-35): phụ lục lấy người phụ trách của hợp đồng gốc, nên
+        // ca "người phụ trách không tồn tại" giờ dựng ở hợp đồng gốc chứ không
+        // ở ownerId gửi lên -> ERR_INVALID + FIELD_OWNER_ID
+        Contract orphanParent = signedParentContract(14, "HD-PARENT-ORPHAN", new BigDecimal("100000000"));
+        orphanParent.setOwnerId(999);
+        contractDAO.putContract(orphanParent);
         Contract badOwnerAmend = validDraftSellContract("PL-BAD-OWNER");
-        badOwnerAmend.setOwnerId(999);
-        ServiceResult<Integer> ownerRes = service.createAmendment(10, badOwnerAmend, adminUser);
+        ServiceResult<Integer> ownerRes = service.createAmendment(14, badOwnerAmend, adminUser);
         assertFalse(ownerRes.isSuccess());
         assertEquals(ContractService.ERR_INVALID, ownerRes.getMessage());
         assertTrue(ownerRes.getFieldErrors().containsKey(ContractValidator.FIELD_OWNER_ID));
@@ -441,14 +445,16 @@ public class ContractServiceTest {
         assertEquals(ContractService.ERR_DUPLICATE_CODE, dupRes.getMessage());
         assertTrue(dupRes.getFieldErrors().containsKey(ContractValidator.FIELD_CONTRACT_CODE));
 
-        // Người phụ trách không tồn tại -> ERR_INVALID + FIELD_OWNER_ID
+        // Task 8.5 (BR-35): ownerId gửi lên (kể cả không tồn tại) bị bỏ qua,
+        // người phụ trách giữ nguyên người đang lưu.
         Contract badOwner = validDraftSellContract("HD-DRAFT-01");
         badOwner.setContractId(20);
+        // DAO giả lưu nguyên đối tượng gửi lên, nên giữ tiến độ Nháp cho bước sau.
+        badOwner.setProgressStatus(ContractService.PROGRESS_DRAFT);
         badOwner.setOwnerId(999);
         ServiceResult<Void> ownerRes = service.updateContract(badOwner, salesManager);
-        assertFalse(ownerRes.isSuccess());
-        assertEquals(ContractService.ERR_INVALID, ownerRes.getMessage());
-        assertTrue(ownerRes.getFieldErrors().containsKey(ContractValidator.FIELD_OWNER_ID));
+        assertTrue(ownerRes.isSuccess());
+        assertEquals(2, contractDAO.findById(20).getOwnerId());
 
         // Cập nhật hợp lệ
         Contract edited = validDraftSellContract("HD-DRAFT-01-NEW");
@@ -487,45 +493,57 @@ public class ContractServiceTest {
         assertTrue(res.getFieldErrors().containsKey(ContractValidator.FIELD_CONTRACT_VALUE));
     }
 
+    /**
+     * Task 8.5 (BR-35) sửa test này theo luật mới: hợp đồng đã ký không còn đổi
+     * được người phụ trách qua form Sửa hay qua updateContractOwner, trừ ngoại
+     * lệ Admin thay người đã bị khoá tài khoản (các test riêng bên dưới).
+     * Trước đó Sales quản lý vùng đổi được người phụ trách sau khi ký.
+     */
     @Test
-    public void updateContract_signedContract_allowsOnlyOwnerChangeAndBlocksOtherFields() {
+    public void updateContract_signedContract_rejectsEveryEditIncludingOwner() {
         Contract signed = signedParentContract(30, "HD-SIGNED-30", new BigDecimal("100000000"));
         contractDAO.putContract(signed);
 
-        // Không có quyền -> MSG-022
+        // Không có quyền quản lý -> MSG-022
         ServiceResult<Void> unauthRes = service.updateContractOwner(30, 3, salesSubordinate);
         assertFalse(unauthRes.isSuccess());
         assertEquals(PermissionService.MSG_022, unauthRes.getMessage());
 
-        // newOwnerId <= 0 hoặc không tồn tại -> ERR_INVALID + FIELD_OWNER_ID
-        ServiceResult<Void> zeroOwner = service.updateContractOwner(30, 0, salesManager);
-        assertFalse(zeroOwner.isSuccess());
-        assertEquals(ContractService.ERR_INVALID, zeroOwner.getMessage());
-        assertTrue(zeroOwner.getFieldErrors().containsKey(ContractValidator.FIELD_OWNER_ID));
+        // Sales quản lý vùng không còn đổi được người phụ trách -> MSG-022
+        ServiceResult<Void> salesRes = service.updateContractOwner(30, 3, salesManager);
+        assertFalse(salesRes.isSuccess());
+        assertEquals(PermissionService.MSG_022, salesRes.getMessage());
 
-        ServiceResult<Void> missingOwner = service.updateContractOwner(30, 999, salesManager);
-        assertFalse(missingOwner.isSuccess());
-        assertEquals(ContractService.ERR_INVALID, missingOwner.getMessage());
-        assertTrue(missingOwner.getFieldErrors().containsKey(ContractValidator.FIELD_OWNER_ID));
+        // Admin, nhưng người phụ trách hiện tại còn hoạt động -> MSG-022
+        ServiceResult<Void> adminRes = service.updateContractOwner(30, 3, adminUser);
+        assertFalse(adminRes.isSuccess());
+        assertEquals(PermissionService.MSG_022, adminRes.getMessage());
+        assertEquals(2, contractDAO.findById(30).getOwnerId());
 
         // HĐ không tồn tại -> ERR_NOT_FOUND
-        ServiceResult<Void> notFoundRes = service.updateContractOwner(9999, 3, salesManager);
+        ServiceResult<Void> notFoundRes = service.updateContractOwner(9999, 3, adminUser);
         assertFalse(notFoundRes.isSuccess());
         assertEquals(ContractService.ERR_NOT_FOUND, notFoundRes.getMessage());
+        assertEquals(ContractService.ERR_NOT_FOUND, service.updateContractOwner(0, 3, adminUser).getMessage());
 
-        // Đổi người phụ trách hợp lệ qua updateContractOwner -> thành công
-        ServiceResult<Void> ownerRes = service.updateContractOwner(30, 3, salesManager);
-        assertTrue(ownerRes.isSuccess());
-        assertEquals(3, contractDAO.findById(30).getOwnerId());
+        // Form Sửa gửi lên cho HĐ đã ký: chỉ đổi người phụ trách cũng bị từ chối
+        Contract ownerOnly = signedParentContract(30, "HD-SIGNED-30", new BigDecimal("100000000"));
+        ownerOnly.setOwnerId(3);
+        ServiceResult<Void> ownerOnlyRes = service.updateContract(ownerOnly, adminUser);
+        assertFalse(ownerOnlyRes.isSuccess());
+        assertEquals(ContractService.ERR_UPDATE_FAILED, ownerOnlyRes.getMessage());
+        assertEquals(ContractValidator.MSG_CANNOT_EDIT_LOCKED,
+                ownerOnlyRes.getFieldErrors().get(ContractValidator.FIELD_PROGRESS_STATUS));
 
-        // Cố tình sửa tiêu đề trên HĐ đã ký -> bị chặn
+        // Cố tình sửa tiêu đề trên HĐ đã ký -> bị chặn, không ghi gì
         Contract illegalEdit = signedParentContract(30, "HD-SIGNED-30", new BigDecimal("100000000"));
-        illegalEdit.setOwnerId(3);
         illegalEdit.setTitle("Sửa tiêu đề trái phép");
-
-        ServiceResult<Void> failRes = service.updateContract(illegalEdit, adminUser);
+        ServiceResult<Void> failRes = service.updateContract(illegalEdit, salesManager);
         assertFalse(failRes.isSuccess());
-        assertEquals(ContractService.ERR_INVALID, failRes.getMessage());
+        assertEquals(ContractService.ERR_UPDATE_FAILED, failRes.getMessage());
+        assertEquals(2, contractDAO.findById(30).getOwnerId());
+        assertEquals("Hợp đồng cung cấp hệ thống lọc bụi", contractDAO.findById(30).getTitle());
+        assertEquals(0, contractDAO.replaceOwnerCalls);
     }
 
     @Test
@@ -541,6 +559,401 @@ public class ContractServiceTest {
         ServiceResult<Void> res2 = service.updateContractOwner(31, 3, adminUser);
         assertFalse(res2.isSuccess());
         assertEquals(ContractService.ERR_UPDATE_FAILED, res2.getMessage());
+    }
+
+    // ==================================================================
+    // 4b. BR-35 (Task 8.5): Người phụ trách theo người tạo, khoá sau khi tạo
+    // ==================================================================
+
+    @Test
+    public void applyCreateOwner_picksParentOwnerOrCreatorOrAdminChoice() {
+        Contract parent = new Contract();
+        parent.setOwnerId(7);
+
+        Contract amendment = new Contract();
+        amendment.setOwnerId(3);
+        ContractService.applyCreateOwner(amendment, parent, 1, true);
+        assertEquals(7, amendment.getOwnerId());
+
+        Contract bySales = new Contract();
+        bySales.setOwnerId(3);
+        ContractService.applyCreateOwner(bySales, null, 2, false);
+        assertEquals(2, bySales.getOwnerId());
+
+        Contract byAdmin = new Contract();
+        byAdmin.setOwnerId(3);
+        ContractService.applyCreateOwner(byAdmin, null, 1, true);
+        assertEquals(3, byAdmin.getOwnerId());
+
+        ContractService.applyCreateOwner(null, parent, 1, true); // không ném lỗi
+    }
+
+    @Test
+    public void canReplaceOwner_onlyAdminWhenCurrentOwnerLockedAndNotFrozen() {
+        Contract signed = signedParentContract(80, "HD-REP-80", new BigDecimal("1000"));
+        Contract draft = validDraftSellContract("HD-REP-81");
+        draft.setProgressStatus(ContractService.PROGRESS_DRAFT);
+        Contract liquidated = signedParentContract(82, "HD-REP-82", new BigDecimal("1000"));
+        liquidated.setProgressStatus(ContractService.PROGRESS_LIQUIDATED);
+
+        assertTrue(ContractService.canReplaceOwner(signed, true, false));
+        assertTrue(ContractService.canReplaceOwner(draft, true, false));
+        assertFalse(ContractService.canReplaceOwner(signed, true, true));
+        assertFalse(ContractService.canReplaceOwner(signed, false, false));
+        assertFalse(ContractService.canReplaceOwner(liquidated, true, false));
+        assertFalse(ContractService.canReplaceOwner(null, true, false));
+
+        // Bản đọc vai và tài khoản từ CSDL
+        signed.setOwnerId(deletedUser.getUserId());
+        assertTrue(service.canReplaceOwner(signed, adminUser));
+        assertFalse(service.canReplaceOwner(signed, salesManager));
+        signed.setOwnerId(salesManager.getUserId());
+        assertFalse(service.canReplaceOwner(signed, adminUser));
+        assertFalse(service.canReplaceOwner(null, adminUser));
+    }
+
+    @Test
+    public void createContract_salesManager_ownerIsAlwaysTheCreator() {
+        Contract c = validDraftSellContract("HD-OWN-SALES");
+        c.setOwnerId(salesSubordinate.getUserId()); // POST tự gõ ownerId người khác
+
+        ServiceResult<Integer> res = service.createContract(c, salesManager);
+
+        assertTrue(res.isSuccess());
+        assertEquals(salesManager.getUserId(), contractDAO.findById(res.getData()).getOwnerId());
+    }
+
+    @Test
+    public void createContract_salesManager_withoutOwnerId_stillSucceedsAsCreator() {
+        Contract c = validDraftSellContract("HD-OWN-NONE");
+        c.setOwnerId(0);
+
+        ServiceResult<Integer> res = service.createContract(c, salesManager);
+
+        assertTrue(res.isSuccess());
+        assertEquals(salesManager.getUserId(), contractDAO.findById(res.getData()).getOwnerId());
+    }
+
+    @Test
+    public void createContract_admin_keepsChosenActiveSales() {
+        Contract c = validDraftSellContract("HD-OWN-ADMIN");
+        c.setOwnerId(salesSubordinate.getUserId());
+
+        ServiceResult<Integer> res = service.createContract(c, adminUser);
+
+        assertTrue(res.isSuccess());
+        assertEquals(salesSubordinate.getUserId(), contractDAO.findById(res.getData()).getOwnerId());
+    }
+
+    @Test
+    public void createContract_adminChoosesNonSalesOrNobody_failsWithOwnerRequired() {
+        for (int ownerId : new int[] {techUser.getUserId(), adminUser.getUserId(), deletedUser.getUserId(), 0, -1}) {
+            Contract c = validDraftSellContract("HD-OWN-BAD-" + ownerId);
+            c.setOwnerId(ownerId);
+
+            ServiceResult<Integer> res = service.createContract(c, adminUser);
+
+            assertFalse("ownerId=" + ownerId, res.isSuccess());
+            assertEquals(ContractService.ERR_INVALID, res.getMessage());
+            assertEquals(ContractValidator.MSG_OWNER_REQUIRED,
+                    res.getFieldErrors().get(ContractValidator.FIELD_OWNER_ID));
+        }
+        assertEquals(0, contractDAO.insertCalls);
+    }
+
+    @Test
+    public void createAmendment_ownerFollowsParentAndIgnoresSubmittedOwner() {
+        Contract parent = signedParentContract(15, "HD-PARENT-OWN", new BigDecimal("100000000"));
+        parent.setOwnerId(salesManager.getUserId());
+        contractDAO.putContract(parent);
+
+        Contract byAdmin = validDraftSellContract("PL-OWN-ADMIN");
+        byAdmin.setOwnerId(salesSubordinate.getUserId());
+        ServiceResult<Integer> adminRes = service.createAmendment(15, byAdmin, adminUser);
+        assertTrue(adminRes.isSuccess());
+        assertEquals(salesManager.getUserId(), contractDAO.findById(adminRes.getData()).getOwnerId());
+
+        Contract bySales = validDraftSellContract("PL-OWN-SALES");
+        bySales.setOwnerId(0);
+        ServiceResult<Integer> salesRes = service.createAmendment(15, bySales, salesManager);
+        assertTrue(salesRes.isSuccess());
+        assertEquals(salesManager.getUserId(), contractDAO.findById(salesRes.getData()).getOwnerId());
+    }
+
+    @Test
+    public void updateContract_draftWithOtherOwnerId_keepsStoredOwner() {
+        Contract existing = validDraftSellContract("HD-OWN-DRAFT");
+        existing.setContractId(83);
+        existing.setProgressStatus(ContractService.PROGRESS_DRAFT);
+        contractDAO.putContract(existing);
+
+        Contract edited = validDraftSellContract("HD-OWN-DRAFT");
+        edited.setContractId(83);
+        edited.setTitle("Tiêu đề mới");
+        edited.setOwnerId(salesSubordinate.getUserId());
+
+        ServiceResult<Void> res = service.updateContract(edited, adminUser);
+
+        assertTrue(res.isSuccess());
+        assertEquals(salesManager.getUserId(), contractDAO.findById(83).getOwnerId());
+        assertEquals("Tiêu đề mới", contractDAO.findById(83).getTitle());
+    }
+
+    /**
+     * Người phụ trách không còn là ô nhập ở form Sửa, nên bản Nháp của người đã
+     * bị khoá tài khoản vẫn lưu được các ô khác; thay người là việc của Admin.
+     */
+    @Test
+    public void updateContract_draftWhoseOwnerIsLocked_stillSavesOtherFields() {
+        Contract existing = validDraftSellContract("HD-OWN-LOCKED");
+        existing.setContractId(84);
+        existing.setProgressStatus(ContractService.PROGRESS_DRAFT);
+        existing.setOwnerId(deletedUser.getUserId());
+        contractDAO.putContract(existing);
+
+        Contract edited = validDraftSellContract("HD-OWN-LOCKED");
+        edited.setContractId(84);
+        edited.setTitle("Sửa khi người phụ trách đã nghỉ");
+
+        ServiceResult<Void> res = service.updateContract(edited, salesManager);
+
+        assertTrue(res.isSuccess());
+        assertEquals(deletedUser.getUserId(), contractDAO.findById(84).getOwnerId());
+    }
+
+    @Test
+    public void correctSignedContract_withOtherOwnerId_keepsStoredOwner() {
+        Contract signed = signedParentContract(85, "HD-OWN-CORR", new BigDecimal("100000000"));
+        contractDAO.putContract(signed);
+
+        Contract corrected = signedParentContract(85, "HD-OWN-CORR-2", new BigDecimal("100000000"));
+        corrected.setOwnerId(salesSubordinate.getUserId());
+
+        ServiceResult<Void> res = service.correctSignedContract(corrected, adminUser, "Gõ nhầm mã");
+
+        assertTrue(res.isSuccess());
+        assertEquals(salesManager.getUserId(), contractDAO.findById(85).getOwnerId());
+        assertEquals("HD-OWN-CORR-2", contractDAO.findById(85).getContractCode());
+    }
+
+    @Test
+    public void updateContractOwner_adminWhenOwnerLocked_replacesWithActiveSalesAndLogs() {
+        Contract signed = signedParentContract(86, "HD-OWN-REP", new BigDecimal("100000000"));
+        signed.setOwnerId(deletedUser.getUserId());
+        contractDAO.putContract(signed);
+
+        ServiceResult<Void> res = service.updateContractOwner(86, salesSubordinate.getUserId(), adminUser);
+
+        assertTrue(res.isSuccess());
+        assertEquals(salesSubordinate.getUserId(), contractDAO.findById(86).getOwnerId());
+        assertEquals(1, contractDAO.replaceOwnerCalls);
+        List<ContractHistory> history = contractDAO.findHistoryByContractId(86);
+        assertEquals(1, history.size());
+        assertEquals(ContractHistory.EVENT_UPDATED, history.get(0).getEventType());
+        assertEquals(adminUser.getUserId(), history.get(0).getChangedBy());
+    }
+
+    @Test
+    public void updateContractOwner_adminWhenOwnerLocked_onDraft_succeeds() {
+        Contract draft = validDraftSellContract("HD-OWN-REP-D");
+        draft.setContractId(87);
+        draft.setProgressStatus(ContractService.PROGRESS_DRAFT);
+        draft.setOwnerId(deletedUser.getUserId());
+        contractDAO.putContract(draft);
+
+        ServiceResult<Void> res = service.updateContractOwner(87, salesManager.getUserId(), adminUser);
+
+        assertTrue(res.isSuccess());
+        assertEquals(salesManager.getUserId(), contractDAO.findById(87).getOwnerId());
+    }
+
+    @Test
+    public void updateContractOwner_newOwnerNotActiveSales_failsWithOwnerRequired() {
+        Contract signed = signedParentContract(88, "HD-OWN-REP-BAD", new BigDecimal("100000000"));
+        signed.setOwnerId(deletedUser.getUserId());
+        contractDAO.putContract(signed);
+
+        for (int ownerId : new int[] {techUser.getUserId(), adminUser.getUserId(), deletedUser.getUserId(), 999, 0}) {
+            ServiceResult<Void> res = service.updateContractOwner(88, ownerId, adminUser);
+            assertFalse("ownerId=" + ownerId, res.isSuccess());
+            assertEquals(ContractService.ERR_INVALID, res.getMessage());
+            assertEquals(ContractValidator.MSG_OWNER_REQUIRED,
+                    res.getFieldErrors().get(ContractValidator.FIELD_OWNER_ID));
+        }
+        assertEquals(deletedUser.getUserId(), contractDAO.findById(88).getOwnerId());
+        assertEquals(0, contractDAO.replaceOwnerCalls);
+    }
+
+    @Test
+    public void updateContractOwner_salesEvenWhenOwnerLocked_isForbidden() {
+        Contract signed = signedParentContract(89, "HD-OWN-REP-S", new BigDecimal("100000000"));
+        signed.setOwnerId(deletedUser.getUserId());
+        contractDAO.putContract(signed);
+
+        ServiceResult<Void> res = service.updateContractOwner(89, salesManager.getUserId(), salesManager);
+
+        assertFalse(res.isSuccess());
+        assertEquals(PermissionService.MSG_022, res.getMessage());
+        assertEquals(deletedUser.getUserId(), contractDAO.findById(89).getOwnerId());
+    }
+
+    @Test
+    public void updateContractOwner_frozenContractWithLockedOwner_isRefused() {
+        Contract terminated = signedParentContract(90, "HD-OWN-REP-T", new BigDecimal("100000000"));
+        terminated.setProgressStatus(ContractService.PROGRESS_TERMINATED);
+        terminated.setOwnerId(deletedUser.getUserId());
+        contractDAO.putContract(terminated);
+
+        ServiceResult<Void> res = service.updateContractOwner(90, salesManager.getUserId(), adminUser);
+
+        assertFalse(res.isSuccess());
+        assertEquals(ContractService.ERR_UPDATE_FAILED, res.getMessage());
+        assertEquals(0, contractDAO.replaceOwnerCalls);
+    }
+
+    /** Bản Nháp #id của người phụ trách đã bị khoá tài khoản, sẵn sàng cho ngoại lệ của Admin. */
+    private Contract draftOfLockedOwner(int id, String code) {
+        Contract draft = validDraftSellContract(code);
+        draft.setContractId(id);
+        draft.setProgressStatus(ContractService.PROGRESS_DRAFT);
+        draft.setOwnerId(deletedUser.getUserId());
+        contractDAO.putContract(draft);
+        return draft;
+    }
+
+    /** Form Sửa gửi lên cho bản Nháp #id (DAO giả lưu nguyên đối tượng, nên giữ tiến độ Nháp). */
+    private Contract editedDraft(int id, String code, String title) {
+        Contract edited = validDraftSellContract(code);
+        edited.setContractId(id);
+        edited.setProgressStatus(ContractService.PROGRESS_DRAFT);
+        edited.setTitle(title);
+        return edited;
+    }
+
+    /** QA-8.5-01: ô khác của bản Nháp lỗi thì không ghi gì, kể cả người phụ trách. */
+    @Test
+    public void updateDraftReplacingOwner_invalidDraftField_writesNothingIncludingOwner() {
+        draftOfLockedOwner(92, "HD-QA-92");
+        Contract other = validDraftSellContract("HD-QA-OTHER");
+        other.setContractId(93);
+        other.setProgressStatus(ContractService.PROGRESS_DRAFT);
+        contractDAO.putContract(other);
+
+        // Trùng mã với hợp đồng khác
+        ServiceResult<Void> dup = service.updateDraftReplacingOwner(
+                editedDraft(92, "HD-QA-OTHER", "Tiêu đề mới"), salesManager.getUserId(), adminUser);
+        assertFalse(dup.isSuccess());
+        assertEquals(ContractService.ERR_DUPLICATE_CODE, dup.getMessage());
+
+        // Thiếu tiêu đề
+        ServiceResult<Void> blank = service.updateDraftReplacingOwner(
+                editedDraft(92, "HD-QA-92", "   "), salesManager.getUserId(), adminUser);
+        assertFalse(blank.isSuccess());
+        assertEquals(ContractService.ERR_INVALID, blank.getMessage());
+        assertTrue(blank.getFieldErrors().containsKey(ContractValidator.FIELD_TITLE));
+
+        assertEquals(deletedUser.getUserId(), contractDAO.findById(92).getOwnerId());
+        assertEquals("Hợp đồng cung cấp hệ thống lọc bụi", contractDAO.findById(92).getTitle());
+        assertEquals(0, contractDAO.replaceOwnerCalls);
+        assertTrue(contractDAO.findHistoryByContractId(92).isEmpty());
+    }
+
+    /** QA-8.5-01: người thay không hợp lệ thì từ chối trước khi lưu bất cứ ô nào. */
+    @Test
+    public void updateDraftReplacingOwner_newOwnerNotActiveSales_savesNothing() {
+        draftOfLockedOwner(94, "HD-QA-94");
+
+        ServiceResult<Void> res = service.updateDraftReplacingOwner(
+                editedDraft(94, "HD-QA-94", "Tiêu đề mới"), techUser.getUserId(), adminUser);
+
+        assertFalse(res.isSuccess());
+        assertEquals(ContractService.ERR_INVALID, res.getMessage());
+        assertEquals(ContractValidator.MSG_OWNER_REQUIRED, res.getFieldErrors().get(ContractValidator.FIELD_OWNER_ID));
+        assertEquals("Hợp đồng cung cấp hệ thống lọc bụi", contractDAO.findById(94).getTitle());
+        assertEquals(0, contractDAO.replaceOwnerCalls);
+    }
+
+    @Test
+    public void updateDraftReplacingOwner_valid_savesFieldsThenReplacesOwner() {
+        draftOfLockedOwner(95, "HD-QA-95");
+
+        ServiceResult<Void> res = service.updateDraftReplacingOwner(
+                editedDraft(95, "HD-QA-95", "Tiêu đề mới"), salesManager.getUserId(), adminUser);
+
+        assertTrue(res.isSuccess());
+        assertEquals("Tiêu đề mới", contractDAO.findById(95).getTitle());
+        assertEquals(salesManager.getUserId(), contractDAO.findById(95).getOwnerId());
+        List<ContractHistory> history = contractDAO.findHistoryByContractId(95);
+        assertEquals(2, history.size());
+        assertEquals("Cập nhật hợp đồng", history.get(0).getDetail());
+        assertEquals("Người phụ trách: cũ → mới", history.get(1).getDetail());
+    }
+
+    @Test
+    public void updateDraftReplacingOwner_salesOrOwnerStillActive_isForbiddenAndSavesNothing() {
+        draftOfLockedOwner(96, "HD-QA-96");
+        ServiceResult<Void> salesRes = service.updateDraftReplacingOwner(
+                editedDraft(96, "HD-QA-96", "Tiêu đề mới"), salesManager.getUserId(), salesManager);
+        assertEquals(PermissionService.MSG_022, salesRes.getMessage());
+
+        Contract activeOwner = validDraftSellContract("HD-QA-97");
+        activeOwner.setContractId(97);
+        activeOwner.setProgressStatus(ContractService.PROGRESS_DRAFT);
+        contractDAO.putContract(activeOwner);
+        ServiceResult<Void> adminRes = service.updateDraftReplacingOwner(
+                editedDraft(97, "HD-QA-97", "Tiêu đề mới"), salesSubordinate.getUserId(), adminUser);
+        assertEquals(PermissionService.MSG_022, adminRes.getMessage());
+
+        assertEquals("Hợp đồng cung cấp hệ thống lọc bụi", contractDAO.findById(96).getTitle());
+        assertEquals("Hợp đồng cung cấp hệ thống lọc bụi", contractDAO.findById(97).getTitle());
+        assertEquals(0, contractDAO.replaceOwnerCalls);
+    }
+
+    /** Đường này chỉ dành cho bản Nháp: hợp đồng đã ký thì updateContract từ chối, không đổi người. */
+    @Test
+    public void updateDraftReplacingOwner_signedContract_isRefusedWithoutReplacing() {
+        Contract signed = signedParentContract(98, "HD-QA-98", new BigDecimal("1000"));
+        signed.setOwnerId(deletedUser.getUserId());
+        contractDAO.putContract(signed);
+
+        ServiceResult<Void> res = service.updateDraftReplacingOwner(
+                signedParentContract(98, "HD-QA-98", new BigDecimal("1000")), salesManager.getUserId(), adminUser);
+
+        assertFalse(res.isSuccess());
+        assertEquals(ContractService.ERR_UPDATE_FAILED, res.getMessage());
+        assertEquals(deletedUser.getUserId(), contractDAO.findById(98).getOwnerId());
+        assertEquals(0, contractDAO.replaceOwnerCalls);
+    }
+
+    @Test
+    public void updateDraftReplacingOwner_nullContract_isNotFound() {
+        assertEquals(ContractService.ERR_NOT_FOUND,
+                service.updateDraftReplacingOwner(null, salesManager.getUserId(), adminUser).getMessage());
+    }
+
+    @Test
+    public void updateDraftReplacingOwner_daoReplaceFails_returnsUpdateFailed() {
+        draftOfLockedOwner(99, "HD-QA-99");
+        contractDAO.failReplaceOwner = true;
+
+        ServiceResult<Void> res = service.updateDraftReplacingOwner(
+                editedDraft(99, "HD-QA-99", "Tiêu đề mới"), salesManager.getUserId(), adminUser);
+
+        assertFalse(res.isSuccess());
+        assertEquals(ContractService.ERR_UPDATE_FAILED, res.getMessage());
+    }
+
+    @Test
+    public void updateContractOwner_daoFails_returnsUpdateFailed() {
+        Contract signed = signedParentContract(91, "HD-OWN-REP-F", new BigDecimal("100000000"));
+        signed.setOwnerId(deletedUser.getUserId());
+        contractDAO.putContract(signed);
+        contractDAO.failReplaceOwner = true;
+
+        ServiceResult<Void> res = service.updateContractOwner(91, salesManager.getUserId(), adminUser);
+
+        assertFalse(res.isSuccess());
+        assertEquals(ContractService.ERR_UPDATE_FAILED, res.getMessage());
     }
 
     // ==================================================================
@@ -1074,18 +1487,20 @@ public class ContractServiceTest {
         assertFalse(r5.isSuccess());
         assertTrue(r5.getFieldErrors().containsKey(ContractValidator.FIELD_CONTRACT_TYPE));
 
-        // Người phụ trách không tồn tại hoặc bị xóa mềm
+        // Task 8.5 (BR-35) sửa hai ca này: chữa sai sót không đổi người phụ
+        // trách, nên ownerId gửi lên (không tồn tại / đã bị khoá) bị bỏ qua và
+        // người phụ trách đang lưu giữ nguyên, thay vì báo lỗi ô người phụ trách.
         Contract badOwner = signedParentContract(73, "HD-VAL-73", new BigDecimal("60000000"));
         badOwner.setOwnerId(9999);
         ServiceResult<Void> r6 = service.correctSignedContract(badOwner, adminUser, "Lý do");
-        assertFalse(r6.isSuccess());
-        assertTrue(r6.getFieldErrors().containsKey(ContractValidator.FIELD_OWNER_ID));
+        assertTrue(r6.isSuccess());
+        assertEquals(2, contractDAO.findById(73).getOwnerId());
 
         Contract delOwner = signedParentContract(73, "HD-VAL-73", new BigDecimal("60000000"));
         delOwner.setOwnerId(deletedUser.getUserId());
         ServiceResult<Void> r7 = service.correctSignedContract(delOwner, adminUser, "Lý do");
-        assertFalse(r7.isSuccess());
-        assertTrue(r7.getFieldErrors().containsKey(ContractValidator.FIELD_OWNER_ID));
+        assertTrue(r7.isSuccess());
+        assertEquals(2, contractDAO.findById(73).getOwnerId());
 
         // Ngày hiệu lực null hoặc ngày kết thúc null -> MSG-045
         Contract nullEff = signedParentContract(73, "HD-VAL-73", new BigDecimal("60000000"));
@@ -1604,13 +2019,15 @@ public class ContractServiceTest {
         contractDAO.putContract(signed);
         when(branchInfoService.get()).thenReturn(branch("GĐCN mới", "Giám đốc chi nhánh", "0233 9", "0233 8"));
 
-        // Form đã ký không gửi bốn ô người ký: chỉ đổi người phụ trách là phải qua được.
+        // Task 8.5 (BR-35) sửa test này: trước đây form đã ký vẫn lưu được khi
+        // chỉ đổi người phụ trách; giờ form Sửa bị từ chối hẳn với hợp đồng đã
+        // ký, và bốn ô người ký đang lưu vẫn nguyên.
         Contract edited = signedParentContract(72, "HD-BR56-72", new BigDecimal("100000000"));
         edited.setOwnerId(3);
         ServiceResult<Void> res = service.updateContract(edited, adminUser);
 
-        assertTrue(res.isSuccess());
-        assertSigner(edited, "GĐCN lúc ký", "Giám đốc chi nhánh", "0233 000 000", "0233 000 001");
+        assertFalse(res.isSuccess());
+        assertEquals(ContractService.ERR_UPDATE_FAILED, res.getMessage());
         assertSigner(contractDAO.findById(72), "GĐCN lúc ký", "Giám đốc chi nhánh", "0233 000 000", "0233 000 001");
         verify(branchInfoService, never()).get();
     }
@@ -1793,6 +2210,10 @@ public class ContractServiceTest {
         private int prodSeq = 1;
         int lastCorrectionActorId;
         String lastCorrectionReason;
+        /** Task 8.5: đếm số lần ghi xuống, để khẳng định lỗi kiểm tra không chạm CSDL. */
+        int insertCalls;
+        int replaceOwnerCalls;
+        boolean failReplaceOwner;
 
         void putContract(Contract c) {
             store.put(c.getContractId(), c);
@@ -1822,7 +2243,21 @@ public class ContractServiceTest {
         }
 
         @Override
+        public boolean replaceOwner(int contractId, int newOwnerId, int actorId) {
+            replaceOwnerCalls++;
+            Contract existing = findById(contractId);
+            if (failReplaceOwner || existing == null || existing.isFrozen()) {
+                return false;
+            }
+            existing.setOwnerId(newOwnerId);
+            recordHistory(contractId, ContractHistory.EVENT_UPDATED,
+                    "Người phụ trách: cũ → mới", null, null, null, actorId);
+            return true;
+        }
+
+        @Override
         public int insert(Contract contract, int actorId) {
+            insertCalls++;
             if (contractCodeExists(contract.getContractCode(), 0)) {
                 return DUPLICATE_CODE;
             }

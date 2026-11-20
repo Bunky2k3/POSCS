@@ -1094,8 +1094,10 @@ public class ContractDAO {
     /**
      * Cột DUY NHẤT còn ghi được sau khi hợp đồng đã ký.
      *
-     * <p>Người phụ trách là phân công nội bộ và đổi theo nhân sự, không nằm
-     * trên tờ giấy hai bên ký.
+     * <p>Người phụ trách là phân công nội bộ, không nằm trên tờ giấy hai bên ký.
+     * Từ Task 8.5 (BR-35) nó cũng khoá sau khi tạo: {@link #update} luôn ghi lại
+     * giá trị cũ, và câu lệnh này chỉ thật sự đổi cột khi đi qua
+     * {@link #replaceOwner} -- ngoại lệ Admin thay người đã bị khoá tài khoản.
      *
      * <p>Trước V34 còn cột thứ hai là {@code attachment_url}, mở với đúng lý do
      * "bản PDF đã ký thường chỉ CÓ sau khi ký". Giấy tờ giờ nằm ở bảng riêng
@@ -1111,14 +1113,15 @@ public class ContractDAO {
 
     /**
      * Bản ghi sẽ được ghi xuống khi các trường điều khoản đã khoá: lấy ĐIỀU
-     * KHOẢN từ {@code before} (giá trị đang nằm trong CSDL) và chỉ nhận hai
-     * trường quản trị từ {@code submitted}.
+     * KHOẢN từ {@code before} (giá trị đang nằm trong CSDL). Người phụ trách
+     * cũng lấy từ {@code before} (BR-35, Task 8.5), nên từ khi ký không còn
+     * trường nào của bản gửi lên đi xuống được.
      *
      * <p>Dựng một đối tượng thay vì chỉ bỏ qua lúc bind, để câu nhật ký so sánh
      * đúng thứ đã ghi -- nếu không, gõ bừa vào một ô đã khoá sẽ sinh ra dòng
      * lịch sử kể một thay đổi không hề xảy ra.
      */
-    private static Contract withTermsFrom(Contract before, Contract submitted) {
+    private static Contract withTermsFrom(Contract before) {
         Contract merged = new Contract();
         merged.setContractId(before.getContractId());
         merged.setContractCode(before.getContractCode());
@@ -1141,8 +1144,17 @@ public class ContractDAO {
         merged.setProgressStatus(before.getProgressStatus());
         merged.setParentContractId(before.getParentContractId());
 
-        merged.setOwnerId(submitted.getOwnerId());
+        merged.setOwnerId(before.getOwnerId());
         return merged;
+    }
+
+    /**
+     * BR-35: người phụ trách không đổi sau khi tạo. Chép {@code owner_id} của
+     * bản ghi đang khoá ({@code before}) sang {@code target}, bất kể bên gọi
+     * truyền gì xuống -- cùng cách {@link #keepBranchSignerFrom} giữ người ký.
+     */
+    private static void keepOwnerFrom(Contract before, Contract target) {
+        target.setOwnerId(before.getOwnerId());
     }
 
     /**
@@ -1193,7 +1205,9 @@ public class ContractDAO {
         }
         // ĐÃ KÝ: chỉ ghi cột owner_id, bỏ qua các trường điều khoản đã khóa.
         boolean termsLocked = before.isTermsLocked();
-        Contract written = termsLocked ? withTermsFrom(before, contract) : contract;
+        Contract written = termsLocked ? withTermsFrom(before) : contract;
+        // BR-35: người phụ trách không đổi qua update(), kể cả bản Nháp.
+        keepOwnerFrom(before, written);
 
         if (!canApplyUpdate(conn, before, written, termsLocked, contract.getContractId())) {
             return false;
@@ -1252,6 +1266,59 @@ public class ContractDAO {
         ps.setString(9, computeStatus(written.getEffectiveDate(), written.getEndDate()));
         bindSigningParties(ps, 10, written);
         ps.setInt(10 + SIGNING_PARTY_COLUMNS, contractId);
+    }
+
+    /**
+     * BR-35, ngoại lệ duy nhất: Admin thay người phụ trách đã bị khoá tài khoản
+     * (nghỉ việc) bằng {@code newOwnerId}. Chỉ ghi cột {@code owner_id}, mọi
+     * tiến độ trừ thanh lý/chấm dứt sớm, và ghi dòng nhật ký "Người phụ trách:
+     * cũ → mới" trong cùng giao dịch.
+     *
+     * <p>Điều kiện của ngoại lệ (Admin, người cũ đã bị khoá, người mới là Sales
+     * đang hoạt động) kiểm ở {@code ContractService.updateContractOwner} và
+     * {@code ContractController}; ở đây chỉ kiểm những thứ phải đúng bất kể ai
+     * gọi.
+     */
+    public boolean replaceOwner(int contractId, int newOwnerId, int actorId) {
+        if (contractId <= 0 || newOwnerId <= 0) {
+            return false;
+        }
+        try (Connection conn = DBContext.getConnection()) {
+            conn.setAutoCommit(false);
+            boolean committed = false;
+            try {
+                if (executeReplaceOwnerTransaction(conn, contractId, newOwnerId, actorId)) {
+                    conn.commit();
+                    committed = true;
+                }
+            } finally {
+                finishTransaction(conn, committed, "doi nguoi phu trach hop dong", contractId);
+            }
+            return committed;
+        } catch (SQLException ex) {
+            LOG.error("Loi doi nguoi phu trach hop dong (contractId={}, newOwnerId={})", contractId, newOwnerId, ex);
+            return false;
+        }
+    }
+
+    private boolean executeReplaceOwnerTransaction(Connection conn, int contractId, int newOwnerId, int actorId)
+            throws SQLException {
+        Contract before = lockForUpdate(conn, contractId);
+        // BR-43: sau thanh lý/chấm dứt sớm không được thay đổi, kể cả cấp cao.
+        if (before == null || before.isFrozen()) {
+            return false;
+        }
+        Contract written = withTermsFrom(before);
+        written.setOwnerId(newOwnerId);
+        try (PreparedStatement ps = conn.prepareStatement(SQL_UPDATE_ADMIN_FIELDS)) {
+            ps.setInt(1, newOwnerId);
+            ps.setInt(2, contractId);
+            if (ps.executeUpdate() == 0) {
+                return false;
+            }
+        }
+        logUpdateHistory(conn, before, written, contractId, actorId);
+        return true;
     }
 
     /**
@@ -1319,6 +1386,8 @@ public class ContractDAO {
         // BR-56: chữa sai sót KHÔNG đổi bốn ô người ký bên mình. Lấy từ bản ghi
         // đang khoá, giống ngày ký bên dưới, bất kể bên gọi truyền gì xuống.
         keepBranchSignerFrom(before, contract);
+        // BR-35: chữa sai sót cũng không đổi người phụ trách.
+        keepOwnerFrom(before, contract);
 
         try (PreparedStatement ps = conn.prepareStatement(SQL_UPDATE_ALL)) {
             // Ngày ký KHÔNG sửa được kể cả ở đây: nó là dấu của một hành

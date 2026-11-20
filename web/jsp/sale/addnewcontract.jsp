@@ -5,6 +5,8 @@
     Request attribute do ContractController#showCreateForm thiết lập trước khi forward tới trang này:
       - customerList : List<poscs.model.Enterprise> (toàn bộ khách hàng, để đổ dropdown "Khách hàng")
       - userList      : List<poscs.model.User>       (nhân viên vai Sales, để đổ dropdown "Người phụ trách")
+      - ownerSelectable : Boolean                   (BR-35: true khi Admin tạo hợp đồng gốc -> hiện ô chọn Sales;
+                                                     Sales tạo thì là chính mình, phụ lục theo hợp đồng gốc, chỉ đọc)
       - branchInfo    : poscs.model.BranchInfo        (thông tin GĐCN, người ký bên mình theo BR-56; có thể null)
       - branchSignerMissing : Boolean                 (true khi họ tên GĐCN còn trống -> hiện MSG-060)
 
@@ -197,16 +199,33 @@
                     </div>
                     <div class="col-md-6 field-row">
                         <label>Người phụ trách <span class="req">*</span></label>
-                        <%-- Ở chế độ phụ lục, gợi ý sẵn người phụ trách hợp đồng gốc
-                             nhưng VẪN cho đổi: nhân sự có thể đã khác từ lúc ký. --%>
-                        <select class="form-select" id="owner" name="ownerId">
-                            <option value="">-- Chọn nhân viên --</option>
-                            <c:forEach var="staff" items="${userList}">
-                                <option value="${staff.userId}"
-                                        ${not empty parentContract and staff.userId == parentContract.ownerId ? 'selected' : ''}>${fn:escapeXml(staff.fullName)}</option>
-                            </c:forEach>
-                        </select>
-                        <span class="error-text" id="err-owner">Vui lòng chọn người phụ trách.</span>
+                        <%-- BR-35: người phụ trách lấy theo người tạo và không đổi sau
+                             khi tạo. Chỉ Admin tạo hợp đồng gốc mới chọn (một Sales);
+                             Sales tạo thì là chính mình, phụ lục theo hợp đồng gốc.
+                             Ô chỉ đọc không có name: server cũng bỏ qua ownerId gửi lên. --%>
+                        <c:choose>
+                            <c:when test="${not empty parentContract}">
+                                <input type="text" class="form-control" value="${fn:escapeXml(parentContract.owner.fullName)}" disabled>
+                                <span style="font-size:0.78rem; color:#9ca3af; display:block; margin-top:6px;">
+                                    Theo hợp đồng gốc, không đổi được.
+                                </span>
+                            </c:when>
+                            <c:when test="${ownerSelectable}">
+                                <select class="form-select" id="owner" name="ownerId">
+                                    <option value="">-- Chọn nhân viên --</option>
+                                    <c:forEach var="staff" items="${userList}">
+                                        <option value="${staff.userId}">${fn:escapeXml(staff.fullName)}</option>
+                                    </c:forEach>
+                                </select>
+                                <span class="error-text" id="err-owner">Vui lòng chọn người phụ trách.</span>
+                            </c:when>
+                            <c:otherwise>
+                                <input type="text" class="form-control" value="${fn:escapeXml(sessionScope.currentUser.fullName)}" disabled>
+                                <span style="font-size:0.78rem; color:#9ca3af; display:block; margin-top:6px;">
+                                    Người tạo hợp đồng là người phụ trách, không đổi được sau khi tạo.
+                                </span>
+                            </c:otherwise>
+                        </c:choose>
                     </div>
                     <div class="col-md-6 field-row">
                         <label>Loại hợp đồng <span class="req">*</span></label>
@@ -399,8 +418,9 @@
 
             // Ô "Khách hàng" KHÔNG tồn tại ở chế độ phụ lục (đối tác lấy theo
             // hợp đồng gốc), nên phải bỏ qua khi vắng mặt thay vì nổ ở
-            // el.value và chặn luôn việc gửi form.
-            ['customer', 'contractType', 'owner'].forEach(function (id) {
+            // el.value và chặn luôn việc gửi form. Ô "Người phụ trách" chỉ có
+            // khi Admin tạo hợp đồng gốc (BR-35).
+            ['customer', 'contractType'<c:if test="${ownerSelectable and empty parentContract}">, 'owner'</c:if>].forEach(function (id) {
                 var el = document.getElementById(id);
                 if (!el) { return; }
                 if (!el.value) { document.getElementById('err-' + id).style.display = 'block'; valid = false; }

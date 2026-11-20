@@ -335,8 +335,14 @@ public class ContractActionControllerTest {
         verify(response).sendRedirect(CONTEXT_PATH + "/contract?error=notfound");
     }
 
+    /**
+     * Task 8.5 (BR-35) sửa test này: trước đây hợp đồng đã ký thiếu ownerId thì
+     * controller tự trả "invalid", có ownerId thì gọi updateContractOwner. Giờ
+     * ngoài ngoại lệ của Admin, form Sửa của hợp đồng đã ký đi qua
+     * updateContract và bị service từ chối (MSG_CANNOT_EDIT_LOCKED).
+     */
     @Test
-    public void handleUpdate_termsLocked_ownerIdMissing_redirectsWithInvalidError() throws Exception {
+    public void handleUpdate_termsLocked_ownerIdMissing_isRefusedThroughUpdateContract() throws Exception {
         User u = loginAs(PermissionService.ROLE_SALES, null);
         when(permissionService.canUpdateContract(u)).thenReturn(true);
         when(request.getParameter("action")).thenReturn("update");
@@ -344,14 +350,20 @@ public class ContractActionControllerTest {
         Contract signed = signedContract(5);
         when(contractService.findById(5)).thenReturn(signed);
         when(request.getParameter("ownerId")).thenReturn("");
+        when(contractService.updateContract(any(), eq(u))).thenReturn(ServiceResult.fail(ContractService.ERR_UPDATE_FAILED));
 
         controller.doPost(request, response);
 
-        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=edit&id=5&error=invalid");
+        verify(contractService, never()).updateContractOwner(anyInt(), anyInt(), any());
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=edit&id=5&error=update_failed");
     }
 
+    /**
+     * Task 8.5 (BR-35) sửa test này: Sales gửi ownerId cho hợp đồng đã ký không
+     * còn đổi được người phụ trách -- không gọi updateContractOwner nữa.
+     */
     @Test
-    public void handleUpdate_termsLocked_updatesOwner_redirectsToDetail() throws Exception {
+    public void handleUpdate_termsLocked_salesTypedOwnerId_isRefused() throws Exception {
         User u = loginAs(PermissionService.ROLE_SALES, null);
         when(permissionService.canUpdateContract(u)).thenReturn(true);
         when(request.getParameter("action")).thenReturn("update");
@@ -359,12 +371,198 @@ public class ContractActionControllerTest {
         when(request.getParameter("ownerId")).thenReturn("88");
         Contract signed = signedContract(5);
         when(contractService.findById(5)).thenReturn(signed);
+        when(contractService.updateContract(any(), eq(u))).thenReturn(ServiceResult.fail(ContractService.ERR_UPDATE_FAILED));
+
+        controller.doPost(request, response);
+
+        verify(contractService, never()).updateContractOwner(anyInt(), anyInt(), any());
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=edit&id=5&error=update_failed");
+    }
+
+    /** BR-35, ngoại lệ: Admin thay người phụ trách đã bị khoá tài khoản trên hợp đồng đã ký. */
+    @Test
+    public void handleUpdate_termsLocked_adminReplacesLockedOwner_redirectsToDetail() throws Exception {
+        User u = loginAs(PermissionService.ROLE_ADMIN, null);
+        when(permissionService.canUpdateContract(u)).thenReturn(true);
+        when(request.getParameter("action")).thenReturn("update");
+        when(request.getParameter("contractId")).thenReturn("5");
+        when(request.getParameter("ownerId")).thenReturn("88");
+        Contract signed = signedContract(5);
+        when(contractService.findById(5)).thenReturn(signed);
+        when(contractService.canReplaceOwner(signed, u)).thenReturn(true);
         when(contractService.updateContractOwner(5, 88, u)).thenReturn(ServiceResult.ok(null));
 
         controller.doPost(request, response);
 
         verify(contractService).updateContractOwner(5, 88, u);
+        verify(contractService, never()).updateContract(any(), any());
         verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=view&id=5");
+    }
+
+    @Test
+    public void handleUpdate_termsLocked_adminReplaceable_missingOwnerId_redirectsInvalid() throws Exception {
+        User u = loginAs(PermissionService.ROLE_ADMIN, null);
+        when(permissionService.canUpdateContract(u)).thenReturn(true);
+        when(request.getParameter("action")).thenReturn("update");
+        when(request.getParameter("contractId")).thenReturn("5");
+        when(request.getParameter("ownerId")).thenReturn("");
+        Contract signed = signedContract(5);
+        when(contractService.findById(5)).thenReturn(signed);
+        when(contractService.canReplaceOwner(signed, u)).thenReturn(true);
+        when(contractService.updateContractOwner(5, 0, u)).thenReturn(ServiceResult.fail(ContractService.ERR_INVALID));
+
+        controller.doPost(request, response);
+
+        verify(contractService).updateContractOwner(5, 0, u);
+        verify(contractService, never()).updateContract(any(), any());
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=edit&id=5&error=invalid");
+    }
+
+    /** QA-8.5-01: bản Nháp có chọn người thay đi qua một đường duy nhất của service. */
+    @Test
+    public void handleUpdate_draft_adminReplaceable_withChoice_goesThroughUpdateDraftReplacingOwner() throws Exception {
+        User u = loginAs(PermissionService.ROLE_ADMIN, null);
+        when(permissionService.canUpdateContract(u)).thenReturn(true);
+        when(request.getParameter("action")).thenReturn("update");
+        when(request.getParameter("contractId")).thenReturn("5");
+        when(request.getParameter("ownerId")).thenReturn("88");
+        Contract draft = draftContract(5);
+        when(contractService.findById(5)).thenReturn(draft);
+        when(contractService.canReplaceOwner(draft, u)).thenReturn(true);
+        when(contractService.updateDraftReplacingOwner(any(), eq(88), eq(u))).thenReturn(ServiceResult.ok(null));
+
+        controller.doPost(request, response);
+
+        verify(contractService).updateDraftReplacingOwner(argThat((Contract c) -> c.getContractId() == 5), eq(88), eq(u));
+        verify(contractService, never()).updateContractOwner(anyInt(), anyInt(), any());
+        verify(contractService, never()).updateContract(any(), any());
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=view&id=5");
+    }
+
+    /** QA-8.5-01: ô khác của bản Nháp lỗi thì báo đúng lỗi đó, không có đường nào đổi người phụ trách. */
+    @Test
+    public void handleUpdate_draft_adminReplaceable_formInvalid_redirectsWithThatErrorOnly() throws Exception {
+        User u = loginAs(PermissionService.ROLE_ADMIN, null);
+        when(permissionService.canUpdateContract(u)).thenReturn(true);
+        when(request.getParameter("action")).thenReturn("update");
+        when(request.getParameter("contractId")).thenReturn("5");
+        when(request.getParameter("ownerId")).thenReturn("88");
+        Contract draft = draftContract(5);
+        when(contractService.findById(5)).thenReturn(draft);
+        when(contractService.canReplaceOwner(draft, u)).thenReturn(true);
+        when(contractService.updateDraftReplacingOwner(any(), eq(88), eq(u)))
+                .thenReturn(ServiceResult.fail(ContractService.ERR_DUPLICATE_CODE));
+
+        controller.doPost(request, response);
+
+        verify(contractService, never()).updateContractOwner(anyInt(), anyInt(), any());
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=edit&id=5&error=duplicate_code");
+    }
+
+    @Test
+    public void handleUpdate_draft_adminReplaceable_withoutChoice_onlyUpdates() throws Exception {
+        User u = loginAs(PermissionService.ROLE_ADMIN, null);
+        when(permissionService.canUpdateContract(u)).thenReturn(true);
+        when(request.getParameter("action")).thenReturn("update");
+        when(request.getParameter("contractId")).thenReturn("5");
+        when(request.getParameter("ownerId")).thenReturn("");
+        Contract draft = draftContract(5);
+        when(contractService.findById(5)).thenReturn(draft);
+        when(contractService.canReplaceOwner(draft, u)).thenReturn(true);
+        when(contractService.updateContract(any(), eq(u))).thenReturn(ServiceResult.ok(null));
+
+        controller.doPost(request, response);
+
+        verify(contractService, never()).updateContractOwner(anyInt(), anyInt(), any());
+        verify(contractService).updateContract(any(), eq(u));
+    }
+
+    @Test
+    public void handleUpdate_draft_adminReplaceable_newOwnerInvalid_redirectsInvalid() throws Exception {
+        User u = loginAs(PermissionService.ROLE_ADMIN, null);
+        when(permissionService.canUpdateContract(u)).thenReturn(true);
+        when(request.getParameter("action")).thenReturn("update");
+        when(request.getParameter("contractId")).thenReturn("5");
+        when(request.getParameter("ownerId")).thenReturn("88");
+        Contract draft = draftContract(5);
+        when(contractService.findById(5)).thenReturn(draft);
+        when(contractService.canReplaceOwner(draft, u)).thenReturn(true);
+        when(contractService.updateDraftReplacingOwner(any(), eq(88), eq(u)))
+                .thenReturn(ServiceResult.fail(ContractService.ERR_INVALID));
+
+        controller.doPost(request, response);
+
+        verify(contractService, never()).updateContract(any(), any());
+        verify(contractService, never()).updateContractOwner(anyInt(), anyInt(), any());
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=edit&id=5&error=invalid");
+    }
+
+    /**
+     * QA-8.5-01 với ContractService thật: Admin chọn người thay hợp lệ nhưng mã
+     * hợp đồng trùng -> báo duplicate_code và KHÔNG ghi gì, kể cả owner_id.
+     */
+    @Test
+    public void handleUpdate_realService_draftReplacingLockedOwner_duplicateCode_writesNothing() throws Exception {
+        User u = loginAs(PermissionService.ROLE_ADMIN, null);
+        stubDraftOwnedByLockedUser(u);
+        when(contractDAO.contractCodeExists("HD-005", 5)).thenReturn(true);
+
+        controller.doPost(request, response);
+
+        verify(contractDAO, never()).replaceOwner(anyInt(), anyInt(), anyInt());
+        verify(contractDAO, never()).update(any(Contract.class), anyInt());
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=edit&id=5&error=duplicate_code");
+    }
+
+    /** Cùng tình huống nhưng form hợp lệ: lưu bản Nháp trước, đổi người phụ trách sau. */
+    @Test
+    public void handleUpdate_realService_draftReplacingLockedOwner_valid_savesThenReplaces() throws Exception {
+        User u = loginAs(PermissionService.ROLE_ADMIN, null);
+        stubDraftOwnedByLockedUser(u);
+        when(contractDAO.update(any(Contract.class), anyInt())).thenReturn(true);
+        when(contractDAO.replaceOwner(5, 55, 99)).thenReturn(true);
+
+        controller.doPost(request, response);
+
+        org.mockito.InOrder order = inOrder(contractDAO);
+        order.verify(contractDAO).update(argThat((Contract c) -> c.getOwnerId() == 77), eq(99));
+        order.verify(contractDAO).replaceOwner(5, 55, 99);
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=view&id=5");
+    }
+
+    /** Bản Nháp #5 của người phụ trách #77 đã bị khoá tài khoản; Admin gửi form Sửa chọn người thay #55. */
+    private void stubDraftOwnedByLockedUser(User admin) {
+        when(permissionService.canUpdateContract(admin)).thenReturn(true);
+        controller.setContractService(realServiceFor(admin, true));
+        // #77 đã bị khoá: getEffectiveUser trả null (stub sau thắng stub chung trong realServiceFor).
+        when(permissionService.getEffectiveUser(argThat((User p) -> p != null && p.getUserId() == 77))).thenReturn(null);
+        when(permissionService.checkPermission(true)).thenReturn(ServiceResult.ok(null));
+        Contract draft = draftContract(5);
+        draft.setOwnerId(77);
+        when(contractDAO.findById(5)).thenReturn(draft);
+        when(request.getParameter("action")).thenReturn("update");
+        when(request.getParameter("contractId")).thenReturn("5");
+        when(request.getParameter("ownerId")).thenReturn("55");
+        when(request.getParameter("contractCode")).thenReturn("HD-005");
+        when(request.getParameter("title")).thenReturn("Hợp đồng nháp 5 (sửa)");
+        when(request.getParameter("contractType")).thenReturn("Cung cấp thiết bị");
+        when(request.getParameter("enterpriseId")).thenReturn("10");
+    }
+
+    @Test
+    public void handleUpdate_draft_notReplaceable_typedOwnerIdNeverReachesUpdateContractOwner() throws Exception {
+        User u = loginAs(PermissionService.ROLE_SALES, null);
+        when(permissionService.canUpdateContract(u)).thenReturn(true);
+        when(request.getParameter("action")).thenReturn("update");
+        when(request.getParameter("contractId")).thenReturn("5");
+        when(request.getParameter("ownerId")).thenReturn("88");
+        when(contractService.findById(5)).thenReturn(draftContract(5));
+        when(contractService.updateContract(any(), eq(u))).thenReturn(ServiceResult.ok(null));
+
+        controller.doPost(request, response);
+
+        verify(contractService, never()).updateContractOwner(anyInt(), anyInt(), any());
+        verify(contractService).updateContract(any(), eq(u));
     }
 
     @Test
@@ -1348,5 +1546,151 @@ public class ContractActionControllerTest {
 
         verify(contractService).correctSignedContract(
                 argThat(ContractActionControllerTest::hasNoSigner), eq(u), eq("Sửa mã hợp đồng gõ nhầm"));
+    }
+
+    // ------------------------------------------------------------------
+    // BR-35 (Task 8.5): người phụ trách theo người tạo, khoá sau khi tạo
+    // ------------------------------------------------------------------
+
+    @Test
+    public void doGet_actionNew_ownerSelectableOnlyForAdmin() throws Exception {
+        User sales = loginAs(PermissionService.ROLE_SALES, null);
+        when(permissionService.canCreateContract(sales)).thenReturn(true);
+        when(request.getParameter("action")).thenReturn("new");
+        controller.doGet(request, response);
+        verify(request).setAttribute("ownerSelectable", false);
+
+        User admin = loginAs(PermissionService.ROLE_ADMIN, null);
+        when(permissionService.canCreateContract(admin)).thenReturn(true);
+        when(permissionService.isAdmin(admin)).thenReturn(true);
+        controller.doGet(request, response);
+        verify(request).setAttribute("ownerSelectable", true);
+    }
+
+    @Test
+    public void doGet_actionNewAmendment_ownerNotSelectable() throws Exception {
+        User u = loginAs(PermissionService.ROLE_ADMIN, null);
+        when(permissionService.canCreateAmendment(u)).thenReturn(true);
+        when(permissionService.isAdmin(u)).thenReturn(true);
+        when(request.getParameter("action")).thenReturn("newAmendment");
+        when(request.getParameter("parentId")).thenReturn("1");
+        when(contractService.findById(1)).thenReturn(signedContract(1));
+
+        controller.doGet(request, response);
+
+        verify(request).setAttribute("ownerSelectable", false);
+        verify(request, never()).setAttribute("ownerSelectable", true);
+    }
+
+    @Test
+    public void doGet_actionEdit_setsCanReplaceOwnerFromService() throws Exception {
+        User u = loginAs(PermissionService.ROLE_ADMIN, null);
+        when(permissionService.canUpdateContract(u)).thenReturn(true);
+        when(request.getParameter("action")).thenReturn("edit");
+        when(request.getParameter("id")).thenReturn("5");
+        Contract signed = signedContract(5);
+        when(contractService.findById(5)).thenReturn(signed);
+        when(contractService.canReplaceOwner(signed, u)).thenReturn(true);
+
+        controller.doGet(request, response);
+
+        verify(request).setAttribute("canReplaceOwner", true);
+    }
+
+    /** ContractService thật trên DAO giả: chạy đúng luật BR-35 ở lối /contract/action. */
+    private ContractService realServiceFor(User salesOrAdmin, boolean admin) {
+        when(permissionService.checkCanCreateContract(salesOrAdmin)).thenReturn(ServiceResult.ok(null));
+        when(permissionService.checkCanUpdateContract(salesOrAdmin)).thenReturn(ServiceResult.ok(null));
+        when(permissionService.checkCanCorrectSignedContract(salesOrAdmin)).thenReturn(ServiceResult.ok(null));
+        when(permissionService.isAdmin(salesOrAdmin)).thenReturn(admin);
+        // Sales đang hoạt động: chỉ #99 (người đăng nhập khi là Sales) và #55.
+        when(permissionService.isSales(any(User.class))).thenAnswer(inv -> {
+            int id = ((User) inv.getArgument(0)).getUserId();
+            return id == 55 || (!admin && id == 99);
+        });
+        when(permissionService.getEffectiveUser(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(customerDAO.findRolesOf(10)).thenReturn(java.util.List.of(ContractService.ROLE_BUYER));
+        poscs.service.BranchInfoService branch = mock(poscs.service.BranchInfoService.class);
+        return new ContractService(contractDAO, customerDAO, productDAO, permissionService,
+                new poscs.validator.ContractValidator(), branch);
+    }
+
+    private void stubCreateFormPost(String ownerId) {
+        when(request.getParameter("action")).thenReturn("create");
+        when(request.getParameter("contractCode")).thenReturn("HD-8.5-01");
+        when(request.getParameter("title")).thenReturn("Hợp đồng thử BR-35");
+        when(request.getParameter("contractType")).thenReturn("Cung cấp thiết bị");
+        when(request.getParameter("enterpriseId")).thenReturn("10");
+        when(request.getParameter("ownerId")).thenReturn(ownerId);
+    }
+
+    @Test
+    public void handleCreate_realService_salesTypedOwnerIdIsReplacedByCreator() throws Exception {
+        User u = loginAs(PermissionService.ROLE_SALES, null);
+        when(permissionService.canCreateContract(u)).thenReturn(true);
+        controller.setContractService(realServiceFor(u, false));
+        stubCreateFormPost("55");
+        when(contractDAO.insert(any(Contract.class), anyInt())).thenReturn(70);
+
+        controller.doPost(request, response);
+
+        verify(contractDAO).insert(argThat((Contract c) -> c.getOwnerId() == 99), eq(99));
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=view&id=70");
+    }
+
+    @Test
+    public void handleCreate_realService_adminChoosesNonSales_redirectsInvalid() throws Exception {
+        User u = loginAs(PermissionService.ROLE_ADMIN, null);
+        when(permissionService.canCreateContract(u)).thenReturn(true);
+        controller.setContractService(realServiceFor(u, true));
+        stubCreateFormPost("99"); // chính Admin, không phải Sales
+
+        controller.doPost(request, response);
+
+        verify(contractDAO, never()).insert(any(Contract.class), anyInt());
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=new&kind=sell&error=invalid");
+    }
+
+    @Test
+    public void handleUpdate_realService_signedContractTypedOwnerIdIsRefused() throws Exception {
+        User u = loginAs(PermissionService.ROLE_SALES, null);
+        when(permissionService.canUpdateContract(u)).thenReturn(true);
+        controller.setContractService(realServiceFor(u, false));
+        when(request.getParameter("action")).thenReturn("update");
+        when(request.getParameter("contractId")).thenReturn("5");
+        when(request.getParameter("ownerId")).thenReturn("55");
+        when(contractDAO.findById(5)).thenReturn(signedContract(5));
+
+        controller.doPost(request, response);
+
+        verify(contractDAO, never()).update(any(Contract.class), anyInt());
+        verify(contractDAO, never()).replaceOwner(anyInt(), anyInt(), anyInt());
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=edit&id=5&error=update_failed");
+    }
+
+    @Test
+    public void handleCorrect_realService_typedOwnerIdIsIgnored() throws Exception {
+        User u = loginAs(PermissionService.ROLE_ADMIN, null);
+        when(permissionService.canCorrectSignedContract(u)).thenReturn(true);
+        controller.setContractService(realServiceFor(u, true));
+        Contract signed = signedContract(5);
+        signed.setOwnerId(55);
+        when(contractDAO.findById(5)).thenReturn(signed);
+        when(request.getParameter("action")).thenReturn("correct");
+        when(request.getParameter("contractId")).thenReturn("5");
+        when(request.getParameter("correctionReason")).thenReturn("Gõ nhầm mã");
+        when(request.getParameter("contractCode")).thenReturn("HD-005");
+        when(request.getParameter("title")).thenReturn("Hợp đồng đã ký 5");
+        when(request.getParameter("contractType")).thenReturn("Cung cấp thiết bị");
+        when(request.getParameter("effectiveDate")).thenReturn("2026-01-01");
+        when(request.getParameter("endDate")).thenReturn("2026-12-31");
+        when(request.getParameter("enterpriseId")).thenReturn("10");
+        when(request.getParameter("ownerId")).thenReturn("99");
+        when(contractDAO.correct(any(Contract.class), anyInt(), anyString())).thenReturn(true);
+
+        controller.doPost(request, response);
+
+        verify(contractDAO).correct(argThat((Contract c) -> c.getOwnerId() == 55), eq(99), eq("Gõ nhầm mã"));
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=view&id=5");
     }
 }

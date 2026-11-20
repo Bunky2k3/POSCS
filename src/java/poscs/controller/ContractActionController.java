@@ -99,6 +99,8 @@ public class ContractActionController extends HttpServlet {
         }
         ContractControllerHelper.populateCreateForm(req, customerDAO, employeeDAO);
         ContractControllerHelper.putBranchSigner(req, getContractService().findBranchInfo());
+        // BR-35: chỉ Admin chọn người phụ trách; Sales tạo thì là chính mình.
+        req.setAttribute("ownerSelectable", getPermissionService().isAdmin(u));
         req.getRequestDispatcher(ContractControllerHelper.CREATE_VIEW).forward(req, resp);
     }
 
@@ -117,6 +119,8 @@ public class ContractActionController extends HttpServlet {
         }
         ContractControllerHelper.populateAmendmentForm(req, parent, customerDAO, employeeDAO);
         ContractControllerHelper.putBranchSigner(req, getContractService().findBranchInfo());
+        // BR-35: phụ lục theo người phụ trách hợp đồng gốc, không chọn.
+        req.setAttribute("ownerSelectable", false);
         req.getRequestDispatcher(ContractControllerHelper.CREATE_VIEW).forward(req, resp);
     }
 
@@ -131,6 +135,8 @@ public class ContractActionController extends HttpServlet {
         if (c == null) { resp.sendRedirect(ContractControllerHelper.notFoundUrl(req)); return; }
         ContractControllerHelper.bindEditFormAttributes(req, c, u, contractDAO, customerDAO, employeeDAO, productDAO, getPermissionService(), canSign(u));
         ContractControllerHelper.putBranchSigner(req, getContractService().findBranchInfo());
+        // BR-35: ô chọn người thay chỉ hiện cho Admin khi người phụ trách đã bị khoá tài khoản.
+        req.setAttribute("canReplaceOwner", getContractService().canReplaceOwner(c, u));
         req.getRequestDispatcher(ContractControllerHelper.UPDATE_VIEW).forward(req, resp);
     }
 
@@ -154,13 +160,26 @@ public class ContractActionController extends HttpServlet {
         ContractActionResultHelper.redirectUpdateResult(req, resp, res, id, back);
     }
 
+    /**
+     * BR-35: người phụ trách không đổi qua form Sửa. Ngoại lệ duy nhất là Admin
+     * thay người đã bị khoá tài khoản: đã ký thì chỉ làm việc đó; bản Nháp có
+     * chọn người thay thì service kiểm và lưu các ô khác trước, đổi người sau
+     * (QA-8.5-01). Mọi trường hợp còn lại đi qua updateContract, nơi hợp đồng
+     * đã ký bị từ chối.
+     */
     private ServiceResult<Void> updateByTermsLock(HttpServletRequest req, User u, int id, Contract existing) {
-        if (existing.isTermsLocked()) {
-            Integer ownerId = ContractControllerHelper.parseIntOrNull(req.getParameter("ownerId"));
-            return ownerId != null ? getContractService().updateContractOwner(id, ownerId, u) : ServiceResult.fail(ContractService.ERR_INVALID);
-        }
+        ContractService service = getContractService();
         Contract c = ContractControllerHelper.extractUpdateContract(req, existing);
-        return getContractService().updateContract(c, u);
+        if (service.canReplaceOwner(existing, u)) {
+            Integer ownerId = ContractControllerHelper.parseIntOrNull(req.getParameter("ownerId"));
+            if (existing.isTermsLocked()) {
+                return service.updateContractOwner(id, ownerId != null ? ownerId : 0, u);
+            }
+            if (ownerId != null) {
+                return service.updateDraftReplacingOwner(c, ownerId, u);
+            }
+        }
+        return service.updateContract(c, u);
     }
 
     public void handleCreateAmendment(HttpServletRequest req, HttpServletResponse resp) throws IOException {
