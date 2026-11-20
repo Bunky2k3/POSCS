@@ -9,7 +9,7 @@
                         .assignedTechnician, .createdByUser đã join nếu tồn tại)
       - ticketHistory : List<poscs.model.TechnicalRequestHistory>, mới nhất trước
       - canDelete     : boolean -- true nếu phiếu chưa có ai xử lý dở dang (status != "Đang xử lý")
-      - canEdit       : boolean -- quyền Full, HOẶC kỹ thuật viên đang được giao phiếu này
+      - canEdit       : boolean -- quyền Full (Admin, Sales)
       - canManage     : boolean -- quyền Full (nút Xóa)
 
     technicalrequestdevices (thiết bị lỗi) chưa hiển thị -- thuộc phạm vi khác.
@@ -236,7 +236,7 @@
                     <div class="view-value">${fn:escapeXml(ticket.receptionChannel)}</div>
                 </div>
                 <div class="col-md-6 field-row">
-                    <label>Kỹ thuật viên phụ trách</label>
+                    <label>Người xử lý</label>
                     <div class="view-value">
                         <c:choose>
                             <c:when test="${ticket.assignedTechnician != null}">${fn:escapeXml(ticket.assignedTechnician.fullName)}</c:when>
@@ -325,10 +325,10 @@
             </div>
         </div>
 
-        <!-- ===== Khối 2: kỹ thuật viên xử lý đánh giá ===== -->
+        <!-- ===== Khối 2: người xử lý đánh giá ===== -->
         <div class="info-card card-box">
             <div class="section-header">
-                <h5>Nhân viên kỹ thuật xử lý</h5>
+                <h5>Người xử lý đánh giá</h5>
                 <span class="author-tag">
                     <i class="fa-solid fa-screwdriver-wrench"></i>
                     <c:choose>
@@ -351,11 +351,11 @@
                  lung tung. Bản cũ đã dính đúng lỗi này. --%>
             <div class="field-row">
                 <label>Nguyên nhân sự cố<c:if test="${not empty ticket.causeCategory}"><span class="cause-tag">${fn:escapeXml(ticket.causeCategory)}</span></c:if></label>
-                <div class="view-value text-block">${not empty ticket.rootCause ? fn:escapeXml(ticket.rootCause) : 'Kỹ thuật viên chưa đánh giá nguyên nhân.'}</div>
+                <div class="view-value text-block">${not empty ticket.rootCause ? fn:escapeXml(ticket.rootCause) : 'Người xử lý chưa đánh giá nguyên nhân.'}</div>
             </div>
             <div class="field-row">
                 <label>Phương hướng xử lý</label>
-                <div class="view-value text-block">${not empty ticket.handlingPlan ? fn:escapeXml(ticket.handlingPlan) : 'Kỹ thuật viên chưa đưa ra phương hướng xử lý.'}</div>
+                <div class="view-value text-block">${not empty ticket.handlingPlan ? fn:escapeXml(ticket.handlingPlan) : 'Người xử lý chưa đưa ra phương hướng xử lý.'}</div>
             </div>
             <div class="field-row" style="margin-bottom: 0;">
                 <label>Kết quả xử lý</label>

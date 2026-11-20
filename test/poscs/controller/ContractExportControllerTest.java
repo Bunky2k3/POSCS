@@ -125,7 +125,7 @@ public class ContractExportControllerTest {
 
     @Test
     public void export_technicalUser_authorizedAndStreamsExcel() throws Exception {
-        User user = loginAs(PermissionService.ROLE_TECHNICAL, null);
+        User user = loginAs("Kỹ thuật", null);
         when(permissionService.canExportContracts(user)).thenReturn(true);
         when(exportService.getExportFileNamePrefix(any())).thenReturn("hop_dong_ban");
 

@@ -26,7 +26,7 @@ import poscs.validator.TicketValidator;
 
 /**
  * Controller chuyên trách xử lý xuất dữ liệu phiếu hỗ trợ kỹ thuật ra Excel hoặc PDF (Task 5.5 - [UC-42]).
- * Phân quyền qua {@link PermissionService#canExportTickets}: Admin, Kỹ thuật, Sales (SPEC §3.3).
+ * Phân quyền qua {@link PermissionService#canExportTickets}: Admin, Sales (SPEC §3.3).
  * Vi phạm trả HTTP 403 với {@link PermissionService#MSG_022}.
  */
 @WebServlet(name = "TicketExportController", urlPatterns = {"/ticket/export"})

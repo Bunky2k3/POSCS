@@ -64,7 +64,7 @@ public class ProductControllerTest {
         session = mock(HttpSession.class);
         User user = new User();
         user.setUserId(99);
-        user.setRole(new Role(1, "Kỹ thuật")); // Full access trên PRODUCT, xem PERMISSIONS.md
+        user.setRole(new Role(1, "Sales")); // Full access trên PRODUCT (Task 9.3), xem PERMISSIONS.md
         when(session.getAttribute("currentUser")).thenReturn(user);
         when(request.getSession(false)).thenReturn(session);
 
@@ -231,7 +231,7 @@ public class ProductControllerTest {
     @Test
     public void create_withoutFullAccess_returns403AndNeverInserts() throws Exception {
         User noAccess = new User();
-        noAccess.setRole(new Role(2, "Sales")); // không có Full access trên PRODUCT
+        noAccess.setRole(new Role(2, "Tổng hợp")); // không có Full access trên PRODUCT
         when(session.getAttribute("currentUser")).thenReturn(noAccess);
         when(request.getParameter("action")).thenReturn("create");
         when(request.getParameter("productName")).thenReturn("Router ABC");
@@ -265,6 +265,30 @@ public class ProductControllerTest {
 
         controller.doPost(request, response);
 
+        verify(productDAO).insert(any(Product.class));
+        verify(response).sendRedirect(CONTEXT_PATH + "/product?action=view&id=42");
+    }
+
+    /**
+     * Task 9.3: Sales nhận việc quản lý sản phẩm của vai Kỹ thuật cũ -- kể cả Sales có
+     * cấp trên (SPEC 3.3 không đánh (*) ở dòng Sản phẩm, cây tổ chức không siết ở đây).
+     */
+    @Test
+    public void create_bySalesWithManager_insertsAndRedirectsToDetail() throws Exception {
+        User salesStaff = new User();
+        salesStaff.setUserId(98);
+        salesStaff.setRole(new Role(1, "Sales"));
+        salesStaff.setManagerId(97);
+        when(session.getAttribute("currentUser")).thenReturn(salesStaff);
+        when(request.getParameter("action")).thenReturn("create");
+        when(request.getParameter("productName")).thenReturn("Router ABC");
+        when(request.getParameter("categoryId")).thenReturn("1");
+        when(productDAO.generateNextProductCode()).thenReturn("SP-0001");
+        when(productDAO.insert(any(Product.class))).thenReturn(42);
+
+        controller.doPost(request, response);
+
+        verify(response, never()).sendError(eq(HttpServletResponse.SC_FORBIDDEN), anyString());
         verify(productDAO).insert(any(Product.class));
         verify(response).sendRedirect(CONTEXT_PATH + "/product?action=view&id=42");
     }
@@ -572,7 +596,7 @@ public class ProductControllerTest {
 
     private void loginWithoutProductAccess() {
         User noAccess = new User();
-        noAccess.setRole(new Role(2, "Sales")); // chỉ View only trên PRODUCT
+        noAccess.setRole(new Role(2, "Tổng hợp")); // chỉ View only trên PRODUCT
         when(session.getAttribute("currentUser")).thenReturn(noAccess);
     }
 

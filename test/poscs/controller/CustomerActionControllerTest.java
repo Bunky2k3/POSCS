@@ -88,7 +88,7 @@ public class CustomerActionControllerTest {
 
     @Test
     public void createForm_withoutPermission_returns403Msg022() throws Exception {
-        User user = loginAs(PermissionService.ROLE_TECHNICAL, null);
+        User user = loginAs("Kỹ thuật", null);
         when(permissionService.canCreateCustomer(user)).thenReturn(false);
         when(request.getParameter("action")).thenReturn("new");
 
@@ -114,7 +114,7 @@ public class CustomerActionControllerTest {
 
     @Test
     public void editForm_withoutPermission_returns403Msg022() throws Exception {
-        User user = loginAs(PermissionService.ROLE_TECHNICAL, null);
+        User user = loginAs("Kỹ thuật", null);
         when(permissionService.canUpdateCustomer(user)).thenReturn(false);
         when(request.getParameter("action")).thenReturn("edit");
 
@@ -182,7 +182,7 @@ public class CustomerActionControllerTest {
 
     @Test
     public void create_withoutPermission_returns403Msg022() throws Exception {
-        User user = loginAs(PermissionService.ROLE_TECHNICAL, null);
+        User user = loginAs("Kỹ thuật", null);
         when(permissionService.canCreateCustomer(user)).thenReturn(false);
         when(request.getParameter("action")).thenReturn("create");
 
@@ -253,7 +253,7 @@ public class CustomerActionControllerTest {
 
     @Test
     public void update_withoutPermission_returns403Msg022() throws Exception {
-        User user = loginAs(PermissionService.ROLE_TECHNICAL, null);
+        User user = loginAs("Kỹ thuật", null);
         when(permissionService.canUpdateCustomer(user)).thenReturn(false);
         when(request.getParameter("action")).thenReturn("update");
 
@@ -309,7 +309,7 @@ public class CustomerActionControllerTest {
 
     @Test
     public void delete_withoutPermission_returns403Msg022_BR34() throws Exception {
-        User user = loginAs(PermissionService.ROLE_TECHNICAL, null);
+        User user = loginAs("Kỹ thuật", null);
         when(permissionService.canDeleteCustomer(user)).thenReturn(false);
         when(request.getParameter("action")).thenReturn("delete");
         when(request.getParameter("id")).thenReturn("5");
@@ -408,7 +408,7 @@ public class CustomerActionControllerTest {
 
     @Test
     public void evaluate_withoutPermission_returns403Msg022() throws Exception {
-        User user = loginAs(PermissionService.ROLE_TECHNICAL, null);
+        User user = loginAs("Kỹ thuật", null);
         when(permissionService.canRateCustomer(user)).thenReturn(false);
         when(request.getParameter("action")).thenReturn("evaluate");
 

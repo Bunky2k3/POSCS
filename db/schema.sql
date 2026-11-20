@@ -3445,12 +3445,13 @@ CREATE TABLE `roles` (
 
 -- Xem PERMISSIONS.md ở gốc repo để biết ma trận quyền theo role x resource.
 -- CSKH đã gộp vào Sales (không còn là vai riêng) -- xem PERMISSIONS.md.
+-- Kỹ thuật đã gộp vào Sales (V42): Sales quản lý sản phẩm và là người xử lý
+-- phiếu hỗ trợ.
 -- Tổng hợp (V40): vai của Phòng tổng hợp -- xem khách hàng, hợp đồng, sản
 -- phẩm; xác nhận bàn giao; ghi nhận kỳ thanh toán đã thu.
 INSERT INTO `roles` (`role_name`) VALUES
 ('Admin'),
 ('Sales'),
-('Kỹ thuật'),
 ('Tổng hợp');
 
 DROP TABLE IF EXISTS `departments`;
@@ -3462,11 +3463,11 @@ CREATE TABLE `departments` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- "Chăm sóc khách hàng" đã xoá (V38) cùng lúc gộp vai CSKH vào Sales -- không
--- còn ai thuộc phòng đó, xem PERMISSIONS.md.
+-- còn ai thuộc phòng đó, xem PERMISSIONS.md. "Kỹ thuật" đã xoá (V42) cùng lúc
+-- gộp vai Kỹ thuật vào Sales, nhân viên chuyển sang Kinh doanh.
 INSERT INTO `departments` (`department_name`) VALUES
 ('Ban giám đốc'),
 ('Kinh doanh'),
-('Kỹ thuật'),
 -- Phòng DUY NHẤT nhận bàn giao hợp đồng (V40 gộp hai phòng Kế toán, Dự án của
 -- V32 vào đây). Bàn giao là giao cho PHÒNG: ai thuộc phòng này cũng xác nhận
 -- được, Admin xác nhận thay được.
@@ -3559,27 +3560,30 @@ VALUES
  'sales6.test@example.com', NULL,
  (SELECT department_id FROM departments WHERE department_name = 'Kinh doanh'), '2023-08-21', 1),
 
--- ===== Kỹ thuật =====
+-- ===== Kỹ thuật (vai đã gộp vào Sales, phòng ban đã gộp vào Kinh doanh ở
+-- V42 -- xem PERMISSIONS.md; giữ nguyên username cho các tài khoản demo này,
+-- chỉ đổi role_id/department_id. Họ vẫn là người xử lý của các phiếu demo bên
+-- dưới) =====
 ('kythuat2', '$2a$10$DAGqjm1tkfcQwNW/Eg4heea3pcFZjnBx61.02OXXc5k2.wlOo/SN2',
- (SELECT role_id FROM roles WHERE role_name = 'Kỹ thuật'),
+ (SELECT role_id FROM roles WHERE role_name = 'Sales'),
  'Vũ', 'Đình', 'Nam', 'Nam', '1991-03-19', '001191012351', '0912340007',
  'kythuat2.test@example.com', NULL,
- (SELECT department_id FROM departments WHERE department_name = 'Kỹ thuật'), '2021-06-14', 0),
+ (SELECT department_id FROM departments WHERE department_name = 'Kinh doanh'), '2021-06-14', 0),
 ('kythuat3', '$2a$10$sZGBam7M3NbxjvgR4t6RAOPIDXvqnM0UT9Yy4DtshErcoiGwUSUxS',
- (SELECT role_id FROM roles WHERE role_name = 'Kỹ thuật'),
+ (SELECT role_id FROM roles WHERE role_name = 'Sales'),
  'Hoàng', 'Thị', 'Lan', 'Nữ', '1994-12-05', '001194012352', '0912340008',
  'kythuat3.test@example.com', NULL,
- (SELECT department_id FROM departments WHERE department_name = 'Kỹ thuật'), '2022-10-03', 0),
+ (SELECT department_id FROM departments WHERE department_name = 'Kinh doanh'), '2022-10-03', 0),
 ('kythuat4', '$2a$10$RoLmNuQu9Ip6Zsu86mf0uOiPm9xokvqtK57spfCn0Dexw/45Ro1qy',
- (SELECT role_id FROM roles WHERE role_name = 'Kỹ thuật'),
+ (SELECT role_id FROM roles WHERE role_name = 'Sales'),
  'Bùi', 'Tiến', 'Dũng', 'Nam', '1989-06-27', '001189012353', '0912340009',
  'kythuat4.test@example.com', NULL,
- (SELECT department_id FROM departments WHERE department_name = 'Kỹ thuật'), '2020-04-20', 0),
+ (SELECT department_id FROM departments WHERE department_name = 'Kinh doanh'), '2020-04-20', 0),
 ('kythuat5', '$2a$10$ClxCdcFUyHKrbyQHYG0yA.5.wx.B8uE.3G8zavmgr8gO4qdL61OfS',
- (SELECT role_id FROM roles WHERE role_name = 'Kỹ thuật'),
+ (SELECT role_id FROM roles WHERE role_name = 'Sales'),
  'Ngô', 'Văn', 'Hiếu', 'Nam', '1997-01-14', '001197012354', '0912340010',
  'kythuat5.test@example.com', NULL,
- (SELECT department_id FROM departments WHERE department_name = 'Kỹ thuật'), '2024-01-08', 0),
+ (SELECT department_id FROM departments WHERE department_name = 'Kinh doanh'), '2024-01-08', 0),
 
 -- ===== CSKH (vai đã gộp vào Sales, phòng ban đã gộp vào Kinh doanh -- xem
 -- PERMISSIONS.md; giữ nguyên username cho các tài khoản demo này, chỉ đổi

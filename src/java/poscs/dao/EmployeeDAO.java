@@ -281,10 +281,10 @@ public class EmployeeDAO {
      * Nhân viên đang hoạt động của MỘT vai, để đổ dropdown "người phụ trách".
      *
      * <p>Mỗi màn hình giao việc cho một vai khác nhau -- khách hàng và hợp
-     * đồng giao cho Sales, phiếu hỗ trợ giao cho Kỹ thuật. {@link
-     * #findAllActive()} trả về tất cả và KHÔNG dùng được ở những chỗ đó: nó
-     * mời người nhập chọn cả Admin lẫn kỹ thuật viên vào ô "người phụ trách
-     * khách hàng".
+     * đồng giao cho Sales, phiếu hỗ trợ cũng giao cho Sales (vai Kỹ thuật cũ
+     * đã gộp vào Sales, V42). {@link #findAllActive()} trả về tất cả và KHÔNG
+     * dùng được ở những chỗ đó: nó mời người nhập chọn cả Admin lẫn Tổng hợp
+     * vào ô "người phụ trách khách hàng".
      *
      * @param alsoInclude user_id vẫn giữ trong danh sách dù sai vai -- truyền
      *        người đang được gán của bản ghi ĐANG SỬA vào đây. Thiếu nó thì
@@ -360,7 +360,7 @@ public class EmployeeDAO {
      * <p>Chỉ còn dùng cho việc so khớp username lúc nhập Excel hàng loạt
      * (cần username nên SELECT cả cột đó). Dropdown "người phụ trách" thì
      * dùng {@link #findActiveByRole} -- đổ tất cả vào đó là mời người nhập
-     * gán khách hàng cho một kỹ thuật viên.
+     * gán khách hàng cho một Admin hay một người phòng Tổng hợp.
      */
     public List<User> findAllActive() {
         List<User> result = new ArrayList<>();

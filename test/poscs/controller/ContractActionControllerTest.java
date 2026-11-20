@@ -115,7 +115,7 @@ public class ContractActionControllerTest {
 
     @Test
     public void doGet_actionNew_withoutPermission_returns403() throws Exception {
-        User u = loginAs(PermissionService.ROLE_TECHNICAL, null);
+        User u = loginAs("Kỹ thuật", null);
         when(permissionService.canCreateContract(u)).thenReturn(false);
         when(request.getParameter("action")).thenReturn("new");
 
@@ -141,7 +141,7 @@ public class ContractActionControllerTest {
 
     @Test
     public void doGet_actionNewAmendment_withoutPermission_returns403() throws Exception {
-        User u = loginAs(PermissionService.ROLE_TECHNICAL, null);
+        User u = loginAs("Kỹ thuật", null);
         when(permissionService.canCreateAmendment(u)).thenReturn(false);
         when(request.getParameter("action")).thenReturn("newAmendment");
 
@@ -193,7 +193,7 @@ public class ContractActionControllerTest {
 
     @Test
     public void doGet_actionEdit_withoutPermission_returns403() throws Exception {
-        User u = loginAs(PermissionService.ROLE_TECHNICAL, null);
+        User u = loginAs("Kỹ thuật", null);
         when(permissionService.canUpdateContract(u)).thenReturn(false);
         when(request.getParameter("action")).thenReturn("edit");
 
@@ -247,7 +247,7 @@ public class ContractActionControllerTest {
 
     @Test
     public void handleCreate_withoutPermission_returns403() throws Exception {
-        User u = loginAs(PermissionService.ROLE_TECHNICAL, null);
+        User u = loginAs("Kỹ thuật", null);
         when(permissionService.canCreateContract(u)).thenReturn(false);
         when(request.getParameter("action")).thenReturn("create");
 
@@ -313,7 +313,7 @@ public class ContractActionControllerTest {
 
     @Test
     public void handleUpdate_withoutPermission_returns403() throws Exception {
-        User u = loginAs(PermissionService.ROLE_TECHNICAL, null);
+        User u = loginAs("Kỹ thuật", null);
         when(permissionService.canUpdateContract(u)).thenReturn(false);
         when(request.getParameter("action")).thenReturn("update");
 
@@ -652,7 +652,7 @@ public class ContractActionControllerTest {
 
     @Test
     public void handleCreateAmendment_withoutPermission_returns403() throws Exception {
-        User u = loginAs(PermissionService.ROLE_TECHNICAL, null);
+        User u = loginAs("Kỹ thuật", null);
         when(permissionService.canCreateAmendment(u)).thenReturn(false);
         when(request.getParameter("action")).thenReturn("createAmendment");
 
@@ -854,7 +854,7 @@ public class ContractActionControllerTest {
 
     @Test
     public void handleCorrect_techRole_returns403() throws Exception {
-        User u = loginAs(PermissionService.ROLE_TECHNICAL, null);
+        User u = loginAs("Kỹ thuật", null);
         when(permissionService.canCorrectSignedContract(u)).thenReturn(false);
         when(request.getParameter("action")).thenReturn("correct");
 
@@ -1027,7 +1027,7 @@ public class ContractActionControllerTest {
 
     @Test
     public void handleChangeProgress_withoutPermission_returns403() throws Exception {
-        User u = loginAs(PermissionService.ROLE_TECHNICAL, null);
+        User u = loginAs("Kỹ thuật", null);
         when(permissionService.canUpdateContract(u)).thenReturn(false);
         when(request.getParameter("action")).thenReturn("changeProgress");
 
@@ -1141,7 +1141,7 @@ public class ContractActionControllerTest {
 
     @Test
     public void handleDelete_withoutPermission_returns403() throws Exception {
-        User u = loginAs(PermissionService.ROLE_TECHNICAL, null);
+        User u = loginAs("Kỹ thuật", null);
         when(request.getParameter("action")).thenReturn("delete");
         when(request.getParameter("id")).thenReturn("5");
         when(contractService.findById(5)).thenReturn(draftContract(5));
@@ -1247,7 +1247,7 @@ public class ContractActionControllerTest {
 
     @Test
     public void handleAddProduct_withoutPermission_returns403() throws Exception {
-        User u = loginAs(PermissionService.ROLE_TECHNICAL, null);
+        User u = loginAs("Kỹ thuật", null);
         when(permissionService.canUpdateContract(u)).thenReturn(false);
         when(request.getParameter("action")).thenReturn("addProduct");
 
@@ -1319,7 +1319,7 @@ public class ContractActionControllerTest {
 
     @Test
     public void handleRemoveProduct_withoutPermission_returns403() throws Exception {
-        User u = loginAs(PermissionService.ROLE_TECHNICAL, null);
+        User u = loginAs("Kỹ thuật", null);
         when(permissionService.canUpdateContract(u)).thenReturn(false);
         when(request.getParameter("action")).thenReturn("removeProduct");
 

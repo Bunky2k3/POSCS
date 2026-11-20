@@ -45,7 +45,7 @@ public class ContractDocumentServiceTest {
         adminUser = buildUser(1, PermissionService.ROLE_ADMIN, null);
         salesManager = buildUser(2, PermissionService.ROLE_SALES, null);
         salesSubordinate = buildUser(3, PermissionService.ROLE_SALES, 2);
-        techUser = buildUser(4, PermissionService.ROLE_TECHNICAL, null);
+        techUser = buildUser(4, "Kỹ thuật", null);
 
         when(permissionService.canManageContractDocuments(adminUser)).thenReturn(true);
         when(permissionService.canManageContractDocuments(salesManager)).thenReturn(true);

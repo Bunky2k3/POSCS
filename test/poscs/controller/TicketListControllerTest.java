@@ -117,7 +117,7 @@ public class TicketListControllerTest {
     }
 
     @Test
-    public void list_adminSalesAndTechnicianRoles_areAllowedAndCanManageFlagMatchesRole() throws Exception {
+    public void list_adminAndSalesAllowedWithCanManage_generalGets403() throws Exception {
         // Admin -> canManage = true
         loginAs(PermissionService.ROLE_ADMIN, 1, null);
         controller.doGet(request, response);
@@ -132,14 +132,15 @@ public class TicketListControllerTest {
         controller.doGet(request, response);
         verify(request).setAttribute("canManage", true);
 
-        // Kỹ thuật -> chỉ xem / sửa phiếu được giao -> canManage = false
+        // Task 9.3: vai Kỹ thuật đã gộp vào Sales. Tổng hợp không vào phiếu hỗ trợ -> 403 MSG-022
         reset(request);
         when(request.getSession(false)).thenReturn(session);
         when(request.getContextPath()).thenReturn(CONTEXT_PATH);
         when(request.getRequestDispatcher(TicketListController.LIST_VIEW)).thenReturn(dispatcher);
-        loginAs(PermissionService.ROLE_TECHNICAL, 50, null);
+        loginAs(PermissionService.ROLE_GENERAL, 50, null);
         controller.doGet(request, response);
-        verify(request).setAttribute("canManage", false);
+        verify(response).sendError(HttpServletResponse.SC_FORBIDDEN, PermissionService.MSG_022);
+        verify(request, never()).setAttribute(eq("canManage"), any());
     }
 
     // ------------------------------------------------------------------
@@ -199,12 +200,14 @@ public class TicketListControllerTest {
     }
 
     // ------------------------------------------------------------------
-    // BR-45 & UC-16: Dải KPI, bộ lọc và mặc định "Phiếu của tôi" cho Kỹ thuật
+    // BR-45 & UC-16: Dải KPI, bộ lọc người xử lý (Task 9.3: người xử lý là Sales,
+    // mở lần đầu mặc định "Tất cả" với mọi vai)
     // ------------------------------------------------------------------
 
     @Test
-    public void list_technicianWithoutAssigneeParam_defaultsToMineAndCountsOwnKpi_UC16_BR45() throws Exception {
-        loginAs(PermissionService.ROLE_TECHNICAL, 50, null);
+    public void list_handlerChoosesMine_filtersAndCountsOwnKpi_UC16_BR45() throws Exception {
+        loginAs(PermissionService.ROLE_SALES, 50, null);
+        when(request.getParameter("assignee")).thenReturn("mine");
         Map<String, Integer> kpi = Map.of(
                 TicketService.STATUS_NEW, 2,
                 TicketService.STATUS_IN_PROGRESS, 3,
@@ -220,8 +223,9 @@ public class TicketListControllerTest {
         verify(ticketDAO).countListSummary(isNull(), eq(50));
         verify(request).setAttribute("statusSummary", kpi);
         verify(request).setAttribute("assigneeFilter", "mine");
-        verify(request).setAttribute("isTechnician", true);
-        verify(employeeDAO).findActiveByRole(PermissionService.ROLE_TECHNICAL, (Integer) null);
+        // Danh sách người xử lý trong bộ lọc: các Sales đang hoạt động (BR-39)
+        verify(employeeDAO).findActiveByRole("Sales", (Integer) null);
+        verify(request, never()).setAttribute(eq("isTechnician"), any());
     }
 
     @Test
@@ -233,12 +237,12 @@ public class TicketListControllerTest {
         verify(ticketDAO).findAll(eq(1), eq(10), isNull(), isNull(), isNull(), isNull(), isNull());
         verify(ticketDAO).countListSummary(isNull(), isNull());
         verify(request).setAttribute("assigneeFilter", "all");
-        verify(request).setAttribute("isTechnician", false);
+        verify(request, never()).setAttribute(eq("isTechnician"), any());
     }
 
     @Test
-    public void list_technicianExplicitlyChoosesAll_seesEveryone_UC16() throws Exception {
-        loginAs(PermissionService.ROLE_TECHNICAL, 50, null);
+    public void list_handlerExplicitlyChoosesAll_seesEveryone_UC16() throws Exception {
+        loginAs(PermissionService.ROLE_SALES, 50, null);
         when(request.getParameter("assignee")).thenReturn("all");
 
         controller.doGet(request, response);
@@ -257,7 +261,7 @@ public class TicketListControllerTest {
         verify(ticketDAO).findAll(eq(1), eq(10), any(), any(), any(), any(), eq(16));
         verify(ticketDAO).countListSummary(any(), eq(16));
         verify(request).setAttribute("assigneeFilter", "16");
-        verify(employeeDAO).findActiveByRole(PermissionService.ROLE_TECHNICAL, 16);
+        verify(employeeDAO).findActiveByRole("Sales", 16);
     }
 
     @Test

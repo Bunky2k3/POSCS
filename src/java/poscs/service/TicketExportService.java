@@ -146,7 +146,7 @@ public class TicketExportService extends BaseService {
         addPair(lines, "Trạng thái", ticket.getStatus());
         addPair(lines, "Ngày tạo", formatDate(ticket.getCreatedDate()));
         addPair(lines, "Hạn xử lý (SLA)", formatDateTime(ticket.getSlaDeadline()));
-        addPair(lines, "Kỹ thuật viên phụ trách", ticket.getAssignedTechnician() != null ? ticket.getAssignedTechnician().getFullName() : "—");
+        addPair(lines, "Người xử lý", ticket.getAssignedTechnician() != null ? ticket.getAssignedTechnician().getFullName() : "—");
         addPair(lines, "Thời điểm đóng", formatDateTime(ticket.getResolvedAt()));
         addParagraph(lines, font, contentWidth, "Mô tả sự cố", ticket.getDescription());
         addParagraph(lines, font, contentWidth, "Nguyên nhân sự cố", causeForPrint(ticket));

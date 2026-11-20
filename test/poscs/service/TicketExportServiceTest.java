@@ -256,6 +256,36 @@ public class TicketExportServiceTest {
         }
     }
 
+    /**
+     * Task 9.3: bản in ghi nhãn "Người xử lý" (BR-46) kèm tên người được giao, không còn
+     * nhãn "Kỹ thuật viên phụ trách" của vai Kỹ thuật cũ; chưa giao ai thì in "—".
+     */
+    @Test
+    public void exportTicketToPdf_printsHandlerLabelAndName() throws Exception {
+        TechnicalRequest t = createSampleTicket();
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        exportService.exportTicketToPdf(out, t, servletContext);
+
+        try (PDDocument doc = Loader.loadPDF(out.toByteArray())) {
+            String text = new PDFTextStripper().getText(doc);
+            assertTrue(text.contains("Người xử lý"));
+            assertTrue(text.contains("Nguyễn Văn Kỹ Thuật"));
+            assertFalse(text.contains("Kỹ thuật viên phụ trách"));
+        }
+
+        TechnicalRequest unassigned = createSampleTicket();
+        unassigned.setAssignedTechnician(null);
+        ByteArrayOutputStream out2 = new ByteArrayOutputStream();
+        exportService.exportTicketToPdf(out2, unassigned, servletContext);
+
+        try (PDDocument doc = Loader.loadPDF(out2.toByteArray())) {
+            String text = new PDFTextStripper().getText(doc);
+            assertTrue(text.contains("Người xử lý"));
+            assertTrue(text.contains("—"));
+            assertFalse(text.contains("Nguyễn Văn Kỹ Thuật"));
+        }
+    }
+
     @Test
     public void exportTicketToPdf_longText_flowsOntoMultiplePages() throws Exception {
         TechnicalRequest t = createSampleTicket();

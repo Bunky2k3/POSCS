@@ -20,7 +20,7 @@ import poscs.validator.ContractValidator;
 /**
  * Nghiệp vụ thông báo (UC-14, UC-15; BR-17, BR-20, BR-21):
  * - Chỉ tự sinh đúng 2 loại thông báo: hợp đồng sắp hết hạn (≤ 30 ngày) gửi
- *   người phụ trách và phiếu hỗ trợ sắp/đã quá hạn SLA (≤ 24 giờ) gửi KTV
+ *   người phụ trách và phiếu hỗ trợ sắp/đã quá hạn SLA (≤ 24 giờ) gửi người xử lý
  *   được phân công. Mỗi cặp (đối tượng, người nhận) tối đa 1 thông báo.
  * - Truy vấn danh sách không tự đánh dấu đã đọc (BR-21); chỉ xem và đánh dấu
  *   thông báo thuộc chính người dùng (BR-20).
@@ -89,7 +89,7 @@ public class NotificationService extends BaseService {
 
     /**
      * Sinh thông báo cho phiếu hỗ trợ chưa đóng sắp/đã quá hạn SLA (còn ≤ 24 giờ)
-     * gửi cho kỹ thuật viên được giao; idempotent theo (technicianId, ticket_sla, ticketId).
+     * gửi cho người xử lý được giao; idempotent theo (technicianId, ticket_sla, ticketId).
      */
     public int generateTicketSlaNotifications() {
         List<TechnicalRequest> dueSoon = ticketDAO.findOverdueOrDueSoon();

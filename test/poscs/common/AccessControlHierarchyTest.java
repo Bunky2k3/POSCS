@@ -99,13 +99,14 @@ public class AccessControlHierarchyTest {
     // ------------------------------------------------------------------
 
     /**
-     * Kỹ thuật viên có cấp trên vẫn phải giữ nguyên quyền trên Sản phẩm. Nếu
-     * việc siết lan sang đây thì cây tổ chức vô tình khoá luôn công việc
-     * chuyên môn của họ, chuyện chẳng ai yêu cầu.
+     * Sales có cấp trên vẫn phải giữ nguyên quyền trên Sản phẩm (Task 9.3: Sales
+     * nhận việc quản lý sản phẩm của vai Kỹ thuật cũ, SPEC 3.3 không đánh (*) ở
+     * dòng này). Nếu việc siết lan sang đây thì cây tổ chức vô tình khoá luôn
+     * việc quản lý sản phẩm của họ, chuyện chẳng ai yêu cầu.
      */
     @Test
-    public void kyThuatCoCapTren_vanGiuToanQuyenSanPham() {
-        loginAs("Kỹ thuật", 3);
+    public void salesCoCapTren_vanGiuToanQuyenSanPham() {
+        loginAs("Sales", 3);
 
         assertTrue(AccessControl.hasFullAccess(request, AccessControl.Resource.PRODUCT));
     }
@@ -124,17 +125,16 @@ public class AccessControlHierarchyTest {
     }
 
     /**
-     * Ngoại lệ của role Kỹ thuật trên phiếu được giao (V14) nằm ở nhánh khác
-     * hẳn, không đi qua FULL_ACCESS_ROLES -- nên cây tổ chức không được đụng
-     * tới nó. Kỹ thuật viên là cấp dưới vẫn phải sửa được phiếu của mình.
+     * Task 9.3: vai Kỹ thuật đã gộp vào Sales (V42), ngoại lệ "sửa phiếu được giao
+     * cho mình" (canUpdateAssignedTicket) bỏ theo. Tài khoản còn sót tên vai cũ
+     * không được giữ lại quyền ghi Sản phẩm hay Phiếu hỗ trợ.
      */
     @Test
-    public void kyThuatCoCapTren_vanSuaDuocPhieuDuocGiaoChoMinh() {
-        loginAs("Kỹ thuật", 3);
-        poscs.model.TechnicalRequest ticket = new poscs.model.TechnicalRequest();
-        ticket.setAssignedTechnicianId(7); // đúng người đang đăng nhập
+    public void vaiKyThuatCu_khongConQuyenGhiSanPhamVaPhieu() {
+        loginAs("Kỹ thuật", null);
 
-        assertTrue(AccessControl.canUpdateAssignedTicket(request, ticket));
+        assertFalse(AccessControl.hasFullAccess(request, AccessControl.Resource.PRODUCT));
+        assertFalse(AccessControl.hasFullAccess(request, AccessControl.Resource.TICKET));
     }
 
     // ------------------------------------------------------------------

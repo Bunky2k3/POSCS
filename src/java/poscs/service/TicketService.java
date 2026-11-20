@@ -33,7 +33,11 @@ public class TicketService extends BaseService {
     public static final String ASSIGNEE_ALL = "all";
     public static final String ASSIGNEE_MINE = "mine";
 
-    public static final String TECHNICIAN_ROLE = PermissionService.ROLE_TECHNICAL;
+    /**
+     * Vai của người xử lý phiếu (BR-39): chọn trong các Sales đang hoạt động. Vai Kỹ thuật
+     * cũ đã gộp vào Sales (V42), nên người tiếp nhận và người xử lý cùng một vai.
+     */
+    public static final String HANDLER_ROLE = PermissionService.ROLE_SALES;
     public static final String ROLE_BUYER = TicketValidator.ROLE_BUYER;
 
     // BR-40: Trạng thái phiếu
@@ -181,11 +185,11 @@ public class TicketService extends BaseService {
 
     /**
      * UC-16: Chuẩn hóa bộ lọc người xử lý ("all", "mine" hoặc user_id).
-     * Vắng tham số thì Kỹ thuật mặc định "mine", các vai trò khác mặc định "all".
+     * Vắng tham số (mở lần đầu) thì mặc định "Tất cả" với mọi vai (SPEC 5.5).
      */
     public String resolveAssigneeFilter(String rawAssignee, User actor) {
         if (rawAssignee == null || rawAssignee.trim().isEmpty()) {
-            return permissionService.isTechnical(actor) ? ASSIGNEE_MINE : ASSIGNEE_ALL;
+            return ASSIGNEE_ALL;
         }
         String trimmed = rawAssignee.trim();
         if (ASSIGNEE_MINE.equals(trimmed)) {
@@ -228,8 +232,13 @@ public class TicketService extends BaseService {
         return customerDAO.findAllByRole(ROLE_BUYER, keepCustomerId);
     }
 
+    /**
+     * BR-39: danh sách người xử lý phiếu = các Sales đang hoạt động. {@code keepUserId}
+     * (người xử lý của phiếu đang sửa) vẫn được giữ trong danh sách dù đã đổi vai hay
+     * bị khoá, xem {@link EmployeeDAO#findActiveByRole}.
+     */
     public List<User> findActiveTechnicians(Integer keepUserId) {
-        return employeeDAO.findActiveByRole(TECHNICIAN_ROLE, keepUserId);
+        return employeeDAO.findActiveByRole(HANDLER_ROLE, keepUserId);
     }
 
     // ------------------------------------------------------------------
@@ -275,7 +284,7 @@ public class TicketService extends BaseService {
 
     /**
      * UC-21: Tạo mới phiếu hỗ trợ kỹ thuật.
-     * - Kiểm quyền Admin hoặc Sales (Kỹ thuật bị từ chối với MSG-022).
+     * - Kiểm quyền Admin hoặc Sales (vai khác bị từ chối với MSG-022).
      * - BR-39: Trạng thái mặc định "Mới tiếp nhận" và ngày tạo là hôm nay.
      * - BR-43: Cờ bảo hành mặc định true (Có) khi null.
      * - BR-38: Mã phiếu hệ thống tự sinh duy nhất, lưu phiếu kèm dòng lịch sử mở đầu trong 1 giao dịch.
@@ -345,7 +354,7 @@ public class TicketService extends BaseService {
 
     /**
      * UC-22: Cập nhật phiếu hỗ trợ kỹ thuật.
-     * - Kỹ thuật chỉ được sửa phiếu giao cho chính mình (vi phạm -> MSG-022) và chỉ sửa các trường kỹ thuật.
+     * - Kiểm quyền Admin hoặc Sales (vai khác -> MSG-022); hai vai này sửa được mọi trường của phiếu.
      * - BR-40: Chuyển trạng thái một chiều Mới tiếp nhận -> Đang xử lý -> Đã đóng (vi phạm -> MSG-051).
      * - BR-40: Ghi thời điểm hoàn tất (resolvedAt) lần đầu chuyển sang Đã đóng; giữ nguyên ở các lần sửa sau.
      * - Lịch sử đổi trạng thái và bản ghi phiếu được ghi trong cùng một giao dịch ở DAO.
@@ -488,7 +497,7 @@ public class TicketService extends BaseService {
         User tech = employeeDAO.findById(technicianId);
         return tech != null && !tech.isDeleted()
                 && tech.getRole() != null
-                && TECHNICIAN_ROLE.equals(tech.getRole().getRoleName());
+                && HANDLER_ROLE.equals(tech.getRole().getRoleName());
     }
 
     private void applyResolvedTimestamp(TechnicalRequest merged, TechnicalRequest existing) {
@@ -508,7 +517,7 @@ public class TicketService extends BaseService {
 
     /**
      * UC-23 & BR-47: Xóa mềm phiếu hỗ trợ kỹ thuật (is_deleted = 1).
-     * - Chỉ Admin và Sales có quyền xóa (Kỹ thuật bị chặn với MSG-022).
+     * - Chỉ Admin và Sales có quyền xóa (vai khác bị chặn với MSG-022).
      * - Chỉ xóa khi trạng thái là Mới tiếp nhận hoặc Đã đóng; chặn khi Đang xử lý.
      */
     public ServiceResult<Void> deleteTicket(int ticketId, User actor) {

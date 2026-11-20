@@ -21,9 +21,9 @@ import poscs.validator.TicketValidator;
 /**
  * Controller cho chi tiết phiếu hỗ trợ kỹ thuật (UC-17, Task 5.3).
  * Đáp ứng các quy tắc:
- * - BR-46: Hiển thị đầy đủ Thông tin chung, Người tạo phiếu, Kỹ thuật viên xử lý, Lịch sử xử lý.
+ * - BR-46: Hiển thị đầy đủ Thông tin chung, Người tạo phiếu, Người xử lý, Lịch sử xử lý.
  * - Phân quyền qua {@link PermissionService}, vi phạm trả MSG-022.
- * - Cờ canEdit (Admin, Sales hoặc Kỹ thuật viên đang được giao phiếu) và canDelete (Admin, Sales
+ * - Cờ canEdit (Admin, Sales) và canDelete (Admin, Sales
  *   và phiếu ở trạng thái Mới tiếp nhận hoặc Đã đóng - BR-47).
  */
 @WebServlet(name = "TicketDetailController", urlPatterns = {"/ticket/detail"})

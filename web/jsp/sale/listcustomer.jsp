@@ -323,9 +323,9 @@
                 <%-- Cấp dưới không có nút "Thêm" vì không được ghi (V16), nhưng
                      không được để họ cụt đường: đây là lối gửi yêu cầu lên cấp
                      trên. Điều kiện là CÓ CẤP TRÊN chứ không phải "không có
-                     canManage" -- người chỉ View only vì vai trò (Kỹ thuật,
-                     CSKH) thì vốn không dính gì tới cây tổ chức, hiện nút này
-                     ra chỉ làm họ bối rối. --%>
+                     canManage" -- người chỉ View only vì vai trò (Tổng hợp)
+                     thì vốn không dính gì tới cây tổ chức, hiện nút này ra chỉ
+                     làm họ bối rối. --%>
                 <%-- Nút "Gửi yêu cầu" đã ẩn cùng mục Yêu cầu thay đổi (21/09/2026)
                      -- xem ghi chú ở sidebar.jsp. --%>
             </div>

@@ -150,7 +150,7 @@
                 <c:if test="${lockGeneral}">
                     <div class="alert alert-primary py-2 px-3 mb-3 lock-note" style="font-size: 0.9rem; border-radius: 12px;">
                         <i class="fa-solid fa-circle-info me-1"></i>
-                        Bạn là kỹ thuật viên được giao phiếu này: chỉ sửa được khối <strong>Nhân viên kỹ thuật xử lý</strong> và <strong>Ghi chú nội bộ</strong>. Các ô còn lại chỉ để xem; cần đổi thì báo Sales hoặc Admin.
+                        Bạn là người xử lý được giao phiếu này: chỉ sửa được khối <strong>Người xử lý đánh giá</strong> và <strong>Ghi chú nội bộ</strong>. Các ô còn lại chỉ để xem; cần đổi thì báo Sales hoặc Admin.
                     </div>
                 </c:if>
 
@@ -225,14 +225,14 @@
                     </div>
 
                     <div class="col-md-6 field-row">
-                        <label>Kỹ thuật viên phụ trách <span class="req">*</span></label>
+                        <label>Người xử lý <span class="req">*</span></label>
                         <select class="form-select" id="technician" name="assignedTechnicianId" ${lockGeneral ? 'disabled' : ''}>
-                            <option value="">-- Chọn kỹ thuật viên --</option>
+                            <option value="">-- Chọn người xử lý --</option>
                             <c:forEach var="staff" items="${userList}">
                                 <option value="${staff.userId}" ${staff.userId == ticket.assignedTechnicianId ? 'selected' : ''}>${fn:escapeXml(staff.fullName)}</option>
                             </c:forEach>
                         </select>
-                        <span class="error-text" id="err-technician">Vui lòng chọn kỹ thuật viên phụ trách.</span>
+                        <span class="error-text" id="err-technician">Vui lòng chọn người xử lý.</span>
                     </div>
 
                     <div class="col-md-6 field-row" style="display:flex; align-items:center;">
@@ -283,8 +283,8 @@
                   tiêu đề nói sai. Thay bằng một dòng nhắc vai trò.
                 --%>
                 <div class="section-header">
-                    <h5>Nhân viên kỹ thuật xử lý</h5>
-                    <span class="section-hint"><i class="fa-solid fa-screwdriver-wrench"></i> Phần do kỹ thuật viên đánh giá</span>
+                    <h5>Người xử lý đánh giá</h5>
+                    <span class="section-hint"><i class="fa-solid fa-screwdriver-wrench"></i> Phần do người xử lý đánh giá</span>
                 </div>
                 <div class="row">
                     <div class="col-md-4 field-row">
@@ -311,7 +311,7 @@
                     </div>
                     <div class="col-12 field-row">
                         <label>Nguyên nhân sự cố</label>
-                        <textarea class="form-control" id="rootCause" name="rootCause" rows="3" placeholder="Kỹ thuật viên đánh giá vì sao xảy ra sự cố">${fn:escapeXml(ticket.rootCause)}</textarea>
+                        <textarea class="form-control" id="rootCause" name="rootCause" rows="3" placeholder="Người xử lý đánh giá vì sao xảy ra sự cố">${fn:escapeXml(ticket.rootCause)}</textarea>
                     </div>
                     <div class="col-12 field-row">
                         <label>Phương hướng xử lý</label>

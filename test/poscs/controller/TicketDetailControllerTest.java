@@ -199,9 +199,10 @@ public class TicketDetailControllerTest {
         verify(dispatcher).forward(request, response);
     }
 
+    /** Task 9.3: người xử lý được giao là Sales -- toàn quyền trên phiếu. */
     @Test
-    public void detail_assignedTechnician_canEditTrueAndCanDeleteFalse_UC17() throws Exception {
-        loginAs(PermissionService.ROLE_TECHNICAL, 50);
+    public void detail_assignedSalesHandler_canManageEditAndDelete_UC17() throws Exception {
+        loginAs(PermissionService.ROLE_SALES, 50);
         when(request.getParameter("id")).thenReturn("3");
         TechnicalRequest ticket = sampleTicket(3, TicketService.STATUS_NEW, 50);
         when(ticketDAO.findById(3)).thenReturn(ticket);
@@ -209,15 +210,16 @@ public class TicketDetailControllerTest {
 
         controller.doGet(request, response);
 
-        verify(request).setAttribute("canManage", false);
+        verify(request).setAttribute("canManage", true);
         verify(request).setAttribute("canEdit", true);
-        verify(request).setAttribute("canDelete", false);
+        verify(request).setAttribute("canDelete", true);
         verify(dispatcher).forward(request, response);
     }
 
+    /** Task 9.3: Tổng hợp không vào phiếu hỗ trợ (SPEC 3.3) -> 403 MSG-022. */
     @Test
-    public void detail_otherTechnicianNotAssigned_canEditFalseAndCanDeleteFalse_UC17() throws Exception {
-        loginAs(PermissionService.ROLE_TECHNICAL, 51);
+    public void detail_generalRole_returns403Msg022_UC17() throws Exception {
+        loginAs(PermissionService.ROLE_GENERAL, 51);
         when(request.getParameter("id")).thenReturn("3");
         TechnicalRequest ticket = sampleTicket(3, TicketService.STATUS_NEW, 50);
         when(ticketDAO.findById(3)).thenReturn(ticket);
@@ -225,10 +227,9 @@ public class TicketDetailControllerTest {
 
         controller.doGet(request, response);
 
-        verify(request).setAttribute("canManage", false);
-        verify(request).setAttribute("canEdit", false);
-        verify(request).setAttribute("canDelete", false);
-        verify(dispatcher).forward(request, response);
+        verify(response).sendError(HttpServletResponse.SC_FORBIDDEN, PermissionService.MSG_022);
+        verify(request, never()).setAttribute(eq("canEdit"), any());
+        verify(dispatcher, never()).forward(request, response);
     }
 
     @Test

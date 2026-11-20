@@ -14,7 +14,7 @@ import poscs.service.NotificationService;
 /**
  * Lịch chạy nền tự động sinh thông báo nhắc hạn mỗi 60 phút:
  * - Hợp đồng "Sắp hết hạn" (BR-17, ≤ 30 ngày) báo cho người phụ trách.
- * - Phiếu hỗ trợ kỹ thuật sắp/đã quá hạn SLA (≤ 24 giờ) báo cho KTV được giao.
+ * - Phiếu hỗ trợ kỹ thuật sắp/đã quá hạn SLA (≤ 24 giờ) báo cho người xử lý được giao.
  *
  * Toàn bộ nghiệp vụ sinh thông báo và chống trùng lặp nằm ở {@link NotificationService}.
  */
