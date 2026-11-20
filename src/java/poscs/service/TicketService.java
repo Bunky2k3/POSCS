@@ -459,7 +459,23 @@ public class TicketService extends BaseService {
         return validateCustomerAndContract(merged, existing.getEnterpriseId(), vr);
     }
 
-    private boolean isAssignedTechnicianValid(int technicianId, Integer keepTechnicianId) {
+    /**
+     * BR-39: người xử lý được giao phiếu phải là một Sales đang hoạt động.
+     *
+     * <p>Dùng chung cho hai lối ghi phiếu: lối {@code /ticket/action} đi qua
+     * {@link #createTicket} / {@link #updateTicket} của service này, còn lối
+     * {@code /ticket} (form đang dùng, {@code TechnicalSupportTicketController}) ghi
+     * thẳng qua DAO nên gọi hàm này trước khi ghi (Task 9.5). Dropdown đã chỉ liệt
+     * kê Sales đang hoạt động, nhưng một POST tự dựng gửi được id bất kỳ.
+     *
+     * @param technicianId id người xử lý gửi lên; {@code <= 0} là chưa chọn.
+     * @param keepTechnicianId người xử lý đang giữ phiếu (null khi tạo mới): gửi lại
+     *        đúng người này thì luôn hợp lệ, để phiếu cũ mà người xử lý đã nghỉ hay
+     *        đổi vai vẫn lưu được khi không đổi người.
+     * @return true nếu hợp lệ; false nếu chưa chọn, user không tồn tại, đã khoá hoặc
+     *         không mang vai Sales.
+     */
+    public boolean isAssignedTechnicianValid(int technicianId, Integer keepTechnicianId) {
         if (technicianId <= 0) {
             return false;
         }

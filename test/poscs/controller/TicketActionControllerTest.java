@@ -492,6 +492,48 @@ public class TicketActionControllerTest {
         verify(response).sendRedirect(CONTEXT_PATH + "/ticket?action=edit&id=3&error=update_failed");
     }
 
+    /**
+     * Task 9.5: kiểm quyền đứng TRƯỚC bước tra phiếu. Vai không có quyền gửi id không
+     * tồn tại hoặc thiếu id vẫn nhận 403 MSG-022 (như id có thật), không phải redirect
+     * "notfound" -- không đoán được id nào tồn tại, và không đụng tới CSDL phiếu.
+     */
+    @Test
+    public void showEditForm_noAccessRole_unknownOrMissingId_returns403BeforeLookup() throws Exception {
+        loginAs("Tổng hợp", 70);
+        when(request.getParameter("action")).thenReturn("edit");
+        when(request.getParameter("id")).thenReturn("999");
+        when(ticketDAO.findById(999)).thenReturn(null);
+
+        controller.doGet(request, response);
+
+        when(request.getParameter("id")).thenReturn(null);
+        controller.doGet(request, response);
+
+        verify(response, times(2)).sendError(HttpServletResponse.SC_FORBIDDEN, PermissionService.MSG_022);
+        verify(response, never()).sendRedirect(anyString());
+        verify(ticketDAO, never()).findById(anyInt());
+        verify(request, never()).getRequestDispatcher(anyString());
+    }
+
+    /** Task 9.5: như form sửa -- POST update kiểm quyền trước khi đọc ticketId hay tra CSDL. */
+    @Test
+    public void handleUpdate_noAccessRole_unknownOrMissingTicketId_returns403BeforeLookup() throws Exception {
+        loginAs("Kỹ thuật", 50); // vai cũ còn sót, không còn quyền gì trên phiếu
+        when(request.getParameter("action")).thenReturn("update");
+        when(request.getParameter("ticketId")).thenReturn("999");
+        when(ticketDAO.findById(999)).thenReturn(null);
+
+        controller.doPost(request, response);
+
+        when(request.getParameter("ticketId")).thenReturn(null);
+        controller.doPost(request, response);
+
+        verify(response, times(2)).sendError(HttpServletResponse.SC_FORBIDDEN, PermissionService.MSG_022);
+        verify(response, never()).sendRedirect(anyString());
+        verify(ticketDAO, never()).findById(anyInt());
+        verify(ticketDAO, never()).update(any(), anyInt(), any());
+    }
+
     // ==================================================================
     // 3. UC-23 & BR-47: POST ?action=delete
     // ==================================================================

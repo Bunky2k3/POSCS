@@ -149,6 +149,16 @@ public class TicketActionController extends HttpServlet {
 
     public void showEditForm(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
+        // Task 9.5: kiểm quyền TRƯỚC khi đọc id hay tra phiếu -- vai không có quyền nhận
+        // 403 MSG-022 dù id có tồn tại hay không, không đoán được id nào có thật qua
+        // chênh lệch phản hồi. Người xử lý của phiếu không còn quyết định quyền (Task
+        // 9.3), nên kiểm được khi chưa có phiếu.
+        User currentUser = AccessControl.currentUser(request);
+        if (!getPermissionService().canUpdateTicket(currentUser, null)) {
+            response.sendError(HttpServletResponse.SC_FORBIDDEN, PermissionService.MSG_022);
+            return;
+        }
+
         Integer id = TicketActionHelper.parseIntOrNull(request.getParameter("id"));
         TechnicalRequest ticket = id != null ? getTicketService().findById(id) : null;
         if (ticket == null) {
@@ -156,14 +166,7 @@ public class TicketActionController extends HttpServlet {
             return;
         }
 
-        User currentUser = AccessControl.currentUser(request);
         boolean fullAccess = getPermissionService().canCreateTicket(currentUser);
-        boolean canUpdate = getPermissionService().canUpdateTicket(currentUser, ticket.getAssignedTechnicianId());
-        if (!canUpdate) {
-            response.sendError(HttpServletResponse.SC_FORBIDDEN, PermissionService.MSG_022);
-            return;
-        }
-
         request.setAttribute("ticket", ticket);
         request.setAttribute("canManage", fullAccess);
         TicketActionHelper.setDropdownAttributes(request, getTicketService(),
@@ -173,16 +176,17 @@ public class TicketActionController extends HttpServlet {
 
     public void handleUpdate(HttpServletRequest request, HttpServletResponse response)
             throws IOException {
+        // Task 9.5: như showEditForm -- kiểm quyền trước khi đọc ticketId hay tra CSDL.
+        User currentUser = AccessControl.currentUser(request);
+        if (!getPermissionService().canUpdateTicket(currentUser, null)) {
+            response.sendError(HttpServletResponse.SC_FORBIDDEN, PermissionService.MSG_022);
+            return;
+        }
+
         Integer id = TicketActionHelper.parseIntOrNull(request.getParameter("ticketId"));
         TechnicalRequest existing = id != null ? getTicketService().findById(id) : null;
         if (existing == null) {
             response.sendRedirect(request.getContextPath() + "/ticket?error=notfound");
-            return;
-        }
-
-        User currentUser = AccessControl.currentUser(request);
-        if (!getPermissionService().canUpdateTicket(currentUser, existing.getAssignedTechnicianId())) {
-            response.sendError(HttpServletResponse.SC_FORBIDDEN, PermissionService.MSG_022);
             return;
         }
 
