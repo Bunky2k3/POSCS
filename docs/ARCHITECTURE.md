@@ -1,6 +1,6 @@
 # Kiến trúc hệ thống POSCS
 
-Tài liệu mô tả kiến trúc phân tầng và cấu trúc mã nguồn thực tế của hệ thống **POSCS** (nền tảng Java 21 / Jakarta EE 11, JSP/JSTL, MySQL, build bằng Apache Ant), tuân thủ quy chuẩn tại `.gemini/rules.md` (§4) và đối chiếu nghiệp vụ từ `docs/SPEC.md`.
+Tài liệu mô tả kiến trúc phân tầng và cấu trúc mã nguồn thực tế của hệ thống **POSCS** (nền tảng Java 21 / Jakarta EE 11, JSP/JSTL, MySQL, build bằng Apache Ant), tuân thủ quy chuẩn tại `rules.md` (§4) và đối chiếu nghiệp vụ từ `docs/SPEC.md`.
 
 ---
 
@@ -55,7 +55,7 @@ sequenceDiagram
     end
 ```
 
-### Nguyên tắc trách nhiệm từng tầng (`.gemini/rules.md` §4)
+### Nguyên tắc trách nhiệm từng tầng (`rules.md` §4)
 
 | Gói / Thư mục | Vai trò & Ranh giới trách nhiệm |
 |---|---|
@@ -144,7 +144,7 @@ Tầng Service kế thừa `BaseService` và giao tiếp với Controller thông
 - **`BaseService`**: Lớp cơ sở cung cấp `Logger` và các phương thức helper `success(...)`, `failure(...)`, `error(...)` trả về `ServiceResult<T>`.
 - **`ServiceResult<T>`**: Wrapper bất biến chứa trạng thái `success`, dữ liệu `data`, thông điệp chung `message` và bản đồ lỗi theo từng trường `fieldErrors` (chuyển đổi trực tiếp từ `ValidationResult`).
 - **`AttributeStore`**: Interface trừu tượng hóa kho thuộc tính kiểu session (`get`, `set`, `remove`), giúp `AuthService` hoặc các service cần lưu trạng thái phiên không phụ thuộc `HttpSession` (dễ kiểm thử đơn vị qua `AttributeStore.of(Map)`).
-- **`PermissionService`**: Service trung tâm thực thi ma trận phân quyền RBAC 3 vai trò (`Admin`, `Sales`, `Kỹ thuật`), phân biệt cấp bậc quản lý vùng với nhân viên có cấp trên (`manager_id`), xác định phạm vi danh sách (`ListScope`) và chuẩn hóa thông báo vi phạm `MSG-022`.
+- **`PermissionService`**: Service trung tâm thực thi ma trận phân quyền RBAC 3 vai trò (`Admin`, `Sales`, `Tổng hợp`), phân biệt cấp bậc quản lý vùng với nhân viên có cấp trên (`manager_id`), xác định phạm vi danh sách (`ListScope`) và chuẩn hóa thông báo vi phạm `MSG-022`.
 
 **Các Service nghiệp vụ theo module:**
 
@@ -153,11 +153,11 @@ Tầng Service kế thừa `BaseService` và giao tiếp với Controller thông
 | Auth & Profile | `AuthService`, `ProfileService` | Đăng nhập, khóa tạm, OTP quên mật khẩu, đổi mật khẩu/hồ sơ cá nhân. |
 | Customer | `CustomerService`, `CustomerEvaluationService` | CRUD & xóa mềm khách hàng/NCC, danh sách/chi tiết, đánh giá xếp hạng quan hệ. |
 | Product | `ProductService` | Quản lý sản phẩm, danh mục, ảnh và catalogue. |
-| Contract | `ContractService`, `ContractPaymentService`, `ContractDocumentService`, `ContractHandoverService`, `ContractLinkService`, `ContractExportService` | Nghiệp vụ hợp đồng, phụ lục, chữa sai sót (UC-54), kỳ thanh toán, tài liệu đính kèm, bàn giao liên phòng, liên kết bán-mua, xuất dữ liệu. |
+| Contract | `ContractService`, `ContractPaymentService`, `ContractDocumentService`, `ContractHandoverService`, `ContractLinkService`, `ContractExportService` | Nghiệp vụ hợp đồng, phụ lục, chữa sai sót (UC-54), kỳ thanh toán, giấy tờ của hợp đồng (ô tích theo danh mục, link không bắt buộc), bàn giao cho phòng Tổng hợp, liên kết bán-mua, xuất dữ liệu. |
 | Ticket | `TicketService`, `TicketExportService` | Tạo, cập nhật, phân công xử lý, xóa mềm phiếu hỗ trợ kỹ thuật và xuất dữ liệu. |
 | Employee | `EmployeeService` | Quản lý tài khoản nhân viên, vai trò, phòng ban, cây cấp trên và phân vùng tỉnh. |
 | Thông tin chi nhánh | `BranchInfoService` | Xem và sửa thông tin Giám đốc chi nhánh (UC-55, BR-57), nguồn người ký bên mình trên hợp đồng (BR-56). |
-| Dashboard & Thông báo | `DashboardService` (kèm `DashboardSummary`), `NotificationService` | Tổng hợp số liệu dashboard theo vai trò/phạm vi và quản lý thông báo (hợp đồng sắp hết hạn 30 ngày, phiếu sắp quá hạn SLA 24 giờ). |
+| Dashboard & Thông báo | `DashboardService` (kèm `DashboardSummary`), `NotificationService` | Tổng hợp số liệu dashboard theo vai trò/phạm vi và quản lý thông báo (hợp đồng sắp hết hạn 30 ngày, phiếu sắp quá hạn SLA 24 giờ, hợp đồng đã giao hàng quá 15 ngày chưa ký). |
 
 ---
 
@@ -238,6 +238,6 @@ flowchart TB
 ## 3. Các quy ước an toàn & bảo mật xuyên suốt
 
 1. **Xác thực & Chống CSRF**: `AuthenticationFilter` chặn toàn bộ request chưa đăng nhập (trừ allow-list trong `PUBLIC_PATHS`), gắn header `no-cache` và kiểm tra `csrfToken` cho mọi request `POST` qua `CsrfUtil`.
-2. **Phân quyền hai lớp (RBAC + Cây tổ chức)**: Thực thi phía server qua `AccessControl` và `PermissionService` với 3 vai trò (`Admin`, `Sales`, `Kỹ thuật`); phân biệt Sales quản lý vùng (`manager_id == null`, có quyền ghi) với Sales cấp dưới (chỉ xem và gửi yêu cầu thay đổi).
+2. **Phân quyền hai lớp (RBAC + Cây tổ chức)**: Thực thi phía server qua `AccessControl` và `PermissionService` với 3 vai trò (`Admin`, `Sales`, `Tổng hợp`); phân biệt Sales quản lý vùng (`manager_id == null`, có quyền ghi) với Sales cấp dưới (chỉ xem và gửi yêu cầu thay đổi).
 3. **Xóa mềm**: Dữ liệu cốt lõi (khách hàng, sản phẩm, hợp đồng, phiếu, tài liệu hợp đồng) áp dụng cờ `is_deleted` thay vì xóa vật lý.
 4. **Truy vấn an toàn**: 100% truy vấn dùng `PreparedStatement`; mật khẩu băm bằng BCrypt.

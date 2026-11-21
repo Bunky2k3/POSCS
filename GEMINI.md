@@ -4,7 +4,6 @@
 1. `rules.md` (thư mục gốc): quy trình, lệnh Ant, ranh giới cấm, kiến trúc. **Bắt buộc đọc trước mỗi lượt.**
 2. `docs/SPEC.md`: nguồn chân lý nghiệp vụ.
 3. `task_tracker.md`: task hiện tại.
-4. `.gemini/rules.md`: quy chuẩn chi tiết bổ sung.
 
 ## Core Tech Rules
 1. **Jakarta EE 11 / Java 21**: luôn dùng `jakarta.*` (`jakarta.servlet.*`, `jakarta.mail.*`), không bao giờ dùng `javax.*`.

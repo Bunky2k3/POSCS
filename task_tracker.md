@@ -1,11 +1,12 @@
 # POSCS Task Tracker (v2)
 
 > **Nguyên tắc làm việc:**
-> - Bám `docs/SPEC.md` (bản v2) và `.gemini/rules.md`. Không suy diễn, không thêm tính năng ngoài SPEC.
+> - Bám `docs/SPEC.md` (bản v2) và `rules.md`. Không suy diễn, không thêm tính năng ngoài SPEC.
 > - **Chỉ giải quyết 1 task (checklist item) trong 1 lượt chạy.**
 > - Chọn task `[ ]` đầu tiên theo thứ tự, trừ khi nó bị chặn bởi mục "Quyết định đang chờ" bên dưới: khi đó **dừng và hỏi người dùng**.
 > - Không viết code dồn vào một file; tách service / validator / DAO / controller rõ ràng.
 > - Mỗi task kết thúc bằng báo cáo ngắn: đã làm gì, file đã đổi, kết quả test, điểm chưa chắc chắn.
+> - Việc triển khai lên VPS (Giai đoạn 11, Task `11.x`) cùng các quyết định của nó ghi riêng ở `task_tracker_deploy.md`.
 
 ## Tiêu chí hoàn thành chung (áp dụng cho MỌI task)
 
@@ -50,6 +51,12 @@ Dòng task viết như các task bên dưới (`**Task X.X:** <Tên task>`), kè
     - **Kỳ thanh toán:** giữ số tiền, hạn thu, ngày thu. Thêm loại kỳ **Tạm ứng / Thanh toán**, điều kiện (ghi ngắn), số ngày phải trả kể từ khi nộp hồ sơ (không bắt buộc), **ngày nộp hồ sơ** và **số tiền thực thu** (mặc định bằng số tiền kỳ, khác thì không bắt lý do). Hạn thu để trống được khi lập; bấm "Đã nộp hồ sơ" thì ghi ngày nộp, kỳ có số ngày thì hạn thu = ngày nộp + số ngày, không có thì nhập hạn tay. Tình trạng suy ra: Chưa nộp hồ sơ → Chờ thu → Quá hạn → Đã thu. Ô "%" trên form chỉ tính sẵn số tiền từ giá trị hợp đồng, vẫn lưu số tiền. Thêm thao tác **sửa kỳ** (kỳ chưa thu, hợp đồng chưa thanh lý/chấm dứt). Dashboard cộng số tiền thực thu theo ngày thu, chưa tách tạm ứng; tạm ứng không thu hồi dần. **Sales** (theo quyền quản lý kỳ) bấm "Đã nộp hồ sơ" (người dùng chốt 19/11/2026); vai Tổng hợp chỉ thêm được "Đã thu" (Task 9.2), và khi bấm thì **nhập được số tiền thực thu** như ở trang Sửa (người dùng chốt 20/11/2026). Bấm "Đã nộp hồ sơ" cho kỳ không có số ngày thì hạn thu **không bắt buộc**; kỳ đã nộp hồ sơ mà chưa có hạn thu hiện **Chờ thu** (người dùng chốt 20/11/2026 lúc làm Task 10.1; thay câu "có hạn thu → Chờ thu" ở BR "Kỳ thanh toán" của Task 10.1 thành "có hạn thu, hoặc đã có ngày nộp hồ sơ → Chờ thu", đã ghi vào BR-60).
     - **Không làm:** trạng thái "Đủ hồ sơ", giấy riêng của từng kỳ, bảng "kỳ cần giấy gì", kỳ "Thanh toán 100%" tự tạo, tự tính lại số tiền kỳ khi phụ lục đổi giá trị, cảnh báo tổng tỷ lệ.
 16. **Dữ liệu mẫu mới (Task 10.6, người dùng chốt 20/11/2026):** chỉ thay **dữ liệu mẫu**, giữ cấu trúc bảng và các file migration cũ. Bộ tài khoản theo chi nhánh thật, tên giả: 2 Admin (GĐ, PGĐ), 4 Sales (Trưởng phòng, Phó phòng, 2 nhân viên; không ai có cấp trên), 3 Tổng hợp (kế toán, thu tiền, nhận bàn giao) và 1 Sales đã nghỉ (tài khoản bị khoá). **Gieo cả hai Admin** vào file migration đánh dấu `-- poscs:demo-only` và phần dữ liệu mẫu của `db/schema.sql` (thay quy tắc cũ "không gieo Admin vào repo"; production theo Task 11.3 không chép bảng `users`). `poscs_db` trên máy dev **xoá sạch rồi dựng lại** từ `db/schema.sql`, không giữ gì, kể cả link demo của HD-0015 và tài khoản `nguyendat`. Bộ dữ liệu **nhỏ**, không nhiều như bộ cũ (người dùng chốt 20/11/2026): 4 khách hàng, 1 nhà cung cấp, 8 hợp đồng và 1 phụ lục, 3 phiếu hỗ trợ. Làm sau Task 10.5, trước hướng dẫn sử dụng (Task 10.7).
+17. **Dọn tài liệu và hướng dẫn (người dùng chốt 21/11/2026):**
+    - **Xoá:** `docs/kichbandemoposcs.html`, `docs/kichbandemoposcs.pdf`, `docs/POSCS_TaiKhoanTest.sql`, `docs/POSERD.png` (lỗi thời, không file nào trỏ tới; Task 10.8). Ảnh mồ côi `web/guide/contract/20-gia-tri-hien-hanh.png` xoá ngay trong Task 10.7, vì Task 10.7 gỡ mục ảnh đó.
+    - **Đưa vào git:** `docs/PROMPTS.md`, `task_tracker_deploy.md`, `docs/HuongDan_DoiEmailGui.md` (Task 10.8). Hướng dẫn đổi email gửi sẽ gộp vào mục Email của `DEPLOY.md` ở Task 11.5 rồi xoá.
+    - **Một bản quy tắc:** `rules.md` là bản duy nhất; `.gemini/rules.md` chỉ còn trỏ về `rules.md`, không chép nội dung nữa.
+    - **Giữ nguyên:** báo cáo QA trong `docs/qa/`; bốn file test `.xlsx` và `tools/testdoc/` (cập nhật là việc tài liệu riêng, giống Project_Report); `DEPLOY.md` (viết lại ở Task 11.5).
+18. **README gọn bằng tiếng Việt (Task 10.9, người dùng chốt 21/11/2026):** viết lại `README.md` bằng tiếng Việt, chỉ giữ thứ người mới cần để chạy được app, gồm 9 mục: POSCS là gì, công nghệ, cấu trúc thư mục, chạy trên máy, đổi cấu trúc CSDL, kiểm thử, log, bảo mật, tài liệu khác. **Không ghi tài khoản hay mật khẩu mẫu.** Bỏ danh sách tên lớp, số file và các đoạn giải thích dài. Quy ước viết log trong code chuyển sang `rules.md` §4 (agent viết code chỉ đọc `rules.md`).
 
 ## Quyết định còn chờ người dùng
 
@@ -348,7 +355,7 @@ Không còn mục nào.
 
 ## Giai đoạn 9: Vai trò và phòng ban theo cơ cấu chi nhánh thật
 
-> Yêu cầu người dùng 19/11/2026, quyết định ở mục 13 "Quyết định đã chốt". Làm **sau Giai đoạn 8**, theo thứ tự 9.1 → 9.5. Bộ Project_Report (diagram đang có actor "Kỹ thuật") **không** nằm trong giai đoạn này; đó là việc tài liệu riêng.
+> Yêu cầu người dùng 19/11/2026, quyết định ở mục 13 "Quyết định đã chốt". Làm **sau Giai đoạn 8**, theo thứ tự 9.1 → 9.5 (Task 9.4, 9.5 thêm ngày 20/11/2026: dọn và sửa phần còn sót sau 9.3). Rút gọn cùng ngày (POSCS chỉ để theo dõi hợp đồng): phòng và vai Tổng hợp gộp thành một task (9.2); bỏ vai Kỹ thuật chỉ sửa đúng chỗ có logic (9.3); hướng dẫn sử dụng và tài khoản test chuyển sang Task 10.6 và Task 9.2. Bộ Project_Report (diagram đang có actor "Kỹ thuật") **không** nằm trong giai đoạn này; đó là việc tài liệu riêng.
 
 - [x] **Task 9.1:** Cập nhật `docs/SPEC.md` theo cơ cấu mới: ba vai Admin / Sales / Tổng hợp, ba phòng Ban giám đốc / Kinh doanh / Tổng hợp.
   - UC: đổi tác nhân Kỹ thuật → Sales ở `UC-12`, `UC-13`, `UC-16` → `UC-23`, `UC-42`; phòng nhận là Tổng hợp ở `UC-48`, `UC-49`; thêm Tổng hợp vào `UC-53` (chỉ ghi nhận đã thu).
@@ -423,6 +430,7 @@ Không còn mục nào.
   - Nhánh: `feat/task-9.3-bo-vai-ky-thuat`.
   - Commit: `feat(role): gộp vai Kỹ thuật vào Sales (Task 9.3)`
   - *Đã hoàn thành:* `db/migrations/V42__merge_kythuat_role_into_sales__ndat2003.sql` (vai Kỹ thuật sang Sales, phòng Kỹ thuật sang Kinh doanh, rồi xoá vai và phòng Kỹ thuật; phiếu giữ nguyên người xử lý); `db/schema.sql` mirror (`kythuat2`–`kythuat5` thành Sales phòng Kinh doanh, giữ username); `PermissionService` (bỏ `ROLE_TECHNICAL`, `isTechnical`; `canManageProducts` = Admin + mọi Sales; `canUpdateTicket` = Admin, Sales, giữ chữ ký); `AccessControl` (PRODUCT Full cho Admin, Sales; bỏ `canUpdateAssignedTicket`); `TicketService` (`HANDLER_ROLE` = Sales, bộ lọc người xử lý mặc định "Tất cả"); `TechnicalSupportTicketController` (người xử lý chọn trong Sales, bỏ nhánh kỹ thuật viên, kiểm quyền trước khi tra phiếu ở form sửa và cập nhật); `TicketListController`, `listTicket.jsp` (bỏ `isTechnician`, "Phiếu của tôi" luôn hiện); nhãn "Người xử lý" ở `addnewTicket.jsp`, `updateTicket.jsp`, `viewdetailTicket.jsp`, bản PDF, `TicketValidator`; comment các file ở dòng "File sửa"; `PERMISSIONS.md` bỏ cột Kỹ thuật, Sales Full Sản phẩm. Test: 8 lớp chỉ thay hằng `ROLE_TECHNICAL` bằng chuỗi "Kỹ thuật" (không đổi assertion); test quyền riêng của vai Kỹ thuật đổi thành test quyền mới của Sales / Tổng hợp ở 8 lớp; 9 test mới, không xoá test nào. `ant test` 2.201 test, 0 fail, 3 skipped. QA report tại `docs/qa/Task-9.3.md` (ĐẠT, 2 🟢 đã sửa). `compile-jsps` trên máy này bị bỏ qua (`compile.jsps=false`, JspC không nhận Java 21); QA đã dịch 6 JSP bằng Jasper của Tomcat 11. Người dùng chạy V42 lên `poscs_db` trước khi kéo code về checkout chính. Ngoài phạm vi, chưa dọn: nhánh "không toàn quyền" của `TicketService.updateTicket` và khối `lockGeneral` ở `updateTicket.jsp` không còn ai đi vào; comment cũ nhắc Kỹ thuật ở `TechnicalSupportTicketDAO`, `TechnicalRequest`, `rules.md` §1 và trang hướng dẫn (Task 10.6).
+
 - [x] **Task 9.4:** Dọn phần còn sót sau khi bỏ vai Kỹ thuật: code không còn ai đi vào ở luồng sửa phiếu, comment cũ, `rules.md` §1.
   - UC: `UC-22` (chỉ dọn, không đổi hành vi).
   - BR / MSG / NFR: không thêm, không đổi; `BR-39`, `BR-40` (`MSG-051`), `MSG-022` giữ như hiện nay.
@@ -471,11 +479,12 @@ Không còn mục nào.
   - Nhánh: `fix/task-9.5-kiem-nguoi-xu-ly-phieu`.
   - Commit: `fix(ticket): kiểm người xử lý ở server và kiểm quyền trước khi tra phiếu (Task 9.5)`
   - *Đã hoàn thành:* `TicketService` (`isAssignedTechnicianValid` mở `public`, giữ tên và luật, Javadoc ghi hai lối dùng chung); `TechnicalSupportTicketController` (`handleCreate`, `handleUpdate` kiểm người xử lý ngay sau `isValid`, sai thì về form với `error=invalid_handler`; giữ người xử lý cũ đã nghỉ vẫn lưu được); `TicketActionController` (`showEditForm`, `handleUpdate` kiểm `canUpdateTicket(currentUser, null)` trước khi đọc id và tra phiếu; bỏ lần kiểm thứ hai sau bước tra phiếu vì người xử lý không còn quyết định quyền, người dùng đồng ý 20/11/2026); `addnewTicket.jsp`, `updateTicket.jsp` (nhánh `invalid_handler` hiện "Vui lòng chọn người xử lý."). Test: 13 test mới (`TechnicalSupportTicketControllerTest` 9, `TicketActionControllerTest` 2, `TicketServiceTest` 2); `setUp` của `TechnicalSupportTicketControllerTest` thêm `employeeDAO.findById(50)` trả về Sales đang hoạt động cho 4 test tạo phiếu cũ, không sửa assertion, không xoá test. `ant test` 2.214 test, 0 fail, 3 skipped. `compile-jsps` trên máy này bị bỏ qua (`compile.jsps=false`); đã dịch 2 JSP bằng Jasper của Tomcat 11, 0 lỗi. QA report tại `docs/qa/Task-9.5.md` (ĐẠT, 0 lỗi). Không có migration.
+
 ---
 
 ## Giai đoạn 10: Vòng đời hợp đồng: chứng từ trước khi ký, giấy tờ, kỳ thanh toán
 
-> Yêu cầu người dùng 19/11/2026, quyết định ở mục 14 và 15 "Quyết định đã chốt" (bản rút gọn chốt cùng ngày: POSCS chỉ để theo dõi hợp đồng, nhưng vòng đời phải khớp cách chi nhánh làm thật). Làm **sau Giai đoạn 9** (Task 10.4 giữ nút "Đã thu" của vai Tổng hợp từ Task 9.2), theo thứ tự 10.1 → 10.7 (Task 10.6 thêm ngày 20/11/2026: dọn dữ liệu mẫu cũ, gieo bộ mới; hướng dẫn sử dụng lùi thành Task 10.7). Mẫu dựng theo hợp đồng thật 01/2026/HĐMB/QTI-POT/SMP (Viễn thông Quảng Trị, Điều 5 "Phương thức thanh toán").
+> Yêu cầu người dùng 19/11/2026, quyết định ở mục 14 và 15 "Quyết định đã chốt" (bản rút gọn chốt cùng ngày: POSCS chỉ để theo dõi hợp đồng, nhưng vòng đời phải khớp cách chi nhánh làm thật). Làm **sau Giai đoạn 9** (Task 10.4 giữ nút "Đã thu" của vai Tổng hợp từ Task 9.2), theo thứ tự 10.1 → 10.9 (Task 10.6 thêm ngày 20/11/2026: dọn dữ liệu mẫu cũ, gieo bộ mới; hướng dẫn sử dụng lùi thành Task 10.7. Task 10.8 thêm ngày 21/11/2026: dọn tài liệu lỗi thời, làm sau khi Task 10.7 merge. Task 10.9 thêm cùng ngày: README gọn bằng tiếng Việt, làm sau Task 10.8). Mẫu dựng theo hợp đồng thật 01/2026/HĐMB/QTI-POT/SMP (Viễn thông Quảng Trị, Điều 5 "Phương thức thanh toán").
 
 - [x] **Task 10.1:** Đặc tả trong `docs/SPEC.md`: vòng đời hợp đồng theo chi nhánh, mã để trống tới lúc Ký, giấy tờ dạng ô tích, kỳ thanh toán có nộp hồ sơ và số thực thu, bước giao hàng và nhắc ký.
   - UC: sửa `UC-10`, `UC-11`, `UC-33`, `UC-44`, `UC-52` (đổi tên thành "Quản lý giấy tờ của hợp đồng"), `UC-53`; §5.7 thêm loại thông báo thứ ba.
@@ -684,3 +693,208 @@ Không còn mục nào.
   - Nhánh: `docs/task-10.7-guide-co-cau-vong-doi-hop-dong`.
   - Commit: `docs(guide): hướng dẫn theo cơ cấu mới và vòng đời hợp đồng (Task 10.7)`
   - *Đã hoàn thành:* Sáu trang `web/jsp/guide/*.jsp` viết lại theo ba vai Admin / Sales / Tổng hợp (bỏ vai Kỹ thuật; Sales quản lý sản phẩm và là người xử lý phiếu; Tổng hợp chỉ xem, xác nhận bàn giao, ghi nhận đã thu, không vào phiếu hỗ trợ và Nhân viên). `contract.jsp` viết lại theo vòng đời mới, giữ số mục cũ: mục 1.1 bảng đối chiếu từng bước GQNCKH → ĐCNB → giao hàng → ký → bàn giao Tổng hợp → tạm ứng → nộp hồ sơ → thu tiền → thanh lý; mã để trống tới lúc ký ("Chưa có số", MSG-061); ba loại nhãn (thêm bước giao hàng, nhắc ký từ 15 ngày); mục 7.1–7.4 kỳ thanh toán (loại kỳ, ô "%", nộp hồ sơ, hạn thu, số thực thu, Tổng hợp ghi nhận ở trang chi tiết); mục 8 bàn giao phòng Tổng hợp; mục 9, 9.1 Giấy tờ dạng ô tích. Chụp lại toàn bộ 75 ảnh trên CSDL tạm dựng từ `schema.sql` (dữ liệu Task 10.6) và Tomcat riêng (người dùng chọn chụp lại hết, 21/11/2026); 4 ảnh Hợp đồng mới `13b`, `13c`, `13d`, `17b`; `git rm` `20-gia-tri-hien-hanh.png`. `capture.mjs` (bảng tài khoản mới) và 6 `tools/guide/shots/*.mjs` theo dữ liệu mới, phần "CHUẨN BỊ BẢN SAO CSDL" ghi đủ câu lệnh. Ngoài dòng File sửa (người dùng đồng ý 21/11/2026): `export_word.py` sửa bảng vai trò, câu mở đầu, Bước 2, Bước 6 cài đặt và ô `DB_PASSWORD`, đếm tài khoản theo chuỗi băm BCrypt, chốt chặn đổi thành báo khi `schema.sql` thôi gieo hai Admin; `tools/guide/word/diagrams.py` vẽ lại 3 sơ đồ (người dùng duyệt 21/11/2026), nhận thư mục ra làm đối số. `docs/Report6_HuongDanSuDung.docx` xuất lại (6 phần, 78 hình, có dòng Task 10.7). `README.md` không liệt kê vai nên không sửa. `ant test` 2.500 test (2.497 pass, 0 fail, 3 skipped); `compile-jsps` trên máy này bị bỏ qua, QA đã dịch 6 trang bằng Jasper của Tomcat 11 (0 lỗi) và cả 6 trang mở được trên Tomcat riêng. QA report tại `docs/qa/Task-10.7.md` (CẦN SỬA; 1 🟡, 2 🟢 đã sửa; chú thích sơ đồ tổng quan giữ nguyên vì đã duyệt; ô `DB_PASSWORD` sửa theo ghi chú ngoài phạm vi). Lỗi app lộ ra lúc chụp (luồng quên mật khẩu hỏng do tham số OTP, nhãn "Đã giao – chưa ký" bị cắt ở danh sách hợp đồng, link phiếu ở hồ sơ khách ra 404…) ghi thành task riêng, chưa sửa; `tools/guide/shots/general.mjs` còn đoạn lách tạm lỗi OTP.
+- [x] **Task 10.8:** Dọn tài liệu: xoá file lỗi thời trong `docs/`, sửa `docs/ARCHITECTURE.md` theo cơ cấu mới, đưa các file quy trình còn nằm ngoài git vào repo, bỏ bản chép trùng của `rules.md`.
+  - UC: không có.
+  - BR / MSG / NFR: không thêm, không đổi.
+  - File sửa:
+    - Xoá bằng `git rm` (người dùng đồng ý 21/11/2026, mục 17 "Quyết định đã chốt"):
+      - `docs/kichbandemoposcs.html`, `docs/kichbandemoposcs.pdf`: kịch bản demo dùng tài khoản `kythuat*`, `cskh*` đã bỏ ở Task 9.3 và Task 10.6. Thư mục làm việc đã xoá sẵn hai file này, chỉ cần đưa việc xoá vào commit.
+      - `docs/POSCS_TaiKhoanTest.sql`: 12 tài khoản theo ba vai cũ Sales / Kỹ thuật / CSKH. Bộ tài khoản hiện dùng nằm ở V46 và `db/schema.sql`.
+      - `docs/POSERD.png`: ERD vẽ ngày 30/06/2026, trước khoảng 40 migration; không file nào trỏ tới.
+    - `docs/ARCHITECTURE.md`:
+      - Dòng 147 và 241: "3 vai trò (`Admin`, `Sales`, `Kỹ thuật`)" đổi thành `Admin`, `Sales`, `Tổng hợp`.
+      - Dòng 3 và tiêu đề ở dòng 58: `.gemini/rules.md` (§4) đổi thành `rules.md` (§4).
+      - Rà mục 2 theo code đã merge tới Task 10.6 (giấy tờ dạng ô tích, kỳ thanh toán có nộp hồ sơ và số thực thu, bàn giao phòng Tổng hợp, nhắc ký sau 15 ngày, người xử lý phiếu là Sales): chỉ sửa câu sai so với code, không viết lại cả file, không thêm mục mới.
+    - `.gemini/rules.md`: thay toàn bộ nội dung bằng vài dòng nói `rules.md` ở thư mục gốc là bản duy nhất, đọc file đó. Không chép lại nội dung.
+    - `GEMINI.md`: bỏ dòng 7 (`.gemini/rules.md`: quy chuẩn chi tiết bổ sung), giữ ba nguồn còn lại.
+    - `task_tracker.md` dòng 4: `.gemini/rules.md` đổi thành `rules.md`.
+    - Đưa vào git, không sửa nội dung (đang chưa track): `docs/PROMPTS.md`, `task_tracker_deploy.md`, `docs/HuongDan_DoiEmailGui.md`. Task 11.5 sẽ gộp `docs/HuongDan_DoiEmailGui.md` vào `DEPLOY.md` rồi xoá.
+  - File test: không có; chạy `ant test`.
+  - Không đụng:
+    - `docs/qa/*.md`: `rules.md` dòng 119 quy định không xoá báo cáo QA. Các báo cáo cũ có nhắc `.gemini/rules.md` cũng giữ nguyên.
+    - Bốn file `docs/POSCS_*Test.xlsx` và `tools/testdoc/`: đã lỗi thời sau Giai đoạn 9 và 10, cập nhật là việc tài liệu riêng.
+    - `docs/Project_Report_v8.docx`, `docs/Report6_HuongDanSuDung.docx`, `docs/SPEC.md`, `PERMISSIONS.md`, `README.md`.
+    - `DEPLOY.md` (Task 11.5).
+    - `tools/guide/`, `web/guide/`, `web/jsp/guide/` (Task 10.7 đã dọn).
+    - Code Java, JSP, `db/`.
+  - Lưu ý: làm sau khi Task 10.7 merge vào `main`, tạo nhánh từ `main` mới. Thấy file lạ khác trong `docs/` thì ghi vào report, không tự xoá. Trước khi commit ba file đang chưa track, đọc lại xem có địa chỉ email, mật khẩu, tên miền hay IP thật không; có thì dừng hỏi.
+  - Xong khi:
+    - `git grep -n -E "kichbandemoposcs|POSCS_TaiKhoanTest|POSERD" -- . ':!task_tracker.md' ':!docs/qa'` ra rỗng.
+    - `git grep -n "\.gemini/rules" -- . ':!task_tracker.md' ':!docs/qa'` ra rỗng.
+    - `grep -n "Kỹ thuật" docs/ARCHITECTURE.md` ra rỗng (chữ "phiếu hỗ trợ kỹ thuật" viết thường vẫn giữ).
+    - `git ls-files docs/PROMPTS.md task_tracker_deploy.md docs/HuongDan_DoiEmailGui.md` ra đủ 3 file.
+  - Nhánh: `chore/task-10.8-don-tai-lieu`.
+  - Commit: `chore(docs): dọn tài liệu lỗi thời và bản chép trùng của rules (Task 10.8)`
+  - *Đã hoàn thành:* `git rm` 4 file `docs/kichbandemoposcs.html`, `docs/kichbandemoposcs.pdf`, `docs/POSCS_TaiKhoanTest.sql`, `docs/POSERD.png`. Đưa vào git, không sửa nội dung: `docs/PROMPTS.md`, `task_tracker_deploy.md`, `docs/HuongDan_DoiEmailGui.md` (đã rà: không có email, mật khẩu, tên miền hay IP thật; chỉ có mật khẩu mẫu `Admin@123` / `Poscs@123` vốn đã nằm trong `db/schema.sql`). `docs/ARCHITECTURE.md`: dòng 3, 58 trỏ `rules.md`; dòng 147, 241 đổi vai `Kỹ thuật` thành `Tổng hợp`; rà mục 2 sửa hai câu sai so với code (Contract Service: "giấy tờ của hợp đồng (ô tích theo danh mục, link không bắt buộc), bàn giao cho phòng Tổng hợp"; thông báo thêm loại "hợp đồng đã giao hàng quá 15 ngày chưa ký"). `.gemini/rules.md` (trước đó giống hệt `rules.md`) chỉ còn vài dòng trỏ về `rules.md`; `GEMINI.md` bỏ dòng 7; dòng 4 file này trỏ `rules.md`. Bốn tiêu chí "Xong khi" đạt. `ant test` 2.500 test (2.497 pass, 0 fail, 3 skipped). QA report tại `docs/qa/Task-10.8.md` (APPROVED, 0 lỗi).
+- [ ] **Task 10.9:** Viết lại `README.md` gọn, bằng tiếng Việt; chuyển quy ước viết log sang `rules.md`.
+  - UC: không có.
+  - BR / MSG / NFR: không thêm, không đổi.
+  - File sửa:
+    - `README.md`: viết lại toàn bộ bằng tiếng Việt, khoảng 100 dòng trở xuống (bản hiện tại 262 dòng tiếng Anh), đúng 9 mục theo thứ tự (mục 18 "Quyết định đã chốt"):
+      1. POSCS là gì: 2–3 câu (theo dõi khách hàng, hợp đồng, phiếu hỗ trợ của chi nhánh; ba vai Admin / Sales / Tổng hợp theo mục 13).
+      2. Công nghệ: mỗi thứ một dòng (Java 21, Jakarta EE 11 Servlet + JSP, Tomcat 11, MySQL, Ant / NetBeans).
+      3. Cấu trúc thư mục: cây ngắn `src/java/poscs/{controller,service,validator,dao,model,common}`, `web/`, `db/`, `test/`, `tools/`, `docs/`, mỗi dòng một câu tả. Không đếm file, không liệt kê tên lớp; chi tiết trỏ tới `docs/ARCHITECTURE.md`.
+      4. Chạy trên máy, 4 bước: tạo CSDL `poscs_db` (utf8mb4) và nạp `db/schema.sql` (2 lệnh `mysql` như bản cũ); đặt `DB_URL`, `DB_USER` (có mặc định), `DB_PASSWORD` (bắt buộc, không có mặc định); `MAIL_USERNAME`, `MAIL_PASSWORD` không đặt thì thư (mã OTP, mật khẩu tạm) in ra log thay vì gửi; build bằng NetBeans hoặc `ant dist` (hai tham số `-D`, trỏ tới `DEPLOY.md` §2) rồi deploy lên Tomcat.
+      5. Đổi cấu trúc CSDL: 1 câu, thêm file vào `db/migrations/`, cách làm xem `db/migrations/README.md`.
+      6. Kiểm thử: 3 lệnh (`ant test`; test tích hợp trên CSDL tên đuôi `_it` với ba tham số `-Dtest-sys-prop.DB_*`; `node --test 'test/js/**/*.test.js'`), thêm 1 câu: không trỏ tới CSDL `_it` thì test tích hợp tự bỏ qua, và CSDL `_it` bị xoá sạch mỗi lần chạy.
+      7. Log: ghi vào log của Tomcat (`logs/catalina.*`); Admin xem và tải ở màn hình Nhật ký hệ thống (`/systemLog`); đổi thư mục log bằng `LOG_DIR`.
+      8. Bảo mật: 4–5 gạch đầu dòng ngắn, không kèm tên lớp (CSRF cho mọi POST, tạo lại session khi đăng nhập, đăng nhập và quên mật khẩu không lộ username có thật, giới hạn số lần nhập và gửi lại OTP); phân quyền trỏ tới `PERMISSIONS.md`.
+      9. Tài liệu khác: danh sách link `docs/SPEC.md`, `PERMISSIONS.md`, `docs/ARCHITECTURE.md`, `DEPLOY.md`, `rules.md`, `task_tracker.md`, hướng dẫn sử dụng (trang `/guide` trong app, `docs/Report6_HuongDanSuDung.docx`).
+      - Bỏ: danh sách tên lớp và số file từng gói; đoạn giải thích vì sao test dùng system property, vì sao test JS chạy trong `vm`, hai "bài học" ở cuối mục test JS; chi tiết màn hình Nhật ký hệ thống (512 KB, đuôi `.log` / `.out` / `.txt`); mục "Roles and permissions" (gộp vào mục 1 và mục 8).
+      - **Không ghi tài khoản hay mật khẩu mẫu** (người dùng chốt 21/11/2026).
+    - `rules.md` §4: thêm 3–4 dòng quy ước viết log, lấy từ mục "Logging" của README cũ: ghi lỗi qua SLF4J, không `printStackTrace()`; DAO log thao tác, tham số khoá và exception; Controller log `warn` ở mọi nhánh redirect `?error=..._failed`, kèm `actor` (`Logs.actor`); chữ trong log không dấu; không bao giờ log mật khẩu, chuỗi băm, mã OTP, mật khẩu tạm (trừ chế độ DEV của `EmailUtil` khi chưa cấu hình SMTP).
+  - File test: không có; chạy `ant test`.
+  - Không đụng: `DEPLOY.md` (Task 11.5), `PERMISSIONS.md`, `db/migrations/README.md`, `tools/testdoc/README.md`, `docs/SPEC.md`, code Java, JSP.
+  - Lưu ý: làm sau khi Task 10.8 merge (khi đó `rules.md` là bản duy nhất, không phải chép sang `.gemini/rules.md`; 10.8 chưa merge thì dừng hỏi). Đọc code trước khi viết, ghi đúng tên biến và giá trị mặc định: `poscs.dao.DBContext` (`DB_*`, đọc system property trước rồi tới biến môi trường), `poscs.common.EmailUtil` (`MAIL_*`), `poscs.common.LogFiles` (`LOG_DIR`), `DEPLOY.md` §2 (hai tham số `-D` của `ant dist`), `.github/workflows/` (lệnh test). Mọi lệnh trong README phải chạy được đúng như ghi. Tên vai, tên phòng theo `docs/SPEC.md`.
+  - Xong khi:
+    - `README.md` viết bằng tiếng Việt, khoảng 100 dòng trở xuống, đủ 9 mục theo đúng thứ tự trên.
+    - `grep -n -E "Poscs@123|Admin@123|leminhhoang|hoangthimai" README.md` ra rỗng.
+    - Không còn số file hay danh sách tên lớp của từng gói.
+    - Mọi link trong `README.md` trỏ tới file có thật.
+    - `rules.md` §4 có quy ước viết log.
+  - Nhánh: `docs/task-10.9-readme-tieng-viet`.
+  - Commit: `docs(readme): viết lại README gọn bằng tiếng Việt (Task 10.9)`
+- [ ] **Task 10.10:** Người dùng dựng lại `poscs_db` từ `db/schema.sql` (dữ liệu mẫu Task 10.6), đưa CSDL dev từ V39 lên V46.
+  - UC: không có.
+  - BR / MSG / NFR: không đổi; mục 16 "Quyết định đã chốt" (xoá sạch, không sao lưu).
+  - File sửa: không có. **Người dùng tự chạy** trên máy, lúc không dùng app; agent không chạy gì lên `poscs_db` (rules §3). Ba bước, chạy ở thư mục repo:
+    1. `mysql -u root -p -e "DROP DATABASE poscs_db; CREATE DATABASE poscs_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"`
+    2. `mysql --default-character-set=utf8mb4 -u root -p poscs_db -e "source C:/Users/Admin/Documents/GitHub/POSCS/db/schema.sql"`. Không dùng `<` hay `|` của PowerShell, vì chúng làm hỏng tiếng Việt.
+    3. Ghi sổ mọi file migration vào `schema_migrations` (`schema.sql` chỉ tạo bảng sổ rỗng). Trong Git Bash: `mysql -u root -p poscs_db -e "$(for f in db/migrations/V[0-9]*.sql; do printf "INSERT INTO schema_migrations (version) VALUES ('%s');" "$(basename "$f" .sql)"; done)"`. Mẫu `V{version}__...sql` không khớp `V[0-9]*` nên không bị ghi.
+  - File test: không có.
+  - Không đụng: file trong repo; CSDL kiểm thử (`poscs_it`, `poscs_bbtest`, các CSDL tạm).
+  - Lưu ý: đo 21/11/2026, `poscs_db` mới tới V39 trong khi code `main` cần từ V40, nên app chạy trên `poscs_db` (Tomcat 8080 của NetBeans) hỏng tới khi dựng lại. Dữ liệu cũ mất hết, kể cả link demo của HD-0015 (người dùng đã chọn ở mục 16). File tải lên của bộ cũ để nguyên trên đĩa.
+  - Xong khi: `SELECT COUNT(*) FROM poscs_db.schema_migrations` bằng số file `V[0-9]*.sql` trong `db/migrations/` (46 lúc ghi task) và có dòng V46; app 8080 đăng nhập được `admin`; danh sách hợp đồng có 8 hợp đồng và 1 phụ lục.
+  - Nhánh: không có (không đổi file trong repo).
+  - Commit: không có; người dùng tự đánh `[x]` khi xong.
+
+---
+
+## Giai đoạn 12: Sửa lỗi lộ ra khi chụp lại hướng dẫn sử dụng (Task 10.7)
+
+> Phát hiện 21/11/2026 lúc chụp lại toàn bộ ảnh hướng dẫn trên CSDL dựng từ `db/schema.sql` (dữ liệu mẫu Task 10.6). Người dùng chọn ghi thành task, không sửa trong Task 10.7 (21/11/2026). Số giai đoạn 12 vì 11 là triển khai (`task_tracker_deploy.md`). Làm **sau khi Task 10.7 merge**; 12.1 trước vì luồng quên mật khẩu đang hỏng hẳn. Task nào đổi giao diện có ảnh trong hướng dẫn thì chụp lại đúng ảnh đó bằng `tools/guide/capture.mjs` (CSDL dựng từ `schema.sql`, xem đầu kịch bản) và xem ảnh trước khi dùng.
+
+- [ ] **Task 12.1:** Quên mật khẩu: trang nhập OTP gửi đúng tham số controller đọc; đủ câu báo lỗi của luồng mật khẩu.
+  - UC: `UC-03`, `UC-04`, `UC-05`.
+  - BR / MSG / NFR: `BR-01`, `BR-04`, `BR-05`; `MSG-007` (OTP hết hạn), `MSG-008` (sai quá nhiều lần).
+  - File sửa:
+    - `src/java/poscs/controller/PasswordResetController.java` (`handleVerifyOtp`, dòng 135): đọc tham số `otpCode` như `web/verifyOtp.jsp` gửi (ô ẩn dòng 234, JS ghép sáu ô ở dòng 327). Lỗi có từ lần tách controller (`d282317`): `AuthenticationController` cũ đọc `otpCode`, bản tách đọc `otp`, nên gõ đúng mã vẫn báo "Mã OTP không đúng".
+    - `web/forgotPassword.jsp` (khối `param.error`, quanh dòng 242–246): thêm nhánh `expired` (controller đẩy về đây khi mã hết hạn) với câu MSG-007. Dòng 282 "liên hệ Phòng Nhân sự / IT" đổi thành "liên hệ Admin" (cơ cấu mới không có phòng đó).
+    - `web/login.jsp` (dòng 284): như trên, "liên hệ Admin để được cấp tài khoản".
+    - `web/changePassword.jsp` (khối `param.error`, quanh dòng 304–307): thêm nhánh `too_many_attempts` (sai mật khẩu hiện tại cũng tính vào lượt chặn máy, `AuthService.changePassword`) với câu MSG-008; hiện tại rơi vào câu chung "Đã có lỗi xảy ra".
+    - `tools/guide/shots/general.mjs` (quanh dòng 185–192): bỏ đoạn "TẠM (Task 10.7)" chèn ô ẩn `otp`; chụp lại ảnh `05`, `06` của phần Bắt đầu để chắc luồng chạy không cần lách.
+    - `web/jsp/guide/general.jsp`: chỉ sửa nếu câu trên giao diện đổi khác chữ đang ghi ở mục 1, 3, 8.
+  - File test: `test/poscs/controller/PasswordResetControllerTest.java`: gửi `otpCode` đúng → sang `resetPassword.jsp`; `otpCode` sai → `error=invalid_otp`; thiếu `otpCode` → báo lỗi, không coi là đúng. Không sửa assertion test cũ; test cũ nào đang dựng tham số `otp` thì dừng hỏi.
+  - Không đụng: `AuthService` (luật OTP, hạn mức), `EmailUtil`, tên ô ẩn `otpCode` trong `verifyOtp.jsp`.
+  - Lưu ý: chạy thật trên Tomcat riêng với `MAIL_*` để trống (mã OTP in ra log): đi trọn quên mật khẩu → nhập mã → đặt mật khẩu mới → đăng nhập lại bằng một tài khoản mẫu, trên CSDL tạm, không phải `poscs_db`.
+  - Xong khi: gõ đúng mã OTP ở `verifyOtp.jsp` sang được trang đặt lại mật khẩu mà không lách gì; `grep -n "TẠM" tools/guide/shots/general.mjs` không còn kết quả; `grep -rn "Nhân sự / IT" web` không còn kết quả.
+  - Nhánh: `fix/task-12.1-otp-quen-mat-khau`.
+  - Commit: `fix(auth): trang nhập OTP gửi đúng tham số, đủ câu báo lỗi luồng mật khẩu (Task 12.1)`
+- [ ] **Task 12.2:** Lỗi hiển thị ở danh sách hợp đồng, chi tiết sản phẩm, hồ sơ khách hàng và các trang phụ.
+  - UC: `UC-10`, `UC-17`, `UC-09`, `UC-55`, `UC-26`, `UC-27`, `UC-16`.
+  - BR / MSG / NFR: `BR-61` (nhãn bước giao hàng phải đọc được), `MSG-022`.
+  - File sửa:
+    - `web/jsp/sale/listcontract.jsp` (CSS `.delivery-tag`, dòng 218): nhãn đang `display: inline-flex` nên đứng cùng dòng với nhãn tiến độ trong ô `nowrap` + `text-overflow: ellipsis` (dòng 182, cột 12% ở dòng 190), "Đã giao – chưa ký" bị cắt thành "…". Cho nhãn xuống dòng dưới nhãn tiến độ (vd. `display: flex`).
+    - `web/jsp/technical/viewdetailProduct.jsp`: `.status-pill` (dòng 125) thêm `white-space: nowrap` (bảng hợp đồng của sản phẩm đang gãy "Chưa hiệu / lực"); ô Mô tả (`.view-value.multiline`, dòng 86 và 227) bỏ dòng trống đầu/cuối do `white-space: pre-line` giữ cả xuống dòng của mã JSP.
+    - `web/jsp/sale/viewcustomerdetail.jsp` (tab phiếu hỗ trợ, dòng 476): link mã phiếu `ticketDetail.jsp?id=` (file không tồn tại, 404) đổi thành `/ticket?action=view&id=`. Tab này hiện mã và mô tả phiếu cho cả vai Tổng hợp dù vai này không vào được phiếu: chỉ hiện khi người xem có quyền xem phiếu (`PermissionService.canViewTickets`, đặt cờ ở `src/java/poscs/controller/CustomerDetailController.java`, quanh dòng 130).
+    - `web/jsp/admin/addEmployee.jsp`, `web/jsp/admin/updateEmployee.jsp` (`isValidPhone`, dòng 317–318): kiểm cùng luật với server (`BaseValidator.PHONE_VN` = `^0[35789]\d{8}$`, `+84` đổi thành `0` như `EmployeeValidator.normalizePhone`); hiện trình duyệt cho qua số mà server từ chối bằng câu chung.
+    - `web/jsp/admin/branchInfo.jsp`: thêm nút "Hướng dẫn" (`.guide-btn`, `target=_blank`) trỏ `/guide?module=employee#thong-tin-chi-nhanh`, như các trang admin khác.
+    - `web/jsp/customersupport/listTicket.jsp` (hộp xoá, dòng 404–405): "Hủy" / "Xóa phiếu" đổi thành "Huỷ bỏ" / "Xoá phiếu" cho khớp hộp xoá ở trang chi tiết.
+    - Ảnh hướng dẫn chụp lại: `web/guide/contract/03-doc-dong.png` (khoanh số 4 phải thấy trọn "Đã giao – chưa ký"), `web/guide/product/04-chi-tiet.png`; ảnh khác nếu giao diện trong ảnh đổi.
+  - File test: `test/poscs/controller/CustomerDetailControllerTest.java` (vai Tổng hợp không nhận danh sách phiếu / cờ xem phiếu là false; Sales thì có). Các sửa JSP/CSS còn lại kiểm bằng chạy thật và ảnh chụp; thêm test `node --test` ở `test/js/` nếu tách được hàm kiểm SĐT.
+  - Không đụng: logic bước giao hàng (`ContractDAO`), quyền phiếu ở `PermissionService`, `EmployeeValidator`.
+  - Lưu ý: dịch các JSP đã sửa bằng Jasper của Tomcat 11 (`compile-jsps` trên máy này không chạy) và mở từng trang trên Tomcat riêng.
+  - Xong khi: danh sách hợp đồng hiện trọn "Đã giao – chưa ký" dưới nhãn Nháp ở khổ 1600 và 1920; bấm mã phiếu ở hồ sơ khách mở đúng phiếu; đăng nhập vai Tổng hợp không thấy phiếu trong hồ sơ khách; form nhân viên báo lỗi SĐT ngay trên trình duyệt với số `0212345678`.
+  - Nhánh: `fix/task-12.2-loi-hien-thi`.
+  - Commit: `fix(ui): nhãn giao hàng, link phiếu ở hồ sơ khách và các lỗi hiển thị nhỏ (Task 12.2)`
+- [ ] **Task 12.3:** Phạm vi và bộ lọc: trang chủ, danh sách và xuất Excel khách hàng.
+  - UC: `UC-36`, `UC-08`, `UC-37`, `UC-31`.
+  - BR / MSG / NFR: phạm vi "Của tôi" / "Toàn chi nhánh" theo §3 SPEC (`PermissionService.getCustomerListScope`).
+  - File sửa:
+    - `web/dashboard.jsp` (dòng 434): link "Xem toàn chi nhánh" là `/dashboard?provinceSet=1`, không mang `scope=all`, nên Sales bấm vào lại rơi về "Của tôi" không tỉnh (chỉ còn việc của chính mình); thêm `scope=all`. Câu ghi chú dòng 428 ("hai bảng cuối trang luôn tính tới hôm nay") sửa cho đúng code: hai bảng lọc theo kỳ (`findActiveInPeriod`, `findInScope(…, period)`), chỉ ô "Đã giao – chưa ký" không theo kỳ.
+    - `web/jsp/sale/listcustomer.jsp` (link Xuất Excel, dòng 319): thêm tham số `view` để file ra đúng phạm vi đang xem (đo 21/11: đang xem Toàn chi nhánh mà file chỉ có khách của "Của tôi"). Ô Phạm vi mất lựa chọn "Của tôi" khi đang ở `view=all`: dùng `viewToggleUrl` mà `CustomerListController` (dòng 147) đã đặt sẵn.
+    - Controller xuất Excel khách hàng (tra `action=exportExcel` của `/customer`): đọc `view` giống danh sách, nếu hiện chưa đọc.
+  - File test: `test/poscs/controller/CustomerListControllerTest.java`, test của controller/service xuất Excel khách hàng (`view=all` ra toàn chi nhánh; không truyền `view` giữ mặc định cũ); `DashboardControllerTest` nếu có đổi controller.
+  - Không đụng: luật phạm vi trong `PermissionService`; phần hợp đồng (link phân trang / Excel của danh sách hợp đồng thiếu `month`, `view`, đã ghi ở Task 10.5).
+  - Lưu ý: **dừng hỏi trước khi code**: Sales chưa được giao tỉnh thì sửa được mọi khách mua (theo `PERMISSIONS.md` và `CustomerService.outsideScope`) hay chỉ khách của mình (theo `PermissionService.isCustomerInScope`, quyết định dấu khoá và nút trên giao diện)? Hai lớp đang trả lời khác nhau; dữ liệu mẫu hiện không có Sales nào như vậy nên hướng dẫn Khách hàng đã bỏ câu này. Chốt xong thì sửa lớp lệch trong cùng task.
+  - Xong khi: Sales bấm "Xem toàn chi nhánh" ở trang chủ thấy số liệu toàn chi nhánh; xuất Excel khách hàng khi đang xem Toàn chi nhánh ra đủ khách; từ Toàn chi nhánh chọn lại được "Của tôi" ngay trên ô Phạm vi.
+  - Nhánh: `fix/task-12.3-pham-vi-bo-loc`.
+  - Commit: `fix(scope): phạm vi trang chủ, danh sách và xuất Excel khách hàng (Task 12.3)`
+
+---
+
+## Giai đoạn 13: Tài liệu nộp theo Giai đoạn 8–10
+
+> Yêu cầu người dùng 21/11/2026. `docs/Project_Report_v8.docx` và bốn file `docs/POSCS_*Test.xlsx` cập nhật lần cuối 02/10/2026 (PR #176, #177), trước Giai đoạn 8–10; mục 17 "Quyết định đã chốt" để riêng việc này. Đo 21/11 trên bản trong repo: Project_Report có 64 chỗ "Kỹ thuật" (gồm cả tên phiếu), 0 chỗ "Tổng hợp", chưa có UC-55, BR-56 → BR-62, MSG-057 → MSG-065; `tools/testdoc/` còn khoảng 380 dòng dựa vào tài khoản, vai cũ (`sales2`…, `kythuat*`, `cskh*`) nên hỏng trên CSDL dựng từ `schema.sql` mới (Task 10.6). Làm **sau khi Task 10.8 và Giai đoạn 12 merge**, để tài liệu khớp code cuối; thứ tự 13.1 → 13.5. Giữ quy ước các đợt tài liệu trước: đọc code `main` trước khi viết; ca mới thêm cuối chức năng vì mã ca đánh theo vị trí; diagram vẽ xong gửi ảnh cho người dùng duyệt, chưa duyệt thì không chèn.
+
+- [ ] **Task 13.1:** `tools/testdoc/` chạy lại được trên CSDL dựng từ `db/schema.sql` (dữ liệu mẫu Task 10.6) và ba vai Admin / Sales / Tổng hợp.
+  - UC: các UC đổi tác nhân ở Task 9.1.
+  - BR / MSG / NFR: không đổi.
+  - File sửa:
+    - `tools/testdoc/blackbox/fixtures.sql`: bỏ phần dựa vào 12 nhân viên cũ của `schema.sql` (`sales2`…`sales6`, `kythuat2`…`kythuat5`, `cskh2`…`cskh4`) và vai Kỹ thuật; tài khoản kiểm thử theo ba vai, có ít nhất một tài khoản Tổng hợp. Vẫn khoá theo `username`, tra vai và phòng theo tên; vẫn nạp lại trước mỗi lượt để đặt lại mật khẩu và trạng thái khoá.
+    - `run_blackbox.py`, `run_blackbox_ui.py`, `run_blackbox_branches.py`, `run_blackbox_rest.py`, `run_systemtest.py`: tài khoản, mã khách hàng, mã / tiêu đề hợp đồng, mã phiếu của bộ cũ đổi sang bộ Task 10.6 hoặc tài khoản của `fixtures.sql`; tra id qua `testdb.py`, không ghi cứng. Bước nào dựa vào hành vi cũ (mã hợp đồng nhập lúc Nháp, tab Tài liệu kiểu dán link, kỳ thanh toán cấu trúc cũ, người xử lý phiếu là Kỹ thuật) thì sửa cho khớp giao diện hiện tại.
+    - `blackbox/*.json`, `systemtest/*.json`, `uat_checklist.json`: bước và dữ liệu nhắc vai Kỹ thuật / CSKH, phòng Kế toán / Dự án hay tài khoản cũ viết lại theo ba vai (người xử lý phiếu là Sales; Sales quản lý sản phẩm; Tổng hợp chỉ xem, xác nhận bàn giao, ghi nhận đã thu). Ca đổi nội dung thì kết quả cũ về "Chưa chạy". Ca của chức năng không còn thì liệt kê trong report, dừng hỏi trước khi xoá.
+    - `tools/testdoc/README.md`: mục dựng CSDL kiểm thử và tài khoản theo bộ mới; gỡ cảnh báo cũ về vai CSKH và bộ 12 nhân viên.
+  - File test: không có test Java; chạy `ant test`. Chạy thử từng script trên CSDL kiểm thử dựng từ `schema.sql` + `fixtures.sql` (không phải `poscs_db`).
+  - Không đụng: ca mới cho Giai đoạn 8–10 (Task 13.2); bốn file `docs/POSCS_*Test.xlsx` và `*_results.json` (Task 13.3); `gen_unittest_function.py`; `src/`, `web/`, `db/`.
+  - Lưu ý: giữ nguyên chặn chạy vào `poscs_db` trong `testdb.py`. Hỏi trước khi tạo và trước khi xoá CSDL kiểm thử. Ca trượt vì lỗi app thật thì ghi vào report, không sửa code trong task này.
+  - Xong khi: `grep -rnE "sales[0-9]|kythuat[0-9]|cskh[0-9]|tonghop1" tools/testdoc --include=*.py --include=*.json --include=*.sql --exclude=*_results.json` ra rỗng; mọi script chạy hết lượt trên CSDL kiểm thử mới, không ca nào trượt vì sai tài khoản hay không tìm thấy dữ liệu.
+  - Nhánh: `docs/task-13.1-testdoc-du-lieu-moi`.
+  - Commit: `docs(testdoc): chạy lại được trên dữ liệu mẫu và ba vai mới (Task 13.1)`
+- [ ] **Task 13.2:** Thêm ca kiểm thử cho Thông tin chi nhánh, người ký bên mình (Giai đoạn 8) và vòng đời hợp đồng mới (Giai đoạn 10).
+  - UC: `UC-55`; `UC-10`, `UC-11`, `UC-33`, `UC-35`, `UC-36`, `UC-44`, `UC-48`, `UC-49`, `UC-52`, `UC-53`.
+  - BR / MSG / NFR: `BR-18`, `BR-35`, `BR-56` → `BR-62`; `MSG-057` → `MSG-065`.
+  - File sửa:
+    - `tools/testdoc/blackbox/*.json` (theo cách gom chức năng hiện có): trang Thông tin chi nhánh (Admin xem / sửa, lỗi từng ô theo BR-57, vai khác bị chặn); form hợp đồng khoá người ký, lấy SĐT / fax (BR-56); người phụ trách theo người tạo (BR-35); mã để trống khi Nháp, bắt buộc khi Ký (BR-58, MSG-061); giấy tờ ô tích và ngày giấy tờ (BR-59); kỳ thanh toán: loại kỳ, nộp hồ sơ, hạn thu, số thực thu, sửa kỳ (BR-60, BR-18); nhãn bước giao hàng (BR-61); nhắc ký sau 15 ngày (BR-62); bàn giao và xác nhận của phòng Tổng hợp.
+    - `tools/testdoc/systemtest/*.json`: luồng trọn vòng đời GQNCKH → ĐCNB → giao hàng → ký → bàn giao Tổng hợp → nộp hồ sơ → thu tiền → thanh lý, đi bằng các vai Sales, Tổng hợp, Admin.
+    - `tools/testdoc/uat_checklist.json`: mục UAT cho cùng các luồng trên.
+    - `run_blackbox*.py`, `run_systemtest.py`: ca tự động được thì thêm vào script; ca không tự động được giữ "Chưa chạy", nhãn `TAY` như lệ cũ.
+  - File test: không có test Java; chạy `ant test`; chạy thử ca mới trên CSDL kiểm thử như Task 13.1.
+  - Không đụng: ca cũ đã sửa ở Task 13.1; bốn file Excel (Task 13.3); code app.
+  - Lưu ý: làm sau Task 13.1. Ca mới thêm **cuối** chức năng / luồng. Câu mong đợi lấy đúng chữ MSG trong `docs/SPEC.md` và đúng chữ trên giao diện. Ca nhắc ký cần ngày giao ≤ hôm nay − 15 ngày: dùng hợp đồng 3 của bộ mẫu hoặc dựng bằng `testdb.py`.
+  - Xong khi: mỗi mã `BR-56` → `BR-62` và `MSG-057` → `MSG-065` có ít nhất một ca hộp đen trỏ tới; system test có luồng trọn vòng đời; mỗi ca mới hoặc có kết quả chạy thật, hoặc ghi "Chưa chạy" kèm nhãn `TAY`.
+  - Nhánh: `docs/task-13.2-testdoc-ca-moi`.
+  - Commit: `docs(testdoc): ca kiểm thử cho thông tin chi nhánh và vòng đời hợp đồng (Task 13.2)`
+- [ ] **Task 13.3:** Chạy lại toàn bộ kiểm thử, sinh lại bốn file `docs/POSCS_*Test.xlsx`.
+  - UC: không có.
+  - BR / MSG / NFR: không đổi.
+  - File sửa:
+    - `docs/POSCS_UnitTest_Function.xlsx`: `ant test` (kèm test tích hợp trên CSDL `_it`), `node --test` xuất junit, rồi `gen_unittest_function.py -o docs/POSCS_UnitTest_Function.xlsx` theo `tools/testdoc/README.md`; tiêu đề test mới chưa có bản dịch thì thêm vào `vi_glossary.json`.
+    - `docs/POSCS_IntegrationTest_Blackbox.xlsx`, `docs/POSCS_SystemTest.xlsx`, `docs/POSCS_UserAcceptanceTest.xlsx`: chạy `run_blackbox*.py`, `run_systemtest.py` trên Tomcat riêng (cổng 8099) + CSDL kiểm thử, rồi `gen_integration_blackbox.py`, `gen_system_test.py`, `gen_uat.py` (đặt `PYTHONIOENCODING=utf-8` trên máy này), ghi đè bản trong `docs/`.
+    - `tools/testdoc/blackbox_results.json`, `systemtest_results.json`: kết quả lượt chạy này.
+  - File test: không có test mới.
+  - Không đụng: nội dung ca (Task 13.1, 13.2); code app.
+  - Lưu ý: làm sau Task 13.2. Nạp lại `fixtures.sql` trước mỗi lượt. Ca trượt vì lỗi app thật thì ghi "Trượt" đúng sự thật và ghi vào report, không sửa code trong task này. Hỏi trước khi tạo và xoá CSDL kiểm thử. Report ghi đủ số liệu cho mục 5.5 của Project_Report (Task 13.4): số lớp / ca unit Java và JS, tích hợp JUnit, hộp đen Đạt / Trượt / N/A / Chưa chạy, system, UAT.
+  - Xong khi: bốn file Excel trong `docs/` sinh lại từ lượt chạy này; không ca nào ghi "Đạt" mà chưa chạy; report có đủ số liệu mục 5.5.
+  - Nhánh: `docs/task-13.3-sinh-lai-excel-kiem-thu`.
+  - Commit: `docs(testdoc): chạy lại kiểm thử và sinh lại tài liệu Excel (Task 13.3)`
+- [ ] **Task 13.4:** `docs/Project_Report_v8.docx`, phần chữ: theo ba vai, Thông tin chi nhánh và vòng đời hợp đồng mới.
+  - UC: `UC-55` (mới); các UC đổi tác nhân ở Task 9.1; `UC-10`, `UC-11`, `UC-33`, `UC-35`, `UC-36`, `UC-44`, `UC-52` (tên mới "Quản lý giấy tờ của hợp đồng"), `UC-53`.
+  - BR / MSG / NFR: thêm `BR-56` → `BR-62`, `MSG-057` → `MSG-065`; sửa `BR-18`, `BR-35`, `BR-39`, `BR-46`.
+  - File sửa: `docs/Project_Report_v8.docx`, theo `docs/SPEC.md` hiện tại (sau Task 8.1, 9.1, 10.1) và code `main`:
+    - Tác nhân: bỏ vai Kỹ thuật, CSKH; thêm vai và phòng Tổng hợp (gộp Kế toán, Dự án); người xử lý phiếu là Sales; Sales quản lý sản phẩm. Giữ chữ "hỗ trợ kỹ thuật" trong tên phiếu.
+    - Danh sách chức năng (FE), bảng UC, ma trận quyền (cột Admin / Sales / Tổng hợp như SPEC §3.3), đặc tả các UC đổi tác nhân hoặc đổi luồng; thêm đặc tả UC-55.
+    - Bảng BR, MSG: thêm mã mới, sửa mã đổi nội dung, câu chữ đúng SPEC.
+    - Mô tả thực thể (mục 3.1.5.2): thêm `branch_info`, cột mới của `contracts`, `contract_documents`, `contract_payments` (SPEC §7, 30 bảng).
+    - Chương hướng dẫn sử dụng trong báo cáo: theo `web/jsp/guide/*.jsp` đã viết lại ở Task 10.7.
+    - Mục 5.5: số liệu kiểm thử theo report Task 13.3.
+  - File test: không có; chạy `ant test`.
+  - Không đụng: hình (Task 13.5); `docs/SPEC.md`; code.
+  - Lưu ý: làm sau Task 13.3. Sửa bằng script trên `word/document.xml` hoặc python-docx, giữ định dạng, chú thích, mục lục; xem trang bằng Word COM để kiểm. Chỗ nào không chắc theo code hay theo SPEC thì ghi report, dừng hỏi. Report liệt kê các hình còn sai sau khi sửa chữ (đầu vào Task 13.5).
+  - Xong khi: chữ "Kỹ thuật" chỉ còn trong tên phiếu "hỗ trợ kỹ thuật"; không còn vai CSKH, phòng Kế toán / Dự án; có UC-55, `BR-56` → `BR-62`, `MSG-057` → `MSG-065`; ma trận quyền có cột Tổng hợp; docx mở trong Word không báo lỗi.
+  - Nhánh: `docs/task-13.4-report-chu-giai-doan-8-10`.
+  - Commit: `docs(report): cập nhật chữ theo cơ cấu mới và vòng đời hợp đồng (Task 13.4)`
+- [ ] **Task 13.5:** `docs/Project_Report_v8.docx`, phần hình: diagram và ảnh màn hình theo cơ cấu mới và vòng đời hợp đồng.
+  - UC: như Task 13.4.
+  - BR / MSG / NFR: như Task 13.4.
+  - File sửa: `docs/Project_Report_v8.docx`:
+    - Use Case tổng: actor Tổng hợp thay Kỹ thuật, thêm UC-55, tên mới của UC-52; chỉ actor chính, giới hạn quyền ghi vào nhãn.
+    - ERD (mục 3.1.5.1 và Hình 4-7, cùng một ảnh): vẽ lại từ `information_schema` của CSDL dựng từ `schema.sql` (V46, 30 bảng, bỏ `schema_migrations`).
+    - Cụm Hợp đồng: class / sequence cho tạo (mã để trống), ký, giấy tờ, kỳ thanh toán, bàn giao Tổng hợp, nhắc ký. Cụm Phiếu: người xử lý là Sales. Cụm Nhân viên: vai Tổng hợp. Thêm cụm Thông tin chi nhánh (UC-55). Dùng đúng tên lớp, hàm, JSP trong code.
+    - Ảnh chụp màn hình (mục 3.2 "Màn hình 3-x" và chương hướng dẫn): chụp lại màn hình đã đổi giao diện ở Giai đoạn 8–10, ảnh sạch không khoanh; chương hướng dẫn được lấy ảnh `web/guide/` của Task 10.7.
+  - File test: không có; chạy `ant test`.
+  - Không đụng: phần chữ (Task 13.4), trừ chú thích và số hình đi theo hình thêm / bớt.
+  - Lưu ý: làm sau Task 13.4, theo danh sách hình còn sai trong report của 13.4. **Vẽ xong gửi ảnh riêng cho người dùng duyệt, chưa được đồng ý thì không chèn**; xem ảnh trước khi gửi (chữ không dính lifeline, ảnh cao tối đa 9,2 in). Làm theo từng cụm, mỗi cụm duyệt riêng; quá dài cho một lượt thì dừng hỏi tách 13.5a, 13.5b. Thêm / bớt hình thì đánh lại số hình liền mạch và sửa mọi chỗ nhắc số hình. Chụp ảnh trên CSDL tạm dựng từ `schema.sql` và Tomcat riêng, hỏi trước khi tạo và xoá.
+  - Xong khi: mọi hình đã duyệt được chèn; không hình nào còn actor Kỹ thuật / CSKH hay tên lớp không có trong code; số hình liền mạch; docx mở trong Word không báo lỗi.
+  - Nhánh: `docs/task-13.5-report-hinh-giai-doan-8-10`.
+  - Commit: `docs(report): vẽ lại hình theo cơ cấu mới và vòng đời hợp đồng (Task 13.5)`
