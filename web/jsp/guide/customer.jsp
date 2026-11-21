@@ -3,8 +3,10 @@
 <%--
     Hướng dẫn sử dụng -- phân hệ Khách hàng (khách hàng mua + nhà cung cấp).
 
-    Viết theo CODE hiện tại (CustomerController, các JSP trong jsp/sale/), không
-    theo tài liệu cũ. Ảnh ở web/guide/customer/ do tools/guide/capture.mjs chụp
+    Viết theo CODE hiện tại (CustomerController và các controller con,
+    PermissionService, AccessControl, các JSP trong jsp/sale/), không theo tài
+    liệu cũ. Ba vai Admin / Sales / Tổng hợp (Giai đoạn 9); ví dụ lấy từ dữ liệu
+    mẫu Task 10.6. Ảnh ở web/guide/customer/ do tools/guide/capture.mjs chụp
     theo kịch bản tools/guide/shots/customer.mjs -- số trong ol.guide-steps phải
     khớp số khoanh đỏ trên ảnh; sửa một bên thì soát lại bên kia.
 
@@ -27,36 +29,39 @@
 <p>Một công ty vừa mua vừa bán thì nằm ở cả hai danh sách: tạo ở một trang, sau đó tick thêm vai còn lại ở trang Sửa (xem <a href="#sua">mục 7</a>).</p>
 
 <table class="guide-table">
-    <tr><th>Việc</th><th>Admin</th><th>Sales</th><th>Kỹ thuật</th></tr>
+    <tr><th>Việc</th><th>Admin</th><th>Sales</th><th>Tổng hợp</th></tr>
     <tr><td>Xem danh sách, xem chi tiết, xuất Excel</td><td>Được</td><td>Được</td><td>Được</td></tr>
     <tr><td>Thêm, sửa, xoá, đánh giá xếp hạng</td><td>Được</td><td>Được (*)</td><td>Không</td></tr>
+    <tr><td>Phạm vi khi mở danh sách</td><td>Toàn chi nhánh</td><td>Của tôi</td><td>Toàn chi nhánh</td></tr>
 </table>
 <div class="guide-note">
-    <p>(*) Sales đã có <strong>cấp trên</strong> trong sơ đồ tổ chức thì chỉ được xem, không tạo/sửa/xoá được. Các nút đó sẽ không hiện ra.</p>
-    <p>(*) Sales <strong>đã được giao tỉnh</strong> chỉ sửa, xoá, đánh giá được <strong>khách của mình</strong>: khách mình phụ trách chính, hoặc khách nằm trong tỉnh mình phụ trách — đúng những khách ở phạm vi <em>Của tôi</em> (<a href="#danh-sach">mục 2</a>). Nhà cung cấp thì chỉ sửa được nhà cung cấp mình phụ trách chính. Khách của người khác vẫn xem được, chỉ không có nút Sửa, Xóa, Đánh giá. Sales chưa được giao tỉnh thì sửa được mọi khách hàng mua, như Admin.</p>
+    <p>(*) Sales <strong>đã được giao tỉnh</strong> chỉ sửa, xoá, đánh giá được <strong>khách của mình</strong>: khách mình phụ trách chính, hoặc khách nằm trong tỉnh mình phụ trách — đúng những khách ở phạm vi <em>Của tôi</em> (<a href="#danh-sach">mục 2</a>). Nhà cung cấp thì chỉ sửa được nhà cung cấp mình phụ trách chính. Khách của người khác vẫn xem được, chỉ không có nút Sửa, Xóa, Đánh giá. Ví dụ: Phạm Thu Trang giữ Hải Phòng, Quảng Ninh, Lạng Sơn, Cao Bằng nên sửa được <code>KH-0002</code> (Hải Phòng), còn khách ở Hà Nội của Lê Minh Hoàng thì chỉ xem.</p>
+    <p>(*) Sales được gán <strong>cấp trên</strong> trong sơ đồ tổ chức thì chỉ được xem, không tạo/sửa/xoá được; các nút đó không hiện ra. Trong dữ liệu hiện tại chưa Sales nào có cấp trên, nên luật này chưa áp vào ai.</p>
+    <p>Tổng hợp chỉ xem: trang không có nút Thêm, Sửa, Xóa, Đánh giá. Mở thẳng đường dẫn trang Thêm hay trang Sửa thì hệ thống báo lỗi 403 <em>Bạn không có quyền truy cập nội dung này.</em></p>
 </div>
 
 <h2 id="danh-sach">2. Xem và tìm khách hàng</h2>
-<div class="guide-who"><span class="lbl">Ai làm được:</span><span class="role">Admin</span><span class="role">Sales</span><span class="role">Kỹ thuật</span></div>
+<div class="guide-who"><span class="lbl">Ai làm được:</span><span class="role">Admin</span><span class="role">Sales</span><span class="role">Tổng hợp</span></div>
 <p>Bấm <strong>Khách hàng mua</strong> (hoặc <strong>Nhà cung cấp</strong>) trên thanh bên trái. Danh sách hiện 10 dòng mỗi trang.</p>
 <figure class="guide-shot">
     <a href="${img}/01-danh-sach.png" target="_blank"><img src="${img}/01-danh-sach.png" alt="Danh sách khách hàng mua"></a>
-    <figcaption>Hình 1. Danh sách khách hàng mua (đăng nhập bằng một tài khoản Sales)</figcaption>
+    <figcaption>Hình 1. Danh sách khách hàng mua (Sales Phạm Thu Trang, phạm vi Toàn chi nhánh)</figcaption>
 </figure>
 <ol class="guide-steps">
     <li><strong>Ô tìm kiếm</strong>: gõ mã khách hàng, tên hoặc số điện thoại rồi nhấn Enter.</li>
     <li><strong>Phạm vi</strong>:
-        <em>Của tôi</em> là những khách bạn (và cấp dưới của bạn, nếu có) phụ trách chính, cộng với khách nằm trong các tỉnh bạn phụ trách. Đây là mặc định của Sales có địa bàn.
-        <em>Toàn chi nhánh</em> là tất cả khách hàng.
-        Chọn <em>tên một nhân viên</em> để xem những khách người đó phụ trách chính.</li>
-    <li><strong>Loại khách hàng</strong>: lọc theo loại (nhà mạng viễn thông, nhà thầu thi công, đại lý phân phối…).</li>
+        <em>Của tôi</em> là những khách bạn (và cấp dưới của bạn, nếu có) phụ trách chính, cộng với khách nằm trong các tỉnh bạn phụ trách. Đây là mặc định của Sales; lựa chọn này chỉ Sales mới có.
+        <em>Toàn chi nhánh</em> là tất cả khách hàng. Admin và Tổng hợp luôn mở danh sách ở phạm vi này.
+        Chọn <em>tên một Sales</em> để xem những khách người đó phụ trách chính.</li>
+    <li><strong>Loại khách hàng</strong>: lọc theo loại (nhà mạng viễn thông, nhà thầu thi công, đại lý phân phối).</li>
     <li><strong>Tỉnh</strong>: lọc theo một hoặc nhiều tỉnh (xem <a href="#loc-tinh">mục 2.1</a>).</li>
     <li><strong>Xuất Excel</strong>: tải danh sách đang lọc về máy (xem <a href="#xuat-excel">mục 9</a>).</li>
-    <li><strong>Thêm khách hàng</strong>: mở trang tạo khách hàng mới (xem <a href="#them-khach-hang">mục 3</a>).</li>
-    <li><strong>Cột Thao tác</strong> ở cuối mỗi dòng: <i class="fa-solid fa-eye"></i> xem chi tiết, <i class="fa-solid fa-pen"></i> sửa, <i class="fa-solid fa-trash"></i> xoá. Bảng rộng hơn màn hình nên cột này thường nằm khuất bên phải: kéo thanh cuộn ngang dưới bảng, hoặc bấm giữ chuột trên bảng rồi kéo sang trái. Bấm vào tên khách cũng mở trang chi tiết. Dòng có dấu <i class="fa-solid fa-lock"></i> thay cho nút sửa, xoá là khách của người khác: bạn chỉ xem được (xem <a href="#tong-quan">mục 1</a>).</li>
+    <li><strong>Thêm khách hàng</strong>: mở trang tạo khách hàng mới (xem <a href="#them-khach-hang">mục 3</a>). Tổng hợp không có nút này.</li>
+    <li><strong>Cột Thao tác</strong> ở cuối mỗi dòng: <i class="fa-solid fa-eye"></i> xem chi tiết, <i class="fa-solid fa-pen"></i> sửa, <i class="fa-solid fa-trash"></i> xoá. Bảng rộng hơn màn hình nên cột này thường nằm khuất bên phải: kéo thanh cuộn ngang dưới bảng, hoặc bấm giữ chuột trên bảng rồi kéo sang trái. Bấm vào tên khách cũng mở trang chi tiết. Dòng có dấu <i class="fa-solid fa-lock"></i> thay cho nút sửa, xoá là khách của người khác: bạn chỉ xem được (xem <a href="#tong-quan">mục 1</a>). Trên Hình 1, dòng Duyên Hải do Phạm Thu Trang phụ trách nên có đủ nút; các dòng của Sales khác có dấu khoá. Tổng hợp chỉ có nút xem.</li>
 </ol>
 <div class="guide-note">
-    <p>Dòng <strong>“Bạn phụ trách:”</strong> ngay dưới ô lọc liệt kê các tỉnh bạn đang được giao. Dải xanh <strong>“Đang xem…”</strong> cho biết danh sách đang hiển thị theo phạm vi nào. Nếu danh sách của bạn khác của đồng nghiệp thì xem dải này trước.</p>
+    <p>Dòng <strong>“Bạn phụ trách:”</strong> ngay dưới ô lọc liệt kê các tỉnh bạn đang được giao (chỉ Sales có địa bàn mới thấy). Dải xanh <strong>“Đang xem…”</strong> cho biết danh sách đang hiển thị theo phạm vi nào. Nếu danh sách của bạn khác của đồng nghiệp thì xem dải này trước.</p>
+    <p>Sales đã chuyển sang <em>Toàn chi nhánh</em> hoặc chọn tên một người thì ô Phạm vi không còn lựa chọn <em>Của tôi</em>. Muốn quay lại, bấm lại <strong>Khách hàng mua</strong> trên thanh bên trái.</p>
     <p>Danh sách Nhà cung cấp không có ô lọc tỉnh, vì nhà cung cấp không chia theo địa bàn bán hàng.</p>
 </div>
 
@@ -68,16 +73,16 @@
 <ol class="guide-steps">
     <li>Bấm ô <strong>Tỉnh</strong> để mở bảng, rồi tích các tỉnh muốn xem. Tỉnh bạn phụ trách được in đậm và có nhãn <em>của bạn</em>.</li>
     <li><strong>Chọn tất cả</strong> / <strong>Bỏ hết</strong> để tích hoặc bỏ tích toàn bộ. Bỏ hết nghĩa là không lọc theo tỉnh.</li>
-    <li><strong>Địa bàn của tôi</strong>: chỉ tích đúng các tỉnh bạn phụ trách.</li>
+    <li><strong>Địa bàn của tôi</strong>: chỉ tích đúng các tỉnh bạn phụ trách. Nút này chỉ có với Sales đã được giao tỉnh.</li>
     <li>Bấm <strong>Áp dụng</strong> để lọc.</li>
 </ol>
 
 <h2 id="them-khach-hang">3. Thêm khách hàng mua</h2>
-<div class="guide-who"><span class="lbl">Ai làm được:</span><span class="role">Admin</span><span class="role">Sales</span><span class="role no">Kỹ thuật</span></div>
+<div class="guide-who"><span class="lbl">Ai làm được:</span><span class="role">Admin</span><span class="role">Sales</span><span class="role no">Tổng hợp</span></div>
 <p>Ở danh sách <strong>Khách hàng mua</strong>, bấm <strong>Thêm khách hàng</strong>. Ô có dấu <span style="color:#e2536b">*</span> là bắt buộc.</p>
 <figure class="guide-shot narrow">
     <a href="${img}/03-them-khach-hang.png" target="_blank"><img src="${img}/03-them-khach-hang.png" alt="Trang Thêm khách hàng"></a>
-    <figcaption>Hình 3. Trang Thêm khách hàng (tài khoản Sales đã được giao tỉnh)</figcaption>
+    <figcaption>Hình 3. Trang Thêm khách hàng (Sales Phạm Thu Trang, giữ bốn tỉnh)</figcaption>
 </figure>
 <ol class="guide-steps">
     <li><strong>Logo</strong> (không bắt buộc): bấm biểu tượng máy ảnh để chọn ảnh JPG, PNG, GIF hoặc WEBP.</li>
@@ -88,9 +93,9 @@
             <li>Sales <strong>đã được giao tỉnh</strong>: ô này khoá sẵn tên bạn, không đổi được.</li>
             <li>Admin, hoặc Sales <strong>chưa được giao tỉnh</strong>: chọn tỉnh ở bước 7 trước. Tỉnh đã có người phụ trách thì ô này tự điền tên người đó và khoá lại. Tỉnh chưa ai phụ trách thì tự chọn.</li>
         </ul></li>
-    <li><strong>Người hỗ trợ</strong> (không bắt buộc). Danh sách tự bỏ đi chính người phụ trách chính và cấp trên trực tiếp của người đó, vì người hỗ trợ không được là hai người này.</li>
+    <li><strong>Người hỗ trợ</strong> (không bắt buộc), chọn trong các Sales đang hoạt động. Danh sách tự bỏ đi chính người phụ trách chính, và cả cấp trên trực tiếp của người đó nếu có, vì người hỗ trợ không được là hai người này.</li>
     <li><strong>Số điện thoại</strong> và <strong>Email</strong>. Số điện thoại bắt đầu bằng <code>0</code> hoặc <code>+84</code>, theo sau là 9–10 chữ số; được có dấu cách, dấu chấm hoặc gạch ngang (vd. <code>024 3822 1234</code>). Website và Ngày tham gia không bắt buộc; ngày tham gia không được ở tương lai.</li>
-    <li><strong>Địa chỉ</strong>: chọn Tỉnh / Thành phố, chờ danh sách Xã / Phường nạp xong rồi chọn, sau đó nhập Địa chỉ chi tiết. Sales đã được giao tỉnh chỉ thấy các tỉnh mình phụ trách; nếu chỉ phụ trách một tỉnh thì ô tỉnh được chọn sẵn và khoá.</li>
+    <li><strong>Địa chỉ</strong>: chọn Tỉnh / Thành phố, chờ danh sách Xã / Phường nạp xong rồi chọn, sau đó nhập Địa chỉ chi tiết. Sales đã được giao tỉnh chỉ thấy các tỉnh mình phụ trách (dòng nhắc <em>Chỉ các tỉnh bạn phụ trách.</em>); nếu chỉ phụ trách một tỉnh thì ô tỉnh được chọn sẵn và khoá.</li>
     <li>Bấm <strong>Tạo khách hàng</strong>. Hệ thống tự sinh mã <code>KH-xxxx</code> rồi chuyển sang trang chi tiết của khách vừa tạo.</li>
 </ol>
 <div class="guide-warn">
@@ -110,12 +115,12 @@
     <tr><td>Số điện thoại này đã thuộc về một khách hàng khác.</td><td>Như trên.</td></tr>
     <tr><td>Mã số thuế này đã được đăng ký cho một khách hàng khác.</td><td>Công ty đã có trong hệ thống: mở hồ sơ của họ và thêm vai ở trang Sửa thay vì tạo mới.</td></tr>
     <tr><td>Xã / phường đã chọn không thuộc các tỉnh bạn phụ trách.</td><td>Sales đã được giao tỉnh chỉ tạo được khách trong các tỉnh của mình. Khách ở tỉnh khác do người phụ trách tỉnh đó tạo.</td></tr>
-    <tr><td>Người hỗ trợ không được là cấp trên trực tiếp của người phụ trách chính.</td><td>Chọn người hỗ trợ khác, hoặc để trống.</td></tr>
+    <tr><td>Người hỗ trợ không được là cấp trên trực tiếp của người phụ trách chính.</td><td>Chỉ gặp khi người phụ trách chính có cấp trên. Chọn người hỗ trợ khác, hoặc để trống.</td></tr>
     <tr><td>Logo chỉ nhận file ảnh JPG, PNG, GIF hoặc WEBP.</td><td>Chọn lại file ảnh đúng định dạng.</td></tr>
 </table>
 
 <h2 id="them-nha-cung-cap">4. Thêm nhà cung cấp</h2>
-<div class="guide-who"><span class="lbl">Ai làm được:</span><span class="role">Admin</span><span class="role">Sales</span><span class="role no">Kỹ thuật</span></div>
+<div class="guide-who"><span class="lbl">Ai làm được:</span><span class="role">Admin</span><span class="role">Sales</span><span class="role no">Tổng hợp</span></div>
 <p>Ở danh sách <strong>Nhà cung cấp</strong>, bấm <strong>Thêm nhà cung cấp</strong>. Các ô giống trang Thêm khách hàng, chỉ khác ở những điểm được khoanh:</p>
 <figure class="guide-shot narrow">
     <a href="${img}/05-them-nha-cung-cap.png" target="_blank"><img src="${img}/05-them-nha-cung-cap.png" alt="Trang Thêm nhà cung cấp"></a>
@@ -129,26 +134,29 @@
 </ol>
 
 <h2 id="chi-tiet">5. Xem chi tiết khách hàng</h2>
-<div class="guide-who"><span class="lbl">Ai làm được:</span><span class="role">Admin</span><span class="role">Sales</span><span class="role">Kỹ thuật</span></div>
+<div class="guide-who"><span class="lbl">Ai làm được:</span><span class="role">Admin</span><span class="role">Sales</span><span class="role">Tổng hợp</span></div>
 <p>Bấm vào tên khách hàng, hoặc nút <i class="fa-solid fa-eye"></i> ở danh sách.</p>
 <figure class="guide-shot narrow">
     <a href="${img}/06-chi-tiet.png" target="_blank"><img src="${img}/06-chi-tiet.png" alt="Trang chi tiết khách hàng"></a>
-    <figcaption>Hình 6. Trang chi tiết khách hàng</figcaption>
+    <figcaption>Hình 6. Trang chi tiết khách hàng KH-0002 (Sales phụ trách đang xem)</figcaption>
 </figure>
 <ol class="guide-steps">
-    <li><strong>Xếp hạng quan hệ</strong> hiện tại: Tốt, Cần theo dõi, Xấu hoặc Có nguy cơ rời bỏ.</li>
+    <li><strong>Xếp hạng quan hệ</strong> hiện tại: Tốt, Cần theo dõi, Xấu hoặc Có nguy cơ rời bỏ. Khách chưa được đánh giá lần nào thì chưa có nhãn này.</li>
     <li><strong>Đánh giá lại xếp hạng</strong>: xem <a href="#danh-gia">mục 6</a>.</li>
     <li><strong>Sửa thông tin</strong>: xem <a href="#sua">mục 7</a>.</li>
     <li><strong>Xóa</strong>: xem <a href="#xoa">mục 8</a>.</li>
-    <li><strong>Thông tin doanh nghiệp</strong>: mã, mã số thuế, liên lạc, địa chỉ, người phụ trách, người hỗ trợ.</li>
+    <li><strong>Thông tin doanh nghiệp</strong>: nhóm, vai (khách hàng mua, nhà cung cấp hoặc cả hai), người phụ trách chính, người hỗ trợ, liên lạc, ngày tham gia, địa chỉ.</li>
     <li><strong>Người liên hệ</strong>: bấm vào một người để xem đầy đủ thông tin. Danh sách này hiện chỉ xem được, trang không có chức năng thêm hay sửa người liên hệ.</li>
-    <li><strong>Lịch sử đánh giá xếp hạng</strong>: mỗi lần đánh giá, ai đánh giá, ngày nào, kèm ghi chú.</li>
-    <li><strong>Hoạt động gần đây</strong>: hai tab <em>Hợp đồng</em> và <em>Phiếu hỗ trợ kỹ thuật</em> của khách này.</li>
+    <li><strong>Lịch sử đánh giá xếp hạng</strong>: mỗi lần đánh giá, ngày nào, xếp hạng gì, lý do, ai ghi nhận.</li>
+    <li><strong>Hoạt động gần đây</strong>: hai tab <em>Hợp đồng</em> và <em>Phiếu hỗ trợ kỹ thuật</em> của khách này. Tab Hợp đồng có mã, tên, trạng thái và ngày ký; bấm mã để mở trang chi tiết hợp đồng. Hợp đồng nháp chưa có mã thì cột mã hiện <em>Chưa có số</em> và chưa có ngày ký (dòng thứ hai trên Hình 6): khi còn Nháp được để trống mã, mã chỉ bắt buộc nhập trước khi ký (hướng dẫn Hợp đồng, mục 1).</li>
 </ol>
-<div class="guide-note"><p>Mở chi tiết khách của người khác (tài khoản Sales đã được giao tỉnh) thì ba nút ở bước 2–4 không hiện; thay vào đó là dòng <em>Do … phụ trách, bạn chỉ xem được</em> kèm tên người phụ trách chính.</p></div>
+<div class="guide-note">
+    <p>Sales mở chi tiết khách của người khác thì ba nút ở bước 2–4 không hiện; thay vào đó là dòng <em>Do … phụ trách, bạn chỉ xem được</em> kèm tên người phụ trách chính.</p>
+    <p>Tổng hợp mở chi tiết thì không có ba nút này. Tab <em>Phiếu hỗ trợ kỹ thuật</em> vẫn liệt kê phiếu của khách, nhưng Tổng hợp không vào được phân hệ Phiếu hỗ trợ.</p>
+</div>
 
 <h2 id="danh-gia">6. Đánh giá lại xếp hạng quan hệ</h2>
-<div class="guide-who"><span class="lbl">Ai làm được:</span><span class="role">Admin</span><span class="role">Sales</span><span class="role no">Kỹ thuật</span></div>
+<div class="guide-who"><span class="lbl">Ai làm được:</span><span class="role">Admin</span><span class="role">Sales</span><span class="role no">Tổng hợp</span></div>
 <figure class="guide-shot">
     <a href="${img}/07-danh-gia.png" target="_blank"><img src="${img}/07-danh-gia.png" alt="Hộp đánh giá xếp hạng"></a>
     <figcaption>Hình 7. Hộp đánh giá xếp hạng khách hàng</figcaption>
@@ -156,13 +164,13 @@
 <ol class="guide-steps">
     <li>Chọn <strong>xếp hạng quan hệ</strong>: Tốt, Cần theo dõi, Xấu hoặc Có nguy cơ rời bỏ.</li>
     <li>Ghi <strong>lý do</strong> (không bắt buộc, tối đa 255 ký tự).</li>
-    <li>Bấm <strong>Lưu đánh giá</strong>. Xếp hạng mới hiện ngay ở đầu trang và được thêm vào Lịch sử đánh giá xếp hạng.</li>
+    <li>Bấm <strong>Lưu đánh giá</strong>. Trang báo <em>Đã đánh giá lại. Xếp hạng hiện tại: …</em>; xếp hạng mới hiện ngay ở đầu trang và được thêm vào Lịch sử đánh giá xếp hạng.</li>
 </ol>
 <div class="guide-note"><p>Xếp hạng do người dùng tự chọn; hệ thống không tự chấm điểm. Mỗi lần lưu là một dòng lịch sử mới, kể cả khi chọn lại đúng mức cũ.</p></div>
 <p>Nếu trang báo <em>Chưa lưu được đánh giá. Xếp hạng vẫn như trước…</em> thì chưa có gì được ghi — cả xếp hạng lẫn dòng lịch sử. Bấm Lưu đánh giá lại; vẫn lỗi thì báo quản trị viên.</p>
 
 <h2 id="sua">7. Sửa thông tin khách hàng / nhà cung cấp</h2>
-<div class="guide-who"><span class="lbl">Ai làm được:</span><span class="role">Admin</span><span class="role">Sales</span><span class="role no">Kỹ thuật</span></div>
+<div class="guide-who"><span class="lbl">Ai làm được:</span><span class="role">Admin</span><span class="role">Sales</span><span class="role no">Tổng hợp</span></div>
 <p>Ở trang chi tiết bấm <strong>Sửa thông tin</strong>, hoặc bấm nút <i class="fa-solid fa-pen"></i> ở danh sách. Như trang Thêm, có hai trang Sửa: đi từ danh sách <strong>Khách hàng mua</strong> thì ra <em>Cập nhật thông tin khách hàng</em>, từ danh sách <strong>Nhà cung cấp</strong> thì ra <em>Cập nhật thông tin nhà cung cấp</em>. Hai trang giống nhau, khác ở tên gọi, loại và nhóm.</p>
 <figure class="guide-shot narrow">
     <a href="${img}/08-sua.png" target="_blank"><img src="${img}/08-sua.png" alt="Trang sửa khách hàng"></a>
@@ -184,18 +192,18 @@
 <p>Trang sửa nhà cung cấp (Hình 9) có cùng các ô, chỉ khác tiêu đề, tên các ô, danh sách loại và nhóm; ô vai khác ở đây là <em>Đồng thời là khách hàng mua</em>.</p>
 <figure class="guide-shot narrow">
     <a href="${img}/08b-sua-nha-cung-cap.png" target="_blank"><img src="${img}/08b-sua-nha-cung-cap.png" alt="Trang sửa nhà cung cấp"></a>
-    <figcaption>Hình 9. Trang sửa thông tin nhà cung cấp (tài khoản Sales)</figcaption>
+    <figcaption>Hình 9. Trang sửa thông tin nhà cung cấp NCC-001 (Sales Lê Minh Hoàng, người phụ trách nhà cung cấp này)</figcaption>
 </figure>
 <table class="guide-table">
     <tr><th>Thông báo</th><th>Nguyên nhân và cách xử lý</th></tr>
-    <tr><td>Bạn chỉ xem được khách hàng này: khách do người khác phụ trách.</td><td>Sales đã được giao tỉnh mở trang Sửa (hoặc Xóa, Đánh giá) của khách ngoài phạm vi <em>Của tôi</em>. Nhờ người phụ trách khách đó hoặc Admin.</td></tr>
+    <tr><td>Bạn chỉ xem được khách hàng này: khách do người khác phụ trách.</td><td>Sales mở trang Sửa (hoặc Xóa, Đánh giá) của khách ngoài phạm vi <em>Của tôi</em>, hoặc của nhà cung cấp do người khác phụ trách. Nhờ người phụ trách hoặc Admin.</td></tr>
     <tr><td>Xã / phường đã chọn không thuộc các tỉnh bạn phụ trách.</td><td>Sales chỉ chuyển được khách sang các tỉnh mình phụ trách. Chọn lại tỉnh.</td></tr>
 </table>
 <p>Các thông báo khác giống khi thêm khách hàng (<a href="#loi-them">mục 3.1</a>).</p>
 <p>Nếu sau khi lưu (thêm hoặc sửa), trang chi tiết báo <em>Đã lưu thông tin nhưng chưa ghi được vai Khách mua / Nhà cung cấp…</em> thì hồ sơ đã lưu, riêng ô vai gặp lỗi hệ thống. Khách mới tạo lúc này chưa hiện trong danh sách nào. Bấm <strong>Sửa</strong> rồi <strong>Lưu thay đổi</strong> (tick lại ô <em>Đồng thời là…</em> nếu công ty có hai vai).</p>
 
 <h2 id="xoa">8. Xoá khách hàng</h2>
-<div class="guide-who"><span class="lbl">Ai làm được:</span><span class="role">Admin</span><span class="role">Sales</span><span class="role no">Kỹ thuật</span></div>
+<div class="guide-who"><span class="lbl">Ai làm được:</span><span class="role">Admin</span><span class="role">Sales</span><span class="role no">Tổng hợp</span></div>
 <figure class="guide-shot">
     <a href="${img}/09-xoa.png" target="_blank"><img src="${img}/09-xoa.png" alt="Hộp xác nhận xoá"></a>
     <figcaption>Hình 10. Hộp xác nhận xoá khách hàng</figcaption>
@@ -207,16 +215,16 @@
 <p>Nếu trang chi tiết mở lại với thông báo <em>Không xoá được khách hàng. Vui lòng thử lại.</em> thì khách chưa bị xoá do lỗi hệ thống: xoá lại; vẫn lỗi thì báo quản trị viên.</p>
 <p>Xoá xong, trang quay về đúng danh sách bạn vừa đứng (Khách hàng mua hoặc Nhà cung cấp). Nếu danh sách hiện dải vàng <em>Không tìm thấy khách hàng này</em> (hoặc <em>nhà cung cấp này</em>) thì bản ghi đã bị xoá trước đó — thường do người khác vừa xoá, hoặc bạn mở một link cũ.</p>
 <div class="guide-warn">
-    <p><strong>Không xoá được khách hàng còn hợp đồng đang hiệu lực.</strong> Khi đó trang báo như Hình 11; cần thanh lý hoặc kết thúc các hợp đồng đó trước.</p>
+    <p><strong>Không xoá được khách hàng còn hợp đồng đang hiệu lực</strong>, tức hợp đồng đã ký mà hôm nay vẫn trong thời hạn (trạng thái <em>Đang hiệu lực</em> hoặc <em>Sắp hết hạn</em>). Khi đó trang báo như Hình 11; cần thanh lý hoặc kết thúc các hợp đồng đó trước. Hợp đồng còn Nháp (chưa ký), đã hết hạn hay đã thanh lý thì không chặn việc xoá.</p>
 </div>
 <figure class="guide-shot">
     <a href="${img}/10-xoa-bi-chan.png" target="_blank"><img src="${img}/10-xoa-bi-chan.png" alt="Không xoá được vì còn hợp đồng"></a>
-    <figcaption>Hình 11. Thông báo khi khách còn hợp đồng đang hiệu lực</figcaption>
+    <figcaption>Hình 11. Thông báo khi khách còn hợp đồng đang hiệu lực (KH-0002 còn hợp đồng 03/2026/HĐKT/POT-DHN)</figcaption>
 </figure>
 <div class="guide-note"><p>Xoá là <strong>xoá mềm</strong>: khách biến khỏi mọi danh sách, nhưng dữ liệu vẫn được giữ lại để các hợp đồng, phiếu hỗ trợ cũ vẫn tra cứu được.</p></div>
 
 <h2 id="xuat-excel">9. Xuất Excel</h2>
-<div class="guide-who"><span class="lbl">Ai làm được:</span><span class="role">Admin</span><span class="role">Sales</span><span class="role">Kỹ thuật</span></div>
+<div class="guide-who"><span class="lbl">Ai làm được:</span><span class="role">Admin</span><span class="role">Sales</span><span class="role">Tổng hợp</span></div>
 <ol class="guide-steps">
     <li class="plain">Lọc danh sách như mong muốn (tìm kiếm, phạm vi, loại, tỉnh).</li>
     <li class="plain">Bấm <strong>Xuất Excel</strong> (số 5 trên Hình 1). Trình duyệt tải về một file Excel (<code>.xls</code>).</li>

@@ -6,18 +6,22 @@
  * web/jsp/guide/product.jsp -- sửa bên này thì soát lại bên kia. Tên ảnh
  * đánh số theo thứ tự xuất hiện trong trang hướng dẫn (Hình 1, Hình 2...).
  *
- * Chụp bằng kythuat1: vai Kỹ thuật (cùng Admin) có toàn quyền trên sản phẩm,
- * nên thấy đủ các nút Thêm / Sửa / Xoá.
+ * Chụp bằng phamthutrang (Sales, Phó phòng Kinh doanh): từ Task 9.3 Admin và
+ * MỌI Sales có toàn quyền trên sản phẩm (PermissionService.canManageProducts),
+ * nên thấy đủ các nút Thêm / Sửa / Xoá. Tổng hợp chỉ xem.
  *
  * KHÔNG ảnh nào ghi dữ liệu: form Thêm chỉ điền ví dụ (ảnh và catalogue lấy
  * từ tools/guide/samples/), không bấm Tạo; hộp xác nhận xoá chỉ mở ra. Ảnh
  * 07 bấm Xoá THẬT trên một sản phẩm đang có hợp đồng -- server từ chối và
  * quay lại trang chi tiết kèm thông báo, không xoá gì.
  *
- * Dữ liệu mẫu (bản sao poscs_db, 89 sản phẩm, 33 danh mục): SP-0006 "Nguồn
- * POSTEF" (id 6) có 3 catalogue và nằm trong 3 hợp đồng bán; SP-0066
- * "Ambient Light Sensor" (id 66) chưa có hợp đồng nào; danh mục 30 là
- * CNTT & IOT › LoRa › Sensors (12 sản phẩm).
+ * Dữ liệu mẫu (db/schema.sql, Task 10.6: 89 sản phẩm, 33 danh mục). Không
+ * cần CHUẨN BỊ BẢN SAO CSDL -- dùng nguyên dữ liệu mẫu:
+ *   - SP-0001 "Ắc quy lithium" (id 1): 1 ảnh, 2 catalogue; nằm trong hợp đồng
+ *     05/2026/HĐMB/POT-HTN (id 5) và hợp đồng id 8 chưa ký (mã trống, trang
+ *     hiện "Chưa có số"). Dùng cho ảnh chi tiết, sửa, xoá bị chặn.
+ *   - SP-0066 "Ambient Light Sensor" (id 66): chưa có hợp đồng nào.
+ *   - Danh mục 30: CNTT & IOT › LoRa › Sensors (12 sản phẩm).
  */
 import { fileURLToPath } from 'node:url';
 
@@ -46,7 +50,7 @@ export default {
         // ===== 2. Xem và tìm sản phẩm =====
         {
             file: '01-danh-sach.png',
-            user: 'kythuat1',
+            user: 'phamthutrang',
             url: '/product',
             marks: [
                 { sel: '.category-panel', n: 1 },
@@ -61,7 +65,7 @@ export default {
         },
         {
             file: '02-loc-danh-muc.png',
-            user: 'kythuat1',
+            user: 'phamthutrang',
             url: '/product?action=list&categoryId=30',
             marks: [
                 { sel: '.cat-link.active', n: 1 },
@@ -76,7 +80,7 @@ export default {
         // ===== 3. Thêm sản phẩm =====
         {
             file: '03-them.png',
-            user: 'kythuat1',
+            user: 'phamthutrang',
             url: '/product?action=new',
             // Điền ví dụ -- KHÔNG bấm Tạo sản phẩm.
             before: async (page) => {
@@ -103,8 +107,8 @@ export default {
         // ===== 4. Xem chi tiết =====
         {
             file: '04-chi-tiet.png',
-            user: 'kythuat1',
-            url: view(6),
+            user: 'phamthutrang',
+            url: view(1),
             marks: [
                 { sel: '.detail-header .product-info', n: 1 },
                 { sel: '.header-actions .btn-edit-detail', n: 2 },
@@ -119,8 +123,8 @@ export default {
         // ===== 5. Sửa sản phẩm =====
         {
             file: '05-sua.png',
-            user: 'kythuat1',
-            url: edit(6),
+            user: 'phamthutrang',
+            url: edit(1),
             marks: [
                 { sel: '.field-row', text: 'Mã sản phẩm', n: 1 },
                 { sel: '.field-row', text: 'Danh mục', n: 2 },
@@ -136,7 +140,7 @@ export default {
         // ===== 6. Xoá sản phẩm =====
         {
             file: '06-xoa.png',
-            user: 'kythuat1',
+            user: 'phamthutrang',
             url: view(66),
             // Mở hộp xác nhận -- KHÔNG bấm Xóa sản phẩm.
             before: async (page) => {
@@ -151,9 +155,9 @@ export default {
         },
         {
             file: '07-xoa-bi-chan.png',
-            user: 'kythuat1',
-            url: view(6),
-            // Xoá THẬT: SP-0006 còn nằm trong hợp đồng nên server từ chối và quay
+            user: 'phamthutrang',
+            url: view(1),
+            // Xoá THẬT: SP-0001 còn nằm trong hợp đồng nên server từ chối và quay
             // lại trang chi tiết kèm thông báo -- không xoá gì.
             before: async (page) => {
                 await page.click('.header-actions .btn-delete-detail');
