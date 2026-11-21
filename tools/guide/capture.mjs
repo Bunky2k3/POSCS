@@ -13,9 +13,9 @@
  *   node tools/guide/capture.mjs customer --base http://127.0.0.1:8081/POSCS --only 03
  * Kịch bản từng phân hệ nằm ở tools/guide/shots/<phân hệ>.mjs.
  *
- * CHỈ TRỎ VÀO TOMCAT THỬ CHẠY TRÊN BẢN SAO poscs_db. Một số ảnh cần bấm lưu thật
- * (ảnh thông báo lỗi, ảnh sau khi lưu), và tài khoản dưới đây là tài khoản thử
- * -- cùng bộ với tools/testdoc/run_blackbox.py.
+ * CHỈ TRỎ VÀO TOMCAT THỬ CHẠY TRÊN MỘT CSDL DỰNG TỪ db/schema.sql (dữ liệu mẫu
+ * Task 10.6), không phải poscs_db. Một số ảnh cần bấm lưu thật (ảnh thông báo
+ * lỗi, ảnh sau khi lưu), và tài khoản dưới đây là tài khoản mẫu của bộ đó.
  *
  * TRÌNH DUYỆT. Dùng Chrome/Edge đã cài trên máy ở chế độ ẩn (--headless=new),
  * điều khiển qua Chrome DevTools Protocol bằng WebSocket có sẵn của Node --
@@ -32,14 +32,19 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 
+// Bộ tài khoản mẫu của Task 10.6 (db/schema.sql, V46): mật khẩu Poscs@123,
+// riêng admin là Admin@123. dangvantung bị khoá nên không có ở đây;
+// ngothilan đang bị buộc đổi mật khẩu tạm (chỉ dùng với onboarding: true).
 const ACCOUNTS = {
     admin: 'Admin@123',
-    sales1: 'Poscs@123',
-    sales4: 'Poscs@123',
-    sales5: 'Poscs@123',
-    cskh1: 'Poscs@123',
-    kythuat1: 'Poscs@123',
-    kythuat3: 'Poscs@123'
+    tranquocbao: 'Poscs@123',
+    leminhhoang: 'Poscs@123',
+    phamthutrang: 'Poscs@123',
+    doducanh: 'Poscs@123',
+    vuthihang: 'Poscs@123',
+    hoangthimai: 'Poscs@123',
+    buivannam: 'Poscs@123',
+    ngothilan: 'Poscs@123'
 };
 
 const CHROME_CANDIDATES = [

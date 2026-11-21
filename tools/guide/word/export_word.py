@@ -59,7 +59,8 @@ BLOCK_TAGS = {'p', 'ul', 'ol', 'div', 'table', 'figure', 'h1', 'h2', 'h3'}
 
 # Sơ đồ chèn vào giữa trang hướng dẫn: module -> (ảnh, chú thích, chèn NGAY TRƯỚC tiêu đề có id này).
 DIAGRAMS = {
-    'contract': ('vong-doi-hop-dong.png', 'Vòng đời hợp đồng: tiến độ và trạng thái theo lịch', 'quyen'),
+    'contract': ('vong-doi-hop-dong.png', 'Vòng đời hợp đồng: tiến độ, bước giao hàng, kỳ thanh toán và trạng thái theo lịch',
+                 'quyen'),
     'ticket': ('trang-thai-phieu.png', 'Trạng thái và bốn phần nội dung của phiếu hỗ trợ', 'quyen'),
 }
 OVERVIEW = ('tong-quan.png', 'Tổng quan các phân hệ, vai trò quản lý và luồng dữ liệu')
@@ -760,6 +761,11 @@ CHANGES = [
     ('16/11/2026', 'S', 'Nhân viên, Phiếu hỗ trợ: thông báo không có quyền ghi đúng câu MSG-022 (Task 7.4a).'),
     ('20/11/2026', 'T', 'Nhân viên: mục Thông tin chi nhánh. Hợp đồng: người ký bên mình lấy từ Thông tin chi nhánh; '
                         'người phụ trách theo người tạo, Admin chỉ thay được người đã bị khoá tài khoản (Task 8.6).'),
+    ('21/11/2026', 'S', 'Mọi phần: ba vai Admin, Sales, Tổng hợp; Sales quản lý sản phẩm và xử lý phiếu hỗ trợ. '
+                        'Hợp đồng: vòng đời từ phiếu GQNCKH tới thanh lý, mã để trống tới lúc ký, giấy tờ dạng ô '
+                        'tích, bước giao hàng và nhắc ký, bàn giao phòng Tổng hợp, kỳ thanh toán có nộp hồ sơ, hạn '
+                        'thu và số tiền thực thu. Ảnh chụp lại trên dữ liệu mẫu mới. Cài đặt: DB_PASSWORD không có '
+                        'giá trị mặc định (Task 10.7).'),
 ]
 
 
@@ -768,7 +774,8 @@ def repo_facts():
     migrations = [int(m.group(1)) for f in (ROOT / 'db' / 'migrations').glob('V*__*.sql')
                   for m in [re.match(r'V(\d+)__', f.name)] if m]
     schema = (ROOT / 'db' / 'schema.sql').read_text(encoding='utf-8')
-    accounts = len(re.findall(r"^\('\w+', '\$2a\$", schema, flags=re.M))
+    # Mỗi tài khoản mẫu có đúng một chuỗi băm BCrypt; chỉ bảng users chứa chúng.
+    accounts = len(re.findall(r"'\$2a\$\d{2}\$[./A-Za-z0-9]{53}'", schema))
     props = (ROOT / 'nbproject' / 'project.properties').read_text(encoding='utf-8')
     java = re.search(r'^javac\.target=(\S+)', props, flags=re.M).group(1)
     war = re.search(r'^war\.name=(\S+)', props, flags=re.M).group(1)
@@ -776,8 +783,9 @@ def repo_facts():
     # Hai jar NetBeans thường tự cấp khi build; ngoài IDE phải chỉ ra bằng -D (xem DEPLOY.md).
     servlet = next((ROOT / 'lib-build').glob('jakarta.servlet-api-*.jar')).name
     copylibs = next((ROOT / 'lib-build').glob('*copylibstask*.jar')).name
-    if 'Admin' in re.findall(r"role_name = '(\w+)'\)", schema.split('INSERT IGNORE INTO users')[1][:20000]):
-        fail('schema.sql đã gieo tài khoản Admin: sửa lại bước tạo Admin ở mục cài đặt')
+    # Bước 6 cài đặt nói dữ liệu mẫu có sẵn hai Admin (Task 10.6, mục 16 "Quyết định đã chốt").
+    if "'admin' username" not in schema or "'tranquocbao'" not in schema:
+        fail('schema.sql không còn gieo hai tài khoản Admin mẫu: sửa lại Bước 6 ở mục cài đặt')
     return {'v_max': max(migrations), 'accounts': accounts, 'java': java, 'war': war,
             'context': war[:-4], 'jbcrypt': jbcrypt, 'servlet': servlet, 'copylibs': copylibs}
 
@@ -836,7 +844,8 @@ def write_install(w, f, book):
     w.code(['mysql -u root -p -e "CREATE DATABASE poscs_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"',
             'mysql --default-character-set=utf8mb4 -u root -p poscs_db < db/schema.sql'])
     w.p('`db/schema.sql` dựng đủ mọi bảng, kèm dữ liệu mẫu: danh mục tỉnh / xã, sản phẩm, khách hàng, hợp đồng, '
-        'phiếu hỗ trợ và %d tài khoản thử dùng chung mật khẩu `Poscs@123`. File này xoá rồi tạo lại mọi bảng, nên '
+        'phiếu hỗ trợ và %d tài khoản thử (mật khẩu `Poscs@123`, riêng `admin` là `Admin@123`). File này xoá rồi '
+        'tạo lại mọi bảng, nên '
         'chỉ chạy trên cơ sở dữ liệu mới. Cơ sở dữ liệu đã có dữ liệu thì không chạy lại file này, mà áp các file '
         'mới trong `db/migrations/` theo thứ tự (xem `db/migrations/README.md`).' % f['accounts'])
     w.step_title('Bước 3. Đóng gói ứng dụng')
@@ -856,7 +865,9 @@ def write_install(w, f, book):
     w.plain_table(['Biến', 'Ý nghĩa', 'Bỏ trống thì'], [
         ('DB_URL', 'Chuỗi kết nối MySQL', 'jdbc:mysql://localhost:3306/poscs_db'),
         ('DB_USER', 'Tài khoản MySQL', 'root'),
-        ('DB_PASSWORD', 'Mật khẩu MySQL', '1234'),
+        # DBContext: DB_PASSWORD không có mặc định từ Task 7.2a (rỗng nếu không khai báo).
+        ('DB_PASSWORD', 'Mật khẩu MySQL', 'Không có mặc định (rỗng), phải khai báo. Thiếu thì MySQL từ chối kết '
+                                          'nối và mọi lần đăng nhập đều báo sai tên đăng nhập hoặc mật khẩu.'),
         ('UPLOAD_DIR', 'Thư mục lưu file tải lên', '<thư mục người dùng>/poscs_uploads'),
         ('MAIL_USERNAME', 'Địa chỉ Gmail gửi thư', 'Không gửi thư, nội dung thư ghi ra log'),
         ('MAIL_PASSWORD', 'App Password 16 ký tự của Gmail (không phải mật khẩu đăng nhập Gmail)', 'Như trên'),
@@ -874,11 +885,11 @@ def write_install(w, f, book):
     w.step_title('Bước 5. Triển khai và khởi động')
     w.p('Chép `dist/%s` vào thư mục `webapps/` của Tomcat rồi khởi động Tomcat (`bin/startup.sh` hoặc '
         '`bin/startup.bat`). Mở `http://<máy chủ>:8080/%s/`: trang đăng nhập hiện ra.' % (f['war'], f['context']))
-    w.step_title('Bước 6. Tạo tài khoản Admin đầu tiên')
-    w.p('Dữ liệu mẫu cố ý không có tài khoản Admin: mã nguồn công khai, nên mật khẩu gieo sẵn nào cũng coi như ai '
-        'cũng biết. Trang Nhân viên cũng không cho chọn vai trò Admin. Admin đầu tiên tạo thẳng trong cơ sở dữ '
-        'liệu. Sinh chuỗi băm của một mật khẩu tạm bằng thư viện đi kèm (`jshell` có sẵn trong JDK), chạy ở thư '
-        'mục mã nguồn:')
+    w.step_title('Bước 6. Tài khoản Admin')
+    w.p('Dữ liệu mẫu có sẵn hai tài khoản Admin, `admin` (Giám đốc) và `tranquocbao` (Phó giám đốc), để dùng thử '
+        'ngay. Trên máy chạy thật thì mật khẩu gieo sẵn coi như ai cũng biết, vì mã nguồn công khai; trang Nhân '
+        'viên lại không cho chọn vai trò Admin. Vậy Admin dùng thật tạo thẳng trong cơ sở dữ liệu. Sinh chuỗi băm '
+        'của một mật khẩu tạm bằng thư viện đi kèm (`jshell` có sẵn trong JDK), chạy ở thư mục mã nguồn:')
     w.code(['jshell --class-path lib/%s' % f['jbcrypt'],
             'jshell> org.mindrot.jbcrypt.BCrypt.hashpw("<mật khẩu tạm>", org.mindrot.jbcrypt.BCrypt.gensalt())'])
     w.p('Chép chuỗi bắt đầu bằng `$2a$10$` vừa in ra, rồi chạy trong MySQL (thay họ, tên):')
@@ -905,9 +916,10 @@ def write_install(w, f, book):
     w.bullet_list([
         'Không mở cổng MySQL (3306) ra Internet; chỉ máy chủ ứng dụng kết nối được.',
         'Bật HTTPS: qua reverse proxy (ví dụ Nginx) hoặc connector SSL của Tomcat.',
-        'Khoá các tài khoản thử của dữ liệu mẫu ở trang Nhân viên (mục %s): mật khẩu chung của chúng nằm công '
-        'khai trong mã nguồn. Dữ liệu mẫu khác (khách hàng, hợp đồng, phiếu) cũng đi kèm `db/schema.sql`; kho mã '
-        'chưa có script dựng cơ sở dữ liệu trống.' % book.section('employee', 'khoa'),
+        'Dữ liệu mẫu trong `db/schema.sql` (tài khoản, khách hàng, hợp đồng, phiếu) chỉ dành cho máy phát triển '
+        'và demo: mật khẩu các tài khoản mẫu, kể cả hai tài khoản Admin, nằm công khai trong mã nguồn. Lỡ nạp lên '
+        'máy chạy thật thì đổi mật khẩu hai tài khoản Admin và khoá các tài khoản mẫu còn lại ở trang Nhân viên '
+        '(mục %s).' % book.section('employee', 'khoa'),
         'Sao lưu cơ sở dữ liệu định kỳ bằng `mysqldump`.',
     ])
 
@@ -916,18 +928,23 @@ def write_overview(w, book):
     w.heading('3. Hướng dẫn sử dụng', 2, new_page=True)
     w.heading('3.1 Tổng quan', 3)
     w.p('POSCS là ứng dụng web nội bộ của POSTEF – Chi nhánh Miền Bắc, dùng để quản lý khách hàng (khách mua và nhà '
-        'cung cấp), hợp đồng bán và mua, danh mục sản phẩm và phiếu hỗ trợ kỹ thuật. Trang chủ tổng hợp số liệu; '
-        'hệ thống tự gửi thông báo khi hợp đồng sắp hết hạn hoặc phiếu hỗ trợ sắp quá hạn xử lý.')
+        'cung cấp), theo dõi hợp đồng bán và mua từ lúc làm phiếu GQNCKH tới khi thanh lý, danh mục sản phẩm và '
+        'phiếu hỗ trợ kỹ thuật. Trang chủ tổng hợp số liệu; hệ thống tự gửi thông báo khi hợp đồng sắp hết hạn, '
+        'hợp đồng đã giao hàng từ 15 ngày mà chưa ký, hoặc phiếu hỗ trợ sắp quá hạn xử lý.')
     w.picture(w.doc, HERE / OVERVIEW[0], 1, OVERVIEW[1], w.text_w)
-    w.p('Mỗi tài khoản có một trong ba vai trò. Vai trò quyết định trang nào mở được và nút nào hiện ra:')
+    w.p('Mỗi tài khoản có một trong ba vai trò, theo cơ cấu của chi nhánh: Ban giám đốc dùng vai Admin, phòng Kinh '
+        'doanh dùng vai Sales, phòng Tổng hợp dùng vai Tổng hợp. Vai trò quyết định trang nào mở được và nút nào '
+        'hiện ra:')
     w.plain_table(['Vai trò', 'Làm được', 'Chỉ xem, hoặc không vào được'], [
-        ('Admin', 'Mọi việc, gồm quản lý nhân viên: tạo tài khoản, giao tỉnh phụ trách, khoá tài khoản.', '—'),
-        ('Sales', 'Khách hàng, hợp đồng, phiếu hỗ trợ.',
-         'Chỉ xem sản phẩm; không vào trang Nhân viên. Sales đã có cấp trên trong sơ đồ tổ chức chỉ xem khách hàng '
-         'và hợp đồng.'),
-        ('Kỹ thuật', 'Danh mục sản phẩm. Phần xử lý của phiếu hỗ trợ được giao cho mình: trạng thái, nguyên nhân, '
-                     'phương hướng xử lý, kết quả.',
-         'Chỉ xem khách hàng, hợp đồng và phần còn lại của phiếu; không vào trang Nhân viên.'),
+        ('Admin', 'Mọi việc, gồm quản lý nhân viên (tạo tài khoản, giao tỉnh phụ trách, khoá tài khoản) và Thông '
+                  'tin chi nhánh.', '—'),
+        ('Sales', 'Khách hàng, hợp đồng (giấy tờ, kỳ thanh toán, bàn giao, ký, thanh lý), sản phẩm, phiếu hỗ trợ '
+                  '(tạo phiếu, là người xử lý).',
+         'Không vào trang Nhân viên và Thông tin chi nhánh. Sales đã có cấp trên trong sơ đồ tổ chức chỉ xem '
+         'khách hàng và hợp đồng.'),
+        ('Tổng hợp', 'Xác nhận bàn giao hợp đồng cho phòng Tổng hợp; ghi nhận kỳ thanh toán đã thu.',
+         'Chỉ xem khách hàng, hợp đồng, sản phẩm; không vào phiếu hỗ trợ, trang Nhân viên và Thông tin chi '
+         'nhánh.'),
     ], [2.6, 6.7, 6.7])
     w.p('Cách đọc phần hướng dẫn:')
     w.bullet_list([

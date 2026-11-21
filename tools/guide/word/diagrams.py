@@ -3,28 +3,33 @@
 
 Ba hình, lưu cạnh file này (tools/guide/word/):
   - tong-quan.png          sơ đồ tổng quan: phân hệ, ai quản lý, luồng dữ liệu
-  - vong-doi-hop-dong.png  vòng đời hợp đồng: trục tiến độ + trục lịch
+  - vong-doi-hop-dong.png  vòng đời hợp đồng: tiến độ, bước giao hàng, kỳ thanh
+                           toán, trạng thái theo lịch
   - trang-thai-phieu.png   trạng thái phiếu hỗ trợ + bốn phần nội dung phiếu
 
 Nội dung bám code, không bám tài liệu cũ: ContractDAO.ALLOWED_TRANSITIONS và
-STATUS_*, TechnicalSupportTicketDAO.STATUS_*, AccessControl.FULL_ACCESS_ROLES,
-NotificationScheduler, và chữ của các trang hướng dẫn trong app. Đổi luật ở đó
-thì vẽ lại ở đây -- chạy:
-    python tools/guide/word/diagrams.py
+STATUS_*, Contract.DELIVERY_* (BR-61), ContractPayment.statusOn (BR-60),
+TechnicalSupportTicketDAO.STATUS_*, AccessControl.FULL_ACCESS_ROLES,
+PermissionService, NotificationService, và chữ của các trang hướng dẫn trong
+app. Đổi luật ở đó thì vẽ lại ở đây -- chạy:
+    python tools/guide/word/diagrams.py [thư mục ra]
+Không ghi thư mục ra thì ghi đè ba ảnh cạnh file này (ảnh bản Word dùng); vẽ
+thử để duyệt thì truyền một thư mục khác.
 Cần Pillow. Chữ tiếng Việt dùng Segoe UI (Windows); không có thì DejaVu Sans.
 """
 import os
+import sys
 
 from PIL import Image, ImageDraw, ImageFont
 
-OUT = os.path.dirname(os.path.abspath(__file__))
+OUT = sys.argv[1] if len(sys.argv) > 1 else os.path.dirname(os.path.abspath(__file__))
 
 INK = '#1f2937'
 MUTED = '#6b7280'
 LINE = '#94a3b8'
 NAVY = '#003c6e'
 BLUE = '#0568a6'
-ROLE_COLORS = {'Admin': '#003c6e', 'Sales': '#0568a6', 'Kỹ thuật': '#0f766e'}
+ROLE_COLORS = {'Admin': '#003c6e', 'Sales': '#0568a6', 'Tổng hợp': '#0f766e'}
 FILL = {'plain': '#f8fafc', 'blue': '#eaf4fb', 'green': '#e8f7f1', 'amber': '#fff6e5',
         'gray': '#f1f5f9', 'red': '#fdecef'}
 EDGE = {'plain': '#cbd5e1', 'blue': '#8cc3e6', 'green': '#7fd1ad', 'amber': '#f3c67a',
@@ -190,26 +195,27 @@ def tong_quan():
     y1 = 150
     h1 = row(d, y1, [
         (L[0], L[1], 'Nhân viên & địa bàn',
-         'Tạo tài khoản, vai trò, phòng ban. Giao tỉnh phụ trách: mỗi tỉnh một người.', 'gray', ('Admin',)),
+         'Tạo tài khoản, vai trò, phòng ban. Giao tỉnh phụ trách cho Sales: mỗi tỉnh một người.', 'gray',
+         ('Admin',)),
         (C[0], C[1], 'Khách hàng',
          'Khách mua và nhà cung cấp. Khách mua tự đứng tên người cầm tỉnh của địa chỉ.', 'blue', ('Admin', 'Sales')),
         (R[0], R[1], 'Trang chủ',
-         'Số liệu khách hàng, hợp đồng, doanh thu theo phạm vi, tỉnh và kỳ.', 'plain', ()),
+         'Số liệu khách hàng, hợp đồng, doanh thu (số tiền thực thu) theo phạm vi, tỉnh và kỳ.', 'plain', ()),
     ])
     y2 = y1 + h1 + 120
     h2 = row(d, y2, [
         (L[0], L[1], 'Phiếu hỗ trợ kỹ thuật',
-         'Lập cho khách mua; kỹ thuật viên được giao ghi nguyên nhân, phương hướng, kết quả.', 'amber',
+         'Lập cho khách mua; người xử lý (một Sales) ghi nguyên nhân, phương hướng, kết quả.', 'amber',
          ('Admin', 'Sales')),
         (C[0], C[1], 'Hợp đồng bán / mua',
-         'Nháp → Đã ký → Đã thanh lý. Hàng hoá, kỳ thanh toán, bàn giao, tài liệu, phụ lục.', 'blue',
-         ('Admin', 'Sales')),
+         'Nháp → Đã ký → Đã thanh lý. Giấy tờ, hàng hoá, kỳ thanh toán, phụ lục. Tổng hợp xác nhận '
+         'bàn giao, ghi nhận đã thu.', 'blue', ('Admin', 'Sales', 'Tổng hợp')),
         (R[0], R[1], 'Sản phẩm',
-         'Danh mục thiết bị theo cây 3 cấp, kèm ảnh và catalogue. Không có giá.', 'green', ('Admin', 'Kỹ thuật')),
+         'Danh mục thiết bị theo cây 3 cấp, kèm ảnh và catalogue. Không có giá.', 'green', ('Admin', 'Sales')),
     ])
     y3 = y2 + h2 + 90
-    h3 = row(d, y3, [(C[0], C[1], 'Thông báo', 'Tự gửi mỗi giờ; bấm vào là mở thẳng việc cần làm.',
-                      'red', ())])
+    h3 = row(d, y3, [(C[0], C[1], 'Thông báo', 'Tự gửi mỗi giờ, mỗi việc một lần; bấm vào là mở thẳng việc '
+                      'cần làm.', 'red', ())])
     m1, m2 = y1 + h1 // 2, y2 + h2 // 2
     arrow(d, [(L[0] + L[1], m1), (C[0], m1)], 'giao tỉnh', label_dy=-32)
     arrow(d, [(C[0] + C[1], m1), (R[0], m1)], 'số liệu', label_dy=-32)
@@ -218,26 +224,35 @@ def tong_quan():
     arrow(d, [(700, y1 + h1), (700, mid1), (275, mid1), (275, y2)], 'khách mua cần hỗ trợ', label_at=0.45,
           label_dy=-14)
     arrow(d, [(R[0], m2), (C[0] + C[1], m2)], 'hàng hoá', label_dy=-32)
-    arrow(d, [(1015, y2 + h2), (1015, y3)], 'sắp hết hạn', label_dx=85, label_dy=-12)
+    arrow(d, [(1015, y2 + h2), (1015, y3)], 'sắp hết hạn, nhắc ký', label_dx=118, label_dy=-12)
     m3 = y3 + h3 // 2
     arrow(d, [(275, y2 + h2), (275, m3), (C[0], m3)], 'quá hạn SLA', label_at=0.72, label_dy=-32)
     note_y = y3 + h3 + 30
-    d.text((40, note_y), 'Kỹ thuật chỉ xem khách hàng, hợp đồng; Sales chỉ xem sản phẩm. Phiếu hỗ trợ: kỹ thuật '
-           'viên được giao cập nhật phần xử lý.', font=font(18), fill=MUTED)
-    save(img, note_y + 50, 'tong-quan.png')
+    d.text((40, note_y), 'Tổng hợp chỉ xem khách hàng, hợp đồng, sản phẩm (cộng xác nhận bàn giao và ghi nhận '
+           'đã thu ở hợp đồng); không vào phiếu hỗ trợ và trang Nhân viên.', font=font(18), fill=MUTED)
+    d.text((40, note_y + 30), 'Nhắc ký: hợp đồng đã giao hàng từ 15 ngày trở lên mà chưa ký thì người phụ trách nhận '
+           'một thông báo.', font=font(18), fill=MUTED)
+    save(img, note_y + 80, 'tong-quan.png')
 
 
 # ----------------------------------------------------------------------
 # 2. Vòng đời hợp đồng
 # ----------------------------------------------------------------------
 
+def section(d, y, title):
+    """Đường kẻ ngăn + tiêu đề phần; trả về y bắt đầu nội dung bên dưới."""
+    d.line([40, y, 1760, y], fill='#e2e8f0', width=3)
+    d.text((40, y + 26), title, font=font(22, True), fill=BLUE)
+    return y + 86
+
+
 def vong_doi_hop_dong():
-    img, d = canvas(1800, 1400, 'Vòng đời hợp đồng')
+    img, d = canvas(1800, 2400, 'Vòng đời hợp đồng')
     d.text((40, 84), 'Tiến độ: người dùng bấm, chỉ đi tới, không quay lại', font=font(22, True), fill=BLUE)
     y = 170
     h = row(d, y, [
-        (40, 330, 'Nháp', 'Sửa mọi thông tin, thêm hàng hoá. Xoá được.', 'gray', ()),
-        (520, 330, 'Đã ký', 'Điều khoản bị khoá; đổi phải lập phụ lục.', 'blue', ()),
+        (40, 330, 'Nháp', 'Mở từ lúc làm phiếu GQNCKH; mã để trống được. Xoá được.', 'gray', ()),
+        (520, 330, 'Đã ký', 'Cần có mã và thời hạn. Điều khoản bị khoá; đổi phải lập phụ lục.', 'blue', ()),
     ])
     mid = y + h // 2
     # Hai trạng thái cuối xếp chồng, cách đều hàng giữa. Từ "Đã ký" đi một thân chung
@@ -259,12 +274,36 @@ def vong_doi_hop_dong():
             'không huỷ được khi đã có phụ lục.')
     hh = box_height(d, 300, 'Xoá / huỷ bản ghi', note, (), 24, 18)
     box(d, 1460, top_y, 300, hh, 'Xoá / huỷ bản ghi', note, kind='red', title_size=24, body_size=18)
-    sep = max(ph_y + ph, top_y + hh) + 45
-    d.line([40, sep, 1760, sep], fill='#e2e8f0', width=3)
-    d.text((40, sep + 26), 'Trạng thái theo lịch: hệ thống tự tính từ ngày hiệu lực và ngày kết thúc, độc lập với '
-           'tiến độ', font=font(22, True), fill=BLUE)
-    cy = sep + 86
+
+    # Bước giao hàng (BR-61, BR-62): suy ra từ giấy tờ, chỉ ở bản Nháp.
+    gy = section(d, max(ph_y + ph, top_y + hh) + 45,
+                 'Bước giao hàng (chỉ ở bản Nháp): hệ thống tự suy ra từ giấy tờ đã tích')
+    gx, gw = [40, 620, 1200], 520
+    steps = [('Mở hồ sơ', 'Chưa tích giấy giao hàng nào: chưa có nhãn.', 'gray'),
+             ('Chuẩn bị hàng', 'Đã tích Phiếu GQNCKH hoặc Phiếu ĐCNB.', 'plain'),
+             ('Đã giao – chưa ký', 'Đã tích Biên bản giao nhận hàng hoá. Đã giao từ 15 ngày trở lên mà chưa ký: '
+              'người phụ trách nhận một thông báo nhắc ký.', 'amber')]
+    gh = row(d, gy, [(x, gw, t, b, k, ()) for x, (t, b, k) in zip(gx, steps)], title_size=24, body_size=18)
+    for x in gx[:-1]:
+        arrow(d, [(x + gw, gy + gh // 2), (x + gw + 60, gy + gh // 2)])
+    d.text((40, gy + gh + 24), 'Ngày giao là ngày trên biên bản giao nhận sớm nhất. Ký xong thì nhãn giao hàng mất.',
+           font=font(19), fill=MUTED)
+
+    # Kỳ thanh toán (BR-60): tình trạng suy ra, không lưu.
+    py = section(d, gy + gh + 80, 'Kỳ thanh toán: tình trạng hệ thống tự suy ra')
     xs, w = [40, 480, 920, 1360], 400
+    pay = [('Chưa nộp hồ sơ', 'Kỳ vừa lập: Tạm ứng hoặc Thanh toán, số tiền, điều kiện, số ngày phải trả.', 'gray'),
+           ('Chờ thu', 'Đã bấm Đã nộp hồ sơ: hạn thu = ngày nộp + số ngày phải trả.', 'blue'),
+           ('Quá hạn', 'Qua hạn thu mà chưa thu.', 'red'),
+           ('Đã thu', 'Ghi ngày thu và số tiền thực thu. Không sửa được nữa.', 'green')]
+    pyh = row(d, py, [(x, w - 40, t, b, k, ()) for x, (t, b, k) in zip(xs, pay)], title_size=24, body_size=18)
+    for x in xs[:-1]:
+        arrow(d, [(x + w - 40, py + pyh // 2), (x + w, py + pyh // 2)])
+    d.text((40, py + pyh + 24), 'Tiền về trước hạn thì Chờ thu sang thẳng Đã thu. Sales, Admin ghi ở trang Quản lý; '
+           'phòng Tổng hợp ghi nhận đã thu ở trang chi tiết.', font=font(19), fill=MUTED)
+
+    cy = section(d, py + pyh + 80, 'Trạng thái theo lịch: hệ thống tự tính từ ngày hiệu lực và ngày kết thúc, '
+                 'độc lập với tiến độ')
     cal = [('Chưa hiệu lực', 'Chưa đủ thời hạn, hoặc chưa tới ngày hiệu lực.', 'gray'),
            ('Đang hiệu lực', 'Đang trong thời hạn.', 'green'),
            ('Sắp hết hạn', 'Còn 30 ngày trở xuống; người phụ trách nhận thông báo.', 'amber'),
@@ -273,8 +312,8 @@ def vong_doi_hop_dong():
     for x in xs[:-1]:
         arrow(d, [(x + w - 40, cy + ch // 2), (x + w, cy + ch // 2)])
     note_y = cy + ch + 28
-    d.text((40, note_y), 'Đọc cả hai nhãn: "Đã ký" + "Đã hết hạn" nghĩa là hết hạn mà chưa thanh lý.',
-           font=font(19), fill=MUTED)
+    d.text((40, note_y), 'Đọc đủ các nhãn: "Đã ký" + "Đã hết hạn" nghĩa là hết hạn mà chưa thanh lý; "Nháp" + '
+           '"Đã giao – chưa ký" nghĩa là hàng đã tới khách mà chưa ký.', font=font(19), fill=MUTED)
     save(img, note_y + 50, 'vong-doi-hop-dong.png')
 
 
@@ -287,7 +326,7 @@ def trang_thai_phieu():
     y = 110
     h = row(d, y, [
         (40, 440, 'Mới tiếp nhận', 'Phiếu vừa tạo, chưa ai bắt tay xử lý. Xoá được.', 'gray', ()),
-        (680, 440, 'Đang xử lý', 'Kỹ thuật viên đang xử lý. Không xoá được.', 'amber', ()),
+        (680, 440, 'Đang xử lý', 'Người xử lý đang làm. Không xoá được.', 'amber', ()),
         (1320, 440, 'Đã đóng', 'Xử lý xong; lần đầu đóng, hệ thống ghi thời điểm hoàn tất.', 'green', ()),
     ])
     mid = y + h // 2
@@ -305,16 +344,16 @@ def trang_thai_phieu():
            fill=BLUE)
     py = sep + 80
     parts = [('Mô tả sự cố', 'Người tiếp nhận ghi khi lập phiếu.', 'blue'),
-             ('Nguyên nhân', 'Kỹ thuật viên ghi sau khi kiểm tra.', 'amber'),
-             ('Phương hướng xử lý', 'Kỹ thuật viên ghi cách xử lý.', 'amber'),
-             ('Kết quả', 'Kỹ thuật viên ghi khi xong.', 'green')]
+             ('Nguyên nhân', 'Người xử lý ghi sau khi kiểm tra.', 'amber'),
+             ('Phương hướng xử lý', 'Người xử lý ghi cách xử lý.', 'amber'),
+             ('Kết quả', 'Người xử lý ghi khi xong.', 'green')]
     xs = [40, 480, 920, 1360]
     ph = row(d, py, [(x, 400, t, b, k, ()) for x, (t, b, k) in zip(xs, parts)], title_size=24, body_size=18)
     for x in xs[:-1]:
         arrow(d, [(x + 400, py + ph // 2), (x + 440, py + ph // 2)])
     note_y = py + ph + 28
     d.text((40, note_y), 'Hạn xử lý (SLA) do Admin hoặc Sales đặt khi lập / sửa phiếu (không bắt buộc). Còn dưới '
-           '24 giờ hoặc đã quá hạn mà chưa đóng thì kỹ thuật viên được giao nhận thông báo.',
+           '24 giờ hoặc đã quá hạn mà chưa đóng thì người xử lý nhận thông báo. Người xử lý là một Sales.',
            font=font(19), fill=MUTED)
     save(img, note_y + 50, 'trang-thai-phieu.png')
 

@@ -3,9 +3,11 @@
 <%--
     Hướng dẫn sử dụng -- phân hệ Sản phẩm.
 
-    Viết theo CODE hiện tại (ProductController, ProductDAO, AccessControl,
-    AuthenticationFilter và các JSP trong jsp/technical/), không theo tài liệu
-    cũ. Ảnh ở web/guide/product/ do tools/guide/capture.mjs chụp theo kịch bản
+    Viết theo CODE hiện tại (ProductController, ProductService, ProductDAO,
+    PermissionService.canManageProducts / canViewProducts, AccessControl
+    Resource.PRODUCT và các JSP trong jsp/technical/), không theo tài liệu cũ.
+    Quyền theo Task 9.3: Admin và Sales thêm / sửa / xoá; Tổng hợp chỉ xem.
+    Ảnh ở web/guide/product/ do tools/guide/capture.mjs chụp theo kịch bản
     tools/guide/shots/product.mjs -- số trong ol.guide-steps phải khớp số
     khoanh đỏ trên ảnh; sửa một bên thì soát lại bên kia.
 
@@ -17,13 +19,13 @@
 <%@ include file="/jsp/guide/_top.jspf" %>
 
 <h1>Sản phẩm</h1>
-<p class="lead">Danh mục thiết bị, sản phẩm POSTEF cung cấp: ảnh, catalogue và các hợp đồng đang dùng từng sản phẩm. Admin và Kỹ thuật quản lý; Sales xem để tư vấn và lập hợp đồng.</p>
+<p class="lead">Danh mục thiết bị, sản phẩm POSTEF cung cấp: ảnh, catalogue và các hợp đồng đang dùng từng sản phẩm. Admin và Sales quản lý (thêm, sửa, xoá); Tổng hợp chỉ xem để tra cứu.</p>
 
 <h2 id="tong-quan">1. Tổng quan</h2>
-<div class="guide-who"><span class="lbl">Ai làm được:</span><span class="role">Admin</span><span class="role">Kỹ thuật</span><span class="role">Sales (chỉ xem)</span></div>
+<div class="guide-who"><span class="lbl">Ai làm được:</span><span class="role">Admin</span><span class="role">Sales</span><span class="role">Tổng hợp (chỉ xem)</span></div>
 <p>Trên thanh bên trái, bấm <strong>Sản phẩm</strong>. Mỗi sản phẩm gồm:</p>
 <ul>
-    <li><strong>Mã sản phẩm</strong> dạng <code>SP-0006</code>: hệ thống tự cấp khi tạo, không sửa được.</li>
+    <li><strong>Mã sản phẩm</strong> dạng <code>SP-0001</code>: hệ thống tự cấp khi tạo, không sửa được.</li>
     <li><strong>Tên</strong> và <strong>Mô tả</strong> (tính năng, thông số kỹ thuật).</li>
     <li><strong>Danh mục</strong>: cây ba cấp, ví dụ <em>CNTT &amp; IOT › LoRa › Sensors</em>. Sản phẩm luôn nằm ở danh mục cuối của một nhánh.</li>
     <li><strong>Hình ảnh</strong>: một hoặc nhiều ảnh; ảnh đầu tiên là ảnh đại diện trên thẻ sản phẩm.</li>
@@ -31,13 +33,13 @@
 </ul>
 <p>Sản phẩm <strong>không có giá</strong>. Khi lập hợp đồng, người lập chọn sản phẩm ở phần Hàng hoá và ghi số lượng, đơn vị (xem hướng dẫn Hợp đồng, mục 5.1).</p>
 <table class="guide-table">
-    <tr><th>Việc</th><th>Admin</th><th>Kỹ thuật</th><th>Sales</th></tr>
+    <tr><th>Việc</th><th>Admin</th><th>Sales</th><th>Tổng hợp</th></tr>
     <tr><td>Xem danh sách, tìm, xem chi tiết</td><td>Có</td><td>Có</td><td>Có</td></tr>
-    <tr><td>Thêm, sửa, xoá sản phẩm</td><td>Có</td><td>Có</td><td>Không: các nút này không hiện</td></tr>
+    <tr><td>Thêm, sửa, xoá sản phẩm</td><td>Có</td><td>Có (mọi Sales)</td><td>Không: các nút này không hiện</td></tr>
 </table>
 
 <h2 id="danh-sach">2. Xem và tìm sản phẩm</h2>
-<div class="guide-who"><span class="lbl">Ai làm được:</span><span class="role">Admin</span><span class="role">Kỹ thuật</span><span class="role">Sales</span></div>
+<div class="guide-who"><span class="lbl">Ai làm được:</span><span class="role">Admin</span><span class="role">Sales</span><span class="role">Tổng hợp</span></div>
 <p>Danh sách hiện 10 sản phẩm mỗi trang, sản phẩm thêm sau cùng đứng đầu.</p>
 <figure class="guide-shot">
     <a href="${img}/01-danh-sach.png" target="_blank"><img src="${img}/01-danh-sach.png" alt="Danh sách sản phẩm"></a>
@@ -45,14 +47,14 @@
 </figure>
 <ol class="guide-steps">
     <li><strong>Danh mục sản phẩm</strong>: bấm tên một danh mục để chỉ xem sản phẩm của nó (<a href="#loc-danh-muc">mục 2.1</a>). Số trong ngoặc là tổng số sản phẩm của danh mục đó, cộng cả các danh mục con. <em>Tất cả sản phẩm</em> bỏ lọc.</li>
-    <li><strong>Ô tìm kiếm</strong>: gõ mã (ví dụ <code>SP-0006</code>) hoặc một phần tên rồi nhấn Enter. Tìm trong danh mục đang lọc.</li>
+    <li><strong>Ô tìm kiếm</strong>: gõ mã (ví dụ <code>SP-0001</code>) hoặc một phần tên rồi nhấn Enter. Tìm trong danh mục đang lọc.</li>
     <li><strong>Thêm sản phẩm</strong> (<a href="#them-san-pham">mục 3</a>).</li>
     <li><strong>Thẻ sản phẩm</strong>: ảnh đại diện, nhãn danh mục, mã, tên và ngày cập nhật gần nhất. Bấm vào tên để mở trang chi tiết.</li>
     <li><strong>Ba nút trên thẻ</strong>: <i class="fa-regular fa-eye"></i> xem chi tiết, <i class="fa-solid fa-pen"></i> sửa (<a href="#sua">mục 5</a>), <i class="fa-solid fa-trash"></i> xoá (<a href="#xoa">mục 6</a>).</li>
     <li><strong>Phân trang</strong>, kèm số sản phẩm đang hiện trên tổng số.</li>
 </ol>
 <div class="guide-note">
-    <p>Tài khoản Sales không thấy nút Thêm sản phẩm, sửa và xoá. Mở đường dẫn tới một sản phẩm đã bị xoá thì danh sách báo <em>Không tìm thấy sản phẩm này</em>.</p>
+    <p>Tài khoản Tổng hợp không thấy nút Thêm sản phẩm, sửa và xoá; mở thẳng đường dẫn trang Thêm hoặc Sửa thì trang báo <em>Bạn không có quyền truy cập nội dung này.</em> Mở đường dẫn tới một sản phẩm đã bị xoá thì danh sách báo <em>Không tìm thấy sản phẩm này</em>.</p>
 </div>
 
 <h3 id="loc-danh-muc">2.1. Lọc theo danh mục</h3>
@@ -72,7 +74,7 @@
 </div>
 
 <h2 id="them-san-pham">3. Thêm sản phẩm</h2>
-<div class="guide-who"><span class="lbl">Ai làm được:</span><span class="role">Admin</span><span class="role">Kỹ thuật</span><span class="role no">Sales</span></div>
+<div class="guide-who"><span class="lbl">Ai làm được:</span><span class="role">Admin</span><span class="role">Sales</span><span class="role no">Tổng hợp</span></div>
 <p>Ở danh sách, bấm <strong>Thêm sản phẩm</strong>. Ô có dấu <span style="color:#e2536b">*</span> là bắt buộc.</p>
 <figure class="guide-shot narrow">
     <a href="${img}/03-them.png" target="_blank"><img src="${img}/03-them.png" alt="Trang Thêm sản phẩm"></a>
@@ -106,7 +108,7 @@
 <p>Nếu trang chi tiết mở ra với thông báo đỏ <em>Đã lưu thông tin sản phẩm, nhưng … tệp chưa gỡ được</em> (hoặc <em>… tệp chưa tải lên được</em>) thì tên, mô tả, danh mục đã lưu, chỉ riêng số tệp nêu trong thông báo gặp lỗi hệ thống. Xem lại ảnh và catalogue ở trang chi tiết, bấm <strong>Sửa</strong> gỡ hoặc chọn lại đúng những tệp đó; vẫn lỗi thì báo người quản trị hệ thống.</p>
 
 <h2 id="chi-tiet">4. Xem chi tiết sản phẩm</h2>
-<div class="guide-who"><span class="lbl">Ai làm được:</span><span class="role">Admin</span><span class="role">Kỹ thuật</span><span class="role">Sales</span></div>
+<div class="guide-who"><span class="lbl">Ai làm được:</span><span class="role">Admin</span><span class="role">Sales</span><span class="role">Tổng hợp</span></div>
 <p>Bấm tên sản phẩm hoặc nút <i class="fa-regular fa-eye"></i> ở danh sách.</p>
 <figure class="guide-shot narrow">
     <a href="${img}/04-chi-tiet.png" target="_blank"><img src="${img}/04-chi-tiet.png" alt="Trang chi tiết sản phẩm"></a>
@@ -115,14 +117,14 @@
 <ol class="guide-steps">
     <li><strong>Đầu trang</strong>: ảnh đại diện, mã, tên, nhãn danh mục và thời điểm cập nhật lần cuối.</li>
     <li><strong>Sửa thông tin</strong> (<a href="#sua">mục 5</a>).</li>
-    <li><strong>Xóa</strong> (<a href="#xoa">mục 6</a>). Hai nút này chỉ hiện với Admin và Kỹ thuật.</li>
+    <li><strong>Xóa</strong> (<a href="#xoa">mục 6</a>). Hai nút này chỉ hiện với Admin và Sales.</li>
     <li><strong>Hình ảnh</strong>: bấm một ảnh để mở ảnh gốc ở tab mới.</li>
     <li><strong>Catalogue</strong>: bấm tên tệp để mở ở tab mới, xem hoặc tải về.</li>
-    <li><strong>Hợp đồng sử dụng sản phẩm này</strong>: các hợp đồng, kể cả phụ lục, có sản phẩm trong phần Hàng hoá, kèm đối tác (khách hàng, hoặc nhà cung cấp ở hợp đồng mua) và trạng thái. Bấm mã hợp đồng để mở. Hợp đồng đã huỷ bản ghi không hiện ở đây.</li>
+    <li><strong>Hợp đồng sử dụng sản phẩm này</strong>: các hợp đồng, kể cả phụ lục, có sản phẩm trong phần Hàng hoá, kèm đối tác (khách hàng, hoặc nhà cung cấp ở hợp đồng mua) và trạng thái. Hợp đồng nháp chưa có mã thì cột Mã hợp đồng ghi <em>Chưa có số</em>. Bấm mã (hoặc chữ <em>Chưa có số</em>) để mở hợp đồng. Hợp đồng đã huỷ bản ghi không hiện ở đây.</li>
 </ol>
 
 <h2 id="sua">5. Sửa sản phẩm</h2>
-<div class="guide-who"><span class="lbl">Ai làm được:</span><span class="role">Admin</span><span class="role">Kỹ thuật</span><span class="role no">Sales</span></div>
+<div class="guide-who"><span class="lbl">Ai làm được:</span><span class="role">Admin</span><span class="role">Sales</span><span class="role no">Tổng hợp</span></div>
 <p>Ở trang chi tiết, bấm <strong>Sửa thông tin</strong>; hoặc bấm <i class="fa-solid fa-pen"></i> trên thẻ ở danh sách.</p>
 <figure class="guide-shot narrow">
     <a href="${img}/05-sua.png" target="_blank"><img src="${img}/05-sua.png" alt="Trang Cập nhật sản phẩm"></a>
@@ -143,7 +145,7 @@
 <p>Các thông báo lỗi giống khi thêm sản phẩm (<a href="#loi-them">mục 3.1</a>); riêng lỗi hệ thống ghi <em>Không lưu được thay đổi. Vui lòng thử lại.</em></p>
 
 <h2 id="xoa">6. Xoá sản phẩm</h2>
-<div class="guide-who"><span class="lbl">Ai làm được:</span><span class="role">Admin</span><span class="role">Kỹ thuật</span><span class="role no">Sales</span></div>
+<div class="guide-who"><span class="lbl">Ai làm được:</span><span class="role">Admin</span><span class="role">Sales</span><span class="role no">Tổng hợp</span></div>
 <figure class="guide-shot">
     <a href="${img}/06-xoa.png" target="_blank"><img src="${img}/06-xoa.png" alt="Hộp xác nhận xoá sản phẩm"></a>
     <figcaption>Hình 6. Hộp xác nhận xoá sản phẩm</figcaption>
@@ -159,7 +161,7 @@
     <figcaption>Hình 7. Sản phẩm đang có trong hợp đồng thì không xoá được</figcaption>
 </figure>
 <div class="guide-warn">
-    <p><strong>Không xoá được sản phẩm đang nằm trong hợp đồng</strong>, kể cả hợp đồng đã hết hạn: trang báo <em>Không thể xoá: sản phẩm đang được dùng trong hợp đồng</em> và giữ nguyên sản phẩm, để các hợp đồng đó vẫn tra được hàng hoá. Xem các hợp đồng đó ở cuối trang chi tiết (<a href="#chi-tiet">mục 4</a>).</p>
+    <p><strong>Không xoá được sản phẩm đang nằm trong hợp đồng</strong>, kể cả hợp đồng chưa ký hoặc đã hết hạn: trang báo <em>Không thể xoá: sản phẩm đang được dùng trong hợp đồng</em> và giữ nguyên sản phẩm, để các hợp đồng đó vẫn tra được hàng hoá. Xem các hợp đồng đó ở cuối trang chi tiết (<a href="#chi-tiet">mục 4</a>).</p>
 </div>
 
 <%@ include file="/jsp/guide/_bottom.jspf" %>

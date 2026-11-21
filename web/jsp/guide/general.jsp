@@ -5,9 +5,11 @@
     nhập, quên / đổi mật khẩu, thanh trên và thanh bên, trang chủ, thông báo,
     thông tin cá nhân, đăng xuất.
 
-    Viết theo CODE hiện tại (AuthenticationController, AuthenticationFilter,
-    DashboardController, NotificationController, NotificationScheduler và các
-    JSP ở gốc web/), không theo tài liệu cũ. Ảnh ở web/guide/general/ do
+    Viết theo CODE hiện tại (LoginController, PasswordResetController,
+    AuthService, ProfileController, AuthenticationFilter, DashboardService,
+    NotificationService, NotificationController, jsp/common/sidebar.jsp và các
+    JSP ở gốc web/), không theo tài liệu cũ. Ba vai Admin / Sales / Tổng hợp,
+    dữ liệu mẫu Task 10.6 (leminhhoang, phamthutrang...). Ảnh ở web/guide/general/ do
     tools/guide/capture.mjs chụp theo kịch bản tools/guide/shots/general.mjs
     -- số trong ol.guide-steps phải khớp số khoanh đỏ trên ảnh; sửa một bên thì
     soát lại bên kia.
@@ -23,14 +25,14 @@
 <p class="lead">Những việc ai cũng dùng: đăng nhập, lấy lại mật khẩu, trang chủ, thông báo, thông tin cá nhân. Hướng dẫn từng phân hệ nằm ở các tab bên cạnh.</p>
 
 <h2 id="dang-nhap">1. Đăng nhập</h2>
-<div class="guide-who"><span class="lbl">Ai làm được:</span><span class="role">Admin</span><span class="role">Sales</span><span class="role">Kỹ thuật</span></div>
-<p>Tài khoản do quản trị viên cấp. Chưa có tài khoản thì liên hệ Phòng Nhân sự / IT.</p>
+<div class="guide-who"><span class="lbl">Ai làm được:</span><span class="role">Admin</span><span class="role">Sales</span><span class="role">Tổng hợp</span></div>
+<p>Tài khoản do Admin cấp. Chưa có tài khoản hoặc quên tên đăng nhập thì liên hệ Admin.</p>
 <figure class="guide-shot">
     <a href="${img}/01-dang-nhap.png" target="_blank"><img src="${img}/01-dang-nhap.png" alt="Trang đăng nhập"></a>
     <figcaption>Hình 1. Trang đăng nhập</figcaption>
 </figure>
 <ol class="guide-steps">
-    <li><strong>Tên đăng nhập</strong>, ví dụ <code>sales4</code>. Đăng nhập bằng tên đăng nhập, không phải bằng email.</li>
+    <li><strong>Tên đăng nhập</strong>, ví dụ <code>leminhhoang</code>. Đăng nhập bằng tên đăng nhập, không phải bằng email.</li>
     <li><strong>Mật khẩu</strong>. Bấm biểu tượng con mắt để xem lại mật khẩu vừa gõ.</li>
     <li><strong>Quên mật khẩu?</strong> (<a href="#quen-mat-khau">mục 3</a>).</li>
     <li>Bấm <strong>Đăng nhập</strong>. Trang chủ mở ra (<a href="#trang-chu">mục 5</a>).</li>
@@ -38,16 +40,16 @@
 <table class="guide-table">
     <tr><th>Thông báo</th><th>Nguyên nhân và cách xử lý</th></tr>
     <tr><td>Sai tên đăng nhập hoặc mật khẩu.</td><td>Một trong hai bị sai. Vì lý do bảo mật, trang không nói rõ là cái nào. Gõ lại; không nhớ mật khẩu thì dùng Quên mật khẩu.</td></tr>
-    <tr><td>Bạn đã nhập sai quá nhiều lần. Vui lòng thử lại sau ít phút.</td><td>Sai 5 lần liên tiếp từ cùng một máy thì máy đó bị tạm chặn đăng nhập 15 phút.</td></tr>
-    <tr><td>Tài khoản này đã bị khóa hoặc ngừng hoạt động…</td><td>Quản trị viên đã khoá tài khoản. Liên hệ quản trị viên.</td></tr>
+    <tr><td>Bạn đã nhập sai quá nhiều lần. Vui lòng thử lại sau ít phút.</td><td>Sai 5 lần liên tiếp từ cùng một máy (kể cả gõ sai mật khẩu hiện tại khi đổi mật khẩu) thì máy đó bị tạm chặn đăng nhập 15 phút.</td></tr>
+    <tr><td>Tài khoản này đã bị khóa hoặc ngừng hoạt động…</td><td>Admin đã khoá tài khoản (ví dụ nhân viên đã nghỉ việc). Liên hệ Admin.</td></tr>
 </table>
 <div class="guide-note">
     <p>Không thao tác quá 30 phút thì phiên đăng nhập hết hạn và phải đăng nhập lại. Tài khoản bị khoá trong lúc đang dùng thì bị đưa ra trang đăng nhập ngay ở lần bấm tiếp theo.</p>
 </div>
 
 <h2 id="lan-dau">2. Lần đầu đăng nhập</h2>
-<div class="guide-who"><span class="lbl">Ai làm được:</span><span class="role">Admin</span><span class="role">Sales</span><span class="role">Kỹ thuật</span></div>
-<p>Khi cấp tài khoản, quản trị viên gửi tên đăng nhập và một <strong>mật khẩu tạm</strong> tới email cá nhân của bạn. Lần đầu đăng nhập bằng mật khẩu tạm, hệ thống buộc làm hai việc dưới đây trước khi dùng các trang khác. Mở trang khác lúc này sẽ bị đưa về đúng trang đang cần làm.</p>
+<div class="guide-who"><span class="lbl">Ai làm được:</span><span class="role">Admin</span><span class="role">Sales</span><span class="role">Tổng hợp</span></div>
+<p>Khi Admin tạo tài khoản, hệ thống gửi tên đăng nhập và một <strong>mật khẩu tạm</strong> tới email cá nhân của bạn. Lần đầu đăng nhập bằng mật khẩu tạm, hệ thống buộc làm hai việc dưới đây trước khi dùng các trang khác. Mở trang khác lúc này sẽ bị đưa về đúng trang đang cần làm.</p>
 <h3 id="doi-mat-khau-tam">2.1. Đổi mật khẩu tạm</h3>
 <figure class="guide-shot narrow">
     <a href="${img}/02-doi-mat-khau-tam.png" target="_blank"><img src="${img}/02-doi-mat-khau-tam.png" alt="Trang đổi mật khẩu khi đang dùng mật khẩu tạm"></a>
@@ -76,7 +78,7 @@
 <p>Các ô khác và thông báo lỗi xem ở <a href="#sua-ho-so">mục 7.1</a>.</p>
 
 <h2 id="quen-mat-khau">3. Quên mật khẩu</h2>
-<div class="guide-who"><span class="lbl">Ai làm được:</span><span class="role">Admin</span><span class="role">Sales</span><span class="role">Kỹ thuật</span></div>
+<div class="guide-who"><span class="lbl">Ai làm được:</span><span class="role">Admin</span><span class="role">Sales</span><span class="role">Tổng hợp</span></div>
 <p>Ở trang đăng nhập, bấm <strong>Quên mật khẩu?</strong>. Hệ thống gửi một mã OTP tới <strong>email cá nhân trong hồ sơ</strong> của bạn, nên email đó phải đúng (<a href="#sua-ho-so">mục 7.1</a>).</p>
 <h3 id="quen-b1">3.1. Bước 1: nhập tên đăng nhập</h3>
 <figure class="guide-shot">
@@ -89,7 +91,7 @@
     <li>Mã gồm 6 chữ số, có hiệu lực <strong>5 phút</strong>. Không thấy email thì kiểm cả hộp thư rác (Spam).</li>
 </ol>
 <div class="guide-note">
-    <p>Vì lý do bảo mật, trang luôn chuyển sang bước 2 dù tên đăng nhập có tồn tại hay không. Không nhận được mã thì kiểm lại tên đăng nhập, hoặc nhờ quản trị viên xem email cá nhân trong hồ sơ.</p>
+    <p>Vì lý do bảo mật, trang luôn chuyển sang bước 2 dù tên đăng nhập có tồn tại hay không. Không nhận được mã thì kiểm lại tên đăng nhập, hoặc nhờ Admin xem email cá nhân trong hồ sơ. Một máy xin mã quá 10 lần trong 15 phút thì hệ thống ngừng gửi mã (trang vẫn chuyển sang bước 2); chờ 15 phút rồi thử lại.</p>
 </div>
 <h3 id="quen-b2">3.2. Bước 2: nhập mã OTP</h3>
 <figure class="guide-shot">
@@ -105,7 +107,7 @@
 <table class="guide-table">
     <tr><th>Thông báo</th><th>Nguyên nhân và cách xử lý</th></tr>
     <tr><td>Mã OTP không đúng, vui lòng thử lại.</td><td>Gõ lại cho đúng mã trong email mới nhất.</td></tr>
-    <tr><td>Mã OTP đã hết hạn…</td><td>Quá 5 phút. Bấm Gửi lại mã.</td></tr>
+    <tr><td>Mã OTP đã hết hạn…</td><td>Quá 5 phút, nút Xác nhận bị khoá. Bấm Gửi lại mã.</td></tr>
     <tr><td>Bạn đã nhập sai mã OTP quá nhiều lần…</td><td>Sai 5 lần thì mã bị huỷ và bạn quay về bước 1 để nhận mã mới.</td></tr>
 </table>
 <h3 id="quen-b3">3.3. Bước 3: đặt mật khẩu mới</h3>
@@ -127,53 +129,61 @@
 </table>
 
 <h2 id="giao-dien">4. Thanh trên và thanh bên</h2>
-<div class="guide-who"><span class="lbl">Ai làm được:</span><span class="role">Admin</span><span class="role">Sales</span><span class="role">Kỹ thuật</span></div>
+<div class="guide-who"><span class="lbl">Ai làm được:</span><span class="role">Admin</span><span class="role">Sales</span><span class="role">Tổng hợp</span></div>
 <figure class="guide-shot">
     <a href="${img}/07-thanh-tren.png" target="_blank"><img src="${img}/07-thanh-tren.png" alt="Thanh trên, thanh bên và menu tài khoản"></a>
-    <figcaption>Hình 7. Thanh trên, thanh bên và menu tài khoản đang mở</figcaption>
+    <figcaption>Hình 7. Thanh trên, thanh bên của một tài khoản Sales và menu tài khoản đang mở</figcaption>
 </figure>
 <ol class="guide-steps">
     <li><strong>Nút ≡</strong>: thu gọn hoặc mở thanh bên. Bấm logo POSCS là về trang chủ.</li>
-    <li><strong>Thanh bên</strong>: các phân hệ. Mục đang mở được tô xanh. Mục <em>Nhân viên</em> chỉ Admin thấy.</li>
+    <li><strong>Thanh bên</strong>: các phân hệ. Mục đang mở được tô xanh. Vai nào cũng thấy <em>Trang chủ</em>, <em>Khách hàng</em> (Khách hàng mua, Nhà cung cấp), <em>Hợp đồng</em> (Hợp đồng bán, Hợp đồng mua, Bàn giao xử lý) và <em>Sản phẩm</em>. <em>Phiếu hỗ trợ</em> không hiện với vai Tổng hợp. <em>Nhân viên</em> và <em>Thông tin chi nhánh</em> chỉ Admin thấy.</li>
     <li><strong>Chuông</strong>: chấm đỏ nghĩa là có thông báo chưa đọc (<a href="#thong-bao">mục 6</a>).</li>
     <li>Bấm <strong>ảnh đại diện</strong> để mở menu tài khoản: họ tên, vai trò, <em>Thông tin cá nhân</em> (<a href="#ho-so">mục 7</a>), <em>Đổi mật khẩu</em> (<a href="#doi-mat-khau">mục 8</a>), <em>Đăng xuất</em> (<a href="#dang-xuat">mục 9</a>).</li>
 </ol>
+<p>Nút <strong>Hướng dẫn</strong> ở đầu các trang mở đúng phần hướng dẫn của trang đó trong một tab mới.</p>
 
 <h2 id="trang-chu">5. Trang chủ</h2>
-<div class="guide-who"><span class="lbl">Ai làm được:</span><span class="role">Admin</span><span class="role">Sales</span><span class="role">Kỹ thuật</span></div>
-<p>Số liệu khách hàng, hợp đồng và doanh thu. Tài khoản Sales mặc định xem phần việc của mình; Admin và Kỹ thuật mặc định xem toàn chi nhánh.</p>
+<div class="guide-who"><span class="lbl">Ai làm được:</span><span class="role">Admin</span><span class="role">Sales</span><span class="role">Tổng hợp</span></div>
+<p>Số liệu khách hàng, hợp đồng và doanh thu. Tài khoản Sales mặc định xem phần việc của mình (<em>Của tôi</em>); Admin và Tổng hợp mặc định xem <em>Toàn chi nhánh</em>.</p>
 <figure class="guide-shot">
     <a href="${img}/08-trang-chu.png" target="_blank"><img src="${img}/08-trang-chu.png" alt="Trang chủ"></a>
     <figcaption>Hình 8. Trang chủ của một tài khoản Sales</figcaption>
 </figure>
 <ol class="guide-steps">
     <li><strong>Lời chào</strong> và phạm vi số liệu đang xem, kèm ngày hôm nay.</li>
-    <li><strong>Phạm vi</strong>: <em>Của tôi</em> gồm khách, hợp đồng do bạn (hoặc cấp dưới) đứng tên, cộng mọi việc ở các tỉnh bạn phụ trách; <em>Toàn chi nhánh</em> là tất cả.</li>
-    <li><strong>Tỉnh</strong>: chỉ tính các tỉnh đã chọn (<a href="#loc-tinh">mục 5.1</a>).</li>
-    <li><strong>Kỳ</strong>: <em>Mọi thời điểm</em>, cả năm, một quý hoặc một tháng. Đổi năm bằng hai nút ‹ ›.</li>
-    <li><strong>Ba ô số liệu</strong>: tổng khách hàng (kèm số khách mới), hợp đồng đang hiệu lực (kèm số sắp hết hạn), doanh thu hợp đồng (so với kỳ trước). Doanh thu chỉ tính hợp đồng bán.</li>
-    <li><strong>Bảng Hợp đồng</strong>: các hợp đồng còn hiệu lực trong kỳ đang chọn; chưa chọn kỳ thì là tháng hiện tại. Giá trị đã cộng các phụ lục đã ký.</li>
-    <li><strong>Bảng Khách hàng</strong>: khách mới nhất trong phạm vi đang xem. Bấm <em>Xem tất cả</em> ở mỗi bảng để mở danh sách đầy đủ.</li>
+    <li><strong>Phạm vi</strong>: <em>Của tôi</em> gồm khách hàng, hợp đồng do bạn phụ trách, cộng mọi việc ở các tỉnh đang tích ở ô Tỉnh; <em>Toàn chi nhánh</em> gồm việc của mọi người, chỉ giới hạn theo các tỉnh đang tích. Đổi ô này là trang nạp lại ngay.</li>
+    <li><strong>Tỉnh</strong>: Sales mặc định tích sẵn các tỉnh mình phụ trách (cũng hiện thành các nhãn <em>Bạn phụ trách</em> bên trái). Admin và Tổng hợp không được giao tỉnh nên mặc định không tích tỉnh nào, tức cả 18 tỉnh địa bàn (<a href="#loc-tinh">mục 5.1</a>).</li>
+    <li><strong>Kỳ</strong>: <em>Mọi thời điểm</em>, cả năm, một quý hoặc một tháng. Đổi năm bằng hai nút ‹ ›. Chọn xong là trang nạp lại.</li>
+    <li><strong>Ba ô số liệu</strong>: <em>Tổng khách hàng</em> (kèm số khách mới trong tháng, hoặc trong kỳ đang chọn); <em>Hợp đồng đang hiệu lực</em> (kèm số hợp đồng sắp hết hạn); <em>Doanh thu hợp đồng</em> của tháng hiện tại hoặc kỳ đang chọn, kèm mức tăng giảm so với tháng / kỳ trước.</li>
+    <li><strong>Đã giao – chưa ký</strong>: số hợp đồng bán đã giao hàng mà chưa ký, trong phạm vi và các tỉnh đang chọn nhưng không theo ô Kỳ: luôn tính tới hôm nay. Bấm vào ô để mở danh sách hợp đồng bán đã lọc đúng các hợp đồng này.</li>
+    <li><strong>Bảng Hợp đồng</strong>: tối đa 8 hợp đồng còn hiệu lực trong kỳ đang chọn (chưa chọn kỳ thì là tháng hiện tại), kể cả hợp đồng nháp (bản nào chưa có mã thì hiện <em>Chưa có số</em>). Giá trị đã cộng các phụ lục đã ký.</li>
+    <li><strong>Bảng Khách hàng</strong>: tối đa 8 khách mới nhất trong phạm vi đang xem. Bấm <em>Xem tất cả</em> ở mỗi bảng để mở danh sách đầy đủ.</li>
 </ol>
+<div class="guide-note">
+    <p><strong>Doanh thu</strong> là tổng <strong>số tiền thực thu</strong> của các kỳ thanh toán đã ghi nhận thu, tính vào tháng có <strong>ngày thu</strong>, chỉ tính hợp đồng bán (hướng dẫn Hợp đồng, mục 7.3). Kỳ chưa thu thì chưa cộng.</p>
+</div>
+<p>Dòng có biểu tượng phễu ngay dưới thanh lọc nói số liệu đang tính theo phạm vi, tỉnh và kỳ nào. Muốn xem số liệu cả chi nhánh: chọn <em>Toàn chi nhánh</em> ở ô Phạm vi, rồi ở ô Tỉnh bấm <em>Bỏ hết</em> và <em>Áp dụng</em>.</p>
 <h3 id="loc-tinh">5.1. Lọc theo tỉnh</h3>
+<p>Ở phạm vi <em>Của tôi</em>, các tỉnh đang tích <strong>cộng thêm</strong> mọi việc trong tỉnh đó vào phần việc của bạn. Ở phạm vi <em>Toàn chi nhánh</em>, chúng <strong>thu hẹp</strong> số liệu về đúng các tỉnh đó.</p>
 <figure class="guide-shot">
     <a href="${img}/09-loc-tinh.png" target="_blank"><img src="${img}/09-loc-tinh.png" alt="Bảng chọn tỉnh ở trang chủ"></a>
     <figcaption>Hình 9. Bảng chọn tỉnh đang mở</figcaption>
 </figure>
 <ol class="guide-steps">
-    <li><strong>Tích các tỉnh</strong> cần xem. Tỉnh bạn phụ trách có nhãn <em>của bạn</em>.</li>
-    <li><strong>Địa bàn của tôi</strong>: chọn nhanh đúng các tỉnh bạn phụ trách. <em>Chọn tất cả</em> và <em>Bỏ hết</em> ở cùng hàng.</li>
-    <li>Bấm <strong>Áp dụng</strong>. Không tích tỉnh nào là xem cả 18 tỉnh địa bàn.</li>
+    <li><strong>Tích các tỉnh</strong> cần xem. Tỉnh bạn phụ trách in đậm, có nhãn <em>của bạn</em>.</li>
+    <li><strong>Địa bàn của tôi</strong>: chọn lại đúng các tỉnh bạn phụ trách (chỉ hiện với người được giao tỉnh). <em>Chọn tất cả</em> và <em>Bỏ hết</em> ở cùng hàng.</li>
+    <li>Bấm <strong>Áp dụng</strong>. Không tích tỉnh nào là xem cả 18 tỉnh địa bàn: ô Tỉnh hiện <em>Toàn bộ 18 tỉnh địa bàn</em>.</li>
 </ol>
 
 <h2 id="thong-bao">6. Thông báo</h2>
-<div class="guide-who"><span class="lbl">Ai làm được:</span><span class="role">Admin</span><span class="role">Sales</span><span class="role">Kỹ thuật</span></div>
+<div class="guide-who"><span class="lbl">Ai làm được:</span><span class="role">Admin</span><span class="role">Sales</span><span class="role">Tổng hợp</span></div>
 <p>Mỗi giờ hệ thống tự kiểm và gửi thông báo khi:</p>
 <ul>
-    <li>một hợp đồng bạn phụ trách chuyển sang <em>Sắp hết hạn</em> (còn 30 ngày trở xuống);</li>
-    <li>một phiếu hỗ trợ giao cho bạn sắp hoặc đã quá hạn xử lý (SLA).</li>
+    <li>một hợp đồng đã ký do bạn phụ trách còn 30 ngày trở xuống là hết hạn (<em>Sắp hết hạn</em>);</li>
+    <li>một hợp đồng do bạn phụ trách đã giao hàng từ 15 ngày trở lên mà vẫn chưa ký (<em>Đã giao – chưa ký</em>, hướng dẫn Hợp đồng, mục 1.2). Đây là thông báo <strong>nhắc ký</strong>, ví dụ <em>Hợp đồng Cung cấp cáp quang… đã giao hàng 16 ngày nhưng chưa ký.</em>;</li>
+    <li>một phiếu hỗ trợ bạn là <em>Người xử lý</em> còn 24 giờ trở xuống là tới hạn xử lý (SLA), hoặc đã quá hạn.</li>
 </ul>
-<p>Mỗi hợp đồng, mỗi phiếu chỉ được báo một lần.</p>
+<p>Mỗi loại chỉ báo bạn một lần cho mỗi hợp đồng, mỗi phiếu. Người phụ trách hợp đồng và người xử lý phiếu đều là Sales, nên thông báo tự động thường tới tài khoản Sales; chuông và trang Thông báo thì vai nào cũng có.</p>
 <figure class="guide-shot narrow">
     <a href="${img}/10-chuong.png" target="_blank"><img src="${img}/10-chuong.png" alt="Chuông thông báo đang mở"></a>
     <figcaption>Hình 10. Chuông thông báo trên thanh trên</figcaption>
@@ -194,7 +204,7 @@
 </ol>
 
 <h2 id="ho-so">7. Thông tin cá nhân</h2>
-<div class="guide-who"><span class="lbl">Ai làm được:</span><span class="role">Admin</span><span class="role">Sales</span><span class="role">Kỹ thuật</span></div>
+<div class="guide-who"><span class="lbl">Ai làm được:</span><span class="role">Admin</span><span class="role">Sales</span><span class="role">Tổng hợp</span></div>
 <p>Bấm ảnh đại diện, chọn <strong>Thông tin cá nhân</strong>.</p>
 <figure class="guide-shot narrow">
     <a href="${img}/12-ho-so.png" target="_blank"><img src="${img}/12-ho-so.png" alt="Trang thông tin cá nhân"></a>
@@ -222,17 +232,18 @@
 <table class="guide-table">
     <tr><th>Thông báo</th><th>Nguyên nhân và cách xử lý</th></tr>
     <tr><td>Vui lòng nhập đầy đủ Họ, Tên và Số CCCD/CMND.</td><td>Còn ô bắt buộc để trống.</td></tr>
+    <tr><td>Vui lòng chọn giới tính.</td><td>Ô Giới tính còn <em>-- Chọn giới tính --</em>.</td></tr>
     <tr><td>Số điện thoại không hợp lệ.</td><td>Không phải số di động Việt Nam dạng <code>0…</code> hoặc <code>+84…</code>.</td></tr>
     <tr><td>Vui lòng chọn ngày sinh hợp lệ trong quá khứ.</td><td>Ngày sinh trống hoặc ở tương lai.</td></tr>
     <tr><td>Địa chỉ email không hợp lệ.</td><td>Email cá nhân trống hoặc sai định dạng.</td></tr>
     <tr><td>Vui lòng chọn Tỉnh/Thành phố và Xã/Phường.</td><td>Chưa chọn xã / phường. Địa chỉ là bắt buộc.</td></tr>
-    <tr><td>Số điện thoại (hoặc số CCCD/CMND) này đã được dùng cho một nhân viên khác…</td><td>Kiểm lại số; đúng là của bạn thì báo quản trị viên.</td></tr>
+    <tr><td>Số điện thoại (hoặc số CCCD/CMND) này đã được dùng cho một nhân viên khác…</td><td>Kiểm lại số; đúng là của bạn thì báo Admin.</td></tr>
     <tr><td>Họ tên và địa chỉ không được chứa ký tự &lt; &gt; "…</td><td>Bỏ các ký tự đó.</td></tr>
     <tr><td>Ảnh đại diện chỉ nhận file JPG, PNG, GIF hoặc WEBP…</td><td>Chọn lại ảnh đúng định dạng.</td></tr>
 </table>
 
 <h2 id="doi-mat-khau">8. Đổi mật khẩu</h2>
-<div class="guide-who"><span class="lbl">Ai làm được:</span><span class="role">Admin</span><span class="role">Sales</span><span class="role">Kỹ thuật</span></div>
+<div class="guide-who"><span class="lbl">Ai làm được:</span><span class="role">Admin</span><span class="role">Sales</span><span class="role">Tổng hợp</span></div>
 <p>Bấm ảnh đại diện, chọn <strong>Đổi mật khẩu</strong>. Trang giống <a href="#doi-mat-khau-tam">Hình 2</a> nhưng không có dải nhắc: nhập mật khẩu hiện tại, mật khẩu mới, gõ lại mật khẩu mới rồi bấm <strong>Cập nhật mật khẩu</strong>. Đổi xong, hệ thống đăng xuất để bạn đăng nhập lại bằng mật khẩu mới.</p>
 <table class="guide-table">
     <tr><th>Thông báo</th><th>Nguyên nhân và cách xử lý</th></tr>
@@ -240,10 +251,11 @@
     <tr><td>Mật khẩu mới phải có ít nhất 8 ký tự.</td><td>Mật khẩu quá ngắn.</td></tr>
     <tr><td>Mật khẩu xác nhận không khớp.</td><td>Hai ô gõ khác nhau.</td></tr>
     <tr><td>Mật khẩu mới không được trùng với mật khẩu cũ.</td><td>Chọn một mật khẩu khác.</td></tr>
+    <tr><td>Đã có lỗi xảy ra. Vui lòng thử lại.</td><td>Thường do đã gõ sai mật khẩu hiện tại 5 lần liên tiếp: máy bị tạm chặn 15 phút, cả đăng nhập lẫn đổi mật khẩu (<a href="#dang-nhap">mục 1</a>). Chờ rồi thử lại.</td></tr>
 </table>
 
 <h2 id="dang-xuat">9. Đăng xuất</h2>
-<div class="guide-who"><span class="lbl">Ai làm được:</span><span class="role">Admin</span><span class="role">Sales</span><span class="role">Kỹ thuật</span></div>
+<div class="guide-who"><span class="lbl">Ai làm được:</span><span class="role">Admin</span><span class="role">Sales</span><span class="role">Tổng hợp</span></div>
 <p>Bấm ảnh đại diện, chọn <strong>Đăng xuất</strong> (<a href="#giao-dien">Hình 7</a>). Mở lại trang đăng nhập, ví dụ bấm nút quay lại của trình duyệt về tới trang đó, cũng tự đăng xuất.</p>
 <div class="guide-warn">
     <p>Dùng máy chung thì luôn đăng xuất khi xong việc.</p>
