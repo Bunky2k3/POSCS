@@ -18,10 +18,11 @@ import poscs.model.TechnicalRequest;
 import poscs.validator.ContractValidator;
 
 /**
- * Nghiệp vụ thông báo (UC-14, UC-15; BR-17, BR-20, BR-21):
- * - Chỉ tự sinh đúng 2 loại thông báo: hợp đồng sắp hết hạn (≤ 30 ngày) gửi
- *   người phụ trách và phiếu hỗ trợ sắp/đã quá hạn SLA (≤ 24 giờ) gửi người xử lý
- *   được phân công. Mỗi cặp (đối tượng, người nhận) tối đa 1 thông báo.
+ * Nghiệp vụ thông báo (UC-14, UC-15; BR-17, BR-20, BR-21, BR-62):
+ * - Tự sinh đúng 3 loại thông báo: hợp đồng sắp hết hạn (≤ 30 ngày) gửi
+ *   người phụ trách, phiếu hỗ trợ sắp/đã quá hạn SLA (≤ 24 giờ) gửi người xử lý
+ *   được phân công, và hợp đồng đã giao hàng quá 15 ngày chưa ký (BR-62) gửi
+ *   người phụ trách hiện tại. Mỗi cặp (đối tượng, người nhận) tối đa 1 thông báo.
  * - Truy vấn danh sách không tự đánh dấu đã đọc (BR-21); chỉ xem và đánh dấu
  *   thông báo thuộc chính người dùng (BR-20).
  */
@@ -29,8 +30,12 @@ public class NotificationService extends BaseService {
 
     public static final String REF_CONTRACT_EXPIRING = "contract_expiring";
     public static final String REF_TICKET_SLA = "ticket_sla";
+    /** BR-62 / SPEC 5.7 loại 3: ref_type riêng, khác loại sắp hết hạn (cột ref_type varchar(30)). */
+    public static final String REF_CONTRACT_UNSIGNED_DELIVERY = "contract_unsigned_delivery";
     public static final int CONTRACT_EXPIRING_DAYS = ContractValidator.SOON_THRESHOLD_DAYS;
     public static final int TICKET_SLA_HOURS = 24;
+    /** BR-62: nhắc khi ngày giao ≤ hôm nay − 15 ngày. */
+    public static final int UNSIGNED_DELIVERY_DAYS = 15;
     public static final int TITLE_MAX_LENGTH = 150;
 
     private final NotificationDAO notificationDAO;
@@ -55,9 +60,39 @@ public class NotificationService extends BaseService {
         this.clock = Objects.requireNonNull(clock, "clock");
     }
 
-    /** Chạy cả 2 luồng sinh thông báo tự động theo lịch; trả về tổng số thông báo mới tạo. */
+    /** Chạy cả 3 luồng sinh thông báo tự động theo lịch; trả về tổng số thông báo mới tạo. */
     public synchronized int generateScheduledNotifications() {
-        return generateContractExpiringNotifications() + generateTicketSlaNotifications();
+        return generateContractExpiringNotifications() + generateTicketSlaNotifications()
+                + generateUnsignedDeliveryNotifications();
+    }
+
+    /**
+     * BR-62: nhắc người phụ trách HIỆN TẠI của hợp đồng "Đã giao – chưa ký" (BR-61)
+     * có ngày giao ≤ hôm nay − 15 ngày. Một lần: idempotent theo
+     * (ownerId, contract_unsigned_delivery, contractId), không nhắc lặp lại và
+     * không gửi Admin. Nội dung theo MSG-065.
+     */
+    public int generateUnsignedDeliveryNotifications() {
+        LocalDate today = LocalDate.now(clock);
+        LocalDate cutoff = today.minusDays(UNSIGNED_DELIVERY_DAYS);
+        List<Contract> delivered = contractDAO.findDeliveredUnsigned(Date.valueOf(cutoff));
+        if (delivered == null || delivered.isEmpty()) {
+            return 0;
+        }
+        int created = 0;
+        for (Contract c : delivered) {
+            if (!isEligibleUnsignedDelivery(c, cutoff)) {
+                continue;
+            }
+            if (notificationDAO.existsForUserAndRef(c.getOwnerId(), REF_CONTRACT_UNSIGNED_DELIVERY, c.getContractId())) {
+                continue;
+            }
+            String title = buildUnsignedDeliveryTitle(c, c.deliveredDaysOn(today));
+            if (notificationDAO.insert(c.getOwnerId(), title, REF_CONTRACT_UNSIGNED_DELIVERY, c.getContractId())) {
+                created++;
+            }
+        }
+        return created;
     }
 
     /**
@@ -185,6 +220,38 @@ public class NotificationService extends BaseService {
         }
         Timestamp sla = t.getSlaDeadline();
         return sla != null && !sla.toLocalDateTime().isAfter(cutoff);
+    }
+
+    /**
+     * Chốt lại ở Java dù câu truy vấn đã lọc: DAO trả về đúng tập này là việc
+     * của SQL, còn lịch nhắc không được bắn cho hợp đồng đã ký, bị huỷ bản ghi
+     * hay chưa đủ 15 ngày chỉ vì một câu truy vấn về sau bị sửa lệch.
+     */
+    private boolean isEligibleUnsignedDelivery(Contract c, LocalDate cutoff) {
+        if (c == null || c.getContractId() <= 0 || c.getOwnerId() <= 0 || c.isDeleted()) {
+            return false;
+        }
+        if (!c.isDraft() || !c.isDeliveredUnsigned() || c.getDeliveredDate() == null) {
+            return false;
+        }
+        return !c.getDeliveredDate().toLocalDate().isAfter(cutoff);
+    }
+
+    /**
+     * MSG-065: "Hợp đồng [tên hợp đồng] đã giao hàng [n] ngày nhưng chưa ký."
+     * Tên dài thì cắt bớt TÊN (thêm "…") để câu vẫn trọn vẹn trong 150 ký tự
+     * của cột title, thay vì cụt mất đuôi "nhưng chưa ký.".
+     */
+    private String buildUnsignedDeliveryTitle(Contract c, Long days) {
+        String name = c.getTitle() == null || c.getTitle().trim().isEmpty()
+                ? c.getDisplayCode() : c.getTitle().trim();
+        String prefix = "Hợp đồng ";
+        String suffix = " đã giao hàng " + (days != null ? days : 0) + " ngày nhưng chưa ký.";
+        int room = TITLE_MAX_LENGTH - prefix.length() - suffix.length();
+        if (name.length() > room) {
+            name = name.substring(0, Math.max(0, room - 1)) + "…";
+        }
+        return prefix + name + suffix;
     }
 
     private long daysUntil(LocalDate today, Date endDate) {

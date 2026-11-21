@@ -452,4 +452,200 @@ public class NotificationServiceTest {
         assertFalse(titleCaptor.getValue(), titleCaptor.getValue().contains("null"));
         assertTrue(titleCaptor.getValue(), titleCaptor.getValue().contains("#13"));
     }
+
+    // ------------------------------------------------------------------
+    // Task 10.5 / BR-62: nhắc ký hợp đồng đã giao hàng quá 15 ngày
+    // ------------------------------------------------------------------
+
+    /** Hôm nay − 15 ngày: mốc lịch nhắc truyền xuống DAO (BR-62 "ngày giao ≤ hôm nay − 15 ngày"). */
+    private static final Date CUTOFF = Date.valueOf(TODAY.minusDays(15));
+
+    private Contract delivered(int id, String title, int ownerId, LocalDate deliveredOn) {
+        Contract c = new Contract();
+        c.setContractId(id);
+        c.setTitle(title);
+        c.setOwnerId(ownerId);
+        c.setProgressStatus(ContractDAO.PROGRESS_DRAFT);
+        c.setDeliveryStage(Contract.DELIVERY_DELIVERED);
+        c.setDeliveredDate(deliveredOn != null ? Date.valueOf(deliveredOn) : null);
+        return c;
+    }
+
+    @Test
+    public void unsignedDelivery_constantsMatchSpec() {
+        assertEquals(15, NotificationService.UNSIGNED_DELIVERY_DAYS);
+        // ref_type riêng, khác loại sắp hết hạn, vừa cột varchar(30).
+        assertNotEquals(NotificationService.REF_CONTRACT_EXPIRING, NotificationService.REF_CONTRACT_UNSIGNED_DELIVERY);
+        assertTrue(NotificationService.REF_CONTRACT_UNSIGNED_DELIVERY.length() <= 30);
+    }
+
+    @Test
+    public void unsignedDelivery_exactly15Days_createsOneNotificationForOwnerWithMsg065() {
+        Contract c = delivered(31, "Cung cấp thiết bị Quảng Trị", 7, TODAY.minusDays(15));
+        when(contractDAO.findDeliveredUnsigned(CUTOFF)).thenReturn(List.of(c));
+        when(notificationDAO.insert(anyInt(), anyString(), anyString(), anyInt())).thenReturn(true);
+
+        assertEquals(1, service.generateUnsignedDeliveryNotifications());
+
+        ArgumentCaptor<String> title = ArgumentCaptor.forClass(String.class);
+        verify(notificationDAO).insert(eq(7), title.capture(),
+                eq(NotificationService.REF_CONTRACT_UNSIGNED_DELIVERY), eq(31));
+        assertEquals("Hợp đồng Cung cấp thiết bị Quảng Trị đã giao hàng 15 ngày nhưng chưa ký.", title.getValue());
+    }
+
+    @Test
+    public void unsignedDelivery_16DaysAgo_createsNotificationSaying16Days() {
+        Contract c = delivered(32, "HĐ giao 16 ngày", 8, TODAY.minusDays(16));
+        when(contractDAO.findDeliveredUnsigned(CUTOFF)).thenReturn(List.of(c));
+        when(notificationDAO.insert(anyInt(), anyString(), anyString(), anyInt())).thenReturn(true);
+
+        assertEquals(1, service.generateUnsignedDeliveryNotifications());
+
+        verify(notificationDAO).insert(8, "Hợp đồng HĐ giao 16 ngày đã giao hàng 16 ngày nhưng chưa ký.",
+                NotificationService.REF_CONTRACT_UNSIGNED_DELIVERY, 32);
+    }
+
+    @Test
+    public void unsignedDelivery_only14Days_noNotification() {
+        // Câu truy vấn đã lọc theo mốc; nếu nó lỡ trả về bản 14 ngày thì service vẫn không nhắc.
+        Contract c = delivered(33, "HĐ mới giao", 7, TODAY.minusDays(14));
+        when(contractDAO.findDeliveredUnsigned(CUTOFF)).thenReturn(List.of(c));
+
+        assertEquals(0, service.generateUnsignedDeliveryNotifications());
+
+        verify(notificationDAO, never()).insert(anyInt(), anyString(), anyString(), any());
+    }
+
+    @Test
+    public void unsignedDelivery_asksDaoForCutoffTodayMinus15() {
+        service.generateUnsignedDeliveryNotifications();
+
+        verify(contractDAO).findDeliveredUnsigned(Date.valueOf(LocalDate.of(2026, 10, 30)));
+    }
+
+    @Test
+    public void unsignedDelivery_alreadyNotified_notCreatedAgain() {
+        Contract c = delivered(34, "HĐ đã nhắc", 7, TODAY.minusDays(20));
+        when(contractDAO.findDeliveredUnsigned(CUTOFF)).thenReturn(List.of(c));
+        when(notificationDAO.existsForUserAndRef(7, NotificationService.REF_CONTRACT_UNSIGNED_DELIVERY, 34))
+                .thenReturn(true);
+
+        assertEquals(0, service.generateUnsignedDeliveryNotifications());
+
+        verify(notificationDAO, never()).insert(anyInt(), anyString(), anyString(), any());
+    }
+
+    @Test
+    public void unsignedDelivery_runTwice_insertsOnlyOnce() {
+        Contract c = delivered(35, "HĐ chạy hai lượt", 7, TODAY.minusDays(20));
+        when(contractDAO.findDeliveredUnsigned(CUTOFF)).thenReturn(List.of(c));
+        Set<String> sent = new HashSet<>();
+        when(notificationDAO.existsForUserAndRef(anyInt(), anyString(), anyInt()))
+                .thenAnswer(inv -> sent.contains(inv.getArgument(0) + "|" + inv.getArgument(1) + "|" + inv.getArgument(2)));
+        when(notificationDAO.insert(anyInt(), anyString(), anyString(), anyInt())).thenAnswer(inv -> {
+            sent.add(inv.getArgument(0) + "|" + inv.getArgument(2) + "|" + inv.getArgument(3));
+            return true;
+        });
+
+        assertEquals(1, service.generateUnsignedDeliveryNotifications());
+        assertEquals(0, service.generateUnsignedDeliveryNotifications());
+
+        verify(notificationDAO, times(1)).insert(anyInt(), anyString(), anyString(), anyInt());
+    }
+
+    @Test
+    public void unsignedDelivery_signedContract_noNotification() {
+        Contract signed = delivered(36, "HĐ đã ký", 7, TODAY.minusDays(30));
+        signed.setProgressStatus(ContractDAO.PROGRESS_SIGNED);
+        when(contractDAO.findDeliveredUnsigned(CUTOFF)).thenReturn(List.of(signed));
+
+        assertEquals(0, service.generateUnsignedDeliveryNotifications());
+
+        verify(notificationDAO, never()).insert(anyInt(), anyString(), anyString(), any());
+    }
+
+    @Test
+    public void unsignedDelivery_voidedDeliveryNote_notCounted() {
+        // Biên bản giao nhận đã huỷ không tính (BR-61): DAO đọc ra bản Nháp không còn bước
+        // giao hàng và không có ngày giao -- không được nhắc.
+        Contract voided = delivered(37, "HĐ huỷ biên bản", 7, null);
+        voided.setDeliveryStage(null);
+        Contract preparing = delivered(38, "HĐ chỉ có phiếu", 7, null);
+        preparing.setDeliveryStage(Contract.DELIVERY_PREPARING);
+        when(contractDAO.findDeliveredUnsigned(CUTOFF)).thenReturn(List.of(voided, preparing));
+
+        assertEquals(0, service.generateUnsignedDeliveryNotifications());
+
+        verify(notificationDAO, never()).insert(anyInt(), anyString(), anyString(), any());
+    }
+
+    @Test
+    public void unsignedDelivery_invalidRows_skipped() {
+        Contract noOwner = delivered(39, "HĐ không người phụ trách", 0, TODAY.minusDays(20));
+        Contract deleted = delivered(40, "HĐ đã huỷ bản ghi", 7, TODAY.minusDays(20));
+        deleted.setDeleted(true);
+        Contract noId = delivered(0, "HĐ không id", 7, TODAY.minusDays(20));
+        when(contractDAO.findDeliveredUnsigned(CUTOFF)).thenReturn(Arrays.asList(null, noOwner, deleted, noId));
+
+        assertEquals(0, service.generateUnsignedDeliveryNotifications());
+
+        verify(notificationDAO, never()).insert(anyInt(), anyString(), anyString(), any());
+    }
+
+    @Test
+    public void unsignedDelivery_daoReturnsNullOrEmpty_returnsZero() {
+        when(contractDAO.findDeliveredUnsigned(CUTOFF)).thenReturn(null);
+        assertEquals(0, service.generateUnsignedDeliveryNotifications());
+
+        when(contractDAO.findDeliveredUnsigned(CUTOFF)).thenReturn(Collections.emptyList());
+        assertEquals(0, service.generateUnsignedDeliveryNotifications());
+    }
+
+    @Test
+    public void unsignedDelivery_insertFails_notCounted() {
+        Contract c = delivered(41, "HĐ ghi lỗi", 7, TODAY.minusDays(20));
+        when(contractDAO.findDeliveredUnsigned(CUTOFF)).thenReturn(List.of(c));
+        when(notificationDAO.insert(anyInt(), anyString(), anyString(), anyInt())).thenReturn(false);
+
+        assertEquals(0, service.generateUnsignedDeliveryNotifications());
+    }
+
+    @Test
+    public void unsignedDelivery_longTitle_isShortenedButSentenceStaysWhole() {
+        String longTitle = "Cung cấp lắp đặt thiết bị truyền dẫn quang ".repeat(6).trim();
+        Contract c = delivered(42, longTitle, 7, TODAY.minusDays(15));
+        when(contractDAO.findDeliveredUnsigned(CUTOFF)).thenReturn(List.of(c));
+        when(notificationDAO.insert(anyInt(), anyString(), anyString(), anyInt())).thenReturn(true);
+
+        service.generateUnsignedDeliveryNotifications();
+
+        ArgumentCaptor<String> title = ArgumentCaptor.forClass(String.class);
+        verify(notificationDAO).insert(eq(7), title.capture(), anyString(), eq(42));
+        assertTrue(title.getValue().length() <= NotificationService.TITLE_MAX_LENGTH);
+        assertTrue(title.getValue(), title.getValue().startsWith("Hợp đồng Cung cấp lắp đặt"));
+        assertTrue(title.getValue(), title.getValue().endsWith("… đã giao hàng 15 ngày nhưng chưa ký."));
+    }
+
+    @Test
+    public void unsignedDelivery_blankTitle_fallsBackToDisplayCode() {
+        Contract c = delivered(43, "  ", 7, TODAY.minusDays(15));
+        when(contractDAO.findDeliveredUnsigned(CUTOFF)).thenReturn(List.of(c));
+        when(notificationDAO.insert(anyInt(), anyString(), anyString(), anyInt())).thenReturn(true);
+
+        service.generateUnsignedDeliveryNotifications();
+
+        verify(notificationDAO).insert(7, "Hợp đồng " + Contract.NO_CODE_LABEL + " đã giao hàng 15 ngày nhưng chưa ký.",
+                NotificationService.REF_CONTRACT_UNSIGNED_DELIVERY, 43);
+    }
+
+    @Test
+    public void generateScheduled_includesUnsignedDeliveryReminders() {
+        Contract c = delivered(44, "HĐ lịch chạy", 7, TODAY.minusDays(15));
+        when(contractDAO.findDeliveredUnsigned(CUTOFF)).thenReturn(List.of(c));
+        when(notificationDAO.insert(anyInt(), anyString(), anyString(), anyInt())).thenReturn(true);
+
+        assertEquals(1, service.generateScheduledNotifications());
+
+        verify(notificationDAO).insert(eq(7), anyString(), eq(NotificationService.REF_CONTRACT_UNSIGNED_DELIVERY), eq(44));
+    }
 }

@@ -80,6 +80,11 @@ public class DashboardService extends BaseService {
         Map<Integer, BigDecimal> contractValues = buildContractValues(windowContracts);
         List<Enterprise> scopeCustomers = safeList(customerDAO.findInScope(
                 CUSTOMERS_IN_SCOPE_LIMIT, provinces.filters, scope.ownerIds, period));
+        // UC-36 / BR-61: ô "Đã giao – chưa ký" -- cùng phạm vi người/địa bàn, KHÔNG theo kỳ
+        // (kỳ lọc theo ngày ký, hợp đồng Nháp chưa có ngày ký), chỉ hợp đồng bán để khớp
+        // danh sách hợp đồng bán mở ra khi bấm vào ô (người dùng chốt 21/11/2026).
+        int deliveredUnsigned = contractDAO.countDeliveredUnsigned(
+                provinces.filters, scope.ownerIds, ContractService.DIRECTION_SELL);
 
         DashboardSummary summary = new DashboardSummary(
                 provinceList, period, scope.scopeFilter, scope.teamSize,
@@ -87,7 +92,7 @@ public class DashboardService extends BaseService {
                 totalCustomers, newCustomersThisMonth, contractStatusSummary,
                 revenue.thisPeriod, revenue.trendPercent, refDate.getMonthValue(),
                 formatTodayLabel(refDate), contractWindow.getLabel(),
-                windowContracts, contractValues, scopeCustomers);
+                windowContracts, contractValues, scopeCustomers, deliveredUnsigned);
         return success(summary);
     }
 

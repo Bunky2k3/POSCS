@@ -547,4 +547,22 @@ public class DashboardControllerTest {
         verify(contractDAO).countStatusSummary(eq(List.<Integer>of()), isNull(), isNull(), anyBoolean(), nullable(List.class));
         verify(request).setAttribute("provinceFilters", List.of());
     }
+
+    /** Task 10.5 / BR-61: ô "Đã giao – chưa ký" nhận đúng số đếm hợp đồng bán trong phạm vi. */
+    @Test
+    public void deliveredUnsignedCount_isExposedToTheView() throws Exception {
+        chonTinh("3");
+        when(contractDAO.countDeliveredUnsigned(List.of(3), null, ContractDAO.DIRECTION_SELL)).thenReturn(3);
+
+        controller.doGet(request, response);
+
+        verify(request).setAttribute("deliveredUnsignedCount", 3);
+    }
+
+    @Test
+    public void deliveredUnsignedCount_noneInScope_isZero() throws Exception {
+        controller.doGet(request, response);
+
+        verify(request).setAttribute("deliveredUnsignedCount", 0);
+    }
 }

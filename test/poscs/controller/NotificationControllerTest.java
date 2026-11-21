@@ -106,6 +106,29 @@ public class NotificationControllerTest {
     }
 
     @Test
+    public void actionOpen_unsignedDeliveryReminder_marksReadAndOpensTheContract() throws Exception {
+        // Task 10.5 / BR-62: bấm thông báo nhắc ký phải mở trang chi tiết hợp đồng (SPEC 5.7 loại 3).
+        when(request.getParameter("action")).thenReturn("open");
+        when(request.getParameter("id")).thenReturn("44");
+        when(notificationDAO.findByIdForUser(44, 7))
+                .thenReturn(notification(44, "contract_unsigned_delivery", 31));
+
+        controller.doGet(request, response);
+
+        verify(notificationDAO).markAsRead(44, 7);
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=view&id=31");
+    }
+
+    @Test
+    public void targetOf_unsignedDeliveryReminder_usesTheServiceRefType() {
+        org.junit.Assert.assertEquals("/contract?action=view&id=31", NotificationController.targetOf(
+                notification(1, poscs.service.NotificationService.REF_CONTRACT_UNSIGNED_DELIVERY, 31)));
+        // Thiếu id thì vẫn về trang Thông báo như các loại khác.
+        org.junit.Assert.assertEquals("/notifications", NotificationController.targetOf(
+                notification(1, poscs.service.NotificationService.REF_CONTRACT_UNSIGNED_DELIVERY, null)));
+    }
+
+    @Test
     public void actionOpen_ticketSla_opensTheTicket() throws Exception {
         when(request.getParameter("action")).thenReturn("open");
         when(request.getParameter("id")).thenReturn("43");

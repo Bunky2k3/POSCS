@@ -132,12 +132,16 @@ public class ContractListController extends HttpServlet {
         return AccessControl.listScope(request,
                 () -> u != null ? employeeDAO.findTeamUserIds(u.getUserId()) : List.of(),
                 () -> u != null ? employeeDAO.findProvincesOf(u.getUserId()).stream().map(Province::getProvinceId).collect(Collectors.toList()) : List.of())
-                .withActiveWindow(activeWindow);
+                .withActiveWindow(activeWindow)
+                // BR-61: bộ lọc bước giao hàng đi cùng phạm vi, nên danh sách, bộ đếm
+                // phân trang và dải KPI cùng lọc một kiểu.
+                .withDeliveryStage(ContractFilterHelper.deliveryFilterOf(request));
     }
 
     private void bindScopeAttributes(HttpServletRequest request, ListScope scope) {
         boolean allTime = MONTH_ALL.equals(request.getParameter("month"));
         Period activeWindow = scope.getActiveWindow();
+        request.setAttribute("deliveryFilter", scope.getDeliveryStage());
         request.setAttribute("viewFilter", AccessControl.defaultView(request));
         request.setAttribute("viewNarrowed", scope.isNarrowed());
         request.setAttribute("viewProvinceCount", scope.getProvinceIds().size());
@@ -189,7 +193,8 @@ public class ContractListController extends HttpServlet {
         String kind = ContractService.DIRECTION_BUY.equals(dir) ? ContractService.KIND_BUY : ContractService.KIND_SELL;
         ContractFilterHelper.FilterState state = new ContractFilterHelper.FilterState(kind, kw, st, prog,
                 rootsOnly ? "root" : null, type, provs, req.getParameter("year"), req.getParameter("period"),
-                wDept, ContractFilterHelper.departmentNameOf(depts, wDept), wAny);
+                wDept, ContractFilterHelper.departmentNameOf(depts, wDept), wAny,
+                ContractFilterHelper.deliveryFilterOf(req));
         req.setAttribute("statusChips", ContractFilterHelper.buildStatusChips(state, summary));
         req.setAttribute("activeFilters", state.activeFilters());
         req.setAttribute("advancedFilterCount", state.advancedCount());

@@ -174,6 +174,10 @@
         .progress-draft  { background: #f3f4f6; color: #4b5563; border-color: #d1d5db; }
         .progress-signed { background: #e8f3ff; color: var(--primary-dark); border-color: var(--primary-light); }
         .progress-frozen { background: #eef7ee; color: #2f6b34; border-color: #a8cfaa; }
+        /* BR-61: nhãn bước giao hàng, cạnh nhãn tiến độ ở tiêu đề. */
+        .delivery-pill { display: inline-flex; align-items: center; gap: 5px; padding: 3px 11px; border-radius: 20px; font-size: 0.72rem; font-weight: 600; white-space: nowrap; margin-left: 8px; }
+        .delivery-preparing { background: #f3f4f6; color: #4b5563; }
+        .delivery-delivered { background: #fff4e0; color: #8a5a00; }
 
         .header-actions { display: flex; gap: 10px; }
         .btn-edit-detail {
@@ -422,6 +426,15 @@
                               title="Trạng thái tiến độ — do người đặt, khác với trạng thái theo lịch bên cạnh">
                             ${fn:escapeXml(contract.progressStatus)}
                         </span>
+                        <%-- BR-61: trục thứ ba, chỉ có ở bản Nháp có giấy giao hàng; ký
+                             xong DAO trả null nên nhãn tự mất. --%>
+                        <c:if test="${not empty contract.deliveryStage}">
+                            <span class="delivery-pill ${contract.deliveredUnsigned ? 'delivery-delivered' : 'delivery-preparing'}"
+                                  title="Bước giao hàng — suy ra từ giấy tờ của hợp đồng Nháp">
+                                <i class="fa-solid ${contract.deliveredUnsigned ? 'fa-truck-ramp-box' : 'fa-boxes-packing'}"></i>
+                                ${fn:escapeXml(contract.deliveryStage)}
+                            </span>
+                        </c:if>
                     </h2>
                     <div style="color:#6b7280; font-size:0.85rem;">Khách hàng:
                         <a href="${pageContext.request.contextPath}/customer?action=view&id=${contract.enterpriseId}" style="color:var(--primary); font-weight:600; text-decoration:none;">
@@ -531,6 +544,30 @@
                 </div>
             </div>
 
+            <%-- BR-61: bước giao hàng, ngày giao và số ngày đã giao của bản Nháp. Quá
+                 15 ngày thì người phụ trách nhận thông báo nhắc ký (BR-62). --%>
+            <c:if test="${contract.deliveredUnsigned}">
+                <div class="lc-alert">
+                    <i class="fa-solid fa-truck-ramp-box" style="margin-top:2px;"></i>
+                    <span>
+                        <strong>${fn:escapeXml(contract.deliveryStage)}</strong>:
+                        <c:choose>
+                            <c:when test="${contract.deliveredDate != null}">
+                                giao hàng ngày <fmt:formatDate value="${contract.deliveredDate}" pattern="dd/MM/yyyy"/>,
+                                đã giao <strong>${contract.deliveredDays} ngày</strong> nhưng hợp đồng chưa ký.
+                            </c:when>
+                            <c:otherwise>hàng đã giao nhưng hợp đồng chưa ký.</c:otherwise>
+                        </c:choose>
+                    </span>
+                </div>
+            </c:if>
+            <c:if test="${not empty contract.deliveryStage and not contract.deliveredUnsigned}">
+                <div class="lc-alert" style="background:#f9fafb; border-color:#e5e7eb; color:#4b5563;">
+                    <i class="fa-solid fa-boxes-packing" style="margin-top:2px;"></i>
+                    <span><strong>${fn:escapeXml(contract.deliveryStage)}</strong>: đã có Phiếu GQNCKH hoặc
+                        Phiếu ĐCNB, chưa có Biên bản giao nhận hàng hoá.</span>
+                </div>
+            </c:if>
             <c:if test="${overdueUnclosed}">
                 <div class="lc-alert">
                     <i class="fa-solid fa-triangle-exclamation" style="margin-top:2px;"></i>

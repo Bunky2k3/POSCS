@@ -132,6 +132,8 @@ public class ContractExportController extends HttpServlet {
         return AccessControl.listScope(request,
                 () -> u != null ? employeeDAO.findTeamUserIds(u.getUserId()) : List.of(),
                 () -> u != null ? employeeDAO.findProvincesOf(u.getUserId()).stream().map(Province::getProvinceId).collect(Collectors.toList()) : List.of())
-                .withActiveWindow(activeWindow);
+                .withActiveWindow(activeWindow)
+                // BR-61: Excel ra đúng danh sách đang lọc theo bước giao hàng.
+                .withDeliveryStage(ContractFilterHelper.deliveryFilterOf(request));
     }
 }

@@ -18,6 +18,8 @@ import poscs.model.Province;
  * Service xuất danh sách hợp đồng ra Excel (Task 4.17 - [UC-41], [BR-16]).
  * Ràng buộc:
  * - Giữ nguyên cùng bộ lọc như danh sách hiển thị (từ khoá, trạng thái, loại, tỉnh, kỳ, tiến độ, chỉ HĐ gốc, phòng đang chờ, phạm vi).
+ *   Bộ lọc bước giao hàng (BR-61, tham số {@code delivery}) đi trong {@link ListScope} cùng phạm vi,
+ *   nên truyền nguyên {@code scope} xuống {@code ContractDAO.findAll} là Excel ra đúng danh sách đang lọc.
  * - Không phân trang (lấy toàn bộ kết quả phù hợp, pageSize = Integer.MAX_VALUE).
  * - Sắp xếp theo tỉnh/thành của đối tác đứng tên (sortByProvince = true).
  * - Hợp đồng Mua không lọc theo tỉnh (đối tác là nhà cung cấp không phân theo địa bàn).
@@ -116,6 +118,7 @@ public class ContractExportService extends BaseService {
 
     /**
      * Truy vấn hợp đồng từ CSDL theo bộ lọc (không phân trang, sắp theo tỉnh/thành) và xuất ra Excel.
+     * {@code scope} mang cả bộ lọc bước giao hàng (BR-61) nếu danh sách đang lọc theo nó.
      */
     public void exportContractsToExcel(OutputStream outputStream, String keyword, String statusFilter,
             String typeFilter, List<Integer> provinceFilters, Period period, String direction,
