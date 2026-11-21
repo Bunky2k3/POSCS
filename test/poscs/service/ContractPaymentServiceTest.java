@@ -215,12 +215,13 @@ public class ContractPaymentServiceTest {
         assertFalse(r5.isSuccess());
         assertEquals(ContractPaymentService.ERR_INVALID_AMOUNT, r5.getMessage());
 
-        // Missing due date
+        // Missing due date -- Task 10.4, BR-60: hạn thu để trống được khi lập (người dùng
+        // đồng ý sửa assertion 21/11/2026; trước đây khoá "thiếu hạn thu → ERR_MISSING_DUE_DATE").
         ContractPayment pNoDueDate = samplePayment(new BigDecimal("10000000"), null, null);
+        when(paymentDAO.insertPayment(10, pNoDueDate, adminUser.getUserId())).thenReturn(true);
         ServiceResult<ContractPayment> r6 = service.addPayment(10, pNoDueDate, adminUser);
-        assertFalse(r6.isSuccess());
-        assertEquals(ContractPaymentService.ERR_MISSING_DUE_DATE, r6.getMessage());
-        assertTrue(r6.getFieldErrors().containsKey(ContractPaymentService.FIELD_DUE_DATE));
+        assertTrue(r6.isSuccess());
+        assertTrue(r6.getFieldErrors() == null || !r6.getFieldErrors().containsKey(ContractPaymentService.FIELD_DUE_DATE));
     }
 
     @Test
@@ -530,5 +531,534 @@ public class ContractPaymentServiceTest {
         assertFalse(r.isSuccess());
         assertEquals(ContractPaymentService.ERR_FORBIDDEN, r.getMessage());
         verify(paymentDAO, never()).deletePayment(anyInt(), anyInt(), anyInt());
+    }
+
+    // ==================================================================
+    // Task 10.4 -- BR-60: loại kỳ, điều kiện, số ngày, nộp hồ sơ, hạn thu,
+    // số thực thu, sửa kỳ. Mẫu theo hợp đồng Quảng Trị 563.160.600 đ: hai kỳ
+    // 80% / 20% = 450.528.480 đ và 112.632.120 đ, điều kiện, 7 ngày.
+    // ==================================================================
+
+    private static final LocalDate TODAY = LocalDate.of(2026, 11, 20);
+    private static final BigDecimal KY_1 = new BigDecimal("450528480");
+    private static final BigDecimal KY_2 = new BigDecimal("112632120");
+
+    /** Service có "hôm nay" cố định -- để khoá MSG-064 và hạn thu theo ngày. */
+    private ContractPaymentService serviceOn(LocalDate today) {
+        java.time.ZoneId zone = java.time.ZoneId.systemDefault();
+        java.time.Clock clock = java.time.Clock.fixed(today.atStartOfDay(zone).toInstant(), zone);
+        return new ContractPaymentService(paymentDAO, contractDAO, permissionService, clock);
+    }
+
+    private ContractPayment ky(int id, String type, BigDecimal amount, Integer days, Date submitted,
+                               Date due, Date paid) {
+        ContractPayment p = samplePayment(id, amount, due, paid);
+        p.setPaymentType(type);
+        p.setPaymentDays(days);
+        p.setSubmittedDate(submitted);
+        return p;
+    }
+
+    private void stubPayments(int contractId, ContractPayment... payments) {
+        when(paymentDAO.findPaymentsByContractId(contractId)).thenReturn(List.of(payments));
+    }
+
+    // ---- addPayment: hạn thu không bắt buộc, loại, điều kiện, số ngày ----
+
+    @Test
+    public void addPayment_khongHanThu_hopLeVaGhiNull() {
+        when(contractDAO.findById(10)).thenReturn(sampleContract(10, PROGRESS_DRAFT));
+        ContractPayment p = ky(0, ContractPayment.TYPE_PAYMENT, KY_2, 7, null, null, null);
+        p.setConditionNote("Sau khi nghiệm thu, bàn giao và nộp đủ hồ sơ");
+        when(paymentDAO.insertPayment(10, p, 1)).thenReturn(true);
+
+        ServiceResult<ContractPayment> r = service.addPayment(10, p, adminUser);
+
+        assertTrue(r.isSuccess());
+        assertNull(p.getDueDate());
+        assertEquals(Integer.valueOf(7), p.getPaymentDays());
+        verify(paymentDAO).insertPayment(10, p, 1);
+    }
+
+    @Test
+    public void addPayment_loaiKyTrong_macDinhThanhToan() {
+        when(contractDAO.findById(10)).thenReturn(sampleContract(10, PROGRESS_SIGNED));
+        ContractPayment p = ky(0, "   ", KY_1, null, null, null, null);
+        when(paymentDAO.insertPayment(10, p, 1)).thenReturn(true);
+
+        assertTrue(service.addPayment(10, p, adminUser).isSuccess());
+        assertEquals(ContractPayment.TYPE_PAYMENT, p.getPaymentType());
+
+        ContractPayment nullType = ky(0, null, KY_1, null, null, null, null);
+        when(paymentDAO.insertPayment(10, nullType, 1)).thenReturn(true);
+        assertTrue(service.addPayment(10, nullType, adminUser).isSuccess());
+        assertEquals(ContractPayment.TYPE_PAYMENT, nullType.getPaymentType());
+    }
+
+    @Test
+    public void addPayment_loaiTamUng_hopLe() {
+        when(contractDAO.findById(10)).thenReturn(sampleContract(10, PROGRESS_SIGNED));
+        ContractPayment p = ky(0, ContractPayment.TYPE_ADVANCE, KY_1, null, null, null, null);
+        when(paymentDAO.insertPayment(10, p, 2)).thenReturn(true);
+
+        assertTrue(service.addPayment(10, p, salesManager).isSuccess());
+        assertEquals("Tạm ứng", p.getPaymentType());
+    }
+
+    @Test
+    public void addPayment_loaiKyNgoaiDanhMuc_biChan() {
+        when(contractDAO.findById(10)).thenReturn(sampleContract(10, PROGRESS_SIGNED));
+        ContractPayment p = ky(0, "Thanh toán 100%", KY_1, null, null, null, null);
+
+        ServiceResult<ContractPayment> r = service.addPayment(10, p, adminUser);
+
+        assertFalse(r.isSuccess());
+        assertEquals(ContractPaymentService.ERR_INVALID_FIELDS, r.getMessage());
+        assertEquals("Loại kỳ phải là Tạm ứng hoặc Thanh toán.",
+                r.getFieldErrors().get(ContractPaymentService.FIELD_PAYMENT_TYPE));
+        verify(paymentDAO, never()).insertPayment(anyInt(), any(), anyInt());
+    }
+
+    @Test
+    public void addPayment_dieuKien_255KyTuHopLe_256KyTuBiChan_trongThanhNull() {
+        when(contractDAO.findById(10)).thenReturn(sampleContract(10, PROGRESS_SIGNED));
+        when(paymentDAO.insertPayment(eq(10), any(), eq(1))).thenReturn(true);
+
+        ContractPayment ok = ky(0, ContractPayment.TYPE_PAYMENT, KY_1, null, null, null, null);
+        ok.setConditionNote("a".repeat(255));
+        assertTrue(service.addPayment(10, ok, adminUser).isSuccess());
+
+        ContractPayment tooLong = ky(0, ContractPayment.TYPE_PAYMENT, KY_1, null, null, null, null);
+        tooLong.setConditionNote("a".repeat(256));
+        ServiceResult<ContractPayment> r = service.addPayment(10, tooLong, adminUser);
+        assertFalse(r.isSuccess());
+        assertEquals(ContractPaymentService.ERR_INVALID_FIELDS, r.getMessage());
+        assertEquals("Điều kiện tối đa 255 ký tự.",
+                r.getFieldErrors().get(ContractPaymentService.FIELD_CONDITION_NOTE));
+
+        ContractPayment blank = ky(0, ContractPayment.TYPE_PAYMENT, KY_1, null, null, null, null);
+        blank.setConditionNote("   ");
+        assertTrue(service.addPayment(10, blank, adminUser).isSuccess());
+        assertNull(blank.getConditionNote());
+    }
+
+    @Test
+    public void addPayment_soNgay_bienHopLeVaNgoaiKhoang() {
+        when(contractDAO.findById(10)).thenReturn(sampleContract(10, PROGRESS_SIGNED));
+        when(paymentDAO.insertPayment(eq(10), any(), eq(1))).thenReturn(true);
+
+        for (int days : new int[]{1, 7, 999}) {
+            ContractPayment p = ky(0, ContractPayment.TYPE_PAYMENT, KY_1, days, null, null, null);
+            assertTrue("số ngày " + days + " phải hợp lệ", service.addPayment(10, p, adminUser).isSuccess());
+        }
+        for (int days : new int[]{0, -1, 1000}) {
+            ContractPayment p = ky(0, ContractPayment.TYPE_PAYMENT, KY_1, days, null, null, null);
+            ServiceResult<ContractPayment> r = service.addPayment(10, p, adminUser);
+            assertFalse("số ngày " + days + " phải bị chặn", r.isSuccess());
+            assertEquals(ContractPaymentService.ERR_INVALID_FIELDS, r.getMessage());
+            assertEquals("Số ngày phải trả là số nguyên từ 1 đến 999.",
+                    r.getFieldErrors().get(ContractPaymentService.FIELD_PAYMENT_DAYS));
+        }
+        verify(paymentDAO, times(3)).insertPayment(eq(10), any(), eq(1));
+    }
+
+    // ---- updatePayment: sửa kỳ ----
+
+    @Test
+    public void updatePayment_kyChuaThu_hopLe_goiDAO() {
+        when(contractDAO.findById(10)).thenReturn(sampleContract(10, PROGRESS_SIGNED));
+        stubPayments(10, ky(5, ContractPayment.TYPE_PAYMENT, new BigDecimal("100000000"), null, null, null, null));
+        ContractPayment edit = ky(5, ContractPayment.TYPE_ADVANCE, KY_1, 7, null, Date.valueOf("2026-12-01"), null);
+        edit.setConditionNote("Trong 7 ngày kể từ ngày ký");
+        when(paymentDAO.updatePayment(5, 10, edit, 2)).thenReturn(true);
+
+        ServiceResult<ContractPayment> r = service.updatePayment(10, edit, salesManager);
+
+        assertTrue(r.isSuccess());
+        assertEquals("Sửa kỳ thanh toán thành công.", r.getMessage());
+        // Kỳ chưa nộp hồ sơ: hạn thu giữ đúng giá trị nhập, không tự tính.
+        assertEquals(Date.valueOf("2026-12-01"), edit.getDueDate());
+        verify(paymentDAO).updatePayment(5, 10, edit, 2);
+    }
+
+    @Test
+    public void updatePayment_kyDaThu_biChan() {
+        when(contractDAO.findById(10)).thenReturn(sampleContract(10, PROGRESS_SIGNED));
+        stubPayments(10, ky(5, ContractPayment.TYPE_PAYMENT, KY_1, null, null,
+                Date.valueOf("2026-11-01"), Date.valueOf("2026-11-05")));
+        ContractPayment edit = ky(5, ContractPayment.TYPE_PAYMENT, KY_2, null, null, null, null);
+
+        ServiceResult<ContractPayment> r = service.updatePayment(10, edit, adminUser);
+
+        assertFalse(r.isSuccess());
+        assertEquals(ContractPaymentService.ERR_PAYMENT_ALREADY_PAID, r.getMessage());
+        verify(paymentDAO, never()).updatePayment(anyInt(), anyInt(), any(), anyInt());
+    }
+
+    @Test
+    public void updatePayment_hopDongDaThanhLyHoacChamDut_biChan() {
+        ContractPayment edit = ky(5, ContractPayment.TYPE_PAYMENT, KY_2, null, null, null, null);
+        for (String frozen : new String[]{PROGRESS_LIQUIDATED, PROGRESS_TERMINATED}) {
+            when(contractDAO.findById(10)).thenReturn(sampleContract(10, frozen));
+
+            ServiceResult<ContractPayment> r = service.updatePayment(10, edit, adminUser);
+
+            assertFalse(r.isSuccess());
+            assertEquals(ContractPaymentService.ERR_PAYMENT_FROZEN, r.getMessage());
+        }
+        verify(paymentDAO, never()).updatePayment(anyInt(), anyInt(), any(), anyInt());
+    }
+
+    @Test
+    public void updatePayment_kyDaNopHoSoCoSoNgay_tinhLaiHanThu() {
+        when(contractDAO.findById(10)).thenReturn(sampleContract(10, PROGRESS_SIGNED));
+        stubPayments(10, ky(5, ContractPayment.TYPE_PAYMENT, KY_2, 7, Date.valueOf("2026-11-20"),
+                Date.valueOf("2026-11-27"), null));
+        // Đổi số ngày 7 → 10 và gửi kèm hạn cũ: hạn thu phải theo ngày nộp + 10.
+        ContractPayment edit = ky(5, ContractPayment.TYPE_PAYMENT, KY_2, 10, null, Date.valueOf("2026-11-27"), null);
+        when(paymentDAO.updatePayment(5, 10, edit, 1)).thenReturn(true);
+
+        assertTrue(service.updatePayment(10, edit, adminUser).isSuccess());
+        assertEquals(Date.valueOf("2026-11-30"), edit.getDueDate());
+    }
+
+    @Test
+    public void updatePayment_kyDaNopHoSoKhongSoNgay_giuHanNhapTay() {
+        when(contractDAO.findById(10)).thenReturn(sampleContract(10, PROGRESS_SIGNED));
+        stubPayments(10, ky(5, ContractPayment.TYPE_PAYMENT, KY_2, null, Date.valueOf("2026-11-20"), null, null));
+        ContractPayment edit = ky(5, ContractPayment.TYPE_PAYMENT, KY_2, null, null, Date.valueOf("2026-12-15"), null);
+        when(paymentDAO.updatePayment(5, 10, edit, 1)).thenReturn(true);
+
+        assertTrue(service.updatePayment(10, edit, adminUser).isSuccess());
+        assertEquals(Date.valueOf("2026-12-15"), edit.getDueDate());
+    }
+
+    @Test
+    public void updatePayment_quyenVaDauVao() {
+        User general = generalUser();
+        ContractPayment edit = ky(5, ContractPayment.TYPE_PAYMENT, KY_2, null, null, null, null);
+
+        assertEquals(ContractPaymentService.ERR_FORBIDDEN, service.updatePayment(10, edit, general).getMessage());
+        assertEquals(ContractPaymentService.ERR_FORBIDDEN, service.updatePayment(10, edit, salesSubordinate).getMessage());
+        assertEquals(ContractPaymentService.ERR_FORBIDDEN, service.updatePayment(10, edit, null).getMessage());
+        assertEquals(ContractPaymentService.ERR_INVALID, service.updatePayment(0, edit, adminUser).getMessage());
+        assertEquals(ContractPaymentService.ERR_INVALID, service.updatePayment(10, null, adminUser).getMessage());
+        ContractPayment noId = ky(0, ContractPayment.TYPE_PAYMENT, KY_2, null, null, null, null);
+        assertEquals(ContractPaymentService.ERR_INVALID, service.updatePayment(10, noId, adminUser).getMessage());
+        verify(paymentDAO, never()).updatePayment(anyInt(), anyInt(), any(), anyInt());
+    }
+
+    @Test
+    public void updatePayment_kyKhongThuocHopDong_hoacHopDongDaHuy_notFound() {
+        when(contractDAO.findById(10)).thenReturn(sampleContract(10, PROGRESS_SIGNED));
+        stubPayments(10, ky(6, ContractPayment.TYPE_PAYMENT, KY_1, null, null, null, null));
+        ContractPayment edit = ky(5, ContractPayment.TYPE_PAYMENT, KY_2, null, null, null, null);
+        assertEquals(ContractPaymentService.ERR_NOT_FOUND, service.updatePayment(10, edit, adminUser).getMessage());
+
+        Contract voided = sampleContract(11, PROGRESS_DRAFT);
+        voided.setDeleted(true);
+        when(contractDAO.findById(11)).thenReturn(voided);
+        assertEquals(ContractPaymentService.ERR_NOT_FOUND, service.updatePayment(11, edit, adminUser).getMessage());
+        verify(paymentDAO, never()).updatePayment(anyInt(), anyInt(), any(), anyInt());
+    }
+
+    @Test
+    public void updatePayment_soTienVaSoNgaySai_biChan_DAOLoiThiPaymentFailed() {
+        when(contractDAO.findById(10)).thenReturn(sampleContract(10, PROGRESS_SIGNED));
+        stubPayments(10, ky(5, ContractPayment.TYPE_PAYMENT, KY_2, null, null, null, null));
+
+        ContractPayment zero = ky(5, ContractPayment.TYPE_PAYMENT, BigDecimal.ZERO, null, null, null, null);
+        assertEquals(ContractPaymentService.ERR_INVALID_AMOUNT, service.updatePayment(10, zero, adminUser).getMessage());
+        ContractPayment badDays = ky(5, ContractPayment.TYPE_PAYMENT, KY_2, 0, null, null, null);
+        assertEquals(ContractPaymentService.ERR_INVALID_FIELDS, service.updatePayment(10, badDays, adminUser).getMessage());
+
+        ContractPayment ok = ky(5, ContractPayment.TYPE_PAYMENT, KY_2, null, null, null, null);
+        when(paymentDAO.updatePayment(5, 10, ok, 1)).thenReturn(false);
+        assertEquals(ContractPaymentService.ERR_PAYMENT_FAILED, service.updatePayment(10, ok, adminUser).getMessage());
+    }
+
+    // ---- markSubmitted: "Đã nộp hồ sơ" ----
+
+    @Test
+    public void markSubmitted_kyCo7Ngay_hanThuBangNgayNopCong7() {
+        ContractPaymentService s = serviceOn(TODAY);
+        when(contractDAO.findById(10)).thenReturn(sampleContract(10, PROGRESS_SIGNED));
+        stubPayments(10, ky(2, ContractPayment.TYPE_PAYMENT, KY_2, 7, null, null, null));
+        Date x = Date.valueOf("2026-11-18");
+        when(paymentDAO.markSubmitted(2, 10, x, Date.valueOf("2026-11-25"), 1)).thenReturn(true);
+
+        // Hạn nhập tay bị bỏ qua: kỳ có số ngày thì hệ thống tự tính.
+        ServiceResult<Void> r = s.markSubmitted(10, 2, x, Date.valueOf("2027-01-01"), adminUser);
+
+        assertTrue(r.isSuccess());
+        assertEquals("Ghi nhận đã nộp hồ sơ thành công.", r.getMessage());
+        verify(paymentDAO).markSubmitted(2, 10, x, Date.valueOf("2026-11-25"), 1);
+    }
+
+    @Test
+    public void markSubmitted_ngayNopSauHomNay_MSG064() {
+        ContractPaymentService s = serviceOn(TODAY);
+
+        ServiceResult<Void> r = s.markSubmitted(10, 2, Date.valueOf("2026-11-21"), null, adminUser);
+
+        assertFalse(r.isSuccess());
+        assertEquals(ContractPaymentService.ERR_SUBMITTED_DATE_FUTURE, r.getMessage());
+        assertEquals("Ngày nộp hồ sơ không được sau hôm nay.",
+                r.getFieldErrors().get(ContractPaymentService.FIELD_SUBMITTED_DATE));
+        assertEquals("Ngày nộp hồ sơ không được sau hôm nay.", ContractPaymentService.MSG_064);
+        verify(paymentDAO, never()).markSubmitted(anyInt(), anyInt(), any(), any(), anyInt());
+    }
+
+    @Test
+    public void markSubmitted_ngayNopDungHomNay_hopLe() {
+        ContractPaymentService s = serviceOn(TODAY);
+        when(contractDAO.findById(10)).thenReturn(sampleContract(10, PROGRESS_SIGNED));
+        stubPayments(10, ky(2, ContractPayment.TYPE_PAYMENT, KY_2, 7, null, null, null));
+        Date today = Date.valueOf(TODAY);
+        when(paymentDAO.markSubmitted(2, 10, today, Date.valueOf("2026-11-27"), 1)).thenReturn(true);
+
+        assertTrue(s.markSubmitted(10, 2, today, null, adminUser).isSuccess());
+    }
+
+    @Test
+    public void markSubmitted_ngayNopTrong_macDinhHomNay() {
+        ContractPaymentService s = serviceOn(TODAY);
+        when(contractDAO.findById(10)).thenReturn(sampleContract(10, PROGRESS_SIGNED));
+        stubPayments(10, ky(2, ContractPayment.TYPE_PAYMENT, KY_2, 7, null, null, null));
+        when(paymentDAO.markSubmitted(2, 10, Date.valueOf(TODAY), Date.valueOf("2026-11-27"), 2)).thenReturn(true);
+
+        assertTrue(s.markSubmitted(10, 2, null, null, salesManager).isSuccess());
+        verify(paymentDAO).markSubmitted(2, 10, Date.valueOf(TODAY), Date.valueOf("2026-11-27"), 2);
+    }
+
+    @Test
+    public void markSubmitted_kyKhongSoNgay_nhapHanTay() {
+        ContractPaymentService s = serviceOn(TODAY);
+        when(contractDAO.findById(10)).thenReturn(sampleContract(10, PROGRESS_SIGNED));
+        stubPayments(10, ky(1, ContractPayment.TYPE_ADVANCE, KY_1, null, null, null, null));
+        Date submitted = Date.valueOf("2026-11-19");
+        Date manual = Date.valueOf("2026-12-05");
+        when(paymentDAO.markSubmitted(1, 10, submitted, manual, 1)).thenReturn(true);
+
+        assertTrue(s.markSubmitted(10, 1, submitted, manual, adminUser).isSuccess());
+        verify(paymentDAO).markSubmitted(1, 10, submitted, manual, 1);
+    }
+
+    @Test
+    public void markSubmitted_kyKhongSoNgay_boTrongHanThu_hopLeVaChoThu() {
+        // Chốt 20/11/2026: kỳ không có số ngày thì hạn thu không bắt buộc khi nộp hồ sơ.
+        ContractPaymentService s = serviceOn(TODAY);
+        when(contractDAO.findById(10)).thenReturn(sampleContract(10, PROGRESS_SIGNED));
+        stubPayments(10, ky(1, ContractPayment.TYPE_ADVANCE, KY_1, null, null, null, null));
+        Date submitted = Date.valueOf("2026-11-19");
+        when(paymentDAO.markSubmitted(1, 10, submitted, null, 1)).thenReturn(true);
+
+        assertTrue(s.markSubmitted(10, 1, submitted, null, adminUser).isSuccess());
+        verify(paymentDAO).markSubmitted(1, 10, submitted, null, 1);
+
+        // Kỳ sau khi ghi: đã nộp hồ sơ, chưa có hạn thu → Chờ thu.
+        ContractPayment after = ky(1, ContractPayment.TYPE_ADVANCE, KY_1, null, submitted, null, null);
+        assertEquals(ContractPayment.STATUS_WAITING, after.statusOn(TODAY));
+    }
+
+    @Test
+    public void markSubmitted_sauThanhLyVaChamDut_vanDuoc() {
+        ContractPaymentService s = serviceOn(TODAY);
+        Date submitted = Date.valueOf("2026-11-10");
+        for (String frozen : new String[]{PROGRESS_LIQUIDATED, PROGRESS_TERMINATED}) {
+            when(contractDAO.findById(10)).thenReturn(sampleContract(10, frozen));
+            stubPayments(10, ky(3, ContractPayment.TYPE_PAYMENT, KY_2, null, null, null, null));
+            when(paymentDAO.markSubmitted(3, 10, submitted, null, 1)).thenReturn(true);
+
+            assertTrue(frozen, s.markSubmitted(10, 3, submitted, null, adminUser).isSuccess());
+        }
+    }
+
+    @Test
+    public void markSubmitted_kyDaThu_biChan_kyKhongCo_notFound() {
+        ContractPaymentService s = serviceOn(TODAY);
+        when(contractDAO.findById(10)).thenReturn(sampleContract(10, PROGRESS_SIGNED));
+        stubPayments(10, ky(3, ContractPayment.TYPE_PAYMENT, KY_2, null, null,
+                Date.valueOf("2026-11-01"), Date.valueOf("2026-11-02")));
+
+        assertEquals(ContractPaymentService.ERR_PAYMENT_ALREADY_PAID,
+                s.markSubmitted(10, 3, Date.valueOf(TODAY), null, adminUser).getMessage());
+        assertEquals(ContractPaymentService.ERR_NOT_FOUND,
+                s.markSubmitted(10, 99, Date.valueOf(TODAY), null, adminUser).getMessage());
+        when(contractDAO.findById(12)).thenReturn(null);
+        assertEquals(ContractPaymentService.ERR_NOT_FOUND,
+                s.markSubmitted(12, 3, Date.valueOf(TODAY), null, adminUser).getMessage());
+        verify(paymentDAO, never()).markSubmitted(anyInt(), anyInt(), any(), any(), anyInt());
+    }
+
+    @Test
+    public void markSubmitted_tongHopVaSalesCoCapTren_biChan_idSai_invalid() {
+        ContractPaymentService s = serviceOn(TODAY);
+        User general = generalUser();
+
+        assertEquals(ContractPaymentService.ERR_FORBIDDEN,
+                s.markSubmitted(10, 3, Date.valueOf(TODAY), null, general).getMessage());
+        assertEquals(ContractPaymentService.ERR_FORBIDDEN,
+                s.markSubmitted(10, 3, Date.valueOf(TODAY), null, salesSubordinate).getMessage());
+        assertEquals(ContractPaymentService.ERR_INVALID,
+                s.markSubmitted(0, 3, Date.valueOf(TODAY), null, adminUser).getMessage());
+        assertEquals(ContractPaymentService.ERR_INVALID,
+                s.markSubmitted(10, 0, Date.valueOf(TODAY), null, adminUser).getMessage());
+        verify(paymentDAO, never()).markSubmitted(anyInt(), anyInt(), any(), any(), anyInt());
+    }
+
+    @Test
+    public void markSubmitted_DAOLoi_paymentFailed() {
+        ContractPaymentService s = serviceOn(TODAY);
+        when(contractDAO.findById(10)).thenReturn(sampleContract(10, PROGRESS_SIGNED));
+        stubPayments(10, ky(3, ContractPayment.TYPE_PAYMENT, KY_2, null, null, null, null));
+        when(paymentDAO.markSubmitted(anyInt(), anyInt(), any(), any(), anyInt())).thenReturn(false);
+
+        assertEquals(ContractPaymentService.ERR_PAYMENT_FAILED,
+                s.markSubmitted(10, 3, Date.valueOf(TODAY), null, adminUser).getMessage());
+    }
+
+    // ---- markPaymentPaid: số tiền thực thu ----
+
+    @Test
+    public void markPaymentPaid_khongNhapSoThucThu_macDinhSoTienKy() {
+        when(contractDAO.findById(10)).thenReturn(sampleContract(10, PROGRESS_SIGNED));
+        Date paid = Date.valueOf("2026-11-20");
+        when(paymentDAO.markPaymentPaid(2, 10, paid, 1)).thenReturn(true);
+
+        assertTrue(service.markPaymentPaid(10, 2, paid, null, adminUser).isSuccess());
+        // Đi đường DAO "thu đủ số tiền kỳ", không gửi số nào xuống.
+        verify(paymentDAO).markPaymentPaid(2, 10, paid, 1);
+        verify(paymentDAO, never()).markPaymentPaid(anyInt(), anyInt(), any(), any(BigDecimal.class), anyInt());
+    }
+
+    @Test
+    public void markPaymentPaid_soThucThuThapHon_ghiDungSoThucThu() {
+        when(contractDAO.findById(10)).thenReturn(sampleContract(10, PROGRESS_SIGNED));
+        Date paid = Date.valueOf("2026-11-20");
+        BigDecimal actual = new BigDecimal("100000000");
+        when(paymentDAO.markPaymentPaid(2, 10, paid, actual, 2)).thenReturn(true);
+
+        ServiceResult<Void> r = service.markPaymentPaid(10, 2, paid, actual, salesManager);
+
+        assertTrue(r.isSuccess());
+        verify(paymentDAO).markPaymentPaid(2, 10, paid, actual, 2);
+        verify(paymentDAO, never()).markPaymentPaid(anyInt(), anyInt(), any(), anyInt());
+    }
+
+    @Test
+    public void markPaymentPaid_soThucThuKhongLonHon0HoacVuotGioiHan_biChan() {
+        when(contractDAO.findById(10)).thenReturn(sampleContract(10, PROGRESS_SIGNED));
+        BigDecimal[] bad = {BigDecimal.ZERO, new BigDecimal("-1"),
+                ContractPaymentService.MAX_PAYMENT_AMOUNT.add(BigDecimal.ONE)};
+        for (BigDecimal amount : bad) {
+            ServiceResult<Void> r = service.markPaymentPaid(10, 2, Date.valueOf("2026-11-20"), amount, adminUser);
+
+            assertFalse(amount.toPlainString(), r.isSuccess());
+            assertEquals(ContractPaymentService.ERR_INVALID_PAID_AMOUNT, r.getMessage());
+            assertTrue(r.getFieldErrors().get(ContractPaymentService.FIELD_PAID_AMOUNT).startsWith("Số tiền thực thu"));
+        }
+        verify(paymentDAO, never()).markPaymentPaid(anyInt(), anyInt(), any(), any(BigDecimal.class), anyInt());
+    }
+
+    @Test
+    public void markPaymentPaid_soThucThuSauThanhLy_vanGhiNhanDuoc() {
+        when(contractDAO.findById(10)).thenReturn(sampleContract(10, PROGRESS_LIQUIDATED));
+        Date paid = Date.valueOf("2026-11-20");
+        BigDecimal actual = new BigDecimal("50000000");
+        when(paymentDAO.markPaymentPaid(2, 10, paid, actual, 1)).thenReturn(true);
+
+        assertTrue(service.markPaymentPaid(10, 2, paid, actual, adminUser).isSuccess());
+    }
+
+    @Test
+    public void markPaymentPaid_tongHopNhapSoThucThu_duoc_ngayTrongLaHomNay() {
+        User general = generalUser();
+        ContractPaymentService s = serviceOn(TODAY);
+        when(contractDAO.findById(10)).thenReturn(sampleContract(10, PROGRESS_SIGNED));
+        BigDecimal actual = new BigDecimal("112000000");
+        when(paymentDAO.markPaymentPaid(2, 10, Date.valueOf(TODAY), actual, 6)).thenReturn(true);
+
+        assertTrue(s.markPaymentPaid(10, 2, null, actual, general).isSuccess());
+        verify(paymentDAO).markPaymentPaid(2, 10, Date.valueOf(TODAY), actual, 6);
+    }
+
+    @Test
+    public void markPaymentPaid_salesCoCapTrenNhapSoThucThu_vanBiChan() {
+        ServiceResult<Void> r = service.markPaymentPaid(10, 2, null, KY_2, salesSubordinate);
+
+        assertEquals(ContractPaymentService.ERR_FORBIDDEN, r.getMessage());
+        verify(paymentDAO, never()).markPaymentPaid(anyInt(), anyInt(), any(), any(BigDecimal.class), anyInt());
+    }
+
+    // ---- ContractPayment: tình trạng suy ra (BR-60) và số thực thu (BR-18) ----
+
+    @Test
+    public void statusOn_bonTinhTrangTheoThuTu() {
+        // Chưa nộp hồ sơ: chưa có ngày nộp, chưa có hạn thu.
+        assertEquals("Chưa nộp hồ sơ", ky(1, null, KY_2, 7, null, null, null).statusOn(TODAY));
+        // Chờ thu: có hạn thu, chưa tới.
+        assertEquals("Chờ thu", ky(1, null, KY_2, 7, Date.valueOf("2026-11-18"),
+                Date.valueOf("2026-11-25"), null).statusOn(TODAY));
+        // Chờ thu: hạn thu đúng hôm nay chưa phải quá hạn.
+        assertEquals("Chờ thu", ky(1, null, KY_2, null, null, Date.valueOf(TODAY), null).statusOn(TODAY));
+        // Quá hạn: hạn thu trước hôm nay.
+        assertEquals("Quá hạn", ky(1, null, KY_2, null, Date.valueOf("2026-11-01"),
+                Date.valueOf("2026-11-19"), null).statusOn(TODAY));
+        // Đã thu: có ngày thu thì thắng cả hạn thu đã qua.
+        assertEquals("Đã thu", ky(1, null, KY_2, null, null,
+                Date.valueOf("2026-10-01"), Date.valueOf("2026-11-10")).statusOn(TODAY));
+        // Đã thu dù chưa từng có hạn thu.
+        assertEquals("Đã thu", ky(1, null, KY_2, null, null, null, Date.valueOf("2026-11-10")).statusOn(TODAY));
+    }
+
+    @Test
+    public void statusOn_daNopHoSoChuaCoHanThu_laChoThu() {
+        ContractPayment p = ky(1, null, KY_1, null, Date.valueOf("2026-11-18"), null, null);
+
+        assertEquals(ContractPayment.STATUS_WAITING, p.statusOn(TODAY));
+        assertTrue(p.isSubmitted());
+        assertFalse(p.isOverdue());
+    }
+
+    @Test
+    public void getStatus_theoNgayHomNayCuaMayChu() {
+        ContractPayment overdue = ky(1, null, KY_1, null, null, Date.valueOf(LocalDate.now().minusDays(1)), null);
+        assertEquals(ContractPayment.STATUS_OVERDUE, overdue.getStatus());
+        assertTrue(overdue.isOverdue());
+        ContractPayment fresh = ky(2, null, KY_1, null, null, null, null);
+        assertEquals(ContractPayment.STATUS_NOT_SUBMITTED, fresh.getStatus());
+        assertFalse(fresh.isOverdue());
+    }
+
+    @Test
+    public void soThucThu_macDinhVaKhacSoTienKy() {
+        ContractPayment unpaid = ky(1, null, KY_1, null, null, null, null);
+        assertEquals(BigDecimal.ZERO, unpaid.getCollectedAmount());
+        assertFalse(unpaid.isPaidAmountDifferent());
+
+        // Kỳ đã thu trước V45, chưa có số thực thu: coi như thu đủ.
+        ContractPayment legacy = ky(2, null, KY_1, null, null, null, Date.valueOf("2026-11-10"));
+        assertEquals(KY_1, legacy.getCollectedAmount());
+        assertFalse(legacy.isPaidAmountDifferent());
+
+        ContractPayment same = ky(3, null, KY_1, null, null, null, Date.valueOf("2026-11-10"));
+        same.setPaidAmount(new BigDecimal("450528480.00"));
+        assertFalse("450528480 và 450528480.00 là cùng số tiền", same.isPaidAmountDifferent());
+
+        ContractPayment less = ky(4, null, KY_1, null, null, null, Date.valueOf("2026-11-10"));
+        less.setPaidAmount(new BigDecimal("400000000"));
+        assertEquals(new BigDecimal("400000000"), less.getCollectedAmount());
+        assertTrue(less.isPaidAmountDifferent());
+    }
+
+    @Test
+    public void modelMacDinh_loaiThanhToan_danhMucHaiLoai_soNgayTreKhongHanThuLaNull() {
+        assertEquals(ContractPayment.TYPE_PAYMENT, new ContractPayment().getPaymentType());
+        assertEquals(List.of("Tạm ứng", "Thanh toán"), ContractPayment.TYPES);
+        ContractPayment paidNoDue = ky(1, null, KY_1, null, null, null, Date.valueOf("2026-11-10"));
+        assertNull(paidNoDue.getDaysLateOrEarly());
+        ContractPayment paidLate = ky(2, null, KY_1, null, null, Date.valueOf("2026-11-08"), Date.valueOf("2026-11-10"));
+        assertEquals(Long.valueOf(2), paidLate.getDaysLateOrEarly());
     }
 }

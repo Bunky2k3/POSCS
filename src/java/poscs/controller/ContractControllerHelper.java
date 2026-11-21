@@ -192,14 +192,21 @@ public final class ContractControllerHelper {
     private static void bindPaymentsAndCluster(HttpServletRequest req, Contract c, ContractDAO cd, int id) {
         List<ContractPayment> p = cd.findPaymentsByContractId(id);
         req.setAttribute("contractPayments", p);
+        // BR-60: danh mục loại kỳ cho ô chọn của form lập / sửa kỳ.
+        req.setAttribute("paymentTypes", ContractPayment.TYPES);
         java.math.BigDecimal sched = java.math.BigDecimal.ZERO, coll = java.math.BigDecimal.ZERO;
+        // BR-18, BR-60: "Đã thu" cộng số tiền THỰC THU (khớp doanh thu ở dashboard).
+        // "Còn phải thu" là phần của các kỳ CHƯA thu: kỳ đã thu thiếu không còn nợ trên
+        // hệ thống (khác số tiền kỳ thì không bắt lý do, cũng không tạo kỳ mới).
+        java.math.BigDecimal open = java.math.BigDecimal.ZERO;
         for (ContractPayment item : p) {
             sched = sched.add(item.getInvoiceAmount());
-            if (item.getPaidDate() != null) coll = coll.add(item.getInvoiceAmount());
+            if (item.isPaid()) coll = coll.add(item.getCollectedAmount());
+            else open = open.add(item.getInvoiceAmount());
         }
         req.setAttribute("paymentScheduled", sched);
         req.setAttribute("paymentCollected", coll);
-        req.setAttribute("paymentOutstanding", sched.subtract(coll));
+        req.setAttribute("paymentOutstanding", open);
 
         Contract root = c.isAmendment() ? cd.findById(c.getParentContractId()) : c;
         java.math.BigDecimal cVal = root == null ? null : root.getCurrentValue();

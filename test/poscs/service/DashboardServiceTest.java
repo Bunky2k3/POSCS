@@ -134,6 +134,24 @@ public class DashboardServiceTest {
     }
 
     @Test
+    public void loadDashboard_doanhThuLaSoThucThu_khongPhaiSoTienKy_BR18() {
+        // Task 10.4: kỳ 112.632.120 đ chỉ thu thực 100.000.000 đ -- DAO cộng số thực thu
+        // (ContractPaymentDAO.COLLECTED_AMOUNT_SQL), dashboard hiện đúng con số đó.
+        LocalDate today = LocalDate.of(2026, 11, 20);
+        when(contractDAO.sumInvoiceAmountByMonth(2026, 11, List.of(), null))
+                .thenReturn(new BigDecimal("100000000.00"));
+        when(contractDAO.sumInvoiceAmountByMonth(2026, 10, List.of(), null))
+                .thenReturn(new BigDecimal("80000000.00"));
+
+        DashboardSummary s = service.loadDashboard(null, null, null, null, false, null, today).getData();
+
+        assertEquals(0, new BigDecimal("100000000").compareTo(s.getRevenueThisMonth()));
+        assertEquals(Double.valueOf(25.0), s.getRevenueTrendPercent());
+        assertEquals("COALESCE(p.paid_amount, p.invoice_amount)",
+                poscs.dao.ContractPaymentDAO.COLLECTED_AMOUNT_SQL);
+    }
+
+    @Test
     public void loadDashboard_zeroPreviousRevenue_leavesTrendNull() {
         LocalDate today = LocalDate.of(2026, 11, 14);
         when(contractDAO.sumInvoiceAmountByMonth(2026, 11, List.of(), null))

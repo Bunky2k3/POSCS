@@ -1957,6 +1957,41 @@ public class ContractControllerTest {
         verify(mockPaymentCtrl).handleMarkPaid(request, response);
     }
 
+    // Task 10.4 (BR-60): trang Sửa gửi form sửa kỳ và "Đã nộp hồ sơ" về /contract,
+    // ContractController phải chuyển đúng sang ContractPaymentController.
+    @Test
+    public void doPost_updatePayment_delegatesToPaymentController() throws Exception {
+        ContractPaymentController mockPaymentCtrl = mock(ContractPaymentController.class);
+        controller.setPaymentController(mockPaymentCtrl);
+
+        when(request.getParameter("action")).thenReturn("updatePayment");
+        controller.doPost(request, response);
+
+        verify(mockPaymentCtrl).handleUpdatePayment(request, response);
+        verify(mockPaymentCtrl, never()).handleAddPayment(any(), any());
+    }
+
+    @Test
+    public void doPost_markSubmitted_delegatesToPaymentController() throws Exception {
+        ContractPaymentController mockPaymentCtrl = mock(ContractPaymentController.class);
+        controller.setPaymentController(mockPaymentCtrl);
+
+        when(request.getParameter("action")).thenReturn("markSubmitted");
+        controller.doPost(request, response);
+
+        verify(mockPaymentCtrl).handleMarkSubmitted(request, response);
+        verify(mockPaymentCtrl, never()).handleMarkPaid(any(), any());
+    }
+
+    @Test
+    public void doPost_actionNamesSharedWithPaymentController() {
+        assertEquals("addPayment", ContractPaymentController.ACTION_ADD);
+        assertEquals("updatePayment", ContractPaymentController.ACTION_UPDATE);
+        assertEquals("markSubmitted", ContractPaymentController.ACTION_SUBMIT);
+        assertEquals("markPaid", ContractPaymentController.ACTION_MARK_PAID);
+        assertEquals("removePayment", ContractPaymentController.ACTION_REMOVE);
+    }
+
     @Test
     public void doPost_removePayment_delegatesToPaymentController() throws Exception {
         ContractPaymentController mockPaymentCtrl = mock(ContractPaymentController.class);

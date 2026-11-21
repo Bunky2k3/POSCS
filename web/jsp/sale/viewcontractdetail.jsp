@@ -69,6 +69,18 @@
         .modal-err { color: var(--danger); font-size: 0.82rem; margin-top: 6px; display: none; }
         .btn-mark-paid { border: 1px solid #cfe3d0; background: #f3f7f3; color: #2f6b34; border-radius: 8px; padding: 4px 10px; font-size: 0.82rem; font-weight: 600; white-space: nowrap; }
         .btn-mark-paid:hover { background: #e6f0e6; }
+        .modal-body .pay-field { margin-bottom: 12px; }
+        .modal-body .pay-field .req { color: var(--danger); }
+        .modal-body .pay-hint { font-size: 0.78rem; color: #6b7280; margin-top: 4px; }
+
+        /* Kỳ thanh toán (BR-60): tình trạng suy ra, Quá hạn tô đỏ -- cùng màu trang quản lý. */
+        .pay-sub { font-size: 0.78rem; color: #6b7280; margin-top: 2px; }
+        .pay-status { font-weight: 600; white-space: nowrap; }
+        .pay-status.paid { color: #2f6b34; }
+        .pay-status.overdue { color: var(--danger); }
+        .pay-status.waiting { color: #8a5a00; }
+        .pay-status.not-submitted { color: #9ca3af; }
+        tr.pay-overdue td { background: #fff5f5; }
 
         .detail-header { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 16px; padding: 22px 26px; margin-bottom: 20px; }
         .detail-header .doc-icon {
@@ -366,6 +378,13 @@
         <div class="toast-msg blocked show">
             <i class="fa-solid fa-circle-xmark"></i>
             <span>Không ghi nhận được kỳ thanh toán &mdash; có thể kỳ này đã được ghi nhận thu trước đó, hoặc ngày thu không hợp lệ.</span>
+        </div>
+    </c:if>
+    <%-- BR-60: số tiền thực thu nhập ở modal "Ghi nhận đã thu" của vai Tổng hợp. --%>
+    <c:if test="${param.error == 'payment_paid_amount_invalid'}">
+        <div class="toast-msg blocked show">
+            <i class="fa-solid fa-circle-xmark"></i>
+            <span>Số tiền thực thu phải lớn hơn 0 và không vượt giới hạn cho phép.</span>
         </div>
     </c:if>
 
@@ -928,39 +947,71 @@
                 <c:otherwise>
                     <%-- Bảng 4-5 cột: dưới ~500px nó rộng hơn màn hình và đẩy CẢ TRANG trượt ngang
                      (đo được trên màn 375px: trang rộng 462px). Cho riêng bảng cuộn. --%>
+                    <%-- BR-60: loại kỳ, hạn thu, tình trạng SUY RA (p.status); số thực thu
+                         hiện thêm khi khác số tiền kỳ. Quá hạn tô đỏ. --%>
                     <div class="table-responsive">
                         <table class="item-table">
                             <thead>
                                 <tr>
-                                    <th style="width:40px;">#</th>
+                                    <th style="width:36px;">#</th>
+                                    <th style="width:96px;">Loại</th>
                                     <th>Số tiền</th>
-                                    <th style="width:130px;">Đến hạn</th>
-                                    <th style="width:160px;">Tình trạng</th>
+                                    <th>Điều kiện</th>
+                                    <th style="width:110px;">Hạn thu</th>
+                                    <th style="width:150px;">Tình trạng</th>
                                     <th style="width:160px;"></th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <c:forEach var="p" items="${contractPayments}" varStatus="row">
-                                    <tr>
+                                    <c:set var="pStatus" value="${p.status}"/>
+                                    <tr class="${pStatus == 'Quá hạn' ? 'pay-overdue' : ''}">
                                         <td>${row.index + 1}</td>
-                                        <td><strong class="money-vnd" data-vnd="${p.invoiceAmount}">&mdash;</strong></td>
-                                        <td><fmt:formatDate value="${p.dueDate}" pattern="dd/MM/yyyy"/></td>
+                                        <td>${fn:escapeXml(p.paymentType)}</td>
+                                        <td>
+                                            <strong class="money-vnd" data-vnd="${p.invoiceAmount}">&mdash;</strong>
+                                            <c:if test="${p.paidAmountDifferent}">
+                                                <div class="pay-sub">Thực thu <span class="money-vnd" data-vnd="${p.paidAmount}">&mdash;</span></div>
+                                            </c:if>
+                                        </td>
+                                        <td>
+                                            ${not empty p.conditionNote ? fn:escapeXml(p.conditionNote) : '—'}
+                                            <c:if test="${p.paymentDays != null}">
+                                                <div class="pay-sub">Trả trong ${p.paymentDays} ngày kể từ khi nộp hồ sơ</div>
+                                            </c:if>
+                                        </td>
                                         <td>
                                             <c:choose>
-                                                <c:when test="${p.paidDate != null}">
-                                                    <span style="color:#2f6b34; font-weight:600;">
+                                                <c:when test="${p.dueDate != null}"><fmt:formatDate value="${p.dueDate}" pattern="dd/MM/yyyy"/></c:when>
+                                                <c:otherwise><span style="color:#9ca3af;">Chưa có</span></c:otherwise>
+                                            </c:choose>
+                                        </td>
+                                        <td>
+                                            <c:choose>
+                                                <c:when test="${pStatus == 'Đã thu'}">
+                                                    <span class="pay-status paid">
                                                         <i class="fa-solid fa-circle-check"></i>
                                                         Đã thu <fmt:formatDate value="${p.paidDate}" pattern="dd/MM/yyyy"/>
                                                     </span>
                                                 </c:when>
-                                                <c:otherwise><span style="color:#9ca3af;">Chưa thu</span></c:otherwise>
+                                                <c:when test="${pStatus == 'Quá hạn'}">
+                                                    <span class="pay-status overdue"><i class="fa-solid fa-triangle-exclamation"></i> Quá hạn</span>
+                                                </c:when>
+                                                <c:when test="${pStatus == 'Chờ thu'}">
+                                                    <span class="pay-status waiting"><i class="fa-solid fa-hourglass-half"></i> Chờ thu</span>
+                                                </c:when>
+                                                <c:otherwise><span class="pay-status not-submitted">Chưa nộp hồ sơ</span></c:otherwise>
                                             </c:choose>
+                                            <c:if test="${p.submittedDate != null}">
+                                                <div class="pay-sub">Nộp hồ sơ <fmt:formatDate value="${p.submittedDate}" pattern="dd/MM/yyyy"/></div>
+                                            </c:if>
                                         </td>
                                         <td style="text-align:right;">
-                                            <c:if test="${p.paidDate == null and canMarkPaidHere}">
+                                            <c:if test="${not p.paid and canMarkPaidHere}">
                                                 <button type="button" class="btn-mark-paid js-mark-paid"
                                                         data-payment-id="${p.paymentId}"
                                                         data-payment-no="${row.index + 1}"
+                                                        data-type="${fn:escapeXml(p.paymentType)}"
                                                         data-amount="${p.invoiceAmount}">
                                                     <i class="fa-solid fa-check"></i> Ghi nhận đã thu
                                                 </button>
@@ -1406,9 +1457,20 @@
                     <div class="modal-body">
                         <h5 class="modal-title" id="markPaidTitle">Ghi nhận đã thu</h5>
                         <div class="modal-msg" id="markPaidMessage"></div>
-                        <label class="form-label" for="markPaidDate">Ngày thu</label>
-                        <input type="date" class="form-control" id="markPaidDate" name="paidDate">
-                        <div class="modal-err" id="markPaidErr">Chọn ngày tiền về.</div>
+                        <div class="pay-field">
+                            <label class="form-label" for="markPaidDate">Ngày thu <span class="req">*</span></label>
+                            <input type="date" class="form-control" id="markPaidDate" name="paidDate">
+                            <div class="modal-err" id="markPaidErr">Chọn ngày tiền về.</div>
+                        </div>
+                        <%-- BR-60 (chốt 20/11/2026): vai Tổng hợp nhập được số tiền thực thu,
+                             điền sẵn số tiền kỳ -- giống modal ở trang quản lý. --%>
+                        <div class="pay-field">
+                            <label class="form-label" for="markPaidAmount">Số tiền thực thu (VNĐ) <span class="req">*</span></label>
+                            <input type="text" class="form-control" id="markPaidAmount" name="paidAmount" inputmode="numeric" data-money>
+                            <span class="money-words" data-money-words-for="markPaidAmount"></span>
+                            <div class="pay-hint">Điền sẵn số tiền kỳ. Thu khác số này thì sửa lại, không cần lý do.</div>
+                            <div class="modal-err" id="markPaidAmountErr">Số tiền thực thu phải lớn hơn 0.</div>
+                        </div>
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn-modal-cancel" data-bs-dismiss="modal">Huỷ bỏ</button>
@@ -1424,17 +1486,26 @@
 
     <script>
         // Mở modal "Ghi nhận đã thu" cho đúng kỳ vừa bấm. Ngày thu mặc định hôm
-        // nay (giờ máy người dùng), sửa được nếu tiền về từ hôm trước.
+        // nay (giờ máy người dùng), sửa được nếu tiền về từ hôm trước. Số tiền thực
+        // thu điền sẵn số tiền kỳ (BR-60); khác số tiền kỳ thì không cần lý do.
         (function () {
             var modalEl = document.getElementById('markPaidModal');
             if (!modalEl || !window.bootstrap) { return; }
             var dateInput = document.getElementById('markPaidDate');
             var err = document.getElementById('markPaidErr');
+            var amountInput = document.getElementById('markPaidAmount');
+            var amountErr = document.getElementById('markPaidAmountErr');
             function today() {
                 var d = new Date();
                 var mm = String(d.getMonth() + 1).padStart(2, '0');
                 var dd = String(d.getDate()).padStart(2, '0');
                 return d.getFullYear() + '-' + mm + '-' + dd;
+            }
+            // Đặt số vào ô data-money rồi phát sự kiện input: appshell.js tự chấm phân
+            // cách hàng nghìn và viết dòng chữ bên dưới, như khi người dùng gõ.
+            function setMoney(input, n) {
+                input.value = isNaN(n) ? '' : String(Math.round(n));
+                input.dispatchEvent(new Event('input', { bubbles: true }));
             }
             document.querySelectorAll('.js-mark-paid').forEach(function (btn) {
                 btn.addEventListener('click', function () {
@@ -1443,17 +1514,28 @@
                     var amountText = isNaN(amount) ? ''
                         : ' · ' + amount.toLocaleString('vi-VN', { maximumFractionDigits: 0 }) + ' ₫';
                     document.getElementById('markPaidMessage').textContent =
-                        'Kỳ ' + btn.dataset.paymentNo + amountText + '\nGhi nhận tiền của kỳ này đã về vào ngày:';
+                        'Kỳ ' + btn.dataset.paymentNo + ' · ' + btn.dataset.type + amountText
+                        + '\nGhi nhận tiền của kỳ này đã về.';
                     dateInput.value = today();
+                    setMoney(amountInput, amount);
                     err.style.display = 'none';
+                    amountErr.style.display = 'none';
                     bootstrap.Modal.getOrCreateInstance(modalEl).show();
                 });
             });
             document.getElementById('markPaidForm').addEventListener('submit', function (e) {
+                var digits = amountInput.value.replace(/\D/g, '');
+                // Tắt lỗi của lần bấm trước: ô đã sửa đúng thì dòng lỗi cũ không được còn.
+                err.style.display = 'none';
+                amountErr.style.display = 'none';
                 if (dateInput.value === '') {
                     e.preventDefault();
                     err.style.display = 'block';
                     dateInput.focus();
+                } else if (!digits || Number(digits) <= 0) {
+                    e.preventDefault();
+                    amountErr.style.display = 'block';
+                    amountInput.focus();
                 }
             });
         })();

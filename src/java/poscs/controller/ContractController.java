@@ -319,13 +319,19 @@ public class ContractController extends HttpServlet {
             case "changeProgress":
                 handleChangeProgress(request, response);
                 break;
-            case "addPayment":
+            case ContractPaymentController.ACTION_ADD:
                 handleAddPayment(request, response);
                 break;
-            case "markPaid":
+            case ContractPaymentController.ACTION_UPDATE:
+                handleUpdatePayment(request, response);
+                break;
+            case ContractPaymentController.ACTION_SUBMIT:
+                handleMarkSubmitted(request, response);
+                break;
+            case ContractPaymentController.ACTION_MARK_PAID:
                 handleMarkPaid(request, response);
                 break;
-            case "removePayment":
+            case ContractPaymentController.ACTION_REMOVE:
                 handleRemovePayment(request, response);
                 break;
             case "handOver":
@@ -1308,6 +1314,16 @@ public class ContractController extends HttpServlet {
 
     private void handleAddPayment(HttpServletRequest request, HttpServletResponse response) throws IOException {
         getPaymentController().handleAddPayment(request, response);
+    }
+
+    /** Sửa kỳ thanh toán chưa thu (UC-53, BR-60) -- ủy quyền sang ContractPaymentController. */
+    private void handleUpdatePayment(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        getPaymentController().handleUpdatePayment(request, response);
+    }
+
+    /** Ghi nhận đã nộp hồ sơ thanh toán (UC-53, BR-60) -- ủy quyền sang ContractPaymentController. */
+    private void handleMarkSubmitted(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        getPaymentController().handleMarkSubmitted(request, response);
     }
 
     private void handleMarkPaid(HttpServletRequest request, HttpServletResponse response) throws IOException {

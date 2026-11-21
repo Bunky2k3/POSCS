@@ -4570,12 +4570,22 @@ CREATE TABLE `notifications` (
 -- =========================================================
 
 DROP TABLE IF EXISTS `contract_payments`;
+-- Kỳ thanh toán (V45, BR-60): loại 'Tạm ứng' | 'Thanh toán' (ContractPayment.TYPES),
+-- điều kiện ghi ngắn, số ngày phải trả kể từ khi nộp hồ sơ, ngày nộp hồ sơ, số
+-- tiền thực thu (BR-18: doanh thu cộng cột này theo ngày thu). Hạn thu để trống
+-- được khi lập; kỳ có số ngày thì hạn thu = ngày nộp + số ngày. Tình trạng kỳ
+-- suy ra mỗi lần đọc (ContractPayment.statusOn), không có cột lưu.
 CREATE TABLE `contract_payments` (
   `payment_id`     int NOT NULL AUTO_INCREMENT,
   `contract_id`    int NOT NULL,
+  `payment_type`   varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'Thanh toán',
   `invoice_amount` decimal(15,2) NOT NULL,
-  `due_date`       date NOT NULL,
+  `condition_note` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `payment_days`   int DEFAULT NULL,
+  `submitted_date` date DEFAULT NULL,
+  `due_date`       date DEFAULT NULL,
   `paid_date`      date DEFAULT NULL,
+  `paid_amount`    decimal(15,2) DEFAULT NULL,
   `created_at`     timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`payment_id`),
   KEY `contract_id` (`contract_id`),
@@ -5159,8 +5169,9 @@ JOIN contracts c ON c.contract_code = x.code
 JOIN products p ON p.product_code = x.sp;
 
 -- ===== Thanh toán =====
-INSERT INTO contract_payments (contract_id, invoice_amount, due_date, paid_date)
-SELECT c.contract_id, x.amount, x.due, x.paid
+-- Kỳ đã thu: số thực thu = số tiền kỳ (V45 làm đúng như vậy với dòng cũ).
+INSERT INTO contract_payments (contract_id, invoice_amount, due_date, paid_date, paid_amount)
+SELECT c.contract_id, x.amount, x.due, x.paid, CASE WHEN x.paid IS NULL THEN NULL ELSE x.amount END
 FROM (
     -- 01: 1,2 tỷ = 700tr (đã thu) + 500tr (chưa tới hạn)
     SELECT N'01/2026/HĐKT-POSTEF' code, 700000000.00 amount,

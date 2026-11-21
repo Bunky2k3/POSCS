@@ -897,4 +897,378 @@ public class ContractPaymentControllerTest {
         verify(response, never()).sendRedirect(anyString());
         verify(paymentService, never()).markPaymentPaid(anyInt(), anyInt(), any(), any());
     }
+
+    // ==================================================================
+    // 9. Task 10.4 -- BR-60: số tiền thực thu, sửa kỳ, "Đã nộp hồ sơ"
+    // ==================================================================
+
+    @Test
+    public void markPaid_tongHop_soThucThuKhacSoTienKy_luuDungSoThucThu_veTrangChiTiet() throws Exception {
+        // Service thật + PermissionService thật: số thực thu đi thẳng xuống DAO.
+        User general = buildUser(6, PermissionService.ROLE_GENERAL, null);
+        when(employeeDAO.findById(6)).thenReturn(general);
+        PermissionService realPs = new PermissionService(employeeDAO);
+        ContractPaymentDAO paymentDAO = mock(ContractPaymentDAO.class);
+        ContractPaymentService realService = new ContractPaymentService(paymentDAO, contractDAO, realPs);
+        ContractPaymentController ctrl = new ContractPaymentController(contractDAO, employeeDAO, realService, realPs);
+        when(contractDAO.findById(10)).thenReturn(sampleContract(10, false));
+        BigDecimal actual = new BigDecimal("100000000");
+        when(paymentDAO.markPaymentPaid(20, 10, Date.valueOf("2026-11-18"), actual, 6)).thenReturn(true);
+        loginUser(general);
+        markPaidRequest("2026-11-18");
+        when(request.getParameter("paidAmount")).thenReturn("100.000.000");
+
+        ctrl.doPost(request, response);
+
+        verify(paymentDAO).markPaymentPaid(20, 10, Date.valueOf("2026-11-18"), actual, 6);
+        verify(paymentDAO, never()).markPaymentPaid(anyInt(), anyInt(), any(), anyInt());
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=view&id=10");
+    }
+
+    @Test
+    public void markPaid_soThucThuDeTrong_dungDuongThuDuSoTienKy() throws Exception {
+        markPaidRequest("2026-11-18");
+        when(request.getParameter("paidAmount")).thenReturn("   ");
+        when(paymentService.markPaymentPaid(10, 20, Date.valueOf("2026-11-18"), adminUser))
+                .thenReturn(ServiceResult.ok(null));
+
+        controller.doPost(request, response);
+
+        verify(paymentService).markPaymentPaid(10, 20, Date.valueOf("2026-11-18"), adminUser);
+        verify(paymentService, never()).markPaymentPaid(anyInt(), anyInt(), any(), any(BigDecimal.class), any());
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=edit&id=10");
+    }
+
+    @Test
+    public void markPaid_soThucThuKhongPhaiSo_baoLoiKhongGoiService() throws Exception {
+        loginGeneralUser();
+        markPaidRequest("2026-11-18");
+        when(request.getParameter("paidAmount")).thenReturn("một trăm triệu");
+
+        controller.doPost(request, response);
+
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=view&id=10&error=payment_paid_amount_invalid");
+        verify(paymentService, never()).markPaymentPaid(anyInt(), anyInt(), any(), any());
+        verify(paymentService, never()).markPaymentPaid(anyInt(), anyInt(), any(), any(BigDecimal.class), any());
+    }
+
+    @Test
+    public void markPaid_soThucThuBang0_serviceTuChoi_baoDungMa() throws Exception {
+        markPaidRequest("2026-11-18");
+        when(request.getParameter("paidAmount")).thenReturn("0");
+        when(paymentService.markPaymentPaid(eq(10), eq(20), any(), eq(BigDecimal.ZERO), eq(adminUser)))
+                .thenReturn(ServiceResult.fail(ContractPaymentService.ERR_INVALID_PAID_AMOUNT));
+
+        controller.doPost(request, response);
+
+        verify(paymentService).markPaymentPaid(eq(10), eq(20), any(), eq(BigDecimal.ZERO), eq(adminUser));
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=edit&id=10&error=payment_paid_amount_invalid");
+    }
+
+    private void paymentFormRequest(String action) {
+        when(request.getParameter("action")).thenReturn(action);
+        when(request.getParameter("contractId")).thenReturn("10");
+        when(request.getParameter("paymentType")).thenReturn("Thanh toán");
+        when(request.getParameter("invoiceAmount")).thenReturn("112.632.120");
+        when(request.getParameter("conditionNote")).thenReturn("Sau khi nghiệm thu, bàn giao và nộp đủ hồ sơ");
+        when(request.getParameter("paymentDays")).thenReturn(" 7 ");
+        when(request.getParameter("dueDate")).thenReturn("");
+    }
+
+    @Test
+    public void addPayment_docDuCacOMoi_hanThuTrong() throws Exception {
+        paymentFormRequest("addPayment");
+        when(paymentService.addPayment(eq(10), any(), eq(adminUser))).thenReturn(ServiceResult.ok(null));
+
+        controller.doPost(request, response);
+
+        verify(paymentService).addPayment(eq(10), argThat(p ->
+                "Thanh toán".equals(p.getPaymentType())
+                        && new BigDecimal("112632120").compareTo(p.getInvoiceAmount()) == 0
+                        && "Sau khi nghiệm thu, bàn giao và nộp đủ hồ sơ".equals(p.getConditionNote())
+                        && Integer.valueOf(7).equals(p.getPaymentDays())
+                        && p.getDueDate() == null
+                        && p.getPaidDate() == null), eq(adminUser));
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=edit&id=10");
+    }
+
+    @Test
+    public void addPayment_soNgayKhongPhaiSoNguyen_baoPaymentInvalid() throws Exception {
+        paymentFormRequest("addPayment");
+        when(request.getParameter("paymentDays")).thenReturn("bảy");
+
+        controller.doPost(request, response);
+
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=edit&id=10&error=payment_invalid");
+        verify(paymentService, never()).addPayment(anyInt(), any(), any());
+    }
+
+    @Test
+    public void addPayment_serviceBaoOSai_giuMaPaymentInvalid() throws Exception {
+        paymentFormRequest("addPayment");
+        when(paymentService.addPayment(eq(10), any(), any()))
+                .thenReturn(ServiceResult.fail(ContractPaymentService.ERR_INVALID_FIELDS));
+
+        controller.doPost(request, response);
+
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=edit&id=10&error=payment_invalid");
+    }
+
+    @Test
+    public void updatePayment_hopLe_guiDungKyVaCacO_veTrangSua() throws Exception {
+        paymentFormRequest("updatePayment");
+        when(request.getParameter("paymentId")).thenReturn("20");
+        when(request.getParameter("dueDate")).thenReturn("2026-12-01");
+        when(paymentService.updatePayment(eq(10), any(), eq(adminUser))).thenReturn(ServiceResult.ok(null));
+
+        controller.doPost(request, response);
+
+        verify(paymentService).updatePayment(eq(10), argThat(p ->
+                p.getPaymentId() == 20
+                        && Integer.valueOf(7).equals(p.getPaymentDays())
+                        && Date.valueOf("2026-12-01").equals(p.getDueDate())
+                        && p.getPaidDate() == null), eq(adminUser));
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=edit&id=10");
+    }
+
+    @Test
+    public void updatePayment_kyDaThu_baoPaymentFailed() throws Exception {
+        paymentFormRequest("updatePayment");
+        when(request.getParameter("paymentId")).thenReturn("20");
+        when(paymentService.updatePayment(eq(10), any(), any()))
+                .thenReturn(ServiceResult.fail(ContractPaymentService.ERR_PAYMENT_ALREADY_PAID));
+
+        controller.doPost(request, response);
+
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=edit&id=10&error=payment_failed");
+    }
+
+    @Test
+    public void updatePayment_khongCoQuyen_403_thieuMaKy_notFound_soNgaySai_invalid() throws Exception {
+        paymentFormRequest("updatePayment");
+        when(request.getParameter("paymentId")).thenReturn("20");
+        when(paymentService.updatePayment(eq(10), any(), any()))
+                .thenReturn(ServiceResult.fail(ContractPaymentService.ERR_FORBIDDEN));
+        controller.doPost(request, response);
+        verify(response).sendError(HttpServletResponse.SC_FORBIDDEN, PermissionService.MSG_022);
+
+        when(request.getParameter("paymentId")).thenReturn(null);
+        controller.doPost(request, response);
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?error=notfound");
+
+        when(request.getParameter("paymentId")).thenReturn("20");
+        when(request.getParameter("paymentDays")).thenReturn("7.5");
+        controller.doPost(request, response);
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=edit&id=10&error=payment_invalid");
+        verify(paymentService, times(1)).updatePayment(anyInt(), any(), any());
+    }
+
+    private void submitRequest(String submittedDate, String dueDate) {
+        when(request.getParameter("action")).thenReturn("markSubmitted");
+        when(request.getParameter("contractId")).thenReturn("10");
+        when(request.getParameter("paymentId")).thenReturn("20");
+        when(request.getParameter("submittedDate")).thenReturn(submittedDate);
+        when(request.getParameter("dueDate")).thenReturn(dueDate);
+    }
+
+    @Test
+    public void markSubmitted_hopLe_guiNgayNopVaHanTay_veTrangSua() throws Exception {
+        submitRequest("2026-11-18", "2026-12-05");
+        when(paymentService.markSubmitted(10, 20, Date.valueOf("2026-11-18"), Date.valueOf("2026-12-05"), adminUser))
+                .thenReturn(ServiceResult.ok(null));
+
+        controller.doPost(request, response);
+
+        verify(paymentService).markSubmitted(10, 20, Date.valueOf("2026-11-18"), Date.valueOf("2026-12-05"), adminUser);
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=edit&id=10");
+    }
+
+    @Test
+    public void markSubmitted_hanThuTrong_guiNull() throws Exception {
+        submitRequest("2026-11-18", "");
+        when(paymentService.markSubmitted(eq(10), eq(20), any(), isNull(), eq(adminUser)))
+                .thenReturn(ServiceResult.ok(null));
+
+        controller.doPost(request, response);
+
+        verify(paymentService).markSubmitted(eq(10), eq(20), eq(Date.valueOf("2026-11-18")), isNull(), eq(adminUser));
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=edit&id=10");
+    }
+
+    @Test
+    public void markSubmitted_ngayTuongLai_baoMSG064() throws Exception {
+        submitRequest("2026-12-31", null);
+        when(paymentService.markSubmitted(eq(10), eq(20), any(), any(), eq(adminUser)))
+                .thenReturn(ServiceResult.fail(ContractPaymentService.ERR_SUBMITTED_DATE_FUTURE));
+
+        controller.doPost(request, response);
+
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=edit&id=10&error=payment_submitted_future");
+    }
+
+    @Test
+    public void markSubmitted_ngaySaiDinhDang_baoLoiKhongGoiService() throws Exception {
+        submitRequest("18/11/2026", null);
+        controller.doPost(request, response);
+        submitRequest("2026-11-18", "05/12/2026");
+        controller.doPost(request, response);
+
+        verify(response, times(2)).sendRedirect(CONTEXT_PATH + "/contract?action=edit&id=10&error=payment_failed");
+        verify(paymentService, never()).markSubmitted(anyInt(), anyInt(), any(), any(), any());
+    }
+
+    @Test
+    public void markSubmitted_tongHop_bi403TruocKhiDocNgay() throws Exception {
+        loginGeneralUser();
+        submitRequest("18/11/2026", null);
+
+        controller.doPost(request, response);
+
+        verify(response).sendError(HttpServletResponse.SC_FORBIDDEN, PermissionService.MSG_022);
+        verify(response, never()).sendRedirect(anyString());
+        verify(paymentService, never()).markSubmitted(anyInt(), anyInt(), any(), any(), any());
+    }
+
+    @Test
+    public void markSubmitted_salesCoCapTren_bi403_thieuMaKy_notFound() throws Exception {
+        loginUser(salesSubordinate);
+        submitRequest("2026-11-18", null);
+        controller.doPost(request, response);
+        verify(response).sendError(HttpServletResponse.SC_FORBIDDEN, PermissionService.MSG_022);
+
+        loginUser(adminUser);
+        when(request.getParameter("paymentId")).thenReturn("abc");
+        controller.doPost(request, response);
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?error=notfound");
+        verify(paymentService, never()).markSubmitted(anyInt(), anyInt(), any(), any(), any());
+    }
+
+    // ==================================================================
+    // 10. Fix QA Task 10.4 -- 🟡 #1: kiểm quyền TRƯỚC khi đọc form lập / sửa kỳ;
+    //     🟡 #2: ngày có chữ mà sai định dạng không được lặng lẽ thành NULL.
+    // ==================================================================
+
+    @Test
+    public void addPaymentVaUpdatePayment_tongHopGuiSoNgaySai_van403KhongRedirect() throws Exception {
+        loginGeneralUser();
+        for (String action : new String[]{"addPayment", "updatePayment"}) {
+            reset(response);
+            paymentFormRequest(action);
+            when(request.getParameter("paymentId")).thenReturn("20");
+            when(request.getParameter("paymentDays")).thenReturn("abc");
+
+            controller.doPost(request, response);
+
+            verify(response).sendError(HttpServletResponse.SC_FORBIDDEN, PermissionService.MSG_022);
+            verify(response, never()).sendRedirect(anyString());
+        }
+        verify(paymentService, never()).addPayment(anyInt(), any(), any());
+        verify(paymentService, never()).updatePayment(anyInt(), any(), any());
+    }
+
+    @Test
+    public void addPaymentVaUpdatePayment_salesCoCapTrenVaChuaDangNhap_bi403() throws Exception {
+        for (User actor : new User[]{salesSubordinate, null}) {
+            loginUser(actor);
+            for (String action : new String[]{"addPayment", "updatePayment"}) {
+                reset(response);
+                paymentFormRequest(action);
+                when(request.getParameter("paymentId")).thenReturn("20");
+                when(request.getParameter("paymentDays")).thenReturn("abc");
+
+                controller.doPost(request, response);
+
+                verify(response).sendError(HttpServletResponse.SC_FORBIDDEN, PermissionService.MSG_022);
+                verify(response, never()).sendRedirect(anyString());
+            }
+        }
+        verify(paymentService, never()).addPayment(anyInt(), any(), any());
+        verify(paymentService, never()).updatePayment(anyInt(), any(), any());
+    }
+
+    @Test
+    public void addPayment_permissionThat_tongHopGuiFormHopLe_bi403TruocService() throws Exception {
+        // PermissionService thật: vai Tổng hợp không lập được kỳ, kể cả form hợp lệ.
+        User general = buildUser(6, PermissionService.ROLE_GENERAL, null);
+        when(employeeDAO.findById(6)).thenReturn(general);
+        PermissionService realPs = new PermissionService(employeeDAO);
+        ContractPaymentController ctrl = new ContractPaymentController(contractDAO, employeeDAO, paymentService, realPs);
+        loginUser(general);
+        paymentFormRequest("addPayment");
+
+        ctrl.doPost(request, response);
+
+        verify(response).sendError(HttpServletResponse.SC_FORBIDDEN, PermissionService.MSG_022);
+        verify(paymentService, never()).addPayment(anyInt(), any(), any());
+    }
+
+    @Test
+    public void updatePayment_hanThuSaiDinhDang_baoLoiKhongGoiService() throws Exception {
+        for (String badDue : new String[]{"01/12/2026", "abc", "2026-13-01"}) {
+            reset(response);
+            paymentFormRequest("updatePayment");
+            when(request.getParameter("paymentId")).thenReturn("20");
+            when(request.getParameter("dueDate")).thenReturn(badDue);
+
+            controller.doPost(request, response);
+
+            verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=edit&id=10&error=payment_failed");
+        }
+        verify(paymentService, never()).updatePayment(anyInt(), any(), any());
+    }
+
+    @Test
+    public void addPayment_hanThuHoacNgayDaThuSaiDinhDang_baoLoiKhongGoiService() throws Exception {
+        paymentFormRequest("addPayment");
+        when(request.getParameter("dueDate")).thenReturn("01/12/2026");
+        controller.doPost(request, response);
+
+        paymentFormRequest("addPayment");
+        when(request.getParameter("paidDate")).thenReturn("hôm qua");
+        controller.doPost(request, response);
+
+        verify(response, times(2)).sendRedirect(CONTEXT_PATH + "/contract?action=edit&id=10&error=payment_failed");
+        verify(paymentService, never()).addPayment(anyInt(), any(), any());
+    }
+
+    @Test
+    public void addPayment_hanThuVaNgayDaThuDeTrongHoacDungDinhDang_vanGoiService() throws Exception {
+        // Ô ngày để trống (hoặc chỉ khoảng trắng) là hợp lệ theo BR-60, không bị coi là sai định dạng.
+        paymentFormRequest("addPayment");
+        when(request.getParameter("dueDate")).thenReturn("   ");
+        when(request.getParameter("paidDate")).thenReturn("2026-11-20");
+        when(paymentService.addPayment(eq(10), any(), eq(adminUser))).thenReturn(ServiceResult.ok(null));
+
+        controller.doPost(request, response);
+
+        verify(paymentService).addPayment(eq(10), argThat(p ->
+                p.getDueDate() == null && Date.valueOf("2026-11-20").equals(p.getPaidDate())), eq(adminUser));
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=edit&id=10");
+    }
+
+    @Test
+    public void updatePayment_soNgaySaiDuocBaoTruocNgaySai_paymentInvalid() throws Exception {
+        paymentFormRequest("updatePayment");
+        when(request.getParameter("paymentId")).thenReturn("20");
+        when(request.getParameter("paymentDays")).thenReturn("x");
+        when(request.getParameter("dueDate")).thenReturn("01/12/2026");
+
+        controller.doPost(request, response);
+
+        verify(response).sendRedirect(CONTEXT_PATH + "/contract?action=edit&id=10&error=payment_invalid");
+        verify(paymentService, never()).updatePayment(anyInt(), any(), any());
+    }
+
+    @Test
+    public void errorParamOf_maRiengGiuNguyen_conLaiVePaymentFailed() {
+        assertEquals("payment_invalid", ContractPaymentController.errorParamOf(ContractPaymentService.ERR_INVALID_FIELDS));
+        assertEquals("payment_submitted_future",
+                ContractPaymentController.errorParamOf(ContractPaymentService.ERR_SUBMITTED_DATE_FUTURE));
+        assertEquals("payment_paid_amount_invalid",
+                ContractPaymentController.errorParamOf(ContractPaymentService.ERR_INVALID_PAID_AMOUNT));
+        assertEquals("payment_failed", ContractPaymentController.errorParamOf(ContractPaymentService.ERR_INVALID));
+        assertEquals("payment_failed", ContractPaymentController.errorParamOf(ContractPaymentService.ERR_INVALID_AMOUNT));
+        assertEquals("payment_failed", ContractPaymentController.errorParamOf(ContractPaymentService.ERR_PAYMENT_FROZEN));
+        assertEquals("payment_failed", ContractPaymentController.errorParamOf(null));
+    }
 }

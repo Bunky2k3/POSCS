@@ -109,7 +109,9 @@ public class DashboardService extends BaseService {
         return new ProvinceResolution(myProvinces, filters, isMine);
     }
 
-    // UC-36, BR-18: Doanh thu lấy từ contract_payments (qua ContractDAO -> ContractPaymentDAO).
+    // UC-36, BR-18: Doanh thu lấy từ contract_payments (qua ContractDAO -> ContractPaymentDAO):
+    // cộng SỐ TIỀN THỰC THU (paid_amount, BR-60) của các kỳ đã thu, tính theo ngày thu;
+    // chưa tách riêng tạm ứng. Phép cộng nằm ở ContractPaymentDAO.COLLECTED_AMOUNT_SQL.
     private RevenueMetrics computeRevenue(Period period, LocalDate today,
             List<Integer> provinceFilters, List<Integer> ownerIds) {
         BigDecimal current;

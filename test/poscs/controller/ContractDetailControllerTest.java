@@ -297,4 +297,34 @@ public class ContractDetailControllerTest {
         controller.doGet(request, response);
         verify(response).sendError(HttpServletResponse.SC_FORBIDDEN, PermissionService.MSG_022);
     }
+
+    // Task 10.4 (BR-18, BR-60; người dùng đồng ý sửa ContractControllerHelper 20/11/2026):
+    // ô "Đã thu" cộng SỐ THỰC THU, "Còn phải thu" là các kỳ chưa thu.
+    @Test
+    public void view_paymentTotals_collectedUsesPaidAmount_outstandingIsUnpaidInstallments() throws Exception {
+        when(request.getParameter("id")).thenReturn("5");
+        Contract contract = new Contract();
+        contract.setContractId(5);
+        contract.setContractValue(new BigDecimal("563160600"));
+        when(contractDAO.findById(5)).thenReturn(contract);
+
+        poscs.model.ContractPayment advance = new poscs.model.ContractPayment();
+        advance.setPaymentType(poscs.model.ContractPayment.TYPE_ADVANCE);
+        advance.setInvoiceAmount(new BigDecimal("450528480"));
+        advance.setPaidDate(java.sql.Date.valueOf("2026-11-10"));
+        advance.setPaidAmount(new BigDecimal("400000000"));
+        poscs.model.ContractPayment legacyPaid = new poscs.model.ContractPayment();
+        legacyPaid.setInvoiceAmount(new BigDecimal("10000000"));
+        legacyPaid.setPaidDate(java.sql.Date.valueOf("2026-11-11")); // trước V45: chưa có số thực thu
+        poscs.model.ContractPayment pending = new poscs.model.ContractPayment();
+        pending.setInvoiceAmount(new BigDecimal("102632120"));
+        when(contractDAO.findPaymentsByContractId(5)).thenReturn(List.of(advance, legacyPaid, pending));
+
+        controller.doGet(request, response);
+
+        verify(request).setAttribute("paymentScheduled", new BigDecimal("563160600"));
+        verify(request).setAttribute("paymentCollected", new BigDecimal("410000000"));
+        verify(request).setAttribute("paymentOutstanding", new BigDecimal("102632120"));
+        verify(request).setAttribute("paymentTypes", poscs.model.ContractPayment.TYPES);
+    }
 }
