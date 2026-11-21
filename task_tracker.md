@@ -49,6 +49,7 @@ Dòng task viết như các task bên dưới (`**Task X.X:** <Tên task>`), kè
     - **Giấy tờ:** giữ mục Tài liệu sẵn có (bảng `contract_documents`, các lớp `ContractDocument*`), **không** làm bảng hay mô-đun mới. Thêm ngày trên giấy (bắt buộc, không sau hôm nay) và số giấy; link thành không bắt buộc. Một danh sách chung cho cả hợp đồng: không tách theo kỳ, không có mẫu giấy theo loại kỳ. Giao diện dạng ô tích theo danh mục cố định trong code cộng "Khác"; một loại có thể có nhiều tờ (giao nhiều đợt, mỗi kỳ một đề nghị thanh toán). Bỏ tích = huỷ mềm **bắt buộc lý do** như hiện nay. Sales có quyền ghi hợp đồng tích giấy. 2 tài liệu cũ (gồm link demo HD-0015) giữ nguyên.
     - **Kỳ thanh toán:** giữ số tiền, hạn thu, ngày thu. Thêm loại kỳ **Tạm ứng / Thanh toán**, điều kiện (ghi ngắn), số ngày phải trả kể từ khi nộp hồ sơ (không bắt buộc), **ngày nộp hồ sơ** và **số tiền thực thu** (mặc định bằng số tiền kỳ, khác thì không bắt lý do). Hạn thu để trống được khi lập; bấm "Đã nộp hồ sơ" thì ghi ngày nộp, kỳ có số ngày thì hạn thu = ngày nộp + số ngày, không có thì nhập hạn tay. Tình trạng suy ra: Chưa nộp hồ sơ → Chờ thu → Quá hạn → Đã thu. Ô "%" trên form chỉ tính sẵn số tiền từ giá trị hợp đồng, vẫn lưu số tiền. Thêm thao tác **sửa kỳ** (kỳ chưa thu, hợp đồng chưa thanh lý/chấm dứt). Dashboard cộng số tiền thực thu theo ngày thu, chưa tách tạm ứng; tạm ứng không thu hồi dần. **Sales** (theo quyền quản lý kỳ) bấm "Đã nộp hồ sơ" (người dùng chốt 19/11/2026); vai Tổng hợp chỉ thêm được "Đã thu" (Task 9.2), và khi bấm thì **nhập được số tiền thực thu** như ở trang Sửa (người dùng chốt 20/11/2026). Bấm "Đã nộp hồ sơ" cho kỳ không có số ngày thì hạn thu **không bắt buộc**; kỳ đã nộp hồ sơ mà chưa có hạn thu hiện **Chờ thu** (người dùng chốt 20/11/2026 lúc làm Task 10.1; thay câu "có hạn thu → Chờ thu" ở BR "Kỳ thanh toán" của Task 10.1 thành "có hạn thu, hoặc đã có ngày nộp hồ sơ → Chờ thu", đã ghi vào BR-60).
     - **Không làm:** trạng thái "Đủ hồ sơ", giấy riêng của từng kỳ, bảng "kỳ cần giấy gì", kỳ "Thanh toán 100%" tự tạo, tự tính lại số tiền kỳ khi phụ lục đổi giá trị, cảnh báo tổng tỷ lệ.
+16. **Dữ liệu mẫu mới (Task 10.6, người dùng chốt 20/11/2026):** chỉ thay **dữ liệu mẫu**, giữ cấu trúc bảng và các file migration cũ. Bộ tài khoản theo chi nhánh thật, tên giả: 2 Admin (GĐ, PGĐ), 4 Sales (Trưởng phòng, Phó phòng, 2 nhân viên; không ai có cấp trên), 3 Tổng hợp (kế toán, thu tiền, nhận bàn giao) và 1 Sales đã nghỉ (tài khoản bị khoá). **Gieo cả hai Admin** vào file migration đánh dấu `-- poscs:demo-only` và phần dữ liệu mẫu của `db/schema.sql` (thay quy tắc cũ "không gieo Admin vào repo"; production theo Task 11.3 không chép bảng `users`). `poscs_db` trên máy dev **xoá sạch rồi dựng lại** từ `db/schema.sql`, không giữ gì, kể cả link demo của HD-0015 và tài khoản `nguyendat`. Bộ dữ liệu **nhỏ**, không nhiều như bộ cũ (người dùng chốt 20/11/2026): 4 khách hàng, 1 nhà cung cấp, 8 hợp đồng và 1 phụ lục, 3 phiếu hỗ trợ. Làm sau Task 10.5, trước hướng dẫn sử dụng (Task 10.7).
 
 ## Quyết định còn chờ người dùng
 
@@ -474,7 +475,7 @@ Không còn mục nào.
 
 ## Giai đoạn 10: Vòng đời hợp đồng: chứng từ trước khi ký, giấy tờ, kỳ thanh toán
 
-> Yêu cầu người dùng 19/11/2026, quyết định ở mục 14 và 15 "Quyết định đã chốt" (bản rút gọn chốt cùng ngày: POSCS chỉ để theo dõi hợp đồng, nhưng vòng đời phải khớp cách chi nhánh làm thật). Làm **sau Giai đoạn 9** (Task 10.4 giữ nút "Đã thu" của vai Tổng hợp từ Task 9.2), theo thứ tự 10.1 → 10.7. Mẫu dựng theo hợp đồng thật 01/2026/HĐMB/QTI-POT/SMP (Viễn thông Quảng Trị, Điều 5 "Phương thức thanh toán").
+> Yêu cầu người dùng 19/11/2026, quyết định ở mục 14 và 15 "Quyết định đã chốt" (bản rút gọn chốt cùng ngày: POSCS chỉ để theo dõi hợp đồng, nhưng vòng đời phải khớp cách chi nhánh làm thật). Làm **sau Giai đoạn 9** (Task 10.4 giữ nút "Đã thu" của vai Tổng hợp từ Task 9.2), theo thứ tự 10.1 → 10.7 (Task 10.6 thêm ngày 20/11/2026: dọn dữ liệu mẫu cũ, gieo bộ mới; hướng dẫn sử dụng lùi thành Task 10.7). Mẫu dựng theo hợp đồng thật 01/2026/HĐMB/QTI-POT/SMP (Viễn thông Quảng Trị, Điều 5 "Phương thức thanh toán").
 
 - [x] **Task 10.1:** Đặc tả trong `docs/SPEC.md`: vòng đời hợp đồng theo chi nhánh, mã để trống tới lúc Ký, giấy tờ dạng ô tích, kỳ thanh toán có nộp hồ sơ và số thực thu, bước giao hàng và nhắc ký.
   - UC: sửa `UC-10`, `UC-11`, `UC-33`, `UC-44`, `UC-52` (đổi tên thành "Quản lý giấy tờ của hợp đồng"), `UC-53`; §5.7 thêm loại thông báo thứ ba.
@@ -596,3 +597,73 @@ Không còn mục nào.
   - Nhánh: `feat/task-10.5-buoc-giao-hang-nhac-ky`.
   - Commit: `feat(contract): bước giao hàng và nhắc ký sau 15 ngày (Task 10.5)`
   - *Đã hoàn thành:* `ContractDAO` (bước giao hàng suy ra trong `SELECT_BASE` từ giấy tờ chưa huỷ: cột `delivery_stage`, `delivered_date`, chỉ với bản Nháp; mã lọc `delivery` = `preparing` / `delivered` qua `deliveryStageClause`, áp cho `findAll`, `countAll` và dải KPI `countStatusSummary` (tách `listScopeSummaryClauses`); `countDeliveredUnsigned` cho Dashboard; `findDeliveredUnsigned(mốc)` cho lịch nhắc). `Contract` (`deliveryStage`, `deliveredDate`, `DELIVERY_PREPARING`, `DELIVERY_DELIVERED`, `isDeliveredUnsigned`, `deliveredDaysOn`). `ContractFilterHelper` (`deliveryFilterOf` chỉ nhận hai mã; chip "Bước giao hàng: …"; giữ `delivery` ở mọi link lọc), `ContractListController`, `ContractExportController` + `ContractExportService` (bộ lọc đi trong `ListScope`, Excel ra đúng danh sách đang lọc). `DashboardService` (ô "Đã giao – chưa ký": chỉ hợp đồng bán, theo phạm vi người/địa bàn, không theo kỳ; người dùng chốt 21/11/2026). `NotificationService` (`REF_CONTRACT_UNSIGNED_DELIVERY` = `contract_unsigned_delivery`, `UNSIGNED_DELIVERY_DAYS = 15`, `generateUnsignedDeliveryNotifications` trong lượt chạy theo lịch, MSG-065, chống trùng bằng `existsForUserAndRef`, chỉ gửi người phụ trách), `NotificationController` (`targetOf` mở chi tiết hợp đồng). JSP: `listcontract.jsp` (nhãn dưới tiến độ; ô lọc trong "Lọc thêm", tự gửi form; `delivery` ở phân trang và Xuất Excel), `viewcontractdetail.jsp` (nhãn ở tiêu đề, ngày giao, số ngày đã giao), `dashboard.jsp` (ô thứ tư bấm sang danh sách đã lọc). Ngoài dòng File sửa (người dùng đồng ý 21/11/2026): `ListScope` (`withDeliveryStage`, giữ nguyên số tham số các hàm DAO nên không sửa test cũ), `DashboardSummary`, `DashboardController`, kèm test ở `ListScopeTest`, `DashboardControllerTest`. Test: thêm 54 test ở 9 lớp (gồm test đọc `listcontract.jsp`, bắt mọi ô lọc có id phải tự gửi form); không sửa, không xoá test cũ. `ant test` 2.435 test (2.432 pass, 0 fail, 3 skipped); `compile-jsps` trên máy này bị bỏ qua (`compile.jsps=false`), đã dịch 3 JSP bằng Jasper của Tomcat 11, 0 lỗi. Chạy thử trên Tomcat riêng với CSDL tạm dựng từ `schema.sql` của nhánh (đã xoá sau khi thử): đạt toàn bộ dòng Xong khi. QA report tại `docs/qa/Task-10.5.md` (CẦN SỬA; 1 🔴, 1 🟡, 1 🟢 đã xử lý). `SELECT_BASE` giờ đọc `contract_documents.doc_date` (V44): `poscs_db` phải chạy V40 → V45 trước khi kéo code về checkout chính. Lỗi có sẵn, ngoài phạm vi: link Xuất Excel và phân trang của danh sách hợp đồng không mang `month`, `view`.
+- [x] **Task 10.6:** Dọn dữ liệu mẫu cũ, gieo bộ dữ liệu mẫu mới theo cơ cấu chi nhánh thật và vòng đời hợp đồng mới; người dùng dựng lại `poscs_db` từ `db/schema.sql`.
+  - UC: không có UC mới; bộ dữ liệu phải bày được `UC-08`, `UC-10`, `UC-11`, `UC-14`, `UC-16`, `UC-36`, `UC-46`, `UC-47`, `UC-48`, `UC-49`, `UC-52`, `UC-53`.
+  - BR / MSG / NFR: `BR-52` (mã `KH-xxxx`, `NCC-xxx`), `BR-17` (trạng thái theo lịch); `BR-58` → `BR-62` (mã hợp đồng, giấy tờ, kỳ thanh toán, bước giao hàng, nhắc ký; Task 10.1); mục 9, 10, 11, 13, 14, 15, 16 "Quyết định đã chốt".
+  - File sửa:
+    - `db/migrations/V{số kế tiếp}__reseed_demo_theo_co_cau_that__ndat2003.sql` (mới):
+      - Dòng đầu `-- poscs:demo-only` (quy ước Task 11.2; ghi cả khi 11.2 chưa merge), rồi `INSERT INTO schema_migrations` như `db/migrations/README.md`.
+      - Xoá bộ cũ: mọi dòng của mọi bảng **không phải danh mục**, trừ `schema_migrations`. Danh mục là 10 bảng Task 11.3 chép lên production: `roles`, `departments`, `provinces`, `districts`, `productcategories`, `products`, `productimages`, `productcatalogues`, `customer_evaluation_rules`, `branch_info`. Xoá con trước cha theo khoá ngoại thật trong `schema.sql` (phụ lục trước hợp đồng gốc như V30; `users.manager_id` và `branch_info.updated_by` đặt NULL trước khi xoá `users`). Không `SET FOREIGN_KEY_CHECKS = 0`, không `TRUNCATE`, không `DROP`.
+      - Gieo bộ mới (mục "Bộ dữ liệu" dưới đây). Không ghi cứng ID: tra khoá ngoại qua `username`, `enterprise_code`, mã hoặc tiêu đề hợp đồng, mã sản phẩm, bằng `INSERT ... SELECT` như V30. Mọi ngày tính từ `CURDATE()` để tình trạng không trôi theo thời gian (như V30).
+      - Không sửa dữ liệu 10 bảng danh mục (Task 11.3 chép nguyên chúng từ `schema.sql` lên production), trừ việc đặt `branch_info.updated_by` NULL ở trên.
+    - `db/schema.sql`:
+      - Gỡ mọi khối gieo dữ liệu mẫu cũ: 12 tài khoản của V12 và `tonghop1` của V41, địa chỉ, khách hàng và nhà cung cấp, người liên hệ, `enterprise_roles`, sự kiện vòng đời, hợp đồng và các bảng con, phiếu hỗ trợ và các bảng con, `user_provinces`, các khối "nối lại" và "điền phương hướng xử lý" của bộ cũ.
+      - Giữ nguyên mọi `CREATE TABLE` và `INSERT` của 10 bảng danh mục.
+      - Thêm **một** khối "DỮ LIỆU MẪU, CHỈ DÙNG DEV/DEMO" ở cuối file: cùng phần gieo của migration, không có phần xoá.
+      - Viết lại comment "Cố ý KHÔNG seed tài khoản Admin" theo mục 16 "Quyết định đã chốt".
+  - Bộ dữ liệu: tên người, tên doanh nghiệp, mã số thuế, SĐT, CCCD đều giả; email dạng `@example.com`; không dùng tên khách hàng thật của chi nhánh.
+    - Tài khoản:
+      - Mật khẩu `Poscs@123`; riêng `admin` dùng `Admin@123` để công cụ chụp ảnh và kiểm thử đang dùng chạy tiếp. Băm bằng `lib/jbcrypt-0.4.jar` (tiền tố `$2a$`), mỗi tài khoản một salt như V12.
+      - Tên đăng nhập theo đúng cách app sinh (`EmployeeDAO.generateUniqueUsername`: họ + đệm + tên, bỏ dấu, `đ` thành `d`, viết thường), trừ `admin`.
+      - Ban giám đốc, vai Admin: GĐ `admin` (Nguyễn Văn Thành), PGĐ `tranquocbao` (Trần Quốc Bảo).
+      - Kinh doanh, vai Sales, không ai có `manager_id`: Trưởng phòng `leminhhoang` (Lê Minh Hoàng), Phó phòng `phamthutrang` (Phạm Thu Trang), nhân viên `doducanh` (Đỗ Đức Anh) và `vuthihang` (Vũ Thị Hằng).
+      - Tổng hợp, vai Tổng hợp: kế toán `hoangthimai` (Hoàng Thị Mai), thu tiền `buivannam` (Bùi Văn Nam), nhận bàn giao `ngothilan` (Ngô Thị Lan, mới vào làm, `must_change_password = 1` để thử luồng đổi mật khẩu tạm).
+      - Sales đã nghỉ: `dangvantung` (Đặng Văn Tùng), `is_deleted = 1`. Vẫn là người phụ trách hợp đồng 6 bên dưới, để thử việc Admin đổi người phụ trách (mục 11).
+      - Hồ sơ đủ giới tính, ngày sinh, CCCD, SĐT (không trùng nhau), để đăng nhập không bị bắt bổ sung hồ sơ.
+      - Địa bàn: chia các tỉnh miền Bắc (tên đúng theo bảng `provinces`) cho 4 Sales, mỗi tỉnh tối đa một người. Admin, Tổng hợp và người đã nghỉ không giữ tỉnh nào.
+    - Khách hàng và nhà cung cấp (bộ nhỏ, mục 16):
+      - 4 khách hàng (bên mua), mỗi Sales một khách ở tỉnh của mình. Người phụ trách là Sales giữ tỉnh đó; người hỗ trợ (`support_owner_id`) khác người phụ trách.
+      - 1 nhà cung cấp.
+      - Mỗi đơn vị có địa chỉ đúng tỉnh và xã, một người liên hệ, dòng `enterprise_roles`, và dòng vòng đời như app ghi khi tạo (đọc `CustomerLifecycleDAO`).
+    - Hợp đồng: **đúng 8 hợp đồng và 1 phụ lục** như dưới đây, không thêm. Hàng hoá lấy 1 đến 2 sản phẩm POSTEF có sẵn mỗi hợp đồng. Mã theo kiểu số hợp đồng thật (vd. `05/2026/HĐMB/POT-HB`). `contract_history` có đúng các sự kiện app ghi ở từng bước (đọc `ContractHistoryDAO`).
+      1. Nháp vừa mở hồ sơ: chưa mã, chưa giấy.
+      2. Nháp "Chuẩn bị hàng": có Phiếu GQNCKH và Phiếu ĐCNB.
+      3. Nháp "Đã giao – chưa ký": Biên bản giao nhận hàng hoá ngày `CURDATE() - 16` (để sinh nhắc ký).
+      4. Đã ký, chưa bàn giao (chờ phòng Tổng hợp xác nhận); một kỳ Thanh toán chưa nộp hồ sơ.
+      5. Đã ký, đã bàn giao, hết hạn trong vòng 30 ngày (để sinh thông báo sắp hết hạn), có **1 phụ lục**. Hai kỳ 80/20 như hợp đồng mẫu ở Task 10.4 (số tiền giả, có điều kiện và 7 ngày): kỳ Tạm ứng đã thu; kỳ Thanh toán đã nộp hồ sơ, hạn thu sau hôm nay (Chờ thu).
+      6. Đã ký, do `dangvantung` phụ trách; một kỳ quá hạn thu.
+      7. Đã thanh lý: đủ giấy (nghiệm thu bàn giao, đề nghị thanh toán, hoá đơn GTGT, biên bản thanh lý), mọi kỳ đã thu, một kỳ có số thực thu thấp hơn số tiền kỳ.
+      8. Hợp đồng Mua với nhà cung cấp, liên kết với hợp đồng 5 (`contract_links`).
+    - Quy tắc chung cho hợp đồng:
+      - Người ký bên mình: hợp đồng đã ký mang họ tên, chức vụ, SĐT, fax của GĐ (`admin`); hợp đồng Nháp để trống bốn ô (như khi chưa khai GĐCN, mục 10). Không sửa `branch_info`.
+      - Người phụ trách theo mục 11: Sales giữ tỉnh của khách, trừ hợp đồng 6 (`dangvantung`); phụ lục theo hợp đồng gốc.
+      - Bàn giao cho phòng Tổng hợp. Lượt đã xác nhận ghi người xác nhận là một tài khoản Tổng hợp.
+      - Các kỳ "Đã thu" có ngày thu ở các tháng khác nhau trong 12 tháng gần nhất, để dashboard có doanh thu theo tháng.
+    - Phiếu hỗ trợ: 3 phiếu, mỗi trạng thái một phiếu (Mới tiếp nhận / Đang xử lý / Đã đóng); phiếu Đang xử lý sắp quá hạn SLA. Người xử lý là Sales; gắn khách hàng và hợp đồng đã ký; lịch sử như app ghi (đọc `TechnicalSupportTicketDAO`).
+    - Không gieo: thông báo (để `NotificationScheduler` tự sinh), yêu cầu thay đổi (`change_requests`).
+  - File test: không có test Java mới. Chạy `ant test`, và chạy cả bộ test tích hợp trên CSDL đuôi `_it` như Task 7.2 (bộ này dựng từ `schema.sql`).
+  - Không đụng:
+    - Cấu trúc bảng và dữ liệu 10 bảng danh mục.
+    - Các file migration cũ: V9, V12, V15, V30, V33, V41 giữ nguyên làm lịch sử.
+    - `src/`, `web/`, `tools/guide/` (Task 10.7).
+    - `tools/testdoc/`: dựa vào bộ cũ (`sales4`, `cskh2`, `KH-0001`…) nên sẽ hỏng khi CSDL kiểm thử dựng lại từ `schema.sql` mới. Không sửa; liệt kê các script bị ảnh hưởng trong report.
+  - Lưu ý:
+    - Task 10.2 → 10.5 phải merge trước, vì bộ mẫu dùng các cột mới của chúng; chưa merge thì dừng hỏi. Đọc lại `schema.sql` lúc làm để lấy đúng tên cột.
+    - Agent **không** xoá hay chạy gì lên `poscs_db`. Kiểm bằng hai CSDL dùng một lần đuôi `_it`: (a) dựng từ `schema.sql` mới; (b) dựng từ `git show main:db/schema.sql` rồi áp file migration mới. Hai CSDL phải ra cùng số dòng ở từng bảng. Kiểm xong thì xoá hai CSDL tạm.
+    - Report ghi lệnh để **người dùng** tự dựng lại `poscs_db` (mục 16: xoá sạch, không sao lưu), chạy lúc không dùng app:
+      - `DROP DATABASE poscs_db`, rồi tạo lại với utf8mb4.
+      - Nạp `schema.sql` bằng `mysql --default-character-set=utf8mb4 ... -e "source db/schema.sql"`. Không dùng `<` hay `|` của PowerShell, vì chúng làm hỏng tiếng Việt.
+      - Ghi vào `schema_migrations` mọi file V đang có, vì `schema.sql` chỉ tạo bảng sổ rỗng.
+    - File tải lên (logo, ảnh đại diện) của bộ cũ để nguyên trên đĩa.
+    - Tình huống nào app hiện không tạo ra được (dữ liệu trái BR) thì không gieo, và ghi lý do trong report.
+  - Xong khi (kiểm trên CSDL (a), app chạy ở Tomcat riêng):
+    - Đăng nhập được `admin`, `tranquocbao`, `leminhhoang`, `hoangthimai`. `ngothilan` bị chuyển sang trang đổi mật khẩu; `dangvantung` báo tài khoản bị khoá.
+    - Danh sách hợp đồng có đúng 8 hợp đồng và 1 phụ lục; nhãn bước giao hàng và đủ bốn tình trạng kỳ (Chưa nộp hồ sơ / Chờ thu / Quá hạn / Đã thu) hiện đúng.
+    - Hàng chờ bàn giao của Tổng hợp có hợp đồng 4.
+    - Dashboard có doanh thu theo tháng và ô "Đã giao – chưa ký".
+    - Sau một lượt `NotificationScheduler` có nhắc ký cho hợp đồng 3 và thông báo sắp hết hạn cho hợp đồng 5.
+    - `grep` trong `schema.sql` không còn `sales1`…`sales6`, `kythuat`, `cskh`, `tonghop1`.
+    - Hai cách dựng (a), (b) ra cùng số dòng ở từng bảng.
+  - Nhánh: `chore/task-10.6-du-lieu-mau-moi`.
+  - Commit: `chore(db): gieo lại dữ liệu mẫu theo cơ cấu chi nhánh và vòng đời mới (Task 10.6)`
+  - *Đã hoàn thành:* `db/migrations/V46__reseed_demo_theo_co_cau_that__ndat2003.sql` (dòng đầu `-- poscs:demo-only`; xoá 19 bảng không phải danh mục, con trước cha, không tắt khoá ngoại; gieo 10 tài khoản, 15 tỉnh cho 4 Sales, 4 khách hàng và 1 nhà cung cấp, 8 hợp đồng và 1 phụ lục, 39 giấy tờ, 7 kỳ thanh toán, 4 lượt bàn giao, 1 liên kết bán – mua, 3 phiếu hỗ trợ; nhật ký hợp đồng sinh theo quy tắc từ chính các dòng vừa gieo, đúng câu chữ các DAO ghi; mọi ngày tính từ `CURDATE()`, kỳ cuối hợp đồng 7 thu hôm nay và kỳ 2 thu ngày 15 tháng trước để Dashboard mở mặc định có doanh thu tháng này và so với tháng trước). `db/schema.sql` (gỡ 12 tài khoản của V12, `tonghop1` của V41 và toàn bộ khối dữ liệu mẫu cũ; comment bảng `users` viết lại theo mục 16; thêm một khối "DỮ LIỆU MẪU, CHỈ DÙNG DEV/DEMO" ở cuối, giống hệt phần gieo của V46; mọi `CREATE TABLE` và 10 bảng danh mục giữ nguyên). Không gieo: `customer_lifecycle_events` (app không ghi dòng nào khi tạo khách hàng), `technicalrequestdevices` (chưa màn hình nào đọc), thông báo, `change_requests`. `ant test` kèm bộ test tích hợp trên `poscs_it`: 2.498 test, 0 fail, 0 skipped. Hai CSDL tạm đuôi `_it` ((a) dựng từ `schema.sql` mới, (b) từ `schema.sql` của `main` rồi áp V46) ra cùng số dòng ở mọi bảng; app chạy ở Tomcat riêng trên (a) đạt mọi dòng Xong khi. QA report tại `docs/qa/Task-10.6.md` (CẦN SỬA; 1 🟡, 1 🟢 đã sửa). Người dùng tự dựng lại `poscs_db`: xoá, tạo lại utf8mb4, nạp `schema.sql` bằng `mysql --default-character-set=utf8mb4 ... -e "source db/schema.sql"`, ghi sổ V1 → V46 vào `schema_migrations`. Ngoài phạm vi, chưa sửa: các script `tools/testdoc/` còn dựa vào bộ cũ (`sales4`, `cskh2`, `KH-0001`…) nên sẽ hỏng trên CSDL dựng lại.
