@@ -11,6 +11,9 @@
       - branchSignerMissing : Boolean (true khi họ tên GĐCN còn trống -> bản Nháp hiện MSG-060)
       - canReplaceOwner : Boolean (BR-35: true khi Admin xem và người phụ trách đã bị khoá tài khoản
                           -> hiện ô chọn Sales thay thế; còn lại người phụ trách chỉ đọc)
+      - contractPayments : List<poscs.model.ContractPayment> (BR-60: loại, điều kiện, số ngày,
+                          ngày nộp hồ sơ, hạn thu, số thực thu; tình trạng suy ra qua .status)
+      - paymentTypes  : List<String> (BR-60: danh mục loại kỳ, ContractPayment.TYPES)
 
     Form sửa ở đầu trang chỉ sửa bản ghi trong bảng contracts. Hạng mục sản
     phẩm/dịch vụ thêm/gỡ ở tab Hàng hoá bên dưới (form riêng, đứng ngoài form sửa).
@@ -181,6 +184,28 @@
         .modal-body .paper-field .form-control { width: 100%; }
         .modal-body .paper-field .req { color: var(--danger); }
 
+        /* ===== Kỳ thanh toán (BR-60): tình trạng suy ra, Quá hạn tô đỏ ===== */
+        .pay-sub { font-size: 0.78rem; color: #6b7280; margin-top: 2px; }
+        .pay-status { font-weight: 600; white-space: nowrap; }
+        .pay-status.paid { color: #2f6b34; }
+        .pay-status.overdue { color: var(--danger); }
+        .pay-status.waiting { color: #8a5a00; }
+        .pay-status.not-submitted { color: #9ca3af; }
+        tr.pay-overdue td { background: #fff5f5; }
+        .pay-actions { display: inline-flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; align-items: center; }
+        .btn-pay {
+            height: 28px; border-radius: 8px; padding: 0 10px; font-size: 0.8rem; font-weight: 600;
+            white-space: nowrap; border: 1px solid #e5e7eb; background: #fff; color: #374151; cursor: pointer;
+        }
+        .btn-pay.paid { border-color: #cfe3d0; background: #f3f7f3; color: #2f6b34; }
+        .btn-pay.submit { border-color: #f5d9a8; background: #fff8ec; color: #8a5a00; }
+        .btn-pay:hover { filter: brightness(0.96); }
+        .btn-add-payment { width: auto; padding: 0 18px; }
+        .modal-body .pay-field { margin-bottom: 12px; }
+        .modal-body .pay-field .form-control, .modal-body .pay-field .form-select { width: 100%; }
+        .modal-body .pay-field .req { color: var(--danger); }
+        .modal-body .pay-hint { font-size: 0.78rem; color: #6b7280; margin-top: 4px; }
+
         @media (max-width: 768px) {
             .card-box { padding: 20px 18px 22px; }
             .paper-sheets { margin-left: 0; }
@@ -281,7 +306,11 @@
                         <c:when test="${param.error == 'add_product_invalid'}">Không thêm được hàng hoá: chọn một sản phẩm và nhập số lượng là số nguyên lớn hơn 0 (viết 1.000 cũng được).</c:when>
                         <c:when test="${param.error == 'add_product_failed'}">Không thêm được hàng hoá — hàng hoá chỉ sửa được khi hợp đồng còn là bản Nháp. Nếu vừa có người ký hợp đồng này, tải lại trang để xem.</c:when>
                         <c:when test="${param.error == 'remove_product_failed'}">Không gỡ được hàng hoá này — hàng hoá chỉ sửa được khi hợp đồng còn là bản Nháp.</c:when>
-                        <c:when test="${param.error == 'payment_failed'}">Không thực hiện được trên kỳ thanh toán — kiểm lại số tiền (phải lớn hơn 0) và ngày đến hạn. Kỳ đã ghi nhận thu thì không ghi lại được; hợp đồng đã thanh lý hoặc chấm dứt thì không lập hay xoá kỳ được nữa.</c:when>
+                        <c:when test="${param.error == 'payment_failed'}">Không thực hiện được trên kỳ thanh toán — kiểm lại số tiền (phải lớn hơn 0) và các ngày đã nhập. Kỳ đã ghi nhận thu thì không sửa, không nộp hồ sơ hay ghi thu lại được; hợp đồng đã thanh lý hoặc chấm dứt thì không lập, sửa hay xoá kỳ được nữa.</c:when>
+                        <c:when test="${param.error == 'payment_invalid'}">Không lưu được kỳ thanh toán: loại kỳ phải là Tạm ứng hoặc Thanh toán, điều kiện tối đa 255 ký tự, số ngày phải trả là số nguyên từ 1 đến 999.</c:when>
+                        <%-- MSG-064 (BR-60): chép đúng chữ của SPEC. --%>
+                        <c:when test="${param.error == 'payment_submitted_future'}">Ngày nộp hồ sơ không được sau hôm nay.</c:when>
+                        <c:when test="${param.error == 'payment_paid_amount_invalid'}">Số tiền thực thu phải lớn hơn 0 và không vượt giới hạn cho phép.</c:when>
                         <c:when test="${param.error == 'handover_done_failed'}">Không xác nhận được chặng bàn giao — có thể phòng đó đã báo xong trước rồi. Ô ghi chú là bắt buộc.</c:when>
                         <c:otherwise>Đã có lỗi xảy ra. Vui lòng thử lại.</c:otherwise>
                     </c:choose>
@@ -772,37 +801,97 @@
                 <c:otherwise>
                     <%-- Bảng 4-5 cột: dưới ~500px nó rộng hơn màn hình và đẩy CẢ TRANG trượt ngang
                      (đo được trên màn 375px: trang rộng 462px). Cho riêng bảng cuộn. --%>
+                    <%-- BR-60: tình trạng SUY RA (pm.status), không lưu. Nút chỉ hiện ở kỳ chưa thu:
+                         "Sửa" và nút xoá khi hợp đồng chưa đóng băng; "Đã nộp hồ sơ" và "Đã thu"
+                         cả sau thanh lý. Mọi hộp thoại là modal trong trang, không dùng
+                         confirm/prompt của trình duyệt. --%>
                     <div class="table-responsive">
                         <table class="item-table">
-                            <thead><tr><th style="width:40px;">#</th><th>Số tiền</th><th style="width:130px;">Đến hạn</th><th style="width:170px;">Tình trạng</th><th style="width:170px;"></th></tr></thead>
+                            <thead><tr><th style="width:36px;">#</th><th style="width:96px;">Loại</th><th>Số tiền</th><th>Điều kiện</th><th style="width:110px;">Hạn thu</th><th style="width:150px;">Tình trạng</th><th style="width:250px;"></th></tr></thead>
                             <tbody>
                                 <c:forEach var="pm" items="${contractPayments}" varStatus="row">
-                                    <tr>
+                                    <c:set var="pmStatus" value="${pm.status}"/>
+                                    <tr class="${pmStatus == 'Quá hạn' ? 'pay-overdue' : ''}">
                                         <td>${row.index + 1}</td>
-                                        <td><strong class="money-vnd" data-vnd="${pm.invoiceAmount}">&mdash;</strong></td>
-                                        <td><fmt:formatDate value="${pm.dueDate}" pattern="dd/MM/yyyy"/></td>
+                                        <td>${fn:escapeXml(pm.paymentType)}</td>
+                                        <td>
+                                            <strong class="money-vnd" data-vnd="${pm.invoiceAmount}">&mdash;</strong>
+                                            <c:if test="${pm.paidAmountDifferent}">
+                                                <div class="pay-sub">Thực thu <span class="money-vnd" data-vnd="${pm.paidAmount}">&mdash;</span></div>
+                                            </c:if>
+                                        </td>
+                                        <td>
+                                            ${not empty pm.conditionNote ? fn:escapeXml(pm.conditionNote) : '—'}
+                                            <c:if test="${pm.paymentDays != null}">
+                                                <div class="pay-sub">Trả trong ${pm.paymentDays} ngày kể từ khi nộp hồ sơ</div>
+                                            </c:if>
+                                        </td>
                                         <td>
                                             <c:choose>
-                                                <c:when test="${pm.paidDate != null}">
-                                                    <span style="color:#2f6b34; font-weight:600;"><i class="fa-solid fa-circle-check"></i>
-                                                        Đã thu <fmt:formatDate value="${pm.paidDate}" pattern="dd/MM/yyyy"/></span>
-                                                </c:when>
-                                                <c:otherwise><span style="color:#9ca3af;">Chưa thu</span></c:otherwise>
+                                                <c:when test="${pm.dueDate != null}"><fmt:formatDate value="${pm.dueDate}" pattern="dd/MM/yyyy"/></c:when>
+                                                <c:otherwise><span style="color:#9ca3af;">Chưa có</span></c:otherwise>
                                             </c:choose>
                                         </td>
-                                        <td style="text-align:right;">
-                                            <c:if test="${pm.paidDate == null and canRecordPayment}">
-                                                <button type="button" class="btn-remove-item"
-                                                        style="width:auto; padding:0 10px; border-color:#cfe3d0; background:#f3f7f3; color:#2f6b34;"
-                                                        onclick="markPaid(${pm.paymentId})">
-                                                    <i class="fa-solid fa-check"></i> Đã thu
-                                                </button>
+                                        <td>
+                                            <c:choose>
+                                                <c:when test="${pmStatus == 'Đã thu'}">
+                                                    <span class="pay-status paid"><i class="fa-solid fa-circle-check"></i>
+                                                        Đã thu <fmt:formatDate value="${pm.paidDate}" pattern="dd/MM/yyyy"/></span>
+                                                </c:when>
+                                                <c:when test="${pmStatus == 'Quá hạn'}">
+                                                    <span class="pay-status overdue"><i class="fa-solid fa-triangle-exclamation"></i> Quá hạn</span>
+                                                </c:when>
+                                                <c:when test="${pmStatus == 'Chờ thu'}">
+                                                    <span class="pay-status waiting"><i class="fa-solid fa-hourglass-half"></i> Chờ thu</span>
+                                                </c:when>
+                                                <c:otherwise><span class="pay-status not-submitted">Chưa nộp hồ sơ</span></c:otherwise>
+                                            </c:choose>
+                                            <c:if test="${pm.submittedDate != null}">
+                                                <div class="pay-sub">Nộp hồ sơ <fmt:formatDate value="${pm.submittedDate}" pattern="dd/MM/yyyy"/></div>
                                             </c:if>
-                                            <c:if test="${canEditPayments}">
-                                                <button type="button" class="btn-remove-item" title="Xoá kỳ này"
-                                                        onclick="confirmRemovePayment(${pm.paymentId})">
-                                                    <i class="fa-solid fa-xmark"></i>
-                                                </button>
+                                        </td>
+                                        <td style="text-align:right;">
+                                            <c:if test="${not pm.paid}">
+                                            <div class="pay-actions">
+                                                <c:if test="${canEditPayments}">
+                                                    <button type="button" class="btn-pay js-edit-payment"
+                                                            data-payment-id="${pm.paymentId}"
+                                                            data-payment-no="${row.index + 1}"
+                                                            data-type="${fn:escapeXml(pm.paymentType)}"
+                                                            data-amount="${pm.invoiceAmount}"
+                                                            data-condition="${fn:escapeXml(pm.conditionNote)}"
+                                                            data-days="${pm.paymentDays}"
+                                                            data-due="<fmt:formatDate value='${pm.dueDate}' pattern='yyyy-MM-dd'/>"
+                                                            data-submitted="${pm.submittedDate != null}">
+                                                        <i class="fa-solid fa-pen"></i> Sửa
+                                                    </button>
+                                                </c:if>
+                                                <c:if test="${canRecordPayment}">
+                                                    <button type="button" class="btn-pay submit js-submit-payment"
+                                                            data-payment-id="${pm.paymentId}"
+                                                            data-payment-no="${row.index + 1}"
+                                                            data-type="${fn:escapeXml(pm.paymentType)}"
+                                                            data-amount="${pm.invoiceAmount}"
+                                                            data-days="${pm.paymentDays}"
+                                                            data-due="<fmt:formatDate value='${pm.dueDate}' pattern='yyyy-MM-dd'/>"
+                                                            data-submitted="<fmt:formatDate value='${pm.submittedDate}' pattern='yyyy-MM-dd'/>">
+                                                        <i class="fa-solid fa-file-import"></i> Đã nộp hồ sơ
+                                                    </button>
+                                                    <button type="button" class="btn-pay paid js-mark-paid"
+                                                            data-payment-id="${pm.paymentId}"
+                                                            data-payment-no="${row.index + 1}"
+                                                            data-type="${fn:escapeXml(pm.paymentType)}"
+                                                            data-amount="${pm.invoiceAmount}">
+                                                        <i class="fa-solid fa-check"></i> Đã thu
+                                                    </button>
+                                                </c:if>
+                                                <c:if test="${canEditPayments}">
+                                                    <button type="button" class="btn-remove-item" title="Xoá kỳ này"
+                                                            onclick="confirmRemovePayment(${pm.paymentId})">
+                                                        <i class="fa-solid fa-xmark"></i>
+                                                    </button>
+                                                </c:if>
+                                            </div>
                                             </c:if>
                                         </td>
                                     </tr>
@@ -814,36 +903,20 @@
             </c:choose>
             <c:choose>
                 <c:when test="${canEditPayments}">
-                    <form class="inline-form" method="POST" action="${pageContext.request.contextPath}/contract">
-                        <input type="hidden" name="csrfToken" value="${csrfToken}">
-                        <input type="hidden" name="action" value="addPayment">
-                        <input type="hidden" name="contractId" value="${contract.contractId}">
-                        <div class="row g-2 align-items-end">
-                            <div class="col-md-4">
-                                <label class="form-label">Số tiền (VNĐ)</label>
-                                <input type="text" class="form-control" id="invoiceAmount" name="invoiceAmount" inputmode="numeric"
-                                       data-money placeholder="VD: 450.000.000" required>
-                                <span class="money-words" data-money-words-for="invoiceAmount"></span>
-                            </div>
-                            <div class="col-md-3">
-                                <label class="form-label">Đến hạn</label>
-                                <input type="date" class="form-control" name="dueDate" required>
-                            </div>
-                            <div class="col-md-3">
-                                <label class="form-label">Ngày đã thu (nếu có)</label>
-                                <input type="date" class="form-control" name="paidDate">
-                            </div>
-                            <div class="col-md-2">
-                                <button type="submit" class="btn-add-item"><i class="fa-solid fa-plus"></i> Lập kỳ</button>
-                            </div>
-                        </div>
-                    </form>
+                    <%-- Lập kỳ mở #paymentModal (cùng modal với Sửa kỳ): loại, ô "%", số tiền,
+                         điều kiện, số ngày, hạn thu (để trống được) và ngày đã thu nếu nhập lại kỳ cũ. --%>
+                    <div class="inline-form">
+                        <button type="button" class="btn-add-item btn-add-payment js-add-payment">
+                            <i class="fa-solid fa-plus"></i> Lập kỳ
+                        </button>
+                    </div>
                 </c:when>
                 <c:otherwise>
                     <div class="inline-form locked-note">
                         <i class="fa-solid fa-lock" style="margin-top:3px; color:#9ca3af;"></i>
-                        <span>Hợp đồng đã đóng băng nên không lập thêm kỳ được. Tiền của kỳ đã lập thì
-                            vẫn ghi nhận được khi về — tiền bảo hành giữ lại thường về sau thanh lý.</span>
+                        <span>Hợp đồng đã đóng băng nên không lập, sửa hay xoá kỳ được nữa. Kỳ đã lập
+                            thì vẫn ghi nhận nộp hồ sơ và đã thu được — tiền bảo hành giữ lại thường về
+                            sau thanh lý.</span>
                     </div>
                 </c:otherwise>
             </c:choose>
@@ -1501,6 +1574,157 @@
         </div>
     </div>
 
+    <%-- Lập / sửa kỳ thanh toán (BR-60). Một modal cho cả hai: JS đổi action
+         (addPayment / updatePayment) và điền sẵn ô khi sửa. Ô "%" chỉ tính sẵn số tiền
+         từ giá trị hợp đồng ngay trên trình duyệt, KHÔNG gửi lên: server chỉ lưu số tiền.
+         Ngày đã thu chỉ có khi lập (nhập lại kỳ cũ đã thu); kỳ đã thu thì không sửa. --%>
+    <c:if test="${canEditPayments}">
+    <div class="modal fade" id="paymentModal" tabindex="-1" aria-hidden="true" aria-labelledby="paymentModalTitle">
+        <div class="modal-dialog modal-dialog-centered">
+            <form class="modal-content" id="paymentForm" method="POST" action="${pageContext.request.contextPath}/contract" novalidate>
+                <input type="hidden" name="csrfToken" value="${csrfToken}">
+                <input type="hidden" name="action" id="paymentFormAction" value="addPayment">
+                <input type="hidden" name="contractId" value="${contract.contractId}">
+                <input type="hidden" name="paymentId" id="paymentFormId" value="">
+                <div class="modal-header">
+                    <div class="modal-icon-ask"><i class="fa-solid fa-money-bill-wave"></i></div>
+                </div>
+                <div class="modal-body">
+                    <h5 class="modal-title" id="paymentModalTitle">Lập kỳ thanh toán</h5>
+                    <div class="modal-msg" style="font-size:0.84rem; color:#6b7280;">
+                        Ghi theo điều khoản thanh toán của hợp đồng. Hạn thu để trống được, tới lúc nộp hồ sơ mới có.
+                    </div>
+                    <div class="row g-2">
+                        <div class="col-sm-6 pay-field">
+                            <label class="form-label" for="payType">Loại kỳ <span class="req">*</span></label>
+                            <select class="form-select" name="paymentType" id="payType">
+                                <c:forEach var="t" items="${paymentTypes}">
+                                    <option value="${fn:escapeXml(t)}">${fn:escapeXml(t)}</option>
+                                </c:forEach>
+                            </select>
+                        </div>
+                        <div class="col-sm-6 pay-field">
+                            <label class="form-label" for="payPercent">% giá trị hợp đồng</label>
+                            <input type="number" class="form-control" id="payPercent" min="0" max="100" step="0.01"
+                                   placeholder="VD: 80" data-contract-value="${contract.contractValue}">
+                            <div class="pay-hint" id="payPercentHint"></div>
+                        </div>
+                    </div>
+                    <div class="pay-field">
+                        <label class="form-label" for="payAmount">Số tiền (VNĐ) <span class="req">*</span></label>
+                        <input type="text" class="form-control" id="payAmount" name="invoiceAmount" inputmode="numeric"
+                               data-money placeholder="VD: 450.528.480">
+                        <span class="money-words" data-money-words-for="payAmount"></span>
+                        <div class="modal-err" id="payAmountErr"></div>
+                    </div>
+                    <div class="pay-field">
+                        <label class="form-label" for="payCondition">Điều kiện</label>
+                        <input type="text" class="form-control" name="conditionNote" id="payCondition" maxlength="255"
+                               placeholder="VD: sau khi nghiệm thu, bàn giao và nộp đủ hồ sơ thanh toán">
+                    </div>
+                    <div class="row g-2">
+                        <div class="col-sm-6 pay-field">
+                            <label class="form-label" for="payDays">Số ngày phải trả</label>
+                            <input type="number" class="form-control" name="paymentDays" id="payDays" min="1" max="999" step="1"
+                                   placeholder="VD: 7">
+                            <div class="pay-hint">Kể từ khi nộp hồ sơ. Không bắt buộc.</div>
+                            <div class="modal-err" id="payDaysErr"></div>
+                        </div>
+                        <div class="col-sm-6 pay-field">
+                            <label class="form-label" for="payDue">Hạn thu</label>
+                            <input type="date" class="form-control" name="dueDate" id="payDue">
+                            <div class="pay-hint" id="payDueHint">Để trống được.</div>
+                        </div>
+                    </div>
+                    <div class="pay-field" id="payPaidWrap">
+                        <label class="form-label" for="payPaid">Ngày đã thu (nếu có)</label>
+                        <input type="date" class="form-control" name="paidDate" id="payPaid">
+                        <div class="pay-hint">Chỉ điền khi nhập lại một kỳ đã thu đủ tiền.</div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn-modal-cancel" data-bs-dismiss="modal">Huỷ bỏ</button>
+                    <button type="submit" class="btn-modal-primary"><i class="fa-solid fa-check me-1"></i> Lưu kỳ</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    </c:if>
+
+    <%-- "Đã nộp hồ sơ" (BR-60, MSG-064): ngày nộp không sau hôm nay. Kỳ có số ngày thì
+         hạn thu = ngày nộp + số ngày (chỉ hiện ra để xem, server tự tính); kỳ không có
+         số ngày thì nhập hạn tay, để trống được, điền sẵn hạn đang có. --%>
+    <div class="modal fade" id="submitModal" tabindex="-1" aria-hidden="true" aria-labelledby="submitModalTitle">
+        <div class="modal-dialog modal-dialog-centered">
+            <form class="modal-content" id="submitForm" method="POST" action="${pageContext.request.contextPath}/contract" novalidate>
+                <input type="hidden" name="csrfToken" value="${csrfToken}">
+                <input type="hidden" name="action" value="markSubmitted">
+                <input type="hidden" name="contractId" value="${contract.contractId}">
+                <input type="hidden" name="paymentId" id="submitPaymentId" value="">
+                <div class="modal-header">
+                    <div class="modal-icon-ask"><i class="fa-solid fa-file-import"></i></div>
+                </div>
+                <div class="modal-body">
+                    <h5 class="modal-title" id="submitModalTitle">Đã nộp hồ sơ thanh toán</h5>
+                    <div class="modal-msg" id="submitMessage"></div>
+                    <div class="pay-field">
+                        <label class="form-label" for="submitDate">Ngày nộp hồ sơ <span class="req">*</span></label>
+                        <input type="date" class="form-control" name="submittedDate" id="submitDate">
+                        <div class="modal-err" id="submitDateErr"></div>
+                    </div>
+                    <div class="pay-field" id="submitDueWrap">
+                        <label class="form-label" for="submitDue">Hạn thu</label>
+                        <input type="date" class="form-control" name="dueDate" id="submitDue">
+                        <div class="pay-hint">Kỳ này không ghi số ngày phải trả: nhập hạn theo thoả thuận, để trống được.</div>
+                    </div>
+                    <div class="pay-field" id="submitAutoDue">
+                        <div class="pay-hint" id="submitAutoDueText"></div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn-modal-cancel" data-bs-dismiss="modal">Huỷ bỏ</button>
+                    <button type="submit" class="btn-modal-primary"><i class="fa-solid fa-check me-1"></i> Ghi nhận</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <%-- "Đã thu" (BR-60): ngày thu và số tiền thực thu, điền sẵn số tiền kỳ; khác số tiền
+         kỳ thì không cần lý do. Server kiểm lại (ContractPaymentService.markPaymentPaid). --%>
+    <div class="modal fade" id="paidModal" tabindex="-1" aria-hidden="true" aria-labelledby="paidModalTitle">
+        <div class="modal-dialog modal-dialog-centered">
+            <form class="modal-content" id="paidForm" method="POST" action="${pageContext.request.contextPath}/contract" novalidate>
+                <input type="hidden" name="csrfToken" value="${csrfToken}">
+                <input type="hidden" name="action" value="markPaid">
+                <input type="hidden" name="contractId" value="${contract.contractId}">
+                <input type="hidden" name="paymentId" id="paidPaymentId" value="">
+                <div class="modal-header">
+                    <div class="modal-icon-ask"><i class="fa-solid fa-circle-check"></i></div>
+                </div>
+                <div class="modal-body">
+                    <h5 class="modal-title" id="paidModalTitle">Ghi nhận đã thu</h5>
+                    <div class="modal-msg" id="paidMessage"></div>
+                    <div class="pay-field">
+                        <label class="form-label" for="paidDate">Ngày thu <span class="req">*</span></label>
+                        <input type="date" class="form-control" name="paidDate" id="paidDate">
+                        <div class="modal-err" id="paidDateErr">Chọn ngày tiền về.</div>
+                    </div>
+                    <div class="pay-field">
+                        <label class="form-label" for="paidAmount">Số tiền thực thu (VNĐ) <span class="req">*</span></label>
+                        <input type="text" class="form-control" name="paidAmount" id="paidAmount" inputmode="numeric" data-money>
+                        <span class="money-words" data-money-words-for="paidAmount"></span>
+                        <div class="pay-hint">Điền sẵn số tiền kỳ. Thu khác số này thì sửa lại, không cần lý do.</div>
+                        <div class="modal-err" id="paidAmountErr">Số tiền thực thu phải lớn hơn 0.</div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn-modal-cancel" data-bs-dismiss="modal">Huỷ bỏ</button>
+                    <button type="submit" class="btn-modal-primary"><i class="fa-solid fa-check me-1"></i> Ghi nhận đã thu</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- Form ẩn cho các thao tác trên hợp đồng (đứng ngoài mọi form khác) -->
     <form id="opForm" method="POST" action="${pageContext.request.contextPath}/contract" style="display:none">
         <input type="hidden" name="csrfToken" value="${csrfToken}">
@@ -1700,14 +1924,6 @@
             });
         }
 
-        function markPaid(paymentId) {
-            ask({ title: 'Ghi nhận đã thu', message: 'Ghi nhận tiền của kỳ này đã về hôm nay?' },
-                function () {
-                    document.getElementById('opPaymentId').value = paymentId;
-                    submitOp('markPaid');
-                });
-        }
-
         function confirmRemovePayment(paymentId) {
             ask({ title: 'Xoá kỳ thanh toán', message: 'Xoá kỳ thanh toán này?',
                   danger: true, okLabel: 'Xoá' },
@@ -1827,6 +2043,208 @@
                     ok = false;
                 } else {
                     showErr(urlErr, '');
+                }
+                if (!ok) { e.preventDefault(); }
+            });
+        })();
+
+        // ===== Kỳ thanh toán (BR-60) =====
+        // Lập / sửa kỳ, "Đã nộp hồ sơ", "Đã thu" đều là modal trong trang. Kiểm ngay tại
+        // chỗ những gì kiểm được (số tiền > 0, số ngày 1–999, MSG-064); server kiểm lại.
+        // "Hôm nay" theo giờ máy người dùng (ô date cũng dùng giờ đó).
+        (function () {
+            var MSG_064 = 'Ngày nộp hồ sơ không được sau hôm nay.';
+
+            function pad(n) { return String(n).padStart(2, '0'); }
+            function isoOf(d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
+            function todayIso() { return isoOf(new Date()); }
+            function addDays(iso, n) {
+                var p = iso.split('-');
+                return isoOf(new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]) + n));
+            }
+            function viDate(iso) {
+                if (!iso) { return ''; }
+                var p = iso.split('-');
+                return p[2] + '/' + p[1] + '/' + p[0];
+            }
+            function vnd(n) { return Number(n).toLocaleString('vi-VN', { maximumFractionDigits: 0 }) + ' ₫'; }
+            function showErr(el, msg) {
+                if (msg) { el.textContent = msg; }
+                el.style.display = msg ? 'block' : 'none';
+            }
+            // Đặt số vào ô data-money rồi phát sự kiện input: appshell.js tự chấm phân cách
+            // hàng nghìn và viết dòng chữ bên dưới, như khi người dùng gõ.
+            function setMoney(input, n) {
+                input.value = (n === null || isNaN(n)) ? '' : String(Math.round(n));
+                input.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+            function moneyOf(input) {
+                var digits = input.value.replace(/\D/g, '');
+                return digits ? Number(digits) : null;
+            }
+            function labelOf(btn) {
+                var amount = Number(btn.dataset.amount);
+                return 'Kỳ ' + btn.dataset.paymentNo + ' · ' + btn.dataset.type
+                    + (isNaN(amount) ? '' : ' · ' + vnd(amount));
+            }
+            function open(id, focusEl) {
+                var el = document.getElementById(id);
+                el.addEventListener('shown.bs.modal', function once() {
+                    el.removeEventListener('shown.bs.modal', once);
+                    if (focusEl) { focusEl.focus(); }
+                });
+                bootstrap.Modal.getOrCreateInstance(el).show();
+            }
+
+            // --- Lập / sửa kỳ: một modal, JS đổi action ---
+            var payForm = document.getElementById('paymentForm');
+            if (payForm) {
+                var type = document.getElementById('payType');
+                var pct = document.getElementById('payPercent');
+                var amount = document.getElementById('payAmount');
+                var amountErr = document.getElementById('payAmountErr');
+                var cond = document.getElementById('payCondition');
+                var days = document.getElementById('payDays');
+                var daysErr = document.getElementById('payDaysErr');
+                var due = document.getElementById('payDue');
+                var paid = document.getElementById('payPaid');
+                // Ô "%" chỉ tính sẵn số tiền từ giá trị hợp đồng; không có name nên không gửi lên.
+                var base = Number(pct.dataset.contractValue);
+                var hasBase = pct.dataset.contractValue !== '' && !isNaN(base) && base > 0;
+                pct.disabled = !hasBase;
+                document.getElementById('payPercentHint').textContent = hasBase
+                    ? 'Của giá trị hợp đồng ' + vnd(base) + '. Chỉ để tính sẵn số tiền.'
+                    : 'Hợp đồng chưa có giá trị nên chưa tính theo % được.';
+                pct.addEventListener('input', function () {
+                    var p = Number(pct.value);
+                    // Bỏ qua số âm: appshell.js chỉ giữ chữ số nên "-20" sẽ thành số tiền DƯƠNG.
+                    if (pct.value !== '' && !isNaN(p) && p >= 0) { setMoney(amount, base * p / 100); }
+                });
+
+                var fill = function (btn) {
+                    var editing = !!btn;
+                    payForm.reset();
+                    document.getElementById('paymentFormAction').value = editing ? 'updatePayment' : 'addPayment';
+                    document.getElementById('paymentFormId').value = editing ? btn.dataset.paymentId : '';
+                    document.getElementById('paymentModalTitle').textContent =
+                        editing ? 'Sửa kỳ ' + btn.dataset.paymentNo : 'Lập kỳ thanh toán';
+                    type.value = editing ? btn.dataset.type : 'Thanh toán';
+                    setMoney(amount, editing ? Number(btn.dataset.amount) : null);
+                    cond.value = editing ? (btn.dataset.condition || '') : '';
+                    days.value = editing ? (btn.dataset.days || '') : '';
+                    due.value = editing ? (btn.dataset.due || '') : '';
+                    // Ngày đã thu chỉ khi lập (nhập lại kỳ cũ); kỳ đã thu thì không sửa được.
+                    document.getElementById('payPaidWrap').style.display = editing ? 'none' : '';
+                    paid.disabled = editing;
+                    document.getElementById('payDueHint').textContent = editing && btn.dataset.submitted === 'true'
+                        ? 'Kỳ đã nộp hồ sơ: có số ngày thì hạn thu tự tính lại = ngày nộp + số ngày.'
+                        : 'Để trống được.';
+                    showErr(amountErr, '');
+                    showErr(daysErr, '');
+                };
+                document.querySelectorAll('.js-add-payment').forEach(function (btn) {
+                    btn.addEventListener('click', function () { fill(null); open('paymentModal', type); });
+                });
+                document.querySelectorAll('.js-edit-payment').forEach(function (btn) {
+                    btn.addEventListener('click', function () { fill(btn); open('paymentModal', amount); });
+                });
+                payForm.addEventListener('submit', function (e) {
+                    var ok = true;
+                    var n = moneyOf(amount);
+                    if (!n || n <= 0) {
+                        showErr(amountErr, 'Số tiền kỳ thanh toán phải lớn hơn 0.');
+                        ok = false;
+                    } else {
+                        showErr(amountErr, '');
+                    }
+                    var d = days.value.trim();
+                    if (d !== '' && (!/^\d+$/.test(d) || Number(d) < 1 || Number(d) > 999)) {
+                        showErr(daysErr, 'Số ngày phải trả là số nguyên từ 1 đến 999.');
+                        ok = false;
+                    } else {
+                        showErr(daysErr, '');
+                    }
+                    if (!ok) { e.preventDefault(); }
+                });
+            }
+
+            // --- "Đã nộp hồ sơ" ---
+            var subForm = document.getElementById('submitForm');
+            var subDate = document.getElementById('submitDate');
+            var subDateErr = document.getElementById('submitDateErr');
+            var subDue = document.getElementById('submitDue');
+            var subAutoText = document.getElementById('submitAutoDueText');
+            var subDays = null;
+            function refreshAutoDue() {
+                if (subDays === null) { return; }
+                subAutoText.textContent = 'Hạn thu = ngày nộp + ' + subDays + ' ngày'
+                    + (subDate.value ? ' = ' + viDate(addDays(subDate.value, subDays)) : '')
+                    + '. Hệ thống tự tính.';
+            }
+            subDate.addEventListener('input', refreshAutoDue);
+            subDate.addEventListener('change', refreshAutoDue);
+            document.querySelectorAll('.js-submit-payment').forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    subForm.reset();
+                    document.getElementById('submitPaymentId').value = btn.dataset.paymentId;
+                    document.getElementById('submitMessage').textContent = labelOf(btn)
+                        + (btn.dataset.submitted
+                            ? '\nĐã ghi nộp hồ sơ ngày ' + viDate(btn.dataset.submitted) + '. Ghi lại sẽ thay ngày đó.'
+                            : '');
+                    subDate.max = todayIso();
+                    subDate.value = btn.dataset.submitted || todayIso();
+                    subDays = btn.dataset.days ? Number(btn.dataset.days) : null;
+                    // Kỳ có số ngày: hạn thu do server tính, ô hạn tay tắt để không gửi lên.
+                    document.getElementById('submitDueWrap').style.display = subDays === null ? '' : 'none';
+                    document.getElementById('submitAutoDue').style.display = subDays === null ? 'none' : '';
+                    subDue.disabled = subDays !== null;
+                    subDue.value = subDays === null ? (btn.dataset.due || '') : '';
+                    refreshAutoDue();
+                    showErr(subDateErr, '');
+                    open('submitModal', subDate);
+                });
+            });
+            subForm.addEventListener('submit', function (e) {
+                if (!subDate.value) {
+                    showErr(subDateErr, 'Chọn ngày nộp hồ sơ.');
+                    e.preventDefault();
+                } else if (subDate.value > todayIso()) {
+                    showErr(subDateErr, MSG_064);
+                    e.preventDefault();
+                }
+            });
+
+            // --- "Đã thu": ngày thu và số tiền thực thu, điền sẵn số tiền kỳ ---
+            var paidForm = document.getElementById('paidForm');
+            var paidDate = document.getElementById('paidDate');
+            var paidAmount = document.getElementById('paidAmount');
+            document.querySelectorAll('.js-mark-paid').forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    paidForm.reset();
+                    document.getElementById('paidPaymentId').value = btn.dataset.paymentId;
+                    document.getElementById('paidMessage').textContent = labelOf(btn) + '\nGhi nhận tiền của kỳ này đã về.';
+                    paidDate.value = todayIso();
+                    setMoney(paidAmount, Number(btn.dataset.amount));
+                    showErr(document.getElementById('paidDateErr'), '');
+                    showErr(document.getElementById('paidAmountErr'), '');
+                    open('paidModal', paidAmount);
+                });
+            });
+            paidForm.addEventListener('submit', function (e) {
+                var ok = true;
+                // Mỗi lần bấm đều đặt lại cả hai dòng lỗi: ô đã sửa đúng thì lỗi cũ phải tắt.
+                if (!paidDate.value) {
+                    showErr(document.getElementById('paidDateErr'), 'Chọn ngày tiền về.');
+                    ok = false;
+                } else {
+                    showErr(document.getElementById('paidDateErr'), '');
+                }
+                var n = moneyOf(paidAmount);
+                if (!n || n <= 0) {
+                    showErr(document.getElementById('paidAmountErr'), 'Số tiền thực thu phải lớn hơn 0.');
+                    ok = false;
+                } else {
+                    showErr(document.getElementById('paidAmountErr'), '');
                 }
                 if (!ok) { e.preventDefault(); }
             });

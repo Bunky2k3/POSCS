@@ -6,6 +6,7 @@ import java.sql.Date;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Types;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
@@ -18,11 +19,12 @@ import poscs.model.ContractPayment;
 
 /**
  * Data Access Object chuyên biệt cho kỳ thanh toán của hợp đồng
- * (bảng {@code contract_payments} - [UC-53] [BR-18]).
+ * (bảng {@code contract_payments} - [UC-53] [BR-18] [BR-60]).
  *
  * <p>Tách từ {@link ContractDAO} (Task 4.4) nhằm phân tách trách nhiệm quản lý thanh toán:
  * <ul>
- *   <li>Quản lý kỳ thanh toán (lập kỳ, ghi nhận đã thu, xoá kỳ lập nhầm).</li>
+ *   <li>Quản lý kỳ thanh toán (lập kỳ, sửa kỳ, ghi nhận đã nộp hồ sơ, ghi nhận đã thu
+ *       kèm số tiền thực thu, xoá kỳ lập nhầm).</li>
  *   <li>Tra cứu kỳ thanh toán theo hợp đồng và đối chiếu tổng tiền theo cụm hợp đồng gốc & phụ lục.</li>
  *   <li>Tính toán số liệu doanh thu thực thu theo kỳ và theo tháng (nguồn chân lý cho Dashboard).</li>
  *   <li>Lưu vết kiểm toán đầy đủ sang {@link ContractHistoryDAO} trong cùng transaction (NFR-19).</li>
@@ -39,6 +41,21 @@ public class ContractPaymentDAO {
 
     /** Cột người phụ trách hợp đồng cho bộ lọc phân quyền Dashboard. */
     public static final List<String> DASHBOARD_OWNER_COLUMNS = List.of("c.owner_id");
+
+    /**
+     * BR-18: doanh thu cộng SỐ TIỀN THỰC THU. Kỳ đã thu trước V45 đã được chép số
+     * tiền kỳ sang paid_amount; COALESCE chỉ để một dòng sót NULL vẫn không làm hụt số.
+     */
+    public static final String COLLECTED_AMOUNT_SQL = "COALESCE(p.paid_amount, p.invoice_amount)";
+
+    private static final String SELECT_COLUMNS = "payment_id, contract_id, payment_type, invoice_amount, "
+            + "condition_note, payment_days, submitted_date, due_date, paid_date, paid_amount, created_at";
+
+    /** Một đơn vị việc chạy trong transaction; trả false là rollback. */
+    @FunctionalInterface
+    private interface TxWork {
+        boolean run(Connection conn) throws SQLException;
+    }
 
     private final ContractHistoryDAO historyDAO;
 
@@ -72,15 +89,20 @@ public class ContractPaymentDAO {
     }
 
     /**
-     * Các kỳ thanh toán của một hợp đồng (tự mở kết nối), kỳ đến hạn sớm nhất trước.
+     * Các kỳ thanh toán của một hợp đồng (tự mở kết nối), theo THỨ TỰ LẬP.
+     *
+     * <p>Không sắp theo hạn thu nữa: hạn thu để trống được tới lúc nộp hồ sơ (BR-60),
+     * sắp theo nó thì số thứ tự kỳ nhảy mỗi lần một kỳ được nộp hồ sơ. Thứ tự lập
+     * là thứ tự trong điều khoản thanh toán (Tạm ứng rồi Thanh toán) -- người dùng
+     * chốt 20/11/2026.
      */
     public List<ContractPayment> findPaymentsByContractId(int contractId) {
         List<ContractPayment> result = new ArrayList<>();
         if (contractId <= 0) {
             return result;
         }
-        String sql = "SELECT payment_id, contract_id, invoice_amount, due_date, paid_date, created_at "
-                + "FROM contract_payments WHERE contract_id = ? ORDER BY due_date, payment_id";
+        String sql = "SELECT " + SELECT_COLUMNS
+                + " FROM contract_payments WHERE contract_id = ? ORDER BY payment_id";
         try (Connection conn = DBContext.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, contractId);
@@ -99,88 +121,222 @@ public class ContractPaymentDAO {
      * Lập một kỳ thanh toán, kèm dòng nhật ký -- trong cùng transaction (tự mở kết nối).
      *
      * <p>CHẶN khi hợp đồng đã đóng băng (Đã thanh lý hoặc Chấm dứt sớm), nhưng KHÔNG chặn khi đã ký.
+     * BR-60: hạn thu để trống được. Kỳ lập kèm ngày đã thu (nhập lại kỳ cũ) thì số thực thu
+     * = số tiền kỳ, trừ khi đã có số thực thu.
      */
     public boolean insertPayment(int contractId, ContractPayment payment, int actorId) {
         if (contractId <= 0 || actorId <= 0 || payment == null
-                || payment.getInvoiceAmount() == null || payment.getInvoiceAmount().signum() <= 0
-                || payment.getDueDate() == null) {
+                || payment.getInvoiceAmount() == null || payment.getInvoiceAmount().signum() <= 0) {
             return false;
         }
-        String sql = "INSERT INTO contract_payments (contract_id, invoice_amount, due_date, paid_date) "
-                + "VALUES (?, ?, ?, ?)";
-        try (Connection conn = DBContext.getConnection()) {
-            conn.setAutoCommit(false);
-            boolean committed = false;
-            try {
-                if (isFrozen(conn, contractId)) {
+        // Bốn cột đầu giữ đúng vị trí cũ; cột của BR-60 nối thêm phía sau.
+        String sql = "INSERT INTO contract_payments (contract_id, invoice_amount, due_date, paid_date, "
+                + "payment_type, condition_note, payment_days, paid_amount) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+        return inTransaction("lap ky thanh toan", contractId, conn -> {
+            if (isFrozen(conn, contractId)) {
+                return false;
+            }
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setInt(1, contractId);
+                ps.setBigDecimal(2, payment.getInvoiceAmount());
+                ps.setDate(3, payment.getDueDate());
+                ps.setDate(4, payment.getPaidDate());
+                ps.setString(5, typeOrDefault(payment.getPaymentType()));
+                ps.setString(6, payment.getConditionNote());
+                setNullableInt(ps, 7, payment.getPaymentDays());
+                ps.setBigDecimal(8, payment.getPaidDate() == null ? null : payment.getCollectedAmount());
+                if (ps.executeUpdate() == 0) {
                     return false;
                 }
-                try (PreparedStatement ps = conn.prepareStatement(sql)) {
-                    ps.setInt(1, contractId);
-                    ps.setBigDecimal(2, payment.getInvoiceAmount());
-                    ps.setDate(3, payment.getDueDate());
-                    ps.setDate(4, payment.getPaidDate());
-                    if (ps.executeUpdate() == 0) {
-                        return false;
-                    }
-                }
-                historyDAO.insertHistory(conn, contractId, ContractHistory.EVENT_PAYMENT_ADDED,
-                        "Lập kỳ thanh toán " + formatMoney(payment.getInvoiceAmount())
-                                + ", đến hạn " + formatDate(payment.getDueDate())
-                                + (payment.getPaidDate() == null ? ""
-                                        : " (đã thu " + formatDate(payment.getPaidDate()) + ")"),
-                        actorId, null);
-                conn.commit();
-                committed = true;
-                return true;
-            } finally {
-                finishTransaction(conn, committed, "lap ky thanh toan", contractId);
             }
-        } catch (SQLException ex) {
-            LOG.error("Loi lap ky thanh toan (contractId={})", contractId, ex);
+            historyDAO.insertHistory(conn, contractId, ContractHistory.EVENT_PAYMENT_ADDED,
+                    "Lập kỳ " + summaryOf(payment)
+                            + (payment.getPaidDate() == null ? ""
+                                    : " (đã thu " + formatDate(payment.getPaidDate()) + ")"),
+                    actorId, null);
+            return true;
+        });
+    }
+
+    /**
+     * Ghi nhận tiền của một kỳ đã về, số thực thu bằng đúng số tiền kỳ.
+     * Xem {@link #markPaymentPaid(int, int, Date, BigDecimal, int)}.
+     */
+    public boolean markPaymentPaid(int paymentId, int contractId, Date paidDate, int actorId) {
+        return markPaymentPaid(paymentId, contractId, paidDate, null, actorId);
+    }
+
+    /**
+     * Ghi nhận tiền của một kỳ đã về kèm SỐ TIỀN THỰC THU (BR-60, BR-18), tự mở kết nối
+     * và quản lý transaction. {@code paidAmount} null là thu đủ số tiền kỳ: câu UPDATE
+     * tự chép invoice_amount, không đọc ra rồi ghi lại.
+     *
+     * <p>KHÔNG chặn kể cả khi hợp đồng đã thanh lý: tiền bảo hành giữ lại thường chỉ về sau thanh lý cả năm.
+     */
+    public boolean markPaymentPaid(int paymentId, int contractId, Date paidDate, BigDecimal paidAmount,
+                                   int actorId) {
+        if (paymentId <= 0 || contractId <= 0 || actorId <= 0 || paidDate == null
+                || (paidAmount != null && paidAmount.signum() <= 0)) {
             return false;
+        }
+        String sql = paidAmount == null
+                ? "UPDATE contract_payments SET paid_date = ?, paid_amount = invoice_amount "
+                        + "WHERE payment_id = ? AND contract_id = ?"
+                : "UPDATE contract_payments SET paid_date = ?, paid_amount = ? "
+                        + "WHERE payment_id = ? AND contract_id = ?";
+        return inTransaction("ghi nhan da thu", contractId, conn -> {
+            ContractPayment before = lockPayment(conn, paymentId, contractId);
+            if (before == null || before.getPaidDate() != null) {
+                return false;
+            }
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                int i = 1;
+                ps.setDate(i++, paidDate);
+                if (paidAmount != null) {
+                    ps.setBigDecimal(i++, paidAmount);
+                }
+                ps.setInt(i++, paymentId);
+                ps.setInt(i, contractId);
+                if (ps.executeUpdate() == 0) {
+                    return false;
+                }
+            }
+            historyDAO.insertHistory(conn, contractId, ContractHistory.EVENT_PAYMENT_PAID,
+                    paidDetail(before, paidDate, paidAmount), actorId, null);
+            return true;
+        });
+    }
+
+    private static String paidDetail(ContractPayment before, Date paidDate, BigDecimal paidAmount) {
+        BigDecimal invoice = before.getInvoiceAmount();
+        boolean differs = paidAmount != null && invoice != null && paidAmount.compareTo(invoice) != 0;
+        return "Đã thu " + formatMoney(paidAmount != null ? paidAmount : invoice)
+                + (differs ? " (số tiền kỳ " + formatMoney(invoice) + ")" : "")
+                + " (kỳ " + dueText(before.getDueDate()) + ")"
+                + " ngày " + formatDate(paidDate);
+    }
+
+    /**
+     * Sửa một kỳ CHƯA THU (BR-60): loại, số tiền, điều kiện, số ngày, hạn thu. Tự mở kết
+     * nối và quản lý transaction, kèm dòng nhật ký. Ngày nộp hồ sơ và ngày thu không sửa ở đây.
+     *
+     * <p>CHẶN khi hợp đồng đã đóng băng hoặc kỳ đã thu -- kiểm lại trong transaction,
+     * khoá dòng kỳ, để hai người bấm cùng lúc không lọt.
+     */
+    public boolean updatePayment(int paymentId, int contractId, ContractPayment payment, int actorId) {
+        if (paymentId <= 0 || contractId <= 0 || actorId <= 0 || payment == null
+                || payment.getInvoiceAmount() == null || payment.getInvoiceAmount().signum() <= 0) {
+            return false;
+        }
+        String sql = "UPDATE contract_payments SET payment_type = ?, invoice_amount = ?, condition_note = ?, "
+                + "payment_days = ?, due_date = ? WHERE payment_id = ? AND contract_id = ?";
+        return inTransaction("sua ky thanh toan", contractId, conn -> {
+            if (isFrozen(conn, contractId)) {
+                return false;
+            }
+            ContractPayment before = lockPayment(conn, paymentId, contractId);
+            if (before == null || before.getPaidDate() != null) {
+                return false;
+            }
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setString(1, typeOrDefault(payment.getPaymentType()));
+                ps.setBigDecimal(2, payment.getInvoiceAmount());
+                ps.setString(3, payment.getConditionNote());
+                setNullableInt(ps, 4, payment.getPaymentDays());
+                ps.setDate(5, payment.getDueDate());
+                ps.setInt(6, paymentId);
+                ps.setInt(7, contractId);
+                if (ps.executeUpdate() == 0) {
+                    return false;
+                }
+            }
+            historyDAO.insertHistory(conn, contractId, ContractHistory.EVENT_PAYMENT_UPDATED,
+                    "Sửa kỳ " + summaryOf(before) + " → " + summaryOf(payment), actorId, null);
+            return true;
+        });
+    }
+
+    /**
+     * Ghi nhận ĐÃ NỘP HỒ SƠ thanh toán của một kỳ (BR-60): ghi ngày nộp và hạn thu do
+     * service đã tính (ngày nộp + số ngày, hoặc hạn nhập tay, hoặc để trống). Tự mở kết
+     * nối và quản lý transaction, kèm dòng nhật ký.
+     *
+     * <p>KHÔNG chặn khi hợp đồng đã thanh lý (BR-60), chỉ chặn kỳ đã thu.
+     */
+    public boolean markSubmitted(int paymentId, int contractId, Date submittedDate, Date dueDate, int actorId) {
+        if (paymentId <= 0 || contractId <= 0 || actorId <= 0 || submittedDate == null) {
+            return false;
+        }
+        String sql = "UPDATE contract_payments SET submitted_date = ?, due_date = ? "
+                + "WHERE payment_id = ? AND contract_id = ?";
+        return inTransaction("ghi nhan nop ho so", contractId, conn -> {
+            ContractPayment before = lockPayment(conn, paymentId, contractId);
+            if (before == null || before.getPaidDate() != null) {
+                return false;
+            }
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setDate(1, submittedDate);
+                ps.setDate(2, dueDate);
+                ps.setInt(3, paymentId);
+                ps.setInt(4, contractId);
+                if (ps.executeUpdate() == 0) {
+                    return false;
+                }
+            }
+            historyDAO.insertHistory(conn, contractId, ContractHistory.EVENT_PAYMENT_SUBMITTED,
+                    "Nộp hồ sơ kỳ " + typeOrDefault(before.getPaymentType()) + " "
+                            + formatMoney(before.getInvoiceAmount())
+                            + " ngày " + formatDate(submittedDate) + ", " + dueText(dueDate),
+                    actorId, null);
+            return true;
+        });
+    }
+
+    /** "Thanh toán 450.528.480 đ, đến hạn 27/11/2026" -- dùng cho nhật ký lập / sửa kỳ. */
+    private static String summaryOf(ContractPayment p) {
+        return typeOrDefault(p.getPaymentType()) + " " + formatMoney(p.getInvoiceAmount())
+                + (p.getPaymentDays() == null ? "" : ", trả trong " + p.getPaymentDays() + " ngày")
+                + ", " + dueText(p.getDueDate());
+    }
+
+    /** "đến hạn dd/MM/yyyy", hoặc "chưa có hạn thu" khi hạn thu trống (BR-60). */
+    private static String dueText(Date dueDate) {
+        return dueDate == null ? "chưa có hạn thu" : "đến hạn " + formatDate(dueDate);
+    }
+
+    /** Loại kỳ để ghi/hiện: trống thì là "Thanh toán", như DEFAULT của cột (V45). */
+    private static String typeOrDefault(String type) {
+        return type == null || type.trim().isEmpty() ? ContractPayment.TYPE_PAYMENT : type;
+    }
+
+    private static void setNullableInt(PreparedStatement ps, int index, Integer value) throws SQLException {
+        if (value == null) {
+            ps.setNull(index, Types.INTEGER);
+        } else {
+            ps.setInt(index, value);
         }
     }
 
     /**
-     * Ghi nhận tiền của một kỳ đã về (tự mở kết nối và quản lý transaction).
-     *
-     * <p>KHÔNG chặn kể cả khi hợp đồng đã thanh lý: tiền bảo hành giữ lại thường chỉ về sau thanh lý cả năm.
+     * Chạy {@code work} trong một transaction trên kết nối tự mở: work trả true thì commit,
+     * false hoặc ném lỗi thì rollback. Lỗi SQL ghi log và trả false.
      */
-    public boolean markPaymentPaid(int paymentId, int contractId, Date paidDate, int actorId) {
-        if (paymentId <= 0 || contractId <= 0 || actorId <= 0 || paidDate == null) {
-            return false;
-        }
+    private boolean inTransaction(String what, int contractId, TxWork work) {
         try (Connection conn = DBContext.getConnection()) {
             conn.setAutoCommit(false);
             boolean committed = false;
             try {
-                ContractPayment before = lockPayment(conn, paymentId, contractId);
-                if (before == null || before.getPaidDate() != null) {
+                if (!work.run(conn)) {
                     return false;
                 }
-                try (PreparedStatement ps = conn.prepareStatement(
-                        "UPDATE contract_payments SET paid_date = ? WHERE payment_id = ? AND contract_id = ?")) {
-                    ps.setDate(1, paidDate);
-                    ps.setInt(2, paymentId);
-                    ps.setInt(3, contractId);
-                    if (ps.executeUpdate() == 0) {
-                        return false;
-                    }
-                }
-                historyDAO.insertHistory(conn, contractId, ContractHistory.EVENT_PAYMENT_PAID,
-                        "Đã thu " + formatMoney(before.getInvoiceAmount())
-                                + " (kỳ đến hạn " + formatDate(before.getDueDate()) + ")"
-                                + " ngày " + formatDate(paidDate),
-                        actorId, null);
                 conn.commit();
                 committed = true;
                 return true;
             } finally {
-                finishTransaction(conn, committed, "ghi nhan da thu", contractId);
+                finishTransaction(conn, committed, what, contractId);
             }
         } catch (SQLException ex) {
-            LOG.error("Loi ghi nhan da thu (paymentId={}, contractId={})", paymentId, contractId, ex);
+            LOG.error("Loi khi {} (contractId={})", what, contractId, ex);
             return false;
         }
     }
@@ -213,7 +369,7 @@ public class ContractPaymentDAO {
                 }
                 historyDAO.insertHistory(conn, contractId, ContractHistory.EVENT_PAYMENT_REMOVED,
                         "Xoá kỳ " + formatMoney(before.getInvoiceAmount())
-                                + " đến hạn " + formatDate(before.getDueDate()),
+                                + " " + dueText(before.getDueDate()),
                         actorId, null);
                 conn.commit();
                 committed = true;
@@ -256,7 +412,7 @@ public class ContractPaymentDAO {
     }
 
     /**
-     * Tổng tiền đã thu trong một kỳ (theo ngày thanh toán), lọc thêm theo tỉnh của khách hàng đứng tên hợp đồng.
+     * Tổng tiền THỰC THU trong một kỳ (theo ngày thu, BR-18), lọc thêm theo tỉnh của khách hàng đứng tên hợp đồng.
      */
     public BigDecimal sumInvoiceAmountInPeriod(Period period, Integer provinceId) {
         return sumInvoiceAmountInPeriod(period, SqlFilters.one(provinceId), null);
@@ -269,7 +425,7 @@ public class ContractPaymentDAO {
         if (period == null) {
             return BigDecimal.ZERO;
         }
-        String sql = "SELECT COALESCE(SUM(p.invoice_amount), 0) FROM contract_payments p "
+        String sql = "SELECT COALESCE(SUM(" + COLLECTED_AMOUNT_SQL + "), 0) FROM contract_payments p "
                 + "LEFT JOIN contracts c ON p.contract_id = c.contract_id "
                 + "LEFT JOIN enterprises e ON c.enterprise_id = e.enterprise_id "
                 + "LEFT JOIN addresses a ON e.address_id = a.address_id "
@@ -297,7 +453,7 @@ public class ContractPaymentDAO {
     }
 
     /**
-     * Tổng tiền đã thu trong 1 tháng cụ thể. Trả về 0 nếu không có khoản thu nào.
+     * Tổng tiền THỰC THU trong 1 tháng cụ thể (theo ngày thu, BR-18). Trả về 0 nếu không có khoản thu nào.
      */
     public BigDecimal sumInvoiceAmountByMonth(int year, int month) {
         return sumInvoiceAmountByMonth(year, month, null);
@@ -318,7 +474,7 @@ public class ContractPaymentDAO {
         if (year <= 0 || month < 1 || month > 12) {
             return BigDecimal.ZERO;
         }
-        String sql = "SELECT COALESCE(SUM(p.invoice_amount), 0) FROM contract_payments p "
+        String sql = "SELECT COALESCE(SUM(" + COLLECTED_AMOUNT_SQL + "), 0) FROM contract_payments p "
                 + "LEFT JOIN contracts c ON p.contract_id = c.contract_id "
                 + "LEFT JOIN enterprises e ON c.enterprise_id = e.enterprise_id "
                 + "LEFT JOIN addresses a ON e.address_id = a.address_id "
@@ -346,8 +502,8 @@ public class ContractPaymentDAO {
     }
 
     private ContractPayment lockPayment(Connection conn, int paymentId, int contractId) throws SQLException {
-        String sql = "SELECT payment_id, invoice_amount, due_date, paid_date FROM contract_payments "
-                + "WHERE payment_id = ? AND contract_id = ? FOR UPDATE";
+        String sql = "SELECT payment_id, payment_type, invoice_amount, payment_days, submitted_date, due_date, "
+                + "paid_date FROM contract_payments WHERE payment_id = ? AND contract_id = ? FOR UPDATE";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, paymentId);
             ps.setInt(2, contractId);
@@ -358,12 +514,20 @@ public class ContractPaymentDAO {
                 ContractPayment p = new ContractPayment();
                 p.setPaymentId(rs.getInt("payment_id"));
                 p.setContractId(contractId);
+                p.setPaymentType(typeOrDefault(rs.getString("payment_type")));
                 p.setInvoiceAmount(rs.getBigDecimal("invoice_amount"));
+                p.setPaymentDays(nullableInt(rs, "payment_days"));
+                p.setSubmittedDate(rs.getDate("submitted_date"));
                 p.setDueDate(rs.getDate("due_date"));
                 p.setPaidDate(rs.getDate("paid_date"));
                 return p;
             }
         }
+    }
+
+    private static Integer nullableInt(ResultSet rs, String column) throws SQLException {
+        int value = rs.getInt(column);
+        return rs.wasNull() ? null : value;
     }
 
     private boolean isFrozen(Connection conn, int contractId) throws SQLException {
@@ -400,9 +564,14 @@ public class ContractPaymentDAO {
         ContractPayment p = new ContractPayment();
         p.setPaymentId(rs.getInt("payment_id"));
         p.setContractId(rs.getInt("contract_id"));
+        p.setPaymentType(typeOrDefault(rs.getString("payment_type")));
         p.setInvoiceAmount(rs.getBigDecimal("invoice_amount"));
+        p.setConditionNote(rs.getString("condition_note"));
+        p.setPaymentDays(nullableInt(rs, "payment_days"));
+        p.setSubmittedDate(rs.getDate("submitted_date"));
         p.setDueDate(rs.getDate("due_date"));
         p.setPaidDate(rs.getDate("paid_date"));
+        p.setPaidAmount(rs.getBigDecimal("paid_amount"));
         p.setCreatedAt(rs.getTimestamp("created_at"));
         return p;
     }

@@ -303,7 +303,8 @@ public class ContractStatusIntegrationTest {
 
         List<poscs.model.ContractPayment> rows = contractDAO.findPaymentsByContractId(2);
         assertEquals(2, rows.size());
-        assertEquals("Kỳ đến hạn sớm nhất phải đứng trước",
+        // Task 10.4: danh sách kỳ sắp theo thứ tự lập (ORDER BY payment_id), không theo hạn thu.
+        assertEquals("Kỳ lập trước phải đứng trước",
                 new java.math.BigDecimal("450000000.00"), rows.get(0).getInvoiceAmount());
         assertNull("Mới lập thì chưa thu", rows.get(0).getPaidDate());
 
@@ -319,12 +320,20 @@ public class ContractStatusIntegrationTest {
 
         assertFalse(contractDAO.insertPayment(2, payment("0", java.time.LocalDate.now()), Fixtures.USER_ID));
         assertFalse(contractDAO.insertPayment(2, payment("-1000", java.time.LocalDate.now()), Fixtures.USER_ID));
+        assertEquals(0, contractDAO.findPaymentsByContractId(2).size());
 
+        // Task 10.4, BR-60: hạn thu để trống được khi lập (người dùng đồng ý sửa 21/11/2026;
+        // trước đây đoạn này khẳng định kỳ không hạn thu bị từ chối).
         poscs.model.ContractPayment noDue = new poscs.model.ContractPayment();
         noDue.setInvoiceAmount(new java.math.BigDecimal("1000"));
-        assertFalse(contractDAO.insertPayment(2, noDue, Fixtures.USER_ID));
+        assertTrue(contractDAO.insertPayment(2, noDue, Fixtures.USER_ID));
 
-        assertEquals(0, contractDAO.findPaymentsByContractId(2).size());
+        List<poscs.model.ContractPayment> rows = contractDAO.findPaymentsByContractId(2);
+        assertEquals(1, rows.size());
+        assertNull("Lập không hạn thu thì due_date là NULL", rows.get(0).getDueDate());
+        assertEquals(poscs.model.ContractPayment.TYPE_PAYMENT, rows.get(0).getPaymentType());
+        assertEquals(poscs.model.ContractPayment.STATUS_NOT_SUBMITTED,
+                rows.get(0).statusOn(java.time.LocalDate.now()));
     }
 
     @Test

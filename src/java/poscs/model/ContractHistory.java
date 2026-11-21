@@ -44,6 +44,12 @@ public class ContractHistory {
     /** Xoá một kỳ thanh toán lập nhầm. */
     public static final String EVENT_PAYMENT_REMOVED = "Xoá kỳ thanh toán";
 
+    /** Sửa một kỳ thanh toán chưa thu (BR-60: loại, số tiền, điều kiện, số ngày, hạn thu). */
+    public static final String EVENT_PAYMENT_UPDATED = "Sửa kỳ thanh toán";
+
+    /** Ghi nhận đã nộp hồ sơ thanh toán của một kỳ (BR-60: ngày nộp, hạn thu). */
+    public static final String EVENT_PAYMENT_SUBMITTED = "Nộp hồ sơ thanh toán";
+
     /**
      * Lập một phụ lục cho hợp đồng này. Dòng này ghi lên HỢP ĐỒNG CHA, không
      * phải lên phụ lục -- phụ lục tự có dòng "Khởi tạo" của nó.

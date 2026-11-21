@@ -119,7 +119,8 @@ public class ContractPaymentDAOTest {
             verify(conn).prepareStatement(sqlCaptor.capture());
             String sql = sqlCaptor.getValue();
             assertTrue(sql.contains("WHERE contract_id = ?"));
-            assertTrue(sql.contains("ORDER BY due_date, payment_id"));
+            // Task 10.4: theo thứ tự lập, hạn thu để trống được (người dùng chốt 20/11/2026).
+            assertTrue(sql.contains("ORDER BY payment_id"));
             verify(ps).setInt(1, CONTRACT_ID);
 
             ContractPayment p1 = payments.get(0);
@@ -177,10 +178,10 @@ public class ContractPaymentDAOTest {
         p.setInvoiceAmount(new BigDecimal("-1000"));
         assertFalse(dao.insertPayment(CONTRACT_ID, p, ACTOR_ID));
 
-        // null dueDate
+        // Task 10.4, BR-60: hạn thu trống KHÔNG còn là lỗi đầu vào -- bỏ trường hợp
+        // "null dueDate → false" (người dùng đồng ý 21/11/2026); không hạn thu vẫn lập
+        // được, xem insertPayment_noDueDate_insertsNullAndNewColumns.
         p.setInvoiceAmount(new BigDecimal("1000000"));
-        p.setDueDate(null);
-        assertFalse(dao.insertPayment(CONTRACT_ID, p, ACTOR_ID));
 
         // invalid contractId or actorId
         p.setDueDate(Date.valueOf("2026-06-01"));
@@ -796,5 +797,433 @@ public class ContractPaymentDAOTest {
         verify(mockPayment).sumInvoiceAmountByMonth(2026, 10, 5);
         injectedDao.sumInvoiceAmountByMonth(2026, 10, List.of(5), List.of(9));
         verify(mockPayment).sumInvoiceAmountByMonth(2026, 10, List.of(5), List.of(9));
+    }
+
+    // ------------------------------------------------------------------
+    // Task 10.4 -- BR-60 / BR-18: cột mới, sửa kỳ, nộp hồ sơ, số thực thu
+    // ------------------------------------------------------------------
+
+    /** Kết nối giả: câu chứa {@code keyword} trả {@code matching}; câu khoá dòng kỳ trả {@code lock}; còn lại trả {@code status}. */
+    private static Connection routed(String keyword, PreparedStatement matching, PreparedStatement lock,
+                                     PreparedStatement status) throws SQLException {
+        Connection conn = mock(Connection.class);
+        when(conn.prepareStatement(anyString())).thenAnswer(inv -> {
+            String sql = inv.getArgument(0, String.class);
+            if (sql.contains(keyword)) {
+                return matching;
+            }
+            if (sql.contains("FROM contract_payments") && sql.contains("FOR UPDATE")) {
+                return lock;
+            }
+            return status;
+        });
+        return conn;
+    }
+
+    private static java.util.Map<String, Object> unpaidRow(Integer days, Date submitted, Date due) {
+        java.util.Map<String, Object> r = new java.util.HashMap<>();
+        r.put("payment_id", PAYMENT_ID);
+        r.put("payment_type", ContractPayment.TYPE_PAYMENT);
+        r.put("invoice_amount", new BigDecimal("112632120.00"));
+        r.put("payment_days", days);
+        r.put("submitted_date", submitted);
+        r.put("due_date", due);
+        r.put("paid_date", null);
+        return r;
+    }
+
+    @Test
+    public void findPaymentsByContractId_mapsBr60ColumnsAndOrdersByCreation() throws Exception {
+        var row = row(
+                "payment_id", 7,
+                "contract_id", CONTRACT_ID,
+                "payment_type", "Tạm ứng",
+                "invoice_amount", new BigDecimal("450528480.00"),
+                "condition_note", "Trong 7 ngày kể từ ngày ký",
+                "payment_days", 7,
+                "submitted_date", Date.valueOf("2026-11-18"),
+                "due_date", Date.valueOf("2026-11-25"),
+                "paid_date", Date.valueOf("2026-11-24"),
+                "paid_amount", new BigDecimal("400000000.00"),
+                "created_at", Timestamp.valueOf("2026-11-01 08:00:00")
+        );
+        var legacyRow = row(
+                "payment_id", 8,
+                "contract_id", CONTRACT_ID,
+                "payment_type", null,
+                "invoice_amount", new BigDecimal("112632120.00"),
+                "condition_note", null,
+                "payment_days", null,
+                "submitted_date", null,
+                "due_date", null,
+                "paid_date", null,
+                "paid_amount", null,
+                "created_at", null
+        );
+        PreparedStatement ps = statementReturning(resultSetOf(List.of(row, legacyRow)));
+        Connection conn = connectionReturning(ps);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            List<ContractPayment> list = dao.findPaymentsByContractId(CONTRACT_ID);
+
+            ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+            verify(conn).prepareStatement(sql.capture());
+            assertTrue(sql.getValue().contains("payment_type"));
+            assertTrue(sql.getValue().contains("paid_amount"));
+            assertTrue(sql.getValue().endsWith("ORDER BY payment_id"));
+
+            ContractPayment p = list.get(0);
+            assertEquals("Tạm ứng", p.getPaymentType());
+            assertEquals("Trong 7 ngày kể từ ngày ký", p.getConditionNote());
+            assertEquals(Integer.valueOf(7), p.getPaymentDays());
+            assertEquals(Date.valueOf("2026-11-18"), p.getSubmittedDate());
+            assertEquals(new BigDecimal("400000000.00"), p.getPaidAmount());
+            assertTrue(p.isPaidAmountDifferent());
+
+            // Kỳ cũ / chưa nộp hồ sơ: số ngày NULL không đọc thành 0, loại trống là "Thanh toán".
+            ContractPayment q = list.get(1);
+            assertEquals(ContractPayment.TYPE_PAYMENT, q.getPaymentType());
+            assertNull(q.getPaymentDays());
+            assertNull(q.getDueDate());
+            assertEquals(ContractPayment.STATUS_NOT_SUBMITTED, q.statusOn(LocalDate.of(2026, 11, 20)));
+        }
+    }
+
+    @Test
+    public void insertPayment_noDueDate_insertsNullAndNewColumns() throws Exception {
+        ContractHistoryDAO historyMock = mock(ContractHistoryDAO.class);
+        ContractPaymentDAO paymentDao = new ContractPaymentDAO(historyMock);
+        ContractPayment p = new ContractPayment();
+        p.setPaymentType(ContractPayment.TYPE_PAYMENT);
+        p.setInvoiceAmount(new BigDecimal("112632120"));
+        p.setConditionNote("Sau khi nghiệm thu, bàn giao và nộp đủ hồ sơ");
+        p.setPaymentDays(7);
+
+        PreparedStatement psStatus = statementReturning(singleRow(row("progress_status", ContractDAO.PROGRESS_SIGNED)));
+        PreparedStatement psInsert = mock(PreparedStatement.class);
+        when(psInsert.executeUpdate()).thenReturn(1);
+        Connection conn = connectionRoutingOn("INSERT INTO contract_payments", psInsert, psStatus);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            assertTrue(paymentDao.insertPayment(CONTRACT_ID, p, ACTOR_ID));
+
+            verify(psInsert).setDate(3, null);
+            verify(psInsert).setDate(4, null);
+            verify(psInsert).setString(5, "Thanh toán");
+            verify(psInsert).setString(6, "Sau khi nghiệm thu, bàn giao và nộp đủ hồ sơ");
+            verify(psInsert).setInt(7, 7);
+            verify(psInsert).setBigDecimal(8, null);
+            ArgumentCaptor<String> detail = ArgumentCaptor.forClass(String.class);
+            verify(historyMock).insertHistory(eq(conn), eq(CONTRACT_ID), eq(ContractHistory.EVENT_PAYMENT_ADDED),
+                    detail.capture(), eq(ACTOR_ID), isNull());
+            assertTrue(detail.getValue().contains("112.632.120 đ"));
+            assertTrue(detail.getValue().contains("trả trong 7 ngày"));
+            assertTrue(detail.getValue().contains("chưa có hạn thu"));
+            verify(conn).commit();
+        }
+    }
+
+    @Test
+    public void insertPayment_withPaidDate_paidAmountDefaultsToInvoice_noDaysBindsNull() throws Exception {
+        ContractPayment p = new ContractPayment();
+        p.setPaymentType(null);
+        p.setInvoiceAmount(new BigDecimal("200000000.00"));
+        p.setPaidDate(Date.valueOf("2026-04-28"));
+
+        PreparedStatement psStatus = statementReturning(singleRow(row("progress_status", ContractDAO.PROGRESS_SIGNED)));
+        PreparedStatement psInsert = mock(PreparedStatement.class);
+        when(psInsert.executeUpdate()).thenReturn(1);
+        Connection conn = connectionRoutingOn("INSERT INTO contract_payments", psInsert, psStatus);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            assertTrue(new ContractPaymentDAO(mock(ContractHistoryDAO.class)).insertPayment(CONTRACT_ID, p, ACTOR_ID));
+
+            verify(psInsert).setString(5, "Thanh toán");
+            verify(psInsert).setNull(7, java.sql.Types.INTEGER);
+            verify(psInsert).setBigDecimal(8, new BigDecimal("200000000.00"));
+        }
+    }
+
+    @Test
+    public void markPaymentPaid_withPaidAmount_bindsAmountAndLogsBothFigures() throws Exception {
+        ContractHistoryDAO historyMock = mock(ContractHistoryDAO.class);
+        ContractPaymentDAO paymentDao = new ContractPaymentDAO(historyMock);
+        Date paid = Date.valueOf("2026-11-24");
+        BigDecimal actual = new BigDecimal("100000000");
+
+        PreparedStatement psLock = statementReturning(singleRow(unpaidRow(7, Date.valueOf("2026-11-18"),
+                Date.valueOf("2026-11-25"))));
+        PreparedStatement psUpdate = mock(PreparedStatement.class);
+        when(psUpdate.executeUpdate()).thenReturn(1);
+        Connection conn = connectionRoutingOn("UPDATE contract_payments", psUpdate, psLock);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            assertTrue(paymentDao.markPaymentPaid(PAYMENT_ID, CONTRACT_ID, paid, actual, ACTOR_ID));
+
+            ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+            verify(conn, atLeastOnce()).prepareStatement(sql.capture());
+            assertTrue(sql.getAllValues().stream().anyMatch(s -> s.contains("SET paid_date = ?, paid_amount = ?")));
+            verify(psUpdate).setDate(1, paid);
+            verify(psUpdate).setBigDecimal(2, actual);
+            verify(psUpdate).setInt(3, PAYMENT_ID);
+            verify(psUpdate).setInt(4, CONTRACT_ID);
+            ArgumentCaptor<String> detail = ArgumentCaptor.forClass(String.class);
+            verify(historyMock).insertHistory(eq(conn), eq(CONTRACT_ID), eq(ContractHistory.EVENT_PAYMENT_PAID),
+                    detail.capture(), eq(ACTOR_ID), isNull());
+            assertTrue(detail.getValue().startsWith("Đã thu 100.000.000 đ (số tiền kỳ 112.632.120 đ)"));
+            assertTrue(detail.getValue().contains("24/11/2026"));
+            verify(conn).commit();
+        }
+    }
+
+    @Test
+    public void markPaymentPaid_withoutPaidAmount_copiesInvoiceInsideUpdate() throws Exception {
+        ContractHistoryDAO historyMock = mock(ContractHistoryDAO.class);
+        PreparedStatement psLock = statementReturning(singleRow(unpaidRow(null, null, null)));
+        PreparedStatement psUpdate = mock(PreparedStatement.class);
+        when(psUpdate.executeUpdate()).thenReturn(1);
+        Connection conn = connectionRoutingOn("UPDATE contract_payments", psUpdate, psLock);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            assertTrue(new ContractPaymentDAO(historyMock)
+                    .markPaymentPaid(PAYMENT_ID, CONTRACT_ID, Date.valueOf("2026-11-24"), ACTOR_ID));
+
+            ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+            verify(conn, atLeastOnce()).prepareStatement(sql.capture());
+            assertTrue(sql.getAllValues().stream().anyMatch(s -> s.contains("paid_amount = invoice_amount")));
+            verify(psUpdate, never()).setBigDecimal(anyInt(), any());
+            ArgumentCaptor<String> detail = ArgumentCaptor.forClass(String.class);
+            verify(historyMock).insertHistory(eq(conn), eq(CONTRACT_ID), eq(ContractHistory.EVENT_PAYMENT_PAID),
+                    detail.capture(), eq(ACTOR_ID), isNull());
+            assertTrue(detail.getValue().contains("kỳ chưa có hạn thu"));
+            assertFalse(detail.getValue().contains("số tiền kỳ"));
+        }
+    }
+
+    @Test
+    public void markPaymentPaid_paidAmountNotPositive_returnsFalseWithoutDb() {
+        Date paid = Date.valueOf("2026-11-24");
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            assertFalse(dao.markPaymentPaid(PAYMENT_ID, CONTRACT_ID, paid, BigDecimal.ZERO, ACTOR_ID));
+            assertFalse(dao.markPaymentPaid(PAYMENT_ID, CONTRACT_ID, paid, new BigDecimal("-5"), ACTOR_ID));
+            db.verifyNoInteractions();
+        }
+    }
+
+    @Test
+    public void updatePayment_success_bindsFieldsAndLogsBeforeAfter() throws Exception {
+        ContractHistoryDAO historyMock = mock(ContractHistoryDAO.class);
+        ContractPayment edit = new ContractPayment();
+        edit.setPaymentType(ContractPayment.TYPE_ADVANCE);
+        edit.setInvoiceAmount(new BigDecimal("450528480"));
+        edit.setConditionNote("Trong 7 ngày kể từ ngày ký");
+        edit.setPaymentDays(null);
+        edit.setDueDate(Date.valueOf("2026-12-01"));
+
+        PreparedStatement psStatus = statementReturning(singleRow(row("progress_status", ContractDAO.PROGRESS_SIGNED)));
+        PreparedStatement psLock = statementReturning(singleRow(unpaidRow(7, null, null)));
+        PreparedStatement psUpdate = mock(PreparedStatement.class);
+        when(psUpdate.executeUpdate()).thenReturn(1);
+        Connection conn = routed("UPDATE contract_payments", psUpdate, psLock, psStatus);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            assertTrue(new ContractPaymentDAO(historyMock).updatePayment(PAYMENT_ID, CONTRACT_ID, edit, ACTOR_ID));
+
+            verify(psUpdate).setString(1, "Tạm ứng");
+            verify(psUpdate).setBigDecimal(2, new BigDecimal("450528480"));
+            verify(psUpdate).setString(3, "Trong 7 ngày kể từ ngày ký");
+            verify(psUpdate).setNull(4, java.sql.Types.INTEGER);
+            verify(psUpdate).setDate(5, Date.valueOf("2026-12-01"));
+            verify(psUpdate).setInt(6, PAYMENT_ID);
+            verify(psUpdate).setInt(7, CONTRACT_ID);
+            ArgumentCaptor<String> detail = ArgumentCaptor.forClass(String.class);
+            verify(historyMock).insertHistory(eq(conn), eq(CONTRACT_ID), eq(ContractHistory.EVENT_PAYMENT_UPDATED),
+                    detail.capture(), eq(ACTOR_ID), isNull());
+            assertEquals("Sửa kỳ Thanh toán 112.632.120 đ, trả trong 7 ngày, chưa có hạn thu"
+                    + " → Tạm ứng 450.528.480 đ, đến hạn 01/12/2026", detail.getValue());
+            verify(conn).commit();
+            verify(conn).setAutoCommit(true);
+        }
+    }
+
+    @Test
+    public void updatePayment_frozenOrPaidOrMissing_returnsFalseAndRollsBack() throws Exception {
+        ContractPayment edit = new ContractPayment();
+        edit.setInvoiceAmount(new BigDecimal("1000"));
+
+        // Đã thanh lý: chặn trước khi đụng dòng kỳ.
+        PreparedStatement psFrozen = statementReturning(singleRow(row("progress_status", ContractDAO.PROGRESS_LIQUIDATED)));
+        PreparedStatement psUpdate1 = mock(PreparedStatement.class);
+        Connection c1 = routed("UPDATE contract_payments", psUpdate1, psFrozen, psFrozen);
+        // Kỳ đã thu.
+        java.util.Map<String, Object> paidRow = unpaidRow(null, null, Date.valueOf("2026-11-01"));
+        paidRow.put("paid_date", Date.valueOf("2026-11-02"));
+        PreparedStatement psSigned = statementReturning(singleRow(row("progress_status", ContractDAO.PROGRESS_SIGNED)));
+        PreparedStatement psPaid = statementReturning(singleRow(paidRow));
+        PreparedStatement psUpdate2 = mock(PreparedStatement.class);
+        Connection c2 = routed("UPDATE contract_payments", psUpdate2, psPaid, psSigned);
+        // Kỳ không có trong hợp đồng.
+        PreparedStatement psSigned3 = statementReturning(singleRow(row("progress_status", ContractDAO.PROGRESS_SIGNED)));
+        PreparedStatement psNone = statementReturning(emptyResultSet());
+        PreparedStatement psUpdate3 = mock(PreparedStatement.class);
+        Connection c3 = routed("UPDATE contract_payments", psUpdate3, psNone, psSigned3);
+
+        for (Connection conn : new Connection[]{c1, c2, c3}) {
+            try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+                db.when(DBContext::getConnection).thenReturn(conn);
+
+                assertFalse(dao.updatePayment(PAYMENT_ID, CONTRACT_ID, edit, ACTOR_ID));
+                verify(conn, never()).commit();
+                verify(conn).rollback();
+                verify(conn).setAutoCommit(true);
+            }
+        }
+        verify(psUpdate1, never()).executeUpdate();
+        verify(psUpdate2, never()).executeUpdate();
+        verify(psUpdate3, never()).executeUpdate();
+    }
+
+    @Test
+    public void updatePayment_invalidInput_returnsFalseWithoutDb() {
+        ContractPayment ok = new ContractPayment();
+        ok.setInvoiceAmount(new BigDecimal("1000"));
+        ContractPayment zero = new ContractPayment();
+        zero.setInvoiceAmount(BigDecimal.ZERO);
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            assertFalse(dao.updatePayment(0, CONTRACT_ID, ok, ACTOR_ID));
+            assertFalse(dao.updatePayment(PAYMENT_ID, 0, ok, ACTOR_ID));
+            assertFalse(dao.updatePayment(PAYMENT_ID, CONTRACT_ID, ok, 0));
+            assertFalse(dao.updatePayment(PAYMENT_ID, CONTRACT_ID, null, ACTOR_ID));
+            assertFalse(dao.updatePayment(PAYMENT_ID, CONTRACT_ID, new ContractPayment(), ACTOR_ID));
+            assertFalse(dao.updatePayment(PAYMENT_ID, CONTRACT_ID, zero, ACTOR_ID));
+            db.verifyNoInteractions();
+        }
+    }
+
+    @Test
+    public void markSubmitted_success_writesDatesAndHistory_noFrozenCheck() throws Exception {
+        ContractHistoryDAO historyMock = mock(ContractHistoryDAO.class);
+        Date submitted = Date.valueOf("2026-11-18");
+        Date due = Date.valueOf("2026-11-25");
+        PreparedStatement psLock = statementReturning(singleRow(unpaidRow(7, null, null)));
+        PreparedStatement psUpdate = mock(PreparedStatement.class);
+        when(psUpdate.executeUpdate()).thenReturn(1);
+        Connection conn = connectionRoutingOn("UPDATE contract_payments", psUpdate, psLock);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            assertTrue(new ContractPaymentDAO(historyMock).markSubmitted(PAYMENT_ID, CONTRACT_ID, submitted, due, ACTOR_ID));
+
+            verify(psUpdate).setDate(1, submitted);
+            verify(psUpdate).setDate(2, due);
+            verify(psUpdate).setInt(3, PAYMENT_ID);
+            verify(psUpdate).setInt(4, CONTRACT_ID);
+            // BR-60: "Đã nộp hồ sơ" bấm được cả sau thanh lý -- không hỏi tiến độ hợp đồng.
+            ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+            verify(conn, atLeastOnce()).prepareStatement(sql.capture());
+            assertTrue(sql.getAllValues().stream().noneMatch(s -> s.contains("progress_status")));
+            ArgumentCaptor<String> detail = ArgumentCaptor.forClass(String.class);
+            verify(historyMock).insertHistory(eq(conn), eq(CONTRACT_ID), eq(ContractHistory.EVENT_PAYMENT_SUBMITTED),
+                    detail.capture(), eq(ACTOR_ID), isNull());
+            assertEquals("Nộp hồ sơ kỳ Thanh toán 112.632.120 đ ngày 18/11/2026, đến hạn 25/11/2026",
+                    detail.getValue());
+            verify(conn).commit();
+        }
+    }
+
+    @Test
+    public void markSubmitted_noDueDate_logsChuaCoHanThu() throws Exception {
+        ContractHistoryDAO historyMock = mock(ContractHistoryDAO.class);
+        PreparedStatement psLock = statementReturning(singleRow(unpaidRow(null, null, null)));
+        PreparedStatement psUpdate = mock(PreparedStatement.class);
+        when(psUpdate.executeUpdate()).thenReturn(1);
+        Connection conn = connectionRoutingOn("UPDATE contract_payments", psUpdate, psLock);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            assertTrue(new ContractPaymentDAO(historyMock)
+                    .markSubmitted(PAYMENT_ID, CONTRACT_ID, Date.valueOf("2026-11-18"), null, ACTOR_ID));
+
+            verify(psUpdate).setDate(2, null);
+            ArgumentCaptor<String> detail = ArgumentCaptor.forClass(String.class);
+            verify(historyMock).insertHistory(eq(conn), eq(CONTRACT_ID), eq(ContractHistory.EVENT_PAYMENT_SUBMITTED),
+                    detail.capture(), eq(ACTOR_ID), isNull());
+            assertTrue(detail.getValue().endsWith("chưa có hạn thu"));
+        }
+    }
+
+    @Test
+    public void markSubmitted_paidOrMissingOrUpdateFails_rollsBack() throws Exception {
+        java.util.Map<String, Object> paidRow = unpaidRow(null, null, null);
+        paidRow.put("paid_date", Date.valueOf("2026-11-02"));
+        Connection cPaid = connectionRoutingOn("UPDATE contract_payments", mock(PreparedStatement.class),
+                statementReturning(singleRow(paidRow)));
+        Connection cMissing = connectionRoutingOn("UPDATE contract_payments", mock(PreparedStatement.class),
+                statementReturning(emptyResultSet()));
+        PreparedStatement psZero = mock(PreparedStatement.class);
+        when(psZero.executeUpdate()).thenReturn(0);
+        Connection cZero = connectionRoutingOn("UPDATE contract_payments", psZero,
+                statementReturning(singleRow(unpaidRow(null, null, null))));
+
+        for (Connection conn : new Connection[]{cPaid, cMissing, cZero}) {
+            try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+                db.when(DBContext::getConnection).thenReturn(conn);
+
+                assertFalse(dao.markSubmitted(PAYMENT_ID, CONTRACT_ID, Date.valueOf("2026-11-18"), null, ACTOR_ID));
+                verify(conn, never()).commit();
+                verify(conn).rollback();
+            }
+        }
+    }
+
+    @Test
+    public void markSubmitted_invalidInput_returnsFalseWithoutDb() {
+        Date d = Date.valueOf("2026-11-18");
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            assertFalse(dao.markSubmitted(PAYMENT_ID, CONTRACT_ID, null, d, ACTOR_ID));
+            assertFalse(dao.markSubmitted(0, CONTRACT_ID, d, d, ACTOR_ID));
+            assertFalse(dao.markSubmitted(PAYMENT_ID, 0, d, d, ACTOR_ID));
+            assertFalse(dao.markSubmitted(PAYMENT_ID, CONTRACT_ID, d, d, 0));
+            db.verifyNoInteractions();
+        }
+    }
+
+    @Test
+    public void revenueSums_addUpPaidAmountNotInvoiceAmount() throws Exception {
+        // BR-18: doanh thu cộng số tiền THỰC THU theo ngày thu.
+        Connection connPeriod = connectionReturning(
+                statementReturning(singleRow(row("total", new BigDecimal("400000000.00")))));
+        Connection connMonth = connectionReturning(
+                statementReturning(singleRow(row("total", new BigDecimal("400000000.00")))));
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(connPeriod, connMonth);
+
+            assertEquals(new BigDecimal("400000000.00"),
+                    dao.sumInvoiceAmountInPeriod(Period.parse("2026", "m11"), List.of(), null));
+            assertEquals(new BigDecimal("400000000.00"), dao.sumInvoiceAmountByMonth(2026, 11, List.of(), null));
+
+            for (Connection conn : new Connection[]{connPeriod, connMonth}) {
+                ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+                verify(conn).prepareStatement(sql.capture());
+                String s = sql.getValue();
+                assertTrue(s, s.startsWith("SELECT COALESCE(SUM(COALESCE(p.paid_amount, p.invoice_amount)), 0)"));
+                assertFalse(s, s.contains("SUM(p.invoice_amount)"));
+            }
+        }
     }
 }
