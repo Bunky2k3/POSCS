@@ -248,6 +248,53 @@ public class ContractDAO {
         "(SELECT COALESCE(MAX(DATEDIFF(NOW(), ph.handed_at)), 0) FROM contract_handovers ph "
         + " WHERE ph.contract_id = c.contract_id AND ph.done_at IS NULL)";
 
+    // ------------------------------------------------------------------
+    // BR-61: bước giao hàng của hợp đồng Nháp, suy ra từ giấy tờ CHƯA HUỶ
+    // (BR-59) mỗi lần đọc -- không có cột, không thêm giá trị tiến độ nào.
+    // Mọi chỗ cần nó (cột hiển thị, bộ lọc danh sách, ô đếm Dashboard, lịch
+    // nhắc ký BR-62) đều ghép từ đúng các mệnh đề dưới đây, nên nhãn trên màn
+    // hình, con số đếm và người được nhắc không lệch nhau được.
+    // ------------------------------------------------------------------
+
+    /** Loại giấy tờ quyết định bước giao hàng -- đúng chữ trong {@code ContractDocument.TYPES}. */
+    public static final String DOC_REQUEST_FORM = "Phiếu GQNCKH";
+    public static final String DOC_INTERNAL_TRANSFER = "Phiếu ĐCNB";
+    public static final String DOC_DELIVERY_NOTE = "Biên bản giao nhận hàng hoá";
+
+    /** Giá trị của tham số lọc {@code delivery} trên danh sách hợp đồng (BR-61). */
+    public static final String DELIVERY_FILTER_PREPARING = "preparing";
+    public static final String DELIVERY_FILTER_DELIVERED = "delivered";
+
+    private static final String IS_DRAFT_SQL = "c.progress_status = '" + PROGRESS_DRAFT + "'";
+
+    private static final String DELIVERY_NOTE_EXISTS_SQL =
+        "EXISTS (SELECT 1 FROM contract_documents dn WHERE dn.contract_id = c.contract_id"
+        + " AND dn.is_deleted = 0 AND dn.doc_type = '" + DOC_DELIVERY_NOTE + "')";
+
+    private static final String PREPARING_DOC_EXISTS_SQL =
+        "EXISTS (SELECT 1 FROM contract_documents dp WHERE dp.contract_id = c.contract_id"
+        + " AND dp.is_deleted = 0 AND dp.doc_type IN ('" + DOC_REQUEST_FORM + "', '" + DOC_INTERNAL_TRANSFER + "'))";
+
+    /** BR-61 "Đã giao – chưa ký": còn Nháp và có Biên bản giao nhận hàng hoá chưa huỷ. */
+    private static final String DELIVERED_UNSIGNED_SQL =
+        "(" + IS_DRAFT_SQL + " AND " + DELIVERY_NOTE_EXISTS_SQL + ")";
+
+    /** BR-61 "Chuẩn bị hàng": còn Nháp, có Phiếu GQNCKH hoặc Phiếu ĐCNB, chưa có biên bản giao nhận. */
+    private static final String PREPARING_SQL =
+        "(" + IS_DRAFT_SQL + " AND NOT " + DELIVERY_NOTE_EXISTS_SQL + " AND " + PREPARING_DOC_EXISTS_SQL + ")";
+
+    private static final String DELIVERY_STAGE_SQL =
+        "(CASE WHEN " + DELIVERED_UNSIGNED_SQL + " THEN '" + Contract.DELIVERY_DELIVERED + "'"
+        + " WHEN " + PREPARING_SQL + " THEN '" + Contract.DELIVERY_PREPARING + "' END)";
+
+    /**
+     * BR-61: ngày giao = ngày sớm nhất trong các biên bản giao nhận chưa huỷ.
+     * NULL khi hợp đồng đã rời Nháp -- ký xong thì không còn bước giao hàng.
+     */
+    private static final String DELIVERED_DATE_SQL =
+        "(SELECT MIN(dd.doc_date) FROM contract_documents dd WHERE dd.contract_id = c.contract_id"
+        + " AND dd.is_deleted = 0 AND dd.doc_type = '" + DOC_DELIVERY_NOTE + "' AND " + IS_DRAFT_SQL + ")";
+
     private static final String SELECT_BASE =
         "SELECT c.contract_id, c.contract_code, c.title, c.contract_type, c.direction, c.signing_date, " +
         "       c.effective_date, c.end_date, c.enterprise_id, c.owner_id, " +
@@ -260,6 +307,8 @@ public class ContractDAO {
         "       " + AMENDMENT_VALUE_PENDING_SQL + " AS amendment_value_pending, " +
         "       " + PENDING_DEPARTMENTS_SQL + " AS pending_departments, " +
         "       " + PENDING_DAYS_SQL + " AS pending_handover_days, " +
+        "       " + DELIVERY_STAGE_SQL + " AS delivery_stage, " +
+        "       " + DELIVERED_DATE_SQL + " AS delivered_date, " +
         "       e.enterprise_name, p.province_id, p.province_name, " +
         "       u.last_name AS owner_last_name, u.middle_name AS owner_middle_name, u.first_name AS owner_first_name " +
         "FROM contracts c " +
@@ -612,20 +661,48 @@ public class ContractDAO {
             + waitingHandoverClause(waitingDepartmentId)
             // Phạm vi Dashboard: của tôi HOẶC trong địa bàn tôi giữ.
             + SqlFilters.scopeClause(DASHBOARD_OWNER_COLUMNS, ownerIds, "d.province_id", provinceIds);
+        return sql + listScopeSummaryClauses(scope, scopeParams);
+    }
 
-        // Hai mệnh đề của phạm vi ghi tham số vào scopeParams theo đúng thứ tự dấu hỏi
-        // của chính chúng, nên chỉ cần nối vào cuối câu và bind lần lượt.
-        if (scope != null) {
-            String scopeClause = scope.predicate("c.owner_id", "d.province_id", scopeParams);
-            if (scopeClause != null) {
-                sql += " AND " + scopeClause;
-            }
-            String windowClause = scope.activeWindowPredicate("c.effective_date", "c.end_date", scopeParams);
-            if (windowClause != null) {
-                sql += " AND " + windowClause;
-            }
+    /**
+     * Các mệnh đề của phạm vi danh sách cho dải KPI: của ai, còn hiệu lực trong khoảng
+     * nào, và bước giao hàng (BR-61) -- để bốn con số đếm đúng tập bảng đang liệt kê.
+     * Mỗi mệnh đề ghi tham số vào {@code scopeParams} theo đúng thứ tự dấu hỏi của chính
+     * nó, nên chỉ cần nối vào cuối câu và bind lần lượt. Trả "" khi không có phạm vi.
+     */
+    private String listScopeSummaryClauses(ListScope scope, List<Object> scopeParams) {
+        if (scope == null) {
+            return "";
         }
-        return sql;
+        StringBuilder sql = new StringBuilder();
+        String scopeClause = scope.predicate("c.owner_id", "d.province_id", scopeParams);
+        if (scopeClause != null) {
+            sql.append(" AND ").append(scopeClause);
+        }
+        String windowClause = scope.activeWindowPredicate("c.effective_date", "c.end_date", scopeParams);
+        if (windowClause != null) {
+            sql.append(" AND ").append(windowClause);
+        }
+        String deliveryClause = deliveryStageClause(scope.getDeliveryStage());
+        if (deliveryClause != null) {
+            sql.append(" AND ").append(deliveryClause);
+        }
+        return sql.toString();
+    }
+
+    /**
+     * BR-61: mệnh đề lọc theo bước giao hàng, hay null khi không lọc. Mã lạ
+     * cũng là "không lọc" -- controller đã chuẩn hoá tham số, đây chỉ là chốt
+     * cuối để một giá trị gõ tay trên URL không sinh ra câu SQL hỏng.
+     */
+    static String deliveryStageClause(String stage) {
+        if (DELIVERY_FILTER_DELIVERED.equals(stage)) {
+            return DELIVERED_UNSIGNED_SQL;
+        }
+        if (DELIVERY_FILTER_PREPARING.equals(stage)) {
+            return PREPARING_SQL;
+        }
+        return null;
     }
 
     private String waitingHandoverClause(Integer waitingDepartmentId) {
@@ -747,6 +824,73 @@ public class ContractDAO {
             }
         } catch (SQLException ex) {
             LOG.error("Loi truy van hop dong sap het han", ex);
+        }
+        return result;
+    }
+
+    /**
+     * UC-36 / BR-61: đếm hợp đồng "Đã giao – chưa ký" cho ô trên Dashboard,
+     * theo phạm vi của trang (của tôi HOẶC trong địa bàn đang chọn, như
+     * {@link #countStatusSummary}).
+     *
+     * <p>KHÔNG nhận kỳ: bộ lọc kỳ của Dashboard đi theo ngày ký, mà hợp đồng
+     * Nháp chưa có ngày ký nên lọc theo kỳ là luôn ra 0. Đây là việc đang tồn,
+     * tính tới hôm nay (người dùng chốt 21/11/2026).
+     *
+     * @param direction null = mọi chiều; Dashboard truyền "Bán" để con số khớp
+     *                  danh sách hợp đồng bán mở ra khi bấm vào ô
+     */
+    public int countDeliveredUnsigned(List<Integer> provinceIds, List<Integer> ownerIds, String direction) {
+        String sql = "SELECT COUNT(*) FROM contracts c "
+            + "LEFT JOIN enterprises e ON c.enterprise_id = e.enterprise_id "
+            + JOIN_PROVINCE_OF_ENTERPRISE
+            + "WHERE c.is_deleted = 0 AND " + DELIVERED_UNSIGNED_SQL
+            + (direction != null ? " AND c.direction = ?" : "")
+            + SqlFilters.scopeClause(DASHBOARD_OWNER_COLUMNS, ownerIds, "d.province_id", provinceIds);
+        try (Connection conn = DBContext.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            int param = 1;
+            if (direction != null) {
+                ps.setString(param++, direction);
+            }
+            SqlFilters.bindScope(ps, param, DASHBOARD_OWNER_COLUMNS, ownerIds, provinceIds);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt(1);
+                }
+            }
+        } catch (SQLException ex) {
+            LOG.error("Loi dem hop dong da giao chua ky", ex);
+        }
+        return 0;
+    }
+
+    /**
+     * BR-62: hợp đồng "Đã giao – chưa ký" có ngày giao không sau {@code deliveredOnOrBefore}
+     * -- nuôi lịch nhắc ký của {@code NotificationScheduler}. Bên gọi truyền
+     * "hôm nay − 15 ngày" theo đồng hồ của nó.
+     *
+     * <p>Không loại phụ lục: BR-61 áp cho mọi hợp đồng Nháp, và phụ lục bổ sung
+     * hàng cũng có biên bản giao nhận riêng của nó.
+     */
+    public List<Contract> findDeliveredUnsigned(Date deliveredOnOrBefore) {
+        List<Contract> result = new ArrayList<>();
+        if (deliveredOnOrBefore == null) {
+            return result;
+        }
+        String sql = SELECT_BASE
+            + "WHERE c.is_deleted = 0 AND " + DELIVERED_UNSIGNED_SQL
+            + " AND " + DELIVERED_DATE_SQL + " <= ? ORDER BY c.contract_id";
+        try (Connection conn = DBContext.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setDate(1, deliveredOnOrBefore);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    result.add(mapRow(rs));
+                }
+            }
+        } catch (SQLException ex) {
+            LOG.error("Loi truy van hop dong da giao chua ky", ex);
         }
         return result;
     }
@@ -2247,6 +2391,10 @@ public class ContractDAO {
             if (windowClause != null) {
                 conditions.add(windowClause);
             }
+            String deliveryClause = deliveryStageClause(scope.getDeliveryStage());
+            if (deliveryClause != null) {
+                conditions.add(deliveryClause);
+            }
         }
         if (rootsOnly) {
             conditions.add("c.parent_contract_id IS NULL");
@@ -2376,6 +2524,9 @@ public class ContractDAO {
         c.setAmendmentValuePending(rs.getBigDecimal("amendment_value_pending"));
         c.setPendingDepartments(rs.getString("pending_departments"));
         c.setPendingHandoverDays(rs.getInt("pending_handover_days"));
+        // BR-61: hai cột suy ra từ giấy tờ, NULL khi không còn Nháp hoặc chưa có giấy giao hàng.
+        c.setDeliveryStage(rs.getString("delivery_stage"));
+        c.setDeliveredDate(rs.getDate("delivered_date"));
     }
 
     private Enterprise mapEnterpriseFromRow(ResultSet rs, int enterpriseId) throws SQLException {

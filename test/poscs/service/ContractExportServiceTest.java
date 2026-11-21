@@ -328,4 +328,26 @@ public class ContractExportServiceTest {
         assertEquals("PL-01", row[1]);
         assertEquals("Chưa có số", row[2]);
     }
+
+    @Test
+    public void exportContractsToExcel_deliveryFilter_passesTheSameScopeToTheQuery() throws IOException {
+        // Task 10.5 / BR-61: bộ lọc bước giao hàng đi trong ListScope -- service chuyển nguyên
+        // scope xuống DAO, nên Excel ra đúng danh sách "Đã giao – chưa ký" đang xem.
+        Contract delivered = new Contract();
+        delivered.setContractCode("05/2026/HĐMB");
+        delivered.setTitle("Hợp đồng đã giao chưa ký");
+        when(contractDAO.findAll(anyInt(), anyInt(), any(), any(), any(), any(), anyBoolean(),
+                any(), any(), any(), anyBoolean(), any(), any())).thenReturn(List.of(delivered));
+        ListScope scope = ListScope.all().withDeliveryStage(ContractDAO.DELIVERY_FILTER_DELIVERED);
+
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        service.exportContractsToExcel(out, null, null, null, List.of(), null, "Bán", null, false, null, scope);
+
+        verify(contractDAO).findAll(eq(1), eq(Integer.MAX_VALUE), isNull(), isNull(), isNull(), eq(List.of()),
+                eq(true), isNull(), eq("Bán"), isNull(), eq(false), isNull(),
+                argThat(s -> s != null && ContractDAO.DELIVERY_FILTER_DELIVERED.equals(s.getDeliveryStage())));
+        try (Workbook wb = new HSSFWorkbook(new ByteArrayInputStream(out.toByteArray()))) {
+            assertEquals("Hợp đồng đã giao chưa ký", wb.getSheetAt(0).getRow(1).getCell(3).getStringCellValue());
+        }
+    }
 }

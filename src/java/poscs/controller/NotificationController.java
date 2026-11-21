@@ -10,6 +10,7 @@ import jakarta.servlet.http.HttpSession;
 import poscs.dao.NotificationDAO;
 import poscs.model.Notification;
 import poscs.model.User;
+import poscs.service.NotificationService;
 
 /**
  * Trang "Xem tất cả thông báo" (notifications.jsp) + 2 hành động đánh dấu đã
@@ -69,9 +70,9 @@ public class NotificationController extends HttpServlet {
 
     /**
      * Trang của thứ thông báo nói tới -- ref_type do NotificationScheduler
-     * ("contract_expiring", "ticket_sla") và ChangeRequestController
-     * ("CHANGE_REQUEST") ghi. Loại lạ, thiếu id hay không tìm thấy thông báo
-     * thì về trang Thông báo như trước.
+     * ("contract_expiring", "ticket_sla", "contract_unsigned_delivery" của
+     * nhắc ký BR-62) và ChangeRequestController ("CHANGE_REQUEST") ghi. Loại
+     * lạ, thiếu id hay không tìm thấy thông báo thì về trang Thông báo như trước.
      */
     static String targetOf(Notification n) {
         if (n == null || n.getRefType() == null || n.getRefId() == null) {
@@ -79,6 +80,7 @@ public class NotificationController extends HttpServlet {
         }
         switch (n.getRefType()) {
             case "contract_expiring":
+            case NotificationService.REF_CONTRACT_UNSIGNED_DELIVERY:
                 return "/contract?action=view&id=" + n.getRefId();
             case "ticket_sla":
                 return "/ticket?action=view&id=" + n.getRefId();

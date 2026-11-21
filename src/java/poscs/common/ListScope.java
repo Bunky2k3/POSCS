@@ -30,20 +30,28 @@ import java.util.List;
  *
  * <p>Danh sách KHÁCH HÀNG không dùng cửa sổ thời gian (luôn null): khách hàng là
  * danh bạ, không phải việc phát sinh theo tháng.
+ *
+ * <p>Bộ lọc bước giao hàng của danh sách hợp đồng (BR-61, {@link #getDeliveryStage()})
+ * cũng gắn vào đây thay vì thành tham số thứ mười bốn của {@code ContractDAO.findAll},
+ * theo đúng ghi chú ở đó (người dùng chốt 21/11/2026, Task 10.5). Danh sách khách
+ * hàng không dùng nó (luôn null).
  */
 public final class ListScope {
 
     private static final ListScope ALL =
-            new ListScope(Collections.emptyList(), Collections.emptyList(), null);
+            new ListScope(Collections.emptyList(), Collections.emptyList(), null, null);
 
     private final List<Integer> ownerIds;
     private final List<Integer> provinceIds;
     private final Period activeWindow;
+    private final String deliveryStage;
 
-    private ListScope(List<Integer> ownerIds, List<Integer> provinceIds, Period activeWindow) {
+    private ListScope(List<Integer> ownerIds, List<Integer> provinceIds, Period activeWindow,
+            String deliveryStage) {
         this.ownerIds = ownerIds == null ? Collections.emptyList() : List.copyOf(ownerIds);
         this.provinceIds = provinceIds == null ? Collections.emptyList() : List.copyOf(provinceIds);
         this.activeWindow = activeWindow;
+        this.deliveryStage = deliveryStage;
     }
 
     /** Không thu hẹp gì: mọi bản ghi, mọi thời điểm. */
@@ -53,12 +61,26 @@ public final class ListScope {
 
     /** Chỉ thu hẹp theo thời gian, không theo người -- Admin mở danh sách hợp đồng. */
     public static ListScope activeIn(Period window) {
-        return window == null ? ALL : new ListScope(Collections.emptyList(), Collections.emptyList(), window);
+        return window == null ? ALL
+                : new ListScope(Collections.emptyList(), Collections.emptyList(), window, null);
     }
 
-    /** Bản sao kèm cửa sổ thời gian. */
+    /** Bản sao kèm cửa sổ thời gian (giữ nguyên bộ lọc bước giao hàng). */
     public ListScope withActiveWindow(Period window) {
-        return new ListScope(ownerIds, provinceIds, window);
+        return new ListScope(ownerIds, provinceIds, window, deliveryStage);
+    }
+
+    /**
+     * Bản sao kèm bộ lọc bước giao hàng (BR-61) -- giá trị là mã lọc của
+     * {@code ContractDAO} ({@code DELIVERY_FILTER_*}); null = không lọc.
+     */
+    public ListScope withDeliveryStage(String stage) {
+        return new ListScope(ownerIds, provinceIds, activeWindow, stage);
+    }
+
+    /** Mã lọc bước giao hàng (BR-61), hay null = không lọc. ListScope chỉ mang, ContractDAO mới hiểu. */
+    public String getDeliveryStage() {
+        return deliveryStage;
     }
 
     /**
@@ -81,7 +103,7 @@ public final class ListScope {
         if (ownerIds == null || ownerIds.isEmpty()) {
             return ALL;
         }
-        return new ListScope(ownerIds, provinceIds, null);
+        return new ListScope(ownerIds, provinceIds, null, null);
     }
 
     /** Có thu hẹp theo NGƯỜI không (riêng cửa sổ thời gian hỏi bằng getActiveWindow). */

@@ -214,6 +214,10 @@
         .progress-draft  { background: #f3f4f6; color: #4b5563; border-color: #d1d5db; }
         .progress-signed { background: #e8f3ff; color: var(--primary-dark); border-color: var(--primary-light); }
         .progress-frozen { background: #eef7ee; color: #2f6b34; border-color: #a8cfaa; }
+        /* BR-61: bước giao hàng của bản Nháp, đứng ngay dưới nhãn tiến độ. */
+        .delivery-tag { display: inline-flex; align-items: center; gap: 4px; margin-top: 4px; font-size: 0.72rem; font-weight: 600; white-space: nowrap; }
+        .delivery-preparing { color: #6b7280; }
+        .delivery-delivered { color: #8a5a00; }
 
         .status-pill { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 20px; font-size: 0.72rem; font-weight: 600; white-space: nowrap; }
         .status-pill .dot { width: 6px; height: 6px; border-radius: 50%; }
@@ -289,7 +293,7 @@
                 <%-- Xuất Excel là thao tác ĐỌC: chỉ lấy đúng dữ liệu vai trò này vốn đã
                      xem được trên màn hình, đổi sang dạng file. Nên KHÔNG khoá theo
                      canManage -- xem PERMISSIONS.md. --%>
-                <a href="${pageContext.request.contextPath}/contract?action=exportExcel&kind=${kind}&keyword=${keywordParam}&status=${fn:escapeXml(statusFilter)}&progress=${fn:escapeXml(progressFilter)}&scope=${fn:escapeXml(scopeFilter)}&type=${fn:escapeXml(typeFilter)}${provinceQuery}&year=${yearFilter}&period=${periodFilter}&waitingDept=${waitingDeptFilter}&waiting=${waitingAnyFilter ? '1' : ''}" class="btn-outline-action"><i class="fa-solid fa-file-excel"></i> Xuất Excel</a>
+                <a href="${pageContext.request.contextPath}/contract?action=exportExcel&kind=${kind}&keyword=${keywordParam}&status=${fn:escapeXml(statusFilter)}&progress=${fn:escapeXml(progressFilter)}&scope=${fn:escapeXml(scopeFilter)}&type=${fn:escapeXml(typeFilter)}${provinceQuery}&year=${yearFilter}&period=${periodFilter}&waitingDept=${waitingDeptFilter}&waiting=${waitingAnyFilter ? '1' : ''}&delivery=${fn:escapeXml(deliveryFilter)}" class="btn-outline-action"><i class="fa-solid fa-file-excel"></i> Xuất Excel</a>
                 <%-- Tạo hợp đồng thì ngược lại: nó GHI, nên vẫn khoá. (Nút "Nhập PDF"
                      đã gỡ theo yêu cầu khách hàng.) --%>
                 <c:if test="${canManage}">
@@ -531,6 +535,14 @@
                         </c:if>
                     </c:forEach>
                 </select>
+                <%-- BR-61: bước giao hàng chỉ có ở hợp đồng Nháp, suy ra từ giấy tờ.
+                     Giá trị là mã (preparing / delivered) của ContractDAO, không phải
+                     chữ hiển thị. Ô "Đã giao – chưa ký" trên Dashboard mở thẳng vào đây. --%>
+                <select id="filterDelivery" name="delivery">
+                    <option value="">Mọi bước giao hàng</option>
+                    <option value="preparing" ${deliveryFilter == 'preparing' ? 'selected' : ''}>Chuẩn bị hàng</option>
+                    <option value="delivered" ${deliveryFilter == 'delivered' ? 'selected' : ''}>Đã giao – chưa ký</option>
+                </select>
             </div>
 
             <%-- Địa bàn của người đang xem, GỌI TÊN chứ không chỉ đếm. Cùng mã
@@ -669,6 +681,15 @@
                                     <span class="progress-pill progress-${contract.draft ? 'draft' : (contract.frozen ? 'frozen' : 'signed')}">
                                         ${fn:escapeXml(contract.progressStatus)}
                                     </span>
+                                    <%-- BR-61: trục riêng cạnh tiến độ, không phải một giá trị tiến
+                                         độ. DAO chỉ trả nhãn cho bản Nháp có giấy giao hàng; ký xong
+                                         là cột này về null nên nhãn tự mất. --%>
+                                    <c:if test="${not empty contract.deliveryStage}">
+                                        <div class="delivery-tag ${contract.deliveredUnsigned ? 'delivery-delivered' : 'delivery-preparing'}">
+                                            <i class="fa-solid ${contract.deliveredUnsigned ? 'fa-truck-ramp-box' : 'fa-boxes-packing'}"></i>
+                                            ${fn:escapeXml(contract.deliveryStage)}
+                                        </div>
+                                    </c:if>
                                     <%-- Đang nằm chờ ở phòng nào, bao nhiêu ngày. Đặt ngay dưới
                                          tiến độ vì hai thứ trả lời cùng một câu "hợp đồng này
                                          đang ở đâu" -- một cột riêng thì bảng phải co thêm lần
@@ -720,11 +741,11 @@
                 <span class="pagination-info">Hiển thị ${fn:length(contractList)} trong tổng số ${totalCount} hợp đồng</span>
                 <nav>
                     <ul class="pagination pagination-sm mb-0">
-                        <li class="page-item ${currentPage <= 1 ? 'disabled' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/contract?action=list&kind=${kind}&page=${currentPage - 1}&keyword=${keywordParam}&status=${fn:escapeXml(statusFilter)}&progress=${fn:escapeXml(progressFilter)}&scope=${fn:escapeXml(scopeFilter)}&type=${fn:escapeXml(typeFilter)}${provinceQuery}&year=${yearFilter}&period=${periodFilter}&waitingDept=${waitingDeptFilter}&waiting=${waitingAnyFilter ? '1' : ''}">Trước</a></li>
+                        <li class="page-item ${currentPage <= 1 ? 'disabled' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/contract?action=list&kind=${kind}&page=${currentPage - 1}&keyword=${keywordParam}&status=${fn:escapeXml(statusFilter)}&progress=${fn:escapeXml(progressFilter)}&scope=${fn:escapeXml(scopeFilter)}&type=${fn:escapeXml(typeFilter)}${provinceQuery}&year=${yearFilter}&period=${periodFilter}&waitingDept=${waitingDeptFilter}&waiting=${waitingAnyFilter ? '1' : ''}&delivery=${fn:escapeXml(deliveryFilter)}">Trước</a></li>
                         <c:forEach begin="1" end="${totalPages}" var="p">
-                            <li class="page-item ${p == currentPage ? 'active' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/contract?action=list&kind=${kind}&page=${p}&keyword=${keywordParam}&status=${fn:escapeXml(statusFilter)}&progress=${fn:escapeXml(progressFilter)}&scope=${fn:escapeXml(scopeFilter)}&type=${fn:escapeXml(typeFilter)}${provinceQuery}&year=${yearFilter}&period=${periodFilter}&waitingDept=${waitingDeptFilter}&waiting=${waitingAnyFilter ? '1' : ''}">${p}</a></li>
+                            <li class="page-item ${p == currentPage ? 'active' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/contract?action=list&kind=${kind}&page=${p}&keyword=${keywordParam}&status=${fn:escapeXml(statusFilter)}&progress=${fn:escapeXml(progressFilter)}&scope=${fn:escapeXml(scopeFilter)}&type=${fn:escapeXml(typeFilter)}${provinceQuery}&year=${yearFilter}&period=${periodFilter}&waitingDept=${waitingDeptFilter}&waiting=${waitingAnyFilter ? '1' : ''}&delivery=${fn:escapeXml(deliveryFilter)}">${p}</a></li>
                         </c:forEach>
-                        <li class="page-item ${currentPage >= totalPages ? 'disabled' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/contract?action=list&kind=${kind}&page=${currentPage + 1}&keyword=${keywordParam}&status=${fn:escapeXml(statusFilter)}&progress=${fn:escapeXml(progressFilter)}&scope=${fn:escapeXml(scopeFilter)}&type=${fn:escapeXml(typeFilter)}${provinceQuery}&year=${yearFilter}&period=${periodFilter}&waitingDept=${waitingDeptFilter}&waiting=${waitingAnyFilter ? '1' : ''}">Sau</a></li>
+                        <li class="page-item ${currentPage >= totalPages ? 'disabled' : ''}"><a class="page-link" href="${pageContext.request.contextPath}/contract?action=list&kind=${kind}&page=${currentPage + 1}&keyword=${keywordParam}&status=${fn:escapeXml(statusFilter)}&progress=${fn:escapeXml(progressFilter)}&scope=${fn:escapeXml(scopeFilter)}&type=${fn:escapeXml(typeFilter)}${provinceQuery}&year=${yearFilter}&period=${periodFilter}&waitingDept=${waitingDeptFilter}&waiting=${waitingAnyFilter ? '1' : ''}&delivery=${fn:escapeXml(deliveryFilter)}">Sau</a></li>
                     </ul>
                 </nav>
             </div>
@@ -783,12 +804,13 @@
         var filterForm = document.getElementById('filterForm');
         // Thêm ô lọc MỚI thì phải thêm id vào đây, nếu không tích vào không có gì
         // xảy ra -- form chỉ gửi khi gõ Enter ở ô tìm kiếm. Đã dính với
-        // 'filterWaitingAny' đúng một lần.
+        // 'filterWaitingAny' đúng một lần, và lần hai với 'filterDelivery' (Task 10.5,
+        // QA bắt được) -- nay ContractListControllerTest đọc file này và đối chiếu.
         // Ô tỉnh và ô kỳ KHÔNG nằm trong danh sách này: chúng là bảng chọn, mã
         // dùng chung ở appshell.js tự lo phần gửi form (tỉnh thì chờ nút "Áp
         // dụng" -- tích ba tỉnh mà gửi ngay là hai lượt tải trang thừa).
         ['filterProgress', 'filterView', 'filterScope', 'filterWaitingAny', 'filterType',
-         'filterWaitingDept']
+         'filterWaitingDept', 'filterDelivery']
             .forEach(function (id) {
                 var el = document.getElementById(id);
                 if (el) { el.addEventListener('change', function () { filterForm.submit(); }); }

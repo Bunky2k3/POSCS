@@ -82,5 +82,7 @@ public class DashboardController extends HttpServlet {
         request.setAttribute("windowContracts", summary.getWindowContracts());
         request.setAttribute("contractValues", summary.getContractValues());
         request.setAttribute("scopeCustomers", summary.getScopeCustomers());
+        // UC-36 / BR-61: ô "Đã giao – chưa ký", bấm vào mở danh sách hợp đồng bán đã lọc.
+        request.setAttribute("deliveredUnsignedCount", summary.getDeliveredUnsignedCount());
     }
 }

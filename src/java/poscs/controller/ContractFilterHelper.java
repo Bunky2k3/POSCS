@@ -9,6 +9,7 @@ import java.util.Map;
 import jakarta.servlet.http.HttpServletRequest;
 import poscs.common.Period;
 import poscs.dao.ContractDAO;
+import poscs.model.Contract;
 import poscs.model.Department;
 
 /**
@@ -55,6 +56,29 @@ public final class ContractFilterHelper {
         return ids;
     }
 
+    /**
+     * BR-61: tham số {@code delivery} đã chuẩn hoá -- chỉ nhận đúng hai mã của
+     * {@link ContractDAO}, giá trị khác (gõ tay, link cũ) coi như không lọc.
+     */
+    public static String deliveryFilterOf(HttpServletRequest request) {
+        String raw = request.getParameter("delivery");
+        if (ContractDAO.DELIVERY_FILTER_PREPARING.equals(raw) || ContractDAO.DELIVERY_FILTER_DELIVERED.equals(raw)) {
+            return raw;
+        }
+        return null;
+    }
+
+    /** Nhãn hiển thị của một mã lọc bước giao hàng (BR-61); null khi không lọc. */
+    public static String deliveryLabelOf(String deliveryFilter) {
+        if (ContractDAO.DELIVERY_FILTER_PREPARING.equals(deliveryFilter)) {
+            return Contract.DELIVERY_PREPARING;
+        }
+        if (ContractDAO.DELIVERY_FILTER_DELIVERED.equals(deliveryFilter)) {
+            return Contract.DELIVERY_DELIVERED;
+        }
+        return null;
+    }
+
     public static String provinceQuery(List<Integer> provinceIds) {
         if (provinceIds == null || provinceIds.isEmpty()) {
             return "";
@@ -99,10 +123,21 @@ public final class ContractFilterHelper {
         private final Integer waitingDepartmentId;
         private final String waitingDepartmentName;
         private final boolean waitingAny;
+        /** BR-61: mã lọc bước giao hàng ({@code ContractDAO.DELIVERY_FILTER_*}), null = không lọc. */
+        private final String delivery;
 
         public FilterState(String kind, String keyword, String status, String progress, String scope,
                 String type, List<Integer> provinceIds, String year, String period, Integer waitingDepartmentId,
                 String waitingDepartmentName, boolean waitingAny) {
+            this(kind, keyword, status, progress, scope, type, provinceIds, year, period, waitingDepartmentId,
+                    waitingDepartmentName, waitingAny, null);
+        }
+
+        /** Như trên, kèm bộ lọc bước giao hàng (BR-61). */
+        public FilterState(String kind, String keyword, String status, String progress, String scope,
+                String type, List<Integer> provinceIds, String year, String period, Integer waitingDepartmentId,
+                String waitingDepartmentName, boolean waitingAny, String delivery) {
+            this.delivery = delivery;
             this.waitingDepartmentId = waitingDepartmentId;
             this.waitingDepartmentName = waitingDepartmentName;
             this.waitingAny = waitingAny;
@@ -130,6 +165,7 @@ public final class ContractFilterHelper {
             String nextYear = "year".equals(name) ? value : year;
             put(sb, "period", ContractControllerHelper.isBlank(nextYear) ? null : ("period".equals(name) ? value : period));
             appendWaitingParams(sb, name, value);
+            put(sb, "delivery", "delivery".equals(name) ? value : delivery);
             return sb.toString();
         }
 
@@ -186,6 +222,11 @@ public final class ContractFilterHelper {
                 chips.add(new ContractController.FilterChip(periodLabel(), queryWith("year", null), null, true, 0));
             }
             appendWaitingFilter(chips);
+            String deliveryLabel = deliveryLabelOf(delivery);
+            if (deliveryLabel != null) {
+                chips.add(new ContractController.FilterChip("Bước giao hàng: " + deliveryLabel,
+                        queryWith("delivery", null), null, true, 0));
+            }
             return chips;
         }
 
@@ -214,6 +255,8 @@ public final class ContractFilterHelper {
             if (!provinceIds.isEmpty()) { n++; }
             if (!ContractControllerHelper.isBlank(year)) { n++; }
             if (waitingDepartmentId != null && waitingDepartmentId != ContractDAO.WAITING_ANY_DEPARTMENT) { n++; }
+            // Ô bước giao hàng nằm trong khối "Lọc thêm": đang lọc thì khối phải mở sẵn.
+            if (deliveryLabelOf(delivery) != null) { n++; }
             return n;
         }
     }

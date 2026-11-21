@@ -3313,6 +3313,307 @@ public class ContractDAOTest {
             verify(conn, never()).commit();
         }
     }
+
+    // ------------------------------------------------------------------
+    // Task 10.5 / BR-61, BR-62: bước giao hàng suy ra từ giấy tờ chưa huỷ
+    // ------------------------------------------------------------------
+
+    /** Phần WHERE chính của câu danh sách -- phần SELECT cũng chứa mệnh đề giao hàng (cột CASE). */
+    private static String mainWhereOf(String sql) {
+        int at = sql.indexOf("WHERE c.is_deleted = 0");
+        assertTrue("thiếu WHERE chính: " + sql, at >= 0);
+        return sql.substring(at);
+    }
+
+    private static final String DELIVERY_NOTE_LIVE =
+            "dn.is_deleted = 0 AND dn.doc_type = '" + ContractDAO.DOC_DELIVERY_NOTE + "'";
+
+    @Test
+    public void deliveryDocTypes_matchTheCatalogueOnTheDocumentModel() {
+        // Đổi chữ một loại giấy tờ ở ContractDocument.TYPES mà quên ở đây thì
+        // bước giao hàng im lặng biến mất khỏi mọi hợp đồng.
+        assertTrue(ContractDocument.TYPES.contains(ContractDAO.DOC_REQUEST_FORM));
+        assertTrue(ContractDocument.TYPES.contains(ContractDAO.DOC_INTERNAL_TRANSFER));
+        assertTrue(ContractDocument.TYPES.contains(ContractDAO.DOC_DELIVERY_NOTE));
+    }
+
+    @Test
+    public void findAll_selectsDeliveryStageAndDate_fromLiveDocumentsOfDraftsOnly() throws Exception {
+        PreparedStatement ps = statementReturning(emptyResultSet());
+        Connection conn = connectionReturning(ps);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            dao.findAll(1, 10, null, null, null, null, false, null, null, null, false, null, ListScope.all());
+
+            String sql = capturedSql(conn);
+            assertTrue(sql.contains("AS delivery_stage"));
+            assertTrue(sql.contains("AS delivered_date"));
+            // Ngày giao = ngày SỚM NHẤT trong các biên bản giao nhận CHƯA HUỶ, chỉ khi còn Nháp.
+            assertTrue(sql.contains("SELECT MIN(dd.doc_date) FROM contract_documents dd"));
+            assertTrue(sql.contains("dd.is_deleted = 0 AND dd.doc_type = '" + ContractDAO.DOC_DELIVERY_NOTE
+                    + "' AND c.progress_status = '" + ContractDAO.PROGRESS_DRAFT + "'"));
+            assertTrue(sql.contains(DELIVERY_NOTE_LIVE));
+            assertTrue(sql.contains("dp.is_deleted = 0 AND dp.doc_type IN ('" + ContractDAO.DOC_REQUEST_FORM
+                    + "', '" + ContractDAO.DOC_INTERNAL_TRANSFER + "')"));
+            assertTrue(sql.contains("THEN '" + Contract.DELIVERY_DELIVERED + "'"));
+            assertTrue(sql.contains("THEN '" + Contract.DELIVERY_PREPARING + "'"));
+            // Không có bộ lọc giao hàng thì WHERE không thêm điều kiện nào về giấy tờ.
+            assertFalse(mainWhereOf(sql).contains("contract_documents"));
+        }
+    }
+
+    @Test
+    public void findAll_deliveredFilter_keepsOnlyDraftsWithALiveDeliveryNote() throws Exception {
+        PreparedStatement ps = statementReturning(emptyResultSet());
+        Connection conn = connectionReturning(ps);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            dao.findAll(1, 10, null, null, null, null, false, null, null, null, false, null,
+                    ListScope.all().withDeliveryStage(ContractDAO.DELIVERY_FILTER_DELIVERED));
+
+            String where = mainWhereOf(capturedSql(conn));
+            assertTrue(where.contains("(c.progress_status = '" + ContractDAO.PROGRESS_DRAFT + "' AND EXISTS ("));
+            assertTrue(where.contains(DELIVERY_NOTE_LIVE));
+            assertFalse(where.contains("NOT EXISTS"));
+        }
+    }
+
+    @Test
+    public void findAll_preparingFilter_needsARequestFormAndNoDeliveryNote() throws Exception {
+        PreparedStatement ps = statementReturning(emptyResultSet());
+        Connection conn = connectionReturning(ps);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            dao.findAll(1, 10, null, null, null, null, false, null, null, null, false, null,
+                    ListScope.all().withDeliveryStage(ContractDAO.DELIVERY_FILTER_PREPARING));
+
+            String where = mainWhereOf(capturedSql(conn));
+            assertTrue(where.contains("c.progress_status = '" + ContractDAO.PROGRESS_DRAFT + "' AND NOT EXISTS ("));
+            assertTrue(where.contains(DELIVERY_NOTE_LIVE));
+            assertTrue(where.contains("dp.doc_type IN ('" + ContractDAO.DOC_REQUEST_FORM + "'"));
+        }
+    }
+
+    @Test
+    public void findAll_unknownDeliveryCode_addsNoDocumentCondition() throws Exception {
+        PreparedStatement ps = statementReturning(emptyResultSet());
+        Connection conn = connectionReturning(ps);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            dao.findAll(1, 10, null, null, null, null, false, null, null, null, false, null,
+                    ListScope.all().withDeliveryStage("x' OR '1'='1"));
+
+            String sql = capturedSql(conn);
+            assertFalse(mainWhereOf(sql).contains("contract_documents"));
+            assertFalse(sql.contains("x' OR"));
+        }
+    }
+
+    @Test
+    public void deliveryStageClause_onlyKnowsTheTwoCodes() {
+        assertNotNull(ContractDAO.deliveryStageClause(ContractDAO.DELIVERY_FILTER_DELIVERED));
+        assertNotNull(ContractDAO.deliveryStageClause(ContractDAO.DELIVERY_FILTER_PREPARING));
+        assertNull(ContractDAO.deliveryStageClause(null));
+        assertNull(ContractDAO.deliveryStageClause(""));
+        assertNull(ContractDAO.deliveryStageClause(Contract.DELIVERY_DELIVERED));
+    }
+
+    @Test
+    public void countAll_deliveredFilter_countsTheSameSetAsTheList() throws Exception {
+        PreparedStatement ps = statementReturning(resultSetOf(List.of(row("c", 2))));
+        Connection conn = connectionReturning(ps);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            assertEquals(2, dao.countAll(null, null, null, List.of(), null, null, null, false, null,
+                    ListScope.all().withDeliveryStage(ContractDAO.DELIVERY_FILTER_DELIVERED)));
+
+            String sql = capturedSql(conn);
+            assertTrue(sql.contains("(c.progress_status = '" + ContractDAO.PROGRESS_DRAFT + "' AND EXISTS ("));
+            assertTrue(sql.contains(DELIVERY_NOTE_LIVE));
+        }
+    }
+
+    @Test
+    public void countStatusSummary_deliveredFilter_kpiCountsTheSameSetAsTheList() throws Exception {
+        ResultSet rs = singleRow(row("draft_count", 3, "expired_count", 0, "soon_count", 0, "active_count", 0));
+        PreparedStatement ps = statementReturning(rs);
+        Connection conn = connectionReturning(ps);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            java.util.Map<String, Integer> summary = dao.countStatusSummary(List.of(), null,
+                    ContractDAO.DIRECTION_SELL, false, null,
+                    ListScope.all().withDeliveryStage(ContractDAO.DELIVERY_FILTER_DELIVERED), null);
+
+            String sql = capturedSql(conn);
+            assertTrue(sql.contains(" AND (c.progress_status = '" + ContractDAO.PROGRESS_DRAFT + "' AND EXISTS ("));
+            assertTrue(sql.contains(DELIVERY_NOTE_LIVE));
+            assertEquals(Integer.valueOf(3), summary.get(ContractDAO.STATUS_DRAFT));
+        }
+    }
+
+    @Test
+    public void findById_mapsDeliveryStageAndDeliveredDate() throws Exception {
+        Date delivered = Date.valueOf(LocalDate.now().minusDays(16));
+        PreparedStatement ps = statementReturning(singleRow(row(
+                "contract_id", 21,
+                "title", "Cung cấp thiết bị Quảng Trị",
+                "progress_status", ContractDAO.PROGRESS_DRAFT,
+                "delivery_stage", Contract.DELIVERY_DELIVERED,
+                "delivered_date", delivered)));
+        Connection conn = connectionReturning(ps);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            Contract found = dao.findById(21);
+
+            assertEquals(Contract.DELIVERY_DELIVERED, found.getDeliveryStage());
+            assertTrue(found.isDeliveredUnsigned());
+            assertEquals(delivered, found.getDeliveredDate());
+            assertEquals(Long.valueOf(16), found.getDeliveredDays());
+        }
+    }
+
+    @Test
+    public void findById_signedContract_hasNoDeliveryStage() throws Exception {
+        // Ký xong thì hai cột suy ra trả NULL (BR-61) -- nhãn trên màn hình tự mất.
+        PreparedStatement ps = statementReturning(singleRow(row(
+                "contract_id", 22,
+                "progress_status", ContractDAO.PROGRESS_SIGNED)));
+        Connection conn = connectionReturning(ps);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            Contract found = dao.findById(22);
+
+            assertNull(found.getDeliveryStage());
+            assertFalse(found.isDeliveredUnsigned());
+            assertNull(found.getDeliveredDate());
+            assertNull(found.getDeliveredDays());
+        }
+    }
+
+    @Test
+    public void countDeliveredUnsigned_scopesByOwnerOrProvinceAndDirection() throws Exception {
+        PreparedStatement ps = statementReturning(resultSetOf(List.of(row("c", 4))));
+        Connection conn = connectionReturning(ps);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            assertEquals(4, dao.countDeliveredUnsigned(List.of(3), List.of(7, 8), ContractDAO.DIRECTION_SELL));
+
+            String sql = capturedSql(conn);
+            assertTrue(sql.contains("WHERE c.is_deleted = 0 AND (c.progress_status = '"
+                    + ContractDAO.PROGRESS_DRAFT + "' AND EXISTS ("));
+            assertTrue(sql.contains(DELIVERY_NOTE_LIVE));
+            assertTrue(sql.contains(" AND c.direction = ?"));
+            assertTrue(sql.contains(" AND (c.owner_id IN (?,?) OR d.province_id IN (?))"));
+            // Không theo kỳ: hợp đồng Nháp chưa có ngày ký.
+            assertFalse(sql.contains("signing_date"));
+            InOrder order = inOrder(ps);
+            order.verify(ps).setString(1, ContractDAO.DIRECTION_SELL);
+            order.verify(ps).setInt(2, 7);
+            order.verify(ps).setInt(3, 8);
+            order.verify(ps).setInt(4, 3);
+        }
+    }
+
+    @Test
+    public void countDeliveredUnsigned_wholeBranchAnyDirection_hasNoScopeNorDirection() throws Exception {
+        PreparedStatement ps = statementReturning(resultSetOf(List.of(row("c", 0))));
+        Connection conn = connectionReturning(ps);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            assertEquals(0, dao.countDeliveredUnsigned(List.of(), null, null));
+
+            String sql = capturedSql(conn);
+            assertFalse(sql.contains("c.direction = ?"));
+            assertFalse(sql.contains("c.owner_id IN"));
+            verify(ps, never()).setString(anyInt(), anyString());
+        }
+    }
+
+    @Test
+    public void countDeliveredUnsigned_sqlError_returnsZero() throws Exception {
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenThrow(new SQLException("mất kết nối"));
+
+            assertEquals(0, dao.countDeliveredUnsigned(List.of(3), List.of(7), ContractDAO.DIRECTION_SELL));
+        }
+    }
+
+    @Test
+    public void findDeliveredUnsigned_filtersByEarliestLiveDeliveryNoteOnOrBeforeCutoff() throws Exception {
+        Date cutoff = Date.valueOf(LocalDate.of(2026, 11, 6));
+        PreparedStatement ps = statementReturning(singleRow(row(
+                "contract_id", 30,
+                "owner_id", 5,
+                "progress_status", ContractDAO.PROGRESS_DRAFT,
+                "delivery_stage", Contract.DELIVERY_DELIVERED,
+                "delivered_date", Date.valueOf(LocalDate.of(2026, 11, 5)))));
+        Connection conn = connectionReturning(ps);
+
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            db.when(DBContext::getConnection).thenReturn(conn);
+
+            List<Contract> found = dao.findDeliveredUnsigned(cutoff);
+
+            assertEquals(1, found.size());
+            assertEquals(30, found.get(0).getContractId());
+            assertEquals(5, found.get(0).getOwnerId());
+            String where = mainWhereOf(capturedSql(conn));
+            assertTrue(where.contains("(c.progress_status = '" + ContractDAO.PROGRESS_DRAFT + "' AND EXISTS ("));
+            assertTrue(where.contains("SELECT MIN(dd.doc_date) FROM contract_documents dd"));
+            assertTrue(where.contains("dd.is_deleted = 0"));
+            assertTrue(where.contains(") <= ?"));
+            verify(ps).setDate(1, cutoff);
+        }
+    }
+
+    @Test
+    public void findDeliveredUnsigned_nullCutoff_returnsEmptyWithoutTouchingDatabase() throws Exception {
+        try (MockedStatic<DBContext> db = mockStatic(DBContext.class)) {
+            assertTrue(dao.findDeliveredUnsigned(null).isEmpty());
+            db.verify(DBContext::getConnection, never());
+        }
+    }
+
+    @Test
+    public void deliveredDaysOn_countsWholeDaysFromDeliveryDate() {
+        Contract c = new Contract();
+        assertNull(c.deliveredDaysOn(LocalDate.of(2026, 11, 21)));
+
+        c.setDeliveredDate(Date.valueOf(LocalDate.of(2026, 11, 6)));
+        assertEquals(Long.valueOf(15), c.deliveredDaysOn(LocalDate.of(2026, 11, 21)));
+        assertEquals(Long.valueOf(0), c.deliveredDaysOn(LocalDate.of(2026, 11, 6)));
+        assertNull(c.deliveredDaysOn(null));
+    }
+
+    @Test
+    public void isDeliveredUnsigned_onlyForTheDeliveredStage() {
+        Contract c = new Contract();
+        assertFalse(c.isDeliveredUnsigned());
+        c.setDeliveryStage(Contract.DELIVERY_PREPARING);
+        assertFalse(c.isDeliveredUnsigned());
+        c.setDeliveryStage(Contract.DELIVERY_DELIVERED);
+        assertTrue(c.isDeliveredUnsigned());
+    }
 }
 
 

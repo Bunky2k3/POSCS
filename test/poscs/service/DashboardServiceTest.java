@@ -316,4 +316,51 @@ public class DashboardServiceTest {
 
         assertEquals("mine", s.getScopeFilter());
     }
+
+    // ---- Task 10.5 / BR-61: ô "Đã giao – chưa ký" ----
+
+    @Test
+    public void loadDashboard_mineScope_countsDeliveredUnsignedSellContractsOfTeamAndProvinces() {
+        User sales = user(21, PermissionService.ROLE_SALES);
+        when(employeeDAO.findTeamUserIds(21)).thenReturn(List.of(21, 22));
+        when(employeeDAO.findProvincesCoveredBy(21)).thenReturn(List.of(new Province(3, "Hà Nội")));
+        when(contractDAO.countDeliveredUnsigned(List.of(3), List.of(21, 22), ContractDAO.DIRECTION_SELL))
+                .thenReturn(2);
+
+        DashboardSummary s = service.loadDashboard(
+                sales, null, null, null, false, null, LocalDate.of(2026, 11, 21)).getData();
+
+        assertEquals(2, s.getDeliveredUnsignedCount());
+        verify(contractDAO).countDeliveredUnsigned(List.of(3), List.of(21, 22), ContractDAO.DIRECTION_SELL);
+    }
+
+    @Test
+    public void loadDashboard_withPeriod_deliveredUnsignedCountIgnoresThePeriod() {
+        // Kỳ lọc theo NGÀY KÝ, hợp đồng Nháp chưa có ngày ký: đếm phải tính tới hôm nay.
+        User admin = user(1, PermissionService.ROLE_ADMIN);
+        when(contractDAO.countDeliveredUnsigned(anyList(), nullable(List.class), anyString())).thenReturn(5);
+
+        DashboardSummary s = service.loadDashboard(
+                admin, "2026", "q1", null, true, new String[]{"3"}, LocalDate.of(2026, 11, 21)).getData();
+
+        assertEquals(5, s.getDeliveredUnsignedCount());
+        // Admin mặc định "Toàn chi nhánh" (không lọc người), tỉnh đang chọn vẫn áp dụng.
+        verify(contractDAO).countDeliveredUnsigned(eq(List.of(3)), isNull(), eq(ContractDAO.DIRECTION_SELL));
+    }
+
+    @Test
+    public void loadDashboard_noDeliveredContracts_countIsZero() {
+        DashboardSummary s = service.loadDashboard(
+                null, null, null, null, false, null, LocalDate.of(2026, 11, 21)).getData();
+
+        assertEquals(0, s.getDeliveredUnsignedCount());
+    }
+
+    @Test
+    public void dashboardSummary_oldConstructor_defaultsDeliveredUnsignedToZero() {
+        DashboardSummary s = new DashboardSummary(List.of(), null, "all", 0, List.of(), List.of(), false,
+                0, 0, Map.of(), BigDecimal.ZERO, null, 11, "", "", List.of(), Map.of(), List.of());
+
+        assertEquals(0, s.getDeliveredUnsignedCount());
+    }
 }

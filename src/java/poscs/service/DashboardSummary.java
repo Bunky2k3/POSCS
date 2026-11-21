@@ -32,6 +32,8 @@ public final class DashboardSummary {
     private final List<Contract> windowContracts;
     private final Map<Integer, BigDecimal> contractValues;
     private final List<Enterprise> scopeCustomers;
+    /** UC-36 / BR-61: số hợp đồng bán "Đã giao – chưa ký" trong phạm vi đang chọn, tính tới hôm nay. */
+    private final int deliveredUnsignedCount;
 
     public DashboardSummary(List<Province> provinceList, Period period, String scopeFilter, int teamSize,
             List<Province> myProvinces, List<Integer> provinceFilters, boolean provinceFilterIsMine,
@@ -39,6 +41,21 @@ public final class DashboardSummary {
             BigDecimal revenueThisMonth, Double revenueTrendPercent, int currentMonthNumber,
             String todayLabel, String contractWindowLabel, List<Contract> windowContracts,
             Map<Integer, BigDecimal> contractValues, List<Enterprise> scopeCustomers) {
+        this(provinceList, period, scopeFilter, teamSize, myProvinces, provinceFilters, provinceFilterIsMine,
+                totalCustomers, newCustomersThisMonth, contractStatusSummary, revenueThisMonth,
+                revenueTrendPercent, currentMonthNumber, todayLabel, contractWindowLabel, windowContracts,
+                contractValues, scopeCustomers, 0);
+    }
+
+    /** Như trên, kèm số hợp đồng "Đã giao – chưa ký" (BR-61, Task 10.5). */
+    public DashboardSummary(List<Province> provinceList, Period period, String scopeFilter, int teamSize,
+            List<Province> myProvinces, List<Integer> provinceFilters, boolean provinceFilterIsMine,
+            int totalCustomers, int newCustomersThisMonth, Map<String, Integer> contractStatusSummary,
+            BigDecimal revenueThisMonth, Double revenueTrendPercent, int currentMonthNumber,
+            String todayLabel, String contractWindowLabel, List<Contract> windowContracts,
+            Map<Integer, BigDecimal> contractValues, List<Enterprise> scopeCustomers,
+            int deliveredUnsignedCount) {
+        this.deliveredUnsignedCount = deliveredUnsignedCount;
         this.provinceList = provinceList;
         this.period = period;
         this.scopeFilter = scopeFilter;
@@ -77,4 +94,5 @@ public final class DashboardSummary {
     public List<Contract> getWindowContracts() { return windowContracts; }
     public Map<Integer, BigDecimal> getContractValues() { return contractValues; }
     public List<Enterprise> getScopeCustomers() { return scopeCustomers; }
+    public int getDeliveredUnsignedCount() { return deliveredUnsignedCount; }
 }

@@ -329,4 +329,149 @@ public class ContractListControllerTest {
         controller.showList(request, response);
         verify(request).setAttribute("currentPage", 1);
     }
+
+    // ------------------------------------------------------------------
+    // Task 10.5 / BR-61: bộ lọc bước giao hàng (tham số "delivery")
+    // ------------------------------------------------------------------
+
+    @Test
+    public void list_deliveryDelivered_passesStageToListCountAndKpiInSameScope() throws Exception {
+        when(request.getParameter("delivery")).thenReturn(ContractDAO.DELIVERY_FILTER_DELIVERED);
+
+        controller.showList(request, response);
+
+        ArgumentCaptor<ListScope> listScope = ArgumentCaptor.forClass(ListScope.class);
+        verify(contractDAO).findAll(anyInt(), anyInt(), any(), any(), any(), any(), anyBoolean(),
+                any(), any(), any(), anyBoolean(), any(), listScope.capture());
+        assertEquals(ContractDAO.DELIVERY_FILTER_DELIVERED, listScope.getValue().getDeliveryStage());
+
+        // Bộ đếm phân trang và dải KPI phải lọc ĐÚNG tập mà bảng đang liệt kê.
+        ArgumentCaptor<ListScope> countScope = ArgumentCaptor.forClass(ListScope.class);
+        verify(contractDAO).countAll(any(), any(), any(), any(), any(), any(), any(), anyBoolean(), any(),
+                countScope.capture());
+        assertEquals(ContractDAO.DELIVERY_FILTER_DELIVERED, countScope.getValue().getDeliveryStage());
+        ArgumentCaptor<ListScope> kpiScope = ArgumentCaptor.forClass(ListScope.class);
+        verify(contractDAO).countStatusSummary(nullable(List.class), any(), any(), anyBoolean(), any(),
+                kpiScope.capture(), any());
+        assertEquals(ContractDAO.DELIVERY_FILTER_DELIVERED, kpiScope.getValue().getDeliveryStage());
+
+        verify(request).setAttribute("deliveryFilter", ContractDAO.DELIVERY_FILTER_DELIVERED);
+    }
+
+    @Test
+    public void list_deliveryFilter_keepsActiveWindowOfDefaultScope() throws Exception {
+        when(request.getParameter("delivery")).thenReturn(ContractDAO.DELIVERY_FILTER_PREPARING);
+
+        controller.showList(request, response);
+
+        ArgumentCaptor<ListScope> listScope = ArgumentCaptor.forClass(ListScope.class);
+        verify(contractDAO).findAll(anyInt(), anyInt(), any(), any(), any(), any(), anyBoolean(),
+                any(), any(), any(), anyBoolean(), any(), listScope.capture());
+        assertEquals(ContractDAO.DELIVERY_FILTER_PREPARING, listScope.getValue().getDeliveryStage());
+        // Gắn bộ lọc mới không được làm rơi cửa sổ "còn hiệu lực trong tháng này" mặc định.
+        assertNotNull(listScope.getValue().getActiveWindow());
+    }
+
+    @Test
+    public void list_unknownDeliveryValue_isIgnored() throws Exception {
+        when(request.getParameter("delivery")).thenReturn("' OR 1=1 --");
+
+        controller.showList(request, response);
+
+        ArgumentCaptor<ListScope> listScope = ArgumentCaptor.forClass(ListScope.class);
+        verify(contractDAO).findAll(anyInt(), anyInt(), any(), any(), any(), any(), anyBoolean(),
+                any(), any(), any(), anyBoolean(), any(), listScope.capture());
+        assertNull(listScope.getValue().getDeliveryStage());
+        verify(request).setAttribute("deliveryFilter", null);
+    }
+
+    @Test
+    public void list_noDeliveryParam_hasNoDeliveryStageAndNoChip() throws Exception {
+        controller.showList(request, response);
+
+        ArgumentCaptor<ListScope> listScope = ArgumentCaptor.forClass(ListScope.class);
+        verify(contractDAO).findAll(anyInt(), anyInt(), any(), any(), any(), any(), anyBoolean(),
+                any(), any(), any(), anyBoolean(), any(), listScope.capture());
+        assertNull(listScope.getValue().getDeliveryStage());
+
+        ArgumentCaptor<List<ContractController.FilterChip>> chips = ArgumentCaptor.forClass(List.class);
+        verify(request).setAttribute(eq("activeFilters"), chips.capture());
+        assertTrue(chips.getValue().stream().noneMatch(c -> c.getLabel().startsWith("Bước giao hàng")));
+        verify(request).setAttribute("advancedFilterCount", 0);
+    }
+
+    @Test
+    public void list_deliveryDelivered_addsRemovableChipAndOpensAdvancedBlock() throws Exception {
+        when(request.getParameter("delivery")).thenReturn(ContractDAO.DELIVERY_FILTER_DELIVERED);
+        when(request.getParameter("keyword")).thenReturn("POS");
+
+        controller.showList(request, response);
+
+        ArgumentCaptor<List<ContractController.FilterChip>> chips = ArgumentCaptor.forClass(List.class);
+        verify(request).setAttribute(eq("activeFilters"), chips.capture());
+        ContractController.FilterChip deliveryChip = chips.getValue().stream()
+                .filter(c -> c.getLabel().equals("Bước giao hàng: " + Contract.DELIVERY_DELIVERED))
+                .findFirst().orElse(null);
+        assertNotNull(deliveryChip);
+        // Bấm × bỏ đúng bộ lọc này, giữ các bộ lọc khác.
+        assertFalse(deliveryChip.getQuery().contains("delivery="));
+        assertTrue(deliveryChip.getQuery().contains("keyword=POS"));
+
+        // Chip của bộ lọc KHÁC thì phải mang theo delivery, nếu không bỏ từ khoá là mất luôn bước giao hàng.
+        ContractController.FilterChip keywordChip = chips.getValue().stream()
+                .filter(c -> c.getLabel().startsWith("Từ khoá")).findFirst().orElse(null);
+        assertNotNull(keywordChip);
+        assertTrue(keywordChip.getQuery().contains("delivery=" + ContractDAO.DELIVERY_FILTER_DELIVERED));
+
+        // Ô lọc nằm trong khối "Lọc thêm": đang lọc thì khối phải mở sẵn.
+        verify(request).setAttribute("advancedFilterCount", 1);
+    }
+
+    @Test
+    public void list_deliveryFilter_statusChipsKeepDeliveryParam() throws Exception {
+        when(request.getParameter("delivery")).thenReturn(ContractDAO.DELIVERY_FILTER_PREPARING);
+
+        controller.showList(request, response);
+
+        ArgumentCaptor<List<ContractController.FilterChip>> chips = ArgumentCaptor.forClass(List.class);
+        verify(request).setAttribute(eq("statusChips"), chips.capture());
+        assertTrue(chips.getValue().stream()
+                .allMatch(c -> c.getQuery().contains("delivery=" + ContractDAO.DELIVERY_FILTER_PREPARING)));
+    }
+
+    /**
+     * QA Task 10.5 (🔴): form lọc của listcontract.jsp không có nút "Lọc" -- mỗi ô tự gửi
+     * form nhờ một danh sách id trong script cuối trang. Ô "Bước giao hàng" mới bị quên
+     * thêm vào đó nên chọn xong không lọc gì (lần thứ hai, sau 'filterWaitingAny').
+     *
+     * <p>Đọc thẳng file JSP (JUnit chạy ở thư mục gốc dự án, xem build-impl.xml): mọi
+     * {@code <select>} / ô tích CÓ id nằm trong {@code #filterForm} phải có mặt trong danh
+     * sách đó. Ô tích tỉnh không có id -- appshell.js tự lo, chờ nút "Áp dụng".
+     */
+    @Test
+    public void listJsp_everyFilterControlInTheForm_autoSubmitsOnChange() throws Exception {
+        String jsp = new String(java.nio.file.Files.readAllBytes(
+                java.nio.file.Paths.get("web", "jsp", "sale", "listcontract.jsp")),
+                java.nio.charset.StandardCharsets.UTF_8);
+        int formStart = jsp.indexOf("id=\"filterForm\"");
+        assertTrue("không thấy #filterForm", formStart >= 0);
+        String form = jsp.substring(formStart, jsp.indexOf("</form>", formStart));
+
+        java.util.regex.Matcher submitList = java.util.regex.Pattern
+                .compile("\\[('filter[^\\]]*)\\]\\s*\\.forEach").matcher(jsp);
+        assertTrue("không thấy danh sách id tự gửi form", submitList.find());
+        String autoSubmitIds = submitList.group(1);
+
+        java.util.regex.Matcher control = java.util.regex.Pattern
+                .compile("<(?:select|input type=\"checkbox\")[^>]*\\bid=\"([^\"]+)\"").matcher(form);
+        List<String> controlIds = new java.util.ArrayList<>();
+        while (control.find()) {
+            controlIds.add(control.group(1));
+        }
+
+        assertTrue("ô lọc bước giao hàng phải nằm trong form", controlIds.contains("filterDelivery"));
+        for (String id : controlIds) {
+            assertTrue("ô lọc '" + id + "' chọn xong không gửi form", autoSubmitIds.contains("'" + id + "'"));
+        }
+    }
 }

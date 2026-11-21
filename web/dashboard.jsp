@@ -110,6 +110,9 @@
         .kpi-trend.up { color: var(--success); }
         .kpi-trend.warn { color: var(--warning); }
         .kpi-trend.down { color: var(--danger); }
+        /* Ô KPI bấm được (BR-61): cả thẻ là link sang danh sách đã lọc. */
+        a.kpi-card.kpi-link { text-decoration: none; color: inherit; transition: box-shadow 0.15s, transform 0.15s; }
+        a.kpi-card.kpi-link:hover { box-shadow: 0 6px 18px rgba(17, 24, 39, 0.08); transform: translateY(-1px); }
 
         /* ===== Tables ===== */
         .table-section { padding: 18px 20px 15px; }
@@ -422,7 +425,7 @@
                             Số liệu đang thu hẹp theo<c:if test="${not empty provNote}"> <strong>${fn:escapeXml(provNote)}</strong></c:if><c:if test="${not empty provNote and not empty periodLabel}"> và</c:if><c:if test="${not empty periodLabel}"> <strong>${fn:escapeXml(periodLabel)}</strong></c:if>.
                         </c:otherwise>
                     </c:choose>
-                    Riêng hai bảng cuối trang luôn tính tới hôm nay.
+                    Riêng ô "Đã giao – chưa ký" và hai bảng cuối trang luôn tính tới hôm nay.
                 </span>
                 <%-- "Xem toàn chi nhánh" chứ không phải "Bỏ lọc": link trỏ /dashboard
                      trần sẽ rơi về MẶC ĐỊNH, mà mặc định giờ đã là địa bàn của mình --
@@ -436,7 +439,7 @@
 
         <!-- ===== KPI cards ===== -->
         <div class="row g-4 mb-4">
-            <div class="col-6 col-lg-4">
+            <div class="col-6 col-lg-3">
                 <div class="card-box kpi-card">
                     <div class="kpi-top">
                         <div>
@@ -448,7 +451,7 @@
                     <span class="kpi-trend up"><i class="fa-solid fa-arrow-trend-up"></i> +${newCustomersThisMonth} khách hàng mới <c:choose><c:when test="${not empty periodLabel}">trong kỳ</c:when><c:otherwise>tháng này</c:otherwise></c:choose></span>
                 </div>
             </div>
-            <div class="col-6 col-lg-4">
+            <div class="col-6 col-lg-3">
                 <div class="card-box kpi-card">
                     <div class="kpi-top">
                         <div>
@@ -460,7 +463,7 @@
                     <span class="kpi-trend warn"><i class="fa-solid fa-triangle-exclamation"></i> ${contractStatusSummary['Sắp hết hạn']} hợp đồng sắp hết hạn</span>
                 </div>
             </div>
-            <div class="col-6 col-lg-4">
+            <div class="col-6 col-lg-3">
                 <div class="card-box kpi-card">
                     <div class="kpi-top">
                         <div>
@@ -478,6 +481,34 @@
                         </c:otherwise>
                     </c:choose>
                 </div>
+            </div>
+            <%-- UC-36 / BR-61: hợp đồng bán "Đã giao – chưa ký" trong phạm vi đang chọn,
+                 KHÔNG theo kỳ (kỳ lọc theo ngày ký, bản Nháp chưa có ngày ký). Bấm vào
+                 mở danh sách hợp đồng bán đã lọc, mọi thời điểm, cùng phạm vi: "Của tôi"
+                 thì view=mine; "Toàn chi nhánh" thì mang theo các tỉnh đang chọn. --%>
+            <c:url var="deliveredUnsignedUrl" value="/contract">
+                <c:param name="action" value="list"/>
+                <c:param name="delivery" value="delivered"/>
+                <c:param name="month" value="all"/>
+                <c:param name="view" value="${scopeFilter == 'mine' ? 'mine' : 'all'}"/>
+                <c:if test="${scopeFilter != 'mine'}">
+                    <c:forEach var="pid" items="${provinceFilters}">
+                        <c:param name="provinceId" value="${pid}"/>
+                    </c:forEach>
+                </c:if>
+            </c:url>
+            <div class="col-6 col-lg-3">
+                <a class="card-box kpi-card kpi-link" href="${fn:escapeXml(deliveredUnsignedUrl)}"
+                   title="Mở danh sách hợp đồng đã giao hàng nhưng chưa ký">
+                    <div class="kpi-top">
+                        <div>
+                            <div class="kpi-label">Đã giao – chưa ký</div>
+                            <div class="kpi-value">${deliveredUnsignedCount}</div>
+                        </div>
+                        <div class="kpi-icon bg-red"><i class="fa-solid fa-truck-ramp-box"></i></div>
+                    </div>
+                    <span class="kpi-trend ${deliveredUnsignedCount > 0 ? 'warn' : ''}"><i class="fa-solid fa-arrow-right-long"></i> Hợp đồng bán đã giao hàng, tính tới hôm nay</span>
+                </a>
             </div>
         </div>
 

@@ -256,6 +256,40 @@ public class ContractExportControllerTest {
     }
 
     @Test
+    public void export_deliveryFilter_reachesTheExportQueryInsideTheScope() throws Exception {
+        // Task 10.5 / BR-61: Excel phải ra đúng danh sách đang lọc theo bước giao hàng.
+        User user = loginAs(PermissionService.ROLE_ADMIN, null);
+        when(permissionService.canExportContracts(user)).thenReturn(true);
+        when(request.getParameter("delivery")).thenReturn(ContractDAO.DELIVERY_FILTER_DELIVERED);
+        when(request.getParameter("month")).thenReturn("all");
+
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        when(response.getOutputStream()).thenReturn(dummyServletOutputStream(baos));
+
+        controller.doGet(request, response);
+
+        verify(exportService).exportContractsToExcel(
+                any(), any(), any(), any(), any(), any(), any(), any(), anyBoolean(), any(),
+                argThat(scope -> scope != null
+                        && ContractDAO.DELIVERY_FILTER_DELIVERED.equals(scope.getDeliveryStage())
+                        && scope.getActiveWindow() == null));
+    }
+
+    @Test
+    public void resolveListScope_deliveryParam_validCodeKept_unknownDropped() {
+        loginAs(PermissionService.ROLE_ADMIN, null);
+
+        when(request.getParameter("delivery")).thenReturn(ContractDAO.DELIVERY_FILTER_PREPARING);
+        assertEquals(ContractDAO.DELIVERY_FILTER_PREPARING, controller.resolveListScope(request).getDeliveryStage());
+
+        when(request.getParameter("delivery")).thenReturn("Đã giao – chưa ký");
+        assertNull(controller.resolveListScope(request).getDeliveryStage());
+
+        when(request.getParameter("delivery")).thenReturn(null);
+        assertNull(controller.resolveListScope(request).getDeliveryStage());
+    }
+
+    @Test
     public void resolveWaitingDept_variousInputs() {
         when(request.getParameter("waitingDept")).thenReturn("8");
         assertEquals(Integer.valueOf(8), controller.resolveWaitingDept(request));

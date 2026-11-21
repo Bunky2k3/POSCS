@@ -2,6 +2,8 @@ package poscs.model;
 
 import java.sql.Date;
 import java.sql.Timestamp;
+import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 
 public class Contract {
     private int contractId;
@@ -140,6 +142,20 @@ public class Contract {
      * hiệu lực -- nên không suy ra cái này từ cái kia được.
      */
     private String progressStatus;
+
+    /**
+     * BR-61: bước giao hàng -- {@link #DELIVERY_PREPARING} hoặc
+     * {@link #DELIVERY_DELIVERED}; null khi hợp đồng không còn Nháp hoặc chưa
+     * có giấy tờ giao hàng nào.
+     *
+     * <p>Trục RIÊNG, không phải một giá trị tiến độ: suy ra mỗi lần đọc từ giấy
+     * tờ chưa huỷ (BR-59) ở {@code ContractDAO}, không ai đặt được và không có
+     * cột trong CSDL. Ký xong (rời Nháp) thì không còn bước giao hàng.
+     */
+    private String deliveryStage;
+
+    /** BR-61: ngày giao = ngày sớm nhất trong các biên bản giao nhận chưa huỷ; null nếu chưa giao. */
+    private Date deliveredDate;
 
     private Timestamp createdAt;
     private Timestamp updatedAt;
@@ -364,6 +380,35 @@ public class Contract {
     public boolean isFrozen() {
         return LIQUIDATED.equals(progressStatus) || TERMINATED.equals(progressStatus);
     }
+
+    /** BR-61: có Phiếu GQNCKH hoặc Phiếu ĐCNB, chưa có Biên bản giao nhận hàng hoá. */
+    public static final String DELIVERY_PREPARING = "Chuẩn bị hàng";
+
+    /** BR-61: đã có Biên bản giao nhận hàng hoá mà hợp đồng vẫn còn Nháp. */
+    public static final String DELIVERY_DELIVERED = "Đã giao – chưa ký";
+
+    public String getDeliveryStage() { return deliveryStage; }
+    public void setDeliveryStage(String deliveryStage) { this.deliveryStage = deliveryStage; }
+
+    public Date getDeliveredDate() { return deliveredDate; }
+    public void setDeliveredDate(Date deliveredDate) { this.deliveredDate = deliveredDate; }
+
+    /** BR-61: true nếu hợp đồng đang ở bước "Đã giao – chưa ký". */
+    public boolean isDeliveredUnsigned() { return DELIVERY_DELIVERED.equals(deliveryStage); }
+
+    /**
+     * BR-61 / BR-62: số ngày đã giao tính tới {@code today}; null khi chưa có
+     * ngày giao. Ngày giao chính là hôm nay thì ra 0.
+     */
+    public Long deliveredDaysOn(LocalDate today) {
+        if (deliveredDate == null || today == null) {
+            return null;
+        }
+        return ChronoUnit.DAYS.between(deliveredDate.toLocalDate(), today);
+    }
+
+    /** Như {@link #deliveredDaysOn(LocalDate)} với hôm nay -- trang chi tiết hiện "đã giao n ngày". */
+    public Long getDeliveredDays() { return deliveredDaysOn(LocalDate.now()); }
 
     public Timestamp getCreatedAt() { return createdAt; }
     public void setCreatedAt(Timestamp createdAt) { this.createdAt = createdAt; }

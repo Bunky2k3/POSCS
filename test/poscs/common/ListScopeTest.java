@@ -60,4 +60,48 @@ public class ListScopeTest {
         assertEquals("(e.account_owner_id IN (?) OR d.province_id IN (?))", sql);
         assertEquals(List.of(99, 1), params);
     }
+
+    // ---- Task 10.5 / BR-61: bộ lọc bước giao hàng đi cùng phạm vi ----
+
+    @Test
+    public void macDinh_khongLocBuocGiaoHang() {
+        assertNull(ListScope.all().getDeliveryStage());
+        assertNull(ListScope.of(List.of(99), List.of(1)).getDeliveryStage());
+        assertNull(ListScope.activeIn(Period.parse("2026", "m11")).getDeliveryStage());
+    }
+
+    @Test
+    public void withDeliveryStage_giuNguyenNguoiTinhVaCuaSoThoiGian() {
+        Period window = Period.parse("2026", "m11");
+        ListScope base = ListScope.of(List.of(99), List.of(1)).withActiveWindow(window);
+
+        ListScope filtered = base.withDeliveryStage("delivered");
+
+        assertEquals("delivered", filtered.getDeliveryStage());
+        assertEquals(List.of(99), filtered.getOwnerIds());
+        assertEquals(List.of(1), filtered.getProvinceIds());
+        assertSame(window, filtered.getActiveWindow());
+        // Bất biến: bản gốc không bị đổi.
+        assertNull(base.getDeliveryStage());
+    }
+
+    @Test
+    public void withActiveWindow_giuNguyenBoLocBuocGiaoHang() {
+        ListScope scope = ListScope.all().withDeliveryStage("preparing").withActiveWindow(null);
+
+        assertEquals("preparing", scope.getDeliveryStage());
+        assertNull(scope.getActiveWindow());
+        // ALL dùng chung không được bị "nhiễm" bộ lọc của một lần gọi.
+        assertNull(ListScope.all().getDeliveryStage());
+    }
+
+    @Test
+    public void boLocBuocGiaoHang_khongDoiMenhDePhamVi() {
+        List<Object> params = new ArrayList<>();
+        ListScope scope = ListScope.of(List.of(99), List.of(1)).withDeliveryStage("delivered");
+
+        assertEquals("(c.owner_id IN (?) OR d.province_id IN (?))", scope.predicate("c.owner_id", "d.province_id", params));
+        assertEquals(List.of(99, 1), params);
+        assertTrue(scope.isNarrowed());
+    }
 }
