@@ -726,7 +726,7 @@ Không còn mục nào.
   - Nhánh: `chore/task-10.8-don-tai-lieu`.
   - Commit: `chore(docs): dọn tài liệu lỗi thời và bản chép trùng của rules (Task 10.8)`
   - *Đã hoàn thành:* `git rm` 4 file `docs/kichbandemoposcs.html`, `docs/kichbandemoposcs.pdf`, `docs/POSCS_TaiKhoanTest.sql`, `docs/POSERD.png`. Đưa vào git, không sửa nội dung: `docs/PROMPTS.md`, `task_tracker_deploy.md`, `docs/HuongDan_DoiEmailGui.md` (đã rà: không có email, mật khẩu, tên miền hay IP thật; chỉ có mật khẩu mẫu `Admin@123` / `Poscs@123` vốn đã nằm trong `db/schema.sql`). `docs/ARCHITECTURE.md`: dòng 3, 58 trỏ `rules.md`; dòng 147, 241 đổi vai `Kỹ thuật` thành `Tổng hợp`; rà mục 2 sửa hai câu sai so với code (Contract Service: "giấy tờ của hợp đồng (ô tích theo danh mục, link không bắt buộc), bàn giao cho phòng Tổng hợp"; thông báo thêm loại "hợp đồng đã giao hàng quá 15 ngày chưa ký"). `.gemini/rules.md` (trước đó giống hệt `rules.md`) chỉ còn vài dòng trỏ về `rules.md`; `GEMINI.md` bỏ dòng 7; dòng 4 file này trỏ `rules.md`. Bốn tiêu chí "Xong khi" đạt. `ant test` 2.500 test (2.497 pass, 0 fail, 3 skipped). QA report tại `docs/qa/Task-10.8.md` (APPROVED, 0 lỗi).
-- [ ] **Task 10.9:** Viết lại `README.md` gọn, bằng tiếng Việt; chuyển quy ước viết log sang `rules.md`.
+- [x] **Task 10.9:** Viết lại `README.md` gọn, bằng tiếng Việt; chuyển quy ước viết log sang `rules.md`.
   - UC: không có.
   - BR / MSG / NFR: không thêm, không đổi.
   - File sửa:
@@ -754,13 +754,14 @@ Không còn mục nào.
     - `rules.md` §4 có quy ước viết log.
   - Nhánh: `docs/task-10.9-readme-tieng-viet`.
   - Commit: `docs(readme): viết lại README gọn bằng tiếng Việt (Task 10.9)`
+  - *Đã hoàn thành:* `README.md` viết lại bằng tiếng Việt, 100 dòng (bản cũ 261 dòng tiếng Anh), đủ 9 mục đúng thứ tự; tên biến, giá trị mặc định đối chiếu `DBContext`, `EmailUtil`, `LogFiles`, `AuthService`, lệnh test theo `.github/workflows/tests.yml`. Ngoài chữ của task, để lệnh chạy được đúng như ghi: mục 4 ghi đủ lệnh `ant dist` kèm hai tham số `-D`; mục 6 thêm câu tạo sẵn CSDL rỗng `poscs_it` và câu "ngoài NetBeans thêm hai tham số `-D` vào mỗi lệnh `ant`"; mục 7 ghi `LOG_DIR` là thư mục màn hình Nhật ký hệ thống đọc (code không đổi chỗ app ghi log). Không có tài khoản, mật khẩu mẫu; 8 link đều trỏ tới file có thật. `rules.md` §4 thêm mục "Viết log" (SLF4J, DAO `LOG.error`, Controller `LOG.warn` kèm `Logs.actor`, chữ không dấu, không log thông tin mật). Ngoài dòng File sửa (người dùng đồng ý 24/11/2026 theo QA 🔴): gỡ mật khẩu `root` khỏi dòng "File sửa" của Task 10.10 trong file này, giữ đường dẫn đầy đủ tới `mysql.exe`. `ant test` 2.500 test (2.497 pass, 0 fail, 3 skipped); `node --test 'test/js/**/*.test.js'` 31 pass. QA report tại `docs/qa/Task-10.9.md` (CẦN SỬA; 1 🔴, 1 🟢 đã sửa).
 - [ ] **Task 10.10:** Người dùng dựng lại `poscs_db` từ `db/schema.sql` (dữ liệu mẫu Task 10.6), đưa CSDL dev từ V39 lên V46.
   - UC: không có.
   - BR / MSG / NFR: không đổi; mục 16 "Quyết định đã chốt" (xoá sạch, không sao lưu).
-  - File sửa: không có. **Người dùng tự chạy** trên máy, lúc không dùng app; agent không chạy gì lên `poscs_db` (rules §3). Ba bước, chạy ở thư mục repo:
-    1. `mysql -u root -p -e "DROP DATABASE poscs_db; CREATE DATABASE poscs_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"`
-    2. `mysql --default-character-set=utf8mb4 -u root -p poscs_db -e "source C:/Users/Admin/Documents/GitHub/POSCS/db/schema.sql"`. Không dùng `<` hay `|` của PowerShell, vì chúng làm hỏng tiếng Việt.
-    3. Ghi sổ mọi file migration vào `schema_migrations` (`schema.sql` chỉ tạo bảng sổ rỗng). Trong Git Bash: `mysql -u root -p poscs_db -e "$(for f in db/migrations/V[0-9]*.sql; do printf "INSERT INTO schema_migrations (version) VALUES ('%s');" "$(basename "$f" .sql)"; done)"`. Mẫu `V{version}__...sql` không khớp `V[0-9]*` nên không bị ghi.
+  - File sửa: không có. **Người dùng tự chạy** trên máy, lúc không dùng app; agent không chạy gì lên `poscs_db` (rules §3). Ba bước, chạy trong Git Bash ở thư mục repo (nhập mật khẩu `root` của máy khi `mysql` hỏi). Máy không có `mysql` trên PATH (PATH chỉ có MySQL Shell 8.0, kiểm 21/11/2026), nên gõ `mysql` trần sẽ báo "command not found"; ba lệnh dưới gọi bằng đường dẫn đầy đủ của MySQL Server 9.3:
+    1. `"/c/Program Files/MySQL/MySQL Server 9.3/bin/mysql.exe" -u root -p -e "DROP DATABASE poscs_db; CREATE DATABASE poscs_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"`
+    2. `"/c/Program Files/MySQL/MySQL Server 9.3/bin/mysql.exe" --default-character-set=utf8mb4 -u root -p poscs_db -e "source C:/Users/Admin/Documents/GitHub/POSCS/db/schema.sql"`. Đừng đổi sang `<` hay `|` của PowerShell, vì chúng làm hỏng tiếng Việt.
+    3. Ghi sổ mọi file migration vào `schema_migrations` (`schema.sql` chỉ tạo bảng sổ rỗng): `"/c/Program Files/MySQL/MySQL Server 9.3/bin/mysql.exe" -u root -p poscs_db -e "$(for f in db/migrations/V[0-9]*.sql; do printf "INSERT INTO schema_migrations (version) VALUES ('%s');" "$(basename "$f" .sql)"; done)"`. Mẫu `V{version}__...sql` không khớp `V[0-9]*` nên không bị ghi.
   - File test: không có.
   - Không đụng: file trong repo; CSDL kiểm thử (`poscs_it`, `poscs_bbtest`, các CSDL tạm).
   - Lưu ý: đo 21/11/2026, `poscs_db` mới tới V39 trong khi code `main` cần từ V40, nên app chạy trên `poscs_db` (Tomcat 8080 của NetBeans) hỏng tới khi dựng lại. Dữ liệu cũ mất hết, kể cả link demo của HD-0015 (người dùng đã chọn ở mục 16). File tải lên của bộ cũ để nguyên trên đĩa.
