@@ -96,6 +96,11 @@ Chi tiết bước Code:
 - Phân quyền chỉ qua `PermissionService`/`AccessControl`, không rải `if (role == ...)` trong controller. Phân biệt **Sales quản lý vùng** (không có cấp trên, được ghi) với **Sales có cấp trên** (chỉ xem, gửi yêu cầu thay đổi). Vi phạm quyền: trả `MSG-022`.
 - Xóa dữ liệu là **xóa mềm** (`is_deleted`) cho khách hàng, sản phẩm, hợp đồng, phiếu, tài liệu hợp đồng.
 - Văn bản hiển thị dùng đúng nội dung `MSG-xxx` trong SPEC.
+- Viết log:
+  - Ghi lỗi qua SLF4J (`LoggerFactory.getLogger(...)`), không dùng `printStackTrace()`.
+  - DAO: `LOG.error` kèm thao tác, tham số khoá và exception, ví dụ `LOG.error("Loi cap nhat hop dong (contractCode={})", code, ex)`.
+  - Controller: mọi nhánh redirect `?error=..._failed` ghi `LOG.warn` kèm `actor` (`Logs.actor(request)`, dạng `username#userId`) và khoá bản ghi, vì DAO không biết ai đang đăng nhập.
+  - Chữ trong log viết không dấu. Không bao giờ log mật khẩu, chuỗi băm, mã OTP, mật khẩu tạm (ngoại lệ duy nhất: chế độ DEV của `EmailUtil` khi chưa cấu hình SMTP).
 
 ## 5. Xử lý lỗi (Error Handling Loop)
 

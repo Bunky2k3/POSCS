@@ -1,261 +1,100 @@
 # POSCS
 
-POSCS is a Java web application (Jakarta EE / Servlets + JSP) built as a
-NetBeans Ant project, backed by a MySQL database.
+## 1. POSCS là gì
 
-## Tech Stack
+POSCS là ứng dụng web giúp Chi nhánh Công ty CP Thiết bị Bưu điện POSTEF theo dõi khách hàng doanh nghiệp, hợp đồng và phiếu hỗ trợ kỹ thuật. Có ba vai: **Admin** (Ban giám đốc, toàn quyền, quản lý nhân viên), **Sales** (Phòng kinh doanh: khách hàng, hợp đồng, sản phẩm, phiếu hỗ trợ) và **Tổng hợp** (Phòng tổng hợp: xem dữ liệu, nhận bàn giao hợp đồng, ghi nhận kỳ thanh toán đã thu).
 
-- **Language:** Java 21
-- **Platform:** Jakarta EE 11 (Servlets + JSP), deployed as a WAR to a
-  servlet container such as Apache Tomcat
-- **Build tool:** Apache Ant (NetBeans project — `build.xml`)
-- **Database:** MySQL (via `mysql-connector-j` and `commons-dbutils`,
-  connection pooling with `HikariCP`)
-- **Notable libraries:** `jbcrypt` (password hashing), `jakarta.mail`
-  (email), `poi` (Excel), `pdfbox` (PDF), `jackson-databind` (JSON)
+## 2. Công nghệ
 
-## Project Structure
+- Java 21
+- Jakarta EE 11: Servlet + JSP (JSTL)
+- Apache Tomcat 11
+- MySQL 8 trở lên, bảng mã `utf8mb4`
+- Apache Ant (dự án NetBeans, `build.xml`)
+- Node 22 trở lên: chạy test JavaScript và kịch bản chụp ảnh hướng dẫn (`tools/guide/`); app chạy không cần Node
+
+## 3. Cấu trúc thư mục
 
 ```
 src/java/poscs/
-  controller/   Servlets & helpers handling HTTP requests (38 files:
-                LoginController, LogoutController, PasswordResetController,
-                ProfileController, Customer*Controller, Contract*Controller,
-                ChangeRequestController, Ticket*Controller, ProductController,
-                EmployeeController, DashboardController, NotificationController,
-                AddressController, GuideController, UploadFileController,
-                SystemLogController, ...)
-  service/      Business logic, transactions & RBAC (21 files: BaseService,
-                ServiceResult, AttributeStore, PermissionService, AuthService,
-                ProfileService, CustomerService, CustomerEvaluationService,
-                ProductService, Contract*Service, Ticket*Service,
-                EmployeeService, DashboardService, NotificationService, ...)
-  validator/    Input validation by Business Rules (9 files: BaseValidator,
-                ValidationResult, AuthValidator, ProfileValidator,
-                CustomerValidator, ProductValidator, ContractValidator,
-                TicketValidator, EmployeeValidator)
-  dao/          Data access objects for database operations (15 files)
-  model/        Domain entities / POJOs (27 files: User, Role, Address, ...)
-  common/       Shared utilities, plus the servlet filter, access control, and
-                the scheduled-notification listener (18 files)
-web/            JSP pages and static web resources
-nbproject/      NetBeans/Ant project configuration
-build.xml       Ant build script
+  controller/   servlet: nhận request, kiểm quyền, kiểm đầu vào, gọi service
+  service/      nghiệp vụ, giao dịch, phân quyền
+  validator/    kiểm tra đầu vào theo BR
+  dao/          đọc, ghi MySQL
+  model/        lớp dữ liệu (POJO)
+  common/       tiện ích dùng chung: filter đăng nhập và CSRF, gửi thư, đọc log...
+web/            JSP, CSS, JS, ảnh; cấu hình ở web/WEB-INF/web.xml
+db/             schema.sql (dựng CSDL từ đầu) và migrations/ (thay đổi dần)
+test/           test JUnit (test/poscs/) và test JavaScript (test/js/)
+tools/          kịch bản chụp ảnh và xuất hướng dẫn sử dụng, sinh tài liệu test
+docs/           đặc tả, kiến trúc, báo cáo, báo cáo QA
 ```
 
-## Database Setup
+Phân tầng và luồng xử lý chi tiết: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
-The database schema is not created automatically — run `db/schema.sql`
-once against a fresh MySQL database (`utf8mb4`):
+## 4. Chạy trên máy
+
+**Bước 1. Tạo CSDL và nạp cấu trúc.** Chạy trong Git Bash ở thư mục repo (PowerShell không có `<`). `schema.sql` xoá rồi tạo lại mọi bảng, kèm dữ liệu mẫu, nên chỉ chạy trên CSDL mới.
 
 ```bash
 mysql -u root -p -e "CREATE DATABASE poscs_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
 mysql --default-character-set=utf8mb4 -u root -p poscs_db < db/schema.sql
 ```
 
-`db/schema.sql` (re)creates every table the app expects, from scratch,
-in one shot — including the core tables (users, enterprises, contracts,
-products, technical support tickets, ...) and the customer evaluation
-tables (`contract_payments`, `customer_evaluation_rules`,
-`customer_lifecycle_events`). Re-running it drops and recreates all of
-these tables, so only run it on a fresh/dev database, not one with data
-you want to keep.
+**Bước 2. Đặt kết nối CSDL.** Biến môi trường, hoặc tham số `-D` của JVM (được ưu tiên hơn):
 
-### Changing the schema later
+- `DB_URL`: mặc định `jdbc:mysql://localhost:3306/poscs_db`
+- `DB_USER`: mặc định `root`
+- `DB_PASSWORD`: bắt buộc, không có mặc định
 
-Don't edit a live database by hand. Add a file under
-[`db/migrations/`](db/migrations/README.md) instead — that folder
-documents the naming convention and full workflow (including keeping
-`db/schema.sql` in sync so new setups stay up to date).
+**Bước 3. Thư.** `MAIL_USERNAME` và `MAIL_PASSWORD` (biến môi trường) không đặt thì app không gửi thư mà in mã OTP và mật khẩu tạm ra log, đủ để thử trên máy. Gửi thư thật và các biến `MAIL_*` khác: xem [DEPLOY.md](DEPLOY.md).
 
-## Tests
-
-`ant test` runs everything. Two very different layers live side by side:
-
-- **Unit tests** (`test/poscs/**`, the bulk of the suite) mock JDBC via
-  `poscs.dao.JdbcStub`, so no SQL ever reaches a database. They are fast and
-  need no setup — but by construction they cannot catch a wrong column name,
-  invalid SQL, a schema drift, a violated UNIQUE/foreign key, a transaction
-  that fails to roll back, or the same rule computed two different ways in
-  Java and in SQL.
-- **Integration tests** (`test/poscs/integration/**`) run the real DAOs
-  against a real MySQL. They cover exactly the gap above.
-
-### Running the integration tests
-
-They need a **disposable** database whose name ends in `_it` — every run wipes
-it. `IntegrationDb` refuses to run anywhere else, so a stray `DB_URL` pointing
-at `poscs_db` cannot destroy real data.
+**Bước 4. Build và deploy.** Trong NetBeans: Clean and Build. Ngoài NetBeans, `ant dist` cần thêm hai tham số `-D` (giải thích ở [DEPLOY.md](DEPLOY.md) §2). Cả hai cách tạo ra `dist/POSCS.war`; deploy file này lên Tomcat 11.
 
 ```bash
-mysql -u root -p -e "CREATE DATABASE poscs_it CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
-
-ant -Dtest-sys-prop.DB_URL=jdbc:mysql://localhost:3306/poscs_it \
-    -Dtest-sys-prop.DB_USER=root \
-    -Dtest-sys-prop.DB_PASSWORD=yourpassword \
-    test
+ant -Dj2ee.platform.classpath=lib-build/jakarta.servlet-api-6.1.jar \
+    -Dlibs.CopyLibs.classpath=lib-build/org-netbeans-modules-java-j2seproject-copylibstask.jar \
+    dist
 ```
 
-The schema is loaded from `db/schema.sql` — the same file real setups use — so
-a change there is exercised by the tests automatically.
+## 5. Đổi cấu trúc CSDL
 
-`test-sys-prop.*` is how NetBeans' generated `build-impl.xml` forwards values
-into the test JVM as system properties. It has to be a system property rather
-than an environment variable, because a JVM cannot set env vars for itself;
-`poscs.dao.DBContext` therefore reads a system property first and falls back to
-the environment (which is what Tomcat uses in production).
+Không sửa tay CSDL đang chạy: thêm một file vào `db/migrations/`, cách đặt tên và các bước xem [db/migrations/README.md](db/migrations/README.md).
 
-### Without MySQL
-
-Plain `ant test` stays green: the integration tests **skip** themselves when
-they are not pointed at an `_it` database. That keeps a fresh clone working
-with no setup — at the cost that "all skipped" looks just like "all passed",
-so CI has an explicit step asserting they really ran.
-
-### JavaScript tests
-
-`ant test` covers Java only. The browser-side money helpers in
-`web/js/appshell.js` have their own suite, run by Node's built-in test runner —
-no npm, no `package.json`, no `node_modules`:
+## 6. Kiểm thử
 
 ```bash
+ant test
+ant -Dtest-sys-prop.DB_URL=jdbc:mysql://localhost:3306/poscs_it \
+    -Dtest-sys-prop.DB_USER=root \
+    -Dtest-sys-prop.DB_PASSWORD=matkhau_mysql \
+    test
 node --test 'test/js/**/*.test.js'
 ```
 
-`appshell.js` is a plain browser script rather than a module: it runs on load
-and touches `document`. So the test builds a ~25-line fake `document` and loads
-**the real file** in a `vm` sandbox, then reads the pure functions off
-`window.POSCS`. Testing a copy of the logic would let the copy drift from the
-shipped file — which is exactly the failure this suite exists to catch.
+- Lệnh 1 chạy toàn bộ test Java. Lệnh 2 chạy thêm test tích hợp trên MySQL thật: tạo sẵn CSDL rỗng `poscs_it` (như lệnh `CREATE DATABASE` ở mục 4, test tự nạp `db/schema.sql`) và thay `matkhau_mysql` bằng mật khẩu của bạn. Lệnh 3 chạy test JavaScript.
+- Không trỏ tới CSDL có tên đuôi `_it` thì test tích hợp tự bỏ qua; CSDL `_it` bị xoá sạch dữ liệu mỗi lần chạy.
+- Ngoài NetBeans, thêm vào mỗi lệnh `ant` hai tham số `-D` như lệnh `ant dist` ở mục 4.
 
-Only those pure functions are reachable this way. The event wiring and anything
-that writes to the DOM still needs the page opened for real.
+## 7. Log
 
-Two cautions, both learned the hard way:
+- App ghi log vào log của Tomcat: `logs/catalina.*`.
+- Admin xem và tải log ngay trong app ở màn hình Nhật ký hệ thống (`/systemLog`). Màn hình này đọc thư mục `logs/` của Tomcat; log nằm chỗ khác thì đặt `LOG_DIR` (biến môi trường hoặc `-D`).
 
-- `node --test` **exits 0 when it matches no files**, so CI asserts the tests
-  really ran — same guard as for the integration tests above.
-- A test that calls a helper directly proves nothing about the path the page
-  actually takes. The two bugs this suite was written for (PR #136) both sat
-  behind a helper that *was* covered; what was not covered was the function the
-  page calls into.
+## 8. Bảo mật
 
-## Building and Running
+- Mọi request `POST`, kể cả đăng nhập, phải kèm mã CSRF đúng của phiên; sai thì bị từ chối.
+- Đăng nhập xong thì tạo phiên mới, không dùng lại mã phiên cũ.
+- Đăng nhập và quên mật khẩu trả lời như nhau dù username có thật hay không, cả câu báo lẫn thời gian phản hồi.
+- Nhập sai mã OTP 5 lần thì mã bị huỷ, phải xin mã mới; gửi lại mã phải cách lần trước ít nhất 30 giây.
+- Phân quyền kiểm ở server theo ma trận trong [PERMISSIONS.md](PERMISSIONS.md).
 
-This project is set up as a NetBeans Ant-based web application:
+## 9. Tài liệu khác
 
-1. Open the project folder in NetBeans, or build the WAR with Ant from
-   the repository root — outside the IDE `ant dist` needs two `-D`
-   values, see [DEPLOY.md](DEPLOY.md) §2.
-2. Set up the database (see **Database Setup** above).
-3. Configure connection settings via the `DB_URL` / `DB_USER` /
-   `DB_PASSWORD` environment variables (or `-D` system properties), read by
-   `poscs.dao.DBContext`. `DB_URL` and `DB_USER` fall back to
-   `jdbc:mysql://localhost:3306/poscs_db` and `root` if unset; `DB_PASSWORD`
-   has no default and must be provided explicitly (e.g.
-   `DB_PASSWORD=<your_password>` or `-DDB_PASSWORD=<your_password>`).
-4. Deploy the resulting WAR to a Jakarta EE 11–compatible servlet
-   container (e.g. Apache Tomcat).
-
-For deploying to a real server (staging/production), see
-[DEPLOY.md](DEPLOY.md).
-
-## Logging
-
-Errors are logged through SLF4J (`slf4j-api` + `slf4j-simple`, both already in
-`lib/`). There is no `printStackTrace()` left in the codebase: a bare stack
-trace says *what* broke but never *which record* or *who was doing it*, which
-is exactly what you need when a tester reports "it just said update_failed".
-
-Two layers, meant to be read together:
-
-- **DAO** — `LOG.error("Loi cap nhat hop dong (contractCode={})", ..., ex)`:
-  the failing operation, its key parameters, and the SQL exception.
-- **Controller** — `LOG.warn("Cap nhat hop dong that bai (actor={}, contractId={})", ...)`
-  on every branch that redirects with a generic `?error=..._failed`. `actor` is
-  `username#userId` (`poscs.common.Logs.actor`), because a DAO cannot see the
-  request and therefore cannot know who was logged in.
-
-Messages are written without Vietnamese diacritics, matching the existing
-console output — log files are read over SSH and through container log viewers,
-where the encoding is not guaranteed.
-
-Passwords, password hashes, OTP codes and temporary passwords are never logged.
-(The exception is `EmailUtil`'s DEV MODE, which prints the OTP and the temporary
-password *on purpose* when no SMTP server is configured — that is the only way
-to complete those flows locally. Configure SMTP and the branch never runs.)
-
-### Where the logs go
-
-`slf4j-simple` writes to stderr, which the servlet container captures: with
-Tomcat that is `logs/catalina.out` plus the daily-rotated `logs/catalina.<date>.log`.
-Nothing extra to configure, and rotation is handled by the container.
-
-To send them to a file of their own instead, add a system property when
-starting the container (Tomcat: `bin/setenv.sh` / `bin/setenv.bat`) — note
-`slf4j-simple` does not rotate this file:
-
-```bash
-CATALINA_OPTS="$CATALINA_OPTS -Dorg.slf4j.simpleLogger.logFile=/var/log/poscs/poscs.log"
-```
-
-Level and format defaults live in [`src/java/simplelogger.properties`](src/java/simplelogger.properties)
-(`info` by default); the same system properties override them per deployment,
-e.g. `-Dorg.slf4j.simpleLogger.log.poscs=debug` for this application's packages
-only.
-
-## Roles and permissions
-
-See [PERMISSIONS.md](PERMISSIONS.md) for the role-based access matrix
-(who can do what per feature). Login/session enforcement is wired up
-in `LoginController`, `LogoutController`, `PasswordResetController`,
-`ProfileController` (`AuthService` / `ProfileService`) and `AuthenticationFilter`,
-and the matrix is enforced server-side for Customer/Contract/Product/Ticket/Employee
-via `poscs.service.PermissionService` and `poscs.common.AccessControl`
-(across `CustomerActionController`, `ContractActionController`, `TicketActionController`,
-`ProductController`, `EmployeeController`, and their companion list/detail/export controllers).
-
-## System log screen (Admin only)
-
-`/systemLog` lets an Admin read the server's log files in the browser and
-download one — useful during testing, when the person who hit the bug is not
-the person with shell access to the server.
-
-- Log directory: the `LOG_DIR` environment variable (or system property) if
-  set, otherwise `${catalina.base}/logs` — where the container collects what
-  the application writes to stderr.
-- Only `.log` / `.out` / `.txt` files are listed, newest first. The `file`
-  parameter is a **name**, always matched against that listing, so no path
-  ever reaches the filesystem from a request (`poscs.common.LogFiles`).
-- The view shows the last N lines (100–2000) of the selected file with an
-  optional keyword filter; reads are capped at the last 512 KB so a huge
-  `catalina.out` cannot be pulled into memory.
-- Gated by `AccessControl.requireAdmin(...)` on every action, the download
-  included — it returns a file without going through a JSP, so it needs its
-  own check. See [PERMISSIONS.md](PERMISSIONS.md).
-
-## Security
-
-- **CSRF protection:** every state-changing `POST` (including login)
-  must carry a valid per-session token, checked in
-  `AuthenticationFilter` before the request reaches a servlet — see
-  `poscs.common.CsrfUtil`.
-- **Session fixation:** login regenerates the session instead of
-  reusing whatever session ID the request arrived with (see
-  `LoginController` / `AuthService`).
-- **Login does not reveal which usernames exist:** an unknown username
-  gets the same `invalid_credentials` error as a wrong password, and
-  still runs one BCrypt check against a dummy hash of the same cost, so
-  the response time matches too (`LoginController` / `AuthService#login`).
-- **OTP rate limiting:** the forgot-password flow locks out a code
-  after 5 failed verification attempts, and enforces a 30-second
-  server-side cooldown between resend requests
-  (`PasswordResetController` / `AuthService`).
-- **Forgot password does not reveal which usernames exist:** an unknown
-  username (or an account with no personal email) still gets a decoy
-  code in the session, so the OTP page, resend, cooldown and
-  wrong-code counter all respond exactly as for a real account. The
-  decoy is never mailed and can never be verified, and the real OTP
-  email is sent on a background thread so response time does not give
-  it away either (`PasswordResetController` / `AuthService#requestPasswordReset`).
-- **Role-based access control:** see [PERMISSIONS.md](PERMISSIONS.md).
+- [docs/SPEC.md](docs/SPEC.md): đặc tả yêu cầu (UC, BR, MSG)
+- [PERMISSIONS.md](PERMISSIONS.md): ma trận phân quyền
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): kiến trúc
+- [DEPLOY.md](DEPLOY.md): triển khai lên máy chủ
+- [rules.md](rules.md): quy chuẩn viết code của dự án
+- [task_tracker.md](task_tracker.md): danh sách task
+- Hướng dẫn sử dụng: trang `/guide` trong app, bản Word [docs/Report6_HuongDanSuDung.docx](docs/Report6_HuongDanSuDung.docx)
