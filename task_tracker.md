@@ -796,7 +796,7 @@ Không còn mục nào.
 
 > Phát hiện 21/11/2026 lúc chụp lại toàn bộ ảnh hướng dẫn trên CSDL dựng từ `db/schema.sql` (dữ liệu mẫu Task 10.6). Người dùng chọn ghi thành task, không sửa trong Task 10.7 (21/11/2026). Số giai đoạn 12 vì 11 là triển khai (`task_tracker_deploy.md`). Làm **sau khi Task 10.7 merge**; 12.1 trước vì luồng quên mật khẩu đang hỏng hẳn. Task nào đổi giao diện có ảnh trong hướng dẫn thì chụp lại đúng ảnh đó bằng `tools/guide/capture.mjs` (CSDL dựng từ `schema.sql`, xem đầu kịch bản) và xem ảnh trước khi dùng.
 
-- [ ] **Task 12.1:** Quên mật khẩu: trang nhập OTP gửi đúng tham số controller đọc; đủ câu báo lỗi của luồng mật khẩu.
+- [x] **Task 12.1:** Quên mật khẩu: trang nhập OTP gửi đúng tham số controller đọc; đủ câu báo lỗi của luồng mật khẩu.
   - UC: `UC-03`, `UC-04`, `UC-05`.
   - BR / MSG / NFR: `BR-01`, `BR-04`, `BR-05`; `MSG-007` (OTP hết hạn), `MSG-008` (sai quá nhiều lần).
   - File sửa:

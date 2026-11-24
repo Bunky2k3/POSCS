@@ -251,7 +251,7 @@
     <tr><td>Mật khẩu mới phải có ít nhất 8 ký tự.</td><td>Mật khẩu quá ngắn.</td></tr>
     <tr><td>Mật khẩu xác nhận không khớp.</td><td>Hai ô gõ khác nhau.</td></tr>
     <tr><td>Mật khẩu mới không được trùng với mật khẩu cũ.</td><td>Chọn một mật khẩu khác.</td></tr>
-    <tr><td>Đã có lỗi xảy ra. Vui lòng thử lại.</td><td>Thường do đã gõ sai mật khẩu hiện tại 5 lần liên tiếp: máy bị tạm chặn 15 phút, cả đăng nhập lẫn đổi mật khẩu (<a href="#dang-nhap">mục 1</a>). Chờ rồi thử lại.</td></tr>
+    <tr><td>Bạn đã nhập sai quá nhiều lần. Vui lòng thử lại sau ít phút.</td><td>Đã gõ sai mật khẩu hiện tại 5 lần liên tiếp: máy bị tạm chặn 15 phút, cả đăng nhập lẫn đổi mật khẩu (<a href="#dang-nhap">mục 1</a>). Chờ rồi thử lại.</td></tr>
 </table>
 
 <h2 id="dang-xuat">9. Đăng xuất</h2>

@@ -132,7 +132,8 @@ public class PasswordResetController extends HttpServlet {
     }
 
     private void handleVerifyOtp(HttpServletRequest request, HttpServletResponse response) throws IOException {
-        String otpInput = request.getParameter("otp");
+        // Tên ô ẩn verifyOtp.jsp ghép sáu ô số vào trước khi gửi.
+        String otpInput = request.getParameter("otpCode");
         long now = System.currentTimeMillis();
         HttpSession session = request.getSession(false);
 

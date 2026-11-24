@@ -182,16 +182,6 @@ export default {
             before: async (page) => {
                 const code = await requestOtp(page);
                 await fillOtp(page, code);
-                // TẠM (Task 10.7): verifyOtp.jsp gửi mã trong ô ẩn "otpCode" nhưng
-                // PasswordResetController đọc tham số "otp", nên mã đúng vẫn bị báo
-                // "Mã OTP không đúng" (lỗi app đã báo, chưa sửa). Thêm một ô "otp"
-                // mang cùng mã để đi tới bước 3; app sửa rồi thì ô này vô hại.
-                await page.eval(`(() => {
-                    const f = document.getElementById('verifyOtpForm');
-                    const i = document.createElement('input');
-                    i.type = 'hidden'; i.name = 'otp'; i.value = ${JSON.stringify(code)};
-                    f.appendChild(i);
-                })()`);
                 await page.clickAndWait('#submitBtn');
                 await page.type('#newPassword', 'MinhHoang@POSTEF26');
                 await page.type('#confirmPassword', 'MinhHoang@POSTEF26');

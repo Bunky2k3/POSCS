@@ -305,6 +305,8 @@
                             <c:when test="${param.error == 'weak_password'}">Mật khẩu mới phải có ít nhất 8 ký tự.</c:when>
                             <c:when test="${param.error == 'mismatch'}">Mật khẩu xác nhận không khớp.</c:when>
                             <c:when test="${param.error == 'same_as_old'}">Mật khẩu mới không được trùng với mật khẩu cũ.</c:when>
+                            <%-- BR-01: gõ sai mật khẩu hiện tại cũng tính vào lượt chặn máy (AuthService.changePassword) --%>
+                            <c:when test="${param.error == 'too_many_attempts'}">Bạn đã nhập sai quá nhiều lần. Vui lòng thử lại sau ít phút.</c:when>
                             <c:otherwise>Đã có lỗi xảy ra. Vui lòng thử lại.</c:otherwise>
                         </c:choose>
                     </div>
