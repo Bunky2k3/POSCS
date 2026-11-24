@@ -56,7 +56,7 @@ Dòng task viết như các task bên dưới (`**Task X.X:** <Tên task>`), kè
     - **Đưa vào git:** `docs/PROMPTS.md`, `task_tracker_deploy.md`, `docs/HuongDan_DoiEmailGui.md` (Task 10.8). Hướng dẫn đổi email gửi sẽ gộp vào mục Email của `DEPLOY.md` ở Task 11.5 rồi xoá.
     - **Một bản quy tắc:** `rules.md` là bản duy nhất; `.gemini/rules.md` chỉ còn trỏ về `rules.md`, không chép nội dung nữa.
     - **Giữ nguyên:** báo cáo QA trong `docs/qa/`; bốn file test `.xlsx` và `tools/testdoc/` (cập nhật là việc tài liệu riêng, giống Project_Report); `DEPLOY.md` (viết lại ở Task 11.5).
-18. **README gọn bằng tiếng Việt (Task 10.9, người dùng chốt 21/11/2026):** viết lại `README.md` bằng tiếng Việt, chỉ giữ thứ người mới cần để chạy được app, gồm 9 mục: POSCS là gì, công nghệ, cấu trúc thư mục, chạy trên máy, đổi cấu trúc CSDL, kiểm thử, log, bảo mật, tài liệu khác. **Không ghi tài khoản hay mật khẩu mẫu.** Bỏ danh sách tên lớp, số file và các đoạn giải thích dài. Quy ước viết log trong code chuyển sang `rules.md` §4 (agent viết code chỉ đọc `rules.md`).
+18. **README gọn bằng tiếng Việt (Task 10.9, người dùng chốt 21/11/2026):** viết lại `README.md` bằng tiếng Việt, chỉ giữ thứ người mới cần để chạy được app, gồm 9 mục: POSCS là gì, công nghệ, cấu trúc thư mục, chạy trên máy, đổi cấu trúc CSDL, kiểm thử, log, bảo mật, tài liệu khác. **Không ghi tài khoản hay mật khẩu mẫu.** Bỏ danh sách tên lớp, số file và các đoạn giải thích dài. Quy ước viết log trong code chuyển sang `rules.md` §4 (agent viết code chỉ đọc `rules.md`). **Sửa 24/11/2026 (Task 10.9a):** bỏ hai mục "Chạy trên máy" và "Đổi cấu trúc CSDL", README còn 7 mục; mục 1 ghi Chi nhánh miền Bắc và tạm không nhắc phiếu hỗ trợ kỹ thuật.
 
 ## Quyết định còn chờ người dùng
 
@@ -755,6 +755,27 @@ Không còn mục nào.
   - Nhánh: `docs/task-10.9-readme-tieng-viet`.
   - Commit: `docs(readme): viết lại README gọn bằng tiếng Việt (Task 10.9)`
   - *Đã hoàn thành:* `README.md` viết lại bằng tiếng Việt, 100 dòng (bản cũ 261 dòng tiếng Anh), đủ 9 mục đúng thứ tự; tên biến, giá trị mặc định đối chiếu `DBContext`, `EmailUtil`, `LogFiles`, `AuthService`, lệnh test theo `.github/workflows/tests.yml`. Ngoài chữ của task, để lệnh chạy được đúng như ghi: mục 4 ghi đủ lệnh `ant dist` kèm hai tham số `-D`; mục 6 thêm câu tạo sẵn CSDL rỗng `poscs_it` và câu "ngoài NetBeans thêm hai tham số `-D` vào mỗi lệnh `ant`"; mục 7 ghi `LOG_DIR` là thư mục màn hình Nhật ký hệ thống đọc (code không đổi chỗ app ghi log). Không có tài khoản, mật khẩu mẫu; 8 link đều trỏ tới file có thật. `rules.md` §4 thêm mục "Viết log" (SLF4J, DAO `LOG.error`, Controller `LOG.warn` kèm `Logs.actor`, chữ không dấu, không log thông tin mật). Ngoài dòng File sửa (người dùng đồng ý 24/11/2026 theo QA 🔴): gỡ mật khẩu `root` khỏi dòng "File sửa" của Task 10.10 trong file này, giữ đường dẫn đầy đủ tới `mysql.exe`. `ant test` 2.500 test (2.497 pass, 0 fail, 3 skipped); `node --test 'test/js/**/*.test.js'` 31 pass. QA report tại `docs/qa/Task-10.9.md` (CẦN SỬA; 1 🔴, 1 🟢 đã sửa).
+- [x] **Task 10.9a:** README: ghi Chi nhánh miền Bắc, tạm bỏ phiếu hỗ trợ kỹ thuật khỏi mô tả, bỏ mục "Chạy trên máy" và "Đổi cấu trúc CSDL".
+  - UC: không có.
+  - BR / MSG / NFR: không thêm, không đổi.
+  - File sửa:
+    - `README.md` (bản Task 10.9 đã merge, PR #198):
+      - Mục 1 "POSCS là gì": "Chi nhánh Công ty CP Thiết bị Bưu điện POSTEF" đổi thành "Chi nhánh miền Bắc của Công ty CP Thiết bị Bưu điện POSTEF". Bỏ "phiếu hỗ trợ kỹ thuật" khỏi câu tả app (còn "theo dõi khách hàng doanh nghiệp và hợp đồng") và bỏ "phiếu hỗ trợ" trong ngoặc của vai Sales (còn "khách hàng, hợp đồng, sản phẩm"). Người dùng ghi "tạm": chỉ bỏ khỏi README, app và SPEC giữ nguyên phiếu hỗ trợ.
+      - Bỏ hẳn mục 4 "Chạy trên máy" và mục 5 "Đổi cấu trúc CSDL" (người dùng yêu cầu 24/11/2026).
+      - Đánh số lại các mục sau: Kiểm thử thành 4, Log thành 5, Bảo mật thành 6, Tài liệu khác thành 7.
+      - Mục Kiểm thử đang trỏ về mục 4 cũ ở hai chỗ, viết lại cho đứng một mình: "tạo sẵn CSDL rỗng `poscs_it` (bảng mã `utf8mb4`; test tự nạp `db/schema.sql`)"; "Ngoài NetBeans, thêm vào mỗi lệnh `ant` hai tham số `-D` ghi ở `DEPLOY.md` §2" (link tới `DEPLOY.md`).
+      - Mục Tài liệu khác: dòng `DEPLOY.md` tả lại thành "dựng CSDL, build và triển khai", vì hướng dẫn chạy giờ chỉ còn ở file đó.
+  - File test: không có; chạy `ant test`.
+  - Không đụng: `rules.md`, `DEPLOY.md`, `db/migrations/README.md`, `docs/SPEC.md`, `PERMISSIONS.md`, `docs/ARCHITECTURE.md`, code Java, JSP, `web/jsp/guide/`.
+  - Lưu ý: tạo nhánh từ `main` mới (sau PR #198). Các mục còn lại (Công nghệ, Cấu trúc thư mục, Log, Bảo mật) giữ nguyên chữ, chỉ đổi số. Không thêm mục mới, không thêm link `db/migrations/README.md` vào chỗ khác.
+  - Xong khi:
+    - `grep -n "^## " README.md` ra đúng 7 mục theo thứ tự: 1. POSCS là gì, 2. Công nghệ, 3. Cấu trúc thư mục, 4. Kiểm thử, 5. Log, 6. Bảo mật, 7. Tài liệu khác.
+    - `grep -n "miền Bắc" README.md` ra dòng ở mục 1; `grep -n -i "phiếu" README.md` ra rỗng.
+    - `grep -n -E "mục [0-9]" README.md` không còn chỗ trỏ tới mục đã bỏ.
+    - `grep -n -E "Poscs@123|Admin@123|leminhhoang|hoangthimai" README.md` ra rỗng; mọi link trong `README.md` trỏ tới file có thật.
+  - Nhánh: `docs/task-10.9a-readme-bot-muc`.
+  - Commit: `docs(readme): ghi Chi nhánh miền Bắc, bỏ mục chạy trên máy và đổi cấu trúc CSDL (Task 10.9a)`
+  - *Đã hoàn thành:* `README.md` còn 71 dòng, 7 mục đúng thứ tự. Mục 1 ghi "Chi nhánh miền Bắc của Công ty CP Thiết bị Bưu điện POSTEF", bỏ phiếu hỗ trợ ở câu tả app và ở vai Sales. Bỏ mục "Chạy trên máy" và "Đổi cấu trúc CSDL", đánh số lại các mục sau. Mục Kiểm thử viết lại hai câu từng trỏ về mục 4 cũ (CSDL `poscs_it` bảng mã `utf8mb4`; hai tham số `-D` trỏ `DEPLOY.md` §2). Dòng `DEPLOY.md` ở mục Tài liệu khác tả lại thành "dựng CSDL, build và triển khai". Bốn tiêu chí "Xong khi" đạt; 7 link đều trỏ tới file có thật. `ant test` 2.500 test (2.497 pass, 0 fail, 3 skipped). Không qua bước QA: người dùng bảo commit thẳng sau bước Code (24/11/2026), nên không có `docs/qa/Task-10.9a.md`.
 - [ ] **Task 10.10:** Người dùng dựng lại `poscs_db` từ `db/schema.sql` (dữ liệu mẫu Task 10.6), đưa CSDL dev từ V39 lên V46.
   - UC: không có.
   - BR / MSG / NFR: không đổi; mục 16 "Quyết định đã chốt" (xoá sạch, không sao lưu).
