@@ -276,12 +276,12 @@
                         </button>
                     </div>
 
-                    <!-- Thông báo liên hệ HR/IT dành riêng cho việc cấp tài khoản mới (Đã bỏ phần Đăng ký tự do) -->
+                    <!-- Tài khoản do Admin cấp (không có đăng ký tự do) -->
                     <div class="p-3 rounded mt-4" style="background-color: #f8fafc; border: 1px dashed #cbd5e1; text-align: center;">
                         <span class="text-muted" style="font-size: 0.85rem; line-height: 1.5; display: block;">
                             <i class="fa-solid fa-circle-info text-primary mb-1"></i><br>
                             Bạn chưa có tài khoản hệ thống?<br>
-                            Vui lòng liên hệ <strong>Phòng Nhân sự / IT</strong> để được cấp tài khoản.
+                            Vui lòng liên hệ <strong>Admin</strong> để được cấp tài khoản.
                         </span>
                     </div>
                 </form>
